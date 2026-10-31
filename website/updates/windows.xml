@@ -5,6 +5,46 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.9.0</title>
+      <description>New in Plantoir 1.9.0
+
+This update brings Windows up to date with what the Mac got in 1.9.0, and adds a few fixes of its own.
+
+BEFORE YOU UPDATE
+
+- Close any preview you have open, and let a scheduled deploy finish, before you install this version by hand. The installer clears out the old website builder as it upgrades, and a preview or a deploy still running will leave you facing a "file in use" message halfway through.
+- Deploy each section again to bring the changes to your class websites. A site you deployed earlier keeps working exactly as it did; GeoGebra sketches and the other site changes reach it the next time you deploy it.
+
+NEW
+
+- GeoGebra sketches on your pages. Put a GeoGebra file beside a page, type GeoGebra commands in a block, or name a sketch from geogebra.org, and students get a sketch they can drag and explore, on a page or inside a quiz question, opened with a tap and served from your own class site. The ready-made MPM2D course has one: The Slope-Angle Conjecture. The sketch's credit line appears on screen and in print.
+- Text blocks that wrap. Start a block with ```text wrap and long lines wrap at the window's width instead of scrolling sideways; each line keeps its number and continuation lines show a small ellipsis in the margin. Code blocks never wrap.
+- Open in Obsidian goes to the page you are looking at. From a section's window, menu or row, Open in Obsidian opens the Markdown file behind the page the preview is showing, and falls back to the vault when it cannot tell. You can also ask the assistant: "open this page in Obsidian".
+
+IMPROVED
+
+- The website builder runs on a newer engine. Your sites look exactly the same. Plantoir also keeps a record of the known weaknesses in the parts it carries, and they were checked for this version.
+- A quiz the website reads differently from the way Plantoir read it is now listed among your folder's problems, naming the page and the quiz, instead of appearing only in the build's console.
+- When Plantoir runs out of room part way through getting Swift ready for a course's runnable programs, it now says so plainly, instead of showing a blank where the number of gigabytes should be. (Windows)
+- Very long lists in the activity record, such as many dated pages at once, are shortened to fit, and the line still says the true number. (Windows)
+
+FIXED
+
+- Lines in Plantoir's console no longer run together. A line that follows a blank line near the start of a run used to be glued to the one before it, in the console, in a saved problem report, and in the box that asks you a question. A question now appears on its own. (Windows)
+- The activity record is now complete for a publish made by an outside assistant such as Claude Code or Codex: the pages dated, the pages kept off, the coverage maps and the other things Plantoir normally notes are all recorded, as they already were for a publish made in the window. (Windows)
+
+DOWNLOADS
+
+File: PlantoirSetup.exe   Size: 246.0 MB (257,969,808 bytes)   SHA-256: a19f1502ccea8281649122526280b94885435bb7165b116fa6d35cafdca9c7dc
+File: Plantoir-win-x64.zip   Size: 397.7 MB (417,045,680 bytes)   SHA-256: 0c4c29801fd185ef1e979df3c8915a5000db49a2d1d88f075122ad12ba52bfb5
+
+The SHA-256 lets your IT department verify the download is genuine.</description>
+      <pubDate>Sat, 31 Oct 2026 17:39:13 -04:00</pubDate>
+      <sparkle:version>1.9.0</sparkle:version>
+      <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.9.0/PlantoirSetup.exe" sparkle:version="1.9.0" sparkle:shortVersionString="1.9.0" length="257969808" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="J0DQKpd0nDJOYcZ6rRulijWIXlt0qRfJMRAdXaOx6H/Yeajx8rhPVxBjlaVXOkKJ5Fdn42nw3d46h4bEAMIRAg==" />
+    </item>
+    <item>
       <title>Plantoir 1.8.7</title>
       <description>New in Plantoir 1.8.7
 
@@ -43,7 +83,7 @@ The SHA-256 lets your IT department verify the download is genuine.</description
       <pubDate>Fri, 23 Oct 2026 19:21:05 -04:00</pubDate>
       <sparkle:version>1.8.7</sparkle:version>
       <sparkle:shortVersionString>1.8.7</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.7/PlantoirSetup.exe" sparkle:version="1.8.7" sparkle:shortVersionString="1.8.7" length="260890520" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="IWMX2fAxDNP6rdRHH6yHN4i0rioLjAOJzoHGISEjz9wkBC4ym1JgnqsSgZeP2WxCjCJtBNk4w1FwB+IK29DsAw==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.8.7/PlantoirSetup.exe" sparkle:version="1.8.7" sparkle:shortVersionString="1.8.7" length="260890520" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="IWMX2fAxDNP6rdRHH6yHN4i0rioLjAOJzoHGISEjz9wkBC4ym1JgnqsSgZeP2WxCjCJtBNk4w1FwB+IK29DsAw==" />
     </item>
     <item>
       <title>Plantoir 1.8.6</title>
