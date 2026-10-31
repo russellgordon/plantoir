@@ -962,7 +962,7 @@ deliberately omitted to avoid confusion.
 Both apps turn that into one sentence for the teacher ("Netlify is limiting how
 often websites can be deployed right now…") only when the output carries
 deploy.py's own phrase, `Netlify API error 429`, or the words `rate limit` —
-never a bare `429` (#482, mac commit cb1b13e77, Windows 2026-10-15). The bare
+never a bare `429` (#482, mac commit 057775edb, Windows 2026-10-15). The bare
 match fired on the eight-digit image tag every build prints (about one tag in
 seven hundred carries the digits), on a "Built in 429ms" timing, and on a
 Cloudflare 429, each time telling the teacher Netlify was limiting deploys. A
@@ -1088,7 +1088,7 @@ security delete-generic-password -s containerized-quartz-cloudflare-account
 
 `ATeacherAlreadyBittenGetsOutOfIt` in `scripts/test_deploy_sh_questions.py`
 pins both halves, and pins them against the REAL blob — it lifts the pre-fix
-function out of `07952399^`, runs it, and feeds what it actually produced back
+function out of `6ca40f6a^`, runs it, and feeds what it actually produced back
 in as the remembered value, rather than a tidy short string that would not
 have caught this.
 
@@ -1494,7 +1494,8 @@ not name this section's build in `Deploying from local build:` — read with
 the `\r` stripped, since the log is a terminal transcript and every line
 ends in `\r\n` (measured) — or whose page lacks the mark.
 
-Rejected: *the front page only* (Windows' oracle as it was; weak for exactly
+Rejected: *the front page only* (Windows' oracle as it was until #680, which
+matched this whole design on Windows, `-SelfTest` included; weak for exactly
 the static-files-only change above, and kept as half of this test); *fetching
 `<hash>.<project>.pages.dev`* (Windows measured it resolving later than
 production on a first publish, and it is not the address a teacher hands
@@ -1530,7 +1531,8 @@ switching (exactly one failure, at the cap, and the function returns), a
 first publish's 404s, the static-files-only change (same front page, the
 runnable-code page switches late), a `\r\n` log line, a log naming another
 section, and an upload without the run's mark. Proved must-fail on copies of
-the script: with the wait returning at once, 4 of the 8 fail; comparing the
+the script: with the wait returning at once, 4 of the 8 fail (the mac's
+figure; Windows' is in 12); comparing the
 front page only fails the static-files case; without the `\r` strip the two
 transcript cases fail.
 

@@ -544,7 +544,7 @@ final class WizardStructureTests: XCTestCase {
     /// `course_config.json` this app wrote before issue #248 was fixed.
     ///
     /// The goldens in `Tests/Goldens/` were captured from `origin/dev` at
-    /// 5d941927, by a throwaway test deleted in the same commit, BEFORE any
+    /// 0094e0fd, by a throwaway test deleted in the same commit, BEFORE any
     /// of this piece was written — so they are what the app did, not what
     /// it was changed to do. Four payload codes and both paths of a code
     /// with no payload: ADA1O plain, MCV4U for the only family whose marks

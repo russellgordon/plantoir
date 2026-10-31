@@ -186,7 +186,7 @@ public static class FailureExplainer
     /// deploys when an ordinary build had failed.
     /// <c>app-rules.json</c> → <c>failureExplanations.cases</c> carries the
     /// three that must come back null; the mac's matcher is the same
-    /// (<c>FailureExplainer.swift</c>, commit cb1b13e77).
+    /// (<c>FailureExplainer.swift</c>, commit 057775edb).
     /// </remarks>
     private static string? RateLimitExplanation(string output)
     {

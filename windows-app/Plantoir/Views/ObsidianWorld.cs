@@ -35,8 +35,11 @@ public sealed class ObsidianWorld : IObsidianWorld
 
     public string TargetFor(string folder, string vault) => FolderActions.ObsidianTarget(folder, vault);
 
-    public Task OpenAsync(string folder, string vault) =>
-        FolderActions.OpenInObsidian(folder, vault, BundledToolchain.SupportPath("obsidian_defaults/.obsidian"));
+    // The page, when one is named, goes in through FolderActions' own page
+    // door (`page ?? ObsidianTarget(...)`, #329's How I Teach door) - never
+    // the folder door, which looks for <page>/index.md and opens the vault (#681).
+    public Task OpenAsync(string folder, string vault, string? page = null) =>
+        FolderActions.OpenInObsidian(folder, vault, BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
 
     public Task QuitAndWaitAsync() => FolderActions.QuitObsidianAndWait();
 

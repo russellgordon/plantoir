@@ -1302,7 +1302,7 @@ reviews, not part of #183.
 **A course damaged by the old behaviour is NOT repaired, decided 2026-09-18.**
 It keeps its frozen pool until the teacher ticks or unticks something, and
 neither app goes looking. The reason is that nobody can have been damaged by a
-version they were given: the freezing code (`a3c581fb`, 2026-08-25) is in no
+version they were given: the freezing code (`18b02264`, 2026-08-25) is in no
 release tag and not on `main`, and `git grep -l graded_folders v1.1.0` comes
 back empty — the whole key is unreleased, so only a development build could have
 written one. And a repair could not identify what it was repairing even if it
@@ -1673,9 +1673,9 @@ win, but a saved file WITHOUT one does not fall back to the manifest. So every
 pre-populated course either app made had no `graded_folders`, which reads as
 "never asked".
 
-**How long.** Two commits crossed on 2026-08-24. At 10:39 `11a70b7e` made a
-saved-config run stop deriving the pool (before it, `392bf357` wrote the
-manifest's pool on every run, the app's included). At 11:41 `e9d71d8d` made
+**How long.** Two commits crossed on 2026-08-24. At 10:39 `d78003cc` made a
+saved-config run stop deriving the pool (before it, `0b370db4` wrote the
+manifest's pool on every run, the app's included). At 11:41 `981d10e1` made
 the wizard write the pool on every path EXCEPT a payload, on the old
 assumption. #192 did not touch this path.
 
@@ -2221,7 +2221,7 @@ one dialog written to end silence was the thing telling them it was dealt with.
 
 `restoreMedia`, the function DIRECTLY above it, has used the `isDirectory:`
 form since it was written, with a comment saying why. And the two were written
-in the same sitting — `git log -S` puts both in commit `04dfd0cd`, 2026-08-23 —
+in the same sitting — `git log -S` puts both in commit `bfe22a7b`, 2026-08-23 —
 so this is not a case of an old habit and a new one. The careful form and the
 bare one were typed one function apart, on the same afternoon, by somebody who
 had just explained in a comment why the careful one was needed. That is the

@@ -228,6 +228,13 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+if (cd scripts && python3 test_machine_line_length.py) >/tmp/verify_machine_line_length_test.log 2>&1; then
+  pass "every machine line the shared Python prints is at most maxCharacters long, and a shortened one says its true count (scripts/test_machine_line_length.py, #666)"
+else
+  fail "every machine line the shared Python prints is at most maxCharacters long (scripts/test_machine_line_length.py, #666)"
+  cat /tmp/verify_machine_line_length_test.log
+fi
+
 if (cd scripts && python3 test_site_disagreements.py) >/tmp/verify_site_disagreements_test.log 2>&1; then
   pass "a runnable block the site shows as plain code: one folder problem, worded as the contract's cases say, its line in the teacher's file, and the command line the site's build runs printing exactly one marker (scripts/test_site_disagreements.py, #567)"
 else
@@ -1733,6 +1740,7 @@ check_baked() {
   fi
 }
 check_baked scripts/contracts.py          /opt/scripts/contracts.py
+check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
 # The contract itself must be IN the image: the container's only bind mount is

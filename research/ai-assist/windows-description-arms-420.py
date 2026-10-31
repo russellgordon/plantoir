@@ -9,7 +9,7 @@ came along only when the model set `includeLinked`, which defaulted to false.
 tools. Step (b) - this measurement - decides whether the two descriptions now
 move to the contract's text.
 
-BEFORE is the local surface on `dev` e313e770 as shipped: plantoir-mcp's
+BEFORE is the local surface on `dev` 646e78a3 as shipped: plantoir-mcp's
 tools/list narrowed by narrow-tools.py (STILL_SHORTENED = publish_pages,
 unpublish_pages), so those two read Briefly() of their Windows text and still
 declare `includeLinked` (boolean, default false).

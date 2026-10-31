@@ -213,11 +213,12 @@ public sealed class NewCourseCreator
     /// shapes setup_course.py really prints, including the arrow-key colour
     /// picker (where Return accepts the current scheme).
     ///
-    /// The picker footer is matched by CONTAINS, not StartsWith: the Windows
-    /// pseudo console sometimes renders it onto the tail of the last swatch
-    /// line ("… textHighlight Use ← / → … Enter to select …"), so anchoring at
-    /// the start would miss it and the run would deadlock waiting for input
-    /// that never comes.
+    /// The picker footer is matched by CONTAINS, not StartsWith. Since #661
+    /// ScriptRunner restores the line break ConPTY draws as a jump to the
+    /// footer's row, so the footer is a line of its own and StartsWith would
+    /// match too. Contains is kept as belt-and-braces for the pre-#661 glued
+    /// shape ("… textHighlight Use ← / → … Enter to select …"), which would
+    /// otherwise leave the run waiting for input that never comes.
     /// </summary>
     internal static bool LooksLikePrompt(string line) =>
         line.EndsWith(':') || line.EndsWith(": ", StringComparison.Ordinal)

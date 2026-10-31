@@ -229,8 +229,9 @@ class Preview:
 
 def node_command() -> list[str]:
     """The runtime's Node. handout_pdf.mjs speaks to the browser with Node's
-    own WebSocket, global from Node 22; the runtime carries Node 20 (Quartz
-    v4.5.0's known-good line), where the same class is behind a flag."""
+    own WebSocket, global from Node 22. The runtime carries 22.23.4 since
+    #675; the flag is kept for a runtime fetched before that, on Node 20,
+    where the same class is behind it."""
     node = runtime() / "node" / "node.exe"
     version = subprocess.run([str(node), "--version"], capture_output=True, text=True).stdout.strip()
     major = int(version.lstrip("v").split(".")[0]) if version else 0

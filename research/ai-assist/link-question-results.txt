@@ -10,7 +10,7 @@ CONDITIONS (they belong to these numbers and to nothing else)
 --------------------------------------------------------------
   machine    Mac16,8, Apple M4 Pro (8 performance cores), 48 GiB
   engine     llama.cpp b10435 (commit 9e40df63b), Metal — the llama-server
-             bundled in the Debug build of dev 68214a6c
+             bundled in the Debug build of dev f0512ae8
   models     .large  qwen3-4b-q4_k_m.gguf, 2,497,280,256 bytes (the size
                      AssistModelTier expects), fetched from the app's own
                      download URL into a scratch folder
@@ -24,7 +24,7 @@ CONDITIONS (they belong to these numbers and to nothing else)
              max_tokens 512 read from AssistModelClient.swift
   prompt     the shipped system prompt, read out of AssistAgent.swift
              (--prompt shipped); the 13-tool local surface from the contract
-             at dev 68214a6c — local sha256 46b96562…, mcp sha256 9bcc7eb7…
+             at dev f0512ae8 — local sha256 46b96562…, mcp sha256 9bcc7eb7…
   dateline   "(Today is <date>, a <weekday>.)" on the END of the message
 
 PART ONE — the 29-probe suite, VVH2O section 1, 10 trials, 2026-09-25 (a Friday)

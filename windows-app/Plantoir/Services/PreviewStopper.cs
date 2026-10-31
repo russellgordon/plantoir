@@ -103,8 +103,9 @@ public static class PreviewStopper
             };
             // Without this the sweep takes the launcher's container branch,
             // boots WSL, finds no container and stops NOTHING - while the
-            // native preview it was meant to kill keeps serving.
-            NativeRuntime.Apply(info);
+            // native preview it was meant to kill keeps serving. The trail
+            // folder travels with it (#682), as for every launcher.
+            LauncherEnvironment.Apply(info);
             info.ArgumentList.Add("-NoLogo");
             info.ArgumentList.Add("-NoProfile");
             info.ArgumentList.Add("-ExecutionPolicy");

@@ -89,23 +89,26 @@ public class BuildRepairReportTests : IDisposable
     }
 
     /// <summary>
-    /// The third reader: a run <c>plantoir-mcp</c> starts. Its capture is
-    /// private to a process-running method, so the source is pinned — that it
-    /// reads the line, and that no machine line reaches the assistant's
-    /// progress text (<c>transcriptStripping.machineLines</c>).
+    /// The third reader: a run <c>plantoir-mcp</c> starts. Since #660 it reads
+    /// through the same <see cref="BuildMachineLines"/> as the other two,
+    /// before the machine-line drop, which comes before progress is reported
+    /// (<c>BuildMachineLinesTests.TheThreeReadersGoThroughTheOneDispatch</c>);
+    /// here, the behaviour, through its capture.
     /// </summary>
     [Fact]
     public void TheMcpServersCaptureReadsTheLineAndPassesNoMachineLineOn()
     {
-        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir.Mcp", "LauncherRunner.cs"));
-        int reads = source.IndexOf("BuildRepairReport.Parse(line)", StringComparison.Ordinal);
-        int drops = source.IndexOf("TranscriptBuilder.IsMachineLine(line)) return;", StringComparison.Ordinal);
-        int health = source.IndexOf("SiteHealthFinding.Parse(line)", StringComparison.Ordinal);
-        int reports = source.IndexOf("progress?.Report(line.Trim());", StringComparison.Ordinal);
-        Assert.True(reads >= 0, "LauncherRunner must read PLANTOIR_REPAIRED:");
-        Assert.True(health >= 0, "LauncherRunner must read PLANTOIR_HEALTH:");
-        Assert.True(reads < drops, "the repair must be read before machine lines are dropped");
-        Assert.True(health < drops, "folder problems must be read before machine lines are dropped");
-        Assert.True(drops >= 0 && drops < reports, "machine lines must be dropped before progress is reported");
+        var reports = new List<string>();
+        var capture = new Plantoir.Mcp.LauncherRunner.OutputCapture(new Progress(reports));
+        capture.Take(Example);
+
+        Assert.Contains("SPH4U/1 · " + TrailLineFor("section1/index"), Trail());
+        Assert.Empty(reports);
+        Assert.DoesNotContain(BuildRepairReport.Marker, capture.Snapshot().Transcript);
+    }
+
+    private sealed class Progress(List<string> into) : IProgress<string>
+    {
+        public void Report(string value) => into.Add(value);
     }
 }

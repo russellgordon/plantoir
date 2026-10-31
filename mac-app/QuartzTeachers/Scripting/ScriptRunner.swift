@@ -95,7 +95,7 @@ class ScriptRunner {
     nonisolated static let killedServerMarker: String = "died with <Signals.SIGKILL: 9>"
 
     /// Whether a preview's end is "Closed for a deploy" rather than a failure
-    /// (#433's stack review, the bb8fbe12 ruling). ALL of: it ended non-zero
+    /// (#433's stack review, the de80da2f ruling). ALL of: it ended non-zero
     /// and not by the teacher; it had been SERVING; its output shows the
     /// server killed the way `stop_preview_serving` kills it; and another
     /// program holds a build lease on the course.

@@ -58,7 +58,7 @@ enum TaskMilestones {
         // verified against a real `preview.ps1 --build-only` transcript on
         // Windows 2026-08-23 ("Quartz v4.5.0" then "Done processing N files in
         // Ns"). Authored on Windows; built, tested and regenerated into
-        // app-rules.json on the mac 2026-09-01 (13da5319).
+        // app-rules.json on the mac 2026-09-01 (26e46d73).
         TaskMilestone(label: "Opening the preview…", marker: "Done processing"),
     ]
 

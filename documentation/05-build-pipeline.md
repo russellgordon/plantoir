@@ -1326,6 +1326,78 @@ A progress marker would not have done: those are matched loosely and getting one
 wrong is silent (see `app-rules.json` → `markerOrigins`). A prefixed JSON line is
 unambiguous and carries structure a sentence cannot.
 
+### How long a machine line may be (#666)
+
+**The rule** (`contracts/shared-rules.json` → `machineLineLength`): every
+`PLANTOIR_` JSON line the shared Python prints is at most `maxCharacters`
+(4,000) characters long, prefix included. The lines that carry an unbounded
+list are printed through `scripts/machine_line.py`:
+
+- `PLANTOIR_DATED:` (`build_site.announce_dated_pages`), `PLANTOIR_KEPT_OFF:`
+  (`how_i_teach.announce`) and `PLANTOIR_MAPS:` (`build_site.announce_coverage_maps`)
+  go through `machine_line.listed`. A line that fits is printed exactly as
+  before. A longer one keeps the FIRST k entries, k as large as fits (found by
+  halving), and adds `"count"` (how many there were) and `"more"` (how many it
+  left out) after the list. k can be 0: a line whose first entry alone would
+  not fit carries an empty list with `count`, and a reader must read it as a
+  report ('M not named'), not as none.
+- `PLANTOIR_HEALTH:` (`site_health.announce`) goes through
+  `machine_line.fitted`. Every finding that names a list is made through
+  `site_health.shortenable`, which remembers how to make it again with a
+  smaller `most`. A finding whose line would be too long is remade naming
+  fewer blocks or pages (at most ten, fewer when they would not fit), its
+  `andMore` saying how many it left out.
+  Its sentence keeps the true count, so no new key is needed. The console's own
+  two lines above it keep all ten. `site_said.py`'s two findings go through
+  the same `shortenable`.
+- The bounded markers (`PLANTOIR_MY_PROGRESS:`, `PLANTOIR_REPAIRED:`,
+  `PLANTOIR_LINKS_CHECKLIST:`, both copies of `PLANTOIR_SWIFT:`, and deploy.py's
+  space-separated `PLANTOIR_CLOUDFLARE_REMADE:`) are printed as they always
+  were. `test_machine_line_length.py` holds each under the cap at its worst
+  plausible size, so a list added to one later is caught.
+
+JSON is never cut mid-text, so a reader parses a shortened line exactly as it
+parses a whole one. A reader that WORDS a count (the DATED, KEPT_OFF and MAPS
+trail lines) takes `count` when it is there, so its "and N more" also counts
+what the line left out. Without that the trail would say "the build gave 206
+pages…" for a build that dated 300 (the count-first reasoning of
+`pagesDatedByTheBuild.trailLine.why`). Russell's ruling on the plan: the true
+count travels as its own field, and both apps' readers use it (Windows in
+#666, the mac by its own issue).
+
+**The numbers.** The mac's kernel pseudo terminal never splits a line.
+Windows' pseudo console does, when a line longer than the console wraps on the
+bottom row while Quartz's spinner redraws (#662, measured on a Lenovo
+20QES70500, i5-8365U, Windows 11 Pro 26200): a 611-character finding split at
+400 columns. #662 widened the app's console to 8,192 columns, the widest
+Windows PowerShell 5.1 can afford (doc 12 → "How wide the console is, and
+why"). But nothing bounded the lines. `PLANTOIR_DATED:` runs to about 40
+characters a page, so about 200 pages pass 8,192, and a ten-block health
+finding is about 2,300. The cap is 4,000, HALF the narrowest limit, because a
+"character" is counted three ways: Python counts code points, the app's carry
+guard (`ScriptRunner`, 8,000) counts UTF-16 units, and the console counts
+cells. A CJK character or an emoji is two of either. The Windows suite pins
+`2 × maxCharacters` against both (`MachineLineLengthContractTests`). The
+contract's cases, run through the REAL emitters: 51 pages of one long name
+are 4,029 characters whole, so the line keeps 50, at 3,975 characters; 300
+short pages keep 206; 200 kept-off pages keep 154; 100 maps keep 42; ten
+links with ~190-character page names (4,382 whole) name 9.
+
+**Rejected:**
+- **(b) a side file per payload**, as `PLANTOIR_LINKS_CHECKLIST:` does. Both
+  apps' readers would change, a scheduled record keeps lines rather than
+  files, and there would be a fourth kind of file to clean up. Russell chose
+  (a) on #666.
+- **A 32,767-column console.** PowerShell 5.1 pads progress to the width
+  (over 280 s for a 2 MB download), and a wider console only moves the limit.
+- **Chopping the text at N.** The JSON no longer parses and the reader
+  records nothing, which is today's bug made certain instead of occasional.
+- **A cap per reader.** The Python prints the line, so one cap in one place
+  reaches every reader, the scheduled record included. A reader cannot mend a
+  line that has already split.
+- **Shortening without the count.** The trail would under-count, which is
+  the one thing the trail lines' count-first shape exists to prevent.
+
 ### Three traps, all met here
 
 - **Do not read the findings from a tail.** Most other structured-line readers in
@@ -1525,7 +1597,7 @@ measured: with the widened code rule and a plain alphabetical scan, a scratch
 LCS course whose `College Board Curriculum` held `1.A` pages had Ontario's map
 silently replaced by College Board's under the same title, because `College`
 sorts before `Ontario`. A golden (Ontario with pages, College Board with `1.A`
-pages, nothing declared) holds it byte for byte to what ff1213ed built. The scan is a FALLBACK, never additive:
+pages, nothing declared) holds it byte for byte to what 92a7099a built. The scan is a FALLBACK, never additive:
 Russell's ruling on the plan. A course made from scratch declares nothing, so
 the scan is still its real path, and its site is unchanged. The whole rule is
 `contracts/shared-rules.json` → `specialNames.curriculumFoldersResolution`,
@@ -1537,7 +1609,7 @@ folder the scan found — is always `Curriculum Coverage`; every other map is
 `<Folder> Coverage`, and a title that would repeat another gets ` (2)`
 (`curriculumRules.coveragePageTitles`). So a course with one map keeps the page,
 its address and every link to it, byte for byte (the goldens in
-`test_coverage_maps.py` were captured from origin/dev ff1213ed before any edit:
+`test_coverage_maps.py` were captured from origin/dev 92a7099a before any edit:
 a `Curriculum/` course and the LCS default, Ontario with pages and College
 Board empty), and a course that declares a second folder later gets a SECOND
 page rather than two renamed ones. Only a non-primary title is written quoted
@@ -1901,12 +1973,13 @@ programs students edit and run in their browser; the site's half is
    one line. Its patch to latex.ts (`patch_katex_local`, beside
    `patch_katex_mhchem`) is 06 → C2-26.
 
-**The live-preview edge.** The preview's own rebuilds (a page edited while
-it serves) do not run the gate or rewrite the words file. A page that gains
-`codeRunner: true` or its first runnable block while a preview is ALREADY
-running therefore shows its blocks as plain code, with the `plantoir: error:`
-line in the preview's output, until the next Preview — never a Run button
-that cannot work. A page that already had runnable code keeps working. Such
+**The live-preview edge.** Quartz's own rebuilds of the merged copy, which
+a teacher's edit never reaches (see "A running preview does not follow
+edits", below), do not run the gate or rewrite the words file. A merged page
+that gains `codeRunner: true` or its first runnable block while a preview is
+ALREADY running therefore shows its blocks as plain code, with the
+`plantoir: error:` line in the preview's output, until the next Preview —
+never a Run button that cannot work. A page that already had runnable code keeps working. Such
 a block is NOT a folder problem: the site says its folder problem on the
 preview's first build only (#567, below).
 
@@ -2638,9 +2711,11 @@ here and as text by the site, and the net said so on its first build; the
 rule was then corrected on both sides and pinned (`aBoxNeedsWordsAfterIt`).
 A page students cannot see is parsed by Quartz too and never named.
 
-**The live-preview edge.** As for runnable code: the preview's own rebuilds
-do not re-run the check or rewrite the files, so a quiz added while a
-preview serves is rendered by the site's own reading (its verdict is the
+**The live-preview edge.** As for runnable code: Quartz's own rebuilds of
+the merged copy, which a teacher's edit never reaches (see "A running
+preview does not follow edits", below), do not re-run the check or rewrite
+the files, so a quiz added to that copy while a preview serves is rendered
+by the site's own reading (its verdict is the
 site's, the same rules), and its folder problem and any safety-net line
 come with the next Preview.
 
@@ -2792,7 +2867,10 @@ wrong section on one platform.
   runs `npx quartz build --concurrency 1 --serve --port <8081-8084>
   --wsPort <port+1000>` (the websocket port keeps concurrent previews'
   live reload from colliding). The teacher browses the HOST address the
-  launcher printed; Quartz rebuilds on file changes.
+  launcher printed. Quartz's watcher watches only the MERGED `content/`, not
+  the course folder, so an edit a teacher makes reaches the preview on the
+  next Preview, on both platforms ([A running preview does not follow
+  edits](#a-running-preview-does-not-follow-edits-671)).
 - **Build-only mode:** `npx quartz build --concurrency 1`, verifies
   `public/` exists in `/tmp/quartz-builds/...`, and performs a one-shot
   sync to the host `.merged_output/section<N>/public/` and `course_config.json`.
@@ -2999,6 +3077,77 @@ will open on whatever page happens to come first" is true of a PREVIEW, and for
 publishing there is no site at all. Its detail in `shared-rules.json` →
 `siteHealth.checks` now names both outcomes, so a teacher can tell whether they
 may carry on for now or must fix it before they publish.
+
+## A running preview does not follow edits (#671)
+
+**The rule, on both platforms: an edit reaches the preview on the NEXT
+Preview.** Nothing re-merges the course while a preview is serving.
+`build_site.py` copies the course into `<build root>/work/<CODE>/section<N>/content`
+once per build (the `rmtree` and copy in the merge), and then runs a plain
+`quartz build --serve` (`build_site.py` ~9790). Quartz's watcher
+(`build.ts` → `startWatching`) watches that COPY. No launcher
+(`preview.sh`, `preview.ps1`) and neither app runs a watcher on `courses/`:
+on Windows the one `FileSystemWatcher` in the app is
+`ScheduledPublishWatcher`'s, and the mac has no course watcher either.
+research/preview-staleness/FINDINGS.md said the same of the mac in its
+"Two more gaps" ("the merge runs once, at preview start"). The two fence notes
+earlier in this page (each headed "The live-preview edge") are cases of this rule.
+
+**How it was found.** #650's step 3 asked for "edit a page while the
+preview runs, and no second dialog appears". On Windows (2026-10-23) no
+rebuild ever followed, which was read as a fault. #671 measured it
+(2026-10-28, Lenovo 20QES70500, i5-8365U, Windows 11 Pro 26200, runtime on
+Node 22.23.4):
+
+- By hand, a course-page edit at 10:42:36 gave no "Detected change" and no
+  new page by 10:43:11. In the app (x64 Debug, `--state-dir`,
+  `--auto-preview`) an edit at 10:49:50 gave nothing in 111 s. That is the
+  rule above working, not a fault: `--state-dir` plays no part, because the
+  launchers resolve `%LOCALAPPDATA%\Plantoir\builds\<id>` themselves (#664)
+  and both runs built there.
+- So #650's step 3 cannot happen on either platform: a second dialog could
+  only come from a second Preview, which is a new first build.
+
+**A second, Windows-only fault, in Quartz v4.5.0.** Editing the MERGED copy
+in place, written the way Obsidian writes, Quartz printed `Detected change`,
+`Parsed 1 Markdown files` and `Emitted 3 files` — `index.xml`,
+`sitemap.xml` and `static/contentIndex.json` — while
+`Discussions/Edit-Me.html` kept its old modification time and the served
+page did not change (by hand at 10:44:47, and in the app at 10:51:41 after
+67 s). The cause is in `build.ts` (the `add`/`change`/`unlink` handlers,
+~161-175, and `rebuild`, ~203-245): chokidar reports
+`Discussions\Edit Me.md` with BACKSLASHES, that becomes the key in
+`changesSinceLastBuild`, and `contentMap` is keyed by the POSIX
+`relativePath`, so the lookup misses, the change event carries no `file`,
+and `contentPage.partialEmit` skips it. Proved by patching a throwaway work
+copy's three handlers to
+
+```ts
+.on("change", (rawFp) => {
+  const fp = toPosixPath(rawFp)   // already imported from ./util/glob
+  ...
+```
+
+after which the same edit gave `Emitted 6 files` and was served within
+3 s (reverted, then deleted). A second shape with the same cause: an `add`
+of a file that vanished before Quartz copied it (sed's temp file
+`sedVmo4aO`) killed the serve — `ENOENT copyfile` in `assets.ts`, node
+exited 1, and build_site exited with a traceback. The mac does not meet
+this, for a stronger reason than its POSIX paths: its watcher never sees a
+write made on the Mac at all, because file events do not cross the Colima
+mount (FINDINGS, "But live reload is dead even where the port matches").
+
+**Not patched in 1.9.0** (decided for #671 on 2026-10-28; the follow-up is
+#703). The patch is small — an ALWAYS-section, idempotent
+`patch_quartz_watcher_posix_paths` beside `patch_quartz_build_clean`, with
+a marker comment and a `scripts/test_*.py` fixture — but it changes every
+folder's recipe hash, so every mac rebuilds its image and `verify.sh` has to
+gate it, for a path no teacher reaches: by the rule above, the watched
+folder changes only when a build rewrites it. **Whoever adds live
+re-merging — the only thing that would make the fault reachable — must
+apply the patch first**, and handle the vanished-file crash. Live re-merging
+as a feature would be its own issue, for both platforms and Russell to
+decide.
 
 ## Quartz serves the OLD site before it builds the new one
 

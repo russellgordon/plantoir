@@ -23,7 +23,7 @@ mechanics, a measurement taken on one machine: not.
 | [`toolchain.json`](toolchain.json) | The image both platforms build from the same recipe: the fifteen pins (Paged.js the eighth, #454; Latin Modern the ninth, #499; function-plot and node-tikzjax the tenth and eleventh, #485 E1; Pyodide and KaTeX the twelfth and thirteenth, #455 and #494 — count them rather than trusting the word) with the REASON each sits where it does, and what each of the seven Quartz patches changes and why it cannot be dropped; and, since #493, `swiftImage` — the SECOND image's pins (the Swift toolchain for each architecture, the wasm SDK, binaryen, the base), a top-level key deliberately not under `pins`, because both apps' pin tests read every pin as a line of the ROOT Dockerfile; and, since #667, `npmAudit` — another top-level key beside it: the five npm trees the image carries, and every `npm audit` advisory accepted for each, with its severity, exposure and reason. verify.sh fails on a high or critical advisory not in it (`scripts/npm_audit.py`, `scripts/test_npm_audit.py`). |
 | [`example-content.json`](example-content.json) | The ready-made courses: how a payload is discovered, the manifest's keys, and the allow-list rule that decides what actually installs. |
 | [`file-formats.json`](file-formats.json) | **The two files both apps WRITE and the Python then reads**: every `course_config.json` key with its type and default, and the frontmatter that decides whether students see a page — including the legacy `draft:` spelling, which means the opposite. Since #245 also the WORK LEASE file (`workLease`): the file under `courses/.internal/activity/` that says which process is doing what, in Windows' shape plus the mac's start-time line. |
-| [`shared-rules.json`](shared-rules.json) | Sixty-eight rule sets (counted 2026-10-24 on `issue/578-geogebra` off `dev` 821ebb58a: sixty-seven plus `geogebraFences` (#578) — the base already had sixty-seven, one more than the sixty-six this row said; sixty-six counted 2026-10-23 on `issue/653-text-fence-wrap` off `dev` 84911d0c0: sixty-five plus `textFenceWrapping` (#653); sixty-five counted 2026-10-23 on `issue/628-netlify-link-case` after merging `main` 93da093e4: sixty-four plus `netlifyPageAddresses` (#628); sixty-four counted 2026-10-23 on `dev` after the merges of #635, #613, #584, #616, #611, #614, #567, #639, #631, #629 and #576 onto `dev` df6980785: sixty-three plus `buildRepairs` (#584); sixty-three counted 2026-10-19 on `issue/545-my-progress` off `dev` a70c5e7e8: sixty-one plus `myProgress` and `myProgressBuilt` (#545); sixty-one counted 2026-10-18 on `issue/519-588` off `dev` 0fe0d1cba: sixty plus `taskBoxes` (#519); sixty counted 2026-10-17 on `issue/495-obsidian-addons` off `dev` 4fc623bfe: fifty-nine plus `obsidianAddOnsForFigures` (#495); fifty-nine counted 2026-10-17 on `issue/563-quizzes` off `dev` 62d81b1a4: fifty-eight plus `quizCallouts` (#563); fifty-eight counted 2026-10-17 on `issue/455-runnable-python` off `dev` 1f29ff04a: fifty-seven plus `codeRunnerBlocks` (#455); fifty-seven counted 2026-10-11 on `issue/504-preview-at-last-viewed` off `dev` 69cb00dc9: fifty-six plus `previewStartPage` (#504); fifty-six counted 2026-10-09 on `issue/485-E1-tikz-functionplot` off `dev` 13d05574c: fifty-five plus `figureFences` (#485 E1); fifty-five counted 2026-10-09 on `issue/454-printable-pages` off `dev` 8178eeaac: fifty-four plus `printablePages` (#454); fifty-four counted 2026-10-08 on `issue/457-hig-sweep` merged with `dev` 178cb511b: fifty-three plus `sidebarDeleteKey` (#457 batch C); fifty-three counted 2026-10-08 on `issue/457-475-assistant-routes` off `dev` 01f384090: fifty-two plus `classesDatedLater` (#475); fifty-two counted 2026-10-08 on `issue/457-482-menus-hig` off `dev` a04e4815a: fifty plus `subjectMenus` and `openRecent` (#457); fifty counted 2026-10-07 on `issue/458-door-course-lease` merged with `dev` 71b133764, as the file's top-level keys other than `note`: forty-eight at `dev` 4b177c68 plus `deployWhileItsSectionDeploys` (#439) and `doorCourseHold` (#458); forty-eight counted 2026-10-03 on `issue/433-outside-assistant-busy`: forty-seven at `dev` b50084d5 plus `publishPlanNaming` (#425); forty-seven counted 2026-09-30 on `issue/379-links-checklist` merged with `dev` 365fbede: forty-four at dev 373b94d5, plus `courseSettingsWording` and `userFacingLabelWords` (bundle C) and `linksChecklist` (#379); it was forty-three at `dev` d467ede6 on 2026-09-27. Three rows each claiming this count had survived successive merges, saying forty-two, forty-three and thirty-eight; they were folded into this one for the v1.4.0 release, and the word's history is in git. Count the keys rather than trusting the word) on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says, what it tells a teacher whose course will start empty, and what its skeleton toggle does to the structure editor in BOTH directions**, and **what a window lets go of when it is pointed at a different working folder**, and **which act turns a scheduled deploy off without being asked, which acts deliberately turn none off, and how late is too late for one to still run**, and **which working folder a window opens on at launch, and what it is told when the one from last time cannot be reopened** (#311), and **which working folders the website builder on a Mac can reach, and what a teacher is told when they choose one it cannot** (#290), and **what happens when a teacher copies one page of one course into another — what is never copied, what the copy's settings must say for it to arrive hidden from students, what is done when a picture of that name is already there with different bytes, and the two shapes where this app and the website builder would read a page differently**, and **how the breadcrumb trail is read back into a problem report when some of its characters cannot be read — every line kept, and a note saying how many**, and **what getting a section ready for the start of the year puts into draft, what it never touches, and what check_section's three groups report** (#96), and **when Plantoir may install a new version of itself, and what a quit does to one that is ready (#204)**, and **the teacher's How I Teach page: its one name and place, that the build never puts it on a website, what the assistant's page lists leave out, and what the three tools that read and write it refuse** (#209), and **how an excluded folder or file is matched, and when a removal or an add-back is written on the trail** (#152), and **how the build tells the app which coverage maps it wrote** (#128), and **that the assistant reads the course list and each course's settings at the moment of every call** (#322), and **that every act which sends a site somewhere or sets a deploy reads the settings as SAVED at that moment** (#335). |
+| [`shared-rules.json`](shared-rules.json) | Sixty-nine rule sets (counted 2026-10-28 on `issue/682-trail-and-machine-lines` off `dev` 4d6e76bba: sixty-eight plus `machineLineLength`, #666); sixty-eight rule sets (counted 2026-10-24 on `issue/578-geogebra` off `dev` ff6766570: sixty-seven plus `geogebraFences` (#578) — the base already had sixty-seven, one more than the sixty-six this row said; sixty-six counted 2026-10-23 on `issue/653-text-fence-wrap` off `dev` 2bce43328: sixty-five plus `textFenceWrapping` (#653); sixty-five counted 2026-10-23 on `issue/628-netlify-link-case` after merging `main` 2b7f65348: sixty-four plus `netlifyPageAddresses` (#628); sixty-four counted 2026-10-23 on `dev` after the merges of #635, #613, #584, #616, #611, #614, #567, #639, #631, #629 and #576 onto `dev` cdea887b5: sixty-three plus `buildRepairs` (#584); sixty-three counted 2026-10-19 on `issue/545-my-progress` off `dev` 8e068c210: sixty-one plus `myProgress` and `myProgressBuilt` (#545); sixty-one counted 2026-10-18 on `issue/519-588` off `dev` 20e19be58: sixty plus `taskBoxes` (#519); sixty counted 2026-10-17 on `issue/495-obsidian-addons` off `dev` 4344c7f43: fifty-nine plus `obsidianAddOnsForFigures` (#495); fifty-nine counted 2026-10-17 on `issue/563-quizzes` off `dev` d2b8591c9: fifty-eight plus `quizCallouts` (#563); fifty-eight counted 2026-10-17 on `issue/455-runnable-python` off `dev` 570ea5359: fifty-seven plus `codeRunnerBlocks` (#455); fifty-seven counted 2026-10-11 on `issue/504-preview-at-last-viewed` off `dev` 1e53c914b: fifty-six plus `previewStartPage` (#504); fifty-six counted 2026-10-09 on `issue/485-E1-tikz-functionplot` off `dev` 24558cba5: fifty-five plus `figureFences` (#485 E1); fifty-five counted 2026-10-09 on `issue/454-printable-pages` off `dev` f7afcb83f: fifty-four plus `printablePages` (#454); fifty-four counted 2026-10-08 on `issue/457-hig-sweep` merged with `dev` 7ee189a9a: fifty-three plus `sidebarDeleteKey` (#457 batch C); fifty-three counted 2026-10-08 on `issue/457-475-assistant-routes` off `dev` 13979b91d: fifty-two plus `classesDatedLater` (#475); fifty-two counted 2026-10-08 on `issue/457-482-menus-hig` off `dev` 152a9d51c: fifty plus `subjectMenus` and `openRecent` (#457); fifty counted 2026-10-07 on `issue/458-door-course-lease` merged with `dev` 6600df4c5, as the file's top-level keys other than `note`: forty-eight at `dev` 5c3ccaf2 plus `deployWhileItsSectionDeploys` (#439) and `doorCourseHold` (#458); forty-eight counted 2026-10-03 on `issue/433-outside-assistant-busy`: forty-seven at `dev` 69360971 plus `publishPlanNaming` (#425); forty-seven counted 2026-09-30 on `issue/379-links-checklist` merged with `dev` c8aa04c3: forty-four at dev 8728a6e5, plus `courseSettingsWording` and `userFacingLabelWords` (bundle C) and `linksChecklist` (#379); it was forty-three at `dev` 7b4b85ba on 2026-09-27. Three rows each claiming this count had survived successive merges, saying forty-two, forty-three and thirty-eight; they were folded into this one for the v1.4.0 release, and the word's history is in git. Count the keys rather than trusting the word) on top of machinery that could not be less alike: what a scheduled deploy refuses and in what order, what the sidebar's filter shows, what is stripped from the launchers' output, what counts as a curriculum expectation, **what is taken out of — and deliberately KEPT in — a problem report**, **which events every new or changed feature must record on the breadcrumb trail**, and **which local assistant a teacher may choose, what they are told it costs, and when one may be removed**, and **what a page is CALLED when the assistant talks about it**, **which folders count for marks, and which a teacher is OFFERED when they are asked**, **what a teacher is told when a folder a feature depends on has been renamed or deleted**, **how a working folder kept in sync by a cloud service is recognised, what a teacher is told about it, and when**, and **where a section's built website is kept, and what happens to a folder that already has one in the old place**, and **which processes belong to a section's preview, and must therefore be stopped**, and **which of a course's own folders the build treats specially, and what a teacher is told about each**, and **what the New Course wizard's affirmative button says, what it tells a teacher whose course will start empty, and what its skeleton toggle does to the structure editor in BOTH directions**, and **what a window lets go of when it is pointed at a different working folder**, and **which act turns a scheduled deploy off without being asked, which acts deliberately turn none off, and how late is too late for one to still run**, and **which working folder a window opens on at launch, and what it is told when the one from last time cannot be reopened** (#311), and **which working folders the website builder on a Mac can reach, and what a teacher is told when they choose one it cannot** (#290), and **what happens when a teacher copies one page of one course into another — what is never copied, what the copy's settings must say for it to arrive hidden from students, what is done when a picture of that name is already there with different bytes, and the two shapes where this app and the website builder would read a page differently**, and **how the breadcrumb trail is read back into a problem report when some of its characters cannot be read — every line kept, and a note saying how many**, and **what getting a section ready for the start of the year puts into draft, what it never touches, and what check_section's three groups report** (#96), and **when Plantoir may install a new version of itself, and what a quit does to one that is ready (#204)**, and **the teacher's How I Teach page: its one name and place, that the build never puts it on a website, what the assistant's page lists leave out, and what the three tools that read and write it refuse** (#209), and **how an excluded folder or file is matched, and when a removal or an add-back is written on the trail** (#152), and **how the build tells the app which coverage maps it wrote** (#128), and **that the assistant reads the course list and each course's settings at the moment of every call** (#322), and **that every act which sends a site somewhere or sets a deploy reads the settings as SAVED at that moment** (#335). |
 
 | [`course-management.json`](course-management.json) | The names the three kinds of zip carry and how they are told apart, what section number is offered next and which entries are refused in whose words, the grade a course code names, what a folder added later starts with (#506), and what happens to backups over time — which are pruned, how the space they take is counted, and what a delete of several removes and keeps, and what a course code may be, at the app and at the command line (#402). |
 | [`class-planning.json`](class-planning.json) | Which page titles carry numbers, what "the next class" would be called, and — the highest-stakes data here — the ORDER renames must run in when room is made for a class, whether Preview offers today's class for the front page (#397), and which published classes are dated after the next class day (#475). |
@@ -165,8 +165,8 @@ looks like:
 
 | When (local) | What |
 |---|---|
-| 18:54 | `0f34c54d` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
-| 19:14 | `b0913344` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
+| 18:54 | `29d7112a` builds `back_up_course` on the mac, requiring `[course]` — the same shape Windows had had since 2026-08-13. Nothing diverges. |
+| 19:14 | `65be722e` fixes a real defect in it: the copy was filed as the TEACHER's, so the Backups list credited them with a copy they never made and `pruneBackups` — which skips anything not the assistant's — would have kept every one for ever. The fix takes a `section` and attributes the copy. The schema moves. |
 | 19:52 | #70 is opened. It names `back_up_course`, its plan twin and its briefing persistence. It does not mention the argument. |
 
 So the thing that travelled unannounced was **a defect fix**, which is the
@@ -221,8 +221,8 @@ Four ways out, and only the last is honest:
   site-health work for exactly this reason, and the comment beside them
   disclaims itself as precedent in as many words. Rejected here, and the
   difference is not tidiness — it was measured rather than remembered. All
-  three were declared in `a3144010` at 08:17 on 2026-08-25 and all three got
-  their first `ActivityTrail.Note` call in `a3c581fb` at 08:45 the same
+  three were declared in `ef844171` at 08:17 on 2026-08-25 and all three got
+  their first `ActivityTrail.Note` call in `18b02264` at 08:45 the same
   morning: **28 minutes**, inside one piece of work. This is a whole feature a
   milestone away. And an event
   that is named but never recorded tells the contract a line exists that no
@@ -262,7 +262,11 @@ entry owed by a genuinely later release rightly survives the cut — the rule is
 "later than this build", not "empty at the cut". A milestone that is not a
 version fails, because it cannot be compared. `RELEASING.md` re-runs the suite
 AFTER the version is set, since a run before the bump compares against the old
-version and passes with entries left. **The ledger is EMPTY.** It was empty
+version and passes with entries left. **Since 2026-10-28 the ledger holds two
+entries**, both against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
+(v1.9.1): `wording.obsidianIsNotOnThisMac` and the scenario "open in Obsidian
+on a Mac without Obsidian presses nothing (#610)", held by #690 because the
+sentence names "this Mac" without `{machine}`. Before that it was empty
 from 2026-10-15, when #514 (batch 6 of the catch-up) closed its last two
 entries; on 2026-10-16 the piece for #551 held mac #524's sixteen plan-table
 wording keys (`plan*`, `menuPlan*`) open in it against
@@ -451,7 +455,7 @@ recounted 2026-09-07.
 | What a Save writes when another window or a build changed the settings file first, what Course Settings says when a preview or publish cannot see the Save or when the Save replaced another window's sidebar change, and when Preview Again has nothing left to reach (#265) | `shared-rules.json` → `savingSettings`, `specialNames.settingsSavedWhilePreviewing`, `settingsSavedWhilePublishing`, `previewUsesSavedSettings`, `settingsSaveReplacedSidebarChange`, `settingsPreviewAgainNothingOpen` | `SettingsSaveNoticeTests` (the 5 cases through `CourseConfiguration.merged`, the five sentences), `TwoWindowSettingsTests`. Not yet run on Windows Since #323, `savingSettings.scheduledDeploys` (5 cases) and the two `specialNames.settingsSaveScheduledDeploy…` sentences: what a Save says about a deploy set to happen on its own (SettingsSaveNotice, 3 tests). |
 | Page visibility: `publish:`, legacy `draft:`, per-section keys, and WHAT EACH VALUE MEANS | `file-formats.json` → `pageVisibility` | ~50 tests across the suite, plus 59 `readingCases` and 21 `writingCases` run as data by `FileFormatsContractTests`, `PageVisibilityReadingTests` for the three-way answer (33 on the mac; its Windows twin of the same name, plus `PageVisibilityWritingTests`, `PageVisibilityCertaintyTests` and `SectionCarryVisibilityTests`, since 2026-09-19), and `scripts/test_page_visibility.py` for the Python — and, since [#139](https://github.com/russellgordon/plantoir/issues/139), what a NEW course is scaffolded with, along three starting-content paths (`NewCourseIsWrittenInTheCurrentKeys`, which reads `pageVisibility.keys` rather than retyping them). The writing half has been RUN only since 2026-09-09 (issue #107), and its absence is how the mac stayed green for two days against a rule it did not implement; **on Windows it has been run since 2026-09-19** ([#138](https://github.com/russellgordon/plantoir/issues/138)), by `FileFormatContractTests.TheWritingCasesInTheContractAreFollowed`, which plays every one of them against `PageFrontmatter.SetDraft` and collects every failing case rather than stopping at the first — until that day it answered `writingRules` with five of the cases retyped into the test file. Three of the other five were already asserted elsewhere in that suite in its own words (`PageVisibilityWritingTests` for the two odd values, `TheRulesForWritingAPagesVisibilityAreFollowed` for a page with no frontmatter); what the loop adds is that every case is read from the FILE and so cannot drift from it (ten on the day; thirteen since #176), and that two — a block carrying neither spelling, and an oddly-worded `published` asked to be HIDDEN — are covered there for the first time. **Two things this list deliberately does NOT carry**, added 2026-09-18 with issue #140: the forms each app reads as `cannot tell` (a value on the next line, a tag, a block scalar, an anchor or alias, a flow collection, an indented key, unparseable frontmatter) — a shared case states what the SITE does, and each app's REPORTING answer for those is `visible` whatever the site does, so pinning one here would oblige the other platform to be wrong in the same direction; those live in each platform's own tests. **With one deliberate exception since 2026-09-19** ([#176](https://github.com/russellgordon/plantoir/issues/176)): the test is not whether the reader can read a form but whether its REPORTING answer matches the site, and for the two continuation forms the site PUBLISHES (`publish: false` over an indented `false`, with and without a blank line between) it does — so those two ARE carried, and they earn it because the reader that got them wrong got them wrong confidently, which turned a writer's already-right gate into a no-op on "hide this page". [#188](https://github.com/russellgordon/plantoir/issues/188) (2026-09-25) added three more for the same reason — a value running into a line of INDENTED dashes, which the build reads as part of the value rather than as the closing fence — and four `writingCases` that carry `expectSiteBefore`/`expectSiteAfter`, which the same script now judges on the site; [#186](https://github.com/russellgordon/plantoir/issues/186) added four more, three of them a page the writer DECLINES (`expectOutcome: noRoomForAKey`), because `expectChanged: false` cannot tell that from a page already right. And YAML trivia with no teacher behind it: `y`/`n` are here because somebody might type them, sexagesimals and octals are not. `scripts/check_visibility_against_the_site.py`, run by `verify.sh`, re-measures every case here down the real build chain — and twenty-five more forms that CANNOT be shared cases, because both readers report them as visible whatever the site does and the refusal is only justified while the measurement holds — so the LIST being wrong fails rather than making both apps confidently wrong together |
 | Image pins and the Quartz patches | `toolchain.json` | checked against `Dockerfile` and `patches/` |
-| Which `npm audit` advisories the image's JavaScript may carry, per tree, and why each is accepted (#667) | `toolchain.json` → `npmAudit` | `scripts/test_npm_audit.py` (stdlib, real trimmed audits; Windows' `PythonToolchainTests` runs it too); verify.sh audits the image and fails on a new or raised high or critical advisory. Windows' runtime audit is owed by the `windows` issue for #667 |
+| Which `npm audit` advisories the image's JavaScript may carry, per tree, and why each is accepted (#667) | `toolchain.json` → `npmAudit` | `scripts/test_npm_audit.py` (stdlib, real trimmed audits; Windows' `PythonToolchainTests` runs it too); verify.sh audits the image and fails on a new or raised high or critical advisory. Windows audits its own runtime since #685 (2026-10-28): `windows-app\audit-runtime.ps1` runs the runtime's own npm over the five trees each `trees[].windowsRuntime` names and compares through the same `scripts/npm_audit.py`. It is OPT-IN, in no `dotnet test` and no build, for the reason verify.sh's audit is a separate step: the advisory database changes daily. Run by hand before a cut that changes the runtime; its record is `research/npm-audit/2026-10-28.md` |
 | Example-content payloads (all 38) | `example-content.json` | ExampleContent (10), and the payloads themselves |
 | Reading a teacher's date list, and which day “tomorrow” or “Monday” names | `schedule-rules.json` | SectionScheduleSource (23) |
 | Scheduled-deploy refusals — and, since #322, the two never-deployed sentences, pinned WHOLE by template (`wording.neverDeployed` names the destination; `wording.additionalDestinationNeverDeployed`), with each such case naming its `destinationNamed` | `shared-rules.json` → `scheduledDeployRefusals` (`cases`, `wording`; since [#396](https://github.com/russellgordon/plantoir/issues/396) `planOpening` — the plan's first sentence names EVERY destination, 3 `cases`; since [#403](https://github.com/russellgordon/plantoir/issues/403) `planOpening.listCoursesLine`, the same cases plus 1 of its own through `list_courses` — and a CHANGED `alsoSaid`: nothing about the section's unpublished classes) | ScheduledDeploy (`testTheSchedulePlanSaysNothingAboutUnpublishedClasses` reads `alsoSaid.rule`); ScheduledDeployAsSetNow (`testTheDestinationsTheSheetNamesAreTheOnesTheJobIsWrittenWith`); SharedRulesContract (`testScheduledDeploysRefuseWhatTheContractSays` compares the two never-deployed refusals as whole rendered sentences — a phrase cannot tell them apart any more — `testTheNeverDeployedSentencesAreTheContractsTemplates`, and `testTheSchedulePlanNamesEveryDestinationAsTheContractSays`: each `planOpening` case's first line WHOLE, the approval card through `explain(call:)`, and the list equal to `deployPlan(...).descriptions`); ListCourses (`testItNamesEveryPlaceEachCoursePublishesTo`, #403: every `planOpening` and `listCoursesLine` case through `list_courses` on both surfaces, the line compared WHOLE) |
@@ -467,13 +471,13 @@ recounted 2026-09-07.
 | What the breadcrumb trail must record | `shared-rules.json` → `activityTrail` | ActivityTrail via ProblemReport, SharedRulesContract (2) |
 | What a printable page prints (#454, v1.6.0): which pages opt in, when the page is put back after asking the browser to print (#576, `printRequest`), a teacher's own PDF, which callout is an answer, what an answer is called, title cleaning, that a page's Curriculum connection is never printed (#498), the three modes and the menu that offers them, and since #499 the handout's look (numbered questions and lettered parts, paper and orientation, footer, which boxes stay, the completeness guard), the corners and page labels, the PDF link, the preview pane, the figure wrapper, the agent guidance (skills, and the managed section in a root AGENTS.md / CLAUDE.md, asked for before it is added to a teacher's own file); Course Settings' Printing words; the `printPdfNotFound` folder check | `file-formats.json` → `pageOptIns`, the four `print_*` keys in `courseConfigKeys`; `shared-rules.json` → `printablePages`, `courseSettingsWording.printing*`, `siteHealth.checks` → `printPdfNotFound`, `activityTrail` → `preview page opened in the web browser`, `asked before adding guidance to a file`, `guidance for assistants could not be written`; `printablePages.agentGuidance.rootFileCases` and `.words` | `scripts/test_page_features.py` and `scripts/test_print_settings.py` (stdlib; verify.sh 0.5 and Windows' `PythonToolchainTests`); `scripts/check_print_rules_against_the_site.py` (every `answerCallouts`, `labels`, `titleCleaning`, `pageLabels` and `curriculumConnection` case, and since #576 every `printRequest` case and its `budgetMs`, through `printRules.ts` in Node, and every typed `pageOptIns` line through the build, in the image under verify.sh); `PrintablePagesTests` (every root-file case, every `corners` case through the getters and Course Settings' sketch since #537, the sheet's words, the guidance never holding the folder back) and `UserFacingLabelWordsTests.testThePrintingWordsAreTheContracts` on the mac; `browser-checks/print_handout.mjs` (a light page's handout prints its diagram drawn, and no handout nor ⌘P prints the Curriculum connection, verify.sh 6h when Chrome for Testing is present); `browser-checks/print_fallback.mjs` (#576: the fallback waits for its faces and pictures before `print()`, and the page is put back as `printRequest` says, with stand-ins that answer `print()` as each browser does, verify.sh 6h). On Windows since 2026-10-15 ([#496](https://github.com/russellgordon/plantoir/issues/496)): `PrintablePagesTests` (the four getters, every `corners` case through `PrintCorners`, the thirteen `printing*` words, the `settings saved` clause), `AgentGuidanceTests` (every root-file case with a second pass, the three `addCases`, the failure line and a notice with no path, the hook never holding the folder back) and `PreviewBrowserHandoffTests` (modes and papers, the message, the trail words); the corners case "blanks of null are the default" (authored 2026-10-15 on Windows: the build reads null as Name and Date) was a request to the mac, whose getter read it as no blanks until #537 (2026-10-16); the mac now reads null as absent and runs every corners case (`PrintablePagesTests.testEveryCornersCaseHoldsAsTheContractSays`). The rules themselves run in the site and the shared Python, so nothing there is Windows' to reimplement. |
 | Diagrams and graphs drawn from a page's ` ```tikz ` and ` ```functionplot ` fences (#485 E1, v1.7.0): which fences count and where, the tidying and cache key every engine shares, the description a screen reader reads, obsidian-functionplot 1.2.1's parse and what the grapher understands, why TeX refused a diagram and where, the clock, the cache, what a site carries, dark mode and print colours, zoom, the words, the known limits; the `figuresCouldNotBeDrawn` folder check | `shared-rules.json` → `figureFences` (`fences`, `tidy`, `cacheKey`, `alt`, `functionplot.parseCases` and `.expressionCases`, `texErrors`, `timing`, `cache`, `siteCarriesEngine`, `darkMode`, `zoom`, `pageIds` (#502), `words`, `agentGuidance`, `knownLimits`), `siteHealth.checks` → `figuresCouldNotBeDrawn`, `printablePages.figures`; `toolchain.json` → `pins` → `functionPlot`, `nodeTikzjax` | `scripts/test_figures.py` (stdlib, a stand-in engine: every `fences`, `tidy`, `cacheKey`, tikz `alt` and `siteCarriesEngine` case, the cache, the clock and the restart, the words and the finding; verify.sh 0.5 and Windows' `PythonToolchainTests`); `scripts/check_figure_rules_against_the_site.py` (every `tidy`/`cacheKey` case through `figureRules.js` in Node, every `texErrors` case through real TeX, every `functionplot` case through the real evaluator, in the image under verify.sh); verify.sh 6i (the planted Figures Fixture built and read back, a second build from the cache, 6c's site without figures) and `browser-checks/print_handout.mjs` (a drawing and a graph in every handout, lettering black); `browser-checks/graphs_draw.mjs` (#502: graphs drawn under a heading named Math or Exports, and on the page the site's own page change reaches next — `pageIds`); `PrintablePagesTests.testTheGraphsSkillIsWrittenAndBothRootFilesNameIt` on the mac. On Windows the two engines are in its runtime since 2026-10-15 ([#503](https://github.com/russellgordon/plantoir/issues/503)): `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` reads every pin's `windowsRuntimeContains` (`pagedjs`, `latinModern`, `functionPlot`, `nodeTikzjax`) in `fetch-runtime.ps1`, with nothing held open in `NamedGapLedger`, and `NativeFiguresTests` draws the contract's triangle and builds a section with a diagram, a graph and a printable page through the real launcher (skipped, with the reason, on a runtime without the engines). No trail event: the app does nothing new a teacher sees. |
-| GeoGebra sketches from a page's ` ```geogebra ` fences (#578, v1.9.0): which fences count and the two page scans, the settings and commands, how a refused command line is known and said, geogebra.org addresses, fetching a geogebra.org sketch once and keeping it by the fence, where a `file:` is looked up and that it is published once, the key the build and the site share, the manifest, what a site carries, the engine's first load, the page change, print, the attribution, the policy, the words, the known limits; a sketch in a self-check question's question or explanation and never in a choice (`sketchInAChoice`); the `geogebraSketchesNotReady` folder check; a payload's sketch is `file:` beside its page with `alt:`, never `material_id:` (the payload linter) | `shared-rules.json` → `geogebraFences` (`fences`, `settings`, `commands`, `materialIds`, `fetch`, `cache`, `files`, `keys`, `manifest`, `quizzes`, `siteCarriesEngine`, `engine`, `spa`, `print`, `attribution`, `policy`, `words`, `knownLimits`), `quizCallouts.recognise` (`sketchInAChoice` in `order`, its `cases`) and `words.problems.sketchInAChoice`; `siteHealth.checks` → `geogebraSketchesNotReady`; `toolchain.json` → `pins` → `geogebra` | `scripts/test_geogebra.py` (stdlib: every `fences`, `settings`, `materialIds`, `files`, `keys`, `manifest`, `cache` and `siteCarriesEngine` case, the pass, the geogebra.org fetch against a local stub server of its own (never the real API), the finding's cases, the transformer's place; verify.sh and Windows' `PythonToolchainTests`); `scripts/check_geogebra_rules_against_the_site.py` (every `keys` and `fences` case through the site's own Markdown reader and `figureRules.js`, in the image under verify.sh); `scripts/test_geogebra_engine.py` (the engine's recipe and pin); `scripts/test_quizzes.py` (the `sketchInAChoice` cases through the folder check's mirror) and verify.sh 6k (every recognise case read back from the built site); `.claude/skills/example-content/lint_payload.py` and verify.sh's payload step (every payload sketch prepared in the image with a fetcher that fails if touched); verify.sh 6i-g (the planted GeoGebra Fixture built and read back) and `browser-checks/geogebra_applet.mjs` (a clone under the publish's own `_headers` on `[::1]`, plain and cross-origin isolated: every `commands` case run in the fixture's commands sketch, and the geogebra.org sketch from a planted saved copy). NOT carried by the contract, so owed to Windows as an issue: the engine in its runtime (`fetch-runtime.ps1`, the pin's `windowsRuntimeContains`), the material fetch over Windows' own network stack (its certificate store, measured once), and a tap on a sketch in Edge on a published Netlify site (and one in a quiz explanation, after answering). No trail event: problems reach the trail as the existing folder-problem line. |
+| GeoGebra sketches from a page's ` ```geogebra ` fences (#578, v1.9.0): which fences count and the two page scans, the settings and commands, how a refused command line is known and said, geogebra.org addresses, fetching a geogebra.org sketch once and keeping it by the fence, where a `file:` is looked up and that it is published once, the key the build and the site share, the manifest, what a site carries, the engine's first load, the page change, print, the attribution, the policy, the words, the known limits; a sketch in a self-check question's question or explanation and never in a choice (`sketchInAChoice`); the `geogebraSketchesNotReady` folder check; a payload's sketch is `file:` beside its page with `alt:`, never `material_id:` (the payload linter) | `shared-rules.json` → `geogebraFences` (`fences`, `settings`, `commands`, `materialIds`, `fetch`, `cache`, `files`, `keys`, `manifest`, `quizzes`, `siteCarriesEngine`, `engine`, `spa`, `print`, `attribution`, `policy`, `words`, `knownLimits`), `quizCallouts.recognise` (`sketchInAChoice` in `order`, its `cases`) and `words.problems.sketchInAChoice`; `siteHealth.checks` → `geogebraSketchesNotReady`; `toolchain.json` → `pins` → `geogebra` | `scripts/test_geogebra.py` (stdlib: every `fences`, `settings`, `materialIds`, `files`, `keys`, `manifest`, `cache` and `siteCarriesEngine` case, the pass, the geogebra.org fetch against a local stub server of its own (never the real API), the finding's cases, the transformer's place; verify.sh and Windows' `PythonToolchainTests`); `scripts/check_geogebra_rules_against_the_site.py` (every `keys` and `fences` case through the site's own Markdown reader and `figureRules.js`, in the image under verify.sh); `scripts/test_geogebra_engine.py` (the engine's recipe and pin); `scripts/test_quizzes.py` (the `sketchInAChoice` cases through the folder check's mirror) and verify.sh 6k (every recognise case read back from the built site); `.claude/skills/example-content/lint_payload.py` and verify.sh's payload step (every payload sketch prepared in the image with a fetcher that fails if touched); verify.sh 6i-g (the planted GeoGebra Fixture built and read back) and `browser-checks/geogebra_applet.mjs` (a clone under the publish's own `_headers` on `[::1]`, plain and cross-origin isolated: every `commands` case run in the fixture's commands sketch, and the geogebra.org sketch from a planted saved copy). NOT carried by the contract, so Windows' own (#687): the engine in its runtime, since 2026-10-28 (`fetch-runtime.ps1`, held to the pin by `ToolchainContractTests.TheWindowsRuntimeRecipeFetchesGeoGebraAtTheContractsHashAndAddresses`, and the built runtime's files by `TheNativeRuntimeCarriesGeoGebraAtTheContractsHashes`); by hand, once, on 2026-10-28: the material fetch over Windows' own network stack (it worked as is through the Windows certificate store, and a build blocked from the network used the saved copy), `geogebra_applet.mjs` in headless Edge 156 (OK, quiz page included), the printed picture and attribution, and the accessibility tree. The numbers are in `documentation/12-windows-app.md` → "Node 22, GeoGebra's engine and the npm audit on Windows". Still by hand and not yet done: a tap in Edge on a site published to Netlify, and Narrator by ear. No trail event: problems reach the trail as the existing folder-problem line. |
 | Where a teacher's press of Preview opens the site (#504, v1.7.1): the app-wide setting and its persisted values, the title of the button and the menu item from (setting, modifier held, running), the modifier giving the opposite, which navigations are remembered (only the teacher's, never the app's own loads; path only), asking the remembered page (200 opens it, 404/410 is gone, anything else retried then the front page), Show on Front Page opening the front page, and the trail's words | `shared-rules.json` → `previewStartPage` (`setting`, `wording`, `titles`, `remembering`, `answers`, `cases`, `settingChangedTrail`); `activityTrail.mustRecord` → "preview started at the page last viewed", "preview start page chosen in Settings"; `subjectMenus.rule` (the Option alternate) | PreviewStartPageTests (18) on the mac — every case deserialised, the `remembering` cases through the real `WebPreviewController`; MenuBarTreeTests' golden carries the alternate (`Preview at Last Viewed [⌥⇧⌘P] (alternate)`). On Windows (#514): PreviewStartPageContractTests (11) — every block, the decision cases through the press's own `Decide`, and `windowsWording.altNote` (authored from Windows, `appliesOn: ["windows"]`, read by no mac test). Not carried: the modifier's mechanics (a `flagsChanged` monitor on the mac; Alt read at the click on Windows, and a second Section item), the web view's address events (WKWebView KVO on the mac, WebView2 `SourceChanged` on Windows) and the toolbar's width — `documentation/12-windows-app.md` → "Preview at Last Viewed on Windows (#514)". |
 | A working folder a cloud service keeps in sync: how it is recognised, what is said, when | `shared-rules.json` → `cloudSyncedFolders` | CloudSyncedFolder (18), CloudSyncNoticeLayout (5) |
 | Where a section's BUILT WEBSITE is kept, and what happens to a folder that already has one | `shared-rules.json` → `buildOutputLocation` | BuildOutputLocation (22), SharedRulesContract (2), and `scripts/test_build_output_link.sh` in `verify.sh` (22 checks) |
 | When quitting asks the teacher first, and when it must NEVER ask | `shared-rules.json` → `quittingWhileWorkIsUnderWay` | QuitConfirmation (7) on the mac, and WhileACopyIsSaved (quit during a zip). **Both platforms since 2026-09-30** — the `appliesOn: ["mac"]` that was an acknowledged exception (Named gaps, above) was deleted when Windows adopted the rule ([#231](https://github.com/russellgordon/plantoir/issues/231); `QuitConfirmationTests` runs every case). Its nine cases (three added 2026-09-23 with [#232](https://github.com/russellgordon/plantoir/issues/232), for a preview being BUILT, and one 2026-09-27 with bundle C/#351, for a copy of a course being ZIPPED — every case now also says `copiesBeingSaved`) are platform-neutral apart from the signal that says the system is logging out (`kAEQuitReason` on the mac, `WM_QUERYENDSESSION` on Windows). The matching trail event `quit asked about work under way` lost its `appliesOn` in the same change. The other three events that landed the same day are mac-only for the ordinary permanent reason (a native Windows toolchain has nothing to stop) and are not part of this |
 | Runnable code on a page (#455, v1.8.0): which pages opt in (`codeRunner:`), which fences run and with which flags, where a fence can sit and how the build's reader and the site's parser agree on it, the ids saved edits are kept under, what a site carries, the safety-net line when they disagree (and, since #567, the one folder problem the site's build says for those blocks: `siteHealth.checks` → `runnableCodeShownAsPlainCode` and its `cases`, through `scripts/test_site_disagreements.py`, the emitter in `check_runner_rules_against_the_site.py`, and verify.sh's Plain Code Fixture), the harness, input, output, loading, storage, the editor, print, the words, the known limits; KaTeX served by the site (#494) | `shared-rules.json` → `codeRunnerBlocks` (`languages`, `fences.cases` and `.pageShapes.cases`, `ids.cases`, `siteCarriesEngine.cases`, `siteDisagrees`, `harness`, `stdin`, `output`, `loading`, `storage`, `editor`, `print`, `words`, `agentGuidance`, `knownLimits`); `file-formats.json` → `pageOptIns.keys` (`codeRunner`) and `pageOptIns.codeRunnerReadingCases`; `toolchain.json` → `pins` → `pyodide`, `katex` | `scripts/test_page_features.py` (stdlib: the language table field for field, every `fences`, `pageShapes`, `ids`, `siteCarriesEngine` and `codeRunnerReadingCases` case, the engine overlay, the words file; verify.sh 0.5 and Windows' `PythonToolchainTests`); `scripts/test_katex_assets.py` (the KaTeX copy and the latex.ts patch, stdlib); `scripts/check_runner_rules_against_the_site.py` (every `fences`, `pageShapes` and `ids` case through the site's own `codeRunnerRule.ts` and Quartz's own parser in Node, the TypeScript table against the contract, every typed `codeRunner:` line through the build's reader; in the image under verify.sh); verify.sh 6j (the planted Runner Fixture built and read back, the engine and KaTeX carried and nothing from a CDN) and `browser-checks/code_runner.mjs` / `browser-checks/maths_offline.mjs`; `PrintablePagesTests.testTheRunnableCodeSkillIsWrittenAndBothRootFilesNameIt` on the mac. On Windows the Python tests run as they are; the `pyodide` pin's `windowsRuntimeContains` is red in `ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` until `fetch-runtime.ps1` carries it (the windows issue for #455). No trail event: the app does nothing new a teacher sees. |
-| Runnable Swift on a page (#493, v1.8.0): the Swift row (read-only, compiled ahead of time), how the launcher plans and compiles and the build prepares, the key a block is cached by, the toolchain id, the cache and its pruning, the free-space threshold, what the site gets, the worker's messages, the WASI shim, traps, why a block has no program (the same reasons on both platforms since v1.8.6); how Windows gets Swift ready and compiles (#570); the `swiftCouldNotBePrepared` folder check | `shared-rules.json` → `codeRunnerBlocks.languages` (the `swift` row), `fences.cases`, `fences.pageShapes.cases`, `ids.cases`, `siteCarriesEngine.cases` (Swift cases), `codeRunnerBlocks.swift` (`compile` with `jobSecondsOnWindows`, `cacheKey.cases`, `cache` with `toolchainIdFromOnWindows`, `room`, `downloadGigabytes`, `site`, `workerTalks`, `wasi`, `traps`, `reasons`, `reasonCases`, `windows` - printed lines, the `PLANTOIR_SWIFT:` marker, exits, the compile wrapper's limits - `mac` - when preview.sh prints the same marker, `printed` and `stateForReason` (what a failed build tells the teacher and leaves in `state.json`, #642), `downloadSteps`, `bytesCases`, `reasonsFromTheBuildLog`, `reasonCases`, `example` (#635) - `notes`, `noteCases`, `cacheCases`), five `words`, eight `knownLimits`, `siteHealth.checks` → `swiftCouldNotBePrepared` (in `repair.neverOffered`; its `groupingCases` say a shared cause once); `toolchain.json` → `swiftImage` and `swiftWindows`; `activityTrail.mustRecord` → "Swift got ready on this computer", "Swift could not be got ready" | `scripts/test_swift_blocks.py` (stdlib: every `cacheKey` and `reasonCases` case, the toolchain id, plan and prepare against a stub course and cache, the finding, every `swiftImage` pin in `support/swift/Dockerfile` and every `compile.mustContain` in `compile.py`, and every `mac.bytesCases`/`mac.reasonCases` case plus a real BuildKit log of the image's build; verify.sh 0.5 and Windows' `PythonToolchainTests`); `test_swift_launcher_marker.py` (preview.sh's Swift step, every ending, bash 3.2 and a stand-in docker; macOS only); `SwiftGotReadyReportTests` (the mac's reader, both readers); `test_page_features.py` (the Swift row and its overlay engine); `check_runner_rules_against_the_site.py` (the `cacheKey` cases through the site's `normaliseProgram` and the transformer's key, four Swift transformer cases); verify.sh's Swift gate (the image, its trim, `swift-gate/` through `browser-checks/wasi_run.mjs` with the G5 must-fail, the same bytes twice), 6j (the planted Swift Playground), the second build (nothing compiled) and `browser-checks/swift_runner.mjs`; `PrintablePagesTests.testTheRunnableCodeSkillIsWrittenAndBothRootFilesNameIt` (the Swift section). On Windows the Python tests run as they are, plus `scripts/test_swift_windows.py` (the pins, the Windows toolchain id, the compile wrapper's every change and its never-cache rule, the resumed download, the carved cabinet through the real expand.exe, msiexec's busy and full answers, the trim, the lock, every `ensure` exit and printed line) and `SwiftGotReadyTests` (the marker into the two trail lines, both readers). The real fetch, the swift-gate through `wasi_run.mjs` and `swift_runner.mjs` in headless Edge are measured by hand (documentation/12 → Runnable Swift on Windows); no suite downloads 2.3 GB. |
+| Runnable Swift on a page (#493, v1.8.0): the Swift row (read-only, compiled ahead of time), how the launcher plans and compiles and the build prepares, the key a block is cached by, the toolchain id, the cache and its pruning, the free-space threshold, what the site gets, the worker's messages, the WASI shim, traps, why a block has no program (the same reasons on both platforms since v1.8.6); how Windows gets Swift ready and compiles (#570); the `swiftCouldNotBePrepared` folder check | `shared-rules.json` → `codeRunnerBlocks.languages` (the `swift` row), `fences.cases`, `fences.pageShapes.cases`, `ids.cases`, `siteCarriesEngine.cases` (Swift cases), `codeRunnerBlocks.swift` (`compile` with `jobSecondsOnWindows`, `cacheKey.cases`, `cache` with `toolchainIdFromOnWindows`, `room`, `downloadGigabytes`, `site`, `workerTalks`, `wasi`, `traps`, `reasons`, `reasonCases`, `windows` - printed lines, the `PLANTOIR_SWIFT:` marker, exits, the compile wrapper's limits - `mac` - when preview.sh prints the same marker, `printed` and `stateForReason` (what a failed build tells the teacher and leaves in `state.json`, #642), `downloadSteps`, `bytesCases`, `reasonsFromTheBuildLog`, `reasonCases`, `example` (#635) - `notes`, `noteCases`, `cacheCases`), five `words`, eight `knownLimits`, `siteHealth.checks` → `swiftCouldNotBePrepared` (in `repair.neverOffered`; its `groupingCases` say a shared cause once); `toolchain.json` → `swiftImage` and `swiftWindows`; `activityTrail.mustRecord` → "Swift got ready on this computer", "Swift could not be got ready" | `scripts/test_swift_blocks.py` (stdlib: every `cacheKey` and `reasonCases` case, the toolchain id, plan and prepare against a stub course and cache, the finding, every `swiftImage` pin in `support/swift/Dockerfile` and every `compile.mustContain` in `compile.py`, and every `mac.bytesCases`/`mac.reasonCases` case plus a real BuildKit log of the image's build; verify.sh 0.5 and Windows' `PythonToolchainTests`); `test_swift_launcher_marker.py` (preview.sh's Swift step, every ending, bash 3.2 and a stand-in docker; macOS only); `SwiftGotReadyReportTests` (the mac's reader, both readers); `test_page_features.py` (the Swift row and its overlay engine); `check_runner_rules_against_the_site.py` (the `cacheKey` cases through the site's `normaliseProgram` and the transformer's key, four Swift transformer cases); verify.sh's Swift gate (the image, its trim, `swift-gate/` through `browser-checks/wasi_run.mjs` with the G5 must-fail, the same bytes twice), 6j (the planted Swift Playground), the second build (nothing compiled) and `browser-checks/swift_runner.mjs`; `PrintablePagesTests.testTheRunnableCodeSkillIsWrittenAndBothRootFilesNameIt` (the Swift section). On Windows the Python tests run as they are, plus `scripts/test_swift_windows.py` (the pins, the Windows toolchain id, the compile wrapper's every change and its never-cache rule, the resumed download, the carved cabinet through the real expand.exe, msiexec's busy and full answers, the trim, the lock, every `ensure` exit and printed line, and since #672 that no ending prints a line with a `{placeholder}` left in it - the disk filling part way prints `windows.printed.ranOutOfRoom`, the twin of `mac.printed.noRoom`) and `SwiftGotReadyTests` (the marker into the two trail lines, both readers). The real fetch, the swift-gate through `wasi_run.mjs` and `swift_runner.mjs` in headless Edge are measured by hand (documentation/12 → Runnable Swift on Windows); no suite downloads 2.3 GB. |
 | Page addresses on Netlify (#628, v1.9.0): which links a Netlify publish lower-cases in memory as it uploads (the raw path of same-site `<a>`/`<area>` hrefs, alias pages' canonical and refresh, sitemap `<loc>`, feed `<link>`; ASCII only, never a reference, a %-escape, the query, the fragment, `data-slug` or `<guid>`), the page's marker, and the router's and link previews' edit that follows it | `shared-rules.json` → `netlifyPageAddresses` (`cases`, `marker`, `rejected`) | `scripts/test_netlify_paths.py` (29, of which the cases are data) — verify.sh step 0 and, over the REAL built site, step 6; Windows' PythonToolchainTests. **Shared Python and shared Quartz edits, so no app carries an implementation** and neither suite has a C#/Swift reader. The live half (every link 200 on Netlify, Cloudflare unchanged) is `verify-deploy.sh` → `check_page_links`, which `verify-deploy.ps1` owes |
 | Self-check quizzes on a page (#563, v1.8.0): what a top-level `[!quiz]` is and the problems in their order, blanks and settings, how an answer line reads (alternatives, tolerance, numbers, formulas) and what a student's answer is checked against, the shuffle, the markup, storage, print, the safety net, the words, the known limits; the `quizzesNotReady` finding, and (#644) the safety net's lines as the one folder problem the site's build says for them, `siteHealth.checks` → `quizzesReadDifferently` and its `cases`, through `scripts/test_site_disagreements.py`, the emitter in `check_runner_rules_against_the_site.py`, and verify.sh's Quiz Read Differently | `shared-rules.json` → `quizCallouts` (`recognise.cases`, `answers.parse.cases`, `answers.check.cases`, `shuffle.cases`, `markup`, `notReady`, `checking`, `storage`, `print`, `safetyNet`, `words`, `agentGuidance`, `knownLimits`); `siteHealth.checks` → `quizzesNotReady` and `repair.neverOffered` | `scripts/test_quizzes.py` (stdlib: every `recognise` and `parse` case through the folder check's mirror, the error line, lines in the teacher's file, the finding, the two files the site reads; verify.sh 0.5 and Windows' `PythonToolchainTests`); `scripts/test_site_health.py` (the finding can fire); `scripts/check_quiz_rules_against_the_site.py` (every `parse`, `check` and `shuffle` case through the site's own `quizRules.ts` in Node, the text hook on every `untouched` case, the words; in the image under verify.sh); verify.sh 6k (every `recognise` case planted and read back from the built site, the build's lines and finding) and `browser-checks/quiz_check.mjs`; `PrintablePagesTests.testTheQuizzesSkillIsWrittenAndBothRootFilesNameIt` on the mac. On Windows the Python tests run as they are; `quizzesNotReady` needs its case in any test that names the checks (the windows issue for #563). No trail event: the app does nothing new a teacher sees. |
 | Task boxes students tick (#519, v1.8.1): which boxes become tickable (every task box outside a quiz), an item's text and id (its first line AS QUARTZ PARSED IT - rewritten links and comments, a callout's inserted line, CR LF - FNV-1a, NFC), the key, the default, persistence across the router's reused elements, a text change, transclusion, the read API #545 imports, the look, the known limits and what was rejected; the quiz blanks line (#588) | `shared-rules.json` → `taskBoxes` (`which.cases`, `itemText.cases`, `itemId.cases`, `itemId.tickedOrNot`, `key.cases`, `default`, `persistence`, `textChange`, `transclusion`, `readApi.cases`, `look`, `print`, `knownLimits`, `rejected`); `quizCallouts.feedback.blanks.cases` and `words.site.oneBlankRight` (#588) | `scripts/check_task_rules_against_the_site.py` (every `itemText`, `itemId`, `key` and `readApi` case through the site's own `taskRules.ts` and `plantoirTasks.ts`, over Quartz's own text transform and parser, in the image under verify.sh); verify.sh 6l (every case's id read back from the real build, every box outside a quiz on every page tickable, a quiz's boxes left alone) and `browser-checks/task_boxes.mjs` (ticks kept and restored, the router's reused box, transclusion in step, storage refused, the look, the ink on paper read from the PDF); `scripts/test_task_box_contrast.py` (stdlib: the look's colours in every colour scheme; verify.sh and Windows' `PythonToolchainTests`); `check_quiz_rules_against_the_site.py` runs `feedback.blanks.cases` through `quizRules.blanksFeedback`. Nothing for either app: the build and the page do it all, and Windows inherits it with `support/quartz`; its windows issue owes a measured look (Edge, Narrator). No trail event: the app does nothing new a teacher sees. |
@@ -481,7 +485,8 @@ recounted 2026-09-07.
 | My Progress (#545, v1.8.2): which sections get the page (`include_my_progress`, read as `include_curriculum_coverage`; the teacher's own page wins), which headings count (`success_criteria_headings`, the defaults, normalised), which items a section counts, the gate both readings run, the grouping by the class that first linked a page directly, the tables' labels (a club: one table), the roll-up of a student's ticks, the manifest, the page, Key Links first, the sidebar pin, the words and the teacher's notes; the build's marker line and its trail event | `shared-rules.json` → `myProgress` (`config.cases`, `headings.cases`, `headings.markupCases`, `sections.cases`, `gate.cases`, `grouping.cases`, `labels.cases`, `rollUp.cases`, `keyLinks.cases`, `sidebar.cases`, `words`, `notes`, `manifest`, `page`, `knownLimits`, `rejected`) and `myProgressBuilt`; `activityTrail.mustRecord` "my progress page built"; `file-formats.json` → `courseConfigKeys` (`include_my_progress`, `success_criteria_headings`) | `scripts/test_my_progress.py` (stdlib: config, headings, the build's gate over every `sections` and `gate` case, labels, Key Links, the words against `userFacingLabelWords.forbidden`, the marker examples; verify.sh and Windows' `PythonToolchainTests`); `scripts/check_progress_rules_against_the_site.py` (every site-side case through `progressRules.ts` over Quartz's own transformers, `grouping.cases` through the build's date pass, the emitter over a plan on disk; in the image under verify.sh); verify.sh 6m and `browser-checks/my_progress.mjs`; the mac's `MyProgressBuiltTests` (the marker, the trail sentences, `config.cases` through the read-only accessors). Windows owes the trail event and the two keys' read in its contract tests (#545's windows issue); the page itself it inherits with `support/quartz`. |
 | Obsidian's add-ons for diagrams and graphs, on one yes (#495, v1.8.0, mac first): the pins the app carries (TikZJax 0.5.2, Functionplot 1.2.1, seven files by size and SHA-256), which pages make a course need them, the order Open in Obsidian asks and adds in, the stored answer, every offer and preview decision, which vault Obsidian opens, what a pass writes in every vault state, the add-on list's format, the marker, backups, reference copies, the words, the trail lines, the known limits and what was rejected | `shared-rules.json` → `obsidianAddOnsForFigures` (`addOns`, `carried`, `whichPages.cases`, `sequence`, `answer`, `offerCases`, `previewCases`, `whichVaultOpens.cases`, `vaultCases`, `listCases`, `sidecar`, `backups.cases`, `referenceCopies`, `wording`, `windowsWording`, `trail`, `knownLimits`, `rejected`); four `activityTrail.mustRecord` events with no `appliesOn`; a tenth `referenceCourses.obsidianAddOns` case. **Windows implements the whole key since #581** (2026-10-22): `ObsidianFigureAddOnsTests` (every case list above, the pins, the fetch script and the build's check, a 2,000-page parity run of its fence reader against `markdown_code.fenced_blocks`), `ObsidianOpenRouteTests` (sequence steps 1–8 through a fake world), the four events recorded, and `ObsidianAddOns.Found` keeping Plantoir's marked folders apart (`ReferenceCopierTests` / `ReferenceImportTests` green). What it cannot carry: Obsidian's own behaviour (measured from its code, live check prepared for Russell), the fetch scripts, the dialog and the Settings pane — `documentation/09-mac-app.md` → "Obsidian's add-ons for diagrams and graphs (#495)" |
 | Where the website builder's helper programs come from on a Mac — copied out of the app, or downloaded and checked — when Plantoir's own copies are replaced (the install stamp), and how the website builder is first created from the app's starting disk ([#312](https://github.com/russellgordon/plantoir/issues/312)) | `app-rules.json` → `helperBootstrap` (`installCases`, `firstStartCases`, `printed`, `stamp`, `rejected`); `shared-rules.json` → `activityTrail.mustRecord`."helper programs installed" and ."website builder created" | `scripts/test_helper_bootstrap.py` (5: every one of the 21 install cases and 7 first-start cases through the REAL first-run block cut out of `setup.sh`, under `set -euo pipefail` AND without it, with real `shasum`, `cp -c`, `xattr` and bash 3.2 and stand-ins for the network and the programs; the three launchers' blocks identical; the printed words; the markers), HelperBootstrapReportTests (9) for the two trail lines the app writes from the markers, HelperProgramsTests (+3) for `PLANTOIR_BUNDLED_HELPERS`, HelperVersionsTests (+4: both kinds of Mac pinned, fetch-helpers.sh carries no pin of its own, the app's MANIFEST carries the launchers' pins, each copy says where it came from). AUTHORED, arrived 2026-09-26. **`appliesOn: ["mac"]`, permanently**, the key and both events: Windows carries its runtime and installs no helper programs. The Python test SKIPS on anything that is not a Mac (`cp -c` and `xattr`), so Windows' `PythonToolchainTests` discovers it and runs nothing |
-| Which folder a launcher writes its own trail lines into when the app hands it one (#664, v1.9.0): `PLANTOIR_TRAIL_DIR`, taken only when it is an absolute path, a trailing separator dropped; it moves the trail ONLY, never the builds root or the helper programs; the app sets it ALWAYS, overriding an inherited value | `app-rules.json` → `launcherTrailFolder` (`variable`, `rule`, `cases`, `rejected`) | `scripts/test_trail_lock.py` (+3: all 5 cases through each of the three launchers' REAL `note_on_the_trail`, a scratch `HOME`, the line in the expected folder and no other file anywhere in the scratch tree; the folder lock taken on a handed-over folder; the variable the contract names is the one the function reads), `scripts/test_preview_while_deploying.py` (+2: the REAL `preview.sh`'s deploying refusal lands in the handed-over folder and not in `HOME`'s trail, and stays in `HOME`'s without one), HelperProgramsTests (+3: the app's folder is set and overrides an inherited value; the default is `ActivityTrail.store`'s folder, never the real trail under test; the name matches the contract and all three launchers). AUTHORED, arrived 2026-10-23. `appliesOn: ["mac", "windows"]`: Windows' `preview.ps1`/`deploy.ps1` owe the same reading |
+| Which folder a launcher writes its own trail lines into when the app hands it one (#664, v1.9.0): `PLANTOIR_TRAIL_DIR`, taken only when it is an absolute path, a trailing separator dropped; it moves the trail ONLY, never the builds root or the helper programs; the app sets it ALWAYS, overriding an inherited value | `app-rules.json` → `launcherTrailFolder` (`variable`, `rule`, `cases`, `rejected`) | `scripts/test_trail_lock.py` (+3: all 5 cases through each of the three launchers' REAL `note_on_the_trail`, a scratch `HOME`, the line in the expected folder and no other file anywhere in the scratch tree; the folder lock taken on a handed-over folder; the variable the contract names is the one the function reads), `scripts/test_preview_while_deploying.py` (+2: the REAL `preview.sh`'s deploying refusal lands in the handed-over folder and not in `HOME`'s trail, and stays in `HOME`'s without one), HelperProgramsTests (+3: the app's folder is set and overrides an inherited value; the default is `ActivityTrail.store`'s folder, never the real trail under test; the name matches the contract and all three launchers). AUTHORED, arrived 2026-10-23. `appliesOn: ["mac", "windows"]`: on Windows since #682, `windows-app/test_launcher_rules.ps1` section 6 (all 5 cases through EACH of `preview.ps1`'s and `deploy.ps1`'s real `Write-TrailLine`, a scratch `LOCALAPPDATA` and current folder, the line in the expected folder and no other file in the scratch tree; plus `C:state` and `\state\Logs`, which PowerShell 5.1 calls rooted, both meaning the default; both launchers read the contract's variable) and `LauncherEnvironmentTests` (+5: the app's folder is handed and overrides an inherited `C:\elsewhere`, never the real trail under test; the trail always and the runtime only when there is one; the name matches the contract; the scheduled publish's wrapper gets the trail and not the runtime; every product site that starts a process with `-File` uses `LauncherEnvironment`, discovered by scan) |
+| How long one machine line may be (#666, v1.9.0): every `PLANTOIR_` JSON line the shared Python prints is at most `maxCharacters` (4,000) long, prefix included; a DATED, KEPT_OFF or MAPS line that would be longer keeps its first entries and carries `count` and `more`, a health finding names fewer (at most ten, fewer when they would not fit), the bounded markers stay as they were; a reader parses a shortened line as a whole one and says the true count | `shared-rules.json` → `machineLineLength` (`maxCharacters`, `rule`, `lists`, `shortenedByNamingFewer`, `bounded`, `why`, `rejected`, `cases`, `readerExamples`); the count wording in `pagesDatedByTheBuild.trailLine.shape`, `howITeachPage.keptOffTrailLineWhenShortened`, `coverageMapsBuilt.trailLine.shape` | `scripts/test_machine_line_length.py` (every case through the REAL emitter - `announce_dated_pages`, `how_i_teach.announce`, `announce_coverage_maps`, `site_health.announce` - the length, the parse, the first entries kept, count + more, and that one more would not fit; the bounded markers at their worst; in `verify.sh` on the mac since #666, `PythonToolchainTests` on Windows); `MachineLineLengthContractTests` on Windows (every `readerExamples` line through its reader and through `BuildMachineLines`, the true count on the trail; 2 x `maxCharacters` within `ConPtyProcess.LauncherColumns` and the carry guard). AUTHORED from Windows, 2026-10-28; the mac's readers owe the count (the `mac` issue opened from #666) |
 | When Plantoir may install a new version of itself, what a quit does to one that is ready, and every sentence of ours a teacher reads while it updates (#204) | `shared-rules.json` → `appUpdates` (`cases`, `atQuit.cases`, `wording`, `feed`, `checkEverySeconds`, `installsWithoutAsking`) | AppUpdatesContract (5: the 14 gate cases through `UpdateGate.workUnderWay`, the 6 quit cases through `UpdateGate.quitAction`, `whenHeldWorkEnds`, the wording both ways and its machinery check), AppUpdatesStart (10: the feed and the ask-first keys read off the test host and `project.yml`, and the user-defaults feed cleared first), AppUpdatesDelegate (13), SameExecutableProcesses (7), UpdateTrail (6) on the mac, counted on this branch. AUTHORED, arrived 2026-09-25 with [#204](https://github.com/russellgordon/plantoir/issues/204). **No Windows reader until NetSparkleUpdater lands** (the `windows` issue drafted from #204, milestone v1.4.0) — unrun rather than red, because Windows deserialises this file by named key. What DOES go red there is the eight new `activityTrail.mustRecord` events, which that issue asks to be ledgered in `NamedGapLedger.cs` against itself. The mechanism is not shared — Sparkle and NetSparkle hold an install differently — the promise is: ask first, once a day, never install while work is under way, never refuse a quit |
 | When the report asks about the assistant, and what it is called | `shared-rules.json` → `problemReportDialog` | SharedRulesContract (2), ProblemReport (2) |
 | How the trail is read back into a report when some of it cannot be read: every line kept, U+FFFD for what could not be read, a note counting the lines shown that carry one, after the prompts note ([#301](https://github.com/russellgordon/plantoir/issues/301)) | `shared-rules.json` → `problemReportTrail` | SharedRulesContract (3: the 12 cases, the two sentences and their order, the `{XX}` byte notation), ProblemReport (4). Not yet run on Windows |
@@ -492,7 +497,7 @@ recounted 2026-09-07.
 | Dating them on EVERY BUILD, in the teacher's own files, per section (#275, #276) | `class-planning.json` → `datingPagesAClassBrings.atBuildTime` (`cases`, `writingCases`) | `scripts/test_dates_follow_the_class.py` — in the image by `verify.sh`, and on Windows by `PythonToolchainTests`, which discovers it (it needs `python-frontmatter` on that interpreter, as `test_class_folder.py` already does). AUTHORED. DIRECT links only — a page reached only through another shared page keeps its own date (the hub case). Shared Python, so both platforms get the behaviour from one implementation; every case is built twice and the second build must rewrite nothing. The trail line it feeds is `shared-rules.json` → `pagesDatedByTheBuild` (PagesDatedByTheBuildTests on the mac; **owed on Windows**: reading the `PLANTOIR_DATED:` line, keeping it out of the console, and the trail event) |
 | Getting a section ready for the start of the year — every class after the first into draft, with the pages only later classes use; what is never touched; the plan code; the undo — and check_section's three groups, "linked but missed" among them (#96) | `shared-rules.json` → `startOfYear` (`rule`, `planShows`, `planCode`, `backup`, `undo`, `howToRunACase`, `cases`, `wording`, `rejected`), `sectionCheck` (`groups`, `cases`); `assist-cases.json` → two `scenarios`; `activityTrail.mustRecord` → three events | StartOfYearTests (23 on the mac: both case lists through the real MCP pair and check_section, the wording key by key, the plan code, the undo, the planner, the app's act), AssistScenario (the two scenarios), ReferenceRefusal (1). AUTHORED, arrived 2026-09-26. **Windows reads `wording`** (`StartOfYearTests.EverySentenceIsTheContracts`, key for key) — RED on `undoAllAlreadyBack` until it adds the sentence (#555's `windows` issue), and on `reasonColumn` (#589, v1.8.4: the "Why" header of the sheet's table of pages going into draft) until it adds that (#589's `windows` issue); the case lists are unrun there, the three trail events RED until recorded or ledgered |
 | Links into hidden pages as a CHECKLIST: which hidden pages publishing would bring back to life (two steps from a visible class, the other pages visible pages link to, the classes), in which group, ticked or not, with which date; when the section window offers it; what Publish writes; and what "published before" means (#379) | `class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist`, `.publishedBeforeIsRecorded`; `shared-rules.json` → `linksChecklist` (`rule`, `groups`, `ticking`, `whatAClassBrings`, `followingARow`, `comingWithAClass`, `naming`, `offeredWhen`, `marker`, `wording`, `rejected`, `buildCases`, `publishCases`), `siteHealth.repair.neverOffered.reversed`, `activityTrail.mustRecord` → three events; `file-formats.json` → `linksChecklistOffer` (with `rowKeys.dependsOn` since #385), `linksChecklistAnswered`, `publishedPagesRecord`, `visiblePagesList` | `scripts/test_links_checklist.py` (8) and `scripts/test_published_pages_record.py` (11), in the image under verify.sh and in Windows' `PythonToolchainTests`; LinksChecklistTests (13), LinksChecklistFollowingTests (17, #385 and #398) and LinksChecklistComingWithTests (4, #398) on the mac. AUTHORED, arrived 2026-09-30; #385 (v1.4.2) added `dependsOn`, `followingARow`, `naming` and publish cases iv-e to iv-i; #398 (v1.4.2) added `comingWithAClass` and publish cases iv-j to iv-n. **Windows inherits** the offer (with `dependsOn`) and `deploy.py`'s record; **owes** the sheet (with #385's rows that follow another row and its naming), `deploy.ps1`'s folder record, the rollover release, the trail events (RED until recorded or ledgered) and the publish cases |
-| Open in Obsidian at the page a section's preview shows: which presses, the page ON SCREEN read at the press, how an address is looked up (decoding, NFC, a trailing slash, `index`), the front page that is only an embed, a hidden page, every fallback and its words, the trail line, the `+` in the link; and how the build names each page's file and slug ([#518](https://github.com/russellgordon/plantoir/issues/518)) | `shared-rules.json` → `obsidianOpensThePreviewedPage` (`rule`, `rejected`, `fallbacks`, `trail`, `link`, `slugCases`, `fixture`, `cases`), `activityTrail.mustRecord` → "page opened in Obsidian"; `file-formats.json` → `pageSourcesList` | `scripts/test_page_sources.py` (12) in the image under verify.sh, plus verify.sh's read-back of a real build's list against the pages Quartz wrote, and in Windows' `PythonToolchainTests`; ObsidianOpensThePreviewedPageTests (13) on the mac. AUTHORED, arrived 2026-10-23. **Windows inherits** the list (shared Python); **owes** reading WebView2's address at the press, the resolution `cases`, the `link` cases, the page through its Open in Obsidian route and the trail event (RED until recorded or ledgered) |
+| Open in Obsidian at the page a section's preview shows: which presses, the page ON SCREEN read at the press, how an address is looked up (decoding, NFC, a trailing slash, `index`), the front page that is only an embed, a hidden page, every fallback and its words, the trail line, the `+` in the link; and how the build names each page's file and slug ([#518](https://github.com/russellgordon/plantoir/issues/518)) | `shared-rules.json` → `obsidianOpensThePreviewedPage` (`rule`, `rejected`, `fallbacks`, `trail`, `link`, `slugCases`, `fixture`, `cases`), `activityTrail.mustRecord` → "page opened in Obsidian"; `file-formats.json` → `pageSourcesList` | `scripts/test_page_sources.py` (12) in the image under verify.sh, plus verify.sh's read-back of a real build's list against the pages Quartz wrote, and in Windows' `PythonToolchainTests`; ObsidianOpensThePreviewedPageTests (13) on the mac. AUTHORED, arrived 2026-10-23. **Windows inherits** the list (shared Python), and since 2026-10-28 ([#681](https://github.com/russellgordon/plantoir/issues/681)) runs the rest: `ObsidianOpensThePreviewedPageContractTests` (every `cases` entry against the `fixture` laid out on disk, the decomposed name NFD as the note says; the `trail` and `fallbacks` words; the `link` cases by what they encode — `+` %2B, `&` %26, a space %20 — since `Uri.EscapeDataString` also escapes `/`), `ObsidianOpenRouteTests` (the page through the route's page door, the offer and the reopen question; one trail line per press) and `ObsidianRouteSourceTests` (WebView2's address, read once) |
 | What a wikilink NAMES — including the escaped pipe `[[Page\|words]]` Obsidian writes for an alias inside a table, and a heading followed by an alias — one definition for every reader; and what is never a link: anything inside code (#313) | `shared-rules.json` → `readingALink` (`rule`, `whenRewritten`, `codeIsNeverALink`, `whatIsCode`, `whatIsCodeLimits`, `expectIs`, `why`, `rejected`, `cases`) | SharedRulesContract (1, `testEveryLinkShapeReadsAsTheContractSays` — every case through BOTH mac readers, `linksAsWritten` and `linkTargets`) and `scripts/test_dates_follow_the_class.py` (`test_every_link_shape_reads_as_the_contract_says`, through the build's `_extract_wikilink_targets`; in the image under verify.sh, and in Windows' `PythonToolchainTests`) and `scripts/test_install_link_readers.py` (every case through the installer's three readers and the coverage map's two, [#314](https://github.com/russellgordon/plantoir/issues/314); on the host under verify.sh step 0.5, and in `PythonToolchainTests`). AUTHORED, arrived 2026-09-26 with [#294](https://github.com/russellgordon/plantoir/issues/294). Windows' own reader, `WikiLinks.Parse`, is not run against it — owed, see the census table below. Pure: text in, names out. Since [#313](https://github.com/russellgordon/plantoir/issues/313) (2026-09-26) the cases also say where CODE is — 40 in all, 30 of them about code — and `scripts/test_markdown_code.py` runs every case through the build's dating walk and a rename, and checks the coverage map; `MarkdownCodeTests` on the mac checks a count against its rewrite on every case, and offsets after an emoji and a decomposed accent. The mac's `MarkdownCode` and the build's `markdown_code.py` are the two implementations of `whatIsCode`; Windows owes the third (see the census table). Since [#331](https://github.com/russellgordon/plantoir/issues/331) (2026-09-26) a `%%` comment is never a link either: `whatIsAComment` and `commentIsNeverALink`, applied FIRST as Quartz does, with code found in the comment-stripped page; 52 cases, 12 of them about comments, checked against Quartz's own order. Windows owes the comment mask with the code mask |
 | What publishing and unpublishing do to linked pages, and what is never swept | `shared-rules.json` → `followingLinks` | SharedRulesContract (3, plus #294's `testThePublishingCasesSayWhatABodyIs`; since #201 `testTheWalkStopsAtAClassPageAndSaysWhy` asserts `appliesTo` NAMES unpublishing and that `unpublishing.casesNote` defines its harness, and `testTheExclusionsTheContractNamesAreExplained` pins the exclusions at three), AssistToolRunner (9, plus #294's `testPublishingFollowsLinksAsTheContractSays`, which shares one harness with the `stopsAtAClassPage` loop, plus #201's five: `testUnpublishingStopsAtALinkedClassAsTheContractSays`, which walks `unpublishing.cases`, and four the case layout cannot express — a whole unit, a range of dates, and the order of the reasons both ways), ClubNounTests (1, #201's meeting twin). Its `stopsAtAClassPage.cases` (3) arrived 2026-09-19 with [#173](https://github.com/russellgordon/plantoir/issues/173), and `publishing.cases` (2) — links written in a TABLE, with the alias pipe escaped, followed through a real publish — arrived 2026-09-26 with [#294](https://github.com/russellgordon/plantoir/issues/294), and its second case, a link shown as an example inside code is NOT followed, the same day with [#313](https://github.com/russellgordon/plantoir/issues/313); `publishing.casesNote` says what a page's `body` means, so the harness can be built from the contract alone. `unpublishing.cases` (4) arrived 2026-09-26 with [#201](https://github.com/russellgordon/plantoir/issues/201), when `stopsAtAClassPage.appliesTo` gained `"unpublishing"`: an unpublish stops at a class page too, and `unpublishing.casesNote` defines the harness (plan first, `expectPlanSays` resolved through `assist-wording.json`, `expectUntouched` byte-identical). `neverTakenDownByFollowingLinks` deliberately stays at three — a class is a stop, not an exclusion. None of the three has a Windows reader — see the census table below. The three `publishing` booleans stay TRUE and both suites assert them: the walk is still transitive, it has one stop |
 | Whether the assistant asks before changing anything, and when it says so | `shared-rules.json` → `assistantConfirmation` | SharedRulesContract (1), AssistPlanMode (6), AssistantSettings (6) |
@@ -526,7 +531,7 @@ recounted 2026-09-07.
 | "Schedule a deploy …" read as the deploy-at-a-time family, "schedule a deploy" with no time ASKED in code (never a deploy now), and "cancel the scheduled deploy" — including the prompt shelf's own "Cancel scheduled deploy" — the spellings answered in code and the ones that go to the model ([#424](https://github.com/russellgordon/plantoir/issues/424), [#449](https://github.com/russellgordon/plantoir/issues/449)) | `assist-cases.json` → `scheduleAndCancel` (accepted 10, asksForTheTime 7, refused 11) | `ScheduleAndCancelFramesTests` on BOTH apps (the mac's since #449: every row through `matching`, and every refused row through `morningOrEvening`, `timeToSayAs` and `asksWhenToSchedule` as well; plus the agent-level checks — no model request, the named sentence, the trail lines); `research/ai-assist/trimmed-surface-suite.py` mirrors the frames. AUTHORED from Windows, arrived 2026-10-04 (v1.4.3 bundle A). The question for a missing time is `wording.scheduleADeployNeedsATime`, generated on the mac since #449 from Windows' sentence byte for byte. The accepted row "Cancel scheduled deploy" was added from the mac with #449: Windows' cancel frame accepts the bare form since #466 (v1.4.4), so the row passes on both apps. |
 | A new unit, a unit or day other than the next one, and several class pages asked of `add_next_class`, which carries only a course and a section on the local surface: the sentences answered in code, the ones that go to the model, the ones settler S3 stops and points (and why), the ones it must leave running, and the sentences the pointer quotes ([#440](https://github.com/russellgordon/plantoir/issues/440)) | `assist-cases.json` → `nextClassUnits` (accepted 11, notThis 12, pointed 25, runs 17, pointerSentences 3) and seven `scenarios` | `NextClassUnitsTests` on the mac (every row through `matching` and `AssistNextClassUnits.kind`; `reachesModel` pinned both ways; every sentence each pointer quotes typed back as a card and RUN in a Unit, a Module and a numbered course), AssistScenario (the seven scenarios), and `research/ai-assist/trimmed-surface-suite.py`, whose mirror is checked against these rows; `next-class-unit-probes.py` reads the pointed and runs rows. AUTHORED on the mac, 2026-10-07. **Read on Windows since 2026-10-08** (#440's Windows half): `NextClassUnitsTests` (every row through `AssistCardCommand.Matching` and `AssistNextClassUnits.KindOf`; each row that reaches the model is also sent through the agent, since Windows has interception layers the matcher alone does not see; every quoted sentence RUN as a card in a Unit, a Module and a numbered course) and AssistScenario (the seven scenarios). The three pointer sentences are generated (`wording.nextClassNeedsItsOwnPhrasing…`). |
 | What Undo Last Change does with each file a change touched — put back, already back (not written, not counted, not holding the change), or left alone — where "no file" means nothing at the path (a folder or a file that is not UTF-8 is left alone), and when the change comes off the list; press by press, the counts, the changes left, the sentence by its wording key and the Section menu's trail ending ([#555](https://github.com/russellgordon/plantoir/issues/555)) | `assist-cases.json` → `undoFiles` (files 14, presses 3) | `UndoFilesContractTests` on the mac (every row against real files through `AssistChangeHistory`; `AssistUndoVerdict.of` is the one rule, also used by the start-of-year undo sheet). AUTHORED on the mac, 2026-10-17. **Owed by Windows** (the `windows` issue drafted from #555): its `UndoHistory.Undo` gains the same verdict. |
-| The in-app assistant's Open in Obsidian, `open_in_obsidian`: which sentences reach it (all matched in code — it was measured against the local model and is NOT shown to it), which must not, what the section window's press comes to and the sentence for each, the refusal from another app's assistant and on a Mac without Obsidian, a course kept for reference running, and the turn ending in code ([#610](https://github.com/russellgordon/plantoir/issues/610)) | `assist-cases.json` → `openInObsidian` (accepted 7, nearMisses 6, recordedOnly 1), ten `scenarios` (new `given` keys `obsidianPress`, `obsidianPage`, `obsidianInstalled`, `keptForReference`; new event `openInObsidian`), four `nearMisses.phrasings`, `toolDescriptions` → `open_in_obsidian`; eight `wording.` sentences; `shared-rules.json` → `activityTrail.mustRecord` "page opened in Obsidian" and `obsidianOpensThePreviewedPage.rule` name the assistant as a door | `OpenInObsidianPhrasingsTests`, AssistScenario (the ten), `ObsidianOpensThePreviewedPageTests` (the press, read once, one trail line) on the mac; `research/ai-assist/open-in-obsidian-610-probes.py` reads the sentences. AUTHORED on the mac, 2026-10-24. **Owed by Windows** (the `windows` issue for #610): the tool on `plantoir-mcp.exe`, the app pressing its own button, the phrasings and the scenarios — RED in `NamedGapLedger.AssistWordingKeys` and `AssistScenarios` until done or ledgered. |
+| The in-app assistant's Open in Obsidian, `open_in_obsidian`: which sentences reach it (all matched in code — it was measured against the local model and is NOT shown to it), which must not, what the section window's press comes to and the sentence for each, the refusal from another app's assistant and on a Mac without Obsidian, a course kept for reference running, and the turn ending in code ([#610](https://github.com/russellgordon/plantoir/issues/610)) | `assist-cases.json` → `openInObsidian` (accepted 7, nearMisses 6, recordedOnly 1), ten `scenarios` (new `given` keys `obsidianPress`, `obsidianPage`, `obsidianInstalled`, `keptForReference`; new event `openInObsidian`), four `nearMisses.phrasings`, `toolDescriptions` → `open_in_obsidian`; eight `wording.` sentences; `shared-rules.json` → `activityTrail.mustRecord` "page opened in Obsidian" and `obsidianOpensThePreviewedPage.rule` name the assistant as a door | `OpenInObsidianPhrasingsTests`, AssistScenario (the ten), `ObsidianOpensThePreviewedPageTests` (the press, read once, one trail line) on the mac; `research/ai-assist/open-in-obsidian-610-probes.py` reads the sentences. AUTHORED on the mac, 2026-10-24. **Run on Windows since 2026-10-28** ([#690](https://github.com/russellgordon/plantoir/issues/690)): `OpenInObsidianPhrasingsContractTests`, `AssistCardCommandTests`, `AssistScenarioTests` (nine of the ten, including the refusal by the real server), `AssistSurfaceContractTests` (served: the contract's 38 ⊂ the 43) and `ContractTests.AssistWording_MatchesContract` (seven sentences). `wording.obsidianIsNotOnThisMac` and the scenario "on a Mac without Obsidian" are held in `NamedGapLedger` against mac [#698](https://github.com/russellgordon/plantoir/issues/698): the sentence names "this Mac" without `{machine}`, so Windows says "this PC". |
 | Naming, numbering, making room | `class-planning.json` | ClassPlanning (13), NextClass (13) |
 | A numbered course (#267 — a club's “Week 1”): its cases in `pageNaming`, `nextClass` (incl. a DATED case in CODING's shape: `existingClasses`, `timetable`, `expectDate`), `insertion` (incl. `numberedPosition`; CODING's sparse dates at a gap, at an existing number and a collision run — `expectAddedOn`, `expectNoMoves`), `duplication` (incl. into a gap), `refusals`, `numberedClassOrder.numberedScheme`, the new `wholeUnit` list, and `insertion.positionInSentences` (#268); the wizard's choice in `shared-rules.json` → `wizard.clubToggle` | `class-planning.json`, `shared-rules.json` | ClassPlanningContractTests, NumberedCourseTests, ClubFillTests on the mac. **Windows runs the old runners**: a case carrying `"scheme": "numbered"` read through the Unit/Day parser should go RED there (not run from the mac) — that is the request, owed under the #267 Windows issue, and `wholeUnit` + `numberedPosition` + `clubToggle` are new lists nothing there reads yet. |
 | Which line of a section's front page is repointed: the embed is found by the CLASS PAGE it names, never by the heading above it; what happens when there is no class embed at all (#267) | `class-planning.json` → `sectionIndexPointer` | `ClassPlanningContractTests.testTheFrontPageIsRepointedAsTheContractSays` on the mac (27 cases — 9, and since #397 eighteen more: the class line read outside code and `%%` comments, the one line found rewritten, the FORM the teacher wrote kept as far as the site can draw it (`writtenAs`: a section path always carries the class's name), a `.md`, Windows line endings; every expected line is also run through the build's `rewrite_section_wikilinks` by `scripts/test_front_page_lines_resolve.py`, in verify.sh and on Windows). AUTHORED. Its `dateCases` (13 — 9, plus #397's comment, fence, `.md` and CRLF cases, #275) pin the front page's DATE: every case is run by the build (`scripts/test_dates_follow_the_class.py`, both platforms), and the nine with a `pointAt` by the mac's pointer (`testTheFrontPagesDateFollowsTheClassItShows`) — owed by Windows' pointer, with `expectCreatedDayOnWindows` where it inserts an embed. The one place two platforms are ALLOWED to differ, and both answers are data: where no line transcludes a class page the mac leaves the page alone (`expectBody: null`) and Windows inserts the embed under the course's own heading (`expectBodyOnWindows`). **Windows goes RED** on the club's heading, CODING's hand-made h2, the front page with no heading, and "Help Sessions" directly under the heading — `SectionIndex.cs` finds the embed by the literal "# Most Recent Class" and takes the first `![[` below it; that is the request |
@@ -552,7 +557,7 @@ recounted 2026-09-07.
 | File ▸ Open Recent: which folders it lists, in what order and under what titles, and what a teacher is told when one cannot be opened (#457) | `shared-rules.json` → `openRecent` (`cap`, `addingCases` 6 — one `appliesOn: ["mac"]` —, `titleCases` 3, `wording`); `activityTrail.mustRecord` → "recent working folders cleared" | `RecentWorkingFoldersTests` (8), `NewWindowOnAFolderTests` (7, the no-window open and Open Recent through the real model). AUTHORED 2026-10-08. Windows: `OpenRecentContractTests` (the cap, the adding cases that apply to it, the titles, and the wording Windows can reach) and the trail event since 2026-10-15 (#488, batch 2A). |
 | What a teacher is told when a folder a feature needs has gone, what Plantoir offers to put right, and what it REFUSES to touch | `shared-rules.json` → `siteHealth` | SiteHealthContract (9), SiteHealthFinding (19), ScheduledDeployFolderProblem (3), SiteHealthRepair (25), and `scripts/test_site_health.py`. `marker.consoleCases.cases` (4) arrived 2026-09-25 with [#153](https://github.com/russellgordon/plantoir/issues/153) — what the console shows of a marker line glued to another, still arriving, or on its own — and `SiteHealthContract.testTheConsoleCasesHold` walks all four; **no Windows reader**, see the census table below |
 | What the build does with a page whose settings it cannot read: hidden in every section, named once per section build with the line it stopped near, and an unreadable front page refused in its own words ([#246](https://github.com/russellgordon/plantoir/issues/246)) | `shared-rules.json` → `unreadablePageSettings`, `siteHealth.checks[pageSettingsUnreadable]`; `app-rules.json` → `failureExplanations` (the three front-page cases) | `scripts/test_unreadable_page_settings.py` (in the image by `verify.sh`, on Windows by `PythonToolchainTests`), `scripts/test_site_health.py`, `scripts/check_visibility_against_the_site.py` (down to the site, `verify.sh` only), SiteHealthContract and AppRulesContract on the mac. AUTHORED. Shared Python, so Windows inherits the rule, the console line and the finding's words; it owes the front page's `FailureExplainer` card |
-| A section front page whose title Plantoir wrote with an unquoted `: ` before 1.8.1, quoted by the BUILD on every build — in the teacher's page when it may be changed, in the build's copy always — so the section has its website ([#584](https://github.com/russellgordon/plantoir/issues/584)) | `shared-rules.json` → `buildRepairs` (`marker`, `frontPageTitleQuoted`: the rule, the console sentences, `trailLine` and 23 `cases`); `transcriptStripping.machineLines` (the marker's line) | `scripts/test_front_page_title_repair.py` (in the image by `verify.sh`, on Windows by `PythonToolchainTests`, which needs python-frontmatter 1.3.0 and PyYAML 6.0.3), BuildRepairReportTests on the mac. AUTHORED. Shared Python, so Windows inherits the repair and its console sentences; both apps read the `PLANTOIR_REPAIRED:` line onto the trail as `folder problem repaired`, from the console and from a scheduled run's record (Windows: `BuildRepairReport.cs`, also from a run `plantoir-mcp` started, [#645](https://github.com/russellgordon/plantoir/issues/645)) |
+| A section front page whose title Plantoir wrote with an unquoted `: ` before 1.8.1, quoted by the BUILD on every build — in the teacher's page when it may be changed, in the build's copy always — so the section has its website ([#584](https://github.com/russellgordon/plantoir/issues/584)) | `shared-rules.json` → `buildRepairs` (`marker`, `frontPageTitleQuoted`: the rule, the console sentences, `trailLine` and 23 `cases`); `transcriptStripping.machineLines` (the marker's line) | `scripts/test_front_page_title_repair.py` (in the image by `verify.sh`, on Windows by `PythonToolchainTests`, which needs python-frontmatter 1.3.0 and PyYAML 6.0.3), BuildRepairReportTests on the mac. AUTHORED. Shared Python, so Windows inherits the repair and its console sentences; both apps read the `PLANTOIR_REPAIRED:` line onto the trail as `folder problem repaired`, from the console and from a scheduled run's record (Windows: `BuildRepairReport.cs`, also from a run `plantoir-mcp` started, [#645](https://github.com/russellgordon/plantoir/issues/645); since [#660](https://github.com/russellgordon/plantoir/issues/660) all three Windows readers, and every other build marker, go through one dispatch, `BuildMachineLines.Record`, pinned by `BuildMachineLinesTests` and `LauncherRunnerCaptureTests`) |
 | What enables Course Settings' Save and Revert — over every key, per-section ones included — when a destination problem holds Save back (only when the edit moves the destination), and the sentence and trail line when it does ([#364](https://github.com/russellgordon/plantoir/issues/364), [#373](https://github.com/russellgordon/plantoir/issues/373)); which locked Class Pages rows are drawn ([#376](https://github.com/russellgordon/plantoir/issues/376)); Course Settings' own sentences and the words no label may use ([#369](https://github.com/russellgordon/plantoir/issues/369)) | `shared-rules.json` → `savingSettings.whatEnablesSave` (`perSectionKeys`, `baseShape`, `freshOpenCases` 10 — the tenth, a null `print_blanks`, proposed from the mac with #537 —, `perSectionEditCases` 7, `heldBackCases` 7), `wizard.clubToggle.settingsRows.shownWhen` / `shownWhenCases` (8; `frontPageHeadingNotSet` RETIRED), `courseSettingsWording`, `userFacingLabelWords`; `activityTrail.mustRecord` → "settings save held back"; `file-formats.json` → `courseConfigKeys` gains `color_schemes` | SaveEnablesTests (9: every case, the fresh-open shapes opened in the real window and read through accessibility, a section toggle pressed through accessibility, the held-back sentence and its one trail line), ClubFill (`testTheLockedRowsAreShownOnlyWhenRecorded`, and the retired key's absence), UserFacingLabelWords (4: the sentences, and a whole-word scan of every label literal in the views). AUTHORED, arrived 2026-09-29. **No Windows reader yet** for any of the four blocks — Windows deserialises by named key, so nothing goes red there except the new trail event; the `windows` issue asks them to ADD readers. |
 | The Delete key on a selected sidebar row: which menu item it asks for, run under that item's own enablement and question (#457 item 4, the HIG sweep) | `shared-rules.json` → `sidebarDeleteKey` (`cases` 6, `rejected`) | `SidebarDeleteKeyTests` (4) on the mac. AUTHORED 2026-10-08 with batch C. **Read on Windows since #491 part B (2026-10-15)**: `SidebarDeleteKeyContractTests` (the 6 cases through `SidebarDeleteKey.ItemFor`, the row names by the 2A mapping, `rejected` non-empty, and the − button's enablement against every `subjectMenus` case whose row is a course or a section — so both reference-section cases grey it, where Windows' − used to remove the whole course). No `minusButtonCases` key was proposed: those `subjectMenus` cases already pin it, and the mac implements and tests it (`SidebarMinusButtonTests`). Counted in the rule-set count at the top of this file (54, re-taken on the merged tree). |
 
@@ -758,7 +763,7 @@ ledger), and the wording block gained `scheduleReplaces` with a new
 
 **Re-taken 2026-09-25 with [#275](https://github.com/russellgordon/plantoir/issues/275) and [#276](https://github.com/russellgordon/plantoir/issues/276)**
 (pages take their class's date). The walker read **171** at `origin/dev`
-(c02f5d3b — the 163 above was not re-taken by the pieces between) and reads
+(2843ab7c — the 163 above was not re-taken by the pieces between) and reads
 **174** after: `sectionIndexPointer.dateCases.cases` (9),
 `datingPagesAClassBrings.atBuildTime.cases` (14 — 12 when first written; the
 fix round the same day added the hub case and a plain YAML date) and
@@ -771,7 +776,7 @@ which is not a new list. The two `atBuildTime` lists DO have a Windows reader
 seven `dateCases` with a `pointAt` are owed by Windows' own pointer.
 **Re-taken 2026-09-25 with [#194](https://github.com/russellgordon/plantoir/issues/194)**
 (asking "morning or evening?" in code). The walker read **171** at `origin/dev`
-(9d4bf2a6) and **172** after on its own branch — **175** on the merged tree,
+(d4d4a510) and **172** after on its own branch — **175** on the merged tree,
 re-taken with the walker after #275 (above) had made it 174: `deployAtATime.asked` (9) is new, and has
 no Windows reader, so it joins the `deployAtATime` row in the table below.
 The review's fix round took `asked` to 11 (`deploy at 6.30` moved there from
@@ -784,7 +789,7 @@ wording block gained `morningOrEvening`, rendered with literal values rather
 than placeholders — see the `asked` rows for every other input.
 **Re-taken 2026-09-25 with [#175](https://github.com/russellgordon/plantoir/issues/175)**
 (adding a section finds frontmatter the build's way). The walker reads **171**
-at `origin/dev` (9d4bf2a6) and **172** after on its own branch — **176** on the
+at `origin/dev` (d4d4a510) and **172** after on its own branch — **176** on the
 merged tree, re-taken with the walker after #275 and #194 (above) had made it
 175. The one new list is
 `course-management.json` → `sectionNumbers.addingKeysToAPage.cases` (7), with
@@ -801,7 +806,7 @@ an event Windows has to record or ledger.
 
 **Re-taken 2026-09-25 with [#242](https://github.com/russellgordon/plantoir/issues/242)**
 (what backups take, and deleting several), counted ON THIS BRANCH — which
-carries `origin/dev` 634182d7 (#235, #275 and #276), not whatever `dev` holds
+carries `origin/dev` d2f60814 (#235, #275 and #276), not whatever `dev` holds
 when it merges. Re-taken at the merge: **179** on the merged tree (176 after #175, above, plus these three), and `activityTrail.mustRecord` **73**. On this branch the walker read **174** before
 #242's lists and **177** after: `course-management.json` → `backups.pruneCases` (3),
 `.sizeCases` (2) and `.deleteCases` (3), none with a Windows reader, all in the
@@ -816,7 +821,7 @@ the same base; the merge that lands second re-counts. Re-taken at the merge, the
 last of the batch: **180** on the merged tree, and `activityTrail.mustRecord` **73**.
 **Re-taken 2026-09-25 with [#277](https://github.com/russellgordon/plantoir/issues/277)**
 (a deploy time the family can read but does not set is answered with the
-spelling to use). The walker read **180** at `origin/dev` (43d8e853) and
+spelling to use). The walker read **180** at `origin/dev` (5c70aac0) and
 **181** after (and still 181 after the fix round) on its branch — **186** on the merged tree, re-taken at the merge after #280 and #245 (above): `deployAtATime.sayItAs` (45) is new, with no Windows reader, so
 it joins the `deployAtATime` row in the table below. `deployAtATime.asked`
 went from 11 to 25, `.refused` from 28 to 51 (`deploy at 6.30 pm` moved to
@@ -829,7 +834,7 @@ renderings of one function, see the
 
 **Re-taken 2026-09-25 with [#245](https://github.com/russellgordon/plantoir/issues/245)**
 (the import's lease edges), counted ON THIS BRANCH, which carries
-`origin/dev` 43d8e853. The walker read **180** before it and **183** after on its branch — **185** on the merged tree (re-taken at the merge: #280's `previewPorts` case lists had taken dev to 182 without a re-take, which is the drift this paragraph exists to catch):
+`origin/dev` 5c70aac0. The walker read **180** before it and **183** after on its branch — **185** on the merged tree (re-taken at the merge: #280's `previewPorts` case lists had taken dev to 182 without a re-take, which is the drift this paragraph exists to catch):
 `shared-rules.json` → `workLeases.liveness.cases` (19 — 18 when first written; review L2 added a one-line import lease),
 `referenceCourses.importing.oneImportPerCourseAtATime.cases` (9) and
 `file-formats.json` → `workLease.bodyCases` (7). None has a Windows reader; all
@@ -858,7 +863,7 @@ of `course could not be imported for reference` now says it is written for
 every course the summary lists as not imported.
 **Re-taken 2026-09-25 with [#192](https://github.com/russellgordon/plantoir/issues/192)**
 (a command-line re-run of setup keeps the marks pool), counted ON THIS BRANCH
-from `origin/dev` 68214a6c. The walker read **187** before it and **188** after:
+from `origin/dev` f0512ae8. The walker read **187** before it and **188** after:
 one new list, `shared-rules.json` → `gradedFolders.rerunningSetup.cases` (11),
 read on Windows by `PythonToolchainTests` through the discovered
 `scripts/test_graded_folders_rerun.py`, so it adds nothing to the hand-checked
@@ -870,7 +875,7 @@ Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **188** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#136](https://github.com/russellgordon/plantoir/issues/136)**
 (the preview-build check reads every page), counted ON THIS BRANCH, which
-carries `origin/dev` 68214a6c. The walker read **187** before it and **188**
+carries `origin/dev` f0512ae8. The walker read **187** before it and **188**
 after: one new list, `app-rules.json` → `buildFreshness.previewBuild.cases`
 (9). It HAS a Windows reader — `scripts/test_preview_build_detection.py`,
 discovered by `PythonToolchainTests`, runs `deploy.py`'s check against it — so
@@ -882,7 +887,7 @@ and not a list. No trail event, so `activityTrail.mustRecord` is unchanged.
 Re-taken at the merge into `dev`: **189** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#234](https://github.com/russellgordon/plantoir/issues/234)**
 (preview.sh makes sure this Mac can reach the builder before it builds),
-counted ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read
+counted ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read
 **187** before it and **188** after on this branch: one new list,
 `app-rules.json` → `previewPorts.whenThisMacCannotReachTheBuilder.cases` (10),
 with no Windows reader that runs it — its row is below.
@@ -892,7 +897,7 @@ existing "preview did not appear" event, whose `carries` grew and which gained
 Re-taken at the merge into `dev`: **190** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#137](https://github.com/russellgordon/plantoir/issues/137)**
 (a scheduled publish whose build failed outright names no destination), counted
-ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **188** after: one new list, `shared-rules.json` →
 `scheduledPublishStopped.whichKind.cases` (6), with no Windows reader — its row
 is below. `activityTrail.mustRecord` is unchanged at **75**: the line for a
@@ -902,7 +907,7 @@ sentence `buildDidNotFinish` (objects, not lists).
 Re-taken at the merge into `dev`: **191** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#255](https://github.com/russellgordon/plantoir/issues/255)**
 (Obsidian add-ons stay behind on every route to a reference course), counted
-ON THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+ON THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **192** after: `shared-rules.json` →
 `referenceCourses.obsidianAddOns` adds five lists —
 `leftBehindInsideObsidian` (3), `kept` (5), `cases` (9 — 8 when first written; the review split the linked-settings case in two), `knownLimits` (3)
@@ -915,7 +920,7 @@ grew instead. The two wording blocks gained `addOnsAreLeftBehind` and
 Re-taken at the merge into `dev`: **196** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#153](https://github.com/russellgordon/plantoir/issues/153)**
 (folder problems: the overnight trail line and two console leaks), counted ON
-THIS BRANCH, which carries `origin/dev` 68214a6c. The walker read **187**
+THIS BRANCH, which carries `origin/dev` f0512ae8. The walker read **187**
 before it and **188** after: one new list, `shared-rules.json` →
 `siteHealth.marker.consoleCases.cases` (4), with no Windows reader — its row
 is below. No trail event was added — the scheduled run now WRITES the existing
@@ -925,7 +930,7 @@ Re-taken at the merge into `dev`: **197** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#246](https://github.com/russellgordon/plantoir/issues/246)**
 (a page whose settings the build cannot read is hidden and named), counted ON
-THIS BRANCH, which is built on #153's (05bc5216). The walker read **188**
+THIS BRANCH, which is built on #153's (467c9c40). The walker read **188**
 before it and **189** after: one new list, `shared-rules.json` →
 `unreadablePageSettings.cases` (18). It HAS a Windows reader —
 `scripts/test_unreadable_page_settings.py`, which `PythonToolchainTests`
@@ -943,7 +948,7 @@ Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **198** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#227](https://github.com/russellgordon/plantoir/issues/227)**
 (a folder publish never misreads the path), counted ON THIS BRANCH, which
-carries `origin/dev` 68214a6c. The walker read **187** before it and **188**
+carries `origin/dev` f0512ae8. The walker read **187** before it and **188**
 after: one new list, `shared-rules.json` → `folderPublishTarget.cases` (6),
 read by `scripts/test_deploy_folder_target.py` — which Windows' PythonToolchainTests
 discovers and SKIPS there (no bash that can reach a scratch folder), so it is
@@ -955,7 +960,7 @@ No trail event was added, so `activityTrail.mustRecord` is unchanged at 75, and
 Re-taken at the merge into `dev`: **199** lists on the merged tree, `activityTrail.mustRecord` **76**.
 **Re-taken 2026-09-25 with [#167](https://github.com/russellgordon/plantoir/issues/167)**
 ("what does this page link to?" answered in code), counted ON THIS BRANCH,
-which carries `origin/dev` 68214a6c. The walker read **187** before it and
+which carries `origin/dev` f0512ae8. The walker read **187** before it and
 **194** after: `assist-cases.json` → `linksQuestion.accepted` (33),
 `.anotherCourse` (10), `.onlyIfAPageIsCalled` (5), `.refused` (34),
 `.answering.section` (9), `.answering.cases` (13) and `.answering.lookup` (9)
@@ -971,7 +976,7 @@ Re-taken at the merge into `dev`: **206** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#212](https://github.com/russellgordon/plantoir/issues/212)**
 (a scheduled publish tells the teacher with a notification), counted ON THIS
-BRANCH, which is built on #137's (6e966265). The walker read **188** before it
+BRANCH, which is built on #137's (1ab0cdd2). The walker read **188** before it
 and **191** after: three new lists under `shared-rules.json` →
 `scheduledPublishStopped.notification` — `announcing.cases` (5, each `everyKind`
 row played once per kind), `onShow.cases` (4) and `asking.cases` (7) — none
@@ -983,7 +988,7 @@ Re-taken at the merge into `dev`: **209** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#182](https://github.com/russellgordon/plantoir/issues/182)**
 (a restore carries a key with its lines, and says what it could not put
-back), counted ON THIS BRANCH, which is built on #246's (402c8e3a). The walker
+back), counted ON THIS BRANCH, which is built on #246's (2175a5be). The walker
 read **189** before it and **190** after: one new list,
 `course-management.json` → `backups.restoringOneSectionsKeys.cases` (6), with
 no Windows reader — its row is below. `activityTrail.mustRecord` grew from 75
@@ -995,22 +1000,22 @@ Re-taken at the merge into `dev`: **210** lists on the merged tree, `activityTra
 
 **Re-taken 2026-09-25 with [#94](https://github.com/russellgordon/plantoir/issues/94)**
 (a workspace is remade only once nothing is running in it), counted ON THIS
-BRANCH, which is built on #189's (7f01653e, itself off `origin/dev`
-68214a6c). The walker read **187** before it and **189** after: two new
+BRANCH, which is built on #189's (83b7f853, itself off `origin/dev`
+f0512ae8). The walker read **187** before it and **189** after: two new
 lists, `app-rules.json` → `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases`
 (14) and `.sequences.cases` (6), both mac-only by `appliesOn` and in the table
 below. `activityTrail.mustRecord` grew from 75 to **76** (`workspace was in
-use`, `appliesOn: ["mac"]`), which is not a new list. Re-taken at the merge of `origin/dev` (366e7f11+) into this branch: **211** lists on the merged tree (209 on dev plus these two), `activityTrail.mustRecord` **78**.
+use`, `appliesOn: ["mac"]`), which is not a new list. Re-taken at the merge of `origin/dev` (c90f35c4+) into this branch: **211** lists on the merged tree (209 on dev plus these two), `activityTrail.mustRecord` **78**.
 Re-taken at the merge into `dev`: **212** lists on the merged tree, `activityTrail.mustRecord` **79**.
 
 **Re-taken 2026-09-25 with [#237](https://github.com/russellgordon/plantoir/issues/237)**
 (one scheduled deploy per section per working folder), counted ON THIS BRANCH
-(on `dev` 56f0d7c5): still **209**. `scheduledDeployCancellation.cases` grew
+(on `dev` 3af11121): still **209**. `scheduledDeployCancellation.cases` grew
 from 10 to 15, which is not a new list, and the new
 `scheduledDeployCancellation.oneAlarmPerWorkingFolder` holds prose and a
 `rejected` list of STRINGS, which the walker rightly does not count.
 `activityTrail.mustRecord` is unchanged at **77** on this branch (no new event; measured — an earlier draft of this note said 78). The director re-takes both numbers at the merge.
-Re-taken at the merge of `origin/dev` (f0a1550c+) into this branch: **212** lists on the merged tree, `activityTrail.mustRecord` **79** — both unchanged by #237.
+Re-taken at the merge of `origin/dev` (4860be32+) into this branch: **212** lists on the merged tree, `activityTrail.mustRecord` **79** — both unchanged by #237.
 Re-taken at the merge into `dev`: **212** lists on the merged tree, `activityTrail.mustRecord` **79**.
 Re-taken at the merge into `dev`: **213** lists on the merged tree, `activityTrail.mustRecord` **79**.
 Re-taken at the merge into `dev`: **215** lists on the merged tree, `activityTrail.mustRecord` **79**.
@@ -1047,7 +1052,7 @@ Re-taken at the merge into `dev`: **285** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **289** lists on the merged tree, `activityTrail.mustRecord` **123**.
 
 **Re-taken 2026-09-26 with [#301](https://github.com/russellgordon/plantoir/issues/301)**
-(the trail read back leniently), counted ON THIS BRANCH (on `dev` cf80225a): **212**
+(the trail read back leniently), counted ON THIS BRANCH (on `dev` 8efb581a): **212**
 before and **213** after — one new list, `shared-rules.json` →
 `problemReportTrail.cases` (12), in the table below and owed by the `windows`
 issue drafted for #301. `problemReportTrail.noteOrder` is a list of STRINGS, which
@@ -1058,7 +1063,7 @@ read" says why a trail line was rejected).
 
 **Re-taken 2026-09-26 with [#292](https://github.com/russellgordon/plantoir/issues/292)**
 (a new course is written its payload's marks pool), counted ON THIS BRANCH off
-`dev` cf80225a. The walker read **212** before it and **214** after: two new
+`dev` 8efb581a. The walker read **212** before it and **214** after: two new
 lists, `shared-rules.json` → `gradedFolders.newCourse.cases` (6) and
 `.manifestCases` (8). Both HAVE a Windows reader for their command-line half —
 `scripts/test_graded_folders_new_course.py`, discovered by
@@ -1070,7 +1075,7 @@ still has thirty-two top-level keys — `newCourse` sits inside `gradedFolders`.
 
 **Re-taken 2026-09-26 with [#294](https://github.com/russellgordon/plantoir/issues/294)**
 (an escaped pipe `[[X\|alias]]` names X for every reader), counted ON THIS
-BRANCH (off `dev` cf80225a). The walker read **212** before it and **215**
+BRANCH (off `dev` 8efb581a). The walker read **212** before it and **215**
 after: three new lists, `shared-rules.json` → `readingALink.cases` (10),
 `readingALink.rejected` (4, prose) and `followingLinks.publishing.cases` (1),
 all in the table above. Three existing lists grew by one case each and are not
@@ -1082,7 +1087,7 @@ already passes) and `copyingAPageBetweenCourses.cases` (27 → 28).
 **Re-taken 2026-09-26 with [#310](https://github.com/russellgordon/plantoir/issues/310)**
 (the preview port walk sees every account; a preview looks before starting a
 stopped workspace and before announcing its address), counted ON THIS BRANCH,
-off `origin/dev` cf80225a. The walker read **212** before it and **213**
+off `origin/dev` 8efb581a. The walker read **212** before it and **213**
 after: one new list, `app-rules.json` →
 `previewPorts.whenAnotherAccountHasTheAddress.cases` (12), mac-only by
 `appliesOn` and in the table below. `previewPorts.hostBlockCases` grew from 12
@@ -1094,7 +1099,7 @@ first.
 
 **Re-taken 2026-09-26 with [#311](https://github.com/russellgordon/plantoir/issues/311) and [#290](https://github.com/russellgordon/plantoir/issues/290)**
 (one piece: reopening the last working folder, and refusing one the builder
-cannot reach), counted ON THIS BRANCH (on `dev` cf80225a). The walker read
+cannot reach), counted ON THIS BRANCH (on `dev` 8efb581a). The walker read
 **212** before it and **219** after: seven new lists, all in `shared-rules.json` —
 `reopeningTheLastWorkingFolder.launchCases` (7), `.folderCases` (11),
 `.memoryCases` (3) and `.rejected` (10), owed by the `windows` issue from #311;
@@ -1105,14 +1110,14 @@ exempt permanently (`appliesOn: ["mac"]`). All seven are in the table below.
 which is not a new list; the first two are events Windows has to record or
 ledger. Review round (same day): `folderCases` grew from 11 to 13 and
 `diskCases` from 7 to 8, and `rejected` from 10 to 11 — rows, not lists.
-Re-taken at the merge of `origin/dev` (46149ac1) into this branch, with the
+Re-taken at the merge of `origin/dev` (4d9dbf95) into this branch, with the
 walker: **226** lists on the merged tree (219 on dev plus these seven),
 `activityTrail.mustRecord` **83** (80 on dev plus these three), and
 `shared-rules.json` holds **thirty-five** rule sets.
 
 **Re-taken 2026-09-26 with [#306](https://github.com/russellgordon/plantoir/issues/306)**
 (a click on a scheduled publish's notification opens that section), counted ON
-THIS BRANCH (off `dev` de4a79e1, which read **226**). The walker reads **228**:
+THIS BRANCH (off `dev` 924eb65b, which read **226**). The walker reads **228**:
 two new lists, both in `shared-rules.json` —
 `scheduledPublishStopped.notification.onClick.cases` (16, three of them
 `appliesOn: ["mac"]`) and `.rejected` (10), owed by the `windows` issue from
@@ -1125,20 +1130,20 @@ to 17 (a mac-only case, a folder out of the builder's reach) — a row, not a li
 
 **Re-taken 2026-09-26 with [#312](https://github.com/russellgordon/plantoir/issues/312)**
 (the Mac app carries its website builder's helper programs and starting disk),
-counted ON THIS BRANCH after merging `dev` 9eb779ac (#204), which read
+counted ON THIS BRANCH after merging `dev` 9eaf0594 (#204), which read
 **230**. The walker read **232**: two new lists, both in `app-rules.json` →
 `helperBootstrap` — `installCases` (18; 21 after the review round, rows) and
 `firstStartCases` (6; 7 after it) — exempt permanently (`appliesOn: ["mac"]`)
 and in the table below. `activityTrail.mustRecord` grew by two ("helper
 programs installed" and "website builder created", both `appliesOn: ["mac"]`),
 which is not a new list and asks nothing of Windows; `app-rules.json` gains
-one top-level key. Re-taken with the walker at the merge of `dev` 163095eb
+one top-level key. Re-taken with the walker at the merge of `dev` a393592d
 into this branch: **244** lists on the merged tree (242 on dev plus these
 two), `activityTrail.mustRecord` **98** (96 on dev plus two), and
 `shared-rules.json` holds **thirty-nine** rule sets (unchanged by #312).
 **Re-taken 2026-09-26 with [#323](https://github.com/russellgordon/plantoir/issues/323)**
 (a scheduled deploy reads the course's settings when it runs), counted ON THIS
-BRANCH, off #322's tip (8375353a), which read **229**. The walker reads **231**:
+BRANCH, off #322's tip (f1b720be), which read **229**. The walker reads **231**:
 two new lists, both in `shared-rules.json` —
 `scheduledDeployCancellation.theDestination.cases` (12, one `appliesOn: ["mac"]`)
 and `savingSettings.scheduledDeploys.cases` (4; 5 after the review round, a row, not a list), owed by the `windows` issue
@@ -1150,18 +1155,18 @@ three at the merge if anything else landed first.
 
 **Re-taken 2026-09-25 with [#204](https://github.com/russellgordon/plantoir/issues/204)**
 (Plantoir finds and installs its own updates, slice 1), counted ON THIS BRANCH
-(on `dev` cf80225a): the walker read **212** before it and **214** after — two
+(on `dev` 8efb581a): the walker read **212** before it and **214** after — two
 new lists, `shared-rules.json` → `appUpdates.cases` (14) and
 `appUpdates.atQuit.cases` (6), both run on the mac and with no Windows reader;
 their row is in the table below. `activityTrail.mustRecord` grew from 79 to
 **87** (eight events, none with `appliesOn`), which is not a new list but eight
 events Windows has to record or ledger. Re-taken 2026-09-26 at the merge of
-`dev` ff1213ed into this branch: **230** lists on the merged tree (228 on dev plus
+`dev` 92a7099a into this branch: **230** lists on the merged tree (228 on dev plus
 these two), `activityTrail.mustRecord` **91** (83 on dev plus eight). The director
 re-takes both numbers at the merge into `dev`.
 **Re-taken 2026-09-26 with [#197](https://github.com/russellgordon/plantoir/issues/197) and [#114](https://github.com/russellgordon/plantoir/issues/114)**
 (a page list that names no page; one description per tool), counted ON THIS
-BRANCH, off `dev` ff1213ed, which read **228**. The walker reads **231**: three
+BRANCH, off `dev` 92a7099a, which read **228**. The walker reads **231**: three
 new lists, all in `assist-cases.json` → `pagesNamingNoPage` — `cases` (12),
 `everythingInAUnit.accepted` (4) and `.refused` (7) — owed by the `windows`
 issue from #197/#114 and in the table below. `cardPhrasings.parsed` grew from 9
@@ -1171,14 +1176,14 @@ find`) — rows, not lists. `toolDescriptions` adds no list: `descriptions` is a
 object keyed by tool, and `measuredDepartures` is empty. `assist-cases.json`
 gains two AUTHORED top-level keys, and the generator's `generated.note` names
 them.
-Re-taken at the merge of `origin/dev` (9eb779ac, which carries #204) into this
+Re-taken at the merge of `origin/dev` (9eaf0594, which carries #204) into this
 branch: **233** lists on the merged tree (230 on dev plus these three),
 `activityTrail.mustRecord` **92** (91 on dev plus this one).
-Re-taken again at the merge of `origin/dev` fe9cb3e5 (#201, #209, #313 and others): **236** lists, `activityTrail.mustRecord` **95**; `toolDescriptions` now pins all **35** tools the mac serves over MCP (#209's three How I Teach tools added).
+Re-taken again at the merge of `origin/dev` dec29da4 (#201, #209, #313 and others): **236** lists, `activityTrail.mustRecord` **95**; `toolDescriptions` now pins all **35** tools the mac serves over MCP (#209's three How I Teach tools added).
 
 **Re-taken 2026-09-26 with [#313](https://github.com/russellgordon/plantoir/issues/313)**
 (a link written inside code is not a link), counted ON THIS BRANCH (off #314's
-tip f7d1a608, on `dev` ff1213ed). The walker reads **228** before and after: no
+tip 3e9bf705, on `dev` 92a7099a). The walker reads **228** before and after: no
 new list. `readingALink.whatIsCode` and `.whatIsCodeLimits` are lists of
 STRINGS, which the walker rightly does not count. Six existing lists grew, and
 none is a new list: `readingALink.cases` (10 → 40), `readingALink.rejected`
@@ -1194,7 +1199,7 @@ on the merged tree (unchanged by #313), `activityTrail.mustRecord` **91**.
 
 **Re-taken 2026-09-26 with [#97](https://github.com/russellgordon/plantoir/issues/97)**
 (a folder rename follows an angle-bracket Markdown link, `[q](<Tasks/Quiz 1.md>)`),
-counted ON THIS BRANCH (off `dev` ff1213ed): **228** before and after — no new
+counted ON THIS BRANCH (off `dev` 92a7099a): **228** before and after — no new
 list. `specialNames.renameFolder.linkRewriting.cases` grew from 13 to **25**,
 rows in a list both suites already deserialise, and the new
 `linkRewriting.insideAngleBrackets` holds prose plus two lists of STRINGS
@@ -1208,7 +1213,7 @@ land in its milestone. `activityTrail.mustRecord` is unchanged at **83** (no
 new event: `folder renamed` records no link counts, so its line stays true).
 **Re-taken 2026-09-26 with [#291](https://github.com/russellgordon/plantoir/issues/291)**
 (the preview check looks for the live-reload client's tag and first
-statement, not the bare address), counted ON THIS BRANCH (off `dev` ff1213ed,
+statement, not the bare address), counted ON THIS BRANCH (off `dev` 92a7099a,
 which read **228**). The walker still reads **228**: `previewBuild.cases` grew
 from 9 to 15 — rows, not a list — and `signature` became an object whose
 `between` is an array of strings, a field rather than a case list. The six new
@@ -1217,7 +1222,7 @@ nine were; its own two readers stay owed on #272. `activityTrail.mustRecord` is
 unchanged at **83** (no new event: the piece narrows when an existing behaviour
 fires). `shared-rules.json` is untouched.
 **Re-taken 2026-09-26 with [#209](https://github.com/russellgordon/plantoir/issues/209)**
-(the teacher's How I Teach page), counted ON THIS BRANCH (off `dev` ff1213ed,
+(the teacher's How I Teach page), counted ON THIS BRANCH (off `dev` 92a7099a,
 which read **228**). The walker reads **229**: one new list,
 `shared-rules.json` → `howITeachPage.nameCases` (13), run by
 `scripts/test_how_i_teach.py` on both platforms (the build's half) and owed by
@@ -1226,15 +1231,15 @@ is a list of strings and is not counted. `activityTrail.mustRecord` grew from 83
 to **86** (`How I Teach page read`, `How I Teach page written`, `How I Teach
 page kept off the website`), which is not a new list. `shared-rules.json` holds
 **thirty-six** rule sets.
-Re-taken at the merge of `origin/dev` 9eb779ac (#204) into this branch, with the
+Re-taken at the merge of `origin/dev` 9eaf0594 (#204) into this branch, with the
 walker: **231** lists on the merged tree (230 on dev plus `howITeachPage.nameCases`),
 `activityTrail.mustRecord` **94** (91 on dev plus these three), and
 `shared-rules.json` holds **thirty-seven** rule sets. Re-taken again at the merge of `origin/dev`
-524485e9 (#314, #315): **232** lists (231 on dev plus `nameCases`),
+57fc8348 (#314, #315): **232** lists (231 on dev plus `nameCases`),
 `activityTrail.mustRecord` **94**, thirty-seven rule sets.
 **Re-taken 2026-09-26 with [#201](https://github.com/russellgordon/plantoir/issues/201)**
 (an unpublish stops at a class page), counted ON THIS BRANCH off `origin/dev`
-ff1213ed, which read **228**. The walker reads **229**: one new list,
+92a7099a, which read **228**. The walker reads **229**: one new list,
 `shared-rules.json` → `followingLinks.unpublishing.cases` (4), owed by the
 `windows` issue from #201 and in the table below. `activityTrail.mustRecord`
 is unchanged at **83** (nothing on the trail records what an unpublish
@@ -1243,7 +1248,7 @@ top-level keys, one of them `note`): the cases sit inside `followingLinks`.
 `neverTakenDownByFollowingLinks` is still three objects, deliberately.
 **Re-taken 2026-09-26 with [#322](https://github.com/russellgordon/plantoir/issues/322)**
 (the assistant reads a course's settings at the call), counted ON THIS BRANCH
-after merging `origin/dev` ff1213ed (#306), which read **228**. The walker
+after merging `origin/dev` 92a7099a (#306), which read **228**. The walker
 reads **229**: one new list, `shared-rules.json` →
 `assistantReadsSettingsAtTheCall.cases` (7), owed by the `windows` issue from
 #322 and in the table below. Its `rejected` is a list of STRINGS, so it is not
@@ -1256,7 +1261,7 @@ three at the merge if anything else landed first.
 
 **Re-taken 2026-09-26 with [#128](https://github.com/russellgordon/plantoir/issues/128)**
 (one coverage map per curriculum folder), counted ON THIS BRANCH (off `dev`
-ff1213ed, which read **228**). The walker reads **234**: seven new lists and
+92a7099a, which read **228**). The walker reads **234**: seven new lists and
 one gone, all in `shared-rules.json` — `curriculumRules.coveragePageTitles.cases`,
 `curriculumRules.coverageMapOrder.cases` (read by the build's test only: the
 map is drawn by the shared Python), `specialNames.curriculumFoldersResolution.cases`
@@ -1266,18 +1271,18 @@ and `transcriptStripping.machineLines.cases`. `activityTrail.mustRecord` grew
 from 83 to **84** (`curriculum maps built`), and `shared-rules.json` holds
 **thirty-six** rule sets (`coverageMapsBuilt`). All but `coverageMapOrder` are
 owed by Windows, in the `windows` issue from #128 and the rows below. Re-taken at the merge of
-`dev` 9eb779ac (#204) into this branch: **236** lists on the merged tree (230 on dev
+`dev` 9eaf0594 (#204) into this branch: **236** lists on the merged tree (230 on dev
 plus these six net), `activityTrail.mustRecord` **92** (91 on dev plus one), **thirty-seven**
 rule sets.
-Re-taken at the merge of `origin/dev` b917b501 (#313, #209 and others) into this branch:
+Re-taken at the merge of `origin/dev` 2a1a31bc (#313, #209 and others) into this branch:
 **238** lists on the merged tree (232 on dev plus #128's six net), `activityTrail.mustRecord`
 **95** (94 on dev plus `curriculum maps built`), **thirty-eight** rule sets.
 
-Re-taken at the merge of the director's stack 5de019ba (dev + #322 + #128 + hygiene) into #323's branch: **242** lists on the merged tree (240 on the stack, plus #323's two), `activityTrail.mustRecord` **96** (95 on the stack, plus #323's one), and `shared-rules.json` holds **thirty-nine** rule sets (#323 adds none; the stack already held thirty-nine, whatever the rule-set line above still says).
+Re-taken at the merge of the director's stack d19fd5b1 (dev + #322 + #128 + hygiene) into #323's branch: **242** lists on the merged tree (240 on the stack, plus #323's two), `activityTrail.mustRecord` **96** (95 on the stack, plus #323's one), and `shared-rules.json` holds **thirty-nine** rule sets (#323 adds none; the stack already held thirty-nine, whatever the rule-set line above still says).
 
 **Re-taken 2026-09-26 with [#152](https://github.com/russellgordon/plantoir/issues/152)**
 (the marks floor, exact exclusions, a chosen pool's spelling, and a revert
-line beside the exclusion lines written on the click), counted ON THIS BRANCH (off `dev` ff1213ed, which
+line beside the exclusion lines written on the click), counted ON THIS BRANCH (off `dev` 92a7099a, which
 read **228**). The walker reads **232**: four new lists, all in
 `shared-rules.json` — `gradedFolders.floor.cases` (17) and
 `excludedItems.recordedOnClick.cases` (9; first landed as `recordedOnSave`, 8, and replaced the same day by Russell's recorded decision), owed by the `windows` issue from #152
@@ -1291,15 +1296,15 @@ not count; `removingAFolder.cases` grew from 7 to 8, a row, not a list.
 `activityTrail.mustRecord` grew from 83 to **84**: `exclusions reverted` is new, and `item
 excluded` / `item re-included` gained the kind in `carries` and the decision in `why`. `shared-rules.json` holds **thirty-six** rule sets
 (37 top-level keys, one of them `note`): `excludedItems` is new.
-Re-taken at the merge of `origin/dev` (9eb779ac, which carries #204) into this branch, with the
+Re-taken at the merge of `origin/dev` (9eaf0594, which carries #204) into this branch, with the
 walker: **234** lists on the merged tree (230 on dev plus these four),
 `activityTrail.mustRecord` **92** (dev's 91 plus `exclusions reverted`), and
 `shared-rules.json` holds **thirty-seven** rule sets.
-Re-taken again at the merge of `origin/dev` (fe9cb3e5) into this branch: **237** lists on the merged tree (233 on dev plus these four), `activityTrail.mustRecord` **95** (dev's 94 plus `exclusions reverted`), and **thirty-eight** rule sets.
-Re-taken at the merge of the director's stack 8d3a5844 (dev plus #322, #128, the hygiene piece and #323) into this branch: **246** lists on the merged tree (242 on the stack plus these four), `activityTrail.mustRecord` **97** (the stack's 96 plus `exclusions reverted`), and **forty** rule sets.
+Re-taken again at the merge of `origin/dev` (dec29da4) into this branch: **237** lists on the merged tree (233 on dev plus these four), `activityTrail.mustRecord` **95** (dev's 94 plus `exclusions reverted`), and **thirty-eight** rule sets.
+Re-taken at the merge of the director's stack 37e1162d (dev plus #322, #128, the hygiene piece and #323) into this branch: **246** lists on the merged tree (242 on the stack plus these four), `activityTrail.mustRecord` **97** (the stack's 96 plus `exclusions reverted`), and **forty** rule sets.
 **Re-taken 2026-09-26 with [#336](https://github.com/russellgordon/plantoir/issues/336)**
 (the wizard's skeleton toggle reads "an English skeleton", not "a english
-skeleton"), counted ON THIS BRANCH (off `dev` ff1213ed, which read **228**).
+skeleton"), counted ON THIS BRANCH (off `dev` 92a7099a, which read **228**).
 The walker reads **229**: one new list, `shared-rules.json` →
 `wizard.skeletonToggleLabelSubject.cases` (16 — the twelve families the old
 rule got wrong and four it got right, `general` among them), owed by the
@@ -1307,12 +1312,12 @@ rule got wrong and four it got right, `general` among them), owed by the
 `article` arrays are string lists, not case lists. `wizard.skeletonToggleLabel`
 changed to `Start from {article} {subject} skeleton`, which reddens any Windows
 test pinning the old template — deliberately. `activityTrail.mustRecord` is
-unchanged: a label is not an event. Re-taken at the merge of `origin/dev` fe9cb3e5
+unchanged: a label is not an event. Re-taken at the merge of `origin/dev` dec29da4
 (#204, #313, #97, #291, #209, #201) into this branch, with the walker: **234**
 lists on the merged tree (233 on dev plus `skeletonToggleLabelSubject.cases`).
 **Re-taken 2026-09-26 with [#150](https://github.com/russellgordon/plantoir/issues/150)
 and [#327](https://github.com/russellgordon/plantoir/issues/327)**, counted ON
-THIS BRANCH (off `dev` ff1213ed, which read **228**): still **228**. #150 adds
+THIS BRANCH (off `dev` 92a7099a, which read **228**): still **228**. #150 adds
 one member to `assist-cases.json` → `cardPhrasings.parsed` (make-room's article
 form) and #327 one pair to `tools.planTwins` — both GENERATED, and neither a new
 list. `activityTrail.mustRecord` grows from 83 to **84** (#327's `assistant
@@ -1320,7 +1325,7 @@ named a tool it was not offered`, owed by Windows — see the `windows` issue fr
 #327).
 **Re-taken 2026-09-26 with bundle C ([#329](https://github.com/russellgordon/plantoir/issues/329),
 [#351](https://github.com/russellgordon/plantoir/issues/351))**, counted ON THIS
-BRANCH (off #154's tip b879cfad, which read **250**): **252**. Two new lists,
+BRANCH (off #154's tip d2e50f63, which read **250**): **252**. Two new lists,
 `shared-rules.json` → `howITeachPage.settingsButton.cases` (6) and
 `howITeachPage.emptyPageIsNotWritten.cases` (5), both owed by the `windows`
 issue drafted from bundle C and in the table below. `activityTrail.mustRecord`
@@ -1328,7 +1333,7 @@ grows from 99 to **101** (`assistant backed up a course`, `How I Teach page
 started`, both owed by Windows), and the `How I Teach page read` line gains its
 empty variant. Still **forty-one** rule sets — both new keys sit inside
 `howITeachPage`.
-Re-taken at the merge of `origin/dev` bd1f571d (bundle B, row 604) into this
+Re-taken at the merge of `origin/dev` 2963aa85 (bundle B, row 604) into this
 branch, with the walker: **265** lists on the merged tree (263 on dev plus
 bundle C's two), `activityTrail.mustRecord` **111** (dev's 109 plus bundle C's
 two), **forty-four** rule sets. The review round added no list:
@@ -1340,7 +1345,7 @@ Windows asks this question at all.
 
 **Re-taken 2026-09-26 with [#96](https://github.com/russellgordon/plantoir/issues/96)**
 (Get Ready for the Start of the Year, and check_section's third group), counted
-ON THIS BRANCH (off `dev` ff1213ed, which read **228**). The walker reads
+ON THIS BRANCH (off `dev` 92a7099a, which read **228**). The walker reads
 **231**: three new lists, all in `shared-rules.json` — `startOfYear.cases`
 (14), `startOfYear.rejected` (12, prose) and `sectionCheck.cases` (7), in the
 table below and owed by the `windows` issue from #96. `assist-cases.json` →
@@ -1350,13 +1355,13 @@ of the year change undone`, `start of the year not done`), none `appliesOn`, so
 all three are red on Windows until recorded or ledgered. `shared-rules.json`
 holds **thirty-seven** rule sets (38 top-level keys, one of them `note`).
 #209 is adding tools in parallel; re-take at the merge.
-Re-taken at the merge of `origin/dev` (9eb779ac, with #204) into this branch: **233** lists on the merged tree (230 on dev plus these three), `activityTrail.mustRecord` **94** (91 on dev plus three), and **thirty-eight** rule sets.
-Re-taken at the merge of `origin/dev` (b917b501, with #209, #313, #97, #291/#253, #314/#326; then fe9cb3e5, with #201) into this branch: **236** lists on the merged tree (233 on dev plus these three), `activityTrail.mustRecord` **97** (94 on dev plus three), and **thirty-nine** rule sets (40 top-level keys, one of them `note`).
-Re-taken at the merge of `origin/dev` 8c5ff37c into this branch: **253** lists (250 on dev plus these three), `activityTrail.mustRecord` **102** (99 on dev plus three), **forty-two** rule sets; `toolDescriptions` gains the two start-of-year tools (37).
+Re-taken at the merge of `origin/dev` (9eaf0594, with #204) into this branch: **233** lists on the merged tree (230 on dev plus these three), `activityTrail.mustRecord` **94** (91 on dev plus three), and **thirty-eight** rule sets.
+Re-taken at the merge of `origin/dev` (2a1a31bc, with #209, #313, #97, #291/#253, #314/#326; then dec29da4, with #201) into this branch: **236** lists on the merged tree (233 on dev plus these three), `activityTrail.mustRecord` **97** (94 on dev plus three), and **thirty-nine** rule sets (40 top-level keys, one of them `note`).
+Re-taken at the merge of `origin/dev` d8df8622 into this branch: **253** lists (250 on dev plus these three), `activityTrail.mustRecord` **102** (99 on dev plus three), **forty-two** rule sets; `toolDescriptions` gains the two start-of-year tools (37).
 **Re-taken 2026-09-26 with [#343](https://github.com/russellgordon/plantoir/issues/343),
 [#341](https://github.com/russellgordon/plantoir/issues/341) and
 [#335](https://github.com/russellgordon/plantoir/issues/335)** (bundle A), counted
-ON THIS BRANCH off `dev` 8c5ff37c, which read **250**: the walker reads **252** —
+ON THIS BRANCH off `dev` d8df8622, which read **250**: the walker reads **252** —
 `class-planning.json` → `reDatingASection.reportedCounts.cases` (5) and
 `shared-rules.json` → `actsUseTheSavedSettings.cases` (7), both in the table
 below (`actsUseTheSavedSettings.rejected` and `.sentences` are string lists).
@@ -1364,11 +1369,11 @@ below (`actsUseTheSavedSettings.rejected` and `.sentences` are string lists).
 settings`). The generated files gain three wording keys
 (`reDatedOnlyPagesTheyUse`, `…ForAMeeting`, `everyPageIsAlreadyOnItsDay`) and a changed `tools.planTwinsNote`
 ("Five writes have none"), none of them a list.
-Re-taken at the merge of the director's stack d3693d06 (dev 8c5ff37c plus #154 and the small fixes, #96 among what it carries) into this branch: **257** lists on the merged tree (255 on the stack plus these two), `activityTrail.mustRecord` **105** (104 on the stack plus `deploy used the saved settings`), and **forty-three** rule sets.
+Re-taken at the merge of the director's stack 6c982ada (dev d8df8622 plus #154 and the small fixes, #96 among what it carries) into this branch: **257** lists on the merged tree (255 on the stack plus these two), `activityTrail.mustRecord` **105** (104 on the stack plus `deploy used the saved settings`), and **forty-three** rule sets.
 
 **Re-taken 2026-09-27 with bundle B** (#331, #325, #333, #330, #334 and the
 background warm-up), counted ON THIS BRANCH after merging `origin/dev`
-1746960d, which read **255**. The walker reads **261**: six new lists —
+7468565b, which read **255**. The walker reads **261**: six new lists —
 `shared-rules.json` → `siteHealth.linksIntoHiddenPages.cases` (11, #333);
 `app-rules.json` → `publishedFreshness.filesCountedUnderRule2.cases` (8) and
 `.stampRuleCases.cases` (6, #330); `builderWarmUp.startsWhen.cases` (8),
@@ -1383,14 +1388,14 @@ Windows on pull**, `FolderPathRewriterTests`), `renamingTheUnitWord.linkCases.ca
 ready in the background: …` events), all four `appliesOn: ["mac"]`,
 permanently: Windows builds natively and has no builder to get ready. **Forty-two** rule sets, unchanged: the
 warm-up's rules are in `app-rules.json`.
-Re-taken at the merge of `origin/dev` c32d9db3 (bundle A and #154) into this
+Re-taken at the merge of `origin/dev` ed239ecd (bundle A and #154) into this
 branch: **263** lists on the merged tree (257 on dev plus these six),
 `activityTrail.mustRecord` **109** (105 on dev plus four), **forty-three** rule
 sets (dev's count; bundle B adds none).
 
 **Re-taken 2026-09-29 with [#381](https://github.com/russellgordon/plantoir/issues/381)**
 (a preview cannot start while its section is being deployed), counted ON
-THIS BRANCH off `dev` 23bde395, which read **265**: the walker reads **268** —
+THIS BRANCH off `dev` 99a47640, which read **265**: the walker reads **268** —
 three new lists, all in `shared-rules.json` → `previewWhileItsSectionDeploys`:
 `cases` (10 after the fix round; 9 first), `launcherCases` (24; 21 first) and `failureExplanationCases` (1), in the
 table below. `activityTrail.mustRecord` is unchanged at **111** (the two new
@@ -1398,11 +1403,11 @@ lines are fields of the existing `build declined, course busy elsewhere`),
 and `shared-rules.json` holds **forty-four** rule sets (dev's forty-three plus
 this one).
 
-**Re-taken 2026-09-29 with bundle C** ([#364](https://github.com/russellgordon/plantoir/issues/364), #373, #374, #376, #369), counted at its merge into `dev` (365fbede): **273** lists (268 on dev plus five): `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases` (8), `.perSectionEditCases` (7), `.heldBackCases` (7), `userFacingLabelWords.exceptions` (1) and `wizard.clubToggle.settingsRows.shownWhenCases` (8). `activityTrail.mustRecord` **112** (`settings save held back`); **forty-seven** rule sets (`courseSettingsWording`, `userFacingLabelWords` and, later, #379's `linksChecklist`).
+**Re-taken 2026-09-29 with bundle C** ([#364](https://github.com/russellgordon/plantoir/issues/364), #373, #374, #376, #369), counted at its merge into `dev` (c8aa04c3): **273** lists (268 on dev plus five): `shared-rules.json` → `savingSettings.whatEnablesSave.freshOpenCases` (8), `.perSectionEditCases` (7), `.heldBackCases` (7), `userFacingLabelWords.exceptions` (1) and `wizard.clubToggle.settingsRows.shownWhenCases` (8). `activityTrail.mustRecord` **112** (`settings save held back`); **forty-seven** rule sets (`courseSettingsWording`, `userFacingLabelWords` and, later, #379's `linksChecklist`).
 
 **Re-taken 2026-09-29 with [#378](https://github.com/russellgordon/plantoir/issues/378)**
 (piece A: work left behind is stopped, the wait is named), counted on this
-branch after merging `origin/dev` 365fbede (#381 and bundle C), which read
+branch after merging `origin/dev` c8aa04c3 (#381 and bundle C), which read
 **273**: **273** lists, unchanged — no new list.
 Lists that grew (rows, not lists): `app-rules.json` →
 `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases` 14 → 41 (34, then 7 more in the review fix rounds) and
@@ -1419,7 +1424,7 @@ four generated keys (`deployNeedsAnAnswer`, `deployNeedsAnAnswerAt`,
 `deployWentOutTo`, `previewBuildNeedsAnAnswer`).
 
 **Re-taken 2026-09-30 with #379** (the links checklist), on `issue/379-links-checklist`
-cut from `origin/dev` 23bde395, which read **265**. The walker reads **269**: four
+cut from `origin/dev` 99a47640, which read **265**. The walker reads **269**: four
 new lists — `class-planning.json` → `datingPagesAClassBrings.fromTheLinksChecklist.cases`
 (13) and `.publishedBeforeIsRecorded.cases` (2); `shared-rules.json` →
 `linksChecklist.buildCases` (3) and `.publishCases` (4) — all in the table below.
@@ -1427,27 +1432,27 @@ new lists — `class-planning.json` → `datingPagesAClassBrings.fromTheLinksChe
 events, on both platforms). **Forty-four** rule sets (`linksChecklist`).
 `class-planning.json` → `datingPagesAClassBrings.neverPublishedIsInferred` is GONE,
 replaced by `publishedBeforeIsRecorded` (it held no list).
-Re-taken at the merge of `origin/dev` 373b94d5 (#381, which read **268**) into this
+Re-taken at the merge of `origin/dev` 8728a6e5 (#381, which read **268**) into this
 branch: **272** lists on the merged tree, `activityTrail.mustRecord` **114**, forty-four
 rule sets.
-Re-taken at the merge of `origin/dev` 365fbede (bundle C, which read **273** and
+Re-taken at the merge of `origin/dev` c8aa04c3 (bundle C, which read **273** and
 `mustRecord` **112**) into this branch: **277** lists, `activityTrail.mustRecord` **115**,
 forty-seven rule sets.
 The #379 fix round (2026-09-30) grew rows, not lists: `fromTheLinksChecklist.cases` 13 → 15,
 `linksChecklist.publishCases` 4 → 5.
 
 **Re-taken 2026-09-30 with #385** (rows that come under another row), on
-`issue/385-checklist-rows-follow` cut from `origin/dev` 21fcec70, which read **277**. The
+`issue/385-checklist-rows-follow` cut from `origin/dev` c1f07514, which read **277**. The
 walker reads **279**: two new lists — `shared-rules.json` → `linksChecklist.followingARow.cases`
 (10) and `linksChecklist.naming.cases` (2) — both in the table below. Rows grew too:
 `fromTheLinksChecklist.cases` 15 → 21, `linksChecklist.publishCases` 5 → 10.
 `activityTrail.mustRecord` stays **117** (three lines changed, no event added); rule sets
 stay forty-seven.
-Re-taken at the merge of `origin/dev` 2259257b (#378 piece A, **273** lists, `mustRecord`
+Re-taken at the merge of `origin/dev` f447ccbd (#378 piece A, **273** lists, `mustRecord`
 **113**) into this branch: **277** lists, `activityTrail.mustRecord` **116**, forty-seven
 rule sets.
 Re-taken 2026-09-30 with [#396](https://github.com/russellgordon/plantoir/issues/396) (v1.4.2 bundle C),
-ON THIS BRANCH off `dev` 21fcec70, which read **277**: **278** lists —
+ON THIS BRANCH off `dev` c1f07514, which read **277**: **278** lists —
 `shared-rules.json` → `scheduledDeployRefusals.planOpening.cases` (3), in the table below
 (`alsoSaid.rejected` is a list of strings). `actsUseTheSavedSettings.cases` grew 7 → 8.
 `activityTrail.mustRecord` stays at **117** (the "116" above is what that branch read
@@ -1456,7 +1461,7 @@ Forty-seven rule sets, unchanged: `planOpening` is a sibling inside an existing 
 
 **Re-taken 2026-09-30 with [#383](https://github.com/russellgordon/plantoir/issues/383) and
 [#388](https://github.com/russellgordon/plantoir/issues/388)** (bundle A of v1.4.2), on
-`issue/383-388-scheme-name-and-one-reader` off `dev` 21fcec70, which read **277**: the
+`issue/383-388-scheme-name-and-one-reader` off `dev` c1f07514, which read **277**: the
 walker reads **278** — one new list, `shared-rules.json` →
 `previewWhileItsSectionDeploys.labelCodeCases` (8). Rows, not lists:
 `previewWhileItsSectionDeploys.launcherCases` 27 → 29 and `app-rules.json` →
@@ -1465,7 +1470,7 @@ rule sets unchanged (`userFacingLabelWords` gained a `data` key, not a list).
 
 **Re-taken 2026-09-30 with [#402](https://github.com/russellgordon/plantoir/issues/402) and
 [#403](https://github.com/russellgordon/plantoir/issues/403)** (bundle F of v1.4.2), on
-`issue/402-403-codes-and-destinations` off `dev` 558ba11a6, which read **281**: the walker
+`issue/402-403-codes-and-destinations` off `dev` ea717a331, which read **281**: the walker
 reads **283** — two new lists, both in the table below: `course-management.json` →
 `courseCode.commandLine.cases` (8) and `shared-rules.json` →
 `scheduledDeployRefusals.planOpening.listCoursesLine.cases` (1). Rows grew:
@@ -1475,30 +1480,30 @@ blocks).
 
 **Re-taken 2026-09-30 with [#398](https://github.com/russellgordon/plantoir/issues/398)**
 (rows a ticked class brings, bundle E of v1.4.2), on
-`issue/398-a-row-its-class-brings` off `dev` 558ba11a6, which read **281**: the
+`issue/398-a-row-its-class-brings` off `dev` ea717a331, which read **281**: the
 walker reads **282** — one new list, `shared-rules.json` →
 `linksChecklist.comingWithAClass.cases` (12), in the table below. Rows, not lists:
 `linksChecklist.publishCases` 10 → 15 (13, then iv-m and iv-n in the fix round). `activityTrail.mustRecord` unchanged at
 **117** (the published line gained a count; no event added); forty-seven rule sets.
-Re-taken at the merge of `origin/dev` c87eb5c2a (bundle F, **283** lists) into this branch: **284** lists, `activityTrail.mustRecord` **117**, forty-seven rule sets.
+Re-taken at the merge of `origin/dev` a2a5312b7 (bundle F, **283** lists) into this branch: **284** lists, `activityTrail.mustRecord` **117**, forty-seven rule sets.
 
 **Re-taken 2026-09-30 with [#397](https://github.com/russellgordon/plantoir/issues/397)**
 (today's class on the front page, v1.4.2 bundle D), on
-`issue/397-todays-class-on-the-front-page` off `dev` 21fcec70, which read **277**: **278** —
+`issue/397-todays-class-on-the-front-page` off `dev` c1f07514, which read **277**: **278** —
 one new list, `class-planning.json` → `todaysClassOnTheFrontPage.cases` (40; 42 after the fix round), in the table
 below. Rows, not lists: `sectionIndexPointer.cases` 9 → 20 (27 after the fix round) and
 `sectionIndexPointer.dateCases.cases` 9 → 13. `activityTrail.mustRecord` 117 → **119**
 ("put today's class on the front page", "left the front page as it was" — both platforms).
 `shared-rules.json` rule sets unchanged at forty-seven (the new rule is a top-level key of
-`class-planning.json`); `file-formats.json` gained `frontPageNotToday`, which holds no list. Re-taken at its merge of `origin/dev` 558ba11a6
+`class-planning.json`); `file-formats.json` gained `frontPageNotToday`, which holds no list. Re-taken at its merge of `origin/dev` ea717a331
 (**281** lists, `mustRecord` **117**): **282** lists, `activityTrail.mustRecord` **119**.
-Re-taken at its merge of `origin/dev` c87eb5c2a (bundle F, **283** lists, `mustRecord` **117**):
+Re-taken at its merge of `origin/dev` a2a5312b7 (bundle F, **283** lists, `mustRecord` **117**):
 **284** lists, `activityTrail.mustRecord` **119**.
-Re-taken at its merge of `origin/dev` 10ecadf0b (bundle E, **284** lists, `mustRecord` **117**):
+Re-taken at its merge of `origin/dev` 2cbde45a0 (bundle E, **284** lists, `mustRecord` **117**):
 **285** lists, `activityTrail.mustRecord` **119**.
 
 **Re-taken 2026-10-01 with Windows parity bundle 10** (#421, #422, Q8), on
-`issue/bundle10-parity` off `dev` e313e770: **287** lists, unchanged by the bundle.
+`issue/bundle10-parity` off `dev` 646e78a3: **287** lists, unchanged by the bundle.
 Rows, not lists: `course-management.json` → `backups.restoringOneSectionsKeys.cases`
 6 → **7** (a blank line before the opening fence is dropped — the mac's behaviour,
 Windows matched it). `activityTrail.mustRecord` 120 → **121** ("making room did not
@@ -1507,7 +1512,7 @@ finish every page", `appliesOn: ["windows"]` until the mac records it; #422).
 **Re-taken 2026-10-03 once for v1.4.3 bundles A, C and D together** (A:
 #433, #412, #425 DO 3 and same-named pages; C: #408, #377, #425 DO 1; D: #418,
 #410, #413, #415, #416), on `issue/433-outside-assistant-busy` with C
-(26d5f70f) and D (b60747f3) merged in, off `dev` b50084d5, which read
+(9cd374bc) and D (65497642) merged in, off `dev` 69360971, which read
 **287**: **289**. The two new lists are A's —
 `workLeases.declining.outsideChanges.cases` (10) and `publishPlanNaming.cases`
 (4). C and D add rows and objects, not lists (the separate paragraphs each
@@ -1526,7 +1531,7 @@ while a preview was open" and "preview closed for a deploy"; C's "remembered tim
 (A's `publishPlanNaming`).
 
 **Re-taken 2026-10-04 for v1.4.3 Windows bundle A** (#424), on
-`issue/v143-a-assistant` off `dev` 52cbd4bd: `assist-cases.json` gains one
+`issue/v143-a-assistant` off `dev` 33c99772: `assist-cases.json` gains one
 AUTHORED top-level key, `scheduleAndCancel`, holding THREE new lists —
 `accepted` (7), `asksForTheTime` (3) and `refused` (11) — so the count grows
 by three wherever it is next re-taken (not re-counted here, the census being
@@ -1534,7 +1539,7 @@ the mac's). Nothing else in A adds a list: #436 wires `outsideChanges` and
 `publishPlanNaming` into Windows' tests, which were already counted.
 
 **Re-taken 2026-10-04 for v1.4.3 bundle B** (#411), on
-`issue/411-tool-surface-and-shortcuts` off `dev` 89b7e4b6: **289, unchanged** —
+`issue/411-tool-surface-and-shortcuts` off `dev` bde940af: **289, unchanged** —
 B adds rows, not lists. `assist-cases.json` → `hideIsUnpublish.accepted` 13 →
 **16** and `.refused` 20 → **35** (one row moved from refused to accepted,
 then two accepted and sixteen refused rows added — eighteen new rows);
@@ -1543,7 +1548,7 @@ key `modelReply`); `deployAtATime.resolving` 11 → **13** (the two
 daylight-saving rows). `cardPhrasings.parsed` gains one entry (generated).
 
 **Re-taken 2026-10-07 for #449** (the mac's half of `scheduleAndCancel`), on
-`issue/449-schedule-and-cancel-frames` off `dev` 4b177c684: **292, unchanged**
+`issue/449-schedule-and-cancel-frames` off `dev` 5c3ccaf24: **292, unchanged**
 — rows, not lists. `scheduleAndCancel.accepted` 9 → **10** (the prompt shelf's
 own "Cancel scheduled deploy", added from the mac); `asksForTheTime` 7 and
 `refused` 11 as Windows left them. The three lists now have a reader on BOTH
@@ -1554,7 +1559,7 @@ at **123** — two entries' `carries` and `why` grew, no event was added.
 are frames over sentences, specified by the authored key, not card phrasings.
 
 **Re-taken 2026-10-07 for #440**, on `issue/440-add-next-class-unit-days` (piece
-S merged in) off `dev` 4b177c684: 292 → **297**. `assist-cases.json` gains one
+S merged in) off `dev` 5c3ccaf24: 292 → **297**. `assist-cases.json` gains one
 AUTHORED top-level key, `nextClassUnits`, holding FIVE lists — `accepted` (11),
 `notThis` (12), `pointed` (22), `runs` (17) and `pointerSentences` (3).
 `scenarios.cases` 25 → **32** (seven #440 scenarios). Generated:
@@ -1568,7 +1573,7 @@ AUTHORED top-level key, `nextClassUnits`, holding FIVE lists — `accepted` (11)
 AUTHORED `pointed` rows (22 → **25**: decided false refusals, not measured);
 the census stays **297**, since it counts lists, not rows.
 **Re-taken 2026-10-07 for #458** (the mac's door course hold), on
-`issue/458-door-course-lease` off `dev` 4b177c684, which read **292**; re-counted at the merge with `dev` 71b133764, which read **297** after #440: **301**.
+`issue/458-door-course-lease` off `dev` 5c3ccaf24, which read **292**; re-counted at the merge with `dev` 6600df4c5, which read **297** after #440: **301**.
 The four new lists are `shared-rules.json` → `doorCourseHold.courseToHold.cases`
 (8) and `doorCourseHold.reviseCases` (9), and `file-formats.json` →
 `heldBackupRecord.cases` (3) and `heldBackupRecord.nameCases` (4); none had a
@@ -1576,7 +1581,7 @@ Windows reader until #468 (2026-10-08, `DoorCourseHoldTests`). `activityTrail.mu
 held a course"). Rule sets 49 → **50** (`doorCourseHold`).
 
 **Re-taken 2026-10-08 for #453 and #465** (Windows' updater), on
-`issue/463-464-465-453-app` off `dev` 5f8e18f7b, which read **303**: **304** — one
+`issue/463-464-465-453-app` off `dev` 40c755a51, which read **303**: **304** — one
 new list, `shared-rules.json` → `appUpdates.offerCases.cases` (8, AUTHORED from
 Windows, appliesOn windows; read by `AppUpdatesContractTests`). The prose rule
 `appUpdates.anOfferNobodySawIsNotAnAnswer` holds a list of strings, which the walker
@@ -1585,7 +1590,7 @@ grew (`update found`, the Windows spelling of the version); no event was added.
 Rule sets unchanged at fifty (both new keys sit inside `appUpdates`).
 
 **Re-taken 2026-10-08 for #457 and #482** (the mac's menus, Open Recent, and
-the rate-limit match), on `issue/457-482-menus-hig` off `dev` a04e4815a, which
+the rate-limit match), on `issue/457-482-menus-hig` off `dev` 152a9d51c, which
 read **305**: **308** — three new lists, all AUTHORED on the mac and none with a
 Windows reader yet (UNRUN there, not red): `shared-rules.json` →
 `subjectMenus.cases` (17, which File, Course, Section and View items can be
@@ -1603,7 +1608,7 @@ opened", "working folder not reopened"), and `class-planning.json` →
 button. Rule sets 50 → **52** (`subjectMenus`, `openRecent`).
 
 **Re-taken 2026-10-08 for #457 batch B and #475** on `issue/457-475-assistant-routes`
-off `dev` 01f384090, which read **308**: **309** — one new list,
+off `dev` 13979b91d, which read **308**: **309** — one new list,
 `class-planning.json` → `futureDatedClasses.cases` (24, AUTHORED on the mac, no
 Windows reader yet: UNRUN there). Five lists grew, and these turn Windows red
 where it reads them: `assist-cases.json` → `scenarios.cases` 32 → **35** (the
@@ -1622,7 +1627,7 @@ fixes round added one scenario (35 → **36**, Keep All) and three
 Rule sets re-counted on the branch after the fixes round: **53**.
 
 **Re-taken 2026-10-08 for #457 batch C (the HIG sweep)** on `issue/457-hig-sweep`
-merged with `dev` 178cb511b (batch B in), which read **309**: **310** — one new
+merged with `dev` 7ee189a9a (batch B in), which read **309**: **310** — one new
 list, `shared-rules.json` → `sidebarDeleteKey.cases` (6, AUTHORED on the mac,
 no Windows reader yet: UNRUN there). One list grew, and it turns Windows red:
 `shared-rules.json` → `activityTrail.mustRecord` 133 → **135** ("opened Plantoir
@@ -1643,13 +1648,13 @@ too, and `outsideAgents.agents[].menuItem` is read by
 `ContractTests.TheOutsideAgentsMenuTitles_AreTheContracts`.
 
 **Re-taken 2026-10-17 for #555** (partial undo), on `issue/555-partial-undo` off
-`dev` 1a52f3a45, which read **347** with the walker below: **349**. `assist-cases.json`
+`dev` 05142a403, which read **347** with the walker below: **349**. `assist-cases.json`
 gains one AUTHORED top-level key, `undoFiles`, holding two lists — `files` (14)
 and `presses` (3); `steps` inside a press is a field of that case. No Windows
 reader yet (owed, the #555 `windows` issue). The generated halves move only in
 `generated.note`, which now names `undoFiles` (`Plantoir --write-contracts
 contracts`, twice; the second run changed nothing).
-**#560 (2026-10-17)**, on `issue/560-trail-open-close` off `dev` 1a52f3a45: no
+**#560 (2026-10-17)**, on `issue/560-trail-open-close` off `dev` 05142a403: no
 list added, so the census is unchanged by this piece (349 after #555). `shared-rules.json` →
 `activityTrail.mustRecord` 140 → **141** ("app closed", for both platforms —
 it turns Windows red until it records it), and "app opened" has a new
@@ -1781,7 +1786,9 @@ entries above rather than in this table. Re-derive it; do not subtract.
 | `app-rules.json` → `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases`, `.sequences.cases` | 47 + 9 (41 until #388 added six: a scheduled deploy's log owns nothing, AP CALC 1 does not own CALC 1, one line can be a launcher and a docker exec at once, a ";" course and a "\\" course each beside a live preview of another (every piece owned), and a publish set for later owns only its own section) | **Exempt, permanently: there is no workspace on Windows** (`appliesOn: ["mac"]` on the key, and on its trail events). Arrived 2026-09-25 with [#94](https://github.com/russellgordon/plantoir/issues/94); 14 + 6 until [#378](https://github.com/russellgordon/plantoir/issues/378) (2026-09-29) added the owner proof, the leftovers and the named waits. Read by `scripts/test_port_blocks.py`, which `PythonToolchainTests` discovers on Windows — its bash half skips there, so this is unrun rather than red, and nothing is owed |
 | `app-rules.json` → `previewPorts.whenAnotherAccountHasTheAddress.cases` | 12 | **Exempt, permanently: there is no forward on Windows** (`appliesOn: ["mac"]` on the key, and on its trail event, `preview address held by another account`). Arrived 2026-09-26 with [#310](https://github.com/russellgordon/plantoir/issues/310). Read by `scripts/test_preview_reach.py`, which `PythonToolchainTests` discovers on Windows — its bash half skips there, so this is unrun rather than red, and nothing is owed. What Windows DOES owe from #310 is a measurement, not these cases: whether `preview.ps1`'s own probe sees another account's listeners (the `windows` issue) |
 | `app-rules.json` → `helperBootstrap.installCases`, `.firstStartCases` | 21 + 7 | **Exempt, permanently** (`appliesOn: ["mac"]`): Windows carries its runtime inside its installer and creates no virtual machine. Run on the mac by `scripts/test_helper_bootstrap.py`, which Windows' `PythonToolchainTests` discovers and which SKIPS there (it needs `cp -c` and `xattr`). AUTHORED, arrived 2026-09-26 with [#312](https://github.com/russellgordon/plantoir/issues/312). |
-| `app-rules.json` → `launcherTrailFolder.cases` | 5 | **Owed**, the `windows` issue drafted from [#664](https://github.com/russellgordon/plantoir/issues/664): `preview.ps1` and `deploy.ps1` build their trail path from `%LOCALAPPDATA%` and must prefer a rooted `PLANTOIR_TRAIL_DIR`, and `test_launcher_rules.ps1` must run these five cases. Run on the mac by `scripts/test_trail_lock.py`, which Windows' `PythonToolchainTests` discovers and whose five-case test SKIPS there (the `.sh` launchers take POSIX paths only). AUTHORED, arrived 2026-10-23. Unrun rather than red: nothing on that side enumerates the top-level keys of `app-rules.json` |
+| `app-rules.json` → `launcherTrailFolder.cases` | 5 | **Run** since [#682](https://github.com/russellgordon/plantoir/issues/682): `windows-app/test_launcher_rules.ps1` section 6 runs all five through EACH of `preview.ps1`'s and `deploy.ps1`'s real `Write-TrailLine` (via `LauncherRulesContractTests`), plus two Windows-only rows (`C:state`, `\state\Logs`); `LauncherEnvironmentTests` pins the app's half. Run on the mac by `scripts/test_trail_lock.py`, which Windows' `PythonToolchainTests` discovers and whose five-case test SKIPS there (the `.sh` launchers take POSIX paths only). AUTHORED, arrived 2026-10-23 |
+| `shared-rules.json` → `machineLineLength.cases` | 6 | **Run** on both platforms: `scripts/test_machine_line_length.py`, in `verify.sh` on the mac since #666 and discovered by `PythonToolchainTests` on Windows ([#666](https://github.com/russellgordon/plantoir/issues/666)). AUTHORED from Windows, 2026-10-28 |
+| `shared-rules.json` → `machineLineLength.readerExamples` | 6 | **Run** on Windows by `MachineLineLengthContractTests`; **Owed** on the mac, whose `PagesDatedByTheBuild`, `HowITeachKeptOffReport` and `CoverageMapsBuilt` readers must take `count`, and read a line with an EMPTY list and a `count` as a report (the k = 0 rows) rather than as none (the `mac` issue opened from [#666](https://github.com/russellgordon/plantoir/issues/666)). Unrun rather than red there until a test reads them. AUTHORED from Windows, 2026-10-28 |
 | `shared-rules.json` → `appUpdates.cases`, `.atQuit.cases` | 14 + 6 | **Run on Windows since bundle 8 (2026-10-01)** by `AppUpdatesContractTests` against `AppUpdates.Evaluate` and `DecideAtQuit`. Since 2026-10-08 also `appUpdates.offerCases` (8, AUTHORED from Windows with [#453](https://github.com/russellgordon/plantoir/issues/453), appliesOn windows: whether an offer is shown and whether it carries Skip and Not Now, through `AppUpdates.DecideOffer`; the mac's Sparkle decides it from the feed's mark itself, and no mac test reads them) and the prose rule `appUpdates.anOfferNobodySawIsNotAnAnswer` ([#465](https://github.com/russellgordon/plantoir/issues/465), proved in `AppUpdaterTests`, a `mac` issue asks the mac to check it); and the engine (`AppUpdater`, NetSparkleUpdater) is wired behind them, inactive until a release sets the feed (#337). Windows-only sentences proposed beside them as `appUpdates.windowsWording` (appliesOn windows; the mac reads none of it). Before: the `windows` issue drafted from [#204](https://github.com/russellgordon/plantoir/issues/204), milestone v1.4.0. AUTHORED, arrived 2026-09-25. The gate cases name what holds an install (this app's publishes and preview BUILDS, a scheduled publish of this installed app, another program's build or publish lease) by facts handed in — on Windows the scheduled publish is a Task Scheduler run of the same install, and the scan is whatever finds one. The quit cases need a Windows reading of "prepared": what NetSparkle has downloaded and is waiting to run.
 | `file-formats.json` → `sectionTimetable.believable.cases` | 8 | **Run on both.** AUTHORED on Windows 2026-09-27 (#144): a remembered date before `earliest` or more than `yearsAhead` years past today is read as nothing remembered and refused rather than written. Windows runs the cases through `TimetableMemory.Unbelievable`, `Read` and `Write` (`DateTextTests`); the mac, since 2026-10-03 (#377), through `SectionTimetableStore.read` and `planRememberTimetable` separately (`FileFormatsContractTests.testARememberedTimetableIsBelievedOnlyInsideTheWindow`). |
 
@@ -1796,7 +1803,9 @@ two. On 2026-10-16 mac 1.7.2's sixteen plan-table sentences (#524:
 `plan*`, `menuPlan*`) were held open against
 [#548](https://github.com/russellgordon/plantoir/issues/548) by the piece for
 #551, and the same day #548 added the members with the plan table and deleted
-the entry, so it is **EMPTY** again. Before 2026-10-01 it held 6 keys at the end of the overnight run: 4 on
+the entry, so it was **EMPTY** again — until 2026-10-28, when #690 held two
+entries against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
+(v1.9.1; "Named gaps" above). Before 2026-10-01 it held 6 keys at the end of the overnight run: 4 on
 [#308](https://github.com/russellgordon/plantoir/issues/308) (the caller-side
 wording that names declined pages) and 2 on
 [#157](https://github.com/russellgordon/plantoir/issues/157) (`noCoursesYet`,

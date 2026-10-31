@@ -105,69 +105,23 @@ public static class ScheduledHealthFindings
         // The alternative is worse: a record that only ever grows stale.
         try { File.Delete(path); } catch { }
 
-        // The build's PLANTOIR_DATED: lines ride the same record (#279): a
+        // Every machine line the wrapper kept goes through the ONE dispatch the
+        // app's console and plantoir-mcp use (#660), dated to the record: a
         // scheduled publish is often the first build after a class goes
-        // visible, so the one likeliest to rewrite the teacher's pages, and
-        // nobody is watching its console. Dated to the record, like the
-        // folder problems below.
-        foreach (var dated in PagesDatedByTheBuild.ReportsIn(lines))
+        // visible (PLANTOIR_DATED:, #279), the build nobody watched is the one
+        // "my second map is missing" (PLANTOIR_MAPS:, #345) or "my students
+        // have no My Progress page" (#599) is asked about, it can be the first
+        // run that gets Swift ready (#570), and nobody watched it put a front
+        // page's title right (#584) or remake a Cloudflare project (#395,
+        // appended by the wrapper's Cloudflare leg). Since #660 the trail
+        // takes them in the record's LINE order rather than grouped by kind.
+        var findings = new List<SiteHealthFinding>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string line in lines)
         {
-            ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,
-                               dated.TrailSentence, dated.Course, dated.Section, writtenAt);
-        }
-
-        // The build's PLANTOIR_MAPS: line (#345): the build nobody watched is
-        // the one "my second map is missing" will be asked about.
-        foreach (var maps in CoverageMapsBuilt.ReportsIn(lines))
-        {
-            ActivityTrail.Note(ActivityTrail.Event.CurriculumMapsBuilt,
-                               maps.TrailSentence, maps.Course, maps.Section, writtenAt);
-        }
-
-        // The build's PLANTOIR_MY_PROGRESS: line (#599): "my students have no
-        // My Progress page" is as likely to follow an overnight publish.
-        foreach (var progress in MyProgressBuilt.ReportsIn(lines))
-        {
-            ActivityTrail.Note(ActivityTrail.Event.MyProgressPageBuilt,
-                               progress.TrailSentence, progress.Course, progress.Section, writtenAt);
-        }
-
-        // PLANTOIR_SWIFT: (#570): a scheduled publish can be the first run
-        // that gets Swift ready on this PC, and nobody watches its console.
-        foreach (var swift in SwiftGotReady.ReportsIn(lines))
-        {
-            swift.Record(writtenAt);
-        }
-
-        // The build's PLANTOIR_KEPT_OFF: line (#340), when the wrapper's scan keeps it.
-        foreach (var keptOff in HowITeachKeptOffReport.ReportsIn(lines))
-        {
-            ActivityTrail.Note(ActivityTrail.Event.HowITeachPageKeptOff,
-                               keptOff.TrailSentence, keptOff.Course, keptOff.Section, writtenAt);
-        }
-
-        // The build's PLANTOIR_REPAIRED: line (#584, mac #645): an overnight
-        // publish is as likely as any build to be the one that put a front
-        // page's title right, and nobody watched its console.
-        foreach (var repaired in BuildRepairReport.ReportsIn(lines))
-        {
-            repaired.Record(writtenAt);
-        }
-
-        // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395), appended by the
-        // wrapper's Cloudflare leg: an overnight publish is exactly the one
-        // nobody watched remake the project, and its address may have changed.
-        foreach (var remade in CloudflareProjectRemade.ReportsIn(lines))
-        {
-            ActivityTrail.Note(ActivityTrail.Event.CloudflareProjectMadeAgain,
-                               remade.TrailSentence, remade.Course, remade.Section, writtenAt);
-        }
-
-        var findings = SiteHealthFinding.FindingsIn(lines);
-        foreach (var finding in findings)
-        {
-            ActivityTrail.Note(ActivityTrail.Event.FolderProblemFound,
-                               finding.TrailSentence, finding.Course, finding.Section, writtenAt);
+            if (BuildMachineLines.Record(line, writtenAt).Finding is { } finding &&
+                BuildMachineLines.AddFinding(finding, seen, writtenAt))
+                findings.Add(finding);
         }
         return findings;
     }

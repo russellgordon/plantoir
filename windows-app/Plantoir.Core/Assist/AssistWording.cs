@@ -944,4 +944,43 @@ public static partial class AssistWording
         "website out to the web. They are different acts: a page can be published for days and still not be online, " +
         "and deploying puts everything already published in front of students straight away. Preview after a change " +
         "to look it over first, which is the safer order.";
+
+    // MARK: - Open in Obsidian from the assistant (#690; the mac's #610)
+
+    /// <summary>The section window's Open in Obsidian opened the page its preview shows; <paramref name="page"/> is its name.</summary>
+    public static string OpenedThePageInObsidian(string page) =>
+        $"Opened {page} in Obsidian.";
+
+    /// <summary>The press went ahead with no preview page on screen, so it opened the section as before.</summary>
+    public static string OpenedTheSectionNoPageShowing(string course, string section) =>
+        $"No page of the preview was showing, so Obsidian opened {course} Section {section} instead.";
+
+    /// <summary>The page on screen could not be matched to one of the course's files (any other fallback).</summary>
+    public static string OpenedTheSectionPageNotFound(string course, string section) =>
+        $"Obsidian opened {course} Section {section}, because the page on screen could not be matched to one of the course's own pages.";
+
+    /// <summary>A question (the add-ons offer, the reopen question, a reference course's note, another dialog) is up in the window first.</summary>
+    public static string ObsidianOpensAfterTheQuestion(string course, string section) =>
+        $"There is a question waiting in the {course} Section {section} window. Obsidian opens once you have answered it.";
+
+    /// <summary>The press was turned away: the course is still being opened (its add-ons scan is running).</summary>
+    public static string ObsidianIsAlreadyOpening(string course) =>
+        $"Obsidian is already opening {course}. It will be on screen in a moment.";
+
+    /// <summary>
+    /// Windows' wording of the contract's <c>obsidianIsNotOnThisMac</c>, which
+    /// names the computer "this Mac" without <c>{machine}</c> - against
+    /// <c>specialNames.platformWording.machine.rule</c>. Held in
+    /// <c>NamedGapLedger</c> until the mac writes it with <c>{machine}</c> (#698).
+    /// </summary>
+    public static readonly string ObsidianIsNotOnThisPc =
+        "Obsidian is not on this PC, so there is nothing to open the page in. Install it from obsidian.md, then ask again.";
+
+    /// <summary>What an assistant outside Plantoir is told: the server has no window and no preview to read (#690).</summary>
+    public static string OpenInObsidianIsInTheSectionWindow(string course, string section) =>
+        $"Opening a page in Obsidian happens in Plantoir itself: open {course} Section {section} there and press Open in Obsidian. Nothing was opened.";
+
+    /// <summary>No main window of this working folder could show the section.</summary>
+    public static string OpenInObsidianFoundNoWindow(string course, string section) =>
+        $"Open {course} Section {section} in Plantoir, then ask again. No window is showing it, so nothing was opened in Obsidian.";
 }

@@ -766,7 +766,7 @@ Three mac-specific things carry this, and each needs its own Windows answer:
   the desktop into the corner curves; masking the corners off afterwards
   approximates the radius and leaves stray fringe pixels, which is exactly the
   rendering-bug look a marketing page cannot carry (fixed in commit
-  `63495853`). Whatever Windows uses (WinAppDriver, an accessibility-driven
+  `fa4bb6fa`). Whatever Windows uses (WinAppDriver, an accessibility-driven
   harness, `PrintWindow`) has to produce the window alone with its real alpha
   channel, not a screen crop and not a rectangle that gets its corners shaved
   off in post.

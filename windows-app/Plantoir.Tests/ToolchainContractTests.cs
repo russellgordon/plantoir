@@ -150,7 +150,7 @@ public class ToolchainContractTests
         var doc = ContractLoader.LoadJson("toolchain.json");
         string recipe = File.ReadAllText(
             Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
-        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax", "pyodide" };
+        var vendorPins = new[] { "pagedjs", "latinModern", "functionPlot", "nodeTikzjax", "pyodide", "geogebra" };
 
         foreach (string name in vendorPins)
         {
@@ -228,7 +228,8 @@ public class ToolchainContractTests
 
         Assert.True(manifest.ContainsKey("pyodide"),
             $"{runtime}\\manifest.json has no \"pyodide\": this runtime predates #568. Re-run " +
-            "windows-app\\Vendor\\fetch-runtime.ps1 (it fetches only runtime\\vendor).");
+            "windows-app\\Vendor\\fetch-runtime.ps1: it fetches only runtime\\vendor, unless it says the runtime's Node " +
+            "(or another base part) differs from the pin, and then delete runtime\\ first.");
         Assert.Equal(version, manifest["pyodide"]!.ToString());
 
         string folder = Path.Combine(runtime, "vendor", "pyodide");
@@ -246,6 +247,200 @@ public class ToolchainContractTests
             File.ReadAllText(Path.Combine(folder, "README.txt")));
     }
 
+    /// <summary>
+    /// #687: GeoGebra is the vendor pin with TWO addresses (GeoGebra's own
+    /// host, which timed out on 4 of 8 connections, then plantoir.app's
+    /// mirror of the same zip) and one hash for whichever answered. The
+    /// recipe must carry both addresses in full, the contract's zip hash and
+    /// size, and run the shared adapter whose own VERSION is the pin's, as
+    /// the Dockerfile tests with <c>geogebra_engine.py version</c>.
+    /// </summary>
+    [Fact]
+    public void TheWindowsRuntimeRecipeFetchesGeoGebraAtTheContractsHashAndAddresses()
+    {
+        var doc = ContractLoader.LoadJson("toolchain.json");
+        string recipe = File.ReadAllText(
+            Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var pin = doc["pins"]!.AsArray().First(p => p?["pin"]?.ToString() == "geogebra")!;
+
+        string zip = pin["sha256"]!.ToString();
+        Assert.True(recipe.Contains($"\"{zip}\"", StringComparison.Ordinal),
+            $"fetch-runtime.ps1 does not check GeoGebra's zip against the contract's sha256 {zip}.");
+        var urls = pin["urls"]!.AsArray().Select(u => u!.ToString()).ToList();
+        Assert.Equal(2, urls.Count);
+        foreach (string url in urls)
+            Assert.True(recipe.Contains($"\"{url}\"", StringComparison.Ordinal),
+                $"fetch-runtime.ps1 does not write out {url} in full.");
+        // GeoGebra's own host is tried first, the mirror second.
+        Assert.True(recipe.IndexOf(urls[0], StringComparison.Ordinal) < recipe.IndexOf(urls[1], StringComparison.Ordinal),
+            "fetch-runtime.ps1 names plantoir.app's mirror before GeoGebra's own address.");
+
+        // The zip's LENGTH lives only in the pin's `why` prose.
+        var stated = System.Text.RegularExpressions.Regex.Match(pin["why"]!.ToString(),
+            @"the zip `sha256`, ([0-9,]+) bytes");
+        Assert.True(stated.Success, "toolchain.json's geogebra `why` no longer states the zip's length.");
+        long length = long.Parse(stated.Groups[1].Value.Replace(",", ""), System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(System.Text.RegularExpressions.Regex.IsMatch(recipe, @"\$GeogebraZipLength\s*=\s*" + length + @"\b"),
+            $"fetch-runtime.ps1's $GeogebraZipLength is not the {length} bytes the contract states.");
+
+        // The ONE recipe: the shared adapter, never a PowerShell copy of it.
+        Assert.Contains(@"scripts\geogebra_engine.py", recipe);
+        Assert.Contains("$ggbRecipe adapt", recipe);
+        string adapter = File.ReadAllText(Path.Combine(RepoRoot, "scripts", "geogebra_engine.py"));
+        var version = System.Text.RegularExpressions.Regex.Match(adapter, @"(?m)^VERSION = ""([^""]+)""");
+        Assert.True(version.Success, "scripts/geogebra_engine.py no longer sets VERSION.");
+        Assert.Equal(pin["value"]!.ToString(), version.Groups[1].Value);
+        var adapterZip = System.Text.RegularExpressions.Regex.Match(adapter, @"(?m)^ZIP_SHA256 = ""([0-9a-f]{64})""");
+        Assert.True(adapterZip.Success, "scripts/geogebra_engine.py no longer sets ZIP_SHA256.");
+        Assert.Equal(zip, adapterZip.Groups[1].Value);
+    }
+
+    /// <summary>
+    /// #687: the runtime on THIS machine, read back, as Pyodide's is above. A
+    /// runtime that names GeoGebra must hold exactly <c>fileCount</c> files,
+    /// <c>bytes</c> in all, and the pin's <c>files</c> at their hashes - the
+    /// bytes every Mac's image carries, since both run the same adapter.
+    /// </summary>
+    [NativeRuntimeFact]
+    public void TheNativeRuntimeCarriesGeoGebraAtTheContractsHashes()
+    {
+        string runtime = NativeRuntime.Folder!;
+        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(runtime, "manifest.json")))!.AsObject();
+        var pin = ContractLoader.LoadJson("toolchain.json")["pins"]!.AsArray()
+            .First(p => p?["pin"]?.ToString() == "geogebra")!;
+
+        Assert.True(manifest.ContainsKey("geogebra"),
+            $"{runtime}\\manifest.json has no \"geogebra\": this runtime predates #687. Re-run " +
+            "windows-app\\Vendor\\fetch-runtime.ps1: it fetches only runtime\\vendor, unless it says the runtime's Node " +
+            "(or another base part) differs from the pin, and then delete runtime\\ first.");
+        Assert.Equal(pin["value"]!.ToString(), manifest["geogebra"]!.ToString());
+
+        string folder = Path.Combine(runtime, "vendor", "geogebra");
+        var files = Directory.GetFiles(folder, "*", SearchOption.AllDirectories);
+        Assert.Equal(pin["fileCount"]!.GetValue<int>(), files.Length);
+        Assert.Equal(pin["bytes"]!.GetValue<long>(), files.Sum(f => new FileInfo(f).Length));
+        foreach (var (name, digest) in pin["files"]!.AsObject())
+        {
+            string path = Path.Combine(new[] { folder }.Concat(name.Split('/')).ToArray());
+            using var stream = File.OpenRead(path);
+            string got = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
+            Assert.True(got == digest!.ToString(), $"runtime\\vendor\\geogebra\\{name}: SHA-256 {got}, the contract's is {digest}.");
+        }
+    }
+
+    /// <summary>
+    /// #675, #687: what the app's build refuses. CheckNativeRuntimeManifest
+    /// names every vendor key (GeoGebra's included) and the Node the runtime
+    /// must carry, and that Node is the contract's: a pin bump that forgot the
+    /// project file would let a release ship the old Node silently.
+    /// </summary>
+    [Fact]
+    public void TheBuildRefusesARuntimeWithoutGeoGebraOrOnAnotherNode()
+    {
+        string project = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj"));
+        var pins = ContractLoader.LoadJson("toolchain.json")["pins"]!.AsArray();
+        string node = pins.First(p => p?["pin"]?.ToString() == "node")!["value"]!.ToString();
+        Assert.Contains($"<_PlantoirRuntimeNode>{node}</_PlantoirRuntimeNode>", project);
+        Assert.Contains("_PlantoirRuntimeManifest.Contains('&quot;geogebra&quot;')", project);
+    }
+
+    /// <summary>
+    /// #675: the fetch script compares the manifest's base VALUES with their
+    /// pins, not only its keys. Before #675 a Node bump against an existing
+    /// runtime was answered "already in place". Read as text: $BasePins must
+    /// name every one of $BaseKeys, and the loop over it must compare each
+    /// value and refuse.
+    /// </summary>
+    [Fact]
+    public void TheFetchScriptComparesEveryBaseValueWithItsPin()
+    {
+        string recipe = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Vendor", "fetch-runtime.ps1"));
+        var keys = System.Text.RegularExpressions.Regex.Match(recipe, @"(?m)^\$BaseKeys\s*=\s*@\(([^)]*)\)");
+        Assert.True(keys.Success, "fetch-runtime.ps1 no longer sets $BaseKeys.");
+        var names = System.Text.RegularExpressions.Regex.Matches(keys.Groups[1].Value, @"""([^""]+)""")
+            .Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(new[] { "node", "python", "quartz", "wrangler", "emoji" }, names);
+
+        var pins = System.Text.RegularExpressions.Regex.Match(recipe, @"(?ms)^\$BasePins\s*=\s*\[ordered\]@\{(.*?)^\}");
+        Assert.True(pins.Success, "fetch-runtime.ps1 no longer sets $BasePins.");
+        foreach (string name in names)
+            Assert.Matches(new System.Text.RegularExpressions.Regex(@"(?m)^\s*" + name + @"\s*=\s*\$\w+"), pins.Groups[1].Value);
+
+        // The loop over $BasePins must compare each value with its pin and
+        // refuse: held loosely (the block names $BasePins[$key], a -ne and a
+        // throw) so a harmless rewrite - a different cast, a Write-Host before
+        // the throw - does not fail it, while deleting the comparison does.
+        var loop = System.Text.RegularExpressions.Regex.Match(
+            recipe, @"(?s)foreach \(\$key in \$BasePins\.Keys\)\s*\{(.*?)
+    \}");
+        Assert.True(loop.Success, "fetch-runtime.ps1 no longer loops over $BasePins.");
+        Assert.Contains("$BasePins[$key]", loop.Groups[1].Value);
+        Assert.Contains("-ne", loop.Groups[1].Value);
+        Assert.Contains("throw", loop.Groups[1].Value);
+    }
+
+    /// <summary>
+    /// #687: the first binary in any payload. <c>Plantoir.csproj</c> takes all
+    /// of <c>support\**</c> as content; this proves the .ggb is INCLUDED -
+    /// nothing excludes it, it is the bytes the payload holds, and git treats
+    /// it as binary so no line-ending rule can touch it. (It reads the
+    /// project as text, as the other bundle tests do: the test project does
+    /// not reference the app, so the installer's output is not in reach.)
+    /// </summary>
+    [Fact]
+    public void TheBundleIncludesTheSlopeAngleSketchAsTheFileThePayloadHolds()
+    {
+        string project = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj"));
+        var support = System.Text.RegularExpressions.Regex.Match(project,
+            @"<Content Include=""\.\.\\\.\.\\support\\\*\*""([^>]*)/>");
+        Assert.True(support.Success, "Plantoir.csproj no longer takes support\\** as content.");
+        Assert.DoesNotContain("Exclude", support.Groups[1].Value);
+        Assert.Contains(@"Link=""Toolchain\support\%(RecursiveDir)%(Filename)%(Extension)""", support.Groups[1].Value);
+        // Nor does a later item take it back out: no Remove= names support or a .ggb.
+        foreach (System.Text.RegularExpressions.Match remove in System.Text.RegularExpressions.Regex.Matches(project, @"Remove=""([^""]*)"""))
+        {
+            string value = remove.Groups[1].Value;
+            Assert.False(value.Contains("support", StringComparison.OrdinalIgnoreCase) || value.Contains(".ggb", StringComparison.OrdinalIgnoreCase),
+                $"Plantoir.csproj removes {value} from its items, which can drop the payload's GeoGebra sketch from the bundle.");
+        }
+
+        string sketch = Path.Combine(RepoRoot, "support", "example_content", "MPM2D", "shared", "Explorations", "Slope Angle Conjecture.ggb");
+        Assert.True(File.Exists(sketch), $"{sketch} is missing.");
+        byte[] bytes = File.ReadAllBytes(sketch);
+        Assert.Equal(1_594_544, bytes.Length);
+        Assert.Equal("504b0304", Convert.ToHexString(bytes, 0, 4).ToLowerInvariant());
+        // The bytes the payload was committed with (2026-10-28), not merely a zip
+        // of the right length: a line-ending or filter rewrite changes this.
+        Assert.Equal("cc1ef8f35c0520429e5a75677cc3aef7e406c698ebea02d9af903fc2f0941069",
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant());
+        Assert.Matches(new System.Text.RegularExpressions.Regex(@"(?m)^\*\.ggb\s+binary\s*$"),
+            File.ReadAllText(Path.Combine(RepoRoot, ".gitattributes")));
+    }
+
+    /// <summary>
+    /// The mac's <c>testTheImagesNodeSatisfiesWranglersEngines</c>, mirrored:
+    /// the shared <c>node</c> pin - the image's Node and, since #675, the
+    /// runtime's - must satisfy wrangler's own <c>engines.node</c>, or
+    /// publishing to Cloudflare breaks with every site build still green.
+    /// </summary>
+    [Fact]
+    public void TheRuntimesNodeSatisfiesWranglersEngines()
+    {
+        var pins = ContractLoader.LoadJson("toolchain.json")["pins"]!.AsArray();
+        string node = pins.First(p => p?["pin"]?.ToString() == "node")!["value"]!.ToString();
+        string? engine = pins.First(p => p?["pin"]?.ToString() == "wrangler")!["nodeEngine"]?.ToString();
+        Assert.True(engine is not null,
+            "The wrangler pin must say which Node its engines need (nodeEngine), as wrangler's own package.json does.");
+        // Only the one shape wrangler has ever used is understood.
+        Assert.True(engine!.StartsWith(">=", StringComparison.Ordinal),
+            $"wrangler's nodeEngine is \"{engine}\"; this test understands only \">=X.Y.Z\".");
+        var floor = Version.Parse(engine[2..]);
+        var ours = Version.Parse(node);
+        Assert.True(ours >= floor,
+            $"The image and Windows' runtime run Node {node}, but wrangler's engines need {engine}: publishing to " +
+            "Cloudflare would break. Raise Node, or keep wrangler at a version whose engines it satisfies.");
+    }
+
     [Fact]
     public void Wrangler_StaysBelowVersionThatNeedsNode22()
     {
@@ -261,7 +456,10 @@ public class ToolchainContractTests
 
         Assert.Equal(pinnedParts[0], ceilingParts[0]);
         Assert.True(pinnedParts[1] < ceilingParts[1],
-            $"wrangler {pinned} must stay below {ceiling} because Node 20 is required by Quartz v4.5.0.");
+            $"wrangler {pinned} is at or past {ceiling}, whose engines need Node 22. Both platforms run Node 22 " +
+            "now (the image since #640, Windows' runtime since #675), so the ceiling no longer protects anything: " +
+            "moving wrangler is its own piece, which re-checks nodeEngine and retires mustStayBelow on both " +
+            "platforms. Raise the pin in that piece, not here.");
     }
 
     [Fact]

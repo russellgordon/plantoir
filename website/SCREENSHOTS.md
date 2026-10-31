@@ -114,7 +114,7 @@ the committed `colour-schemes` and `light-and-dark` before they were
 retaken, and passes after. **It is a guard, not a proof:** a mask drawn at a
 window's REAL radius reads like the real curve, which is why the code that
 drew them is gone rather than merely checked. `schedule` was the one such picture
-(its banner masked at the measured radius in 2e11471d); it was retaken the
+(its banner masked at the measured radius in fb191f7c); it was retaken the
 same day from a native capture of Notification Center's window, and
 `DRAWN_BUT_NOT_DETECTABLE` in the test is empty and must stay so.
 
@@ -143,7 +143,7 @@ in the 200% session — first served at 1700 × 1064 under `prepare()`'s old
 cap, then at its own size once #557 lifted it — and read back by `windowshot --ocr` in both themes: "On battery, a PC goes to sleep
 sooner, so be sure to keep it awake until then." is there, and neither
 "plugged" nor "laptop" is. The first pass of both themes had a keyboard
-focus ring round the date box (the 1.4.4 trap, commit 7a91dceba: the run
+focus ring round the date box (the 1.4.4 trap, commit 7467a1d49: the run
 before it had pressed Escape in Edge, so the last input Windows saw was the
 keyboard); real mouse movement through `SendInput` just before each
 `app_scenes_windows.py --retake schedule:<theme>` cleared it. The gate judges every
@@ -350,7 +350,8 @@ and the bundled runtime (`windows-app/Vendor/runtime`, or `PLANTOIR_RUNTIME`),
 photographs *Similar Triangles Practice* from its top in an Edge `--app`
 window in light and dark (`print-page-windows-light/-dark.png`), prints the
 Questions only handout through `handout_pdf.mjs` with the runtime's Node
-(`--experimental-websocket`, since it carries Node 20) and headless Edge, and
+(with `--experimental-websocket` only on a runtime older than Node 22: the
+runtime has carried 22.23.4 since #675) and headless Edge, and
 shows that PDF in an Edge `--app` window with the viewer's toolbar off
 (`print-handout-windows.png`, light: it is paper). Each picture is read back
 with Windows' own text recognition (`windowshot --ocr`) and must show

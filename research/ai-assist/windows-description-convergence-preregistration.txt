@@ -106,7 +106,7 @@ WHAT IS DECIDED BY IT (bundle 10 rulings Q2-Q4)
   AssistAgent.StillShortened (and narrow-tools.py STILL_SHORTENED) becomes
   empty, and the two toolDescriptions.measuredDepartures entries are deleted.
 
-BEHAVIOUR FIRST - done before this was written, in step (a) (f59050e9):
+BEHAVIOUR FIRST - done before this was written, in step (a) (fdeae02d):
   publish always takes what a page links to (transitively, stopping at a
   class) and unpublish takes a page only the hidden pages link to, with NO
   argument; `includeLinked` is gone from PlanPublish and from all four MCP
@@ -130,9 +130,9 @@ CONDITIONS - #352's, unchanged
   rather than inferred.
 
 ARMS (13-tool local surface; built by windows-description-arms-420.py)
-  BEFORE  the local surface on dev e313e770, as shipped: the bundle 9 re-dump
+  BEFORE  the local surface on dev 646e78a3, as shipped: the bundle 9 re-dump
           of plantoir-mcp's tools/list after #352 and its Z2 round
-          (scratchpad arms/raw-z.json; `git diff 554eeafc e313e770` touches no
+          (scratchpad arms/raw-z.json; `git diff 10e72c68 646e78a3` touches no
           served tool text - a comment in AssistAgent.cs and the MCP
           instructions only) narrowed by dev's narrow-tools.py. JSON-equal to
           bundle 9's shipped-z.json. publish_pages / unpublish_pages read

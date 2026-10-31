@@ -32,7 +32,9 @@ namespace Plantoir.Core.Models;
 /// harness redirects ITS OWN process as well, because it sets working folders
 /// up in-process and that copy writes a trail line. The LAUNCHERS are the sharp edge and are worth
 /// naming separately: <c>preview.ps1</c> and <c>deploy.ps1</c> compute the
-/// builds root from the environment themselves, and the scheduled-task
+/// builds root from the environment themselves (only their TRAIL lines follow
+/// the redirect, since #682: <see cref="Scripting.LauncherEnvironment"/> hands
+/// them PLANTOIR_TRAIL_DIR), and the scheduled-task
 /// wrapper bakes the same into the script it registers. So a redirected run
 /// that PREVIEWED would look for its build where the launcher did not put it,
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task

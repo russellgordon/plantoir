@@ -111,12 +111,16 @@ class EngineTestCase(unittest.TestCase):
         return geogebra_engine.adapt(zip_path, self.out, expected_sha256=digest)
 
     def files_written(self) -> list:
+        # Sorted as STRINGS, the way the expected lists are: sorting the Path
+        # objects is case-insensitive on Windows (WindowsPath compares
+        # case-folded), which put 'deployggb.js' before 'HTML5/...' and
+        # failed two tests there with every byte right (#687).
         found = []
         if self.out.exists():
-            for path in sorted(self.out.rglob("*")):
+            for path in self.out.rglob("*"):
                 if path.is_file():
                     found.append(path.relative_to(self.out).as_posix())
-        return found
+        return sorted(found)
 
     def assert_nothing_written(self):
         self.assertFalse(self.out.exists(), "a refusal wrote the engine folder")

@@ -6,7 +6,8 @@ no WSL2, no Docker and no administrator rights: everything the Dockerfile
 used to bake into the Linux image is fetched here as pinned, portable
 Windows pieces, and the app ships the folder the same way it ships llama/.
 
-    runtime\node\       Node.js 20 (win-x64 zip distribution - no installer)
+    runtime\node\       Node.js 22.23.4 (win-x64 zip distribution - no
+                        installer)
     runtime\python\     Python 3.11 embeddable + python-frontmatter 1.3.0,
                         PyYAML 6.0.3, Pillow 12.3.0
     runtime\quartz\     Quartz v4.5.0 + this repo's patches + node_modules
@@ -17,30 +18,43 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
                         0.4.3, and Latin Modern in pagedjs\fonts\),
                         function-plot\ (function-plot 1.25.4), pyodide\
                         (Pyodide 314.0.7's five runtime files, for runnable
-                        Python) and tikz-engine\ (node-tikzjax 1.0.5 and its
-                        locked dependencies, run at build time only)
+                        Python), tikz-engine\ (node-tikzjax 1.0.5 and its
+                        locked dependencies, run at build time only) and
+                        geogebra\ (GeoGebra Math Apps 5.4.933.1, adapted by
+                        scripts\geogebra_engine.py, for sketches, #578/#687)
     runtime\manifest.json
 
-Pins mirror the Dockerfile deliberately: Node 20 because Quartz v4.5.0 is
-known-good against it, wrangler below 4.100 because 4.100+ needs Node 22,
-Python 3.11 to match the python:3.11-slim base. Change a pin here and the
-Dockerfile's reasoning applies to you.
+Pins mirror the Dockerfile deliberately: Node 22.23.4 because that is the
+image's exact pin and Quartz v4.5.0 was revalidated on it (#640, #675);
+wrangler 4.80.0, below 4.87 because 4.87.0 is the first wrangler whose
+engines need Node 22 (the boundary was never 4.100, which this comment said
+until #675) - the pin is shared, and moving it is its own piece now that
+both platforms run 22; Python 3.11 to match the python:3.11-slim base.
+Change a pin here and the Dockerfile's reasoning applies to you.
 
 NOT committed (~600 MB of fetched output) - this repository ships recipes,
 not binaries. Run once before building the Windows app; re-run after
 deleting runtime\ to rebuild it.
 
-RE-RUN IT after pulling a change to the vendor pins below: the run decides
-from runtime\manifest.json's KEYS what is missing. No manifest: everything is
-fetched. A manifest from before the vendor folder (every runtime made before
-2026-10-15) or with a vendor version that differs from the pins: runtime\vendor
-is deleted and ONLY the vendor phase runs, against the node and python
-already there, so nobody fetches ~600 MB again for the vendor pieces (~56 MB since
-Pyodide joined them, #568).
+RE-RUN IT after pulling a change to any pin below: the run decides from
+runtime\manifest.json what is missing, comparing every key's VALUE with its
+pin. No manifest: everything is fetched. A BASE pin (node, python, quartz,
+wrangler, emoji) that differs from the manifest: the run REFUSES and says to
+delete runtime\ and re-run, because the base phase cannot be redone in place
+(the node folder would be moved INSIDE the old one, and git clone refuses a
+non-empty quartz\) - that is a full re-fetch of ~600 MB, as #675's Node 22
+bump needs. Until #675 only the base KEYS were checked, never their values,
+so a Node bump answered "[OK] Runtime already in place" on Node 20 (measured
+2026-10-28 on a copy of a 20.18.1 runtime). Base pins all current but a
+VENDOR version that differs or is missing (every runtime made before
+2026-10-15 lacks them all; before #687, geogebra): runtime\vendor is deleted
+and ONLY the vendor phase runs, against the node and python already there,
+so nobody fetches ~600 MB again for the vendor pieces.
 It never infers a phase from folders: an npm ci that crashed leaves a
 node_modules that looks finished. The app's build REFUSES a runtime whose
-manifest lacks the vendor keys (Plantoir.csproj -> CheckNativeRuntimeManifest),
-so a release cannot ship without the engines by accident.
+manifest lacks the vendor keys or names another Node (Plantoir.csproj ->
+CheckNativeRuntimeManifest), so a release cannot ship without the engines, or
+on the old Node, by accident.
 #>
 [CmdletBinding()]
 param()
@@ -48,7 +62,10 @@ param()
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-$NodeVersion     = "20.18.1"
+# Node 22.23.4 (#675): the image's exact pin since #640 (nodejs=22.23.4-1nodesource1).
+# contracts/toolchain.json -> pins -> node -> windowsRuntimeContains holds this
+# line, spacing included, against the contract.
+$NodeVersion     = "22.23.4"
 $PythonVersion   = "3.11.9"
 $WranglerVersion = "4.80.0"
 $QuartzTag       = "v4.5.0"
@@ -64,6 +81,11 @@ $LatinModernVersion  = "2.005-1"
 $FunctionPlotVersion = "1.25.4"
 $NodeTikzjaxVersion  = "1.0.5"
 $PyodideVersion      = "314.0.7"
+# ONE space before the "=", deliberately, not aligned with the lines above:
+# contracts/toolchain.json -> pins -> geogebra -> windowsRuntimeContains is
+# the next line exactly, with one space, and the test is an ordinal Contains
+# (#687).
+$GeogebraVersion = "5.4.933.1"
 # The literal addresses, beside the versions they must carry. A bump that
 # edits a version and not its address would compare the manifest against
 # the new version while fetching the old bytes (or never fetch at all), so
@@ -75,13 +97,20 @@ $LatinModernSnapshotUrl = "https://snapshot.debian.org/archive/debian/20230101T0
 $FunctionPlotUrl = "https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz"
 $NodeTikzjaxSpec = "node-tikzjax@1.0.5"
 $PyodideUrl      = "https://github.com/pyodide/pyodide/releases/download/314.0.7/pyodide-core-314.0.7.tar.bz2"
+# GeoGebra's own host first, then plantoir.app's mirror of the SAME zip
+# (pins -> geogebra -> urls, in that order). The address spells the version
+# with hyphens, 5-4-933-1.
+$GeogebraUrl       = "https://download.geogebra.org/installers/5.4/geogebra-math-apps-bundle-5-4-933-1.zip"
+$GeogebraMirrorUrl = "https://plantoir.app/mirror/geogebra/geogebra-math-apps-bundle-5-4-933-1.zip"
 foreach ($pair in @(
         @($PagedjsUrl, "pagedjs-$PagedjsVersion.tgz"),
         @($LatinModernUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
         @($LatinModernSnapshotUrl, "fonts-lmodern_${LatinModernVersion}_all.deb"),
         @($FunctionPlotUrl, "function-plot-$FunctionPlotVersion.tgz"),
         @($NodeTikzjaxSpec, "node-tikzjax@$NodeTikzjaxVersion"),
-        @($PyodideUrl, "$PyodideVersion/pyodide-core-$PyodideVersion.tar.bz2"))) {
+        @($PyodideUrl, "$PyodideVersion/pyodide-core-$PyodideVersion.tar.bz2"),
+        @($GeogebraUrl, "geogebra-math-apps-bundle-$($GeogebraVersion.Replace('.', '-')).zip"),
+        @($GeogebraMirrorUrl, "geogebra-math-apps-bundle-$($GeogebraVersion.Replace('.', '-')).zip"))) {
     if (-not $pair[0].EndsWith($pair[1], [StringComparison]::Ordinal)) {
         throw "$($pair[0]) does not carry $($pair[1]): a version above was changed without its address."
     }
@@ -90,15 +119,17 @@ foreach ($pair in @(
 # SHA-256 of each fixed download (#356, after the mac's #312 pinned its
 # helpers). A version pin says WHICH file is asked for; a hash says the file
 # that arrived is that one. Measured 2026-10-01 on the build PC (i5-8365U,
-# Windows 11 26200): the Node hash equals nodejs.org's own SHASUMS256.txt for
-# v20.18.1; the Python zip's python.exe and python311.dll are byte-identical
+# Windows 11 26200): the Node hash equalled nodejs.org's own SHASUMS256.txt for
+# v20.18.1, and the v22.23.4 hash below is that file's line for
+# node-v22.23.4-win-x64.zip (#675, re-checked 2026-10-23); the Python zip's
+# python.exe and python311.dll are byte-identical
 # to the runtime that has shipped; the font equals the shipped font. Change a
 # version above and its hash must change with it, or the fetch refuses.
 # get-pip.py is NOT hashed, deliberately: bootstrap.pypa.io serves one moving
 # file with no versioned URL, so a hash would break the build on pip's next
 # release while protecting nothing the package pins below do not - those are
 # exact versions, fetched by pip from PyPI over TLS.
-$NodeZipSha256   = "56e5aacdeee7168871721b75819ccacf2367de8761b78eaceacdecd41e04ca03"
+$NodeZipSha256   = "cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20"
 $PythonZipSha256 = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
 $EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
 # The vendor tarballs' hashes are the contract's own (toolchain.json ->
@@ -124,6 +155,11 @@ $LatinModernFiles = [ordered]@{
 # files), checked here as the Dockerfile checks them.
 $PyodideTarSha256 = "2abdcc2e35208af406e07724cffa85bc582ced97e9028383ecf5462541393f95"
 $PyodideTarLength = 6757104
+# GeoGebra Math Apps 5.4.933.1 (#578, #687): the contract's zip hash and size
+# (pins -> geogebra -> sha256), checked whichever host answered.
+# scripts\geogebra_engine.py checks the same hash again before it adapts.
+$GeogebraZipSha256 = "409095947e065bce5bde20b8a6d56a60e2b3cb3cce6947e817a802513515ec0c"
+$GeogebraZipLength = 33461640
 $PyodideFiles = [ordered]@{
     "pyodide.mjs"       = "6f1d60f7bf529beb300f0f47983c921d3982363640ba20af0e38efdddbc66109"
     "pyodide.asm.mjs"   = "f7cdc8ece80678ceb712f8e65ebe6d3a83203a180c399865f49612a051693635"
@@ -157,9 +193,20 @@ $VendorPins = [ordered]@{
     functionPlot = $FunctionPlotVersion
     nodeTikzjax  = $NodeTikzjaxVersion
     pyodide      = $PyodideVersion
+    geogebra     = $GeogebraVersion
+}
+$BasePins   = [ordered]@{
+    node     = $NodeVersion
+    python   = $PythonVersion
+    quartz   = $QuartzTag
+    wrangler = $WranglerVersion
+    emoji    = $EmojiFontTag
 }
 
-# What to run is decided from the manifest's KEYS, never from folders.
+# What to run is decided from the manifest's keys AND VALUES, never from
+# folders. A base value that differs from its pin refuses (see the header:
+# the base phase cannot be redone in place); before #675 only the keys were
+# checked, and a Node bump was answered "already in place".
 $runBase = $true
 $existing = $null
 if (Test-Path $Manifest) {
@@ -168,6 +215,12 @@ if (Test-Path $Manifest) {
     foreach ($key in $BaseKeys) {
         if ($names -notcontains $key) {
             throw "runtime\manifest.json has no '$key': this is not a runtime this script made. Delete $Runtime and re-run."
+        }
+    }
+    foreach ($key in $BasePins.Keys) {
+        if ([string]$existing.$key -ne $BasePins[$key]) {
+            throw ("runtime\manifest.json says $key $($existing.$key), and the pin is now $($BasePins[$key]). " +
+                   "That part of the runtime cannot be replaced in place: delete $Runtime and re-run (a full fetch, about 600 MB).")
         }
     }
     $vendorCurrent = $true
@@ -226,9 +279,11 @@ function Get-BaseFields {
     return $fields
 }
 
-function Fetch([string]$Url, [string]$To, [string]$Sha256 = "") {
+# $CurlOptions: how hard to try. The default is what every download here has
+# always had; GeoGebra passes the Dockerfile's own flags (see its section).
+function Fetch([string]$Url, [string]$To, [string]$Sha256 = "", [string[]]$CurlOptions = @("--retry", "3")) {
     Write-Host "Fetching $Url" -ForegroundColor Cyan
-    & curl.exe -fL --retry 3 -o $To $Url
+    & curl.exe -fL @CurlOptions -o $To $Url
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $To)) { throw "Failed to download $Url" }
     if ($Sha256) {
         $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $To).Hash.ToLowerInvariant()
@@ -325,7 +380,11 @@ try {
     $env:PLANTOIR_QUARTZ_DIR = $quartzDir
     $env:PLANTOIR_SUPPORT_DIR = Join-Path $RepoRoot "support"
     $env:PLANTOIR_CONTRACTS_DIR = Join-Path $RepoRoot "contracts"
-    & "$pyDir\python.exe" -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor(); setup_course.ensure_quartz_overflowlist_static_id()"
+    # -X utf8: setup_course prints a check mark, and with this script's output
+    # sent to a file or a pipe Python writes it in the ANSI code page and
+    # dies with UnicodeEncodeError ('charmap' cannot encode U+2705) - measured
+    # 2026-10-28, the first full re-fetch run with its output to a log (#675).
+    & "$pyDir\python.exe" -X utf8 -c "import sys; sys.path.insert(0, r'$RepoRoot\scripts'); import setup_course; setup_course.ensure_quartz_explorer_anchor(); setup_course.ensure_quartz_overflowlist_static_id()"
     if ($LASTEXITCODE -ne 0) { throw "Baking the Quartz scaffold patches failed" }
     if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -Pattern 'CQ4T-OMIT-ANCHOR' -Quiet)) {
         throw "quartz.layout.ts is missing the CQ4T-OMIT-ANCHOR marker - hidden pages would publish"
@@ -344,7 +403,7 @@ try {
     Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
-    # ---- wrangler (Cloudflare's deploy CLI, pinned below 4.100) --------------
+    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.80.0, below 4.87) -----
     $wranglerDir = Join-Path $Runtime "wrangler"
     New-Item -ItemType Directory -Force $wranglerDir | Out-Null
     & "$nodeDir\npm.cmd" install --prefix $wranglerDir --no-audit --no-fund --silent "wrangler@$WranglerVersion"
@@ -524,6 +583,40 @@ if missing:
     # npm ls --parseable lists the folder itself first, then each package.
     Write-Host ("TikZ engine node-tikzjax $NodeTikzjaxVersion in place: {0} packages, {1} files, {2:N1} MB." -f `
         ($installed.Count - 1), $engineFiles.Count, ($engineBytes / 1MB)) -ForegroundColor Green
+
+    # GeoGebra Math Apps 5.4.933.1 (#578, #687): the engine a page's
+    # ```geogebra sketches run on, copied into a site's static\geogebra only
+    # while a page students can see has a sketch (page_features). The folder
+    # name is load-bearing (toolchain_paths.VENDOR_DIR \ geogebra).
+    # scripts\geogebra_engine.py `adapt` is the ONE recipe, the same file the
+    # Dockerfile runs: it checks the zip's hash, keeps 117 files and makes six
+    # exact replacements, so both platforms carry identical bytes (the pin's
+    # `files` hashes say so in ToolchainContractTests). Never re-implemented
+    # here. Its `version` must name the pin first, as the Dockerfile tests.
+    # download.geogebra.org timed out on 4 of 8 connections (2026-10-23,
+    # Ontario) and keeps no old versions: the Dockerfile's curl flags, then
+    # plantoir.app's mirror of the same zip, one SHA-256 whichever answered.
+    $ggbRecipe = Join-Path $RepoRoot "scripts\geogebra_engine.py"
+    $ggbSays = (& "$pyDir\python.exe" -I $ggbRecipe version | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $ggbSays -ne $GeogebraVersion) {
+        throw "scripts\geogebra_engine.py prepares GeoGebra '$ggbSays', and the pin here is ${GeogebraVersion}: change them together."
+    }
+    $ggbCurl = @("--retry", "6", "--retry-all-errors", "--retry-delay", "5", "--connect-timeout", "30",
+                 "--speed-limit", "1024", "--speed-time", "60")
+    $ggbZip = Join-Path $Temp "geogebra-math-apps-bundle.zip"
+    $ggbClock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        Fetch $GeogebraUrl $ggbZip $GeogebraZipSha256 $ggbCurl
+    }
+    catch {
+        Write-Host "GeoGebra's own download did not answer ($($_.Exception.Message)); trying plantoir.app's copy of the same file" -ForegroundColor Yellow
+        Remove-Item -LiteralPath $ggbZip -Force -ErrorAction SilentlyContinue
+        Fetch $GeogebraMirrorUrl $ggbZip $GeogebraZipSha256 $ggbCurl
+    }
+    Assert-Sha256 $ggbZip $GeogebraZipSha256 $GeogebraZipLength
+    Write-Host ("GeoGebra downloaded in {0:N0} s." -f $ggbClock.Elapsed.TotalSeconds)
+    & "$pyDir\python.exe" -I $ggbRecipe adapt $ggbZip (Join-Path $VendorOut "geogebra")
+    if ($LASTEXITCODE -ne 0) { throw "Preparing GeoGebra's engine failed (scripts\geogebra_engine.py adapt)" }
     Write-Host ("Vendor phase took {0:N0} s." -f $vendorClock.Elapsed.TotalSeconds)
 
     # ---- Manifest ------------------------------------------------------------

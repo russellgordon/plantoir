@@ -22,7 +22,7 @@ WHAT CHANGED (code only; nothing the local model is shown)
 
 ARMS
   BEFORE  the branch's parent, issue/449 (piece S) merged onto origin/dev
-          4b177c684 - commit dfa34e51c (the merge commit; recorded in the
+          5c3ccaf24 - commit 3318354a4 (the merge commit; recorded in the
           results), research/ and contracts/ taken by `git archive`; tools =
           its tools-from-contract.py local.
   AFTER   this branch: the same tools JSON (must compare EQUAL, parsed), and

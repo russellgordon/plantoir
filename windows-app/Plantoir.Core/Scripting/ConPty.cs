@@ -29,8 +29,10 @@ public sealed class ConPtyProcess : IDisposable
     /// The screen width the app's own launcher runs get (#662): wider than any
     /// machine line a build prints today, so <c>PLANTOIR_HEALTH:</c> and the
     /// other markers reach their readers whole. A width, not a cure — a line
-    /// longer than this still splits the same way, and the machine lines have
-    /// no cap (#666 proposes one). Why 8192 and not the 32767 a
+    /// longer than this still splits the same way — which is why, since #666,
+    /// the shared Python keeps every machine line to
+    /// <c>machineLineLength.maxCharacters</c> (half this, for wide characters;
+    /// pinned by <c>MachineLineLengthContractTests</c>). Why 8192 and not the 32767 a
     /// <c>short</c> allows: Windows PowerShell 5.1 pads every progress frame
     /// to the full width, so <c>Invoke-WebRequest</c>'s progress costs bytes
     /// and time in proportion to it. The measurements are in

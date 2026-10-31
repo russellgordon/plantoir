@@ -1,7 +1,7 @@
 #352 (the #114 half) on WINDOWS: one description per tool - RESULTS.
 Measured 2026-10-01, 07:46-10:41 EDT, against the pre-registration beside
 this file (windows-description-convergence-preregistration.txt, committed
-3a96054b before the first request; dated F4 note 3ccfc58f appended before any
+95aa6ca6 before the first request; dated F4 note a45065e9 appended before any
 result was read). Raw per-trial logs: plantoir-windows-run\logs\
 bundle9-352-S{1,2,3}-{before,after}.txt on Russell's Windows PC.
 
@@ -82,7 +82,7 @@ WHAT THIS DOES NOT MEASURE: what Claude Code does with the converged MCP text
 ======================================================================
 #420 STEP (b) - publish_pages and unpublish_pages - RESULTS.
 Measured 2026-10-01, 13:49-19:50 EDT, against the #420 section of the
-pre-registration beside this file (committed aa71836c at 13:48:59, before
+pre-registration beside this file (committed a731d7ad at 13:48:59, before
 the first request at 13:49:43). Raw per-trial logs: plantoir-windows-run\logs\
 bundle10-420-S{1,2,3}-{before,after,middle}.txt on Russell's Windows PC.
 

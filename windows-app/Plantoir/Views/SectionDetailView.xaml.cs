@@ -1800,6 +1800,20 @@ public sealed partial class SectionDetailView : UserControl
             LastViewedPages.Remember(folder, _course.Code, _sectionNumber, path);
     }
 
+    /// <summary>
+    /// The page the preview shows NOW, for Open in Obsidian (#681): WebView2's
+    /// own address at the moment of the press, through the same normaliser
+    /// (the path below the preview's root, query and fragment stripped; '' for
+    /// the front page). Null when no site is shown (building, stopped, or
+    /// Rebuild Preview under way, all of which clear the root). Deliberately
+    /// NOT <see cref="LastViewedPages"/>: that ignores the app's own loads and
+    /// so can name a page no longer on screen (the contract's <c>rejected</c>).
+    /// </summary>
+    internal string? PreviewedAddress() =>
+        _isTornDown || _previewUrl is not { } root || Preview.CoreWebView2?.Source is not { } shown
+            ? null
+            : PreviewStartPage.Remember(shown, root, appLoadUnderWay: false);
+
     // ---- Teardown ---------------------------------------------------------
     //
     // Everything from here to END TEARDOWN REGION unwinds work that has

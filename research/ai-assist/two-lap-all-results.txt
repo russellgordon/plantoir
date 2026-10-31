@@ -33,7 +33,7 @@ SUMMARY
     refuses with wording.answerWasCutOff (#166). So the shape has two failure
     modes, input-dependent; the issue's 3/3 "all" came from one real course.
   * The app's answer to "pages": "all" (confirmed by a throwaway test against
-    dev ff1213ed before the fix): "Nothing needed changing." on the writes, a
+    dev 92a7099a before the fix): "Nothing needed changing." on the writes, a
     Go/Cancel card over nothing on the plan twins, and the same for ANY list
     whose every name matched no page. Fixed in code (#197): see doc 10, "A page
     list that names no page".

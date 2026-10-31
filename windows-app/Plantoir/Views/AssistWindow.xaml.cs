@@ -536,6 +536,15 @@ public sealed partial class AssistWindow : Window
             // opens one), so "no window" is reached only when none can show
             // the section — and is said, never thrown.
             AskAboutClassesDatedLaterInApp = AskAboutClassesDatedLaterInTheWindow,
+            // #690: "Open this in Obsidian" presses the section window's own
+            // Open in Obsidian (#681's route, the page its preview shows) in a
+            // window on THIS conversation's folder - opened if there is none -
+            // and the reply is made from what that press came to.
+            ObsidianIsInstalled = () => FolderActions.ObsidianIsInstalled,
+            OpenInObsidianInApp = async () => MainWindowForBuilds() is { } window
+                ? await window.PressOpenInObsidianFor(_folder, _course.Code, _section)
+                : new OpenInObsidianPress.NoWindow(),
+            ShownCourseCode = () => ReferenceCourse.ShownCode(_course),
             StartDeployInApp = () => MainWindowForBuilds()?.DeployFor(_course.Code, _section),
             StartDeployInAppAsync = async () =>
             {

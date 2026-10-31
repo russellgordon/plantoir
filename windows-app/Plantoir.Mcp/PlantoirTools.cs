@@ -248,6 +248,28 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private const string LinksAnswerHelp =
         "Leave empty. Filled by Plantoir's own window when a teacher asks what a page links to.";
 
+    /// <summary>
+    /// #690 (the mac's #610): served so an outside assistant meets the same
+    /// tool the mac's server offers, and REFUSED - this process has no window
+    /// and no preview to read the page on screen from. The in-app assistant
+    /// never reaches here: its window answers the call by pressing the
+    /// section window's own Open in Obsidian. Read-only, so a course kept for
+    /// reference is not refused by <see cref="ReferenceWriteGate"/>; an
+    /// unknown course or section is refused as every tool refuses it.
+    /// </summary>
+    [McpServerTool(Name = "open_in_obsidian", Title = "Open the page on screen in Obsidian",
+                   ReadOnly = true, Destructive = false, Idempotent = true)]
+    [Description("TEACHERS SAY: \"open this in Obsidian\", \"edit this in Obsidian\". Open this note in Obsidian, altering nothing.")]
+    public string OpenInObsidian(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section)
+        => Guarded(() =>
+        {
+            var found = workspace.Course(course);
+            int number = workspace.Section(found, section);
+            return AssistWording.OpenInObsidianIsInTheSectionWindow(ReferenceCourse.ShownCode(found), number.ToString());
+        });
+
     /// <summary>How many links into hidden pages check_section names before counting the rest — the build's number.</summary>
     private const int HiddenLinksNamed = 10;
 

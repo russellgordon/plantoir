@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -117,6 +118,25 @@ public sealed class AssistToolRunner
     /// </summary>
     public Func<bool>? CourseIsBeingCopied { get; init; }
 
+    /// <summary>
+    /// Presses the section window's own Open in Obsidian (#690; the mac's
+    /// #610) and says what the press came to: the page the preview showed, a
+    /// fallback, a question up first, or already opening. Null where there is
+    /// no window to press (an outside assistant: the server refuses).
+    /// </summary>
+    public Func<Task<OpenInObsidianPress>>? OpenInObsidianInApp { get; init; }
+
+    /// <summary>Whether anything answers <c>obsidian://</c> on this PC.</summary>
+    public Func<bool> ObsidianIsInstalled { get; init; } = () => true;
+
+    /// <summary>
+    /// The code a teacher reads for this window's course - for a course kept
+    /// for reference, its <c>course_code</c> rather than its folder's name
+    /// (<see cref="Plantoir.Core.Models.ReferenceCourse.ShownCode"/>), as the
+    /// mac's reply says <c>displayCode</c>. Null says the folder code.
+    /// </summary>
+    public Func<string>? ShownCourseCode { get; init; }
+
     // ---- Which tools do what to the preview
 
     /// <summary>
@@ -190,6 +210,15 @@ public sealed class AssistToolRunner
         // section. The menu itself, and every read, go ahead.
         if (Surface == AssistSurface.LocalWindow && IsWriteTool(name) && SectionIsChangingFromTheMenu?.Invoke() == true)
             return Handed(AssistWording.SectionIsChangingFromTheMenu(_courseCode, _section.ToString()));
+
+        // #690: Open in Obsidian is answered by the APP, by pressing the
+        // section window's own button (#681's route), never by the server,
+        // which has no window and no preview to read. Read-only: no approval
+        // card, no menu claim, not refused on a course kept for reference.
+        // The order is #690's: course/section (the window's own) -> Obsidian
+        // not installed -> bring the window up -> press.
+        if (name.Equals("open_in_obsidian", StringComparison.OrdinalIgnoreCase) && OpenInObsidianInApp is not null)
+            return Handed(await OpenInObsidianAsync());
 
         if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ThisSectionIsBeingDeployed())
         {
@@ -303,6 +332,41 @@ public sealed class AssistToolRunner
             ShowPreviewInApp.Invoke();
         }
         return (answer, handed);
+    }
+
+    /// <summary>
+    /// The reply to the assistant's Open in Obsidian, made from the press's own
+    /// answer - read once, at the press - so it names the page that opened.
+    /// <c>{course}</c> is the code the teacher reads (<see cref="ShownCourseCode"/>),
+    /// as the mac's says <c>displayCode</c>.
+    /// </summary>
+    private async Task<string> OpenInObsidianAsync()
+    {
+        string section = _section.ToString();
+        string course = ShownCourseCode?.Invoke() ?? _courseCode;
+        if (!ObsidianIsInstalled()) return AssistWording.ObsidianIsNotOnThisPc;
+        OpenInObsidianPress press;
+        // A fault is a press that opened nothing - never "no window", which
+        // would send the teacher looking for a window that is right there.
+        try { press = await OpenInObsidianInApp!.Invoke(); }
+        catch { press = new OpenInObsidianPress.DidNotOpen(); }
+        return press switch
+        {
+            OpenInObsidianPress.Opened { Answer: PreviewedPageSource.Page page } =>
+                AssistWording.OpenedThePageInObsidian(page.Place[(page.Place.LastIndexOf('/') + 1)..]),
+            OpenInObsidianPress.Opened { Answer: PreviewedPageSource.FellBack { Why: PreviewedPageSource.Fallback.NoPageShowing } } =>
+                AssistWording.OpenedTheSectionNoPageShowing(course, section),
+            OpenInObsidianPress.Opened => AssistWording.OpenedTheSectionPageNotFound(course, section),
+            OpenInObsidianPress.WaitingForAnAnswer => AssistWording.ObsidianOpensAfterTheQuestion(course, section),
+            OpenInObsidianPress.AlreadyOpening => AssistWording.ObsidianIsAlreadyOpening(course),
+            // The contract has no sentence for a press that failed: mac #698
+            // asks for a `wording` key and a scenario
+            // `given.obsidianPress: "didNotOpen"`. This one is the least wrong: every clause of it
+            // is true - the button is in Plantoir, pressing it is the way, and
+            // nothing was opened - where "no window" and "opened" are not.
+            OpenInObsidianPress.DidNotOpen => AssistWording.OpenInObsidianIsInTheSectionWindow(course, section),
+            _ => AssistWording.OpenInObsidianFoundNoWindow(course, section),
+        };
     }
 
     /// <summary>An answer made here, without the server: the same words to the teacher and the model.</summary>

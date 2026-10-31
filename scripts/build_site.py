@@ -22,6 +22,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import site_health
 import contracts
+import machine_line
 import class_pages
 import markdown_code
 import how_i_teach
@@ -4691,8 +4692,9 @@ def announce_dated_pages(result: dict, course: str, section_number: int, printer
         prefix = contracts.section("shared-rules", "pagesDatedByTheBuild", "marker", "prefix")
     except Exception:
         return
-    payload = {"course": course, "section": section_number, "pages": rewritten}
-    printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
+    # At most machineLineLength.maxCharacters (#666): a long list keeps its
+    # first pages and says how many there were ("count") and were left out.
+    printer(machine_line.listed(prefix, {"course": course, "section": section_number}, "pages", rewritten))
 # ===========================================================================
 
 
@@ -8715,10 +8717,10 @@ def announce_coverage_maps(maps: list, course: str, section_number: int, printer
         prefix = contracts.section("shared-rules", "coverageMapsBuilt", "marker", "prefix")
     except Exception:
         return
-    payload = {"course": course, "section": section_number,
-               "maps": [{"title": item["title"], "folder": item["folder"],
-                         "expectations": item["expectations"]} for item in maps]}
-    printer(f"{prefix} {json.dumps(payload, ensure_ascii=False)}")
+    named = [{"title": item["title"], "folder": item["folder"],
+              "expectations": item["expectations"]} for item in maps]
+    # At most machineLineLength.maxCharacters (#666), as PLANTOIR_DATED: is.
+    printer(machine_line.listed(prefix, {"course": course, "section": section_number}, "maps", named))
 
 
 def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,

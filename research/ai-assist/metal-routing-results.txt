@@ -3,7 +3,7 @@ ROUTING ON METAL, AFTER THE 2026-08-24 SYSTEM-PROMPT CHANGE
 
 THE FIRST THING TO KNOW: THIS IS A RE-MEASUREMENT, AND IT CANNOT SHOW A WIN
 --------------------------------------------------------------------------
-The two sentences added to the system prompt on 2026-08-24 (commit b77b91bd,
+The two sentences added to the system prompt on 2026-08-24 (commit 0a9aae83,
 "undo_last_change reverses only the assistant's own most recent action…" and
 "There is no tool to delete, remove or rename a page or a folder…") were
 written to fix a cluster measured on WINDOWS, in a container, against
@@ -97,8 +97,8 @@ Surface:     13 tools, the local surface, from
              that does not ship. `Plantoir --write-contracts` was NOT run (it
              needs an app build, and another agent held the checkout), so the
              contract's freshness was checked instead:
-               contract     68de49ad, 2026-09-09 23:33
-               descriptions AssistToolSurface.swift, last changed 3c080a54,
+               contract     3964aafb, 2026-09-09 23:33
+               descriptions AssistToolSurface.swift, last changed a1146fe6,
                             2026-09-09 23:20 — an ANCESTOR of the contract
                             commit, so the contract is not older than the
                             surface.
@@ -106,11 +106,11 @@ Surface:     13 tools, the local surface, from
                the diff touches no tool description and no tool name.
 Suite:       research/ai-assist/trimmed-surface-suite.py, in the shipped
              configuration `--date-appended --real-course --course VVH2O`, 29
-             probes. Harness changes for this run are commit 97c18fb6; the
+             probes. Harness changes for this run are commit 81c1faa3; the
              defaults are unchanged, so an older command line still
              reproduces the older files.
-Prompt:      AssistAgent.swift as of 51e74cfe (2026-09-10) for the `shipped`
-             and `hyphen` forms; `git show b77b91bd^` for the `pre-tweak`
+Prompt:      AssistAgent.swift as of e87ac0f7 (2026-09-10) for the `shipped`
+             and `hyphen` forms; `git show 0a9aae83^` for the `pre-tweak`
              form. The three differ as follows, verified by the harness on
              every run:
                hyphen     1278 chars — the suite's own constant, ASCII
@@ -120,11 +120,11 @@ Prompt:      AssistAgent.swift as of 51e74cfe (2026-09-10) for the `shipped`
                           of the Swift; identical to `hyphen` except for SIX
                           em-dashes. Windows' AssistAgent.cs also ships
                           em-dashes.
-               pre-tweak  929 chars — the same literal at b77b91bd^, before
+               pre-tweak  929 chars — the same literal at 0a9aae83^, before
                           the two sentences
              The system prompt is NOT in the contract, so nothing pins the
              Swift, the C# and this suite together but the assertion added in
-             97c18fb6.
+             81c1faa3.
 Other load:  another agent was running xcodebuild test suites on this machine
              throughout. **Latency figures here are indicative only.** Token
              counts and tool choices are unaffected by a busy machine.
@@ -133,7 +133,7 @@ DECIDED IN ADVANCE
 ------------------
 Written and committed BEFORE the first model call, so that the thresholds
 cannot be fitted to the numbers. The commit order is the evidence: this
-section is in 97c18fb6's successor, and every results block below arrived
+section is in 81c1faa3's successor, and every results block below arrived
 later.
 
 **The arms.** All of them: 29 probes, `--date-appended --real-course --course

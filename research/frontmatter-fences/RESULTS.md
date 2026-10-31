@@ -13,7 +13,7 @@ three or more dashes at column 0, trailing spaces and tabs only; the OPENING
 fence may be indented, because `frontmatter.parse` strips the whole document
 first — both disagree on **0 of 3,000**.
 
-| Reader | Before #188 (`origin/dev` 68214a6c) | After #188 |
+| Reader | Before #188 (`origin/dev` f0512ae8) | After #188 |
 |---|---|---|
 | Swift, `PageVisibilityReader.fenceIndices` | 1,316 of 3,000 | 0 of 3,000 |
 | Python, `build_site._frontmatter_fences` | 1,316 of 3,000 | 0 of 3,000 |
@@ -87,7 +87,7 @@ python3 $F compare /tmp/library.json /tmp/swift.json
 
 For the "before" column, run the same against `git archive origin/dev` of
 `scripts/` (piped into the container as a tar stream) and the four Swift files
-from `git show 68214a6c:<path>`.
+from `git show f0512ae8:<path>`.
 
 Measured by Claude Opus 5.5 on 2026-09-25 for the branch
 `issue/188-182-186-frontmatter-shapes`, reproducing the plan's rig

@@ -12,7 +12,7 @@ namespace Plantoir.Mcp;
 /// Asked FIRST, before a tool is dispatched at all — a refusal that arrives
 /// after the work has started is not a refusal — by a call-tool filter on the
 /// server (Program.cs), so it covers the local assistant's window and every
-/// outside session alike, and all 42 tools this server serves, not the 22 the
+/// outside session alike, and all 43 tools this server serves, not the 22 the
 /// mac's runner holds.
 ///
 /// <para><b>Gated on each tool's OWN ReadOnly flag</b>, read off its

@@ -56,10 +56,12 @@ public sealed record SiteHealthFinding(
     /// the section. One build reporting a rebuilt section twice is one
     /// problem; the same check in two sections is two.
     ///
-    /// <para>Lives on the record so the two places that de-duplicate --
-    /// <see cref="FindingsIn"/> over a finished transcript, and
-    /// <c>ScriptRunner</c> over a live one -- cannot drift into disagreeing
-    /// about what a duplicate is.</para>
+    /// <para>Lives on the record so every place that de-duplicates --
+    /// <see cref="Plantoir.Core.Scripting.BuildMachineLines.AddFinding"/>,
+    /// which <c>ScriptRunner</c>, <c>plantoir-mcp</c>'s <c>LauncherRunner</c>
+    /// and <c>ScheduledHealthFindings</c> all call (#660), and
+    /// <see cref="FindingsIn"/> -- cannot drift into disagreeing about what a
+    /// duplicate is.</para>
     /// </summary>
     public string Identity => $"{Name} {Course} {Section}";
 
@@ -118,6 +120,10 @@ public sealed record SiteHealthFinding(
     /// hold more than one build -- the app appends to one console -- and
     /// telling a teacher the same folder is missing three times reads as three
     /// problems.</para>
+    ///
+    /// <para>Kept for tests: no product code calls it - every reader goes
+    /// through <c>BuildMachineLines</c> (#660) - and <c>SiteHealthContractTests</c>
+    /// uses it to pin the de-duplication rule.</para>
     /// </summary>
     public static IReadOnlyList<SiteHealthFinding> FindingsIn(IEnumerable<string>? transcriptLines)
     {

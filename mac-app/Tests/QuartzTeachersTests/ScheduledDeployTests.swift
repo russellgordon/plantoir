@@ -1335,7 +1335,7 @@ final class ScheduledDeployTests: XCTestCase {
         return Course(code: "ICS3U", directoryURL: courseURL, configuration: configuration)
     }
 
-    /// A job exactly as a release BEFORE #237 wrote it (dev 68214a6c's
+    /// A job exactly as a release BEFORE #237 wrote it (dev f0512ae8's
     /// `propertyList`): the label with no folder id, and its wrapper beside it.
     @discardableResult
     func writeAgentSetBeforeTheUpdate(

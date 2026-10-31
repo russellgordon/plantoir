@@ -57,14 +57,15 @@
       "pin": "node",
       "value": "22.23.4",
       "dockerfileContains": "nodejs=22.23.4-1nodesource1",
-      "why": "#640 (v1.9.0): Node 22.23.4 from NodeSource (`setup_22.x`), PINNED EXACTLY. Node 20 has been end-of-life since 2026-04-30, and the unpinned `setup_20.x` let the image and Windows' runtime drift to different patch releases (#636). 22.23.4 is the 2026-10-20 security release (npm 10.9.9, OpenSSL 3.5.9). An `=` pin is safe here, unlike caCertificates' floor: NodeSource keeps its history (measured 2026-10-23: every 22.x from 22.5.0 on arm64, 22.23.4 and back past 22.22.0 on amd64), so the pin does not break a first build the day 22.23.5 ships. Quartz v4.5.0 is still what decides this, and was revalidated on 22: an identical `npm ls --all` tree for Quartz and the tikz engine (665 lines, no EBADENGINE), byte-identical figure-cache SVG, the same 336 files for the EXC2O example with 0 differences once timestamps and Explorer ids are set aside, and verify.sh and verify-deploy.sh green. The one new behaviour, a `punycode` DEP0040 deprecation line on every Quartz build, is silenced by build_site.py (`--disable-warning=DEP0040`, that one warning only). Node's own built-in store (`tls.rootCertificates`) holds 116 roots and neither caCertificates subject; verify.sh checks the version, wrangler's engines and that store. Node 22 is end-of-life on 2027-04-30, so Quartz 5 (#512) or Node 24 must land before then. No windowsRuntimeContains yet: Windows' runtime stays on 20.18.1 until its own issue, which adds it with the bump. REJECTED: Node 24 (the ruling on #636 is 22, and 24 is a second, unmeasured jump); a floating `setup_22.x` (#636's drift again); a late `nodejs` layer over Node 20 (saves existing teachers about 90 MB, estimated, but every npm layer below must rebuild anyway, Node 20's files stay as dead weight, and no no-cache build reproduces the image)."
+      "windowsRuntimeContains": "$NodeVersion     = \"22.23.4\"",
+      "why": "#640 (v1.9.0): Node 22.23.4 from NodeSource (`setup_22.x`), PINNED EXACTLY. Node 20 has been end-of-life since 2026-04-30, and the unpinned `setup_20.x` let the image and Windows' runtime drift to different patch releases (#636). 22.23.4 is the 2026-10-20 security release (npm 10.9.9, OpenSSL 3.5.9). An `=` pin is safe here, unlike caCertificates' floor: NodeSource keeps its history (measured 2026-10-23: every 22.x from 22.5.0 on arm64, 22.23.4 and back past 22.22.0 on amd64), so the pin does not break a first build the day 22.23.5 ships. Quartz v4.5.0 is still what decides this, and was revalidated on 22: an identical `npm ls --all` tree for Quartz and the tikz engine (665 lines, no EBADENGINE), byte-identical figure-cache SVG, the same 336 files for the EXC2O example with 0 differences once timestamps and Explorer ids are set aside, and verify.sh and verify-deploy.sh green. The one new behaviour, a `punycode` DEP0040 deprecation line on every Quartz build, is silenced by build_site.py (`--disable-warning=DEP0040`, that one warning only). Node's own built-in store (`tls.rootCertificates`) holds 116 roots and neither caCertificates subject; verify.sh checks the version, wrangler's engines and that store. Node 22 is end-of-life on 2027-04-30, so Quartz 5 (#512) or Node 24 must land before then. Windows' runtime carries the same 22.23.4 since #675 (v1.9.0; fetch-runtime.ps1's `$NodeVersion`, held to this pin by windowsRuntimeContains, five spaces and all), so both platforms run one Node; there, global `WebSocket` exists without `--experimental-websocket` and Quartz's `npm ls --all` tree is the one it had on 20.18.1. REJECTED: Node 24 (the ruling on #636 is 22, and 24 is a second, unmeasured jump); a floating `setup_22.x` (#636's drift again); a late `nodejs` layer over Node 20 (saves existing teachers about 90 MB, estimated, but every npm layer below must rebuild anyway, Node 20's files stay as dead weight, and no no-cache build reproduces the image)."
     },
     {
       "mustStayBelow": "4.87",
       "nodeEngine": ">=20.3.0",
       "pin": "wrangler",
       "value": "4.80.0",
-      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. `mustStayBelow` is 4.87 because 4.87.0 is the first wrangler whose `engines.node` is `>=22.0.0` (`npm view 'wrangler@>=4.80.0' engines.node`, 2026-10-23: 4.80.0 to 4.86.0 say `>=20.3.0`, 4.87.0 to 4.152.0 say `>=22.0.0`, none yet needs 24). It said 4.100 until #640, which was never a boundary. The image runs Node 22 since #640, so the ceiling now comes from WINDOWS: the pin is shared, and Windows' runtime stays on Node 20.18.1 until its own issue lands. Moving wrangler is its own piece once both platforms run 22, and that piece retires `mustStayBelow` on both. `nodeEngine` is wrangler's own `engines.node` at this pin: verify.sh reads it from the image's wrangler package.json, and the mac suite checks the `node` pin satisfies it - the invariant that matters from now on. The exact pin also keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester."
+      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. `mustStayBelow` is 4.87 because 4.87.0 is the first wrangler whose `engines.node` is `>=22.0.0` (`npm view 'wrangler@>=4.80.0' engines.node`, 2026-10-23: 4.80.0 to 4.86.0 say `>=20.3.0`, 4.87.0 to 4.152.0 say `>=22.0.0`, none yet needs 24). It said 4.100 until #640, which was never a boundary. The image runs Node 22 since #640 and Windows' runtime since #675, so no platform needs the ceiling any more: it stays only until moving wrangler, its own piece now that both platforms run 22, retires `mustStayBelow` on both. `nodeEngine` is wrangler's own `engines.node` at this pin: verify.sh reads it from the image's wrangler package.json, and the mac suite checks the `node` pin satisfies it - the invariant that matters from now on. The exact pin also keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester."
     },
     {
       "pin": "quartz",
@@ -206,7 +207,7 @@
     },
     {
       "rule": "If you raise Node, revalidate Quartz BEFORE chasing a newer CLI",
-      "why": "The order is the whole point of the wrangler pin. #640 did the first half: the image's Node is 22 and Quartz v4.5.0 was revalidated on it; the CLI moves only once Windows' runtime is on 22 too."
+      "why": "The order is the whole point of the wrangler pin. #640 did the first half: the image's Node is 22 and Quartz v4.5.0 was revalidated on it; #675 did the second for Windows' runtime, so the CLI may now move, as its own piece."
     }
   ],
   "whyWranglerAtAll": "Cloudflare's upload protocol — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that reimplementing it would break teachers' publishing whenever Cloudflare changed it. So the image carries their CLI instead.",
@@ -389,7 +390,7 @@
   "npmAudit": {
     "note": "#667 (v1.9.0): what `npm audit` reports against the image's JavaScript, and which findings are accepted and why. verify.sh audits every tree below inside the image, with the image's own npm, and FAILS on a high or critical advisory that is not accepted here for that tree, or that is accepted at a LOWER severity than the database gives it now (re-decide). Low and moderate advisories that are not accepted are reported, not failed; an accepted advisory no longer reported is stale, said and not failed. Offline it SKIPS, saying no tree counts as audited until every tree can be. A top-level key, deliberately NOT under `pins`: both apps' pin tests read every pin as a Dockerfile line. Every current advisory is listed, low and moderate included, with the severity it has today, so a later raise fails. `exposure` and `reason` are decided per tree, because one advisory can be harmless in one tree and not in another. Windows audits its runtime's copies of the same trees (`windowsRuntime`) against this same list. scripts/npm_audit.py is the comparator; research/npm-audit/<date>.md is the record of each run; RELEASING.md step 2 revisits it at every cut. REJECTED: upgrading now (the ruling on #667: no upgrades this release; Quartz's tree moves with Quartz 5, #512, and wrangler's with its own piece); `npm audit --audit-level=high` alone, which cannot say 'accepted', so every run would be red; auditing in the image build, which would need the network on every build and fail a teacher's first build the day an advisory is published.",
     "failsOn": ["high", "critical"],
-    "reviewed": "2026-10-24",
+    "reviewed": "2026-10-28",
     "trees": [
       {"tree": "quartz", "image": "/opt/quartz", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\quartz", "exposure": "Quartz v4.5.0 and every dependency its lockfile installs, dev dependencies included. Runs in the container on the teacher's Mac: the build, and the preview server while a preview runs. A built site carries Quartz's own client scripts and stylesheets."},
       {"tree": "tikz-engine", "image": "/opt/vendor/tikz-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\tikz-engine", "exposure": "node-tikzjax and its locked dependencies (support/figures/package-lock.json, npm ci --omit=dev). Build only: a site carries the SVG it draws, never the engine."},
@@ -520,6 +521,15 @@
       },
       {
         "tree": "quartz",
+        "package": "satori",
+        "exposure": "the teacher's build only",
+        "reason": "Improper escaping in the SVG satori generates. Quartz uses satori only in its CustomOgImages emitter (social-preview images), and build_site.py comments that emitter out of quartz.config.ts on every build unless --include-social-media-previews is passed, which neither app passes (contracts/app-rules.json lists it among the flags the apps do not pass). With the flag, what satori draws is the teacher's own page titles and course name, and its SVG goes straight to sharp to become a PNG, so no generated SVG reaches a site. Checked 2026-10-28: build_site.py's toggle_custom_og_images, and the Windows runtime's quartz.config.ts (the same Quartz v4.5.0 file the image carries) naming Plugin.CustomOgImages() for it to comment out.",
+        "advisories": [
+          {"id": "GHSA-wx4j-mvgx-mqwp", "severity": "moderate"}
+        ]
+      },
+      {
+        "tree": "quartz",
         "package": "sharp",
         "exposure": "the teacher's build only",
         "reason": "libvips, libheif and librsvg issues with hostile images. sharp here renders Quartz's own generated social-preview images, not uploaded ones.",
@@ -585,7 +595,7 @@
         "tree": "wrangler",
         "package": "undici",
         "exposure": "Cloudflare deploy only",
-        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's Mac. The SOCKS5 and pool-proxy advisories need a proxy, and none is configured. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. Fixed in wrangler > 4.113.0, which needs Node 22 on Windows too: moving wrangler is its own piece (the wrangler pin).",
+        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's computer. Plantoir configures no proxy; one in the teacher's environment is honoured through EnvHttpProxyAgent. The SOCKS5 advisories need a `socks5://` proxy, and the dropped-requestTls one also needs a `requestTls` option wrangler never passes, so the pool-reuse one is reached only behind a SOCKS5 proxy. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. The five published 2026-10-27, checked 2026-10-28 in wrangler 4.80.0's own wrangler-dist/cli.js, which BUNDLES undici 7.24.4 (so these are wrangler's own requests, not only miniflare's): GHSA-4w7w-5xrc-9h26 and GHSA-55wc-3pg8-jfw6 need undici's cache or decompress interceptor composed onto a dispatcher, and wrangler composes none; GHSA-2m5v-pch6-74hx needs a function-valued `tls` option on an Agent, and wrangler's only dispatchers are undici's default Agent and, when a proxy variable is set, EnvHttpProxyAgent({ noProxy }), neither with a tls option; GHSA-qrxm-fqhp-jwvm needs a TLS 1.2 connection, and api.cloudflare.com, where every `wrangler pages deploy` request goes, negotiated TLS 1.3 from Windows' runtime's Node 22.23.4, the image's exact pin (MEASURED 2026-10-28 on Windows: only those TLS 1.3 handshakes, of this PC's route, and registry.npmjs.org negotiating TLS 1.2 there; that host is reached only by the update check, which goes through Node's https module, not undici. REASONED, NOT MEASURED: through an HTTPS_PROXY CONNECT tunnel TLS stays end to end, so the measurement carries over; a proxy that terminates TLS is the peer instead and may speak 1.2, but Node trusts it only if its CA was handed to Node, and a proxy in that position already sees the token, so the worst it can then do is crash that deploy, a client-side DoS); GHSA-9fm3-97px-rjf6 is the WebSocket client, which a deploy never opens. Fixed in wrangler > 4.113.0, whose engines need Node 22: both platforms run Node 22.23.4 since #675, and moving wrangler is its own piece, #699 (the wrangler pin).",
         "advisories": [
           {"id": "GHSA-vmh5-mc38-953g", "severity": "high"},
           {"id": "GHSA-p88m-4jfj-68fv", "severity": "moderate"},
@@ -610,7 +620,12 @@
           {"id": "GHSA-rx4f-c7p8-82vq", "severity": "moderate"},
           {"id": "GHSA-4qv8-2p9j-2685", "severity": "moderate"},
           {"id": "GHSA-f72v-6w45-q472", "severity": "moderate"},
-          {"id": "GHSA-xjj6-f33q-929c", "severity": "high"}
+          {"id": "GHSA-xjj6-f33q-929c", "severity": "high"},
+          {"id": "GHSA-4w7w-5xrc-9h26", "severity": "high"},
+          {"id": "GHSA-2m5v-pch6-74hx", "severity": "high"},
+          {"id": "GHSA-qrxm-fqhp-jwvm", "severity": "high"},
+          {"id": "GHSA-9fm3-97px-rjf6", "severity": "moderate"},
+          {"id": "GHSA-55wc-3pg8-jfw6", "severity": "moderate"}
         ]
       },
       {

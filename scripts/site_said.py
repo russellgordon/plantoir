@@ -237,7 +237,7 @@ def say(payload: dict, printer=print) -> None:
     try:
         facts = facts_from_site(payload, payload.get("blocks") or [])
         if facts:
-            found.append(site_health.site_disagreements_finding(
+            found.append(site_health.shortenable(site_health.site_disagreements_finding,
                 {"site_disagreements": facts}, course, section, site_health._checks_by_name()))
     except Exception as error:
         printer(f"ℹ️  Could not name the blocks of code shown as plain code "
@@ -245,7 +245,7 @@ def say(payload: dict, printer=print) -> None:
     try:
         facts = quiz_facts_from_site(payload, payload.get("quizzes") or [])
         if facts:
-            found.append(site_health.quizzes_read_differently_finding(
+            found.append(site_health.shortenable(site_health.quizzes_read_differently_finding,
                 {"quiz_disagreements": facts}, course, section, site_health._checks_by_name()))
     except Exception as error:
         printer(f"ℹ️  Could not name the self-check questions the website read differently "

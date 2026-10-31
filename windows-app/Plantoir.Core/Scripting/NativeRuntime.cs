@@ -7,7 +7,8 @@ namespace Plantoir.Core.Scripting;
 /// first bug this design shipped was three launch sites disagreeing: the
 /// ConPTY path set PLANTOIR_RUNTIME and the stop-sweep and MCP paths did
 /// not, so a sweep against a Debug build quietly booted WSL and stopped
-/// nothing.
+/// nothing. Every launcher child is handed it through
+/// <see cref="LauncherEnvironment"/> (since #682, with the trail folder).
 /// </summary>
 public static class NativeRuntime
 {
@@ -20,12 +21,5 @@ public static class NativeRuntime
             string candidate = Path.Combine(AppContext.BaseDirectory, "runtime");
             return File.Exists(Path.Combine(candidate, "manifest.json")) ? candidate : null;
         }
-    }
-
-    /// <summary>Points a launcher child at the runtime, when there is one.</summary>
-    public static void Apply(System.Diagnostics.ProcessStartInfo info)
-    {
-        if (Directory is { } runtime)
-            info.EnvironmentVariables["PLANTOIR_RUNTIME"] = runtime;
     }
 }

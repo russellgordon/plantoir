@@ -331,10 +331,28 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
 # stamp, same lock as the app's own writer (ActivityTrail.Append: the named
 # mutex Local\PlantoirActivityTrail, an append opened to share), so two
 # writers cannot tear a line. Never fails the launcher.
+#
+# WHICH trail (#682, the Windows half of mac #664): the app hands every
+# launcher its own trail folder in PLANTOIR_TRAIL_DIR (contracts/app-rules.json
+# -> launcherTrailFolder), so an app started with --state-dir keeps a
+# launcher's lines in ITS trail rather than the real one. Taken only when it
+# is ABSOLUTE: a drive letter and a separator, or a UNC \\server\share.
+# [IO.Path]::IsPathRooted is not enough on Windows PowerShell 5.1: it is true
+# for \state\Logs (relative to the current drive) and for C:state (relative
+# to the current folder on C:). A trailing separator is dropped, except that
+# C:\ stays C:\. Anything else means the default folder. Only the trail
+# moves; the mutex is a name, not a path, so it still serialises against the
+# app.
 function Write-TrailLine {
     param([string]$What)
     try {
         $dir = Join-Path $env:LOCALAPPDATA 'Plantoir\Logs'
+        $handed = $env:PLANTOIR_TRAIL_DIR
+        if ($handed -and ($handed -match '^[A-Za-z]:[\\/]' -or $handed -match '^[\\/]{2}[^\\/]+[\\/][^\\/]+')) {
+            $trimmed = $handed.TrimEnd([char[]]@([char]92, [char]47))
+            if ($trimmed -match '^[A-Za-z]:$') { $trimmed += '\' }
+            $dir = $trimmed
+        }
         if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Force -Path $dir }
         $line = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) + ' ' + [char]0x00B7 + ' ' + $What + [Environment]::NewLine
         $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($line)

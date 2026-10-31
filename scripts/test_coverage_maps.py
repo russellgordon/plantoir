@@ -103,7 +103,7 @@ def build(content_root: Path, configured: list, printer=None):
     return maps, output.getvalue()
 
 
-# Captured from origin/dev ff1213ed7b80c001310a13b45136518d14af2e38, BEFORE any #128 edit, by
+# Captured from origin/dev 92a7099ac9fb2670db9f349ae0952e10db125220, BEFORE any #128 edit, by
 # running that commit's build_curriculum_coverage / link_coverage_from_key_links (twice) /
 # set_backlinks_structural_pages / names_the_sidebar_hides(["Private"]) over the two fixtures
 # below. Never re-capture these after editing the build: a golden taken from the code it
@@ -416,7 +416,7 @@ class OneMapIsUnchanged(unittest.TestCase):
     def test_the_lcs_default_with_college_board_pages_and_nothing_declared(self):
         # The #128 review's finding 1: College Board sorts first, and its `1.A`
         # pages are expectations now — the undeclared fallback must still pick
-        # Ontario's letter-first pages, byte for byte what ff1213ed built.
+        # Ontario's letter-first pages, byte for byte what 92a7099a built.
         def with_board_pages(folder, second, configured):
             return self.run_fixture(folder, second, configured, board_pages=["1.A", "1.B"])
         self.assertEqual(with_board_pages("Ontario Curriculum", "College Board Curriculum", []),

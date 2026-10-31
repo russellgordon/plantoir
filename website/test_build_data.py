@@ -447,7 +447,7 @@ WINDOWS_PICTURE_OWED: dict = {
     # does not carry GeoGebra yet (fetch-runtime.ps1, #578's windows issue),
     # so there is no Windows preview of the sketch to photograph. It leaves
     # this list with site.json's availability geogebra -> windows: true.
-    "geogebra-sketch": "the Windows runtime does not carry GeoGebra yet (#578's windows issue)",
+    "geogebra-sketch": "the Windows runtime carries GeoGebra since #687 (Windows 1.9.0); its picture waits for a 4K session at 200% (#590)",
 }
 
 
@@ -502,8 +502,9 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
     def test_the_geogebra_section_shows_its_picture_in_both_appearances(self):
         # #578: the GeoGebra section of /visualizations/ shows MPM2D's
         # slope-angle page with its sketch opened (capture.py --geogebra),
-        # light AND dark, Mac only until the Windows runtime carries the
-        # engine (site.json availability -> geogebra).
+        # light AND dark. The Windows runtime carries the engine since #687
+        # (Windows 1.9.0, 2026-10-31), so the availability flag is true on
+        # both; the Windows PICTURE is still owed (WINDOWS_PICTURE_OWED, #590).
         import re
         page = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
         self.assertIn('<section id="geogebra">', page)
@@ -517,7 +518,7 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
         self.assertIs(shot.get("windows"), False)
         self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).is_file())
         site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
-        self.assertIs(site["availability"]["features"]["geogebra"]["windows"], False)
+        self.assertIs(site["availability"]["features"]["geogebra"]["windows"], True)
         for suffix in ("light", "dark"):
             for extension in ("png", "webp"):
                 picture = build.IMAGE_DIR / f"geogebra-sketch-{suffix}.{extension}"

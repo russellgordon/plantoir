@@ -714,6 +714,18 @@ public static class ActivityTrail
         /// <summary>File ▸ Settings ▸ Obsidian turned the add-ons on or off — the only way back from "Don't ask again".</summary>
         ObsidianAddOnsSettingChanged,
 
+        // ---- Open in Obsidian opens the page the preview shows (#681; the mac's #518) ----
+        /// <summary>
+        /// A SECTION's Open in Obsidian went ahead: the place of the file it
+        /// opened for the page the preview showed (with "(hidden from
+        /// students)" when that file is hidden), or why it opened the section
+        /// as before. Written once per press by
+        /// <see cref="Plantoir.Core.Models.PreviewedPageSource.NoteThePress"/>;
+        /// never for a course press, never for a press turned away while the
+        /// add-ons scan runs. Never anything written on the page.
+        /// </summary>
+        PageOpenedInObsidian,
+
         // ---- Runnable Swift on Windows (#570; the mac's #493) ----
         /// <summary>
         /// The first preview with a Swift block got Swift ready on this PC:
@@ -861,6 +873,7 @@ public static class ActivityTrail
         Event.ObsidianAddOnsAdded => "obsidian add-ons added",
         Event.ObsidianReopenedForAddOns => "obsidian reopened for add-ons",
         Event.ObsidianAddOnsSettingChanged => "obsidian add-ons setting changed",
+        Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
@@ -883,6 +896,21 @@ public static class ActivityTrail
     }
 
     public static string CurrentLogPath => _customLogPath ?? DefaultLogPath;
+
+    /// <summary>The folder <see cref="CurrentLogPath"/> is in: what every
+    /// launcher is handed as PLANTOIR_TRAIL_DIR (#682,
+    /// <see cref="LauncherEnvironment"/>). A launcher always writes
+    /// <c>activity.txt</c> there, which is why a test that wants a launcher's
+    /// lines in its scratch trail names that file.
+    ///
+    /// <para>A test that sets its trail at <c>%TEMP%\plantoir-trail-&lt;guid&gt;.txt</c>
+    /// (BuildMachineLinesTests, ConPtyLongLineTests, MachineLineLengthContractTests
+    /// and others) makes <c>%TEMP%</c> itself the log directory for its run.
+    /// Harmless: those tests run no launcher that writes a trail line, and
+    /// nothing reads <c>%TEMP%\activity.txt</c>. A test that DOES want a
+    /// launcher's lines gives its trail a folder of its own, ending in
+    /// <c>activity.txt</c>.</para></summary>
+    public static string CurrentLogDirectory => Path.GetDirectoryName(CurrentLogPath)!;
 
     public const string PromptPrefix = "  asked: ";
 

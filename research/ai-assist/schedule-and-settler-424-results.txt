@@ -1,6 +1,6 @@
 #424 - "schedule a deploy", "cancel the scheduled deploy" and "next day's lesson"
 RESULTS, against schedule-and-settler-424-preregistration.txt (committed
-9a1a6f1e at 09:00:55 EDT, before the first request at 09:01:20).
+6683f3f7 at 09:00:55 EDT, before the first request at 09:01:20).
 
 Run 2026-10-04 09:01-10:40 EDT on the conditions registered: Intel Core
 i5-8365U, 16 GB, Samsung 980 NVMe, Intel UHD 620, Windows 11 Pro 26200;
@@ -12,7 +12,7 @@ after. Generation ~5.7-8.5 tokens/s. DEVIATION: another program's python
 affects wall times only, not greedy choices.
 
 WHICH NUMBERS PREDATE THE FIX ROUND. Every model number below was taken on
-commit 9a1a6f1e, BEFORE the bundle A fix round. The fix round changed:
+commit 6683f3f7, BEFORE the bundle A fix round. The fix round changed:
  - ruling 1 (the schedule frame takes the day first; any other sentence
    opening "schedule a|the deploy" is ASKED in code): nothing the model is
    shown, so no request was re-run; the suite's interception guard was

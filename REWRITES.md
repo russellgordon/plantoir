@@ -1,7 +1,7 @@
 # Picking the Growing Success sweep back up
 
 Written 2026-08-20, for a session resuming **Wednesday 26 August** or later.
-Branch `bc-curriculum`, tree clean, HEAD `27479b23`.
+Branch `bc-curriculum`, tree clean, HEAD `d2ea989e`.
 
 **Read this file first, then
 [`.claude/skills/example-content/OUTSTANDING.md`](.claude/skills/example-content/OUTSTANDING.md),
@@ -37,10 +37,10 @@ mechanical checks. What follows is improvement, not repair.
 
 ### 2. Four payloads with fix rounds — ALL COMPLETED (SPH3U, TGJ2O, CHC2D, CHA3U)
 
-- **SPH3U** — adversarial review and fix round completed on 2026-08-21 (see `reviews/SPH3U-2026-08-21.md`, commit `7bed42a9`).
-- **TGJ2O** — adversarial review and fix round completed on 2026-08-21 (see `reviews/TGJ2O-2026-08-21.md`, commit `3c321e6f`).
-- **CHC2D** — adversarial review and fix round completed on 2026-08-21 (see `reviews/CHC2D-2026-08-21.md`, commit `f38e6593`).
-- **CHA3U** — adversarial review completed and confirmed findings applied on 2026-08-21 (see `reviews/CHA3U-2026-08-21.md`, commit `89a6bacc`). Fixed calendar drift in `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index, added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`, verified and confirmed distinctness of all 11 task OBSERVE prompts and conformance across the 86 class pages, and deepened multi-hit curriculum transclusions.
+- **SPH3U** — adversarial review and fix round completed on 2026-08-21 (see `reviews/SPH3U-2026-08-21.md`, commit `c066bd32`).
+- **TGJ2O** — adversarial review and fix round completed on 2026-08-21 (see `reviews/TGJ2O-2026-08-21.md`, commit `683ec133`).
+- **CHC2D** — adversarial review and fix round completed on 2026-08-21 (see `reviews/CHC2D-2026-08-21.md`, commit `be3f7923`).
+- **CHA3U** — adversarial review completed and confirmed findings applied on 2026-08-21 (see `reviews/CHA3U-2026-08-21.md`, commit `e7655fc6`). Fixed calendar drift in `Where the Records Live.md`, disabled TOC on single-H2 Curriculum index, added standard 2-slice 70/30 Mermaid pie chart to `How Marks Work.md`, verified and confirmed distinctness of all 11 task OBSERVE prompts and conformance across the 86 class pages, and deepened multi-hit curriculum transclusions.
 
 Prefer a **fresh adversarial review** over hunting the old lists: a review
 against the current state settles what is still true and costs less than

@@ -3,7 +3,7 @@
 contracts/assist-cases.json -> toolDescriptions.rule asks.
 
 PRE-REGISTERED (written before the run, 2026-10-04)
-  Arms: BEFORE = toolSchemas.mcp at origin/dev b2726e6b; AFTER = toolSchemas.mcp
+  Arms: BEFORE = toolSchemas.mcp at origin/dev 189d4084; AFTER = toolSchemas.mcp
   on issue/443-deploy-wording. They differ in exactly four tools:
   list_courses, re_date_classes, make_room_for_classes (descriptions) and
   plan_scheduled_deploy (its `classes` argument). Checked by comparing the two

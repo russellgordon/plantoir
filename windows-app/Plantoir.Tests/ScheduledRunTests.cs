@@ -784,7 +784,16 @@ public class ScheduledRunTests : IDisposable
         string folder = Folder();
         string old = Path.Combine(folder, ".toolchain", "scripts", "section_fingerprint.py");
         Directory.CreateDirectory(Path.GetDirectoryName(old)!);
-        File.WriteAllText(old, "OLD fingerprint");
+        // A DIFFERENT length from Bundle()'s "NEW fingerprint", and an hour
+        // older (#673). The mirror's fast path (ToolchainMirror.FilesLookIdentical,
+        // reached first through SyncDirectory and again in SyncFile) takes two
+        // files of equal length whose times are within 2 ms for the same file
+        // and copies nothing. "OLD fingerprint" was the same 15 characters, so
+        // when this copy and the bundled file landed in one clock tick the old
+        // script stayed and the test failed, once in a full run. A test of the
+        // mirror must never depend on two writes landing in different ticks.
+        File.WriteAllText(old, "OLD fingerprint, the one before");
+        File.SetLastWriteTimeUtc(old, DateTime.UtcNow.AddHours(-1));
         var clock = new Clock();
         string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
         var seen = new List<string>();

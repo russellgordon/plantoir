@@ -33,6 +33,7 @@ import os
 import re
 
 import contracts
+import machine_line
 
 CONTRACT_FILE = "shared-rules"
 
@@ -42,6 +43,9 @@ class Finding:
 
     def __init__(self, name: str, sentence: str, detail: str, fixable: bool,
                  course: str, section):
+        # How to build this finding again naming at most N blocks or pages
+        # (#666), for a finding that names a list; None for one that does not.
+        self.rebuild = None
         self.name = name
         self.sentence = sentence
         self.detail = detail
@@ -124,11 +128,25 @@ def finding(name: str, course: str, section, checks: dict = None,
 
 
 # How many pages a `pageSettingsUnreadable` finding names before it says "and
-# N more": the detail is ONE line of the console and of the dialog.
+# N more": the detail is ONE line of the console and of the dialog. Every
+# finding that names a list takes `most` (#666): `announce` names fewer when
+# ten would make the machine line longer than machineLineLength allows.
 MOST_PAGES_NAMED = 10
 
 
-def unreadable_settings_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def shortenable(make, facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    `make(facts, course, section, table)`, remembering how to make it again
+    naming fewer (#666): `announce` calls `rebuild(most)` when the finding's
+    machine line would be too long. The sentence keeps the true count; only
+    the detail names fewer, with `andMore` saying how many it left out.
+    """
+    item = make(facts, course, section, table)
+    item.rebuild = lambda most: make(facts, course, section, table, most=most)
+    return item
+
+
+def unreadable_settings_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every page of this build whose settings could not be read
     (#246), never one per page. Both apps key a finding's identity on its name,
@@ -142,14 +160,14 @@ def unreadable_settings_finding(facts: dict, course: str, section, table: dict) 
     entry = table["pageSettingsUnreadable"]
     pages = facts.get("unreadable_pages") or []
     named = []
-    for page in pages[:MOST_PAGES_NAMED]:
+    for page in pages[:most]:
         line = page.get("line")
         if line is None:
             named.append(filled(entry["pageWithoutLine"], {"page": page.get("page", "")}))
         else:
             named.append(filled(entry["pageWithLine"], {"page": page.get("page", ""), "line": line}))
-    if len(pages) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(pages) - MOST_PAGES_NAMED}))
+    if len(pages) > most:
+        named.append(filled(entry["andMore"], {"count": len(pages) - most}))
     extra = {
         "page": pages[0].get("page", "") if pages else "",
         "count": len(pages),
@@ -166,7 +184,7 @@ def unreadable_settings_finding(facts: dict, course: str, section, table: dict) 
     )
 
 
-def links_into_hidden_pages_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def links_into_hidden_pages_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every link on a page students can see that leads to a
     page they cannot (#333), never one per link - both apps key a finding on
@@ -177,10 +195,10 @@ def links_into_hidden_pages_finding(facts: dict, course: str, section, table: di
     entry = table["linksIntoHiddenPages"]
     pairs = facts.get("links_into_hidden_pages") or []
     named = []
-    for pair in pairs[:MOST_PAGES_NAMED]:
+    for pair in pairs[:most]:
         named.append(filled(entry["linkLine"], {"from": pair.get("from", ""), "to": pair.get("to", "")}))
-    if len(pairs) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(pairs) - MOST_PAGES_NAMED}))
+    if len(pairs) > most:
+        named.append(filled(entry["andMore"], {"count": len(pairs) - most}))
     extra = {
         "page": pairs[0].get("to", "") if pairs else "",
         "count": len(pairs),
@@ -193,7 +211,7 @@ def links_into_hidden_pages_finding(facts: dict, course: str, section, table: di
     )
 
 
-def print_pdf_problems_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def print_pdf_problems_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every page whose `printPdf:` could not be used (#454,
     review S3), never one per page. Each page is named through the sentence
@@ -203,11 +221,11 @@ def print_pdf_problems_finding(facts: dict, course: str, section, table: dict) -
     problems = facts.get("print_pdf_problems") or []
     piece_for = {"missing": "pageMissing", "notAPdf": "pageNotAPdf", "hasAPath": "pageHasAPath"}
     named = []
-    for problem in problems[:MOST_PAGES_NAMED]:
+    for problem in problems[:most]:
         piece = entry[piece_for.get(problem.get("problem"), "pageMissing")]
         named.append(filled(piece, {"page": problem.get("page", ""), "file": problem.get("file", "")}))
-    if len(problems) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
     extra = {
         "page": problems[0].get("page", "") if problems else "",
         "count": len(problems),
@@ -220,7 +238,7 @@ def print_pdf_problems_finding(facts: dict, course: str, section, table: dict) -
     )
 
 
-def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def figures_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every diagram or graph this build could not draw (#485
     E1), never one per figure. Each is named through figureLine (its line in
@@ -233,7 +251,7 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     reasons = contracts.section(CONTRACT_FILE, "figureFences", "words", "reasons")
     seconds = contracts.section(CONTRACT_FILE, "figureFences", "timing", "perDiagramSeconds")
     named = []
-    for problem in problems[:MOST_PAGES_NAMED]:
+    for problem in problems[:most]:
         reason_text = reasons.get(problem.get("reason") or "", reasons["texSaid"])
         reason = filled(reason_text, {"name": problem.get("name") or "",
                                       "said": problem.get("said") or "",
@@ -253,8 +271,8 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
         else:
             piece = entry["figureLineNoLine"]
         named.append(filled(piece, fill))
-    if len(problems) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
     extra = {
         "page": problems[0].get("page", "") if problems else "",
         "count": len(problems),
@@ -268,7 +286,7 @@ def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
-def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def geogebra_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every GeoGebra sketch this build cannot show (#578),
     never one per sketch. Each is named through sketchLine (its line in the
@@ -280,7 +298,7 @@ def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
     reasons = contracts.section(CONTRACT_FILE, "geogebraFences", "words", "reasons")
     limit = contracts.section(CONTRACT_FILE, "geogebraFences", "files", "largestFileMegabytes")
     named = []
-    for problem in problems[:MOST_PAGES_NAMED]:
+    for problem in problems[:most]:
         reason_text = reasons.get(problem.get("reason") or "", reasons["nothingToShow"])
         reason = filled(reason_text, {"file": problem.get("file") or "",
                                       "name": problem.get("name") or "",
@@ -295,8 +313,8 @@ def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
         else:
             piece = entry["sketchLineNoLine"]
         named.append(filled(piece, fill))
-    if len(problems) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
     extra = {
         "page": problems[0].get("page", "") if problems else "",
         "count": len(problems),
@@ -310,7 +328,7 @@ def geogebra_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
-def swift_finding(facts: dict, course: str, section, table: dict, windows=None) -> Finding:
+def swift_finding(facts: dict, course: str, section, table: dict, windows=None, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every runnable Swift block this build has no program
     for (#493: codeRunnerBlocks.swift), never one per block. A compile error
@@ -368,9 +386,9 @@ def swift_finding(facts: dict, course: str, section, table: dict, windows=None) 
             "blocks": counted(entry["blockCount"], len(sharing)),
             "pages": counted(entry["pageCount"], len(pages)),
         }))
-    named = pieces[:MOST_PAGES_NAMED]
-    if len(pieces) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(pieces) - MOST_PAGES_NAMED}))
+    named = pieces[:most]
+    if len(pieces) > most:
+        named.append(filled(entry["andMore"], {"count": len(pieces) - most}))
     extra = {
         "page": problems[0].get("page", "") if problems else "",
         "count": len(problems),
@@ -384,7 +402,7 @@ def swift_finding(facts: dict, course: str, section, table: dict, windows=None) 
     )
 
 
-def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def quizzes_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every self-check question this build found it cannot
     check (#563), never one per question. Each is named through quizLine
@@ -398,7 +416,7 @@ def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
     problems = facts.get("quiz_problems") or []
     reasons = contracts.section(CONTRACT_FILE, "quizCallouts", "words", "problems")
     named = []
-    for problem in problems[:MOST_PAGES_NAMED]:
+    for problem in problems[:most]:
         reason_text = reasons.get(problem.get("reason") or "", reasons["nothingToCheck"])
         reason = filled(reason_text, {key: value for key, value in (problem.get("fill") or {}).items()})
         fill = {"page": problem.get("page", ""), "reason": reason}
@@ -417,8 +435,8 @@ def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
         else:
             piece = entry["quizPageOnly"]
         named.append(filled(piece, fill))
-    if len(problems) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    if len(problems) > most:
+        named.append(filled(entry["andMore"], {"count": len(problems) - most}))
     extra = {
         "page": problems[0].get("page", "") if problems else "",
         "count": len(problems),
@@ -432,7 +450,7 @@ def quizzes_finding(facts: dict, course: str, section, table: dict) -> Finding:
     )
 
 
-def site_disagreements_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def site_disagreements_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every runnable block the SITE showed as plain code
     (#567: codeRunnerBlocks.siteDisagrees), never one per block. One of the
@@ -451,7 +469,7 @@ def site_disagreements_finding(facts: dict, course: str, section, table: dict) -
         names[row["fence"]] = row["displayName"]
     reasons = entry["reasons"]
     named = []
-    for block in blocks[:MOST_PAGES_NAMED]:
+    for block in blocks[:most]:
         language = names.get(block.get("language") or "", block.get("language") or "")
         reason_text = reasons.get(block.get("reason") or "", reasons["blockNotPrepared"])
         fill = {
@@ -466,8 +484,8 @@ def site_disagreements_finding(facts: dict, course: str, section, table: dict) -
         else:
             piece = entry["blockLineNoLine"]
         named.append(filled(piece, fill))
-    if len(blocks) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(blocks) - MOST_PAGES_NAMED}))
+    if len(blocks) > most:
+        named.append(filled(entry["andMore"], {"count": len(blocks) - most}))
     extra = {
         "page": blocks[0].get("page", "") if blocks else "",
         "count": len(blocks),
@@ -481,7 +499,7 @@ def site_disagreements_finding(facts: dict, course: str, section, table: dict) -
     )
 
 
-def quizzes_read_differently_finding(facts: dict, course: str, section, table: dict) -> Finding:
+def quizzes_read_differently_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every self-check question the SITE read differently from
     the folder check (#644: quizCallouts.safetyNet), never one per question -
@@ -498,7 +516,7 @@ def quizzes_read_differently_finding(facts: dict, course: str, section, table: d
     reasons = entry["reasons"]
     problems = contracts.section(CONTRACT_FILE, "quizCallouts", "words", "problems")
     named = []
-    for quiz in quizzes[:MOST_PAGES_NAMED]:
+    for quiz in quizzes[:most]:
         reason_text = reasons.get(quiz.get("reason") or "", reasons["countedDifferently"])
         problem_text = problems.get(quiz.get("problem") or "", problems["nothingToCheck"])
         problem = filled(problem_text, {key: value for key, value in (quiz.get("fill") or {}).items()})
@@ -518,8 +536,8 @@ def quizzes_read_differently_finding(facts: dict, course: str, section, table: d
         else:
             piece = entry["quizPageOnly"]
         named.append(filled(piece, fill))
-    if len(quizzes) > MOST_PAGES_NAMED:
-        named.append(filled(entry["andMore"], {"count": len(quizzes) - MOST_PAGES_NAMED}))
+    if len(quizzes) > most:
+        named.append(filled(entry["andMore"], {"count": len(quizzes) - most}))
     extra = {
         "page": quizzes[0].get("page", "") if quizzes else "",
         "count": len(quizzes),
@@ -647,39 +665,39 @@ def findings(facts: dict, course: str, section) -> list:
     # LAST, so the findings above keep their places — the contract's marker
     # examples and #153's console cases are captured in this order.
     if facts.get("unreadable_pages"):
-        found.append(unreadable_settings_finding(facts, course, section, table))
+        found.append(shortenable(unreadable_settings_finding, facts, course, section, table))
 
     # After everything above, for the same reason: the existing examples keep
     # their order (#333).
     if facts.get("links_into_hidden_pages"):
-        found.append(links_into_hidden_pages_finding(facts, course, section, table))
+        found.append(shortenable(links_into_hidden_pages_finding, facts, course, section, table))
 
     # After everything above, so the existing examples keep their order (#454).
     if facts.get("print_pdf_problems"):
-        found.append(print_pdf_problems_finding(facts, course, section, table))
+        found.append(shortenable(print_pdf_problems_finding, facts, course, section, table))
 
     # After everything above, so the existing examples keep their order (#485).
     if facts.get("figure_problems"):
-        found.append(figures_finding(facts, course, section, table))
+        found.append(shortenable(figures_finding, facts, course, section, table))
 
     # After everything above, so the existing examples keep their order (#493).
     if facts.get("swift_problems"):
-        found.append(swift_finding(facts, course, section, table))
+        found.append(shortenable(swift_finding, facts, course, section, table))
     # After everything above, so the existing examples keep their order (#563).
     if facts.get("quiz_problems"):
-        found.append(quizzes_finding(facts, course, section, table))
+        found.append(shortenable(quizzes_finding, facts, course, section, table))
     # After everything above, so the existing examples keep their order
     # (#567). In practice it arrives alone, from scripts/site_said.py.
     if facts.get("site_disagreements"):
-        found.append(site_disagreements_finding(facts, course, section, table))
+        found.append(shortenable(site_disagreements_finding, facts, course, section, table))
     # After everything above, so the existing examples keep their order
     # (#644). From scripts/site_said.py too, after the code's finding.
     if facts.get("quiz_disagreements"):
-        found.append(quizzes_read_differently_finding(facts, course, section, table))
+        found.append(shortenable(quizzes_read_differently_finding, facts, course, section, table))
     # After everything above, so the existing examples keep their order
     # (#578). From build_site.py, beside the figures' and the quizzes'.
     if facts.get("geogebra_problems"):
-        found.append(geogebra_finding(facts, course, section, table))
+        found.append(shortenable(geogebra_finding, facts, course, section, table))
 
     return found
 
@@ -723,4 +741,11 @@ def announce(found: list, printer=print) -> None:
     for item in found:
         printer(f"⚠️  {item.sentence}")
         printer(f"   {item.detail}")
-        printer(f"{prefix} {json.dumps(item.as_dict(), ensure_ascii=False)}")
+        if item.rebuild is None:
+            printer(machine_line.text(prefix, item.as_dict()))
+        else:
+            # At most machineLineLength.maxCharacters (#666): a finding that
+            # names a list names fewer when ten would not fit. The console's
+            # own two lines above keep all ten.
+            rebuild = item.rebuild
+            printer(machine_line.fitted(prefix, lambda most: rebuild(most).as_dict(), MOST_PAGES_NAMED))
