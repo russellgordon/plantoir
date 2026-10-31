@@ -290,9 +290,12 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   `quiz-code-run`), presses Check, waits for the contract's words, and fails
   rather than photographs a quiz too tall for the 1280 × 860 window. The run
   refuses a demo folder that does not hold the three demo courses. On Windows
-  `capture_windows.py --quizzes` takes all four (#590, below); they stay
-  `windows: false` and owed by name until their 2× pictures are taken and
-  promoted. `website/README.md` → "The Quizzes page" has the run.
+  `capture_windows.py --quizzes` takes all four (#590, below); all four
+  have their 2× Windows pictures since 2026-10-31. `quiz-math` and
+  `quiz-code-run` frame with 16 pt above and 24 below rather than the
+  others' 40 and 56, so they fit the window on Windows, where Edge's title
+  bar is outside the page (Russell's ruling (a) on #590; the Mac retook its
+  two with the same scripts). `website/README.md` → "The Quizzes page" has the run.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and
@@ -308,6 +311,7 @@ python website/shots/capture_windows.py --app [scenes]   # the app's scenes, How
 python website/shots/capture_windows.py --print-set      # what printing does: a preview of MPM2D (~/Plantoir Print)
 python website/shots/capture_windows.py --code [ids]     # the Code page's figures (#590), 2x only
 python website/shots/capture_windows.py --quizzes [ids]  # the Quizzes page's figures (#590), 2x only
+python website/shots/capture_windows.py --geogebra --print-folder <new folder>  # the GeoGebra figure (#590, #687), 2x only
 python website/shots/capture_windows.py --code --quizzes --dry-run   # the same at any scale, into scratch only
 python website/shots/capture_windows.py --promote id,id  # no pictures: windows: true once they pass
 python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
@@ -393,6 +397,18 @@ run — delete both to start clean. **Everything before the shutter runs on a
 locked desktop; the photographs do not** (Windows.Graphics.Capture sends no
 frame for a window nobody can see, measured 2026-10-15), and the run stops
 there and says so.
+
+**The GeoGebra figure on Windows (`--geogebra`, #590, #687).** The Mac's
+`capture.py --geogebra` in `--print-set`'s shape (`preview_pages_windows.
+capture_geogebra`): MPM2D made from its example content by the COMMITTED
+`setup.ps1` in the folder `--print-folder` names — required, as on the Mac,
+because a folder made before 2026-10-24 has no slope-angle page (this PC's
+`~/Plantoir Print` was made 2026-10-15, and the run refused it before writing
+anything) — previewed natively, the sketch opened by the Mac's
+`prepare/geogebra-sketch.js`, and photographed light and dark at exactly 2×
+like the figures below, which it shares `photograph_course`, the ledger and
+`--promote` with. `documentation/12-windows-app.md` → "The last three
+plantoir.app pictures (#590)".
 
 **The Code and Quizzes pages' figures on Windows (`--code`, `--quizzes`, #590).**
 `preview_pages_windows.py` takes every `preview-page` shot of scene `code` or
@@ -610,8 +626,9 @@ marketing folder, prepare scripts in `website/shots/prepare/`):
 | `code-swift` | A read-only Swift program answered a name and an age as it asked (#583; the input box before), finished | ICS4U `/Programs/Reading-Input-in-Swift` (planted) |
 | `code-quiz` | A multiple-choice quiz answered right and checked, its explanation open | ICS3U `/Exercises/Check-Your-Loops` (planted) |
 
-Added for v1.8.1 (#587, macOS only — `windows: false`, owed by name in
-`WINDOWS_PICTURE_OWED`; taken by `capture.py --quizzes`; every page planted):
+Added for v1.8.1 (#587, macOS only at first — `windows: false`, owed by name
+in `WINDOWS_PICTURE_OWED` until #590 took the Windows twins, the last on
+2026-10-31; taken by `capture.py --quizzes`; every page planted):
 
 | ID | Subject | Page |
 |---|---|---|

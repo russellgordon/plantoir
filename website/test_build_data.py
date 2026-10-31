@@ -441,13 +441,12 @@ WINDOWS_PICTURE_OWED: dict = {
     # code-swift and code-swift-live left this list on 2026-10-23, their 2x
     # pictures taken in a 4K session (Swift runs on Windows since v1.8.6,
     # #570), and site.json's runnable-swift became windows: true with them.
-    "quiz-math": "too tall for the 1280 x 860 window at 2x: quiz-math.js refuses it (767 pt) (#590)",
-    "quiz-code-run": "too tall for the 1280 x 860 window at 2x: quiz-code-run.js refuses it (744 pt) (#590)",
-    # The Visualizations page's GeoGebra figure (#578): the Windows runtime
-    # does not carry GeoGebra yet (fetch-runtime.ps1, #578's windows issue),
-    # so there is no Windows preview of the sketch to photograph. It leaves
-    # this list with site.json's availability geogebra -> windows: true.
-    "geogebra-sketch": "the Windows runtime does not carry GeoGebra yet (#578's windows issue)",
+    # quiz-math, quiz-code-run and geogebra-sketch left this list on
+    # 2026-10-31 (#590), taken at 2x in a 4K session: the two quizzes once
+    # their shared prepare scripts' margins became 16/24 pt (they were too
+    # tall for the 1280 x 860 window under 40/56), the GeoGebra figure by
+    # capture_windows.py --geogebra once the runtime carried the engine
+    # (#687). site.json's geogebra flag is the release's, not this list's.
 }
 
 
@@ -502,8 +501,9 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
     def test_the_geogebra_section_shows_its_picture_in_both_appearances(self):
         # #578: the GeoGebra section of /visualizations/ shows MPM2D's
         # slope-angle page with its sketch opened (capture.py --geogebra),
-        # light AND dark, Mac only until the Windows runtime carries the
-        # engine (site.json availability -> geogebra).
+        # light AND dark. The Windows twin was taken on 2026-10-31 (#590,
+        # capture_windows.py --geogebra); site.json's availability flag is
+        # the release's (it flips at the 1.9.0 cut), so it is not pinned here.
         import re
         page = (build.WEBSITE / "pages" / "visualizations.html").read_text(encoding="utf-8")
         self.assertIn('<section id="geogebra">', page)
@@ -514,11 +514,9 @@ class VisualizationsPageGeoGebraTests(unittest.TestCase):
         shot = {entry["id"]: entry for entry in manifest["shots"]}["geogebra-sketch"]
         self.assertEqual(shot["capture"]["scene"], "geogebra")
         self.assertNotIn("awaiting_capture", shot)
-        self.assertIs(shot.get("windows"), False)
+        self.assertIs(shot.get("windows"), True)
         self.assertTrue((build.WEBSITE / "shots" / "prepare" / shot["capture"]["prepare"]).is_file())
-        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
-        self.assertIs(site["availability"]["features"]["geogebra"]["windows"], False)
-        for suffix in ("light", "dark"):
+        for suffix in ("light", "dark", "windows-light", "windows-dark"):
             for extension in ("png", "webp"):
                 picture = build.IMAGE_DIR / f"geogebra-sketch-{suffix}.{extension}"
                 self.assertTrue(picture.is_file(), f"{picture.name} is missing")
