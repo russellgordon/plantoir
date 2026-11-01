@@ -251,6 +251,37 @@ public sealed class ScheduledDeployTests : IDisposable
         // line of its own after the list, where the mac says its own.
         Assert.DoesNotContain("plugged in", described);
         Assert.Contains(ScheduledDeploy.OnBatterySleepsSooner, described.Split('\n'));
+        // #554, measured 2026-10-31 on a Lenovo 20QES70500 (i5-8365U, Windows
+        // 11 Pro 26200): a PC asleep at the moment ran the deploy when it next
+        // woke (StartWhenAvailable), so "nothing happens" was untrue. The
+        // sentence says the late run and the window that stops it.
+        Assert.DoesNotContain("nothing happens", described);
+        Assert.Contains("If it is asleep at that time, Windows runs the deploy when the computer next wakes instead", described);
+        Assert.Contains("If that is more than 1 week after the time you chose, Plantoir cancels the deploy", described);
+    }
+
+    [Fact]
+    public void ItNamesTheCoursesOwnLatenessWindow()
+    {
+        string config = Path.Combine(_folder, "courses", "ICS3U", "course_config.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace(
+            "\"num_sections\": 1,", "\"num_sections\": 1, \"scheduled_deploy_may_run_late_days\": 1,"));
+
+        string described = Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow).Describe();
+
+        Assert.Contains("If that is more than 1 day after the time you chose", described);
+    }
+
+    [Fact]
+    public void TheWindowIsSaidInTheSettingsOwnWords()
+    {
+        var rule = ContractLoader.LoadJson("shared-rules.json")["scheduledDeployCancellation"]!;
+        var choices = rule["wording"]!["settingChoices"]!.AsObject();
+        var offered = rule["theSetting"]!["offered"]!.AsArray();
+
+        Assert.Equal(offered.Count, choices.Count);
+        foreach (var days in offered)
+            Assert.Equal((string)choices[days!.ToString()]!, ScheduledDeploy.WindowInWords((int)days!));
     }
 
     [Fact]

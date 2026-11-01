@@ -4041,7 +4041,9 @@ mac's "on and awake then, with the lid open." through one constant,
   start may run when the PC wakes, inside the lateness window, so that sentence
   may be untrue. It has to be MEASURED before it is reworded, and a `windows`
   issue ([#554](https://github.com/russellgordon/plantoir/issues/554)) asks
-  for that.
+  for that. *(Measured and reworded since, 2026-10-31: see "A sleep across
+  the moment, measured (#554)" under the Windows section below. The sentence
+  WAS untrue.)*
 
 **REJECTED, again:** a wake timer (`pmset schedule wake` /
 `IOPMSchedulePowerEvent` — needs administrator rights and fails silently; the
@@ -4200,12 +4202,74 @@ locale date format is guessed). `TaskDefinitionTests` schedules through
 a task registered with its start two minutes already past did NOT run within
 15 minutes (Last Result 267011) — a start already past when the task was
 registered is not treated as missed. Two earlier simulations (before the fix)
-agreed. **Not measured:** a start missed while the PC is asleep or off; that
-such a start runs once Windows is available again is Microsoft's documented
-behaviour for `StartWhenAvailable`, unmeasured here (it would have suspended the
-machine the run was on). If it holds, the lateness window decides whether the
-late run is still worth doing, so `tooLateToRun` has a real path; its ten cases
-run either way.
+agreed. A start missed while the PC was ASLEEP is measured since 2026-10-31 —
+the next paragraph; one missed while it was switched OFF is still not.
+
+**A sleep across the moment, measured (#554).** The machine: Lenovo
+20QES70500, Intel i5-8365U, Windows 11 Pro 26200, on mains; `powercfg /a` lists
+Modern Standby (S0 Low Power Idle) and Hibernate, no S3. The installed
+Plantoir 1.9.0 scheduled ICS3U Section 1 of a test working folder to a FOLDER
+destination through `plantoir-mcp.exe` (`plan_scheduled_deploy`, then
+`schedule_deploy`), for T = 19:33:00. The registered task read back
+`StartWhenAvailable` true, both battery gates false, `MultipleInstancesPolicy`
+`Queue`, no `WakeToRun`. A separate task of the probe's own, registered as the
+ordinary user (no administrator rights needed) with `<WakeToRun>true</WakeToRun>`,
+was set for T + 3 min, and the PC was suspended at T − 1 min through
+`SetSuspendState(FALSE, FALSE, FALSE)` (P/Invoke; `rundll32
+powrprof.dll,SetSuspendState` was avoided, because it cannot pass the BOOLEANs
+and is known to hibernate). The System log (Kernel-Power 42/107/506/507,
+Power-Troubleshooter 1), the task's `LastRunTime`, and the trail:
+
+| time | what happened |
+|---|---|
+| 19:32:00.1 | suspend called; Kernel-Power 42 "entering sleep", reason Application API, target state 5 — this PC HIBERNATED, not Modern Standby |
+| 19:33:00 | T — the PC is hibernating; nothing runs |
+| 19:35:48.5 | woken by the timer (Power-Troubleshooter: "Wake Source: Timer — … 'Plantoir 554 wake probe' …"), 12 s before that task's own 19:36:00; the PC comes back into Modern Standby, screen off |
+| 19:35:48 | **Plantoir's task starts** (`LastRunTime`) — 2 min 48 s after T, the same second the PC woke |
+| 19:37:36 | trail: "got the working folder ready for a scheduled deploy — 34 files brought up to date … in 100.4 s"; the build starts 19:37:42 |
+| 19:38:09 | Kernel-Power 42 again, reason **System Idle**, target state 5: the PC hibernated by itself, 2 min 20 s after the timer wake, mid-build |
+| 20:15:35 | woken again (wake source Unknown — the power button); the same run carries on |
+| 20:15:49 | trail: the deploy finished; the folder destination written; run record `succeeded`; the task and the job gone |
+| 20:15:50 | trail: "told the teacher how a scheduled deploy went, with a notification" |
+
+So **"If it is asleep at that time, nothing happens" was untrue.** A moment
+missed while the PC slept ran when it next woke, inside the window (the
+default week), and the run SURVIVED a second hibernation mid-build and finished
+on the wake after — 42 min 49 s after T in all. `Describe()` now says so:
+"Plantoir does not wake the computer up. If it is asleep at that time, Windows
+runs the deploy when the computer next wakes instead — which could be well after
+the class it was meant for. If that is more than {window} after the time you
+chose, Plantoir cancels the deploy and the site stays as it is." — the mac's
+own shape (its `plan_scheduled_deploy` line), with the course's own window
+named in the setting's words (`ScheduledDeploy.WindowInWords`, pinned against
+`scheduledDeployCancellation.wording.settingChoices` by
+`ScheduledDeployTests.TheWindowIsSaidInTheSettingsOwnWords`; Windows offers no
+control for the setting yet, so a window chosen on a Mac is the only way it is
+not a week). The bullets above it ("switched on, and awake — not asleep…") and
+the dialog's "Plantoir does not wake it up." stay: they are about deploying ON
+TIME, and both are still true.
+
+What this does and does not show:
+
+- **The wake was the probe's, not Plantoir's.** Plantoir still sets no wake
+  timer (the top of `ScheduledDeploy.cs`). The run started at whatever woke the
+  PC; with no probe it would have been the power button at 20:15, 42 minutes late.
+  That a non-admin user CAN register `WakeToRun` was confirmed on the way
+  (it read back true) — it is not a reason to adopt one: a timer wake here gave
+  2 min 20 s of screen-off Modern Standby before the PC hibernated again on
+  idle, less than one cold run's folder refresh (100 s) plus a build, so the
+  deploy finished only on the NEXT wake anyway.
+- **It hibernated, both times.** The suspend call and the later idle sleep both
+  logged target state 5 and resumed "from Hibernate". A plain Modern Standby
+  across the moment (screen off, no hibernation) was not isolated; the run
+  did make progress during the 2 min 20 s of Modern Standby after the timer
+  wake, so a task can run in it.
+- **Switched off** across the moment: not measured.
+- **Woken OUTSIDE the window: not measurable here today.** The shortest window
+  is a day, so the run's `tooLateToRun` path after a real sleep would need the
+  PC asleep for over 24 hours. The decision itself is pure code
+  (the `scheduledDeployCancellation` lateness cases, run by
+  `ScheduledRunTests`), and the run reads it the same way whatever woke the PC.
 
 **A crash between writing the job and replacing the task** (the fix round's
 order, job first): the task's arguments carry the setting's TOKEN as well as its

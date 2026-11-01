@@ -3381,6 +3381,7 @@ public sealed partial class AssistWorkspace
             SectionNumber = section,
             When = when,
             ClassesNamed = named,
+            MayRunLateDays = course.Configuration.ScheduledDeployMayRunLateDays,
             // EVERY destination, from the list the run deploys to (#400).
             Destination = ScheduledDeploy.EveryDestination(course.Configuration),
         };
