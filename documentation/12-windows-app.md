@@ -1855,8 +1855,16 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
   `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code`,
   `plantoir-quizzes` (#563) and `plantoir-handouts` (#631, a PDF made from
-  LaTeX rather than a page, with starter `.tex` files in a subfolder;
-  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"). `AgentGuidance.Write` enumerates the folder, so a
+  LaTeX rather than a page, with starter `.tex` files in a subfolder, and
+  since #715 a `patterns` subfolder holding `.tex` files and one `.py` -
+  copied like any other file, never run by the app;
+  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"
+  and "Tables, the scaffold, cards and the remembered folder (#715)"). The
+  handouts skill has an assistant write ONE file inside a course,
+  `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
+  handouts are kept); the app neither reads it nor needs to, and a backup,
+  archive, restore or reference import should carry it as it carries the
+  rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and

@@ -3089,7 +3089,7 @@ asked that `plantoir-math-graphs` teach an assistant to build a page with a
 figure productively, not only the fence syntax, so it carries when to use
 which fence, four complete patterns (a parabola beside its parent, two lines
 meeting — interactive and with the point marked, labelled similar triangles,
-a number line), the measured package list, the limits on paper and time,
+a number line; #715 added a fifth, the finite-difference scaffold), the measured package list, the limits on paper and time,
 how a failure shows up, what to avoid, and what cannot be done (a slider
 is for GeoGebra, arriving in the next release, with several curves for
 several values of the parameter offered meanwhile — as of 2026-10-09;
@@ -3238,10 +3238,13 @@ to OFFER it first whenever something is to be printed, beside
 - **Sources and answer keys are kept OUT of `courses/`.** Every file in a
   course folder that is not a page is copied to the site (Quartz's Assets
   emitter globs everything but `*.md`), so an answer key kept beside the
-  pages is one students can download. The skill suggests a
-  `handouts/<CODE>/` folder beside `courses/` when the teacher has no place
-  of their own, and the student copy alone goes into `Media` when it should
-  also be handed out from the site (`printPdf:`).
+  pages is one students can download. The skill suggested a
+  `handouts/<CODE>/` folder beside `courses/` when the teacher had no place
+  of their own, and the student copy alone went into `Media` when it should
+  also be handed out from the site (`printPdf:`). **Since #715** the course
+  remembers its folder and a worksheet's merged `- with Answers.pdf` may go
+  on the site - see "Tables, the scaffold, cards and the remembered folder
+  (#715)" below.
 - **The corners follow the course's print settings** - `print_school_name`,
   `print_school_name_at`, `print_course_code_at` and `print_blanks`, read as
   `scripts/print_settings.py` reads them - because the issue's fixed layout
@@ -3274,6 +3277,120 @@ one run each:
 |---|---|---|
 | `claude -p` (2.1.309, `--permission-mode acceptEdits`), working folder root | `Make me a short warmup worksheet on solving one-step linear equations for MPM2D, with an answer key.` | PASS - built from the skill's starter in `handouts/MPM2D/`, the school's name from the course's settings, `- Answers` wrapper, both PDFs rendered and looked at, a separate reviewer re-solved every answer, no build files left. **Confounded:** Russell's own `~/.claude/CLAUDE.md` carries the same style, so this run says the skill was followed, not that it alone was enough |
 | `codex exec` (0.162.0, `-s workspace-write --skip-git-repo-check`), working folder root | `Make me a short quiz on factoring for MPM2D that I can print, with solutions.` | PASS - read `plantoir-handouts` (and `plantoir-printing`), wrote `Factoring Quiz.tex` with `- Solutions`, `\score` marks and `\work` in the solutions, in `handouts/MPM2D/`; all five answers re-checked by hand here and right. No global instructions on this side, so this is the clean run |
+
+**Tables, the scaffold, cards and the remembered folder (#715, v1.9.1).**
+Russell settled six rules with an assistant on 2026-10-31 while sweeping the
+MPM2D Thread 1 and 2 handouts and pages; they lived only in his own
+`~/.claude/CLAUDE.md` and memory. They are now in `plantoir-handouts`
+(sections 9-11 and section 2), `plantoir-page-authoring` (section 7) and
+`plantoir-math-graphs` (sections 3, 4E and 8), with worked sources in the
+handouts skill's `patterns/` folder - `tables.tex`, `finite_differences.tex`
+and `finite_differences.py` - which are not starters and so not in the
+contract's `starters` list. What was decided, what was measured, and what was
+rejected:
+
+- **A shaded heading: nicematrix for new tables, the inset `\rowcolor` for
+  existing ones - and NOT a bare `\rowcolor`.** The issue's comments credited
+  `\rowcolor` at the row start (instead of `\cellcolor` in a `\multicolumn`)
+  with closing tables that looked "open at the top". Measured with tectonic
+  and poppler, the two draw **byte-identical** PDF: colortbl paints a cell's
+  fill after the rule above it and the rule on its left. At 600 dpi nothing
+  is covered; at 80 dpi - the skill's own look-at-every-page check - both
+  lose the whole top rule (58 px) and 19 px of the left rule, and a table
+  with no fill loses none. What actually fixed Russell's Day 2 Summary was
+  `\rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]`
+  (fill stops 0.5 pt short of each side rule: left 0 px lost, top still 54 px
+  lost at 80 dpi) PLUS a global redraw of every `tabular`'s outer frame in
+  his preamble (0 px lost). `NiceTabular[hvlines]` with
+  `\CodeBefore \rowcolor{tablehead}{1}` paints colours first and every rule
+  after: 0 px lost at 80, 100, 150 and 600 dpi, same geometry as a
+  `tabular` (bounding box and rule positions equal at 300 dpi), and it is in
+  tectonic's bundle. Measured again for the shipped `patterns/tables.tex`
+  (gap counts top/bottom/left/right): pattern A 0/0/0/0 at 80 and 600 dpi;
+  pattern B 54/0/0/0 at 80 dpi, 0/0/0/0 at 600; each of pattern C's three
+  tables 0/0/0/0 at both, and the starter's new table 0/0/0/0 at both.
+  CoreGraphics (Preview's engine) thins the same top rule at 80 dpi too
+  (mean grey 141 with no fill, 190 with `\rowcolor`), so it is not one
+  renderer's quirk. REJECTED: the frame-redraw hack as the skill's pattern -
+  it fixes the outer edges only and redefines `tabular` for the whole
+  document; and `\rowcolor` alone, which the measurement shows fixes nothing.
+- **The "notched" right-hand rule was not reproduced.** The card skeleton
+  table, `p{}` with `\raggedleft` and trailing `\hspace`/`\hspace*`, with and
+  without the frame hack, at 600/1200 dpi in poppler and 300/600 in
+  CoreGraphics: every outer rule continuous. So the skill prescribes a 600-dpi
+  look at every table rather than naming a cause it cannot show.
+- **Side by side:** `[t]` minipages starting `\vspace{0pt}`, `[t]` tables, one
+  `\arraystretch`, and `\headstrut` (`\rule[-1.1em]{0pt}{2.6em}`) in every
+  heading row put every rule of three tables (a one-line heading, a two-line
+  `\Block`, units) at the same height - measured, rows at y 72, 104, 123,
+  143, 162, 181 px at 80 dpi for all three. The strut goes INSIDE a
+  `\multicolumn` ("Misplaced \omit" otherwise). Plain `tabular`s with a
+  nested two-line heading drifted 46 px at 600 dpi.
+- **Alignment and decimals** follow the issue's final ruling (its first
+  comment replaced the body's "mixes positive and negative"): any negative
+  value in a column means right-aligned with 0.25 cm padding; none means
+  centred; zero is not negative. Whole numbers beside decimals carry the
+  places (2.0 beside 4.5), never `\phantom`. On a page `---:` and `:---:` say
+  the same, and need no CSS: Quartz writes `style="text-align:right;"` on
+  the cells, the site pads every cell (0.7rem on screen, 5pt printed), and
+  the HEADING follows its column, so the skill does not claim a centred
+  heading over a `---:` column. `verify.sh` 6n builds the new example and
+  checks five right-aligned and five centred maths cells, a right-aligned
+  heading and "2.0".
+- **The finite-difference scaffold** ships as a static example
+  (`finite_differences.tex`, and pattern E in math-graphs for a page) beside
+  a cleaned copy of the generator Russell's session wrote
+  (`finite_differences.py`), because a Windows teacher may have no Python.
+  Its default works the first TWO first differences (the generator's own
+  default was one - rule 4's fix for the giveaway), and its output was diffed
+  against the measured originals: identical apart from two comments. Decimal
+  values are written to the column's places, using `Decimal` so a
+  difference never prints as 0.30000000000000004. The skill says to RUN it,
+  never import it: an import would leave a `__pycache__` under
+  `support/agent_guidance`, which `verify.sh` hashes into the image tag. The
+  page fence draws on the site's engine in about a second (limit 20 s) and
+  carries no `%%`.
+- **The site engine's limits** (node-tikzjax 1.0.5, measured with the pinned
+  `support/figures` driven as `plantoir-figures.mjs` drives it): `groupplots`
+  is not carried; a dot drawn `circle (2pt)` - a radius in brackets - inside
+  an `axis` fails, with or without `axis cs:`, while `circle[radius=2pt]` and
+  `\addplot[only marks]` draw (the issue named `\fill … circle` as the
+  culprit, which is too broad: outside an axis it draws). Those three are
+  `figureFences.texErrors` cases. `\textdegree`, `\$` and `\textdollar` end
+  the engine itself in a pgfplots label ("Could not find font tcrm1000"), and
+  the build reports that as `tookTooLong`, uncached and retried every build -
+  the wrong reason; #718 owns the fix, and the three are a `knownLimits`
+  entry rather than cases, because a case would pin the wrong answer.
+  `$^{\circ}$` and `\char36` draw.
+- **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
+  (`{folder, teacherSaid, recorded}`), read and written by the assistant
+  only. It sits inside the course so it travels with a backup, an archive
+  and a restore, as `.internal/timetable/` does; a reference import keeps
+  `.internal` minus `activity`. It never reaches a site: discovery skips
+  dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
+  `.internal` is a page or an asset. The skill says the folder back on every
+  use, because a course outlives a `2026-27` path, and asks again when the
+  folder is gone (another Mac, a rename). The default suggestion is
+  `handouts/<CODE>/` in the teacher's Documents folder. REJECTED: a
+  `course_config.json` key - it would need a `file-formats.json` key both
+  apps show in Course Settings, and the skill tells assistants not to edit
+  that file (unknown keys are preserved, so it stays possible later); a
+  line in How I Teach - that page is pedagogy, written through gated tools
+  with a backup; a visible file in the course - it would be copied to the
+  site; one folder for the whole working folder - Russell asked for per
+  course; and an entry in `contracts/file-formats.json`, which describes
+  files the APPS write - this skill and this section are its one home.
+- **What goes on the site** is one rule now, not two: `Name.pdf`, or for a
+  worksheet whose page gives the answers a merged `Name - with Answers.pdf`
+  (`pdfunite`), as Russell's own Thread 2 pages do; a quiz or test may go
+  there, its solutions never. The PDF is copied again after every change.
+- **Task cards**: one relation per grid, never "on the same axes", at most
+  four graphs per set, discussion pages mirror the cards word for word -
+  carried as the issue wrote them.
+
+Russell's own `~/.claude/CLAUDE.md` "Tables of values" bullet still says to
+right-align every numeric column and use `\phantom{.5}`, which #715
+reverses; that file is his, not this repository's, and was left alone.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
