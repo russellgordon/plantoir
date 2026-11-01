@@ -1379,19 +1379,19 @@ syntax for an assistant.
 node-tikzjax 1.0.5 as the build drives it).** Four pgfplots figures on
 Russell's MPM2D pages had silently failed for some time. `groupplots` is not
 carried (TeX cannot find `pgflibrarypgfplots.groupplots.code.tex`). A dot
-written `\fill (axis cs:1,1) circle (2pt);` - a radius in BRACKETS inside an
-`axis`, with or without `axis cs:` - fails (`Argument of \pgfmathfloatparse@@
+written `\fill (axis cs:1,1) circle (2pt);` - a radius in PARENTHESES inside
+an `axis`, with or without `axis cs:` - fails (`Argument of \pgfmathfloatparse@@
 has an extra }`, reported at the `\end{axis}` line), while
 `circle[radius=2pt]` and `\addplot[only marks]` draw, and `circle (2pt)`
 outside an axis draws; the issue's "`\fill … circle`" was broader than the
 fault. Those three are `figureFences.texErrors` cases, run against the real
 engine by `scripts/check_figure_rules_against_the_site.py` in `verify.sh`.
 `\textdegree`, `\$` and `\textdollar` in a pgfplots label END the engine
-("Could not find font tcrm1000"); the build cannot tell that from a drawing
-that never finishes and reports `tookTooLong`, uncached and retried every
-build (#718). In plain TikZ the same commands fail with TeX saying nothing.
-They are a `figureFences.knownLimits` entry, not cases, because a case would
-pin the wrong reason. `$^{\circ}$` and `\char36` draw, and
+("Could not find font tcrm1000"), and in plain TikZ they fail with TeX
+saying nothing. Until #718 the build reported the first as `tookTooLong`,
+uncached and retried every build; since #718 it names the problem
+(`fontMissing`), and #718's `figureFences.knownLimits` entry lists the nine
+text symbols measured. `$^{\circ}$` and `\char36` draw, and
 `plantoir-math-graphs` sections 3 and 8 tell an assistant to write those.
 
 **Rejected** (with the reasons in 05 and 02): TikZJax in the browser;

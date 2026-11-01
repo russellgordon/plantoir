@@ -123,17 +123,25 @@ y = -x + 4
 - **Write these instead (measured):** each of the left-hand forms stops the
   whole drawing on the site, though it works in a LaTeX handout.
   - A dot inside an `axis`: not `\fill (axis cs:1,1) circle (2pt);` - a
-    radius in brackets fails inside an axis, with or without `axis cs:`.
-    Write `\addplot[only marks, mark=*] coordinates {(1,1)};`, or
-    `\fill (axis cs:1,1) circle[radius=2pt];`. Outside an axis,
-    `circle (2pt)` draws.
-  - A degree sign: not `\textdegree`; write `$^{\circ}$`.
-  - A dollar sign: not `\$` or `\textdollar`; write `\char36`.
+    radius in parentheses, `circle (2pt)`, fails inside an axis, with or
+    without `axis cs:`. Write `\addplot[only marks, mark=*] coordinates
+    {(1,1)};`, or `\fill (axis cs:1,1) circle[radius=2pt];`. Outside an
+    axis, `circle (2pt)` draws.
+  - A degree sign: not `\textdegree`; write it in maths, `$^{\circ}$`.
+  - A dollar sign: not `\$` or `\textdollar`; write the plain character,
+    `\char36`.
+  - Any other symbol written as TEXT that needs lettering the site does not
+    have. Measured: `\$`, `\textdollar`, `\textdegree`, `\S`, `\pounds`,
+    `\copyright`, `\textbullet`, `\textmu` and `\textcent` all stop the
+    drawing, in any fence and not only in an axis label. Write the symbol
+    in maths, or as the plain character. `\textsf`, `\texttt`, `\textsc`,
+    `\mathbb` and bold italic draw.
 
-  `\textdegree`, `\$` and `\textdollar` stop the drawing in any fence, not
-  only in an axis label, and the build may then give the wrong reason for
-  it (that it took too long); check for them first when a figure with a
-  degree or a dollar sign is not drawn.
+  The build names this problem. Its `plantoir: error:` line (section 7)
+  for that figure ends with the sentence Plantoir's contract keeps as
+  `figureFences.words.reasons.fontMissing`, which says a symbol written as
+  text needs lettering diagrams don't have, and to write it in maths or as
+  the plain character.
 - Comments with ONE `%`. A `%%` anywhere on a page is removed by the
   website before it reads the page (inside fences too).
 - Colours: black and white follow the reader's theme; other colours are
@@ -247,7 +255,7 @@ A closed circle (`x >= -2`) is `fill=red` instead of `fill=white`.
 The first table of a day that meets first or second differences carries
 this figure; later tables that day are plain Markdown tables. A curved arrow
 starts at each lower value and points up to the one above it, labelled with
-the whole subtraction, lower minus upper, negatives in brackets; a second
+the whole subtraction, lower minus upper, negatives in parentheses; a second
 column does the same for second differences. It is the same figure a
 printed handout carries (`plantoir-handouts` section 10, whose
 `patterns/finite_differences.py` prints this fence for any table with
@@ -315,8 +323,8 @@ each subtraction and its result.
 
 For first differences only (the first time differences appear in a unit),
 leave out the "Second differences" heading and its three arrows and lines,
-and move the caption's `at (...)` x to half the new width. Never on a quiz
-or test page.
+and move the caption's `at (...)` x to half the new width. Never on a quiz,
+test or practice test page.
 
 ## 5. Where a fence can go
 
@@ -362,8 +370,9 @@ remembered, so it is quick.
 
 - `\documentclass`, `\usepackage{tikz}` (harmless but pointless), two
   pictures in one fence, `%%`, `siunitx`.
-- `groupplots`, `\textdegree`, `\$`, `\textdollar`, and a dot drawn as
-  `circle (2pt)` inside an `axis` - section 3 says what to write instead.
+- `groupplots`, `\textdegree`, `\$`, `\textdollar` and the other text
+  symbols section 3 lists, and a dot drawn as `circle (2pt)` inside an
+  `axis` - section 3 says what to write instead.
 - In functionplot: `**`, `ln`, `pi`, `e`, `|x|`, `sin x`, `x(x - 1)`,
   settings below the functions, bounds that hide what matters.
 - A picture, screenshot or embed of a graph that a fence can draw.

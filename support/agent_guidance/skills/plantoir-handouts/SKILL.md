@@ -230,10 +230,12 @@ pdftoppm -png -r 80 "Name - Answers.pdf" /tmp/handout-check/Answers
 comes with Poppler: `brew install poppler` on a Mac.) If you
 cannot render the pages, tell the teacher they have not been looked at.
 
-Leave no build files behind: only `Name.tex`, `Name - Answers.tex`,
-`Name.pdf` and `Name - Answers.pdf` (and a merged `Name - with
-Answers.pdf`, if the page links one) stay in the folder, and the rendered
-images are deleted.
+Leave no build files behind. Of THIS handout's files, only `Name.tex`,
+`Name - Answers.tex`, `Name.pdf` and `Name - Answers.pdf` (and a merged
+`Name - with Answers.pdf`, if the page links one) stay, and the rendered
+images are deleted. The folder holds the course's other handouts too, and
+perhaps folders for units and days: leave every file you did not make in
+this session exactly as it is.
 
 ## 9. Tables
 
@@ -258,9 +260,18 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
 - **An existing `tabular` that stays a `tabular`** (pattern B):
   `\rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]`
   at the START of the heading row, with both of those arguments and no
-  `\cellcolor` in any cell. That keeps the side rules; the top rule can
-  still thin out at 80 dpi, so check it at 600 dpi, and a table being
-  rewritten anyway becomes pattern A. Never mix the two kinds in one table.
+  `\cellcolor` in any cell. That keeps the side rules, but NOT always the
+  top one: at 80 dpi the top rule vanishes at about half of the places a
+  table can sit on the page (6 of 12 measured), exactly as with a bare
+  `\rowcolor`, and a 600 dpi look never shows it. So look at the table's
+  top edge in the 80 dpi pages of section 8; if it is gone, rewrite the
+  table as pattern A. The one thing that closes pattern B is a preamble
+  that redraws every `tabular`'s outer frame last - a teacher's own
+  worksheet template may carry one, such as a block headed "Outer border,
+  drawn last" - so if the preamble you copied has that block, keep it and
+  pattern B is whole (0 of 12 positions lost, measured). Do not add that
+  block to a handout that lacks it; use pattern A. A table being rewritten
+  anyway becomes pattern A. Never mix the two kinds in one table.
 - **Alignment is decided per column, by that column's values:**
   - A column holding **any negative value** is right-aligned, with about
     0.25 cm of padding before the rule so the units digits line up and the
@@ -289,10 +300,12 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
   row, and `\headstrut` in every heading row (inside the `\multicolumn`
   where the heading cell is one), so a one-line heading is as tall as a
   two-line `\Block{}{First\\differences}`.
-- **Look at every table at 600 dpi** as well as at 80: render the page
-  holding it and look at its edges up close - every outer rule one
-  continuous line, no notch where a row's rule meets a side rule, no fill
-  covering a rule.
+- **Look at every table at 80 dpi and at 600 dpi.** At 80 dpi (section
+  8's pages) the top edge of a shaded heading must be there - that is
+  where a fill covering a rule shows, and 600 dpi hides it. At 600 dpi,
+  render the page holding the table and look at its edges up close: every
+  outer rule one continuous line, no notch where a row's rule meets a side
+  rule.
 
   ```bash
   pdftoppm -png -r 600 -f 2 -l 2 "Name.pdf" /tmp/handout-check/table-page-2
@@ -305,10 +318,12 @@ table of that day carries a scaffold figure; later tables that day are
 plain. `patterns/finite_differences.tex` beside this file is a complete
 example to copy and change the numbers in (it needs nothing but LaTeX);
 `patterns/finite_differences.py` writes the same picture for any table
-when Python is available. Run it, never import it:
+when Python is available. Run it, never import it - from the working
+folder, where this skill is at `.claude/skills/plantoir-handouts` (the same
+files are at `.agents/skills/plantoir-handouts`):
 
 ```bash
-python3 patterns/finite_differences.py --x -2 -1 0 1 2 --y 1 -2 -3 -2 1
+python3 .claude/skills/plantoir-handouts/patterns/finite_differences.py --x -2 -1 0 1 2 --y 1 -2 -3 -2 1
 ```
 
 It prints a `tikzpicture` that uses the handout's own `\qa` switch, so one
@@ -317,7 +332,7 @@ source makes both copies. The figure:
 - The x, y table on the left, bordered and aligned as section 9 says.
 - Between consecutive rows, a curved arrow that **starts at the lower
   value and points up** to the one above, labelled with the whole
-  subtraction, **lower minus upper**, negatives in brackets:
+  subtraction, **lower minus upper**, negatives in parentheses:
   `1 - (-2) = 3`. The lines of a column line up on their equals signs.
 - A second column of arrows and subtractions for second differences, such
   as `2 - (-2) = 4`.

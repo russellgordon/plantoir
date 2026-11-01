@@ -20,8 +20,11 @@
 %   So moving from \cellcolor to a bare \rowcolor fixes nothing.
 % - What fixed the teacher's tables was \rowcolor WITH the two overhang
 %   arguments below (the fill stops 0.5pt short of each side rule: 0 px of
-%   the side rules lost, 54 px of the top rule still lost at 80 dpi) plus a
-%   global redraw of every tabular's outer frame (0 px lost anywhere).
+%   the side rules lost) plus a global redraw of every tabular's outer frame
+%   (0 px lost anywhere). Without the redraw, B's top rule depends on where
+%   the table sits: set at 12 sub-pixel page positions (2026-11-01), 54-56
+%   of its 58-59 px were lost at 80 dpi at 6 of the 12, exactly where a
+%   bare \rowcolor lost its top rule too, and 0 at 600 dpi at all 12.
 % - nicematrix (pattern A) paints the colours FIRST and every rule after:
 %   0 px lost at 80, 100, 150 and 600 dpi, with no redraw, and the same
 %   geometry as a tabular. That is why it is the pattern for new tables.
@@ -69,9 +72,12 @@ $4$ & $0$ \\
 % Keep the full border: | at both ends of the spec, \hline above the heading
 % row and below the last row. Shade the heading with \rowcolor at the START
 % of the row, with both overhang arguments, and no \cellcolor in any cell.
-% Its top rule can still thin out at 80 dpi, so look at the top edge at
-% 600 dpi (section 9's check); a table being rewritten anyway becomes
-% pattern A. In a plain tabular the heading's \multicolumn repeats the rules:
+% Its top rule VANISHES at 80 dpi at about half of page positions, and 600
+% dpi never shows it: look at the top edge in the 80 dpi pages, and if it is
+% gone rewrite the table as pattern A - unless the preamble already redraws
+% every tabular's outer frame last (a teacher's template may carry one, as
+% an "Outer border, drawn last" block), which closes it. A table being rewritten anyway
+% becomes pattern A. In a plain tabular the heading's \multicolumn repeats the rules:
 % {|c|} over the first column, {c|} over the others.
 {\renewcommand{\arraystretch}{1.25}%
 \begin{tabular}{|c|r<{\hspace{0.25cm}}|}

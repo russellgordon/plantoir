@@ -5219,6 +5219,13 @@ def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
             re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', html_text or "")]
+def centred_cells_holding(html, number):
+    """How many centred table cells are the one KaTeX number `number` - the
+    cell itself, so a "0.0" elsewhere on the page does not count (#715 L5)."""
+    cell = r'<td style="text-align:center;"><span class="katex">(?:(?!</td>).)*?<span class="mord">' + re.escape(number) + r'</span>(?:(?!</td>).)*?</td>'
+    return len(re.findall(cell, html, re.S))
+
+
 # (a text only that example holds, what it must build as, the check)
 claims = [
     ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
@@ -5238,7 +5245,8 @@ claims = [
     ("| $x$ | $y = 0.5x^2$ |", "a table of values: the column with negatives right-aligned under its heading, the one without centred, 2.0 beside 0.5 (#715)",
      lambda a, p: len(re.findall(r'<td style="text-align:right;"><span class="katex"', a)) == 5
      and len(re.findall(r'<td style="text-align:center;"><span class="katex"', a)) == 5
-     and '<th style="text-align:right;"><span class="katex"' in a and "2.0" in a and "0.0" in a),
+     and '<th style="text-align:right;"><span class="katex"' in a
+     and centred_cells_holding(a, "2.0") == 2 and centred_cells_holding(a, "0.0") == 1),
     ("Chemistry works too", "inline, display and chemistry maths",
      lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",

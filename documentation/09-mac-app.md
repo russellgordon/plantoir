@@ -3299,21 +3299,42 @@ rejected:
   lose the whole top rule (58 px) and 19 px of the left rule, and a table
   with no fill loses none. What actually fixed Russell's Day 2 Summary was
   `\rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]`
-  (fill stops 0.5 pt short of each side rule: left 0 px lost, top still 54 px
-  lost at 80 dpi) PLUS a global redraw of every `tabular`'s outer frame in
-  his preamble (0 px lost). `NiceTabular[hvlines]` with
+  (fill stops 0.5 pt short of each side rule: left 0 px lost, top still lost
+  at 80 dpi wherever the table happens to sit - below) PLUS a global redraw
+  of every `tabular`'s outer frame in his preamble (0 px lost). `NiceTabular[hvlines]` with
   `\CodeBefore \rowcolor{tablehead}{1}` paints colours first and every rule
   after: 0 px lost at 80, 100, 150 and 600 dpi, same geometry as a
   `tabular` (bounding box and rule positions equal at 300 dpi), and it is in
   tectonic's bundle. Measured again for the shipped `patterns/tables.tex`
   (gap counts top/bottom/left/right): pattern A 0/0/0/0 at 80 and 600 dpi;
-  pattern B 54/0/0/0 at 80 dpi, 0/0/0/0 at 600; each of pattern C's three
-  tables 0/0/0/0 at both, and the starter's new table 0/0/0/0 at both.
+  each of pattern C's three tables 0/0/0/0 at both, and the starter's new
+  table 0/0/0/0 at both. Pattern B is **position-dependent**: 54-56 of the
+  58-59 px top rule lost at 80 dpi at 6 of 12 positions, 0 at 600 dpi. That
+  is from the fixes round (2026-11-01, tectonic 0.17.0, poppler 25.09.1,
+  `pdftoppm -gray -r 80`), which set the three kinds of table on twelve
+  pages, each nudged 0.17 pt down and 0.13 pt right from the one before,
+  because the implementation review could not reproduce the first
+  "54/0/0/0" and found the loss followed where the table sat. Top-rule
+  pixels lost at 80 dpi, positions 1-12:
+  - pattern A: 0 at all 12;
+  - pattern B: 0, 0, 56, 55, 55, 0, 0, 54, 55, 56, 0, 0 - side rules 0;
+  - a bare `\rowcolor`: 0, 0, 56, 57, 58, 0, 0, 57, 56, 56, 0, 0 - the same
+    six positions - and 18-19 px of the left rule at 7 of 12;
+  - B and the bare `\rowcolor` with Russell's templates' "Outer border, drawn
+    last" redraw in the preamble: 0 at all 12 (side rules at most 1 px);
+  - at 600 dpi: 0 for every kind at every position.
+
+  So a 600 dpi look can never show B's open top, and the skill says to look
+  at the top edge at 80 dpi and, if it is gone, rewrite the table as
+  pattern A - or keep the redraw if the preamble copied from the templates
+  already has it, which is what closes B.
   CoreGraphics (Preview's engine) thins the same top rule at 80 dpi too
   (mean grey 141 with no fill, 190 with `\rowcolor`), so it is not one
   renderer's quirk. REJECTED: the frame-redraw hack as the skill's pattern -
   it fixes the outer edges only and redefines `tabular` for the whole
-  document; and `\rowcolor` alone, which the measurement shows fixes nothing.
+  document (the skill names it as what closes B where a copied preamble
+  already carries it, and does not add it); and `\rowcolor` alone, which the
+  measurement shows fixes nothing.
 - **The "notched" right-hand rule was not reproduced.** The card skeleton
   table, `p{}` with `\raggedleft` and trailing `\hspace`/`\hspace*`, with and
   without the frame hack, at 600/1200 dpi in poppler and 300/600 in
@@ -3336,7 +3357,9 @@ rejected:
   the HEADING follows its column, so the skill does not claim a centred
   heading over a `---:` column. `verify.sh` 6n builds the new example and
   checks five right-aligned and five centred maths cells, a right-aligned
-  heading and "2.0".
+  heading, and that "2.0" and "0.0" are each a centred cell of their own
+  (two and one), not merely somewhere on the page (the fixes round, review
+  L5).
 - **The finite-difference scaffold** ships as a static example
   (`finite_differences.tex`, and pattern E in math-graphs for a page) beside
   a cleaned copy of the generator Russell's session wrote
@@ -3352,16 +3375,20 @@ rejected:
   carries no `%%`.
 - **The site engine's limits** (node-tikzjax 1.0.5, measured with the pinned
   `support/figures` driven as `plantoir-figures.mjs` drives it): `groupplots`
-  is not carried; a dot drawn `circle (2pt)` - a radius in brackets - inside
-  an `axis` fails, with or without `axis cs:`, while `circle[radius=2pt]` and
+  is not carried; a dot drawn with a radius in parentheses, `circle (2pt)`,
+  inside an `axis` fails, with or without `axis cs:`, while `circle[radius=2pt]` and
   `\addplot[only marks]` draw (the issue named `\fill … circle` as the
   culprit, which is too broad: outside an axis it draws). Those three are
   `figureFences.texErrors` cases. `\textdegree`, `\$` and `\textdollar` end
-  the engine itself in a pgfplots label ("Could not find font tcrm1000"), and
-  the build reports that as `tookTooLong`, uncached and retried every build -
-  the wrong reason; #718 owns the fix, and the three are a `knownLimits`
-  entry rather than cases, because a case would pin the wrong answer.
-  `$^{\circ}$` and `\char36` draw.
+  the engine itself in a pgfplots label ("Could not find font tcrm1000").
+  Before #718 the build reported that as `tookTooLong`, uncached and retried
+  every build, so #715 first wrote them up as a `knownLimits` entry rather
+  than as cases; #718 (merged first) makes the build name it, `fontMissing`,
+  pins it with its own `texErrors` cases and carries the `knownLimits` entry
+  with the nine symbols measured, so #715's entry was dropped and
+  `plantoir-math-graphs` section 3 lists the nine and names the
+  `figureFences.words.reasons.fontMissing` line. `$^{\circ}$` and `\char36`
+  draw.
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
   only. It sits inside the course so it travels with a backup, an archive
