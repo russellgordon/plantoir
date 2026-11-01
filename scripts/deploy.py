@@ -28,6 +28,7 @@ import reference_course
 import contracts
 import isolation_headers
 import netlify_paths
+import section_problems
 from collections import Counter
 
 # ---- Host OS signaling & example command helper -----------------------------
@@ -823,6 +824,10 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
         sys.exit(1)
 
     oversized = oversized_for_cloudflare(public_dir)
+    # The section's Problems record (#717, plan review MED 6): each file
+    # refused is a row of the section's own, and a deploy that reached this
+    # check with nothing too large takes the rows away. Never stops a deploy.
+    note_cloudflare_refusals(public_dir.parent, course_code, section, oversized)
     if oversized:
         print("❌ Some files are too large for Cloudflare Pages.")
         print(" Cloudflare refuses any single file bigger than 25 MB:")
@@ -1252,6 +1257,40 @@ def record_published_pages(course_dir: Path, section_dir: Path, section, destina
     return target
 
 
+def _build_id_of(section_dir: Path) -> str:
+    try:
+        return (section_dir / BUILD_ID_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def note_cloudflare_refusals(section_dir: Path, course_code: str, section, oversized: list,
+                             printer=print) -> None:
+    """The files Cloudflare Pages refuses, as the section's Problems record
+    has them (#717: sectionProblems.deployRefusals); none clears them."""
+    section_problems.record_deploy_refusals(section_dir, _build_id_of(section_dir), course_code,
+                                            section, oversized, printer=printer)
+
+
+def deploys_to_cloudflare(course_dir: Path) -> bool:
+    """Whether the course still sends a site to Cloudflare Pages, first or
+    as well (file-formats.json: deploy_target, additional_deploy_targets).
+    True when the settings cannot be read, so a refusal is never cleared on
+    a guess."""
+    try:
+        config = json.loads((course_dir / "course_config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    if not isinstance(config, dict):
+        return True
+    if config.get("deploy_target") == "cloudflare_pages":
+        return True
+    for extra in config.get("additional_deploy_targets") or []:
+        if isinstance(extra, dict) and extra.get("type") == "cloudflare_pages":
+            return True
+    return False
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Deploy a built section site — to Netlify by delta (file-digest) upload, or to Cloudflare Pages."
@@ -1563,6 +1602,11 @@ def main():
     # After the upload succeeded, never before (#379): the record says what
     # has been on a site students could reach.
     record_published_pages(course_dir, section_dir, args.section, "netlify")
+    # A Cloudflare refusal kept in the section's Problems record (#717) goes
+    # once the section no longer deploys there: nothing else would ever
+    # reach the check that clears it.
+    if not deploys_to_cloudflare(course_dir):
+        note_cloudflare_refusals(section_dir, args.course, args.section, [])
 
 def run_until_stopped():
     """Run main(); a Cancel in the app (its ^C) or Ctrl-C at a terminal leaves

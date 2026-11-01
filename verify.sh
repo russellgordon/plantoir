@@ -1754,6 +1754,7 @@ check_baked scripts/contracts.py          /opt/scripts/contracts.py
 check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
+check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.

@@ -273,6 +273,11 @@ nonisolated enum ActivityTrail {
         /// (`ScheduledDeploy.recordFolderProblems`, #153) — dated to the run,
         /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
+        /// A section's record of its problems changed — counts and kinds,
+        /// never a page — once per record's alert key, when the app first
+        /// reads it; and, as a second line of the same event, the answer the
+        /// teacher gave the alert about it (#717, `SectionProblems`).
+        case problemsChanged = "problems changed"
         /// A folder a feature depends on was put back, at the teacher's
         /// request — or, since #584, something the build put right in the
         /// teacher's own files by itself (`BuildRepairReport`: a front page's

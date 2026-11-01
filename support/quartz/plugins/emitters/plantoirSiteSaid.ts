@@ -23,8 +23,12 @@
 //
 // Python words it, rather than this file from prepared words, so a finding's
 // assembly has ONE implementation, tested on both platforms (#567 ruling 1).
-// The call costs 24-31 ms in the image (measured), and is made only when a
-// block or a quiz disagrees.
+// The call costs 24-31 ms in the image (measured). Since #717 it is made on
+// every first emit whose side file names the section's Problems record, so
+// the rows only the site can say are replaced - by none, when nothing
+// disagrees - and a block put right leaves the record; a side file without
+// one (a check, an older build) still calls only when a block or a quiz
+// disagrees.
 //
 // ONCE per process: Quartz 4.5.0 runs an emitter with no `partialEmit` again,
 // with every page, on each rebuild a preview makes (quartz/build.ts). Saying
@@ -112,11 +116,14 @@ export function sayWhatTheSiteFound(
   try {
     const blocks = gathered(content)
     const quizzes = gatheredQuizzes(content)
-    if (blocks.length === 0 && quizzes.length === 0) {
-      return false
-    }
     const said = JSON.parse(readFileSync(join(folder, SAID_FILE), "utf-8")) as Said
     if (typeof said.python !== "string" || typeof said.script !== "string") {
+      return false
+    }
+    // With nothing to say, Python is still asked when the build named its
+    // Problems record (#717, plan review HIGH 1): the site's rows are
+    // replaced on EVERY build, so a block put right leaves the record.
+    if (blocks.length === 0 && quizzes.length === 0 && !said.problems) {
       return false
     }
     const { python, script, ...rest } = said

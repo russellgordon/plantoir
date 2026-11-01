@@ -12,8 +12,10 @@ about a block only once Quartz has parsed the page (codeRunnerBlocks.
 siteDisagrees), and in a preview Quartz is one `quartz build --serve` process
 that never hands control back to build_site.py. So the site's emitter
 (support/quartz/plugins/emitters/plantoirSiteSaid.ts) runs THIS file, once per
-site-building process and only when a block or a quiz disagrees, with what
-the site's transformers recorded on stdin. It prints the finding with site_health's own
+site-building process, with what the site's transformers recorded on stdin -
+on every build whose side file names the section's Problems record (#717),
+which this file then gives the site's rows (none, when nothing disagrees),
+and otherwise only when a block or a quiz disagrees. It prints the finding with site_health's own
 `announce` - the ⚠️ lines and ONE `PLANTOIR_HEALTH:` line - so both apps, the
 assistant and a scheduled deploy's record read it the way they read every
 other folder problem, with no new reader.
@@ -64,14 +66,16 @@ def nfc(text) -> str:
 # ---- The build's half: the side file --------------------------------------------
 
 def write_side_file(output_dir, course, section, places: dict, swift_named: list,
-                    content_root, python=None, script=None) -> bool:
+                    content_root, python=None, script=None, problems: dict = None) -> bool:
     """
     Write quartz/plantoir_site_said.json. `places` maps each opted-in page's
     path in the site's content (forward slashes, as Quartz names it) - and
     each page the quiz check examined (#644) - to
     {"place": its place in the course folder without .md, "source": the
     teacher's own file or None}; `swift_named` is [[place, n]] for every
-    Swift block swiftCouldNotBePrepared names. Same input, same bytes;
+    Swift block swiftCouldNotBePrepared names. `problems` is
+    {"file": the section's Problems record, "buildId": this build's id}
+    (#717), or None, and is written only when given. Same input, same bytes;
     answers whether the file changed.
     """
     named = []
@@ -86,6 +90,8 @@ def write_side_file(output_dir, course, section, places: dict, swift_named: list
         "places": {nfc(path): value for path, value in sorted(places.items())},
         "swiftNamed": sorted(named),
     }
+    if problems:
+        content["problems"] = {"file": str(problems["file"]), "buildId": str(problems["buildId"])}
     data = (json.dumps(content, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
     path = Path(output_dir) / "quartz" / SIDE_FILE
     if path.is_file() and path.read_bytes() == data:
@@ -254,6 +260,21 @@ def say(payload: dict, printer=print) -> None:
         site_health.announce(found, printer=printer)
     except Exception as error:
         printer(f"ℹ️  Could not say what the website found in {course} Section {section}: {error}")
+    # The section's Problems record (#717): the site's rows replaced on every
+    # build - none, when nothing disagrees - so a fixed block's row goes.
+    # After the HEALTH lines, and only for the build that named the record.
+    problems = payload.get("problems")
+    if isinstance(problems, dict) and problems.get("file") and problems.get("buildId"):
+        try:
+            import section_problems
+            section_problems.merge_site_said(
+                problems["file"], problems["buildId"],
+                facts_from_site(payload, payload.get("blocks") or []),
+                quiz_facts_from_site(payload, payload.get("quizzes") or []),
+                course, section, printer=printer)
+        except Exception as error:
+            printer(f"ℹ️  Could not add what the website found to the list of problems for "
+                    f"{course} Section {section}: {error}")
 
 
 def main() -> int:
