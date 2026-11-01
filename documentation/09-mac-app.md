@@ -3425,8 +3425,8 @@ rejected:
   carried as the issue wrote them.
 
 **Graphs, the key's layout, and table widths and spacing (#715 reopened,
-2026-11-01).** Russell added five rules after the merge (issue comments
-13:02-13:14 UTC), landed on `issue/715-graph-and-key-rules`:
+2026-11-01).** Russell added six rules after the merge (issue comments
+12:58-13:14 UTC), landed on `issue/715-graph-and-key-rules`:
 
 - **Abstract or in context, decided per graph.** A graph of a relation with
   no context is drawn to the edge of the grid with an arrowhead at each end,
@@ -3481,8 +3481,20 @@ rejected:
   C's h column, `finite_differences.py` (`right_aligned`: any negative, or
   whole beside decimal), the contract's `handoutsSkill.rule`, and 6n.
 
-Not landed here: the 12:58 fill-in-blank height rule, which was not part
-of this piece.
+- **A blank students write on is about two lines tall** (12:58). The
+  starters gain `\fillin[width]{answer}`: the blank on the student copy,
+  the answer written on the same line in the key, and an invisible
+  `\rule[-0.2em]{0pt}{2.1em}` strut either way, so a wrapped prompt keeps a
+  full line of room above the blank (Handout's new question 4, compiled and
+  looked at in both copies). The header's Name/Date/Class # `\fillblank`
+  keeps one line: a two-line strut there would push into `headheight`, and
+  those blanks are not prompts. On a page the only blank is a quiz's
+  `` `____` ``, which prints as a line at the site's own height;
+  `plantoir-printing` section 3 says never to fake blanks with underscores
+  or typed empty lines, and to make a PDF handout when written answers need
+  the room. NOT changed: the printed quiz blank's height, which is the
+  site's `quiz.scss` print rule (a product change for both platforms, not
+  a skill's).
 
 Russell's own `~/.claude/CLAUDE.md` "Tables of values" bullet still says to
 right-align every numeric column and use `\phantom{.5}`, which #715

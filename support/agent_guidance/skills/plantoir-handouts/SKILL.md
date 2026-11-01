@@ -160,6 +160,23 @@ look the same:
   worksheet's column count.
 - `pgfplots` for graphs. How far a graph is drawn, and when it has
   arrowheads, is in section 12.
+- **A blank students write on is about two lines tall.** Any line that
+  carries a fill-in blank gets the room, so a prompt that wraps still
+  leaves a full line of writing above the blank. The blank macro carries
+  an invisible strut, so nothing is spaced by hand - the starters'
+  `\fillin`:
+
+  ```latex
+  \newcommand{\fillin}[2][3.2cm]{\ \qa{\rule[-0.2em]{#1}{0.4pt}}{\makebox[#1]{#2}\llap{\rule[-0.2em]{#1}{0.4pt}}}\rule[-0.2em]{0pt}{2.1em}}
+  ```
+
+  `its slope is \fillin[2cm]{$2$}` draws the blank on the student copy and
+  writes the answer on the same line in the key, at the same height
+  (section 3). Never fake the room with blank lines, `\vspace` or
+  `\\[1em]` typed between prompts, and never a row of underscores. If the
+  room makes the sheet a page longer, accept it and tell the teacher it
+  grew. (The Name, Date and Class # blanks in the header are not prompts
+  and keep their own one-line `\fillblank`.)
 - Tables: full borders, alignment by column, decimals and tables side by
   side are in section 9; the finite-difference scaffold in section 10;
   task cards in section 11.

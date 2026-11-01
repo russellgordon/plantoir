@@ -34,6 +34,13 @@
 \newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
 
+% A blank students write on, in a question (the skill's section 4): an
+% invisible strut makes its line about two lines tall, so a wrapped prompt
+% still leaves a full line of writing room above the blank. \fillin{answer}
+% or \fillin[5cm]{answer}: the student copy shows the blank, the answer key
+% writes the answer on the same line, at the same height.
+\newcommand{\fillin}[2][3.2cm]{\ \qa{\rule[-0.2em]{#1}{0.4pt}}{\makebox[#1]{#2}\llap{\rule[-0.2em]{#1}{0.4pt}}}\rule[-0.2em]{0pt}{2.1em}}
+
 \ifanswers
   \newcommand{\doctitle}{\handouttitle\ --- Answers}
 \else
@@ -180,6 +187,9 @@ $2$ & \qa{}{$-1$} \\
 $3$ & \qa{}{$0$} \\
 \end{NiceTabular}}
 \end{center}
+
+\q{4} The line $y = 2x - 1$ crosses the $y$-axis at the point where $x = 0$,
+so its $y$-intercept is \fillin[2cm]{$-1$}, and its slope is \fillin[2cm]{$2$}.
 \end{questions}
 
 \end{document}
