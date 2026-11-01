@@ -25,13 +25,51 @@ struct HowITeachKeptOffReport: Equatable {
     /// anything written on the page.
     let pages: [String]
 
+    /// The build's own count of the pages it kept off, when it SHORTENED its
+    /// line to stay under `contracts/shared-rules.json` → `machineLineLength`
+    /// (#666, #704): the line then names only the first pages. `nil` for a
+    /// whole line, which names every page.
+    let count: Int?
+
     // MARK: - Computed properties
 
-    /// `howITeachPage.keptOffTrailLine`.
+    /// How many pages were kept off: the line's `count` when it carries one,
+    /// and never fewer than the names it carries, as
+    /// `PagesDatedByTheBuild.total` reads its own.
+    nonisolated var total: Int {
+        let counted: Int = count ?? 0
+        if counted > pages.count {
+            return counted
+        }
+        return pages.count
+    }
+
+    /// `howITeachPage.keptOffTrailLine`, and
+    /// `howITeachPage.keptOffTrailLineWhenShortened` when the line named
+    /// fewer pages than it kept off.
     nonisolated var trailSentence: String {
-        let noun: String = pages.count == 1 ? "page" : "pages"
-        return "the build kept \(pages.count) \(noun) named How I Teach off the website that the "
-             + "course's settings had listed for it: \(pages.joined(separator: ", "))"
+        var names: String = pages.joined(separator: ", ")
+        let notShown: Int = total - pages.count
+        if notShown > 0 {
+            if pages.isEmpty {
+                names = "\(notShown) not named"
+            } else {
+                names += " and \(notShown) more"
+            }
+        }
+        let noun: String = total == 1 ? "page" : "pages"
+        return "the build kept \(total) \(noun) named How I Teach off the website that the "
+             + "course's settings had listed for it: \(names)"
+    }
+
+    // MARK: - Initializer
+
+    /// `count` is left out for a whole line.
+    nonisolated init(course: String, section: Int, pages: [String], count: Int? = nil) {
+        self.course = course
+        self.section = section
+        self.pages = pages
+        self.count = count
     }
 
     // MARK: - Functions
@@ -53,11 +91,16 @@ struct HowITeachKeptOffReport: Equatable {
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let course = object["course"] as? String,
                   let section = object["section"] as? Int,
-                  let pages = object["pages"] as? [String],
-                  !pages.isEmpty else {
+                  let pages = object["pages"] as? [String] else {
                 continue
             }
-            found.append(HowITeachKeptOffReport(course: course, section: section, pages: pages))
+            // An empty list WITH a count is a shortened line that named none
+            // (k = 0); an empty list without one reports nothing.
+            let count: Int? = object["count"] as? Int
+            if pages.isEmpty && (count ?? 0) == 0 {
+                continue
+            }
+            found.append(HowITeachKeptOffReport(course: course, section: section, pages: pages, count: count))
         }
         return found
     }
