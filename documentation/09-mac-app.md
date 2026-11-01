@@ -650,8 +650,17 @@ that finished while the teacher was on section 2 showed "Done" on return.
     preview wins the comparison when it is the more recent run.
   - Rejected: keeping the panel until the next deploy (the first build, above);
     forgetting it only when a preview starts (a deploy watched to the end would
-    still come back on every visit). The contract case
-    `watchedToTheEndThenPreviewed` holds it.
+    still come back on every visit). The contract cases
+    `watchedToTheEndThenPreviewed`, `watchedToTheEnd` (no preview: only the
+    shown-once clause makes it false) and
+    `finishedWhileAwayThenPreviewedFromAnotherWindow` (nobody saw the ending:
+    only the later-preview clause makes it false) hold it. The last two were
+    added by the fixes review (L1), which measured that an implementation
+    with EITHER clause alone passed the first. `SectionRunsTests`' source scan
+    also pins `previewRunner.startedAt ?? deployRun.previewLastStartedAt` in
+    `showsDeployProgress` and the `notePreviewStarted` call in `startPreview`
+    (L3), since the model tests recompute the first inline and cannot see the
+    second.
 - `TaskConsoleView` scrolls to its end on appearing, so a returned, finished
   console opens where the outcome is. That applies to every console, the
   preview's included, which is harmless: a console that has just appeared has

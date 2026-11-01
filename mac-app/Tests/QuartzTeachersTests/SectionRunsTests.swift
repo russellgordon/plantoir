@@ -192,7 +192,7 @@ final class SectionRunsTests: XCTestCase {
     func testReturningToASectionMidDeployCases() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 9)
+        XCTAssertEqual(cases.count, 11)
         for testCase in cases {
             SectionRuns.shared.reset()
             CourseActivity.reset()
@@ -243,6 +243,21 @@ final class SectionRunsTests: XCTestCase {
                     giveOutput(to: started)
                     started.noteEnded()
                     started.noteEndingShown()
+                    started.notePreviewStarted(at: deployStart.addingTimeInterval(60))
+                }
+            case "watchedToTheEnd":
+                // The view that started it watched it end; no preview since.
+                if let started {
+                    giveOutput(to: started)
+                    started.noteEnded()
+                    started.noteEndingShown()
+                }
+            case "finishedWhileAwayThenPreviewedFromAnotherWindow":
+                // It ended with no view showing the section, and another
+                // window then started a preview of the section.
+                if let started {
+                    giveOutput(to: started)
+                    started.noteEnded()
                     started.notePreviewStarted(at: deployStart.addingTimeInterval(60))
                 }
             default:
@@ -313,6 +328,24 @@ final class SectionRunsTests: XCTestCase {
         XCTAssertTrue(deployBody.contains("let run: SectionDeployRun = SectionRuns.shared.deploy("))
         let cancelBody: String = try XCTUnwrap(bodyOfFunction(startingWith: "func cancelDeploy(", in: source))
         XCTAssertTrue(cancelBody.contains("run.folder"), "Cancel aims at the folder the deploy noted")
+
+        // A view that came back has a preview runner with no start time, so
+        // it must fall back on the section's last preview start (#706 fixes
+        // review, L3).
+        let progressBody: String = try XCTUnwrap(
+            bodyOfFunction(startingWith: "var showsDeployProgress: Bool {", in: source)
+        )
+        XCTAssertTrue(
+            progressBody.contains("previewRunner.startedAt ?? deployRun.previewLastStartedAt"),
+            "showsDeployProgress must compare against the section's last preview when the view has none"
+        )
+        // And every preview started tells the section's run, so that view
+        // has something to compare against.
+        let previewBody: String = try XCTUnwrap(bodyOfFunction(startingWith: "func startPreview(", in: source))
+        XCTAssertTrue(
+            previewBody.contains(".notePreviewStarted(at:"),
+            "startPreview must tell the section's run that a preview started"
+        )
     }
 
     // MARK: - Helpers
