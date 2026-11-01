@@ -18,6 +18,17 @@
 // that never finishes (`\def\x{\x}\x` loops for ever, measured) is ended by
 // figures.py killing this process, never by anything in here.
 //
+// A diagram can also CRASH the engine rather than stop TeX (#718): `\$`,
+// `\textdollar` and `\textdegree` need a font the engine does not carry
+// (tcrm1000) and its DVI reader throws "Could not find font tcrm1000". In
+// plain TikZ the throw reaches the catch in drawTikz; in a pgfplots label it
+// is thrown outside it, and Node would end this process with the reason only
+// on stderr. Either way the job is answered with what happened -
+// {"reason": "fontMissing", "name": ...} or {"reason": "drawingStopped",
+// "said": ...} - and after an uncaught one this process exits, because the
+// engine cannot be trusted after it. figures.py starts a fresh helper for the
+// next job after either answer.
+//
 // Arguments: --engine <folder holding node-tikzjax's package.json>
 //            --function-plot <function-plot.js>
 //            --rules <figureRules.js, from the section's own Quartz>
@@ -62,6 +73,30 @@ try {
 
 let tikz = null
 
+// The job being drawn, so a crash outside drawTikz's own catch can still be
+// answered for it (#718).
+let current = null
+
+// What a crash said, as a reason a build can give a teacher (#718). The
+// engine throws an Error in one place and a bare STRING in another
+// (dvi2html's parser: "Could not find font " + a font NUMBER + "."), so the
+// message is read either way, and a number is not taken for a font's name.
+// `said` is one line of the message, never the stack or a path, and short:
+// it reaches a teacher's console and the folder-problem finding.
+function crashReason(error) {
+  const message = String(error && error.message !== undefined ? error.message : error)
+  const font = message.match(/Could not find font ([A-Za-z0-9]+)/)
+  if (font) {
+    return { reason: "fontMissing", texLine: null, name: /^\d+$/.test(font[1]) ? null : font[1], said: "" }
+  }
+  return { reason: "drawingStopped", texLine: null, name: null, said: oneLine(message) }
+}
+
+function oneLine(text) {
+  const first = String(text).split("\n")[0].replace(/(?:\/[^\s/'"]+){2,}/g, "…").trim()
+  return first.length > 160 ? first.slice(0, 159) + "…" : first
+}
+
 async function loadTikz() {
   if (tikz === null) {
     const engine = createRequire(join(argument("engine"), "package.json"))("node-tikzjax")
@@ -80,12 +115,16 @@ async function drawTikz(job) {
     captured.push(parts.join(" "))
   }
   let svg = null
+  let crash = null
+  current = { id: job.id, started }
   try {
     svg = await tikz.default(source, { showConsole: true })
   } catch (error) {
     svg = null
+    crash = error
   } finally {
     console.log = original
+    current = null
   }
   if (svg !== null && svg.includes("<svg")) {
     return { id: job.id, ok: true, svg, ms: Date.now() - started }
@@ -99,6 +138,12 @@ async function drawTikz(job) {
     }
   }
   const problem = rules.texProblem(texLines)
+  // TeX's own `! ` line says more than the crash that followed it; with
+  // none, the crash is the reason (#718: until then this answered texSaid
+  // with nothing said).
+  if (crash !== null && problem.reason === "texSaid" && !problem.said) {
+    return { id: job.id, ok: false, ...crashReason(crash), ms: Date.now() - started }
+  }
   return { id: job.id, ok: false, ...problem, ms: Date.now() - started }
 }
 
@@ -200,6 +245,22 @@ async function handle(message) {
   }
   send({ id: message.id ?? null, ok: false, reason: "unknownEngine" })
 }
+
+// A throw nothing caught (#718: a pgfplots label with \textdegree). The job
+// being drawn is answered with the reason, then this process ends - but only
+// once the answer is written, in the write's own callback, since how much of
+// a pipe write lands before an exit differs by platform and Windows runs this
+// natively. The message also goes to stderr, where figures.py looks when no
+// answer arrives at all.
+process.on("uncaughtException", (error) => {
+  process.stderr.write("Error: " + oneLine(error && error.message !== undefined ? error.message : error) + "\n")
+  if (current === null) {
+    process.exit(1)
+  }
+  const answer = { id: current.id, ok: false, ...crashReason(error), ms: Date.now() - current.started }
+  current = null
+  out.write(JSON.stringify(answer) + "\n", () => process.exit(1))
+})
 
 let queue = Promise.resolve()
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity })

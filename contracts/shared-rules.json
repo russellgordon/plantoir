@@ -24617,7 +24617,7 @@
       }
     },
     "texErrors": {
-      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence; `command` is what the reason names ({name} in words.reasons).",
+      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence; `command` is what the reason names ({name} in words.reasons). A diagram can also CRASH the engine rather than stop TeX (#718): a symbol written as text that needs a font the engine does not carry (tcrm1000 - knownLimits lists the ones measured) makes its DVI reader throw. The helper answers that job fontMissing (with the font's name, never a font NUMBER, which the reader's other throw carries), any other throw with no `! ` line drawingStopped (with one line of what was thrown, at most 160 characters, never a path or a stack), and after a throw nothing caught it exits once the answer is written; the build starts a fresh engine for the next job. A helper that ENDS without answering is read from what it said on its way out: fontMissing again if it named the font, otherwise drawingEnded, which is not cached (cache.notCached). Before #718 a crash in a pgfplots label was tookTooLong (uncached, tried every build) and one in plain TikZ texSaid with nothing said.",
       "cases": [
         {
           "name": "a command TeX does not know",
@@ -24662,6 +24662,22 @@
           "name": "\\usepackage{tikz} is harmless",
           "body": "\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
           "reason": null
+        },
+        {
+          "name": "a dollar sign in plain TikZ",
+          "command": "tcrm1000",
+          "body": "\\begin{document}\n\\begin{tikzpicture}\\node at (0,0) {\\$5};\\end{tikzpicture}\n\\end{document}",
+          "reason": "fontMissing",
+          "blockLine": null,
+          "why": "#718, measured 2026-11-01 with node-tikzjax 1.0.5: the engine's DVI reader throws 'Could not find font tcrm1000' inside the drawing, in 0.02 s, and TeX prints no `! ` line - so until #718 it was texSaid with nothing said. No line: a crash has no `l.N`."
+        },
+        {
+          "name": "a degree sign in a pgfplots label",
+          "command": "tcrm1000",
+          "body": "\\usepackage{pgfplots}\n\\pgfplotsset{compat=1.16}\n\\begin{document}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel={Angle (\\textdegree)}]\n\\addplot[domain=0:90] {x};\n\\end{axis}\n\\end{tikzpicture}\n\\end{document}",
+          "reason": "fontMissing",
+          "blockLine": null,
+          "why": "#718, measured 2026-11-01: the same font, thrown where nothing caught it, so the engine itself ended (exit 1 after about 0.55 s) and until #718 the build said tookTooLong and tried again every build. The helper now answers the job before it exits. Placed before the graph cases, so the run also proves the job after a crash gets a fresh engine."
         }
       ]
     },
@@ -24681,8 +24697,10 @@
       "pruneDays": 90,
       "notCached": [
         "tookTooLong",
-        "engineMissing"
-      ]
+        "engineMissing",
+        "drawingEnded"
+      ],
+      "notCachedWhy": "tookTooLong and engineMissing say nothing about the figure. drawingEnded (#718) is a drawing engine that ended without answering - a signal, the memory running out, the builder being stopped - which cached would stick to a good figure until it changed; it is bounded the way tookTooLong is (each figure is tried once a build, so it costs one engine start a build). fontMissing and drawingStopped ARE cached: the same fence and engine crash the same way every time (3 of 3, measured), and engineId changes when the engine does. scripts/figures.py's NOT_CACHED is pinned to this list (test_figures.py)."
     },
     "siteCarriesEngine": {
       "rule": "The #454 gate, per site. `static/function-plot/` (function-plot.js and its LICENSE) only when a page students can see has a graph that can be drawn (page_features.GATED_ASSETS -> \"function-plot\"); `static/tikz/` only when a diagram is drawn, holding exactly the Computer Modern faces the site's diagrams name (each 20 to 33 KB as TrueType; 140 exist), fonts.css and the BaKoMa LICENCE. The TikZ engine itself (39 MB, 5,445 files) is never copied into a site: its folder is `tikz-engine`, a different name from the site's `tikz` (review S8). A site with no figure carries neither folder, and no page of it changes.",
@@ -24815,6 +24833,9 @@
         "documentClassNotNeeded": "remove the \\documentclass line - a diagram doesn't need one",
         "texSaid": "LaTeX stopped here: {said}",
         "tookTooLong": "it took longer than {seconds} seconds to draw, so it was stopped (it will be tried again next time)",
+        "fontMissing": "a symbol written as text here (such as \\$, \\textdegree or \\pounds) needs lettering diagrams don't have - write it in maths instead, as $^\\circ$ for a degree sign, or as the plain character, as \\char36 for a dollar sign",
+        "drawingStopped": "drawing it stopped part-way ({said}), so it won't be tried again until the diagram changes",
+        "drawingEnded": "drawing it stopped part-way ({said}) - it will be tried again next time",
         "engineMissing": "this copy of Plantoir can't draw diagrams and graphs",
         "settingsMustComeFirst": "the settings between --- lines must come before the functions",
         "settingsDoNotParse": "the settings between the --- lines can't be read (put quotes around a value that has a colon in it)",
@@ -24840,7 +24861,8 @@
       "One picture per fence: TikZJax draws only the first tikzpicture in a fence (measured).",
       "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
-      "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+      "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5).",
+      "A symbol written as TEXT that needs the font tcrm1000 stops a diagram, because the engine does not carry that font (no licensed source was found to add it): measured 2026-11-01 with node-tikzjax 1.0.5, \\$, \\textdollar, \\textdegree, \\S, \\pounds, \\copyright, \\textbullet, \\textmu and \\textcent all do, in plain TikZ and in a pgfplots label. The build names it (fontMissing, #718). Write the symbol in maths - $^\\circ$ for a degree sign - or as the plain character - \\char36 for a dollar sign; both draw, and render as ° and $ on the site (measured). \\textsf, \\texttt, \\textsc, \\mathbb and bold italic draw (#718's plan review)."
     ]
   },
   "geogebraFences": {

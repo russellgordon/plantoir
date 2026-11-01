@@ -7716,6 +7716,21 @@ parent + `vendor`; `figures.helper_command` runs `node` from PATH.
   answered `tookTooLong` and the next diagram still drawn, both in **23.5 s**
   — the 20-second clock plus the helper's restart and the engine's second
   load.
+- **A diagram that crashes the engine** (#718, mac 2026-11-01; know, owe
+  nothing): `\$`, `\textdegree` and the other text symbols that need the
+  font `tcrm1000` used to come back `tookTooLong` (pgfplots) or `texSaid`
+  with nothing said (plain TikZ). The shared `figures.py` and
+  `plantoir-figures.mjs` now answer `fontMissing` (cached), `drawingStopped`
+  (cached) or `drawingEnded` (not cached), and start a fresh helper after a
+  crash — Windows runs both files natively, so it inherits this as it is.
+  The same font gap is EXPECTED there (same engine, same BaKoMa set) but is
+  unmeasured on a PC; `NativeFiguresTests`' endless case still gets
+  `tookTooLong`, correctly, and the first build after the update redraws
+  every figure once (the engine id covers the helper). The helper exits in
+  the answer's write CALLBACK, not straight after it, precisely because pipe
+  semantics differ on Windows. Adding a crash case to `NativeFiguresTests`
+  is optional; [05 → "A diagram that crashes the engine"](05-build-pipeline.md)
+  has the reasons and the measurements.
 - **Path length.** The longest path under `tikz-engine\` is 134 characters
   (`…\@jsonjoy.com\json-pack\lib\nfs\v4\server\operations\node\Nfsv4OperationsNode.js.map`;
   the longest code file is 130). Installed at
