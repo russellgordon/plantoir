@@ -1696,8 +1696,11 @@ previous record by id; `lastSeen` is the build that last found it.
   destinations**: `build_site.py` drops them at the next build of a course
   that no longer goes there (implementation review M1). That is what clears a
   course moved to a FOLDER, whose deploy (`deploy.sh`'s rsync) never enters
-  the Python; every deploy builds first, so no record code was added to the
-  launcher. Both writers ask one function,
+  the Python, and the app's deploy builds first (a destination change counts
+  as content for the freshness check), so no record code was added to the
+  launcher. The one gap, measured by the fixes review (F1): a terminal
+  `deploy.sh --to-folder` on an already-built site does not rebuild, so there
+  the row stays until the next build. Both writers ask one function,
   `section_problems.cloudflare_is_a_destination` (`deploy_target` or
   `additional_deploy_targets` is `cloudflare_pages`; settings that cannot be
   read count as yes, so nothing is dropped on a guess).

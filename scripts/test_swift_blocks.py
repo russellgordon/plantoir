@@ -305,6 +305,10 @@ class PrepareTests(unittest.TestCase):
         # from the top, and the error is on the program's line 2: line 11.
         self.assertEqual((problem["line"], problem["block"], problem["reason"]), (11, 1, "compileError"))
         self.assertEqual(problem["said"], "cannot find 'nmae' in scope")
+        # The problem carries the program's content key, so the Problems tab
+        # (#717) knows the same block again when one above it is added or
+        # removed; without it rows fall back to position (fixes review F2).
+        self.assertEqual(problem["key"], key)
         lines = [line for line in self.space.said if line.startswith("plantoir: error:")]
         reason = swift_rules("reasons", "compileError").replace("{said}", "cannot find 'nmae' in scope")
         self.assertEqual(lines, [f"plantoir: error: Units/Strings.md: swift block 1, line 11: {reason}"])
