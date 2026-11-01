@@ -535,6 +535,20 @@ workspace exists the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
 remake #94 refused prints nothing. The words live in the contract's
 `whyWords`; a reason the app does not know writes the line without one.
 
+**Two lines for one remake is deliberate, where #310 already writes one.**
+When another account, macOS or something else on the Mac holds a preview
+address and the workspace is made again for it (`start_the_existing_workspace`
+before a start, or `preview.sh`'s look before the announcement), the trail
+gets #310's `preview address held by another account` line AND this one.
+They are two facts, not one fact twice: #310's says WHY, and names the
+address and who held it; this one says WHAT was done to the folder, in the
+same words as every other remake, so a reader looking for "when was this
+folder set up again, and why was the next preview slow?" finds every remake
+under one event. The plain port-clash remake (a start Docker refused) writes
+only this line, since nothing else records it. Skipping the marker where
+#310's line exists was rejected: it would make the one event that answers
+that question incomplete exactly when an address was taken (#684 review L1).
+
 **What was rejected, and why:**
 
 - **Leaving the preview open on purpose, for an iPad or a phone on the same
@@ -548,6 +562,11 @@ remake #94 refused prints nothing. The words live in the contract's
   all — the reason Windows' loopback rewrite is native-only.
 - **Remaking in `deploy.sh` too.** It serves nothing, so an open address costs
   it nothing, and a publish at six in the morning keeps its warm builder.
+  Measured (#684 review L2): a folder that only ever deploys keeps an old workspace's open forwards —
+  lsof shows `ssh … *:<port> (LISTEN)` — but with nothing serving, a request
+  from the school network gets an empty reply (curl exit 52) and no page. So
+  the port is visible to a scan and gives nothing away; the next setup or
+  preview of that folder makes it again on 127.0.0.1.
 - **The launcher writing the remake line itself, under `workspace was in
   use`** (the plan's first proposal, as for #310 below): that event's lines
   come from its own marker and say a remake with nothing running writes
