@@ -618,7 +618,10 @@ that finished while the teacher was on section 2 showed "Done" on return.
 - Findings go through the run: `deployAndWait` calls `run.noteEnded()`.
   Whichever view shows the section takes them, in `.onChange(of:
   deployRun.endings)` or on appearing. `takeFindings()` reads and clears, so
-  two windows on one section raise the dialog once.
+  two windows on one section raise the dialog once. (Since #717 the findings
+  only route the links checklist; the dialog is the section's Problems alert,
+  raised from its record when the deploy has ended — "A section's Problems
+  tab, its marker and its alert" below.)
 - `SectionDetailView.deployIsAvailable` and `deployIsUnderWay` add
   `CourseActivity.sectionPublishIsRunning`. That record is written by the
   window's deploy (through `claimAPublish`) and by the assistant's windowless
@@ -719,6 +722,143 @@ Must-fail, by copy-and-restore:
 
 `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
 a stub `deploy.sh` that counts its own starts. It is part of no gate.
+
+## A section's Problems tab, its marker and its alert (#717)
+
+**What it replaced.** Every build that met a folder problem put ALL of them in
+one alert, mid-build, which the teacher dismissed and nothing kept; a build
+nobody watched (a scheduled deploy, the MCP server, a terminal) left only the
+overnight record that `takeFolderProblems` consumed on opening. Russell's
+rulings on #717: a TAB on the section (ruling 9), a proper macOS table with a
+tick per row (5, 6), every problem a preview or deploy can report (8), a
+warning on the section's sidebar row until its own next build is clean (10),
+an alert only when the set CHANGED that offers Show (7), and a shared page's
+problem shown "fixed in the source" in a section that has not been built since
+(11). The record itself is the shared Python's (doc 05, "A section's record of
+its problems"); this is the mac's half, and what Windows owes.
+
+**The store.** `Models/SectionProblems.swift`: `SectionProblems.shared`,
+`@MainActor @Observable`, keyed by `SectionRuns.key` (#706's canonical folder,
+course lowercased, section — one spelling of the key). It holds the records it
+has READ, the tab each section shows and the rows the teacher UNticked, all in
+memory. It reads a record at the moments one can have changed and never from a
+`body`: a `PLANTOIR_PROBLEMS:` marker in any run of this app
+(`ScriptRunner.problemsMarkers`, and `noteAMarkerArrived()` so the sidebar
+reloads even for a deploy that outlived its view), the section appearing, the
+app becoming active (the MCP server's builds), the scheduled-deploy watcher
+moving, and the window's courses loading. The sidebar row reads
+`hasProblems`, which is memory only (plan review, MED 7). A course is read
+WHOLE, because one section's record decides what another's rows say.
+
+**The tabs: Website | Problems.** `Views/Section/DetailTabs.swift`, a
+segmented control in a thin bar above the section's content, shown only while
+the section's own record has rows; with none, the section looks as it always
+has, and the tab falls back to Website. The Problems tab (`ProblemsTableView`)
+is drawn OVER the console and the site as a top layer of the existing stack.
+**Rejected: a `TabView`** — the site is a live `WKWebView` scrolled to where the
+teacher left it, and moving it between containers is how that is thrown away
+(the comment on the cover layer). **Rejected: the toolbar's principal slot**
+(the plan's place) — the section's toolbar keeps every item ALWAYS present,
+because inserting one conditionally makes macOS rebuild the toolbar and
+mis-lay-out the title (the comment on `.toolbar`), and the switch exists only
+while there are problems. `DetailTabs` is generic over its tab type so #708's
+Settings | Unit plan on a course adds a tab rather than a second shell. The tab
+chosen is kept in the store, not the view's `@State`, because
+`.id("code-section")` rebuilds the view and Show must survive that.
+
+**The table.** One row per problem: a tick (ticked means included — the app's
+checklist rule — and rows start ticked; ticks last while the app is open,
+since a fixed row goes by itself on the next build; 717b's Fix with Claude or
+Codex acts on the ticked rows), Kind (`sectionProblems.kinds[].label`), Page
+(the place, or Whole section / Whole course), Problem (the row's `item` — the
+piece of the folder problem naming the page, the fence and what was said —
+with the full sentence and detail on hover), First found and Last found.
+Sorted by Kind to begin with; every column but the tick and the Problem sorts.
+A problem with a repair (a missing Media folder, a missing front page) has its
+button in the row, because the alert no longer comes with every build; its
+outcome is shown the way the alert's was. A `fixedInTheSource` row reads the
+contract's sentence in secondary style. A course kept for reference shows the
+table without repairs.
+
+**Fixed in the source** (`SectionProblemsRules.state`, `sectionProblems.
+rowState`): a row clears to that state only when ANOTHER section's LATER
+record shows the page and has no row of the same kind on it — not merely no
+row with this id, because a renumbered fence's id is not the fence it was
+(MED 5) — the kind depends on the page alone (`clearsAcrossSections`: not a
+link into a hidden page, which depends on what THIS section hides), the reason
+is not about the machine (`notAboutThePage`: a time-out, an engine or Swift
+not there yet, geogebra.org out of reach), and for a kind the site says, that
+record's site has said (`siteSaidComplete`). The section's marker stays
+either way: its deployed site still carries the broken page (ruling 11).
+
+**The marker.** ONE `exclamationmark.triangle.fill`, orange, on the row
+(`SidebarView.sectionRowLabel`), shown while the section's OWN record has a
+row; another section's build never puts it on or takes it off. The stopped
+scheduled deploy already drew the same glyph, so when both apply it is still
+one glyph, and its help and accessibility label say each sentence that applies
+(`warningTooltip`); the clock beside it keeps saying a deploy is scheduled.
+Identifier `problemsBadge-section<N>`, or `stoppedPublishBadge-section<N>`
+when the stopped deploy applies, so the tests that find that one still do.
+**Rejected:** a second triangle (plan review, MED 7 — two near-identical
+glyphs, two meanings).
+
+**The alert.** Raised only when the record found something NEW
+(`changed.new`) and its `alertKey` has not been answered
+(`SectionProblemsRules.alertIsDue`). Raised by the section's own view: mid-build
+when its preview prints the marker (the #153 timing), when its deploy ends
+(`takeWhatTheDeployLeft`), and when the section is opened, or the app comes
+back to the front, onto a record nobody has answered. Title from
+`sectionProblems.words` (one or several new problems), message: the new
+problem's own sentence when there is one, where Show takes you, how many went.
+Buttons: **Show** (selects the Problems tab), the repair when a NEW problem has
+one, and **Not Now**. Every answer is remembered by alert key in
+`~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
+(last 20 per section), so a relaunch does not raise yesterday's alert again
+(plan review, HIGH 2) — never in the record, which the build rewrites. A record
+whose changes are all GONE raises nothing (ruling 7 says "finds new"): the
+marker and the tab go by themselves.
+
+**One dialog.** The alert IS the old `.findings` case of the view's one
+health alert, so the repair outcome, the preview alert (#397) and the links
+checklist (#379) keep their order: the checklist follows the alert. Nothing is
+queued behind another dialog any more (`heldHealthFindings` is gone): an alert
+that is due stays due in the store until answered, so whatever is in front of
+it going away asks again (`showAnythingWaiting`, the checklist sheet's
+dismissal). `showHealthFindings` now only routes the #333 finding to the
+checklist. #706's findings left by a deploy that outlived its view come to this
+alert rather than to a second one (plan review, MED 8). On opening, the
+overnight record (`takeFolderProblems`) is still TAKEN, so it does not pile up,
+but its findings no longer have a dialog of their own: the section's record
+holds the same problems, one row each. The PLANTOIR_HEALTH: line, the
+"folder problem found" trail line and the assistant's sentences
+(`SiteHealthFinding.appending`) are unchanged — no tool description or
+`AssistWording` byte moved (`test_tool_surface_digest.py` before and after).
+
+**The trail.** "problems changed" (`ActivityTrail.Event.problemsChanged`,
+`activityTrail.mustRecord`): one line per alert key whose set changed, the
+first time the app reads it — counts and KINDS, never a page — remembered beside
+the answers so a relaunch does not write it again; and a second line with the
+answer to the alert. Nothing for a tick or for opening the tab.
+
+**Measured.** See the closing comment on #717 for the real-app drive
+(screenshots in the run's scratchpad): a planted `\foo` diagram, a preview,
+the alert, Show, the tab, the table, the marker; the fence put right, a
+preview, the row and the marker gone.
+
+**What Windows owes** (the `windows` issue): a store keyed like #706's, the
+Website | Problems switch with WebView2 kept mounted, a check-box list sortable
+by kind, the Segoe Fluent warning glyph on the section row (one, as above), the
+alert with Show and the repair, the answers file, `rowState`/`sectionMarker`/
+`alert` cases, and the trail event. The record, its rows and their words are
+free: Windows runs the same Python.
+
+**Tests.** `SectionProblemsTests` (12): the three case lists, the lists and
+words pinned key by key, rule 1 over every word, the marker read from its
+prefix onward, a record read as the build writes it, the store's key, answers
+across a relaunch, ticks and tab, the trail line, and a source scan that the
+view raises one alert from the record. Must-fail, by copy-and-restore: no
+`pagesShown` guard, "lacks this id" for "no row of that kind", the marker from
+any record, answers kept in memory only — each fails a named test.
 
 ## One folder, however it is spelled
 
