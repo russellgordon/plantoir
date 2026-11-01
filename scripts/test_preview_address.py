@@ -138,6 +138,14 @@ class TheAddressIsAnnouncedOrTheLauncherStops(unittest.TestCase):
         self.assertIn(ANNOUNCEMENT + "http://localhost:8091/\n", output_of(result))
         self.assertIn("ASKED=1", output_of(result))
 
+    def test_an_address_on_this_mac_only_is_announced(self):
+        """#684: a workspace publishes on 127.0.0.1, and `docker port`
+        answers in that shape (measured); the port after the colon is read."""
+        result = announce(["127.0.0.1:8091"])
+        self.assertEqual(result.returncode, 0, output_of(result))
+        self.assertIn(ANNOUNCEMENT + "http://localhost:8091/\n", output_of(result))
+        self.assertIn("ASKED=1", output_of(result))
+
     def test_one_empty_answer_is_asked_again(self):
         """A single empty answer is not proof: the question is put a second
         time, and the second answer is announced."""

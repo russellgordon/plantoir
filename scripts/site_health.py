@@ -238,6 +238,25 @@ def print_pdf_problems_finding(facts: dict, course: str, section, table: dict, m
     )
 
 
+def figure_reason_words(problem: dict, reasons: dict, without_detail: dict, seconds) -> str:
+    """
+    Why one diagram or graph was not drawn, in figureFences.words.reasons -
+    or, when that sentence carries {said} and nothing was said, in
+    words.reasonsWithoutDetail (#718 review M1: an engine ended by a signal
+    says nothing, and the teacher read "drawing it stopped part-way ()").
+    The one place both the build's own line (figures.reason_sentence) and
+    this folder problem word a reason.
+    """
+    reason = problem.get("reason") or "texSaid"
+    text = reasons.get(reason) or reasons["texSaid"]
+    said = str(problem.get("said") or "").strip()
+    if not said and "{said}" in text:
+        bare = (without_detail or {}).get(reason if reason in reasons else "texSaid")
+        if bare:
+            text = bare
+    return filled(text, {"name": problem.get("name") or "", "said": said, "seconds": seconds})
+
+
 def figures_finding(facts: dict, course: str, section, table: dict, most: int = MOST_PAGES_NAMED) -> Finding:
     """
     ONE finding for every diagram or graph this build could not draw (#485
@@ -249,13 +268,11 @@ def figures_finding(facts: dict, course: str, section, table: dict, most: int = 
     entry = table["figuresCouldNotBeDrawn"]
     problems = facts.get("figure_problems") or []
     reasons = contracts.section(CONTRACT_FILE, "figureFences", "words", "reasons")
+    without_detail = contracts.section(CONTRACT_FILE, "figureFences", "words", "reasonsWithoutDetail")
     seconds = contracts.section(CONTRACT_FILE, "figureFences", "timing", "perDiagramSeconds")
     named = []
     for problem in problems[:most]:
-        reason_text = reasons.get(problem.get("reason") or "", reasons["texSaid"])
-        reason = filled(reason_text, {"name": problem.get("name") or "",
-                                      "said": problem.get("said") or "",
-                                      "seconds": seconds})
+        reason = figure_reason_words(problem, reasons, without_detail, seconds)
         fill = {
             "page": problem.get("page", ""),
             "kind": entry["kinds"].get(problem.get("engine"), problem.get("engine") or ""),

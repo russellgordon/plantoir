@@ -654,6 +654,39 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
       },
       {
+        "carries": "where the run was for (course and section, or the word setup) and WHY the folder's workspace had to be made again, as one of the reasons in whyWords: Plantoir had been updated, its previews could be opened from other computers on the network (GitHub #684), it could show only one preview at a time, built websites are now kept outside the course folder, the courses could not be found or saved into, it had been set up for a folder somewhere else, 'courses/' had just been created, the connection to it was lost, or something else was using its preview addresses. Never a path, a command or a process number.",
+        "event": "folder set up again",
+        "marker": {
+          "prefix": "PLANTOIR_FOLDER_SET_UP_AGAIN:",
+          "shape": "PLANTOIR_FOLDER_SET_UP_AGAIN: <reason> <course>/<section or the word setup>, the course's one permitted space written +; <reason> is one word, a key of whyWords",
+          "examples": [
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: update ICS4U/1",
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: thisMacOnly setup",
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: buildsOutside AP+CALC/2"
+          ],
+          "why": "Printed by setup.sh, preview.sh and deploy.sh alike, from the function they share in the PREVIEW PORT BLOCK (note_that_this_folder_was_set_up_again), on EVERY remake of a folder's workspace and only once the new one EXISTS - so a remake #94's wait refused (it exits inside remake_the_workspace with its own 'workspace was in use' line) never claims one. Read by the APP, which writes the line, in the same two places as PLANTOIR_WORKSPACE_IN_USE and for the same reason: ScriptRunner from the console of a run it started, ScheduledDeploy from the log of a publish launchd ran - one writer for the event's words, and a real call site (ActivityTrailWiringTests). A preview typed in Terminal is not recorded, as with every launcher marker. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says the reason in words on the line before (previewPorts.whenTheWorkspaceIsInUse.sentences.whenItNeedsSettingUpAgain and the launchers' other remake lines). A marker that is not this shape records nothing; a reason the app has no words for writes lineWithoutAReason, never a wrong reason."
+        },
+        "line": "{place} · set this folder up again — {why}",
+        "lineWithoutAReason": "{place} · set this folder up again",
+        "whyWords": {
+          "update": "Plantoir had been updated",
+          "thisMacOnly": "its previews could be opened from other computers on the network",
+          "severalPreviews": "it could show only one preview at a time",
+          "buildsOutside": "built websites are now kept outside the course folder",
+          "coursesNotFound": "the website builder could not find the courses",
+          "otherFolder": "it had been set up for a folder somewhere else",
+          "coursesJustMade": "'courses/' had just been created",
+          "couldNotSave": "the website builder could not save into 'courses/'",
+          "lostConnection": "Plantoir had lost its connection to the website builder",
+          "addressTaken": "something else was using its preview addresses"
+        },
+        "why": "GitHub #684 (the director's ruling on its plan review). A remake throws away the warm website builder, so the next preview takes about two minutes instead of seconds (109 s measured on a teacher's Mac, #225), and 'why was my first preview this morning so slow?' is asked days later. Until #684 only a WAIT before a remake reached the trail ('workspace was in use'), so the commonest remake of all - after an update - left nothing. One event with the reason carried, rather than one per reason: to a teacher they are the same thing, the folder being got ready again. Not filed under 'workspace was in use' (rejected for #310 too, documentation/03-launcher-scripts.md): that event's lines are written from its own marker and say a remake with nothing running writes nothing. In v1.9.1 the image changed, so every folder is remade for 'update' first and 'thisMacOnly' fires on its own only for a workspace the image check passed. Where #310 already records a remake ('preview address held by another account', outcomes before-start and remade) this line is written too, on purpose (#684 review L1): that one says WHY and names the address, this one says WHAT was done to the folder in the same words as every other remake, so every remake is found under one event; the plain port-clash remake writes only this one.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
+      },
+      {
         "carries": "which of the four helper programs were installed into Plantoir's tools folder (Colima, Lima, the Docker CLI, Buildx) and at which pinned versions; whether they were set up from inside Plantoir or downloaded; why they were installed (not yet on this Mac, other versions were there, a copy there was damaged, or the copies there were set up before Plantoir kept a record of them); and for a download, why Plantoir's own copy was not used (this Plantoir does not carry one, it is for another kind of Mac, or it did not pass its check)",
         "event": "helper programs installed",
         "marker": {
@@ -24038,7 +24071,7 @@
         ]
       },
       "handoutsSkill": {
-        "rule": "The skill `plantoir-handouts` (#631) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so a new skill needs no code on either platform: both apps enumerate the folder. It carries the house style for paper made OUTSIDE the site - a LaTeX source compiled with tectonic to `Name.pdf`, with `Name - Answers.pdf` (`- Solutions` for a quiz or test) from the same source behind the \\qa/\\onlyq/\\onlya switch - and tells an assistant to OFFER it first whenever a teacher asks for something to print, in any course, beside `plantoir-printing` for a page that prints. It lays the corners out as the course's print settings do (`print_school_name`, `print_school_name_at`, `print_course_code_at`, `print_blanks`, read the way scripts/print_settings.py reads them, with the handout's title before whatever is placed bottom left), and when `print_school_name` is empty the assistant asks. A quiz or test for marks is usually printed this way; whether it also goes on the website is the teacher's call, and the assistant asks. Sources and answer keys are kept OUT of `courses/`, because every file in a course folder that is not a page is copied to the website (Quartz's Assets emitter). It ships the starters listed here, compiled and looked at when they were written. It is NOT in pageAuthoringSkill.routesTo: that table routes the parts of a PAGE, and a handout made as a PDF is not one; `plantoir-printing` and `plantoir-page-authoring` each name it in a sentence instead (mentionedBy). The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
+        "rule": "The skill `plantoir-handouts` (#631) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so a new skill needs no code on either platform: both apps enumerate the folder. It carries the house style for paper made OUTSIDE the site - a LaTeX source compiled with tectonic to `Name.pdf`, with `Name - Answers.pdf` (`- Solutions` for a quiz or test) from the same source behind the \\qa/\\onlyq/\\onlya switch - and tells an assistant to OFFER it first whenever a teacher asks for something to print, in any course, beside `plantoir-printing` for a page that prints. It lays the corners out as the course's print settings do (`print_school_name`, `print_school_name_at`, `print_course_code_at`, `print_blanks`, read the way scripts/print_settings.py reads them, with the handout's title before whatever is placed bottom left), and when `print_school_name` is empty the assistant asks. A quiz or test for marks is usually printed this way; whether it also goes on the website is the teacher's call, and the assistant asks. Sources and answer keys are kept OUT of `courses/`, because every file in a course folder that is not a page is copied to the website (Quartz's Assets emitter). It ships the starters listed here, compiled and looked at when they were written. Since #715 it also carries `patterns/` - tables.tex (a new table in nicematrix, an existing colortbl table with the inset \\rowcolor, tables side by side), finite_differences.tex and finite_differences.py (the scaffold) - which are not starters and so are not listed, and the house rules for tables (a full border always, right-aligned with padding for a column holding any negative value and centred otherwise, decimals to the same places, a look at every table at 80 dpi for its top edge and at 600 dpi for notches), the finite-difference scaffold and task cards. It remembers the folder a course's handouts are kept in, in `courses/<CODE>/.internal/handouts/handouts.json` ({folder, teacherSaid, recorded}): written and read by the assistant only, neither app reads it and both leave it alone; inside `.internal` it travels with a backup, an archive and a restore and never reaches a site. On the site goes only the PDF a page hands out - `Name.pdf`, or a worksheet's merged `Name - with Answers.pdf` when its page gives the answers; a quiz or test may go there, its solutions never. It is NOT in pageAuthoringSkill.routesTo: that table routes the parts of a PAGE, and a handout made as a PDF is not one; `plantoir-printing` and `plantoir-page-authoring` each name it in a sentence instead (mentionedBy). The root AGENTS.md and CLAUDE.md sections name it in one bullet each.",
         "skill": "plantoir-handouts",
         "starters": [
           "starters/Handout.tex",
@@ -24624,7 +24657,7 @@
       }
     },
     "texErrors": {
-      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence; `command` is what the reason names ({name} in words.reasons).",
+      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence; `command` is what the reason names ({name} in words.reasons). A diagram can also CRASH the engine rather than stop TeX (#718): a symbol written as text that needs a font the engine does not carry (tcrm1000 - knownLimits lists the ones measured) makes its DVI reader throw. The helper answers that job fontMissing (with the font's name, never a font NUMBER, which the reader's other throw carries), any other throw with no `! ` line drawingStopped (with one line of what was thrown, at most 160 characters, never a path or a stack), and after a throw nothing caught it exits once the answer is written; the build starts a fresh engine for the next job. A helper that ENDS without answering is read from what it said on its way out: fontMissing again if it named the font, otherwise drawingEnded, which is not cached (cache.notCached). Before #718 a crash in a pgfplots label was tookTooLong (uncached, tried every build) and one in plain TikZ texSaid with nothing said.",
       "cases": [
         {
           "name": "a command TeX does not know",
@@ -24669,6 +24702,42 @@
           "name": "\\usepackage{tikz} is harmless",
           "body": "\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
           "reason": null
+        },
+        {
+          "name": "a dollar sign in plain TikZ",
+          "command": "tcrm1000",
+          "body": "\\begin{document}\n\\begin{tikzpicture}\\node at (0,0) {\\$5};\\end{tikzpicture}\n\\end{document}",
+          "reason": "fontMissing",
+          "blockLine": null,
+          "why": "#718, measured 2026-11-01 with node-tikzjax 1.0.5: the engine's DVI reader throws 'Could not find font tcrm1000' inside the drawing, in 0.02 s, and TeX prints no `! ` line - so until #718 it was texSaid with nothing said. No line: a crash has no `l.N`."
+        },
+        {
+          "name": "a degree sign in a pgfplots label",
+          "command": "tcrm1000",
+          "body": "\\usepackage{pgfplots}\n\\pgfplotsset{compat=1.16}\n\\begin{document}\n\\begin{tikzpicture}\n\\begin{axis}[xlabel={Angle (\\textdegree)}]\n\\addplot[domain=0:90] {x};\n\\end{axis}\n\\end{tikzpicture}\n\\end{document}",
+          "reason": "fontMissing",
+          "blockLine": null,
+          "why": "#718, measured 2026-11-01: the same font, thrown where nothing caught it, so the engine itself ended (exit 1 after about 0.55 s) and until #718 the build said tookTooLong and tried again every build. The helper now answers the job before it exits. Placed before the graph cases, so the run also proves the job after a crash gets a fresh engine."
+        },
+        {
+          "name": "the pgfplots library groupplots, which the engine does not carry",
+          "body": "\\usepackage{pgfplots}\n\\pgfplotsset{compat=1.16}\n\\usepgfplotslibrary{groupplots}\n\\begin{document}\n\\begin{tikzpicture}\n\\begin{groupplot}[group style={group size=2 by 1}]\n\\nextgroupplot \\addplot {x^2};\n\\nextgroupplot \\addplot {x};\n\\end{groupplot}\n\\end{tikzpicture}\n\\end{document}",
+          "reason": "texSaid",
+          "blockLine": 3,
+          "why": "#715, measured 2026-10-31 with node-tikzjax 1.0.5: TeX cannot find pgflibrarypgfplots.groupplots.code.tex, so the drawing stops at the \\usepgfplotslibrary line. Teachers' pages had failed this way unnoticed; plantoir-math-graphs says one graph per fence instead."
+        },
+        {
+          "name": "a dot drawn with a radius in parentheses, circle (2pt), inside an axis",
+          "body": "\\usepackage{pgfplots}\n\\pgfplotsset{compat=1.16}\n\\begin{document}\n\\begin{tikzpicture}\n\\begin{axis}[xmin=-2, xmax=2, ymin=-1, ymax=4]\n\\addplot[domain=-2:2] {x^2};\n\\fill (axis cs:1,1) circle (2pt);\n\\end{axis}\n\\end{tikzpicture}\n\\end{document}",
+          "reason": "texSaid",
+          "blockLine": 8,
+          "why": "#715, measured 2026-10-31 with node-tikzjax 1.0.5: `circle (2pt)` inside an axis stops the drawing (Argument of \\pgfmathfloatparse@@ has an extra }), with or without `axis cs:`, and TeX names the \\end{axis} line, where pgfplots draws what the axis held. Outside an axis it draws. plantoir-math-graphs gives `\\addplot[only marks]` or `circle[radius=2pt]` instead."
+        },
+        {
+          "name": "a dot drawn with circle[radius=...] inside an axis draws",
+          "body": "\\usepackage{pgfplots}\n\\pgfplotsset{compat=1.16}\n\\begin{document}\n\\begin{tikzpicture}\n\\begin{axis}[xmin=-2, xmax=2, ymin=-1, ymax=4]\n\\addplot[domain=-2:2] {x^2};\n\\fill (axis cs:1,1) circle[radius=2pt];\n\\end{axis}\n\\end{tikzpicture}\n\\end{document}",
+          "reason": null,
+          "why": "#715: the form plantoir-math-graphs tells an assistant to write instead of the one above, pinned so the advice stays true."
         }
       ]
     },
@@ -24688,8 +24757,10 @@
       "pruneDays": 90,
       "notCached": [
         "tookTooLong",
-        "engineMissing"
-      ]
+        "engineMissing",
+        "drawingEnded"
+      ],
+      "notCachedWhy": "tookTooLong and engineMissing say nothing about the figure. drawingEnded (#718) is a drawing engine that ended without answering - a signal, the memory running out, the builder being stopped - which cached would stick to a good figure until it changed; it is bounded the way tookTooLong is (each figure is tried once a build, so it costs one engine start a build). fontMissing and drawingStopped ARE cached: the same fence and engine crash the same way every time (3 of 3, measured), and engineId changes when the engine does. scripts/figures.py's NOT_CACHED is pinned to this list (test_figures.py)."
     },
     "siteCarriesEngine": {
       "rule": "The #454 gate, per site. `static/function-plot/` (function-plot.js and its LICENSE) only when a page students can see has a graph that can be drawn (page_features.GATED_ASSETS -> \"function-plot\"); `static/tikz/` only when a diagram is drawn, holding exactly the Computer Modern faces the site's diagrams name (each 20 to 33 KB as TrueType; 140 exist), fonts.css and the BaKoMa LICENCE. The TikZ engine itself (39 MB, 5,445 files) is never copied into a site: its folder is `tikz-engine`, a different name from the site's `tikz` (review S8). A site with no figure carries neither folder, and no page of it changes.",
@@ -24822,6 +24893,9 @@
         "documentClassNotNeeded": "remove the \\documentclass line - a diagram doesn't need one",
         "texSaid": "LaTeX stopped here: {said}",
         "tookTooLong": "it took longer than {seconds} seconds to draw, so it was stopped (it will be tried again next time)",
+        "fontMissing": "a symbol written as text here (such as \\$, \\textdegree or \\pounds) needs lettering diagrams don't have - write it in maths instead, as $^\\circ$ for a degree sign, or as the plain character, as \\char36 for a dollar sign",
+        "drawingStopped": "drawing it stopped part-way ({said}), so it won't be tried again until the diagram changes",
+        "drawingEnded": "drawing it stopped part-way ({said}) - it will be tried again next time",
         "engineMissing": "this copy of Plantoir can't draw diagrams and graphs",
         "settingsMustComeFirst": "the settings between --- lines must come before the functions",
         "settingsDoNotParse": "the settings between the --- lines can't be read (put quotes around a value that has a colon in it)",
@@ -24836,10 +24910,17 @@
         "graphEngineMissing": "this copy of Plantoir can't check graphs",
         "unknownSetting": "{name} isn't a graph setting, so it was left out",
         "missingAlt": "it has no “% alt:” first line, so a screen reader only says “A diagram.”"
-      }
+      },
+      "reasonsWithoutDetail": {
+        "texSaid": "LaTeX stopped here without saying why",
+        "drawingStopped": "drawing it stopped part-way, so it won't be tried again until the diagram changes",
+        "drawingEnded": "drawing it stopped part-way - it will be tried again next time",
+        "expressionNotUnderstood": "the graph can't read this function"
+      },
+      "reasonsWithoutDetailWhy": "#718's implementation review (M1, measured): a drawing engine ended by a signal - SIGKILL or SIGTERM mid-diagram, the memory running out, the builder being stopped - leaves nothing on stderr, so drawingEnded has nothing in `said`, and the teacher read 'drawing it stopped part-way () - it will be tried again next time' in the console and in the folder-problem finding. So a reason whose sentence holds {said} is said with THIS sentence when `said` is empty (blank after trimming), wherever it is said: figures.reason_sentence and site_health's figuresCouldNotBeDrawn share one function (site_health.figure_reason_words) for it. texSaid had the same hole ('LaTeX stopped here: ' with nothing after it, which a plain-TikZ crash said until #718), and expressionNotUnderstood would have it for an evaluator that threw an empty message. test_figures.py renders every reason with an empty `said` and refuses '()', a dangling colon or a {said} left in."
     },
     "agentGuidance": {
-      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, a GeoGebra sketch three ways with `version:`, Obsidian's hidden .ggb and what Copy a Page and a rename do not follow (#578, section 10), the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
+      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, five complete patterns (#715 added the finite-difference scaffold, the same figure plantoir-handouts gives a printed handout), the measured limits of the site's engine to write around (#715: groupplots, and a dot drawn with a radius in parentheses, `circle (2pt)`, in an axis; #718: the text symbols knownLimits lists, such as \\textdegree, \\$ and \\textdollar), a GeoGebra sketch three ways with `version:`, Obsidian's hidden .ggb and what Copy a Page and a rename do not follow (#578, section 10), the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
       "skill": "plantoir-math-graphs"
     },
     "knownLimits": [
@@ -24847,7 +24928,9 @@
       "One picture per fence: TikZJax draws only the first tikzpicture in a fence (measured).",
       "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so it cannot be installed from Obsidian's own Browse list; without it Obsidian shows a functionplot fence as plain text, while the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site once it is installed and switched on in the course. obsidianAddOnsForFigures (#495) says which app adds them, and where.",
       "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
-      "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+      "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5).",
+      "A symbol written as TEXT that needs the font tcrm1000 stops a diagram, because the engine does not carry that font (no licensed source was found to add it): measured 2026-11-01 with node-tikzjax 1.0.5, \\$, \\textdollar, \\textdegree, \\S, \\pounds, \\copyright, \\textbullet, \\textmu and \\textcent all do, in plain TikZ and in a pgfplots label. The build names it (fontMissing, #718). Write the symbol in maths - $^\\circ$ for a degree sign - or as the plain character - \\char36 for a dollar sign; both draw, and render as ° and $ on the site (measured). \\textsf, \\texttt, \\textsc, \\mathbb and bold italic draw (#718's plan review).",
+      "Measured 2026-10-31 with node-tikzjax 1.0.5 (#715): the pgfplots library `groupplots` is not carried, and a dot drawn with a radius in parentheses, `circle (2pt)`, inside an axis stops the drawing, while `circle[radius=2pt]` and `\\addplot[only marks]` draw (texErrors pins all three)."
     ]
   },
   "geogebraFences": {

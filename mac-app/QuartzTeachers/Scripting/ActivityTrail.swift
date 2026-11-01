@@ -1009,6 +1009,19 @@ nonisolated enum ActivityTrail {
         /// Mac only, permanently: Windows serves a preview on the PC itself,
         /// with no forward to lose.
         case previewAddressHeldByAnotherAccount = "preview address held by another account"
+        /// This working folder's workspace WAS made again (GitHub #684): where
+        /// the run was for, and why — one of the reasons the launchers' own
+        /// checks name (an update, previews open to the network, a missing
+        /// mount, the courses not saving, the addresses taken…), in the
+        /// contract's `whyWords`. A remake makes the next preview about two
+        /// minutes slower, and until #684 only a WAIT before one reached the
+        /// trail, so the commonest of all — after an update — left nothing.
+        ///
+        /// Written by the app, from the line every launcher prints once the
+        /// new workspace exists (`FolderSetUpAgainReport`), which
+        /// `ScriptRunner` reads from a run's console and `ScheduledDeploy` from
+        /// a publish's log. Mac only, permanently: Windows has no workspace.
+        case folderSetUpAgain = "folder set up again"
         /// Plantoir installed one or more of the website builder's helper
         /// programs into its tools folder (GitHub #312): which ones, at which
         /// pinned versions, whether from inside Plantoir or downloaded, why

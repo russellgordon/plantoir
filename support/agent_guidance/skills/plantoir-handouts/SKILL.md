@@ -1,6 +1,6 @@
 ---
 name: plantoir-handouts
-description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go, how the page looks, how quizzes and tests differ, and how every answer is checked before handing over.
+description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered and aligned, the finite-difference scaffold, task cards, how quizzes and tests differ, and how every answer is checked before handing over.
 ---
 
 # Making a printed handout in the house style
@@ -46,11 +46,43 @@ without asking again.
 - **Where the files go: never inside `courses/`.** Every file in a course
   folder that is not a page is copied to the class website when it is
   built, so a `.tex` source or an answer key kept there is one students can
-  download. Ask the teacher where they keep handouts; if they have no
-  place, suggest a `handouts/<CODE>/` folder in this working folder, beside
-  `courses/`. If the teacher also wants the handout on the class website,
-  copy only `Name.pdf` (never the answers) into the course's `Media` folder
-  and follow section 4 of `plantoir-printing`.
+  download. The sources, their `- Answers` wrappers and every PDF live in
+  one folder per course, outside the course, and the course remembers it:
+  - **Read `courses/<CODE>/.internal/handouts/handouts.json` first.** If it
+    is there and the folder it names exists, use that folder, and say it
+    back to the teacher every time ("I'll keep this in ..."), so a folder
+    from last school year is noticed rather than reused unseen.
+  - **If the file is missing, or its folder is not there** (another
+    computer, a renamed folder), ask the teacher where to keep this
+    course's handouts: a folder of their own outside `courses/`, such as
+    `handouts/<CODE>/` in their Documents folder. Inside it they may keep a
+    folder per unit and per day (`Unit 2/Day 3/`); follow what is there.
+    Then write the file - creating the `handouts` folder inside
+    `.internal` - and tell the teacher you did:
+
+    ```json
+    {"folder": "/Users/name/Documents/handouts/MPM2D", "teacherSaid": "keep them in Documents, handouts, MPM2D", "recorded": "2026-10-31"}
+    ```
+
+    `folder` is the full path, `teacherSaid` their own words, `recorded`
+    today's date. A new answer replaces the file. This is the one file in
+    a folder whose name starts with a dot that you may write; leave
+    everything else under `.internal` alone. It lives there because it
+    travels with the course (a backup, an archive, a restore) and is never
+    copied to the class website.
+- **On the class website, only the PDF a page hands out.** Copy it into
+  the course's `Media` folder and follow section 4 of `plantoir-printing`:
+  - `Name.pdf` - the default.
+  - A merged `Name - with Answers.pdf` (the questions, then the answer
+    key, as one file) for a worksheet or handout whose page gives the
+    answers as well, when the teacher wants that:
+    `pdfunite "Name.pdf" "Name - Answers.pdf" "Name - with Answers.pdf"`
+    (`pdfunite` comes with Poppler, like `pdftoppm`).
+  - A quiz or test may go on the website if the teacher wants it there;
+    its **solutions never do**.
+  - Never a `.tex`. After every change to the source, compile again and
+    copy the PDF into `Media` again, so the site never hands out an old
+    copy.
 - **The names.** `Name.tex` and `Name - Answers.tex` for a worksheet or
   handout; `Name.tex` and `Name - Solutions.tex` for a quiz or test. Check
   that a new name does not differ from an existing file in that folder only
@@ -109,6 +141,9 @@ source.
 - `tasks` columns for a), b), c) parts. The answer key keeps the
   worksheet's column count.
 - `pgfplots` for graphs.
+- Tables: full borders, alignment by column, decimals and tables side by
+  side are in section 9; the finite-difference scaffold in section 10;
+  task cards in section 11.
 - Worked examples in peach `tcolorbox` boxes with dark-red sans titles. The
   answer key hides the worked examples and gives final answers only, with a
   graph where the answer is a graph.
@@ -195,6 +230,138 @@ pdftoppm -png -r 80 "Name - Answers.pdf" /tmp/handout-check/Answers
 comes with Poppler: `brew install poppler` on a Mac.) If you
 cannot render the pages, tell the teacher they have not been looked at.
 
-Leave no build files behind: only `Name.tex`, `Name - Answers.tex`,
-`Name.pdf` and `Name - Answers.pdf` stay in the folder, and the rendered
-images are deleted.
+Leave no build files behind. Of THIS handout's files, only `Name.tex`,
+`Name - Answers.tex`, `Name.pdf` and `Name - Answers.pdf` (and a merged
+`Name - with Answers.pdf`, if the page links one) stay, and the rendered
+images are deleted. The folder holds the course's other handouts too, and
+perhaps folders for units and days: leave every file you did not make in
+this session exactly as it is.
+
+## 9. Tables
+
+`patterns/tables.tex` beside this file holds the three patterns below,
+compiled and checked, with what was measured in its opening comment. The
+starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
+`\headstrut`). Copy a pattern into the handout; never edit it here.
+
+- **A full outer border on every table**: fill-in tables students
+  complete, tables built by a macro, tables on task cards and tables drawn
+  in TikZ. In a `NiceTabular`, `[hvlines]`; in a `tabular`, `|` at both
+  ends of the column spec and `\hline` above the heading row and below the
+  last row; in TikZ, a closing rectangle. Never an open or top-less table.
+- **A shaded heading row: `NiceTabular` for every new table** (pattern A),
+  with `\CodeBefore \rowcolor{tablehead}{1} \Body`. It paints the colour
+  first and every rule after it. A heading shaded with `\cellcolor` (also
+  through a small heading macro that wraps it) and one shaded with a bare
+  `\rowcolor` draw exactly the same thing: the fill lands on top of the
+  rule above it and the rule on its left, and at 80 dpi - the check in
+  section 8, and about what a screen shows - the table looks open at the
+  top. Switching one for the other fixes nothing.
+- **An existing `tabular` that stays a `tabular`** (pattern B):
+  `\rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]`
+  at the START of the heading row, with both of those arguments and no
+  `\cellcolor` in any cell. That keeps the side rules, but NOT always the
+  top one: at 80 dpi the top rule vanishes at about half of the places a
+  table can sit on the page (6 of 12 measured), exactly as with a bare
+  `\rowcolor`, and a 600 dpi look never shows it. So look at the table's
+  top edge in the 80 dpi pages of section 8; if it is gone, rewrite the
+  table as pattern A. The one thing that closes pattern B is a preamble
+  that redraws every `tabular`'s outer frame last - a teacher's own
+  worksheet template may carry one, such as a block headed "Outer border,
+  drawn last" - so if the preamble you copied has that block, keep it and
+  pattern B is whole (0 of 12 positions lost, measured). Do not add that
+  block to a handout that lacks it; use pattern A. A table being rewritten
+  anyway becomes pattern A. Never mix the two kinds in one table.
+- **Alignment is decided per column, by that column's values:**
+  - A column holding **any negative value** is right-aligned, with about
+    0.25 cm of padding before the rule so the units digits line up and the
+    numbers clear it: `r<{\hspace{0.25cm}}`, or
+    `>{\raggedleft\arraybackslash}p{1.6cm}<{\hspace{0.25cm}}` for a fixed
+    width. That includes a column of zeros and negatives (0, -3, -4, -3,
+    0) and a column that is all negative (-6, -10, -14).
+  - A column with **no negative value** is centred (`c`). Zero is not
+    negative.
+  - The heading over a right-aligned column stays centred:
+    `\multicolumn{1}{c}{$y$}` in a `NiceTabular`; in a `tabular` it repeats
+    the rules, `\multicolumn{1}{|c|}{$x$}` over the first column and
+    `\multicolumn{1}{c|}{$y$}` over the others.
+  - A Power column of expressions such as $2^{-3}$ stays centred; its
+    Value column follows the two rules above. Word columns are left as
+    they are.
+- **Decimals**: in a column that mixes whole numbers and decimals, write
+  every value to the same places - 31.0 beside 18.5, 0.0 beside 0.5, 1.00
+  beside 0.80. Never a bare whole number and never an invisible
+  `\phantom{.5}`. A column of whole numbers gets no decimals.
+- **Tables side by side** (pattern C: three fill-in tables across a
+  warmup, a scaffold beside two tables, a), b), c) of one question) share
+  a top edge and, where they list the same x values, the same row height,
+  so rows line up across the page: each in a `[t]` minipage that starts
+  with `\vspace{0pt}`, `[t]` on the table, one `\arraystretch` for the
+  row, and `\headstrut` in every heading row (inside the `\multicolumn`
+  where the heading cell is one), so a one-line heading is as tall as a
+  two-line `\Block{}{First\\differences}`.
+- **Look at every table at 80 dpi and at 600 dpi.** At 80 dpi (section
+  8's pages) the top edge of a shaded heading must be there - that is
+  where a fill covering a rule shows, and 600 dpi hides it. At 600 dpi,
+  render the page holding the table and look at its edges up close: every
+  outer rule one continuous line, no notch where a row's rule meets a side
+  rule.
+
+  ```bash
+  pdftoppm -png -r 600 -f 2 -l 2 "Name.pdf" /tmp/handout-check/table-page-2
+  ```
+
+## 10. Finite-difference scaffold
+
+Whenever first or second differences come up on a given day, the **first**
+table of that day carries a scaffold figure; later tables that day are
+plain. `patterns/finite_differences.tex` beside this file is a complete
+example to copy and change the numbers in (it needs nothing but LaTeX);
+`patterns/finite_differences.py` writes the same picture for any table
+when Python is available. Run it, never import it - from the working
+folder, where this skill is at `.claude/skills/plantoir-handouts` (the same
+files are at `.agents/skills/plantoir-handouts`):
+
+```bash
+python3 .claude/skills/plantoir-handouts/patterns/finite_differences.py --x -2 -1 0 1 2 --y 1 -2 -3 -2 1
+```
+
+It prints a `tikzpicture` that uses the handout's own `\qa` switch, so one
+source makes both copies. The figure:
+
+- The x, y table on the left, bordered and aligned as section 9 says.
+- Between consecutive rows, a curved arrow that **starts at the lower
+  value and points up** to the one above, labelled with the whole
+  subtraction, **lower minus upper**, negatives in parentheses:
+  `1 - (-2) = 3`. The lines of a column line up on their equals signs.
+- A second column of arrows and subtractions for second differences, such
+  as `2 - (-2) = 4`.
+- The headings "First differences" and "Second differences" over the
+  columns, and under the figure a small grey caption: "Each difference is
+  the lower value minus the one above it."
+- **The student copy**, where students compute the differences: the first
+  **two** first differences worked and the first second difference worked,
+  so every value a worked line uses is already on the sheet; the rest are
+  short blank rules that stop clear of the next column's arrows. The
+  answer key has every line. Where the y values themselves are what
+  students compute, nothing is worked (`--nothing-worked`).
+- The first time differences appear in a unit (a warmup that only uses
+  first differences), the first-difference column only (`--columns 1`).
+- **Never on a quiz, a test or a practice test.**
+
+The same figure goes on a page as a ` ```tikz ` fence:
+`plantoir-math-graphs` section 4E, or `--page --alt "..."` to print one.
+
+## 11. Task cards
+
+Each group has four empty Cartesian-plane templates on its whiteboard.
+
+- A card never says "on the same axes", "on the same grid" or "on one
+  grid": every relation it asks students to plot or sketch goes on its
+  own grid, and comparing is side by side ("put it beside your graph of
+  $y = x^2$ and compare").
+- A card set asks a group for **at most four graphs in total**, counting
+  the sketch prompts for a group that finishes early.
+- A table on a card has a full border, as every table does (section 9).
+- A page that discusses the cards repeats each card's wording word for
+  word.

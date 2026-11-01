@@ -19,6 +19,7 @@
 \usepackage{array}
 \usepackage{needspace}
 \usepackage[most]{tcolorbox}
+\usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the skill's section 9)
 \pgfplotsset{compat=1.18}
 
 % ---------- Fill in ----------
@@ -58,6 +59,9 @@
 \definecolor{peach}{RGB}{253,244,233}
 \definecolor{peachframe}{RGB}{226,160,96}
 \definecolor{exampletitle}{RGB}{176,38,30}
+\definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
+% One heading-row height for tables set side by side (the skill's section 9)
+\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
 
 % Section heading for the answer key, where the worked examples are hidden
 \newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
@@ -140,6 +144,24 @@ Evaluate $3x + 2$ when $x = 4$.
   \addplot[lineA, domain=-2.4:3.4]{2*x - 1};
 \end{axis}\end{tikzpicture}
 \end{center}}
+
+\q[9]{3} \onlyq{Complete the table of values for $y = x - 3$.}\onlya{$y = x - 3$:}
+
+% A table: full border, a shaded heading row, each column aligned by its own
+% values - x has no negative value, so it is centred; y has negatives, so it
+% is right-aligned with padding, its heading centred over it. The y column is
+% a fixed width so students have room to write in it.
+\begin{center}
+{\renewcommand{\arraystretch}{1.25}%
+\begin{NiceTabular}{c>{\raggedleft\arraybackslash}p{1.6cm}<{\hspace{0.25cm}}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+$x$ & \multicolumn{1}{c}{$y$} \\
+$0$ & \qa{}{$-3$} \\
+$1$ & \qa{}{$-2$} \\
+$2$ & \qa{}{$-1$} \\
+$3$ & \qa{}{$0$} \\
+\end{NiceTabular}}
+\end{center}
 \end{questions}
 
 \end{document}

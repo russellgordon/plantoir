@@ -2884,6 +2884,9 @@ enum ScheduledDeploy {
         // again (#378) — a publish at half six is exactly when nobody would
         // otherwise know.
         LeftoverWorkReport.noteOnTheTrail(from: text)
+        // The folder's workspace made again by a launcher of this run, and
+        // why (#684): the next preview is slow, and nobody saw it happen.
+        FolderSetUpAgainReport.noteOnTheTrail(from: text)
         // A section's Cloudflare project made again by this run's publish
         // (2026-09-30): its address may have changed while nobody watched.
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
