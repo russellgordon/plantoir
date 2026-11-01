@@ -11519,7 +11519,7 @@ Keychain never comes into it, because the real launcher never runs.
 |---|---|
 | The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
 | The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Covered since #154** by `NewSiteDialogUITests`, with a stubbed `deploy.sh` whose prompts are read from `contracts/app-rules.json`. In the UI target, which is part of no gate. |
-| A publish with a genuinely invalid saved token | **Not covered and not automatable**, for the Keychain reason above. |
+| A publish with a genuinely invalid saved token | **The launcher's half is covered since #716**: `scripts/test_deploy_token_refusal.py` runs `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed and pins which answers clear the token. The app's half — the window with a real refused token in the real Keychain — is still **not automatable**, for the Keychain reason above; its sentence is a `failureExplanations` case (#695). |
 
 The first row used to be the reverse of Windows: `verify-deploy.ps1` redirected
 stdin so `sys.stdin.isatty()` was false and `deploy.py` asked nothing, leaving

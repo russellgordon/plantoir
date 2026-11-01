@@ -1014,6 +1014,133 @@ Two things are needed, and only one comes from the teacher directly:
   Deploying, where the item is there; the launchers keep one sentence for
   both platforms, Russell's ruling on #490.)
 
+### A token Cloudflare refuses (#695), and a saved one is cleared only on a refusal (#716)
+
+**What a teacher saw.** Russell, 2026-10-27, deploying ICS3U-S1 to Netlify +
+Cloudflare Pages: Netlify deployed, the saved Cloudflare token was refused and
+cleared, the "Connect to Cloudflare" steps were shown, the token he pasted was
+refused too — and the window said only "Something went wrong". The reason was
+two lines at the bottom of the console, behind "Show details":
+`validate_cf_token` failed, `deploy.sh` printed "Cloudflare did not accept
+that token." and the permission hint, and exited 1. `failureExplanations` had
+no case for it, so `FailureExplainer` fell through to the generic failure.
+
+**The fix is a LIFT, not a new sentence.** Four cases in
+`contracts/app-rules.json` → `failureExplanations.cases` (23 → 27), and
+`FailureExplainer.tokenRefusedExplanation` / `savedTokenUnheardExplanation`
+through one `liftedAndJoinedSentence`: find the line carrying the launcher's
+words, take everything before its first letter off (the ❌, mojibake or a `?`,
+as `liftedSentence` does for #471), and join the next line that has words on
+it. The launchers' two lines already are the sentence a teacher acts on, and a
+second wording of one refusal is how a rule comes to be said two ways — the
+same reasoning as the "cannot tell" refusal in "A course kept for reference".
+`scripts/test_deploy_token_refusal.py` pins both launchers' printed lines to
+the contract's `expect`, so changing the words in a launcher fails until the
+contract moves with them. It is in verify.sh's step 0 and in Windows'
+`PythonToolchainTests` by discovery.
+
+The bash case is **the whole transcript**, re-captured 2026-11-01 by driving
+the real `deploy.sh` through a terminal in a scratch folder (USER set to an
+account with no Keychain entries; one stub entry made for the run and removed
+by the launcher's own refusal) — the "saved token no longer works" line, the
+full heredoc, the prompt and the refusal — with the Netlify leg's success
+lines in front, written from `deploy.py`'s own `print`s since that leg needs a
+real site.
+That pins that nothing earlier in the transcript answers first, on BOTH
+platforms, without writing an order of checks into the contract — the two
+apps' explainer chains are hand-ordered and not in the same order. The second
+case is `deploy.ps1`'s shape: no cross, no indent, same words.
+
+**An offline Mac is NOT told apart at the paste check, and that is a known
+limit, not something the order fixes.** `validate_cf_token` sends curl's
+errors to `/dev/null` (and `Test-CloudflareToken` is `catch { return $false
+}`), so a paste made with no connection prints the same two refusal lines and
+none of `connectionExplanation`'s signs: that teacher is told to check the
+permission. The paste check is deliberately left as it was: a refused paste is
+not saved, so it costs a re-paste on the next deploy and nothing else, and the
+paste is where #696 asks again in the sheet instead of failing.
+
+**The hint itself may be the wrong hint, and is shipped anyway.**
+`/user/tokens/verify` does not check permissions — it answers `active` for a
+Pages-only token (above) — so a refusal more likely means a partial paste, a
+revoked or expired token, or (unmeasured) a token made under the account's API
+Tokens page rather than My Profile. Measured 2026-11-01 against the live
+endpoint with made-up tokens: three characters → **HTTP 400**, code 6003
+"Invalid format for Authorization header"; forty characters of nonsense →
+**HTTP 401**, code 1000 "Invalid API Token"; no header → 400, code 1001.
+Russell's ruling: ship the lift, since it is what the launchers already say;
+measuring real tokens of each kind against both verify endpoints is #696, and
+if the hint proves wrong both launchers are reworded there and the drift test
+moves the contract with them.
+
+**A SAVED token is cleared only when the service says no (#716).** The
+saved-token checks used the same yes/no probe, so a Mac on a captive portal,
+on school Wi-Fi that dropped for a moment, or running a deploy set for half
+six before the laptop had joined the network, heard "no" — and `deploy.sh`
+deleted a good token and, for Cloudflare, its account, and asked for another.
+Measured on the old launcher with its connection sent to a closed port
+(`https_proxy=http://127.0.0.1:9`) and `--non-interactive`: "The saved
+Cloudflare token no longer works, so it has been cleared.", the Keychain entry
+gone, then the token question refused with exit 3 — a scheduled deploy that
+destroys the credential it needed and then says nobody was there to give a new
+one. `token_check_answer` now reads the HTTP status (`curl -w '%{http_code}'`,
+no `-f`, curl's errors still discarded) and says one of three words:
+
+| Heard | Means | Saved token |
+|---|---|---|
+| `accepted` | 2xx whose body says yes: Cloudflare's `"success":true`, Netlify's account (`"id":`) | used |
+| `refused` | **400, 401 or 403** whose body is the service's own refusal: Cloudflare's `"success":false`, Netlify's `"code":4xx` | cleared (and the Cloudflare account), as before; the question is asked |
+| `unheard` | 000 (no answer, a timeout, a name that did not resolve), a redirect, a captive portal's page, 429, any 5xx, a 2xx that does not say yes, a 400/401/403 that is not the service's (a school web filter's block page, a firewall's challenge in front of the API) | **kept**; the deploy stops, exit 1 |
+
+400 is a refusal because Cloudflare answers a malformed token with it, and a
+saved token that can never be accepted must not be kept for ever behind a
+sentence about the connection. The BODY is read as well as the status
+(review of #716): a filter that inspects a school's traffic, or a firewall
+challenging a VPN, answers 403 with a page of its own, and a token must not be
+cleared on the word of something that never asked the service — the same
+reason a 200 portal page is not a yes, which until that review held for
+Cloudflare only. Measured 2026-11-01 with made-up tokens: Cloudflare's
+refusals carry `"success":false` (400 code 6003, 401 code 1000), Netlify's
+`{"code":401,"message":"Access Denied"}`. The cost is the other direction: if
+either service ever refused without its JSON, a dead saved token would be
+kept behind the could-not-reach sentence until the teacher replaced it, which
+is the lesser fault — that sentence does not destroy anything. With the same closed port the new launcher
+prints "❌ Plantoir could not reach Cloudflare to check the saved token, so
+this section was not deployed there." and "The token is still saved. Check
+that this computer is online, then try again in a few minutes.", exits 1, and
+the Keychain entry is still there; Netlify's twin says the same with its name.
+Those two lines are the other two contract cases, lifted the same way. It
+STOPS rather than carrying on because the upload needs the same connection
+and would fail later with a less useful message. The paste checks and the
+legacy-file migration keep `validate_token` / `validate_cf_token` unchanged —
+Netlify's `validate_token` still shows curl's own error, which is how an
+offline Netlify paste is explained as a connection today.
+
+**Rejected.** A reworded sentence in the app (two wordings of one refusal); a
+new exit code for "could not check" (the explainer reads the words, and exit 3
+already means "a question went unanswered"); carrying on to the upload when
+the check was unheard (it fails anyway, later, less clearly); treating only
+401/403 as a refusal (a saved malformed token would never be cleared); a trail
+line for the refusal (Russell's ruling for v1.9.1: the trail already shows
+"asked for a publishing credential" then the failed run, and the problem
+report carries the sentence — the line belongs with #696's retries).
+
+**Tested.** `scripts/test_deploy_token_refusal.py` copies `deploy.sh` into a
+scratch folder, stubs every Keychain reader and writer and `curl` (answering
+with a chosen status), stops it before the website builder, and runs the real
+saved-token checks: 400/401/403 with the service's refusal clear;
+000/429/500/503/302, a 2xx without `"success":true`, and a 401/403 block page
+keep and stop; 200 is used; Netlify likewise (a 200 portal page and a 401/403
+block page kept). The three block-page and portal tests added on review fail
+against the launcher before it (five failures counting subtests). Against the pre-#716
+launcher (copied in and restored) five of the twelve tests it had then fail, twelve
+failures counting subtests: every "kept" case, the could-not-reach sentences,
+and the Netlify-refused pair — that last only because the old probe relied on
+`curl -f`, which the stub does not imitate, so it is not evidence of a fault.
+**Windows:** `deploy.ps1`'s half is #705; until it lands the two "could not
+reach" cases are matched by the explainer only, and the drift test asks only
+that IF `deploy.ps1` prints those lines they say what the contract says.
+
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
 That "asking once" is `prompt_for_cf_account`, and until issue #129 it did

@@ -1403,6 +1403,78 @@ validate_cf_token() {
     | grep -q '"success":[[:space:]]*true'
 }
 
+# What a SAVED token's check heard back, as one word (GitHub #716):
+#
+#   accepted  the service answered and took the token
+#   refused   the service answered and said no: HTTP 400, 401 or 403 with
+#             the service's own answer in the body
+#   unheard   anything else — no answer at all (offline, a timeout, a name
+#             that did not resolve), a captive portal's page or redirect, a
+#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
+#             is not the service's answer (a school web filter's block page,
+#             a firewall's challenge in front of the API)
+#
+# Only "refused" may clear a saved token. Until #716 the check was the same
+# yes/no probe the PASTE check uses, which throws curl's errors away, so a Mac
+# on a captive portal or a school network that dropped for a moment lost a
+# good token (and, for Cloudflare, its account) and was sent to make another.
+# 400 is a refusal because Cloudflare answers a malformed token with it
+# (measured 2026-11-01: a three-character token gets 400, code 6003 "Invalid
+# format for Authorization header"; forty characters of nonsense get 401, code
+# 1000 "Invalid API Token"), and a saved token that can never be accepted must
+# not be kept for ever behind a sentence about the connection.
+#
+# The PASTE checks above and below are deliberately left as they were: a paste
+# that is refused is not saved, so it costs nothing beyond being asked again
+# on the next deploy, and the paste is where #696 will ask again in the sheet.
+#
+# Both bodies are checked because a page is not the service just because it
+# came back over its address: a filter that inspects the school's traffic, or
+# a firewall challenging a VPN, answers 403 with a page of its own, and a
+# token must not be cleared on the word of something that never asked the
+# service. Measured 2026-11-01 with made-up tokens: Cloudflare's refusals say
+# `"success":false` (400 code 6003, 401 code 1000), Netlify's say
+# `{"code":401,"message":"Access Denied"}`, and Netlify's yes is the account,
+# which carries `"id"`.
+#
+# $1 the URL, $2 the token, $3 (optional) an extended regular expression the
+# answer's body must match before a 2xx counts as accepted, $4 (optional) one
+# it must match before a 400/401/403 counts as refused.
+token_check_answer() {
+  local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
+  local answer code body
+  if [[ -z "$token" ]]; then
+    echo "refused"
+    return 0
+  fi
+  # -w puts the status on a line of its own after the body; curl writes it
+  # even when it gets no answer at all, as 000. No -f, so a 401 is READ
+  # rather than turned into an exit code that looks like a dropped network.
+  answer="$(curl -sS --max-time 20 -w '\n%{http_code}' \
+    -H "Authorization: Bearer $token" "$url" 2>/dev/null)" || true
+  code="${answer##*$'\n'}"
+  body="${answer%$'\n'*}"
+  case "$code" in
+    400|401|403)
+      if [[ -z "$refusal_must_say" ]] || printf '%s' "$body" | grep -Eq "$refusal_must_say"; then
+        echo "refused"
+      else
+        echo "unheard"
+      fi
+      ;;
+    2[0-9][0-9])
+      if [[ -z "$body_must_say" ]] || printf '%s' "$body" | grep -Eq "$body_must_say"; then
+        echo "accepted"
+      else
+        echo "unheard"
+      fi
+      ;;
+    *)
+      echo "unheard"
+      ;;
+  esac
+}
+
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
 # in the dashboard, and asking for it loses people.
@@ -1561,11 +1633,26 @@ CF_TOKEN=""
 CF_ACCOUNT=""
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
-  if [[ -n "$CF_TOKEN" ]] && ! validate_cf_token "$CF_TOKEN"; then
-    echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
-    delete_cf_token_keychain
-    delete_cf_account_keychain
-    CF_TOKEN=""
+  if [[ -n "$CF_TOKEN" ]]; then
+    # Cleared only when Cloudflare SAYS no; kept when it could not be asked
+    # (GitHub #716, above token_check_answer). The run stops there rather than
+    # carrying on, because the upload needs the same connection and would only
+    # fail later with a less useful message.
+    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true' '"success":[[:space:]]*false')" in
+      accepted)
+        ;;
+      refused)
+        echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
+        delete_cf_token_keychain
+        delete_cf_account_keychain
+        CF_TOKEN=""
+        ;;
+      *)
+        echo "❌ Plantoir could not reach Cloudflare to check the saved token, so this section was not deployed there."
+        echo "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+        exit 1
+        ;;
+    esac
   fi
   if [[ -z "$CF_TOKEN" ]]; then
     cat <<'MSG'
@@ -1661,10 +1748,22 @@ fi
 TOKEN=""
 if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
-if [[ -n "$TOKEN" ]] && ! validate_token "$TOKEN"; then
-  echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
-  delete_token_keychain
-  TOKEN=""
+if [[ -n "$TOKEN" ]]; then
+  # Cleared only when Netlify SAYS no, as Cloudflare's is (GitHub #716).
+  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN" '"id"[[:space:]]*:' '"code":[[:space:]]*4[0-9][0-9]')" in
+    accepted)
+      ;;
+    refused)
+      echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
+      delete_token_keychain
+      TOKEN=""
+      ;;
+    *)
+      echo "❌ Plantoir could not reach Netlify to check the saved token, so this section was not deployed there."
+      echo "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+      exit 1
+      ;;
+  esac
 fi
 
 # If legacy file exists, try to migrate it (XOR+base64 scheme first)

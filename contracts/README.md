@@ -434,6 +434,7 @@ recounted 2026-09-07.
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (10) |
+| What a teacher reads when a pasted Cloudflare token is refused (#695), or a saved token could not be checked (#716) — the launchers' own lines, lifted and joined — and that a saved token is cleared only on a 400/401/403 that is the service's own answer | `app-rules.json` → `failureExplanations.cases` (the four whose output carries "did not accept that token" or "to check the saved token") | `scripts/test_deploy_token_refusal.py` (15): pins both launchers' printed lines to the cases' `expect`, and RUNS `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed. Discovered by Windows' `PythonToolchainTests`; the run half skips off a Mac. |
 | Where a publish to a folder on this computer lands, and that a copy which did not finish is never reported as published (#227) | `shared-rules.json` → `folderPublishTarget` (`cases`, `partialCopy`) | `scripts/test_deploy_folder_target.py` (3), which RUNS `deploy.sh` from a working folder named with a colon — verify.sh and Windows' PythonToolchainTests, which skips it where bash cannot reach a scratch folder. **The bash launcher's**: the four cases with `appliesOn: ["mac"]` use a colon, which NTFS forbids and Windows reads as a drive letter; the other two are portable in meaning and are what `deploy.ps1` would run if it had a reader. The app's half — refusing a partial path, handing over a trimmed one, and the sentence for a copy that did not finish — is in `configurationRules.deployFolder`, `deployArguments` and `failureExplanations` |
 | Special folder names: what is blocked, what is confirmed, what a rename says, which keys it carries, and how the new name is SPELLED inside a link | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22), FolderPathRewriterTests (2) |
 | What a teacher reads under the four Content Structure lists | `shared-rules.json` → `specialNames.contentStructureTip` | `SharedRulesContract` (3 functions, plus one further assertion inside `testSpecialNamesSentencesMatchContract`). Proposed from Windows 2026-09-07 and adopted here 2026-09-09 ([#72](https://github.com/russellgordon/plantoir/issues/72)); Windows' wording won, widened to “folders and files”. **Not counted in the `SharedRulesContractTests (24)` row above**, which is left as it stands. Whether a teacher can SEE it is checked on Windows (`CourseSettingsCaptionUiTests`) and NOT here: an XCUITest was tried and reached this caption in one run of four, so the mac's on-screen half is the source scan's deletion guard — `documentation/09-mac-app.md` says what went wrong and which part is worth fixing. Two of the four go beyond the string: the entry must carry no `reason` key — pinned on the side that authors this file, because the cost lands on Windows, whose `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every top-level `reason` — and `CourseSettingsView` must actually DRAW the constant, measured by mutation, because the other three stay green when the line that renders it is deleted. |
@@ -1664,6 +1665,15 @@ list added, so the census is unchanged by this piece (349 after #555). `shared-r
 `activityTrail.mustRecord` 140 → **141** ("app closed", for both platforms —
 it turns Windows red until it records it), and "app opened" has a new
 `carries` and `why` (the three-part version) in place.
+
+**#695 and #716 (2026-11-01)**, on `issue/695-cloudflare-token-refused` off
+`dev` bd32fe9f1: no list added, so the census is unchanged by this piece. One
+list grew, and it DOES turn Windows red: `app-rules.json` →
+`failureExplanations.cases` 23 → **27** — a refused Cloudflare paste in
+`deploy.sh`'s shape (the whole transcript, Netlify leg included) and in
+`deploy.ps1`'s, and "could not reach Cloudflare / Netlify to check the saved
+token" (`deploy.sh` only until Windows' #705). Windows' `FailureExplainer.cs`
+stays red on all four until it lifts and joins them. No generated half moves.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
