@@ -5804,8 +5804,12 @@ if ! ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_pr
   PROBLEMS_OK=false
   echo "   Section 1 did not build after the fence was put right"
 fi
+# Read now: the stages after this one build the section again.
+cp "$PROBLEMS_ONE" /tmp/verify_problems_section1_fixed.json 2>/dev/null || true
+cp "$PROBLEMS_TWO" /tmp/verify_problems_section2_after.json 2>/dev/null || true
 if $PROBLEMS_OK && python3 - /tmp/verify_main_build.log /tmp/verify_problems_after_second.json \
-     /tmp/verify_problems_section2_before.json "$PROBLEMS_ONE" "$PROBLEMS_TWO" /tmp/verify_problems_fixed.log <<'PROBLEMSPY'
+     /tmp/verify_problems_section2_before.json /tmp/verify_problems_section1_fixed.json \
+     /tmp/verify_problems_section2_after.json /tmp/verify_problems_fixed.log <<'PROBLEMSPY'
 import json, re, sys
 from pathlib import Path
 main_log, second, two_before, one_now, two_now, fixed_log = [Path(arg) for arg in sys.argv[1:7]]
@@ -5828,8 +5832,11 @@ after_second = read(second)
 if after_second is None:
     problems.append("no record after the second build of Section 1")
 else:
-    figure = [row for row in after_second["rows"] if row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture"]
-    if len(figure) != 1 or "\\foo" not in figure[0]["item"] or "|tikz|" not in figure[0]["id"]:
+    # The page holds two figures that cannot be drawn (\\foo and a graph's
+    # "ln"): each is its own row, and the \\foo diagram is exactly one.
+    figures_here = [row for row in after_second["rows"] if row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture"]
+    figure = [row for row in figures_here if "\\foo" in row["item"]]
+    if len(figures_here) < 2 or len(figure) != 1 or "|tikz|" not in figure[0]["id"]:
         problems.append(f"the record does not name the diagram TeX cannot draw as one row: {figure}")
     if not after_second.get("siteSaidComplete"):
         problems.append("the site did not say into the record (siteSaidComplete)")
