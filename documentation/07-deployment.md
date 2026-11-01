@@ -1647,13 +1647,31 @@ by the next run's preflight. The surname is `Testing` plus six random
 letters. **Unlike Windows, it deletes the two sites it made** at the end, via
 Netlify's `DELETE /api/v1/sites/{id}` and Cloudflare's `DELETE
 /accounts/{id}/pages/projects/{name}` (the token on curl's stdin, never a
-command line), and only a site whose name carries that run's surname —
-compared in lower case, since Netlify kept the first run's `Testingwqvxbk`
-as typed and a case-sensitive test left it behind (deleted by hand, HTTP 204).
-The Result block says which were deleted and which need deleting by hand.
-Measured 2026-10-31: 173 passed, 1 failed (a Netlify link on the brand-new
-site, 200 minutes later) on wrangler 4.80.0; 175 passed, 0 failed on
-4.156.0; transcripts in `research/wrangler/2026-10-31-first-upload.md`.
+command line), and only a site whose name carries the surname of the run
+that made it. That surname is the sentinel's first line (`surname<TAB>…`), so
+a run killed half way is cleaned up by the next run's preflight against ITS
+surname — never the new run's random one, and never the bare `Testing` of a
+plain run — and a sentinel without one (written before this) deletes nothing
+and names the site for deleting by hand. The comparison is in lower case,
+since Netlify kept the first run's `Testingwqvxbk` as typed and a
+case-sensitive test left it behind (deleted by hand, HTTP 204). The Result
+block says which were deleted and which need deleting by hand.
+
+**Ctrl-C ends the run; it does not just tidy up.** The trap used to be
+`trap restore_what_was_borrowed EXIT INT TERM`, and a trap on INT that does
+not exit RETURNS to the script: measured with a stand-in under its own
+session, `killpg(SIGINT)` printed the trap's line, then the script's next
+line, then the trap again, and exited 0. With `--first-publish` that would
+put the records back, delete the two new sites, and then keep publishing —
+as repeat publishes to the section's own sites, checked at addresses just
+deleted. Now INT exits 130 and TERM 143, and the EXIT trap restores once
+(the restore and the deletion are idempotent anyway).
+
+Measured 2026-10-31: 173 passed, 1 failed (a Netlify link that was HTTP 404
+on the brand-new site and 200 by hand minutes later) on wrangler 4.80.0;
+175 passed, 0 failed on 4.156.0; transcripts in
+`research/wrangler/2026-10-31-first-upload.md`.
+
 ## The scheduled task never refuses over FOLDER PROBLEMS
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map

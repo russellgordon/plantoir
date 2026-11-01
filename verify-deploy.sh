@@ -62,8 +62,10 @@
 # creates, a Netlify site and a Cloudflare project nobody has ever uploaded
 # to. A random surname alone changes nothing while the records are there:
 # deploy.py reuses a recorded site and never asks (#699's plan review, B1).
-# Everything moved aside is put back on every exit, and a run killed outright
-# is put right by the next run's preflight. The two sites it made are DELETED
+# Everything moved aside is put back on every exit - Ctrl-C or a TERM ends
+# the run there (130/143) rather than letting it publish on - and a run killed
+# outright is put right by the next run's preflight, against the surname that
+# run wrote into its sentinel. The two sites it made are DELETED
 # at the end of the run, through the hosts' own APIs, and the Result block
 # names them either way, so nothing is left on the accounts unannounced.
 
@@ -390,15 +392,16 @@ FIRST_PUBLISH_STATE=(
   "$WORKING_FOLDER/courses/$COURSE/section$SECTION/.netlify_site.json"
 )
 FIRST_PUBLISH_SENTINEL="$WORKING_FOLDER/courses/.verify-deploy-first-publish.txt"
-SITES_MADE=()      # "netlify<TAB>name<TAB>site id" / "cloudflare<TAB>name<TAB>account id"
+SITES_MADE=()      # "netlify<TAB>name<TAB>site id<TAB>surname" / "cloudflare<TAB>name<TAB>account id<TAB>surname"
 SITES_REPORT=()    # what the Result block says about each, deleted or not
 SURNAME="Testing"
 if [ "$FIRST_PUBLISH" = true ]; then
-  # Letters only, as deploy.py asks; lower case so the site name carries it
-  # verbatim, which is what the deletion below checks before it deletes.
+  # Letters only, as deploy.py asks. The host may keep the capital or fold
+  # it (Netlify keeps it, measured), so the deletion below compares the site's
+  # name with the surname in lower case. The surname is written into the
+  # sentinel too, so a run killed half way is cleaned up against ITS surname.
   SURNAME="Testing$(LC_ALL=C tr -dc 'a-z' </dev/urandom | head -c 6)"
 fi
-SURNAME_IN_NAMES=$(printf '%s' "$SURNAME" | tr 'A-Z' 'a-z')
 first_publish_anything_hidden() {
   local path
   [ -f "$FIRST_PUBLISH_SENTINEL" ] && return 0
@@ -409,9 +412,17 @@ first_publish_recorded() {  # first_publish_recorded <path> -> hidden|absent|""
   [ -f "$FIRST_PUBLISH_SENTINEL" ] || return 0
   awk -F '\t' -v p="$1" '$2 == p { v = $1 } END { if (v != "") print v }' "$FIRST_PUBLISH_SENTINEL"
 }
+first_publish_surname() {  # the surname the run that wrote the sentinel used, or ""
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] || return 0
+  awk -F '\t' '$1 == "surname" { v = $2 } END { if (v != "") print v }' "$FIRST_PUBLISH_SENTINEL"
+}
 restore_first_publish_state() {
-  local path hidden safe recorded line
+  local path hidden safe recorded line surname
   first_publish_anything_hidden || return 0
+  # The surname of the run that hid these records - this run's, or a killed
+  # earlier run's - never the current run's guess. Empty (a sentinel written
+  # before #699's fixes, or none at all) means no site is deleted, only named.
+  surname=$(first_publish_surname)
   for path in "${FIRST_PUBLISH_STATE[@]}"; do
     hidden="$path.verify-deploy-hidden"
     safe=false; [ -e "$hidden" ] && safe=true
@@ -435,7 +446,7 @@ elif "netlify" in path:
     print("netlify\t" + name + "\t" + (record.get("site_id") or record.get("id") or ""))
 PY2
 )
-      [ -n "$line" ] && SITES_MADE+=("$line")
+      [ -n "$line" ] && SITES_MADE+=("$line"$'\t'"$surname")
       rm -f "$path"
     fi
     if [ "$safe" = true ]; then
@@ -453,7 +464,8 @@ PY2
 }
 hide_first_publish_state() {
   local path
-  : >"$FIRST_PUBLISH_SENTINEL" || { echo "could not write $FIRST_PUBLISH_SENTINEL"; return 1; }
+  printf 'surname\t%s\n' "$SURNAME" >"$FIRST_PUBLISH_SENTINEL" \
+    || { echo "could not write $FIRST_PUBLISH_SENTINEL"; return 1; }
   for path in "${FIRST_PUBLISH_STATE[@]}"; do
     if [ -e "$path" ]; then
       mv "$path" "$path.verify-deploy-hidden" 2>/dev/null || { echo "could not move $path aside"; return 1; }
@@ -466,20 +478,27 @@ hide_first_publish_state() {
 }
 # Deletes the sites a first publish made, through each host's own API, so a
 # release's first-publish run leaves nothing on the accounts. Only a site whose
-# record deploy.py wrote during THIS run (collected by the restore above) and
-# whose name carries this run's random surname is ever touched - never the
-# section's own sites, whose records were hidden and are now back. The token
+# record deploy.py wrote while the originals were hidden (collected by the
+# restore above) and whose name carries the random surname of the run that hid
+# them - read from the sentinel, so a killed run's sites are matched against
+# ITS surname - is ever touched; never the section's own sites, whose records
+# were hidden and are now back. The token
 # goes to curl on stdin (-H @-), never on a command line.
 delete_sites_made() {
-  local entry kind name id code token
+  local entry kind name id surname code token
   for entry in ${SITES_MADE[@]+"${SITES_MADE[@]}"}; do
-    IFS=$'\t' read -r kind name id <<<"$entry"
+    IFS=$'\t' read -r kind name id surname <<<"$entry"
+    if [ -z "$surname" ]; then
+      SITES_REPORT+=("$kind $name: NOT deleted (the run that made it left no surname to check it against) - delete it by hand if it is a test site")
+      continue
+    fi
+    surname=$(printf '%s' "$surname" | tr 'A-Z' 'a-z')
     # Netlify keeps the name as typed ("Testingabcdef", measured on the first
     # run, whose case-sensitive test left that site behind), so compare in
     # lower case.
     case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
-      *"$SURNAME_IN_NAMES"*) ;;
-      *) SITES_REPORT+=("$kind $name: NOT deleted (its name does not carry this run's surname $SURNAME_IN_NAMES)"); continue ;;
+      *"$surname"*) ;;
+      *) SITES_REPORT+=("$kind $name: NOT deleted (its name does not carry the surname $surname of the run that made it)"); continue ;;
     esac
     code=""
     if [ "$kind" = netlify ] && [ -n "$id" ]; then
@@ -528,7 +547,13 @@ if [ -n "$CANONICAL_FOLDER" ] && [ "$CANONICAL_FOLDER" = "$CLASS_WEBSITES" ]; th
   echo "  ❌ $WORKING_FOLDER is the teaching folder (Class Websites); run this against a test folder"
   exit 1
 fi
-trap restore_what_was_borrowed EXIT INT TERM
+# INT and TERM EXIT, and the EXIT trap puts things back once. A trap on INT
+# that only restored would return to the script, which then kept publishing -
+# as repeat publishes to the section's own sites, against addresses the
+# restore had just deleted (#699 implementation review, measured).
+trap restore_what_was_borrowed EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------- preflight
 hdr "Preflight — refuse clearly rather than half-running"

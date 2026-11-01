@@ -371,7 +371,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    >
    > **On the mac, run it once with `--first-publish` too** (#712): it moves
    > the section's saved surname and site records aside (crash-safe, put
-   > back on every exit), answers the surname question with `Testing` and six
+   > back on every exit; Ctrl-C stops the run there), answers the surname question with `Testing` and six
    > random letters, and so publishes to a NEW Netlify site and a NEW
    > Cloudflare project, the only way to see a first-ever upload. Unlike the
    > plain run, it **deletes the two sites it made** at the end, through the
