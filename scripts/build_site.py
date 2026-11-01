@@ -3624,24 +3624,19 @@ def _vault_relative_source(copied: Path, course_dir: Path,
     or None when the build made it, the file is gone, or it is not in the
     course folder.
 
-    One correction on the way: the per-section folder copy credits EVERY file
-    under a folder it copied to the section, so when a folder name is both
-    shared and per-section, a shared page copied there first is credited to a
-    section file that does not exist. The file that made the page is then the
-    shared one at the same place in the course folder, which is what is
-    listed. (The record itself is left alone here; that trap is a toolchain
-    issue of its own, #518's plan.)"""
+    Read straight from the build's record. Until #678 the per-section folder
+    copy credited every file under a folder that is both shared and
+    per-section to the section, and this function corrected it for its own
+    list; the record is right at the source now
+    (`copy_the_per_section_folders`), so every reader of it gets the shared
+    file. A regression now shows as a page missing from the list, which
+    test_page_sources.py fails on, rather than being quietly put right here.
+    `content_root` is no longer read; it is kept so the callers stay as
+    they are."""
     found = _vault_sources.get(copied)
     if found is None:
         return None
-    source, is_section_page = found
-    if not source.is_file() and is_section_page and content_root is not None:
-        try:
-            shared = course_dir / copied.relative_to(content_root)
-        except ValueError:
-            shared = None
-        if shared is not None and shared.is_file():
-            source = shared
+    source, _is_section_page = found
     if not source.is_file():
         return None
     try:
@@ -3816,7 +3811,15 @@ def _class_embed_target(line: str) -> str | None:
 # `build_section_site`, one build of one section per process, and read by
 # `_date_pages_from_their_classes`, which writes a page's date back into the
 # file it came from (#275, #276). A page the build made itself has no entry and
-# is never written back.
+# is never written back. Every source recorded here is a file the course folder
+# really has: in a folder that is both shared and per-section, a page is
+# credited to the section only when the section's folder has it, and keeps its
+# shared credit otherwise (`copy_the_per_section_folders`, #678). Every reader
+# depends on that - the date write-back, the names in folder problems and in
+# links into hidden pages, the name of a page whose settings cannot be read,
+# figure/quiz/GeoGebra line numbers, the runnable-Swift check, the site-said
+# side file and the visible-pages list - so it is put right once, here, rather
+# than in each of them.
 _vault_sources: dict[Path, tuple[Path, bool]] = {}
 _vault_course_folder: list[Path] = []
 
@@ -4497,6 +4500,52 @@ def copy_the_section_front_page(course_dir: Path, section_dir: Path, content_roo
     rewrite_section_wikilinks(dest)
     print(f"  🏠 Copied section index.md to content/index.md")
     return True
+
+
+def copy_the_per_section_folders(section_dir: Path, content_root: Path, per_section_folders,
+                                 section_number: int) -> None:
+    """
+    Copies each of the section's own folders over the build's copy, and
+    records which file in the course folder each page came from (#678).
+
+    A folder name can be shared AND per-section at once: section overrides
+    are what that is for, and the preflight adds a per-section name by itself
+    as soon as a teacher makes a section-only page in a folder named like a
+    shared one. The shared folder was copied first, so after `copytree` the
+    folder in the build holds both the shared pages and the section's. Only a
+    file the section's folder really has is credited to the section; every
+    other file keeps the shared credit the shared copy recorded. Crediting
+    every file under the folder to the section, as this loop did until #678,
+    named section files that do not exist - so the date write-back skipped
+    every linked shared page in that folder without a word, and a folder
+    problem named `section1/<folder>/<page>`.
+
+    `lexists`, not `exists`: a section page that is a link to a file elsewhere
+    is the section's page all the same, and the write-back must see it as one
+    to say it was left alone. The frontmatter pass and the wikilink rewrite
+    still run on every file in the folder, shared pages included, as before.
+
+    Called at the same point in the build as the loop it replaced: after the
+    shared folders and files, before the section's loose files, so a section's
+    page still wins over a shared one of the same name. Factored out of
+    `build_section_site` so the tests drive exactly what the build runs.
+    """
+    print(f"\n📥 Copying per-section folders...")
+    for folder in per_section_folders:
+        src = section_dir / folder
+        dest = content_root / folder
+        if src.exists():
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+            for root, dirs, files in os.walk(dest):
+                for file in files:
+                    fp = Path(root) / file
+                    section_file = src / fp.relative_to(dest)
+                    if os.path.lexists(section_file):
+                        remember_vault_source(fp, section_file, is_section_page=True)
+                    process_frontmatter(fp, section_number)
+                    if fp.suffix.lower() == ".md":
+                        rewrite_section_wikilinks(fp)
+            print(f"  📁 Copied per-section folder: {folder}")
 # ===========================================================================
 
 
@@ -9274,21 +9323,9 @@ def build_section_site(
             process_frontmatter(dest, section_number)
             print(f"  📄 Copied shared file: {file_name}")
 
-    # Copy per-section folders
-    print(f"\n📥 Copying per-section folders...")
-    for folder in per_section_folders:
-        src = section_dir / folder
-        dest = content_root / folder
-        if src.exists():
-            shutil.copytree(src, dest, dirs_exist_ok=True)
-            for root, dirs, files in os.walk(dest):
-                for file in files:
-                    fp = Path(root) / file
-                    remember_vault_source(fp, src / fp.relative_to(dest), is_section_page=True)
-                    process_frontmatter(fp, section_number)
-                    if fp.suffix.lower() == ".md":
-                        rewrite_section_wikilinks(fp)
-            print(f"  📁 Copied per-section folder: {folder}")
+    # Copy per-section folders, over the shared ones (#678: only the section's
+    # own files are credited to the section)
+    copy_the_per_section_folders(section_dir, content_root, per_section_folders, section_number)
 
     # Copy per-section files
     print(f"\n📥 Copying per-section files...")
