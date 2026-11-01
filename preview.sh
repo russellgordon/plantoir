@@ -936,7 +936,8 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 #     --logout) or prints its help; --diagnose DOES deploy. Only one working
 #     in THIS folder counts: its working directory is asked of lsof, and one
 #     that cannot be asked counts (a deploy of this very section is proved;
-#     only its folder is not).
+#     only its folder is not) - unless `ps -p` finds it has ended since the
+#     table was read (#737).
 #   - a scheduled deploy of C/S: any process whose arguments name its script,
 #     `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
 #     (ScheduledDeploy.agentLabel; <CODE> as ScheduledDeploy.sanitizedCode
@@ -982,6 +983,15 @@ a_deploy_is_running_for() {
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        # Nothing from lsof, and the process has ENDED since the table was
+        # read: skipped (#737). A deploy.sh that exits between the two looks,
+        # in any folder, used to count. One still running whose folder lsof
+        # cannot answer for still counts, as #381 decided. `ps -p`, never
+        # `kill -0`, which also fails for another account's process that is
+        # running, and which this guard must still count.
+        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
+          continue
+        fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           return 0
         fi ;;
@@ -1045,7 +1055,9 @@ fi
 #     its leases as well, and its script is in the table.
 #   - "another": `deploy.sh C S` as the program, working in THIS folder (its
 #     working directory, asked of lsof; one that cannot be asked counts, as in
-#     #381), and not only clearing a token or printing its help.
+#     #381, while `ps -p` still finds it running - one that has ended since
+#     the table was read does not, #737), and not only clearing a token or
+#     printing its help.
 # This run, its ancestors and its descendants never count (the reader's
 # family rule), so a scheduled run's own legs are never refused by its own
 # wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
@@ -1081,6 +1093,15 @@ what_is_deploying_this_section() {
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        # Nothing from lsof, and the process has ENDED since the table was
+        # read: skipped (#737). A deploy.sh that exits between the two looks,
+        # in any folder, used to count. One still running whose folder lsof
+        # cannot answer for still counts, as #381 decided. `ps -p`, never
+        # `kill -0`, which also fails for another account's process that is
+        # running, and which this guard must still count.
+        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
+          continue
+        fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           seen="another"
         fi ;;
