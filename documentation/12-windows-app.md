@@ -4376,7 +4376,12 @@ stayed in the ledger against #360. It was built in parity bundle 6a —
 and `NamedGapLedger` was empty from bundle 9, but for a few hours on
 2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
 until #548 landed them — and since 2026-10-28 it holds two entries against
-mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.)
+mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.
+Mac #698 landed on 2026-10-31: the key is now `obsidianIsNotOnThisMachine`,
+carrying `{machine}`, and the scenario is "open in Obsidian where Obsidian is
+not installed presses nothing (#610)", so both entries are deleted with the
+commit that takes the regenerated contract — the `windows` issue opened with
+#698 lists them.)
 
 ---
 
@@ -10490,8 +10495,11 @@ Obsidian; nothing was opened). It reads a little oddly from the in-app
 assistant, which is IN Plantoir. The contract has no sentence for a press that
 failed, and that gap is the mac's to fill, since Windows cannot regenerate
 `assist-wording.json`: mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`.
-`AFailedPressIsAnsweredWithoutAFalseSentence` and
+asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`
+— landed 2026-10-31 as `wording.openInObsidianDidNotOpen` and the scenario
+"open in Obsidian whose press failed before Obsidian was handed anything says
+nothing was opened (#698)", which this app switches to with the regenerated
+contract. `AFailedPressIsAnsweredWithoutAFalseSentence` and
 `TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 
 **Two divergences from the mac, chosen here (the mac should KNOW):**
@@ -10566,7 +10574,14 @@ Windows cannot regenerate `assist-wording.json`. Windows says
 `ContractTests.WindowsOnlyWording`), and `NamedGapLedger` holds the key and the
 scenario "open in Obsidian on a Mac without Obsidian presses nothing (#610)"
 against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-(v1.9.1), which asks for `{machine}` in that sentence.
+(v1.9.1), which asks for `{machine}` in that sentence. **Landed on the mac
+2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` ("…not on this
+{machine}…", recorded in `specialNames.platformWording.machine.usedIn`) and the
+scenario is renamed "open in Obsidian where Obsidian is not installed presses
+nothing (#610)"; the mac also added `wording.openInObsidianDidNotOpen` and a
+`given.obsidianPress: "didNotOpen"` scenario for `DidNotOpen` (below). Until
+Windows takes the regenerated contract, the paragraph above describes this
+app as it stands.
 
 **The scenario runner** implements `given.obsidianPress`, `given.obsidianPage`
 (fills `{page}` through an async-local the static `Sentence()` reads),

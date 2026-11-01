@@ -948,11 +948,12 @@ final class AssistAgent {
     /// Take the whole turn back out of the conversation, down to where it
     /// began.
     ///
-    /// Shared by the four places that abandon a turn — an answer that did
+    /// Shared by every place that abandons a turn — an answer that did
     /// not finish, a request that named another course, a reply that was
-    /// the request back again, and a tool the model was not offered (#327) —
-    /// because they make the same claim about the history and the four must
-    /// not drift. What the teacher can SEE is
+    /// the request back again, a tool the model was not offered (#327),
+    /// and, since #689, a turn that reached the lap cap, among others —
+    /// because they make the same claim about the history and must not
+    /// drift. What the teacher can SEE is
     /// untouched: `entries` keeps their sentence on every path.
     ///
     /// Two reasons it is the whole turn rather than the reply alone, and both

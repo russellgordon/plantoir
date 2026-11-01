@@ -301,7 +301,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
    > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
    > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
-   > with them in it. The boundary and the reasoning
+   > with them in it. Mac #698 landed on 2026-10-31 (the key renamed
+   > `obsidianIsNotOnThisMachine`, with `{machine}`), so a Windows v1.9.1 cut
+   > needs both entries DELETED, with the regenerated contract taken, before
+   > it — at 1.9.1 the rule above turns them red. The boundary and the reasoning
    > are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries

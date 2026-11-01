@@ -1853,6 +1853,98 @@ description moves, and this piece of work ran no model. The descriptions and
 `Briefly()` were unchanged then; the work stayed on #352, and landed in parity
 bundle 9 (2026-10-01) — see "On Windows: measured, and moved (#352)" below.
 
+### A turn asks the model at most six times (#689)
+
+[GitHub #689](https://github.com/russellgordon/plantoir/issues/689), mac
+v1.9.1. Found proving #610's must-fails (2026-10-24): a READ hands its result
+back to the model for another lap (`AssistToolOutcome.shouldContinue`), and
+until this nothing on the mac counted the laps. A model that kept choosing the
+same read — `list_pages`, say — would ask, read and ask again for as long as
+the window stayed open, with nothing said to the teacher and a spinner that
+never stopped.
+
+**The rule** (`contracts/shared-rules.json` → `assistantLapLimit`): one
+teacher action — a sentence (`say`) or Go (`approvePending`) — asks the model
+at most `mostModelRequestsPerTurn` times, which is **6**
+(`AssistAgent.mostModelRequestsPerTurn`, pinned to the contract by
+`AssistLapCapTests.testTheCapIsTheContractsNumber`). Both actions start the
+count again from nought. The request that would be the seventh is **not sent**:
+the tool the sixth request chose has run, and nothing after it does.
+
+**Where the count is kept: `think()`, and only there.** A turn re-enters the
+model from TWO places — `execute` (a read handing back) and
+`run(settledCall:)`'s "There is no tool by that name.", which hands straight
+back without passing through `execute` — so a cap on either alone would leave
+the other unbounded. `think()` is where every request is made, so the guard
+sits at its entry. `AssistLapCapTests` covers both re-entries.
+
+**What the teacher sees, and what the model is sent next.** The teacher reads
+`AssistWording.wentRoundWithoutFinishing`: Windows' sentence as it had shipped
+there, with "nothing was changed" added in `answerWasCutOff`'s order (did not
+finish, nothing changed, something to do next) — Russell's choice, 2026-10-31.
+The turn is **wound back** out of `messages`, as every other abandoned turn
+is (`windTheTurnBack`): six identical calls are exactly the poisoned history
+#215 measured, which a model at temperature 0 copies into the teacher's next
+sentence. Only `messages` goes: `entries`, the transcript, keeps every tool
+line the turn showed, and the sentence goes there alone. The trail records
+`assistant went round without finishing` with the count and the last tool
+chosen IN WORDS, never the sentence or argument values.
+
+**"Nothing was changed" is true on every path that reaches the cap**, by the
+same walk as `answerWasCutOff` and the echo refusal (above, "The reply that
+was the question again"): a turn laps only after `read`, `couldNotRead` or
+`planned` (held behind the card), or after a tool name that exists nowhere, so
+everything the turn ran was a read. After Go the turn's start is moved past the
+approved call's RESULT (`execute(call:approvedByTheTeacher:)`), so a wind-back
+from a lap after Go could never erase a call that has run. No approval-gated
+call laps today (each answers `wrote` or `refused`); the move makes that safe
+by construction rather than by inspection, and it is what Windows' `Approve`
+already did ("winding back past it would erase a call that has already run").
+`AssistLapCapTests.testGoMovesTheTurnPastTheApprovedResult` pins it.
+
+**An assistant working from another app never meets it**: it runs its own loop,
+and each call it makes is one request from its side. The tool surface did not
+move: `scripts/test_tool_surface_digest.py` and `toolhash.surfaces()` give the
+same digests before and after (local 13 `46b96562…2cd96cb6`, MCP 38
+`89641d12…6129fbc20a`), and no description, schema or system-prompt byte is in
+the diff.
+
+**The scenario** ("a turn whose model keeps choosing the same read is stopped
+after six requests …") scripts `list_pages` as the answer to EVERY request
+(`given.modelReplyAnswers: "everyRequest"`), and the runner serves it through
+a FUSE — twenty repeats (three times the cap, plus two), then plain text — because `StubEngine` repeats
+its last entry for ever: without the cap the case fails on the count (21 ≠ 6)
+in seconds rather than hanging. Its sentence matches no fixed phrasing, on
+purpose (`AssistLapCapTests.testTheSentenceReachesTheModel`): the plan review
+found the first choice, "What pages are in this section?", is a card phrase,
+so the case would have tested a card that then lapped rather than a turn the
+model routed — and on Windows, where card turns may never enter the loop, it
+could have failed for reasons nothing to do with the cap.
+
+**Measured** with copy-and-restore must-fails: the guard removed, the two
+headline tests, the trail test and the scenario fail (21 requests and 43 messages
+where 6 and 1 were expected); the mark move removed, the Go test fails (1 ≠ 2).
+
+**Rejected, and why:**
+
+- **A TIME limit.** A cold engine or a big course trips it, and it measures the
+  computer rather than the loop.
+- **Spotting a REPEATED call.** A model alternating between two reads defeats
+  it, and a repeat is sometimes right (reading two pages one after another).
+- **Stopping SILENTLY.** "I asked and nothing happened" becomes unfalsifiable,
+  which is what the sentence and the trail line exist to prevent.
+- **Three.** It cuts off list, read and answer with a single retry, which real
+  turns do.
+- **Ten or more.** No turn needs it, and every lap past six is a wait the
+  teacher sits through for an answer that is not coming.
+- **Not winding back** (what Windows did until it adopts this): it leaves the
+  six repeats in the history, the #215 fault.
+
+**Windows** has capped its loop at 6 (`MostStepsPerTurn`) since its agent was
+written, with a literal sentence, no trail line and no wind-back; the issue
+opened with this piece asks it to read the number from the contract, say the
+contract's sentence, wind back, write the event, and run the scenario.
+
 ### Step 4 — The app presses its own buttons
 
 Two of those Swift functions do not do the work themselves. When a teacher
@@ -7696,8 +7788,10 @@ the course and section are found first (the reply names them); then an
 assistant working from another app (`surface == .mcp`) is refused
 (`wording.openInObsidianIsInTheSectionWindow`) — that process builds no Scene
 graph, so there is no preview to read and no window to ask in, and nothing is
-pressed or opened; then a Mac with no Obsidian (`wording.obsidianIsNotOnThisMac`,
-read through `ObsidianOpening.isInstalled`, the button's own condition); then
+pressed or opened; then a Mac with no Obsidian (`wording.obsidianIsNotOnThisMachine`,
+read through `ObsidianOpening.isInstalled`, the button's own condition — named
+`obsidianIsNotOnThisMac` until #698, which gave it the `{machine}` placeholder
+so Windows says "this PC" from the same key); then
 the window, brought up with `revealSectionOnScreen` as a rebuild or a deploy
 brings it, and pressed through `SectionWindowControllers.Controller.openInObsidian`,
 which runs `WorkspaceModel.openInObsidianAndWait` on the WINDOW's model —
@@ -7710,7 +7804,17 @@ answer read ONCE at the press — whether it is hidden from students is the
 trail's to say), `openedTheSectionNoPageShowing`, `openedTheSectionPageNotFound`
 (every other fallback), `obsidianOpensAfterTheQuestion` (a question is up; it
 never says "opened"), `obsidianIsAlreadyOpening`, and
-`openInObsidianFoundNoWindow` when no window came. The trail line is #518's
+`openInObsidianFoundNoWindow` when no window came. Since #698 there is a
+sixth outcome, `.didNotOpen`, answered with `openInObsidianDidNotOpen` and
+refused: the press went ahead but Obsidian was handed nothing (the add-ons
+scan, the add-ons pass or the open itself failed) — Windows' `DidNotOpen`
+from #690, which until then answered with `openInObsidianIsInTheSectionWindow`,
+a sentence written for an assistant in another app. **Nothing on the mac's
+press path produces it yet**: the scan does not throw, and `FolderActions`
+ignores the answer `NSWorkspace.open` gives, so a failed open reads as one
+that opened. The case, the sentence and the scenario exist so both apps
+answer a failed press from one key; the route reporting it is a follow-up
+issue. The trail line is #518's
 "page opened in Obsidian", written once by the route; there is no new event
 (`shared-rules.json` → `activityTrail.mustRecord` and
 `obsidianOpensThePreviewedPage.rule` name the assistant as a door).
@@ -7770,11 +7874,16 @@ on the larger tier "Open my website" deploys (`deploy_section` 10/10) and the
 edit request above becomes a `publish_pages` plan, in every arm.
 
 **A test-harness change worth knowing.** Proving the must-fails found that a
-scripted engine reply which the runner hands back (`shouldContinue`) loops for
-ever — the agent has no lap cap and the stub answered the same call every
-lap. The mac scenario runner now serves the scripted reply to the FIRST
+scripted engine reply which the runner hands back (`shouldContinue`) looped
+for ever — the agent had no lap cap then and the stub answered the same call
+every lap. The mac scenario runner now serves the scripted reply to the FIRST
 request only and plain text after it, so such a regression fails on
 `expectModelRequests` in seconds. Windows' runner does the same since #690.
+The agent has had a cap since #689 ("A turn asks the model at most six times
+(#689)", above), and the runner keeps serving the first request only all the
+same — a suite must not depend on the thing it checks; a case that wants
+every request answered says `given.modelReplyAnswers: "everyRequest"` and is
+served through a fuse.
 
 **Windows landed it with #690** (and the press it presses with #681):
 `plantoir-mcp.exe` serves the tool and refuses (42 → 43), the call is answered
@@ -7782,8 +7891,13 @@ by the APP pressing the section window's own Open in Obsidian
 (`MainWindow.PressOpenInObsidianFor`, the shape of its `deploy_section`
 hand-back), the eight fixed shapes are in `AssistCardCommand.FixedShapes`, and
 nine of the ten scenarios run; the tenth, "on a Mac without Obsidian", is held
-in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` names "this Mac"
-without `{machine}` (mac #698), so Windows says "this PC". How the press
+in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` named "this Mac"
+without `{machine}` (mac #698), so Windows says "this PC". #698 (2026-10-31)
+renamed the key `obsidianIsNotOnThisMachine`, gave it the placeholder and
+renamed the scenario "open in Obsidian where Obsidian is not installed
+presses nothing (#610)", and added `openInObsidianDidNotOpen` with a scenario
+for Windows' `DidNotOpen`; the `windows` issue opened with it lists the ledger
+entries and the Windows-only member to delete. How the press
 reports early on Windows, where a question is an awaited dialog, is in
 `12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
