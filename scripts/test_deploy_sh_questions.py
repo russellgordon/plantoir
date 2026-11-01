@@ -168,10 +168,11 @@ def with_credentials_stubbed(folder: Path, remembered: str = "") -> str:
     Needed for ONE question — the Cloudflare Account ID — which is reached
     only when a token is already saved and no account could be discovered.
     Getting there for real would mean putting a token in the teacher's
-    Keychain and calling Cloudflare. Four of the five stubs are credential and
-    network LOOKUPS; the fifth, `set_cf_account_keychain`, is a WRITER, and is
-    stubbed so that this file cannot put anything in the teacher's Keychain
-    even if a future edit got that far. `assert_can_ask`, the call site and
+    Keychain and calling Cloudflare. Five of the seven stubs are credential and
+    network LOOKUPS (`token_check_answer`, the saved token's check, since
+    #716); `set_cf_account_keychain` is a WRITER, stubbed so that this file
+    cannot put anything in the teacher's Keychain even if a future edit got
+    that far, and `delete_cf_account_keychain` only says it was called. `assert_can_ask`, the call site and
     `prompt_for_cf_account` — everything under test — are untouched, and the
     marker is asserted so a rename fails the test rather than skipping it.
     """
@@ -188,6 +189,10 @@ def with_credentials_stubbed(folder: Path, remembered: str = "") -> str:
     stubs = (
         "get_cf_token_keychain() { printf '%s' 'stub-token-never-leaves-this-test'; }\n"
         "validate_cf_token() { return 0; }\n"
+        # The SAVED token's check has its own reader since #716, which reads
+        # the HTTP status rather than a yes/no; stubbed as the yes the old
+        # stub above gave, so no run here reaches Cloudflare.
+        "token_check_answer() { echo accepted; }\n"
         "discover_cf_account() { printf '%s' ''; }\n"
         # Read from a FILE rather than interpolated: what the old bug saved
         # carries newlines, quotes and parentheses, and inlining it into the
