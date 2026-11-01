@@ -261,6 +261,30 @@ public sealed class ScheduledDeploy
     public IReadOnlyList<(string Title, bool? Published)> ClassesNamed { get; init; } = [];
 
     /// <summary>
+    /// How late this course's deploy may still run, in days
+    /// (<see cref="Models.CourseConfiguration.ScheduledDeployMayRunLateDays"/>,
+    /// <c>scheduledDeployCancellation.theSetting</c>). <see cref="Describe"/>
+    /// names it because a missed moment is NOT a deploy that never happens
+    /// (#554, measured 2026-10-31): the task's <c>StartWhenAvailable</c> runs
+    /// it when the PC next wakes, and only this window stops a late one.
+    /// </summary>
+    public int MayRunLateDays { get; init; } = Models.CourseConfiguration.DefaultMayRunLateDays;
+
+    /// <summary>
+    /// A lateness window in the words the setting's choices use
+    /// (<c>scheduledDeployCancellation.wording.settingChoices</c>: "1 day",
+    /// "3 days", "1 week", "2 weeks"), pinned against the contract by
+    /// <c>ScheduledDeployTests.TheWindowIsSaidInTheSettingsOwnWords</c>.
+    /// </summary>
+    public static string WindowInWords(int days) => days switch
+    {
+        1 => "1 day",
+        7 => "1 week",
+        14 => "2 weeks",
+        _ => $"{days} days",
+    };
+
+    /// <summary>
     /// EVERY destination the deploy goes to, primary first and then each
     /// additional in the order saved, joined "A", "A and B", "A, B and C" — in
     /// the sheet's words (a folder by its path). Built from the same list the
@@ -330,8 +354,10 @@ public sealed class ScheduledDeploy
             "",
             OnBatterySleepsSooner,
             "",
-            "Plantoir does not wake the computer up. If it is asleep at that time, " +
-            "nothing happens and the site stays as it is.",
+            "Plantoir does not wake the computer up. If it is asleep at that time, Windows runs the deploy " +
+            "when the computer next wakes instead — which could be well after the class it was meant for. " +
+            $"If that is more than {WindowInWords(MayRunLateDays)} after the time you chose, Plantoir cancels " +
+            "the deploy and the site stays as it is.",
         };
 
         // The only class check left (#400): the classes the caller NAMED, each
