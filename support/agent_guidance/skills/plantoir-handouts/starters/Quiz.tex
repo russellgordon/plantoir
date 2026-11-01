@@ -20,6 +20,13 @@
 \usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the handouts skill's section 9)
 \definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}   % one heading-row height for tables side by side
+% Tables (the handouts skill's section 9): space above and below every value;
+% one width for a table's value columns (\setvaluecol{the widest value});
+% \rowstrut{3em} at the start of a tall row, its value centred.
+\renewcommand{\arraystretch}{1.2}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.3em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
 
 % ---------- Fill in ----------
 \newcommand{\schoolname}{School Name}   % print_school_name in the course's settings

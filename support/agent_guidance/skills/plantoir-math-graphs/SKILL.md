@@ -1,6 +1,6 @@
 ---
 name: plantoir-math-graphs
-description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit" - and a GeoGebra sketch students drag, a slider, or a .ggb file. Says when to use an interactive functionplot graph, a static TikZ diagram and a GeoGebra sketch, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line, the finite-difference scaffold), the limits, what to avoid, and how a figure that cannot be drawn shows up.
+description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit" - and a GeoGebra sketch students drag, a slider, or a .ggb file. Says when to use an interactive functionplot graph, a static TikZ diagram and a GeoGebra sketch, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line, the finite-difference scaffold), how far a graph is drawn and when it has arrowheads (an abstract relation or one in context), the limits, what to avoid, and how a figure that cannot be drawn shows up.
 ---
 
 # Graphs and diagrams on a Plantoir page
@@ -153,6 +153,39 @@ y = -x + 4
 
 Five patterns: A to D below, and E, the finite-difference scaffold.
 
+**First, how far a graph goes - decide it per graph, by whether the
+relation has a context.**
+
+- **An abstract relation** (no context: $y = -x^2 + 6x - 5$, a line, a
+  parent parabola) goes on past the points that were plotted, so its graph
+  is drawn **to the edge of the grid with an arrowhead at each end**, and
+  the plotted points stay on it. In a `tikz` fence with `pgfplots`, put
+  `<->, >=latex` on the `\addplot` and give it a `domain` that ends where
+  the curve meets the edge of the grid (pattern B):
+
+  ```latex
+  \addplot[<->, >=latex, domain=-0.16:6.16, samples=50, thick, red] {-x^2 + 6*x - 5};
+  \addplot[only marks, mark=*] coordinates {(1,0) (2,3) (3,4) (4,3) (5,0)};
+  ```
+
+  Measured on the site's own engine (node-tikzjax 1.0.5): `<->, >=latex`
+  draws an arrowhead at both ends of an `\addplot` inside an `axis`, as do
+  `>=stealth` and `arrows.meta`'s `{Latex}-{Latex}`. Solve for where the
+  curve leaves the grid (this parabola meets $y = -6$ at
+  $x = 3 \pm \sqrt{10}$, so -0.16 and 6.16) and **never let the domain run
+  past the edge**: the axis clips the curve there and the arrowheads are
+  cut off with it (`domain=-1:7` on the same grid draws none).
+- **A relation that models a context** (a bridge arch, a ball in flight,
+  supply and demand) stops at the end points the situation gives it - the
+  arch's two feet, the moment the ball lands - with **no arrowheads**:
+  `\addplot[domain=0:40, samples=50, thick, red] {-0.05*(x - 20)^2 + 20};`,
+  with a dot on an end point where it matters.
+- **functionplot** always draws every curve across the whole window, and
+  further as a student drags it; it cannot end a curve at a point or draw
+  an arrowhead. That suits an abstract relation explored on screen
+  (patterns A and B's interactive graph). A graph that models a context,
+  and a graph whose arrowheads should show on paper, is a `tikz` fence.
+
 ### A. A transformed parabola beside its parent
 
 The student gets one graph with two curves - the parent `y = x^2` and the
@@ -199,8 +232,9 @@ Static, with the point marked and labelled:
 \begin{document}
 \begin{tikzpicture}
 \begin{axis}[axis lines=middle, xlabel=$x$, ylabel=$y$, xmin=-2, xmax=5, ymin=-2, ymax=7, grid=major, width=8cm]
-\addplot[domain=-1.5:3, thick, red] {2*x + 1};
-\addplot[domain=-2:5, thick, teal] {-x + 4};
+% No context, so each line runs to the edge of the grid with an arrowhead at each end
+\addplot[<->, >=latex, domain=-1.5:3, thick, red] {2*x + 1};
+\addplot[<->, >=latex, domain=-2:5, thick, teal] {-x + 4};
 \node[red, left] at (axis cs:2.4,5.8) {$y = 2x + 1$};
 \node[teal, above right] at (axis cs:2.6,1.4) {$y = -x + 4$};
 \addplot[only marks, mark=*] coordinates {(1,3)} node[right] {$(1, 3)$};
@@ -273,49 +307,51 @@ each subtraction and its result.
   numc/.style={num, anchor=center},
   dif/.style={num, text=diffcol, font=\footnotesize},
   diffarrow/.style={diffcol, thin, -stealth}}
-% The table of values: a shaded heading row, a full outer border, one ruled row for each x
-\fill[headfill, fill opacity=0.13] (0,0) rectangle (1.75,-0.75);
-\draw (0,0) rectangle (1.75,-3.850);
-\draw (0.80,0) -- (0.80,-3.850);
-\draw (0,-0.750) -- (1.75,-0.750);
-\draw (0,-1.370) -- (1.75,-1.370);
-\draw (0,-1.990) -- (1.75,-1.990);
-\draw (0,-2.610) -- (1.75,-2.610);
-\draw (0,-3.230) -- (1.75,-3.230);
-\node at (0.400,-0.375) {$x$};
-\node at (1.275,-0.375) {$y$};
-% A column with any negative value is right-aligned with padding; one with none is centred
-\node[num] at (0.59,-1.060) {$-2$};
-\node[num] at (0.59,-1.680) {$-1$};
-\node[num] at (0.59,-2.300) {$0$};
-\node[num] at (0.59,-2.920) {$1$};
-\node[num] at (0.59,-3.540) {$2$};
-\node[num] at (1.50,-1.060) {$1$};
-\node[num] at (1.50,-1.680) {$-2$};
-\node[num] at (1.50,-2.300) {$-3$};
-\node[num] at (1.50,-2.920) {$-2$};
-\node[num] at (1.50,-3.540) {$1$};
+% The table of values: a shaded heading row, a full outer border, one ruled row for each x;
+% the x and y columns are one width, and each value is centred in its row
+\fill[headfill, fill opacity=0.13] (0,0) rectangle (1.74,-0.75);
+\draw (0,0) rectangle (1.74,-3.850);
+\draw (0.87,0) -- (0.87,-3.850);
+\draw (0,-0.750) -- (1.74,-0.750);
+\draw (0,-1.370) -- (1.74,-1.370);
+\draw (0,-1.990) -- (1.74,-1.990);
+\draw (0,-2.610) -- (1.74,-2.610);
+\draw (0,-3.230) -- (1.74,-3.230);
+\node at (0.435,-0.375) {$x$};
+\node at (1.305,-0.375) {$y$};
+% A column with any negative value, or whole numbers beside decimals, is right-aligned
+% with padding; any other column of numbers is centred
+\node[num] at (0.62,-1.060) {$-2$};
+\node[num] at (0.62,-1.680) {$-1$};
+\node[num] at (0.62,-2.300) {$0$};
+\node[num] at (0.62,-2.920) {$1$};
+\node[num] at (0.62,-3.540) {$2$};
+\node[num] at (1.49,-1.060) {$1$};
+\node[num] at (1.49,-1.680) {$-2$};
+\node[num] at (1.49,-2.300) {$-3$};
+\node[num] at (1.49,-2.920) {$-2$};
+\node[num] at (1.49,-3.540) {$1$};
 % First differences: each arrow starts at the lower value and points up to the one above it;
 % beside it, the subtraction: lower value minus the one above it
-\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (3.350,-0.700) {First\\differences};
-\draw[diffarrow] (1.820,-1.630) .. controls (2.236,-1.604) and (2.124,-1.370) .. (1.890,-1.110);
-\node[dif] at (3.780,-1.370) {$-2 - 1$}; \node[dif, anchor=west] at (3.780,-1.370) {${}= -3$};
-\draw[diffarrow] (1.820,-2.250) .. controls (2.236,-2.224) and (2.124,-1.990) .. (1.890,-1.730);
-\node[dif] at (3.780,-1.990) {$-3 - (-2)$}; \node[dif, anchor=west] at (3.780,-1.990) {${}= -1$};
-\draw[diffarrow] (1.820,-2.870) .. controls (2.236,-2.844) and (2.124,-2.610) .. (1.890,-2.350);
-\node[dif] at (3.780,-2.610) {$-2 - (-3)$}; \node[dif, anchor=west] at (3.780,-2.610) {${}= 1$};
-\draw[diffarrow] (1.820,-3.490) .. controls (2.236,-3.464) and (2.124,-3.230) .. (1.890,-2.970);
-\node[dif] at (3.780,-3.230) {$1 - (-2)$}; \node[dif, anchor=west] at (3.780,-3.230) {${}= 3$};
+\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (3.340,-0.700) {First\\differences};
+\draw[diffarrow] (1.810,-1.630) .. controls (2.226,-1.604) and (2.114,-1.370) .. (1.880,-1.110);
+\node[dif] at (3.770,-1.370) {$-2 - 1$}; \node[dif, anchor=west] at (3.770,-1.370) {${}= -3$};
+\draw[diffarrow] (1.810,-2.250) .. controls (2.226,-2.224) and (2.114,-1.990) .. (1.880,-1.730);
+\node[dif] at (3.770,-1.990) {$-3 - (-2)$}; \node[dif, anchor=west] at (3.770,-1.990) {${}= -1$};
+\draw[diffarrow] (1.810,-2.870) .. controls (2.226,-2.844) and (2.114,-2.610) .. (1.880,-2.350);
+\node[dif] at (3.770,-2.610) {$-2 - (-3)$}; \node[dif, anchor=west] at (3.770,-2.610) {${}= 1$};
+\draw[diffarrow] (1.810,-3.490) .. controls (2.226,-3.464) and (2.114,-3.230) .. (1.880,-2.970);
+\node[dif] at (3.770,-3.230) {$1 - (-2)$}; \node[dif, anchor=west] at (3.770,-3.230) {${}= 3$};
 % Second differences: each arrow starts at the lower value and points up to the one above it;
 % beside it, the subtraction: lower value minus the one above it
-\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (6.305,-0.700) {Second\\differences};
-\draw[diffarrow] (4.860,-1.916) .. controls (5.276,-1.892) and (5.164,-1.680) .. (4.930,-1.444);
-\node[dif] at (6.820,-1.680) {$-1 - (-3)$}; \node[dif, anchor=west] at (6.820,-1.680) {${}= 2$};
-\draw[diffarrow] (4.860,-2.536) .. controls (5.276,-2.512) and (5.164,-2.300) .. (4.930,-2.064);
-\node[dif] at (6.820,-2.300) {$1 - (-1)$}; \node[dif, anchor=west] at (6.820,-2.300) {${}= 2$};
-\draw[diffarrow] (4.860,-3.156) .. controls (5.276,-3.132) and (5.164,-2.920) .. (4.930,-2.684);
-\node[dif] at (6.820,-2.920) {$3 - 1$}; \node[dif, anchor=west] at (6.820,-2.920) {${}= 2$};
-\node[font=\scriptsize, text=gray, anchor=north, text width=7.18cm, align=center] at (3.715,-3.950) {Each difference is the lower value minus the one above it.};
+\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (6.380,-0.700) {Second\\differences};
+\draw[diffarrow] (4.850,-1.916) .. controls (5.266,-1.892) and (5.154,-1.680) .. (4.920,-1.444);
+\node[dif] at (6.810,-1.680) {$-1 - (-3)$}; \node[dif, anchor=west] at (6.810,-1.680) {${}= 2$};
+\draw[diffarrow] (4.850,-2.536) .. controls (5.266,-2.512) and (5.154,-2.300) .. (4.920,-2.064);
+\node[dif] at (6.810,-2.300) {$1 - (-1)$}; \node[dif, anchor=west] at (6.810,-2.300) {${}= 2$};
+\draw[diffarrow] (4.850,-3.156) .. controls (5.266,-3.132) and (5.154,-2.920) .. (4.920,-2.684);
+\node[dif] at (6.810,-2.920) {$3 - 1$}; \node[dif, anchor=west] at (6.810,-2.920) {${}= 2$};
+\node[font=\scriptsize, text=gray, anchor=north, text width=7.34cm, align=center] at (3.795,-3.950) {Each difference is the lower value minus the one above it.};
 \end{tikzpicture}
 \end{document}
 ```
@@ -375,6 +411,10 @@ remembered, so it is quick.
   `axis` - section 3 says what to write instead.
 - In functionplot: `**`, `ln`, `pi`, `e`, `|x|`, `sin x`, `x(x - 1)`,
   settings below the functions, bounds that hide what matters.
+- A graph of an abstract relation that stops short of the grid's edge or
+  has no arrowheads; a `domain` that runs past the grid's edge (the
+  arrowheads are clipped off); arrowheads on a graph that models a context
+  (section 4).
 - A picture, screenshot or embed of a graph that a fence can draw.
 - Promising interactivity functionplot does not have (sliders, points) -
   that is a GeoGebra sketch.

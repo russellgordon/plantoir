@@ -1,6 +1,6 @@
 ---
 name: plantoir-handouts
-description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered and aligned, the finite-difference scaffold, task cards, how quizzes and tests differ, and how every answer is checked before handing over.
+description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered, aligned and turned, how far a graph is drawn and when it has arrowheads, how the answer key keeps the question copy's layout, the finite-difference scaffold, task cards, how quizzes and tests differ, and how every answer is checked before handing over.
 ---
 
 # Making a printed handout in the house style
@@ -131,6 +131,24 @@ defined in its preamble (the starters have it):
 Compile both, so `Name.pdf` and `Name - Answers.pdf` sit beside the
 source.
 
+**The answer key keeps the question copy's layout.** A student holds the
+two side by side, so what they wrote on and what they check against must
+look the same:
+
+- A table is the same table in both: the same orientation (vertical in
+  both, or horizontal in both - section 9), the same columns, the same
+  alignment and padding, the same row height.
+- A graph is the same grid in both: the same axis ranges, the same scale
+  and the same printed size. The question copy shows the empty grid the
+  student draws on; the key shows the same grid with the answer on it.
+- So author each table and each graph ONCE, outside the switch, and switch
+  only what changes: the cell contents (`$1$ & \qa{}{$-2$} \\`) and the
+  plotted answer (`\onlya{\addplot ...;}` inside the `axis`). The starter's
+  questions 2 and 3 do exactly this.
+- Never a vertical table in the question copy with a horizontal one in the
+  key, never a smaller, more compressed or differently scaled grid in the
+  key, and never a grid that appears only in the key.
+
 ## 4. The look
 
 - `\documentclass[11pt]{article}`, letter paper (a test may use legal
@@ -140,7 +158,8 @@ source.
   subtitle line of instructions.
 - `tasks` columns for a), b), c) parts. The answer key keeps the
   worksheet's column count.
-- `pgfplots` for graphs.
+- `pgfplots` for graphs. How far a graph is drawn, and when it has
+  arrowheads, is in section 12.
 - Tables: full borders, alignment by column, decimals and tables side by
   side are in section 9; the finite-difference scaffold in section 10;
   task cards in section 11.
@@ -239,10 +258,11 @@ this session exactly as it is.
 
 ## 9. Tables
 
-`patterns/tables.tex` beside this file holds the three patterns below,
+`patterns/tables.tex` beside this file holds the four patterns below,
 compiled and checked, with what was measured in its opening comment. The
 starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
-`\headstrut`). Copy a pattern into the handout; never edit it here.
+`\headstrut`, `\arraystretch` 1.2, `\valuecol` with `\setvaluecol`, and
+`\rowstrut`). Copy a pattern into the handout; never edit it here.
 
 - **A full outer border on every table**: fill-in tables students
   complete, tables built by a macro, tables on task cards and tables drawn
@@ -273,14 +293,16 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
   block to a handout that lacks it; use pattern A. A table being rewritten
   anyway becomes pattern A. Never mix the two kinds in one table.
 - **Alignment is decided per column, by that column's values:**
-  - A column holding **any negative value** is right-aligned, with about
-    0.25 cm of padding before the rule so the units digits line up and the
-    numbers clear it: `r<{\hspace{0.25cm}}`, or
-    `>{\raggedleft\arraybackslash}p{1.6cm}<{\hspace{0.25cm}}` for a fixed
-    width. That includes a column of zeros and negatives (0, -3, -4, -3,
-    0) and a column that is all negative (-6, -10, -14).
-  - A column with **no negative value** is centred (`c`). Zero is not
-    negative.
+  - A column holding **any negative value**, or **mixing whole numbers
+    and decimals**, is right-aligned, with about 0.25 cm of padding before
+    the rule so the units digits and the decimal points line up and the
+    numbers clear it: `w{r}{\valuecol}<{\hspace{0.25cm}}` (the width rule
+    below), or `r<{\hspace{0.25cm}}`. That includes a column of zeros and
+    negatives (0, -3, -4, -3, 0), a column that is all negative (-6, -10,
+    -14), and a column such as 9.0, 10.5, 12.0 - centring that one shifts
+    the decimal point by half a digit from row to row.
+  - Any other column of numbers is centred (`c`): no negative value, and
+    either all whole numbers or all decimals. Zero is not negative.
   - The heading over a right-aligned column stays centred:
     `\multicolumn{1}{c}{$y$}` in a `NiceTabular`; in a `tabular` it repeats
     the rules, `\multicolumn{1}{|c|}{$x$}` over the first column and
@@ -288,10 +310,36 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
   - A Power column of expressions such as $2^{-3}$ stays centred; its
     Value column follows the two rules above. Word columns are left as
     they are.
+- **The x and y columns are the same width**, and so are the first- and
+  second-difference columns, so a right-aligned number ends at the same
+  offset in each column. The width comes from the widest value in EITHER
+  column: `\setvaluecol{$-18$}` (inside the table's group, with that
+  table's widest value) sets `\valuecol` to it plus 0.5 cm, and each value
+  column is `w{c}{\valuecol}` or `w{r}{\valuecol}<{\hspace{0.25cm}}`. A
+  heading wider than every value (`$h$ (m)`) counts as the widest. A
+  column students write in may be set wider for room
+  (`\setlength{\valuecol}{1.6cm}`), but the x and y columns still share
+  it. Never `c` beside `r` with each as wide as its own contents.
+- **Every value has a little space above and below it.** The first row of
+  values never sits against the heading rule: `\arraystretch` 1.2 (the
+  starters set it; at 1.0 a digit sat half as far below the rule above it
+  as above the rule below). A **tall row** with room to write - a skeleton
+  difference table - keeps its value centred in the row:
+  `\rowstrut{3em}` at the start of each such row (pattern D), never a
+  large `\arraystretch`, which puts the value low in its row (measured
+  1.2 mm below the middle at 2.6; `\rowstrut` about 0.1 mm).
+- **Which way a table runs.** A table of values may be horizontal - two
+  rows, $x$ across the top and $y$ below - wherever students are NOT asked
+  to compute finite differences from it. **Any table used for finite
+  differences is vertical** ($x$ and $y$ as columns), so the differences
+  can sit beside the rows they come from (section 10). Whichever way the
+  question copy's table runs, the answer key's runs the same way
+  (section 3).
 - **Decimals**: in a column that mixes whole numbers and decimals, write
   every value to the same places - 31.0 beside 18.5, 0.0 beside 0.5, 1.00
-  beside 0.80. Never a bare whole number and never an invisible
-  `\phantom{.5}`. A column of whole numbers gets no decimals.
+  beside 0.80 - and right-align it with the padding above. Never a bare
+  whole number and never an invisible `\phantom{.5}`. A column of whole
+  numbers gets no decimals.
 - **Tables side by side** (pattern C: three fill-in tables across a
   warmup, a scaffold beside two tables, a), b), c) of one question) share
   a top edge and, where they list the same x values, the same row height,
@@ -329,7 +377,11 @@ python3 .claude/skills/plantoir-handouts/patterns/finite_differences.py --x -2 -
 It prints a `tikzpicture` that uses the handout's own `\qa` switch, so one
 source makes both copies. The figure:
 
-- The x, y table on the left, bordered and aligned as section 9 says.
+- The x, y table on the left, vertical (as every table used for finite
+  differences is), bordered and aligned as section 9 says, its x and y
+  columns one width and each value centred in its row. The two columns of
+  differences are one width too, so their lines sit at the same offset
+  in each.
 - Between consecutive rows, a curved arrow that **starts at the lower
   value and points up** to the one above, labelled with the whole
   subtraction, **lower minus upper**, negatives in parentheses:
@@ -365,3 +417,45 @@ Each group has four empty Cartesian-plane templates on its whiteboard.
 - A table on a card has a full border, as every table does (section 9).
 - A page that discusses the cards repeats each card's wording word for
   word.
+
+## 12. Graphs: how far the line goes, and arrowheads
+
+Decide it per graph, by one question: **does the relation have a
+context?**
+
+- **An abstract relation** - no context: $y = -x^2 + 6x - 5$, a line such
+  as $y = 2x - 1$, a parent parabola. The relation goes on past the points
+  that were plotted, so the graph does too: it is drawn **to the edge of
+  the grid, with an arrowhead at each end**. The plotted points stay on it.
+  In `pgfplots`, `<->, >=latex` on the `\addplot` and a `domain` that ends
+  where the curve meets the edge of the grid:
+
+  ```latex
+  \addplot[thick, <->, >=latex, domain=-0.16:6.16, samples=50] {-x^2 + 6*x - 5};
+  \addplot[only marks, mark=*] coordinates {(1,0) (2,3) (3,4) (4,3) (5,0)};
+  ```
+
+  Find each end by solving for where the curve leaves the grid: a line
+  leaves through whichever edge it reaches first (on a grid from -6 to 6,
+  $y = 2x - 1$ leaves at $x = -2.5$ and $x = 3.5$); this parabola meets
+  $y = -6$ at $x = 3 \pm \sqrt{10}$, so -0.16 and 6.16. **Do not let the
+  domain run past the edge**: the axis clips the curve there and the
+  arrowheads are cut off with it (measured: `domain=-1:7` above draws no
+  arrowheads at all). Stopping a little short of the edge is fine; past
+  it is not.
+- **A relation that models a context** - a bridge arch, a ball in flight,
+  supply and demand, a cost that starts at zero items. The situation gives
+  the graph its end points (the arch's two feet, the ball leaving the hand
+  and landing, zero and the most that can be bought), so the graph **stops
+  at those end points, with no arrowheads**:
+
+  ```latex
+  \addplot[thick, domain=0:40, samples=50] {-0.05*(x - 20)^2 + 20};   % the arch, foot to foot
+  ```
+
+  Mark an end point with a dot where it matters (`\addplot[only marks,
+  mark=*] coordinates {(0,0) (40,0)};`).
+
+The same rule holds on a page of the class website: `plantoir-math-graphs`
+section 4 says how. Whatever the graph, the answer key draws it on the
+same grid the question copy gives (section 3).

@@ -28,9 +28,17 @@ What it prints:
   on the site's light and dark themes). `--alt` is the sentence a screen
   reader says, and is required with `--page`.
 
+The x and y columns are one width, from the widest value in either of
+them, and the first- and second-difference columns are one width, from the
+widest line in either, so right-aligned numbers end at the same offset in
+each column. Every value is centred vertically in its row, clear of the
+rules above and below it.
+
 Values may be whole numbers or decimals. If any value in a column has a
 decimal part, every value in it is written with the same number of places
-(2.0 beside 4.5), and the differences are written to the y column's places.
+(2.0 beside 4.5) and, if it mixes whole numbers and decimals, the column is
+right-aligned so the points line up; the differences are written to the y
+column's places.
 
 A teacher without Python copies the static example in finite_differences.tex
 (or plantoir-math-graphs section 4E for a page) and changes the numbers.
@@ -91,25 +99,48 @@ def text_width(text, font):
 
 
 def has_negative(values):
-    """Any negative value means right-aligned with padding; none means centred.
-    Zero is neither, so a column of 0, -3, -4 is right-aligned."""
+    """Zero is not negative, so a column of 0, -3, -4 has a negative value."""
     for value in values:
         if value < 0:
             return True
     return False
 
 
-def column_placement(values, places, left, width, padding, font):
-    """The node style and x position for one column of the table."""
-    if not has_negative(values):
-        return "numc", left + width / 2
+def mixes_whole_and_decimal(values):
+    """True for a column such as 9, 10.5, 12 (written 9.0, 10.5, 12.0)."""
+    whole = False
+    decimal = False
+    for value in values:
+        if value == value.to_integral_value():
+            whole = True
+        else:
+            decimal = True
+    return whole and decimal
+
+
+def right_aligned(values):
+    """Any negative value, or whole numbers beside decimals, means
+    right-aligned with padding, so the units digits and decimal points line
+    up; any other column of numbers is centred."""
+    return has_negative(values) or mixes_whole_and_decimal(values)
+
+
+def widest_value(values, places, font):
     widest = 0.0
     for value in values:
         width_of_value = text_width(written(value, places), font)
         if width_of_value > widest:
             widest = width_of_value
-    trailing = min(0.25, max(padding, (width - widest) / 2))
-    return "num", left + width - trailing
+    return widest
+
+
+def column_placement(values, left, width, padding):
+    """The node style and x position for one column of the table. The x and
+    y columns are the same width and share `padding`, so a right-aligned
+    value ends at the same offset in each."""
+    if not right_aligned(values):
+        return "numc", left + width / 2
+    return "num", left + width - padding
 
 
 def differences_of(values):
@@ -122,12 +153,11 @@ def differences_of(values):
 def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_first=2,
              nothing_worked=False):
     """Return the tikzpicture as text. mode is 'switch', 'filled' or 'student'."""
-    # Geometry, in cm: row height, heading height, x and y column widths
+    # Geometry, in cm: row height, heading height; the x and y columns share
+    # one width, the widest value in either plus 0.25 cm each side
     row = 0.62
     heading = 0.75
-    x_width = 0.8
-    y_width = 0.95
-    padding = 0.15
+    padding = 0.25
     gap = 0.07
     bulge = 0.32
     column_gap = 0.3
@@ -139,6 +169,9 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
     count = len(xs)
     x_places = decimal_places(xs)
     y_places = decimal_places(ys)
+    widest = max(widest_value(xs, x_places, number_font), widest_value(ys, y_places, number_font))
+    x_width = round(max(0.85, widest + 2 * padding), 2)
+    y_width = x_width
     first = differences_of(ys)
     second = differences_of(first)
     table_width = x_width + y_width
@@ -159,7 +192,8 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
     add(r"  numc/.style={num, anchor=center},")
     add(r"  dif/.style={num, text=diffcol, font=%s}," % subtraction_font)
     add(r"  diffarrow/.style={diffcol, thin, -stealth}}")
-    add("% The table of values: a shaded heading row, a full outer border, one ruled row for each x")
+    add("% The table of values: a shaded heading row, a full outer border, one ruled row for each x;")
+    add("% the x and y columns are one width, and each value is centred in its row")
     add(r"\fill[headfill, fill opacity=0.13] (0,0) rectangle (%.2f,%.2f);" % (table_width, -heading))
     add(r"\draw (0,0) rectangle (%.2f,%.3f);" % (table_width, bottom))
     add(r"\draw (%.2f,0) -- (%.2f,%.3f);" % (x_width, x_width, bottom))
@@ -167,9 +201,10 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
         add(r"\draw (0,%.3f) -- (%.2f,%.3f);" % (-heading - index * row, table_width, -heading - index * row))
     add(r"\node at (%.3f,%.3f) {$x$};" % (x_width / 2, -heading / 2))
     add(r"\node at (%.3f,%.3f) {$y$};" % (x_width + y_width / 2, -heading / 2))
-    add("% A column with any negative value is right-aligned with padding; one with none is centred")
-    x_style, x_position = column_placement(xs, x_places, 0, x_width, padding, number_font)
-    y_style, y_position = column_placement(ys, y_places, x_width, y_width, padding, number_font)
+    add("% A column with any negative value, or whole numbers beside decimals, is right-aligned")
+    add("% with padding; any other column of numbers is centred")
+    x_style, x_position = column_placement(xs, 0, x_width, padding)
+    y_style, y_position = column_placement(ys, x_width, y_width, padding)
     for index in range(count):
         add(r"\node[%s] at (%.2f,%.3f) {$%s$};" % (x_style, x_position, centre_of_row(index), written(xs[index], x_places)))
     for index in range(count):
@@ -200,13 +235,12 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
             return index < worked_first
         return index == 0
 
-    starts = []
-    equals_at = []
-    right_edges = []
-    left = table_width + gap
+    # The difference columns share one width: the widest subtraction and the
+    # widest result in EITHER column, so their equals signs and their right
+    # edges sit at the same offset in each
+    widest_left = 0.0
+    widest_right = 0.0
     for column in range(columns):
-        widest_left = 0.0
-        widest_right = 0.0
         for index in range(len(results[column])):
             left_text = subtraction(sources[column][index + 1], sources[column][index], y_places)
             right_text = "= " + written(results[column][index], y_places)
@@ -214,6 +248,12 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
                 widest_left = text_width(left_text, subtraction_font)
             if text_width(right_text, subtraction_font) > widest_right:
                 widest_right = text_width(right_text, subtraction_font)
+
+    starts = []
+    equals_at = []
+    right_edges = []
+    left = table_width + gap
+    for column in range(columns):
         starts.append(left)
         equals_at.append(left + bulge + inner + widest_left)
         right_edges.append(equals_at[-1] + widest_right)

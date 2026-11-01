@@ -5,6 +5,7 @@
 %   B. An EXISTING colortbl table that is to stay a tabular: \rowcolor with
 %      its two overhang arguments (inset 0.5pt) - never \cellcolor.
 %   C. Tables side by side: one top edge, one row pitch.
+%   D. Tall rows with room to write, each value centred in its row.
 %
 % Never mix the two kinds in one table. The preamble lines a handout needs
 % are marked "Preamble" below; the starters carry them already, except
@@ -31,6 +32,18 @@
 % - Side by side, plain tabulars with a two-line heading in one of them
 %   drifted 46 px at 600 dpi; pattern C put every rule of three tables at
 %   the same height.
+% - (2026-11-01) The value columns of a table are ONE width, the widest
+%   value in either column plus 0.5cm (\setvaluecol), as w{c}{...} or
+%   w{r}{...} columns: at 300 dpi the right-aligned x and y values of
+%   pattern C's first table end at the same offset (47 px) in each column.
+%   The padding of a right-aligned column, <{\hspace{0.25cm}}, sits inside
+%   that width, so the widest value has about 0.46cm on both sides.
+% - (2026-11-01) \arraystretch 1.2 gives every value a little space above
+%   and below (at 1.0 a digit sat 10 px at 300 dpi under the heading rule
+%   and 18 px over the next). A TALL row - room to write - is made with
+%   \rowstrut{3em} at the start of the row, never a big \arraystretch:
+%   \arraystretch 2.6 put the digit's middle 14 px (1.2 mm) below the row's
+%   middle, \rowstrut 1.5 px.
 \documentclass[11pt]{article}
 \usepackage[letterpaper, margin=0.75in, bottom=0.9in]{geometry}
 \usepackage{lmodern}
@@ -41,6 +54,10 @@
 \usepackage{nicematrix}     % Preamble: patterns A and C
 \definecolor{tablehead}{RGB}{225,232,245}             % Preamble: the heading row's shade
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}    % Preamble: one heading-row height
+\renewcommand{\arraystretch}{1.2}                     % Preamble: space above and below every value
+\newlength{\valuecol}                                 % Preamble: one width for a table's value columns,
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}  % the widest value + 0.5cm
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.3em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}    % Preamble: a tall row, value centred
 \setlength{\parindent}{0pt}
 \pagestyle{empty}
 \providecommand{\patternbreak}{\par\bigskip\bigskip}
@@ -51,11 +68,16 @@
 % Per column, by its values: x (1 to 4) has no negative value, so it is
 % centred (c); y holds -3, -4, -3 and 0, so it is right-aligned with 0.25cm
 % of padding before the rule. Zero is not negative and does not make a column
-% "all the same sign". The heading over a right-aligned column is centred
+% "all the same sign". A column mixing whole numbers and decimals (2.0 beside
+% 4.5) is right-aligned too, so its decimal points line up; any other column
+% of numbers is centred. The heading over a right-aligned column is centred
 % with \multicolumn{1}{c}{...}; in a NiceTabular the [hvlines] option draws
 % every rule, so the heading's spec needs no | and no \hline is written.
-{\renewcommand{\arraystretch}{1.25}%
-\begin{NiceTabular}{cr<{\hspace{0.25cm}}}[hvlines]
+% The two columns are ONE width - the widest value in either column ($-3$)
+% plus 0.5cm, set by \setvaluecol inside the table's group - so the values
+% sit at the same offset in each. Write the widest value of THIS table.
+{\setvaluecol{$-3$}%
+\begin{NiceTabular}{w{c}{\valuecol}w{r}{\valuecol}<{\hspace{0.25cm}}}[hvlines]
 \CodeBefore
   \rowcolor{tablehead}{1}
 \Body
@@ -79,8 +101,8 @@ $4$ & $0$ \\
 % an "Outer border, drawn last" block), which closes it. A table being rewritten anyway
 % becomes pattern A. In a plain tabular the heading's \multicolumn repeats the rules:
 % {|c|} over the first column, {c|} over the others.
-{\renewcommand{\arraystretch}{1.25}%
-\begin{tabular}{|c|r<{\hspace{0.25cm}}|}
+{\setvaluecol{$-3$}%
+\begin{tabular}{|w{c}{\valuecol}|w{r}{\valuecol}<{\hspace{0.25cm}}|}
 \hline
 \rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]
 \multicolumn{1}{|c|}{$x$} & \multicolumn{1}{c|}{$y$} \\
@@ -102,10 +124,16 @@ $4$ & $0$ \\ \hline
 % otherwise). A two-line heading is \Block{}{First\\differences}.
 % Decimals: in a column mixing whole numbers and decimals, every value has
 % the same places (2.0 beside 4.5, 0.0 beside 0.5) - never a bare whole
-% number, never \phantom. A column of whole numbers gets no decimals.
-{\renewcommand{\arraystretch}{1.25}%
+% number, never \phantom - and the column is right-aligned with padding, so
+% the decimal points line up (h below). A column of whole numbers gets no
+% decimals.
+% Each table sets ONE \valuecol for its value columns, from its own widest
+% entry (a heading wider than every value, such as $h$ (m), counts). The
+% row height is the preamble's one \arraystretch, the same for all three.
+{%
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{r<{\hspace{0.25cm}}r<{\hspace{0.25cm}}}[hvlines]
+\setvaluecol{$-18$}%
+\begin{NiceTabular}[t]{w{r}{\valuecol}<{\hspace{0.25cm}}w{r}{\valuecol}<{\hspace{0.25cm}}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 \multicolumn{1}{c}{\headstrut$x$} & \multicolumn{1}{c}{$y$} \\
 $-2$ & $-6$ \\
@@ -115,7 +143,8 @@ $1$ & $-18$ \\
 \end{NiceTabular}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{ccc}[hvlines]
+\setvaluecol{$7$}%
+\begin{NiceTabular}[t]{w{c}{\valuecol}w{c}{\valuecol}c}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 \headstrut$x$ & $y$ & \Block{}{First\\differences} \\
 $0$ & $1$ & \\
@@ -125,14 +154,33 @@ $3$ & $7$ & \\
 \end{NiceTabular}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{cc}[hvlines]
+\setvaluecol{$h$ (m)}%
+\begin{NiceTabular}[t]{w{c}{\valuecol}w{r}{\valuecol}<{\hspace{0.25cm}}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
-\headstrut$t$ (s) & $h$ (m) \\
+\headstrut$t$ (s) & \multicolumn{1}{c}{$h$ (m)} \\
 $0$ & $2.0$ \\
 $1$ & $4.5$ \\
 $2$ & $0.5$ \\
 $3$ & $0.0$ \\
 \end{NiceTabular}
 \end{minipage}}
+
+\patternbreak
+
+% ---------- D. Tall rows with room to write ----------
+% A skeleton table students fill in by hand gets tall rows, and each value
+% is centred in its row: \rowstrut{3em} at the start of every row (the
+% heading keeps the ordinary height). Never a big \arraystretch for this:
+% it puts each value low in its row (14 px at 300 dpi at 2.6). The x and y
+% columns are one width, as always; a table students write in gets the room
+% they need. The difference column has a width of its own (its heading's).
+{\setlength{\valuecol}{1.6cm}%
+\begin{NiceTabular}{w{c}{\valuecol}w{r}{\valuecol}<{\hspace{0.25cm}}w{c}{2.2cm}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+\headstrut$x$ & \multicolumn{1}{c}{$y$} & \Block{}{First\\differences} \\
+\rowstrut{3em}$0$ & $-5$ & \\
+\rowstrut{3em}$1$ & $-2$ & \\
+\rowstrut{3em}$2$ & $1$ & \\
+\end{NiceTabular}}
 
 \end{document}

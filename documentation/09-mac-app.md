@@ -3362,7 +3362,13 @@ rejected:
   checks five right-aligned and five centred maths cells, a right-aligned
   heading, and that "2.0" and "0.0" are each a centred cell of their own
   (two and one), not merely somewhere on the page (the fixes round, review
-  L5).
+  L5). **Corrected 2026-11-01:** this merge missed the issue's 12:43
+  refinement - a column mixing whole numbers and decimals is right-aligned
+  too, so its points line up - and centred such a column in both skills,
+  the page example, `tables.tex`, the contract clause and 6n. The second
+  round (below) fixes all of them; 6n now counts ten right-aligned cells,
+  no centred one, two right-aligned headings, and "2.0" and "0.0" as
+  right-aligned cells of their own.
 - **The finite-difference scaffold** ships as a static example
   (`finite_differences.tex`, and pattern E in math-graphs for a page) beside
   a cleaned copy of the generator Russell's session wrote
@@ -3417,6 +3423,66 @@ rejected:
 - **Task cards**: one relation per grid, never "on the same axes", at most
   four graphs per set, discussion pages mirror the cards word for word -
   carried as the issue wrote them.
+
+**Graphs, the key's layout, and table widths and spacing (#715 reopened,
+2026-11-01).** Russell added five rules after the merge (issue comments
+13:02-13:14 UTC), landed on `issue/715-graph-and-key-rules`:
+
+- **Abstract or in context, decided per graph.** A graph of a relation with
+  no context is drawn to the edge of the grid with an arrowhead at each end,
+  its plotted points kept; one that models a context stops at the end points
+  the situation gives it, with no arrowheads. `plantoir-handouts` section 12
+  and `plantoir-math-graphs` section 4 carry it; pattern B's static fence and
+  the handout starter's question 2 now follow it. MEASURED on the site's
+  engine (node-tikzjax 1.0.5, `support/figures` driven through
+  `figures.run_jobs` in the `quartz-teacher:dev-test` image, the SVG
+  rasterised with rsvg-convert): `<->, >=latex` on an `\addplot` inside an
+  `axis` draws both arrowheads, as do `>=stealth` and `arrows.meta`'s
+  `{Latex}-{Latex}` (each about 0.7 s). A `domain` that runs PAST the grid's
+  edge loses both arrowheads, because the axis clips the curve and its tips
+  with it - measured on the engine and in tectonic alike - so the skills
+  say to solve for where the curve leaves the grid. functionplot cannot end
+  a curve or draw an arrowhead (it draws every function across the window),
+  so it stays the tool for an abstract relation explored on screen and a
+  context graph is a `tikz` fence. REJECTED: adding arrowheads to functionplot
+  (it is the vendored function-plot's drawing, and a plain line on an
+  interactive graph a student drags past its edge says the same thing).
+- **The answer key keeps the question copy's layout** (`plantoir-handouts`
+  section 3): one table and one grid, authored once, with only the cells and
+  the plotted answer switched by `\qa`/`\onlya`. The starter's question 2
+  used to draw its grid only in the key; it now draws the same grid in
+  both. **Orientation** (section 9): a horizontal two-row table is fine where
+  no finite differences are asked; any table used for finite differences is
+  vertical; the key follows the question.
+- **One width for the value columns.** x and y share a width, and the two
+  difference columns share one, from the widest value in either:
+  `\setvaluecol{widest}` (width plus 0.5 cm) with `w{c}{\valuecol}` /
+  `w{r}{\valuecol}<{\hspace{0.25cm}}`. Measured at 300 dpi: the
+  right-aligned x and y values of pattern C's first table end 47 px from
+  their right rules in both columns; the `<{\hspace}` padding falls inside
+  the `w` box. `finite_differences.py` now computes one x/y width (widest +
+  0.25 cm each side, at least 0.85 cm; it was 0.8 and 0.95) with a shared
+  0.25 cm padding, and one width for both difference columns; the static
+  `finite_differences.tex` and math-graphs pattern E were regenerated from it.
+- **Space above and below every value.** `\arraystretch` 1.2 in the starters'
+  preamble; a tall skeleton row takes `\rowstrut{3em}` (a strut centred on
+  0.3 em, the middle of a digit). Measured at 300 dpi: at `\arraystretch`
+  1.0 a digit sat 10 px below the heading rule and 18 px above the next; at
+  2.6 its middle sat 14 px (1.2 mm) below the row's middle; with
+  `\rowstrut{3em}`, 1.5 px. REJECTED: a large `\arraystretch` for tall rows,
+  for that reason. `patterns/tables.tex` gains pattern D.
+
+- **A miss in the first merge, corrected: a column mixing whole numbers and
+  decimals is right-aligned** with the same 0.25 cm padding as a negative
+  column (the issue's 12:43 refinement, which the first merge did not
+  carry): centring 9.0 beside 10.5 shifts the point by half a digit from
+  row to row. Fixed in `plantoir-handouts` section 9, `plantoir-page-authoring`
+  section 7 (its example's y column is `---:` now), `tables.tex` pattern
+  C's h column, `finite_differences.py` (`right_aligned`: any negative, or
+  whole beside decimal), the contract's `handoutsSkill.rule`, and 6n.
+
+Not landed here: the 12:58 fill-in-blank height rule, which was not part
+of this piece.
 
 Russell's own `~/.claude/CLAUDE.md` "Tables of values" bullet still says to
 right-align every numeric column and use `\phantom{.5}`, which #715
