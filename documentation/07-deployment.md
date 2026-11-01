@@ -1866,7 +1866,9 @@ COEP `require-corp` for the COEP checks) is asked again every 5 s for at most
 `↻` line naming the file, the count and the seconds, and the Result block
 carries one measured line per site ("N file(s) needed asking again, …", or "no
 file needed asking again"). An answer that never comes is still that check's
-failure, judged on the last answer. A plain run asks once, exactly as before.
+failure, judged on the last answer. A plain run asks once, exactly as before,
+and so does the local preview's `check_engine` on any run, since it is no new
+site.
 
 **Measured at the v1.9.1 gate** (2026-11-01, dev e7a73e082, M4 Pro, home
 network): two `--first-publish` runs in a row failed on the NEW Netlify site

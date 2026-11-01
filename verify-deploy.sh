@@ -254,6 +254,7 @@ fetch_headers() {
     waited=$(( $(date +%s) - start ))
     [ "$good" = true ] && break
     [ "$FIRST_PUBLISH" = true ] || break
+    case "$url" in http://localhost:*) break ;; esac  # the preview is no new site
     [ "$waited" -ge "$NS_WAIT" ] && break
     tries=$((tries+1))
     sleep "$NS_POLL"
@@ -270,6 +271,7 @@ fetch_headers() {
 measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in />
   local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
   [ "$FIRST_PUBLISH" = true ] || return 0
+  case "$2" in http://localhost:*) return 0 ;; esac
   line=$(awk -F '\t' -v b="$2" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
     END { if (n == 0) print "no file needed asking again"; else printf "%d file(s) needed asking again, %d retries in all, at most %d for one file, the longest %d s", n, t, m, w }' "$log" 2>/dev/null)
   MEASURED+=("$1, a brand-new site's files (#740): ${line:-no file needed asking again}")
