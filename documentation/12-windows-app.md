@@ -8648,9 +8648,11 @@ which breaks the 2560 x 1720 match with the mac (#557), and (c) shorter
 quizzes, which changes what teachers are shown to fit a capture. On the mac
 the page runs under an invisible title bar with no buttons
 (`webwindow.swift`), so the old top margin was only space, not clearance.
-**The mac's two pictures were taken under 40/56 and must be retaken with
-the new scripts** (`capture.py --quizzes --quiz-shots
-quiz-math,quiz-code-run`) so the twins frame alike; that is mac #710.
+**The mac's two pictures were retaken under the new scripts on
+2026-11-01** (`capture.py --quizzes --quiz-shots quiz-math,quiz-code-run`,
+mac #710), so the twins frame alike: both moved exactly 32 pt down
+(an edge-scan of the old and new pictures), and nothing else in them
+changed.
 The other quiz and code scripts keep 40/56.
 
 **`--geogebra`.** The Windows twin of `capture.py --geogebra`, in
