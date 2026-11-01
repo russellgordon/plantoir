@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 31 October 2026. The current release is **1.9.0** on both the Mac and Windows.*
+*Last updated: 1 November 2026. The current release is **1.9.1** on the Mac and **1.9.0** on Windows.*
 
 A few things to know before you read on:
 
@@ -82,10 +82,6 @@ need to read those to use Plantoir.
   correcting what it says about scheduled publishing when your computer is
   closed or asleep at the scheduled time
   ([#509](https://github.com/russellgordon/plantoir/issues/509)).
-- **Being looked into: a completely opt-in usage count**, so we can learn
-  roughly how many teachers use Plantoir and how. Nothing would be sent unless
-  you choose to turn it on.
-  ([#510](https://github.com/russellgordon/plantoir/issues/510))
 - Behind the scenes: a handful of checks that the Mac and Windows apps
   behave the same way, and fixes to how plantoir.app's pictures are made.
 
