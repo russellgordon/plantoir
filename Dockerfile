@@ -13,9 +13,11 @@
 # inspect python:3.11-slim` names the current index digest; bump it
 # deliberately, and run verify.sh. A package an apt line below NAMES comes
 # from Debian's live trixie-security instead, but only when that line's layer
-# is rebuilt - which a cached layer never is. The certificate store is the
-# one that cannot wait for either, so it has a late layer of its own (#639,
-# below the tikz engine).
+# is rebuilt - which a cached layer never is. Debian's security updates are
+# the ones that cannot wait for either, so they have a late layer of their
+# own (#639, #714, below the tikz engine): every package trixie-security has
+# a newer version of, with floors on the certificate store, libbrotli1 and
+# libssl3t64.
 FROM python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
 
 # Python packages: frontmatter parsing, and Pillow to draw each
@@ -53,18 +55,6 @@ RUN apt-get update && apt-get install -y curl git lsof dos2unix fonts-noto-color
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs=22.23.4-1nodesource1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Cloudflare's own deploy CLI, used by deploy.py for the Pages publishing
-# target. It is pinned, and deliberately pinned BELOW 4.87: 4.87.0 is the
-# first wrangler whose engines need Node 22 (`npm view`, 2026-10-23: 4.80.0
-# to 4.86.0 say >=20.3.0, 4.87.0 on say >=22.0.0; this comment said 4.100
-# until #640, thirteen minors late). This image runs Node 22 now,
-# but the pin is shared with Windows, whose runtime stays on Node 20 until its
-# own issue lands - so the pin stays below the first version Windows cannot run.
-# Moving wrangler is its own piece, once both platforms run Node 22. The
-# exact pin also keeps the image reproducible and stops an upstream CLI
-# change from breaking publishing for a teacher mid-semester.
-RUN npm install -g wrangler@4.80.0 && npm cache clean --force
 
 # Clone Quartz v4.5.0 into /opt/quartz
 #
@@ -184,26 +174,51 @@ RUN cd /opt/vendor/tikz-engine \
  && npm ls node-tikzjax@1.0.5 \
  && npm cache clean --force
 
+# Debian's security updates (#714), and the three floors under them.
+#
+# The base's packages are frozen at its digest, and the apt line above is
+# cached on every Mac that has built before, so neither ever takes a fix
+# Debian publishes later. This layer does: every package for which
+# trixie-security (already in the base's sources) has a newer version than
+# the image - 15 of them on 2026-10-31, 22.6 MB, among them libssl3t64
+# 3.5.6 -> 3.5.7 (the TLS under every Netlify publish and deploy.py's own
+# Cloudflare calls) and libbrotli1 1.1.0-2+b7 -> +deb13u1 (CVE-2026-111497,
+# in CISA's KEV since 2026-10-27; curl links it, and GeoGebra's download
+# below runs on it). The three floored packages are ALSO named, so they are taken from
+# whichever archive has the newer version: the selector keeps a package only
+# when its candidate is labelled Debian-Security, and a point release that
+# ships a newer stable-only version would otherwise leave one at the base's
+# copy and fail the floor on every first build.
+#
 # Debian's certificate store, at least 20250419+deb13u1 (#639): the version
 # that stops trusting "AAA Certificate Services" (Comodo) and "emSign ECC Root
 # CA - G3" (eMudhra), the roots above the intermediates compromised in
-# October 2026. Python's urllib - every Netlify publish, and deploy.py's own
-# Cloudflare calls - trusts this store, and OpenSSL checks no revocation, so
-# distrusting the roots is the protection. The base's own copy is frozen at
-# 20250419 by its digest, and the apt line above is cached on every Mac that
-# has built before; trixie-security is in the base's sources, so this
-# upgrades it without moving the digest. A FLOOR, not an `=` pin: Debian's
-# security archive serves only its newest version, so an exact pin would break
-# every first build the day deb13u2 ships, and a later version only distrusts
-# more. The floor is written in this line, so raising it re-runs the layer,
-# and a store older than it fails the build rather than shipping. Its own
-# layer, late, so a teacher who has built before re-runs only this (~10 MB,
-# seconds), not apt, wrangler, Quartz and npm (~330 MB). verify.sh checks
-# the version and both subjects; contracts/toolchain.json -> pins ->
-# caCertificates and documentation/02 -> "The certificate store" carry why.
+# October 2026. Python's urllib trusts this store, and OpenSSL checks no
+# revocation, so distrusting the roots is the protection.
+#
+# FLOORS, not `=` pins: Debian's security archive serves only its newest
+# version, so an exact pin would break every first build the day the next
+# one ships, and a later version only carries more fixes. Each floor is
+# written in this line, so raising one re-runs the layer, and a package older
+# than its floor fails the build rather than shipping. REJECTED: a full
+# `apt-get upgrade` (25 packages, 57.6 MB, six more fixes from the 13.7 point
+# release), because it would move nodejs off its exact pin the day NodeSource
+# ships 22.23.5 - those fixes come with the next base-digest bump instead;
+# and this layer at the top of the file, which would re-run the clone and
+# every download above for a cached Mac, for packages none of them need.
+# Its own layer, late, so a teacher who has built before re-runs only this
+# (seconds), not apt, Quartz and npm (~330 MB). verify.sh checks every floor
+# and the store's subjects; contracts/toolchain.json -> pins ->
+# caCertificates, libbrotli1, libssl3t64 and documentation/02 -> "Debian's
+# security updates (#714)" carry why.
 RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade \
+      $(apt-get -s upgrade | awk '/^Inst / && /Debian-Security/ {print $2}') \
+      libbrotli1 libssl3t64 openssl \
  && apt-get install -y --no-install-recommends ca-certificates \
  && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419+deb13u1 \
+ && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge 1.1.0-2+deb13u1 \
+ && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libssl3t64)" ge 3.5.7-1~deb13u3 \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # GeoGebra (#578): the engine a class site's ```geogebra sketches run on,
@@ -234,6 +249,23 @@ RUN test "$(python3 /tmp/geogebra_engine.py version)" = "$GEOGEBRA_VERSION" \
  && echo "409095947e065bce5bde20b8a6d56a60e2b3cb3cce6947e817a802513515ec0c  /tmp/ggb.zip" | sha256sum -c - \
  && python3 /tmp/geogebra_engine.py adapt /tmp/ggb.zip /opt/vendor/geogebra \
  && rm -f /tmp/ggb.zip /tmp/geogebra_engine.py
+
+# Cloudflare's own deploy CLI, used by deploy.py for the Pages destination,
+# PINNED EXACTLY at the newest 4.x on 2026-10-31 (#699): the exact pin keeps
+# the image reproducible and stops an upstream CLI change from breaking
+# publishing for a teacher mid-semester. It was held at 4.80.0, below 4.87
+# (the first wrangler whose engines need Node 22), until both platforms ran
+# Node 22.23.4 - the image since #640, Windows' runtime since #675 - so the
+# ceiling is retired on both. 4.156.0 bundles undici 7.30.1 in its own
+# wrangler-dist/cli.js (4.80.0 bundled 7.24.4), and npm audit finds no
+# advisory in its tree, against 35 in 4.80.0's. Since 4.108 a NEW static
+# project deployed by an AI agent goes to Workers instead of Pages; deploy.py
+# passes --branch (an argument that delegation refuses) and makes the
+# project through the API first, and docker exec hands wrangler six named
+# variables only (documentation/07). Its own layer, late, so the next bump
+# re-runs this (~222 MB) and nothing above it; contracts/toolchain.json ->
+# pins -> wrangler carries why.
+RUN npm install -g wrangler@4.156.0 && npm cache clean --force
 
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx

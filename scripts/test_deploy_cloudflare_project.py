@@ -13,7 +13,10 @@ non-interactive context", exit 1.
 So everything that would make wrangler ask must be settled before it runs:
 
   * the flags that answer its questions (project, branch, dirty tree) are
-    passed, and CI is set, whatever the caller's environment;
+    passed, and CI is set, whatever the caller's environment. --branch is
+    load-bearing twice since wrangler 4.108 (#699): it is also an argument
+    wrangler's Pages-to-Workers delegation refuses, so an AI agent's deploy
+    of a new project stays on Pages (documentation/07);
   * the project must EXIST. A section's saved project whose Cloudflare project
     was deleted in the dashboard made wrangler ask "create it?", and every
     publish of that section failed. Found 2026-09-30, when verify-deploy.sh

@@ -54,6 +54,17 @@ a release cut when anything changed (RELEASING.md step 2). Older files stay.
 Cited from `contracts/toolchain.json` → `npmAudit` and
 `documentation/02-docker-image.md`.
 
+## `wrangler/` — what Cloudflare's deploy CLI prints
+
+Transcripts of `wrangler pages deploy` as the image runs it, kept so a later
+wrangler move can be compared with what was there before (#712). Each file
+names the wrangler and Node versions, the image tag and the run, and is
+redacted of the account id and anything token-shaped before it is committed.
+`2026-10-31-first-upload.md` holds a first-ever upload to a brand-new project
+on 4.80.0 and on 4.156.0 (#699), both from `verify-deploy.sh
+--first-publish`. Cited from `contracts/toolchain.json` → `pins` → wrangler
+and `documentation/02-docker-image.md`.
+
 ## `ai-assist/` — the local assistant
 
 Why the assistant is built the way it is: which models were tried, which were
