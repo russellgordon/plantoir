@@ -1628,6 +1628,32 @@ more file under `contracts/` by the time it ran), rebuilt the section from
 scratch in **32 s** (the image's layers were cached), and found the folder
 still on this checkout's recipe at the end.
 
+
+**A first publish, on the mac too (`--first-publish`, #712, 2026-10-31).** The
+plain run always answered the surname question "Testing" and so reused
+`ada1o-s1-2026-testing` for ever: no upload it made was a first-ever one,
+which is the case #699 needed to compare. A random surname alone would change
+nothing, because `deploy.py` reuses a recorded site and never asks (the plan
+review's finding). So `--first-publish` does what Windows' `-FirstPublish`
+does, path for path: the saved surname (`courses/.internal/profile.json` and
+the legacy `_secrets/profile.json`), the section's Netlify record (and the
+legacy per-section `.netlify_site.json`) and its Cloudflare record are
+RENAMED to `<path>.verify-deploy-hidden`, a sentinel
+(`courses/.verify-deploy-first-publish.txt`) records after each step whether
+each path was hidden or absent, and the restore deletes a record only when
+its original is safe beside it or there never was one — so a failed move can
+never cost the course its real records, and a run killed outright is put right
+by the next run's preflight. The surname is `Testing` plus six random
+letters. **Unlike Windows, it deletes the two sites it made** at the end, via
+Netlify's `DELETE /api/v1/sites/{id}` and Cloudflare's `DELETE
+/accounts/{id}/pages/projects/{name}` (the token on curl's stdin, never a
+command line), and only a site whose name carries that run's surname —
+compared in lower case, since Netlify kept the first run's `Testingwqvxbk`
+as typed and a case-sensitive test left it behind (deleted by hand, HTTP 204).
+The Result block says which were deleted and which need deleting by hand.
+Measured 2026-10-31: 173 passed, 1 failed (a Netlify link on the brand-new
+site, 200 minutes later) on wrangler 4.80.0; 175 passed, 0 failed on
+4.156.0; transcripts in `research/wrangler/2026-10-31-first-upload.md`.
 ## The scheduled task never refuses over FOLDER PROBLEMS
 
 Russell's call, and the reasoning travels: *"a slightly inaccurate curriculum map
