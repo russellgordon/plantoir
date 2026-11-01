@@ -55,6 +55,31 @@ input[type="checkbox"].plantoir-task {
   cursor: pointer;
 }
 
+// Where the box sits (#693): centred on the capitals of the words beside it,
+// at every size, in a tight list and a loose one, on screen and on paper.
+//
+// Quartz drew it 1px too high everywhere and 3px high of the capitals' middle
+// at 16px: its rule sets no margin-block, so the browser's own 3px top and
+// bottom margins lifted the box 3px, and its `translateY(2px)` - written for
+// Quartz's own `li > input` shape - brought back 2. Measured in Chrome 155 and
+// WebKit (macOS 26), 12-24px, system-ui, Georgia, Verdana and Times; the
+// numbers, and what was rejected, are in documentation/06 -> "Where the box
+// sits (#693)".
+//
+// `font: inherit` is what makes `cap` the WORDS' cap height rather than the
+// control's 13.33px default. 8px is half the box: Quartz's base.scss makes it
+// 16px square, and browser-checks/task_boxes.mjs asserts 16, so a Quartz that
+// changes it fails loudly rather than drifting by half a pixel. A browser
+// without the `cap` unit (Safari before 17.2) drops the second declaration
+// and keeps `baseline`: the box's bottom on the words' baseline.
+input[type="checkbox"].plantoir-task {
+  font: inherit;
+  margin-block: 0;
+  transform: none;
+  vertical-align: baseline;
+  vertical-align: calc(0.5cap - 8px);
+}
+
 input[type="checkbox"].plantoir-task {
   cursor: pointer;
 
