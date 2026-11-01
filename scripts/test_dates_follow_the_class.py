@@ -550,6 +550,72 @@ class DatesFollowTheClassTests(unittest.TestCase):
                          "2026-09-10T07:00:00.000+0000")
         self.assert_a_second_build_writes_nothing(folder, [1])
 
+    def test_a_shared_page_in_a_folder_that_is_per_section_too_takes_its_date_in_the_vault(self):
+        # "Unit 1" is both shared and per-section, as it becomes the moment a
+        # teacher makes a section-only page in a folder named like a shared
+        # one (the preflight adds the name). Lesson 3 is shared only;
+        # Homework is overridden by the section's own. Until #678 the
+        # per-section copy credited Lesson 3 to section1/Unit 1/Lesson 3.md,
+        # which does not exist, so its date was never written into the
+        # teacher's file: the site was dated, Obsidian was not. Copied with
+        # the build's own `copy_the_per_section_folders`, not a retyped loop.
+        self.use_the_course_words({})
+        course = self.temporary / "courses" / "TEST"
+        section_dir = course / "section1"
+        class_date = "2026-09-24T07:00:00.000+0000"
+        install_day = "2026-09-08T07:00:00.000+0000"
+        (section_dir / "All Classes").mkdir(parents=True)
+        (section_dir / "All Classes" / "Unit 1, Day 3.md").write_text(
+            f"---\ntitle: Unit 1, Day 3\npublish: true\ncreated: {class_date}\n---\n"
+            "[[Lesson 3]]\n[[Homework]]\n", encoding="utf-8")
+        (course / "Unit 1").mkdir(parents=True)
+        lesson = course / "Unit 1" / "Lesson 3.md"
+        lesson.write_text(f"---\ntitle: Lesson 3\ncreatedSection1: {install_day}\n---\nLesson.\n",
+                          encoding="utf-8")
+        shared_homework = course / "Unit 1" / "Homework.md"
+        shared_homework.write_text(f"---\ntitle: Homework\ncreatedSection1: {install_day}\n---\nShared.\n",
+                                   encoding="utf-8")
+        (section_dir / "Unit 1").mkdir(parents=True)
+        section_homework = section_dir / "Unit 1" / "Homework.md"
+        section_homework.write_text(f"---\ntitle: Homework\ncreated: {install_day}\n---\nThis section's.\n",
+                                    encoding="utf-8")
+        shared_before = shared_homework.read_bytes()
+
+        def build() -> tuple[Path, dict]:
+            content = self.temporary / "content1"
+            if content.exists():
+                shutil.rmtree(content)
+            content.mkdir()
+            build_site.forget_vault_sources(course)
+            for root, _dirs, files in os.walk(course / "Unit 1"):
+                relative = Path(root).relative_to(course)
+                (content / relative).mkdir(parents=True, exist_ok=True)
+                for file in files:
+                    shutil.copy2(Path(root) / file, content / relative / file)
+                    build_site.remember_vault_source(content / relative / file, Path(root) / file, False)
+                    build_site.process_frontmatter(content / relative / file, 1)
+            build_site.copy_the_per_section_folders(section_dir, content, ["Unit 1", "All Classes"], 1)
+            first = build_site._find_first_class_created(content)
+            if first is not None:
+                build_site._sync_non_class_pages_created(content, first)
+            return content, build_site._date_pages_from_their_classes(content, 1)
+
+        content, result = build()
+        self.assertEqual(frontmatter.load(content / "Unit 1" / "Lesson 3.md").get("created"), class_date,
+                         "the site's copy is dated")
+        self.assertEqual(self.date_the_build_reads(lesson, 1), class_date,
+                         "the shared page's own file did not take its class's date")
+        self.assertEqual(frontmatter.load(section_homework).get("created"), class_date)
+        self.assertEqual(shared_homework.read_bytes(), shared_before,
+                         "the shared page the section overrides was written")
+        self.assertIn("Unit 1/Lesson 3", result["rewritten"])
+        self.assertIn("section1/Unit 1/Homework", result["rewritten"])
+
+        settled = {path: path.read_bytes() for path in course.rglob("*.md")}
+        _content, again = build()
+        self.assertEqual(again["rewritten"], [], "a second build rewrote pages")
+        self.assertEqual({path: path.read_bytes() for path in course.rglob("*.md")}, settled)
+
     # MARK: - Assertions
 
     def copy_of(self, content: Path, title: str) -> Path:

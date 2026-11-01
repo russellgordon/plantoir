@@ -901,8 +901,12 @@ implementer's call, not Russell's ruling, and is flagged as such
 **Where a page came from** is recorded as the build copies it
 (`remember_vault_source`, beside each `shutil.copy2`): the section's
 `index.md`, each shared folder and file (a course page), each per-section folder
-and file (a section page). A page the build made itself has no source and is
-never written back.
+and file (a section page). In a folder that is both shared and per-section, a
+page is a section page only when the section's folder has that file; a shared
+page copied there keeps its course credit (`copy_the_per_section_folders`,
+#678 — until then such a page was credited to a section file that does not
+exist, and its date was never written back: "Which file each page came from",
+below). A page the build made itself has no source and is never written back.
 
 #### The trail
 
@@ -4144,13 +4148,75 @@ the class it embeds is hidden, and the trail's "(hidden from students)" is
 said of the file that opens, so the front page's own `hidden` cannot stand
 in for it (#518 implementation review).
 
-**One correction, one trap left alone.** The per-section folder copy credits
-EVERY file under a folder it copied to the section, so when a folder name is
-both shared and per-section, a shared page copied there first is credited to
-a section file that does not exist. The list names the shared file at the
-same place instead. The record itself (`_vault_sources`, which the date pass
-also writes back through) is unchanged; that trap is a toolchain issue of its
-own (#518's plan, recommended for v2.0.0).
+**A shared page keeps its shared credit, in every reader (#678).** A folder
+name can be shared AND per-section at once — section overrides are what that
+is for, and the preflight adds a per-section name by itself the moment a
+teacher makes a section-only page in a folder named like a shared one. The
+shared folder is copied first and the section's folder over it, so the build's
+folder then holds both. Until #678 the per-section copy credited EVERY file
+under it to the section, so each shared page there was credited to a section
+file that does not exist. This list corrected it for itself (#518); the
+record's other readers did not. Since #678, `copy_the_per_section_folders`
+credits a file to the section only when `os.path.lexists` finds it in the
+section's folder, and every other file keeps the shared credit the shared copy
+recorded; the #518 correction in `_vault_relative_source` is gone.
+
+- **What it cost a teacher, measured.** A driver (kept with #678's closing
+  comment, not in the repository) runs the real `build_section_site("EXC2O", 1, …)` (Quartz stubbed, stopped after the
+  date pass; `python3.11`, which has `frontmatter`) on fresh copies of
+  `courses/EXC2O` with every shared page's `createdSection1` stripped, so the
+  write-back has work to do. A: EXC2O as shipped. B: a page
+  `section1/Tasks/Section Task.md` added and `Tasks` added to
+  `per_section_folders`. C: the same page, settings untouched (the preflight
+  adds `Tasks` itself). Run back to back, 2026-11-01:
+
+  | Scenario | Pages | Credited to a missing file | Write-backs | Written | Skipped without a word |
+  |---|---:|---:|---:|---:|---:|
+  | A, before and after | 270 | 0 | 99 | 98 | 0 |
+  | B and C, before | 271 | **12** | 99 | 88 | **10** |
+  | B and C, after | 271 | 0 | 99 | 98 | 0 |
+
+  The ten skipped were the linked shared pages in `Tasks` (Lab Reports and
+  Unit 2 Test among them): their SITE copy was dated, their file in the vault
+  was not, and nothing said so. The written count is compared with A on the
+  same day rather than fixed, because it moves with today's date and the
+  fixture. It spies on `_write_date_into_the_teachers_page`; the site-only
+  pass cannot see this, and neither can `verify.sh`'s `--site` check, whose
+  EXC2O has no folder that is both shared and per-section.
+- **Who it reached.** Only a folder a teacher made by hand that is both
+  shared and per-section, since v1.4.0 (2026-09-27; the write-back came in
+  1bf84d415 on 2026-09-25). No payload, skeleton or app feature makes one —
+  none of the 39 payloads has a per-section folder other than `All Classes`.
+  The first build after the fix writes the missing dates itself, so there is
+  no migration.
+- **Every reader of the record is mended by the one change**: the date
+  write-back, the names in folder problems (`_place_in_the_course`) and in
+  links into hidden pages, the name of a page whose settings cannot be read,
+  the teacher's file the figure, quiz, GeoGebra and runnable-Swift checks read
+  line numbers from (`_vault_source_of`, which fell back to the build's copy
+  and so gave a wrong line), the site-said side file, and this list.
+  `test_page_sources.py` and `test_dates_follow_the_class.py` drive the
+  build's own `copy_the_per_section_folders` rather than a retyped loop, so a
+  must-fail against them proves something; with the old credit restored,
+  four page-source tests and the new date test fail.
+- **`lexists`, not `exists`**: a section page that is a link to a file
+  elsewhere is the section's page all the same, and the write-back must see
+  it as one to say "left linked".
+- **Left as it was, and known:** two names that differ only by case. In the
+  container the content root is on ext4, so a shared `x.md` and a section
+  `X.md` both land there; `lexists(section/…/x.md)` asks the host's
+  case-insensitive disk through the mount and answers yes, so the shared page
+  is still credited to the section and its date goes into `X.md`. #678 does
+  not make that worse; an exact-name check (`name in os.listdir(parent)`)
+  would close it, and is not in this piece.
+- **Rejected:** correcting each reader, as #518 did for this list — eight
+  readers, each one a place to forget; walking the section's folder instead of
+  the build's — it would stop the frontmatter pass and the wikilink rewrite
+  reaching the shared pages in a mixed folder, which they reach today;
+  keeping the #518 correction as a safety net — it hid exactly this fault,
+  and without it a regression is a page missing from the list, which
+  `test_page_sources.py` fails on; a folder problem of its own for a folder
+  that is both shared and per-section — it is a legitimate, designed shape.
 
 **Measured against Quartz itself.** `scripts/test_page_sources.py` runs the
 slug cases and a course copied the way the build copies it, in the image
