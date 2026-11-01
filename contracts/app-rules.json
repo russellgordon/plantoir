@@ -2826,6 +2826,382 @@
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. What points a session at one course is the greeting. Both doors ALSO name their course to the server, in its environment (doorCourseVariable) - to HOLD it, never to narrow: the server takes an assist lease on it (shared-rules.json -> doorCourseHold), and every course stays reachable. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
     "doorCourseVariable" : "PLANTOIR_DOOR_COURSE",
     "doorCourseVariableWhy" : "The one name both platforms read: both doors write it into their server's environment (each agent's serverEnvironment: the Claude door in its configuration's env, the Codex door as a -c override), and the server - Plantoir --mcp-stdio on the mac since #458, plantoir-mcp on Windows since #430 - holds an assist lease on that course when the folder has it. An environment variable rather than an argument because the argv is the folder alone (serverArguments) and #430's trap was a course in the argv being read as a lock.",
+    "fixWith" : {
+      "note" : "Fix with Claude… and Fix with Codex… on a section's Problems tab (#717 part two, 717b; Russell's rulings 3, 5 and 6 on #717): the problems a teacher ticked, handed to an outside assistant through the SAME two doors as Revise With ▸ (agents, above), with an opening message that lists them in place of the plain greeting. AUTHORED, not generated. The rows' own words are the record's `prompt` (shared-rules.json -> sectionProblems.prompt), used verbatim.",
+      "buttons" : [
+        {
+          "key" : "claude",
+          "title" : "Fix with Claude…"
+        },
+        {
+          "key" : "codex",
+          "title" : "Fix with Codex…"
+        }
+      ],
+      "where" : "Under the table on the section's Problems tab, Claude's first.",
+      "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
+      "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
+      "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
+      "atTheClick" : "The same refusal Revise With ▸ makes at the click (a Claude or Codex session already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
+      "opensAt" : "The working folder, as both doors always do: that is where the skills and the guidance are. The message names each page by its place from there, courses/<COURSE>/<page>.md.",
+      "fixGreeting" : {
+        "openingOne" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found a problem on its website that I'd like your help to fix: ",
+        "openingSeveral" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found problems on its website that I'd like your help to fix: ",
+        "rowWithAPage" : "{number}) {prompt} (page: {file}{shared}; skill: {skill})",
+        "rowWithoutAPage" : "{number}) {prompt} (skill: {skill})",
+        "sharedPage" : "; this page is shared by every section",
+        "rowSeparator" : "; ",
+        "more" : "; and {count} more on the Problems tab",
+        "afterTheRows" : ". Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. ",
+        "planFirst" : " Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. ",
+        "closing" : "When you are done, preview Section {section} so its Problems tab clears."
+      },
+      "fixGreetingIsOneLine" : "Windows hands the message to cmd /k, which cannot carry a newline, so rows are numbered on one line (1) …; 2) …) rather than set one per line (plan review, MED 9).",
+      "fixGreetingMustSay" : [
+        "the course, by code, and its name when that differs, and whether a preview or a deploy found the problems, and of which section",
+        "each handed row's prompt, verbatim, numbered",
+        "for a row with a page, the page's place from the working folder (courses/<COURSE>/<page>.md), and that the page is shared by every section when it is not under section<N>/",
+        "the skill for each row's kind (skillForKind)",
+        "that the plantoir tools are the way to do anything to do with this course",
+        "greetingHowITeachSentence, verbatim",
+        "that before anything is changed the teacher is shown what will change, in plain words, and agrees",
+        "that when it is done this section is previewed, so its Problems tab clears"
+      ],
+      "skillForKind" : {
+        "figuresCouldNotBeDrawn" : "plantoir-math-graphs",
+        "geogebraSketchesNotReady" : "plantoir-math-graphs",
+        "swiftCouldNotBePrepared" : "plantoir-runnable-code",
+        "runnableCodeShownAsPlainCode" : "plantoir-runnable-code",
+        "quizzesNotReady" : "plantoir-quizzes",
+        "quizzesReadDifferently" : "plantoir-quizzes",
+        "printPdfNotFound" : "plantoir-printing"
+      },
+      "otherwiseSkill" : "plantoir-page-authoring",
+      "skillForKindWhy" : "Each skill is one of the guidance skills the app writes into the working folder (support/agent_guidance/skills). Figures and GeoGebra sketches are plantoir-math-graphs, which knows what this site can draw; Swift and runnable code plantoir-runnable-code; self-check questions plantoir-quizzes; a handout plantoir-printing; everything else - links, page settings, a front page, the curriculum map, a file too large - plantoir-page-authoring, which the others defer to.",
+      "mostRowsInThePrompt" : 10,
+      "greetingMaxCharacters" : 6500,
+      "pagePlaceMaxCharacters" : 300,
+      "boundsWhy" : "Rows are named in the record's order until mostRowsInThePrompt are, or until the next would take the WHOLE message past greetingMaxCharacters; the first is always named, and the rest are 'and N more on the Problems tab'. A row's prompt is at most 400 characters (sectionProblems.prompt) and its page place at most pagePlaceMaxCharacters (cut with …), so ten ordinary rows fit, and 6,500 leaves room under cmd's 8,191-character command line for the terminal, the assistant's path and the configuration's.",
+      "rejected" : [
+        "Handing the rows over in a file the message names (plan review, MED 9's other option): it is a file written where the assistant can read it - the working folder, which Obsidian is watching - and nobody cleans it up; the one-line message fits.",
+        "One session per problem: a shared page's problems are one fix, and ten terminals are not triage.",
+        "Greying a button when its assistant is not installed: hiddenWhenNotInstalled, as Revise With ▸.",
+        "Asking a shell where the tool is: slow (1.06 s for zsh -lic on the planning Mac), and it runs the teacher's login scripts while a view draws. The doors' own search list (searchedForInOrder) is used."
+      ],
+      "buttonCases" : [
+        {
+          "name" : "both assistants installed, one problem ticked",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "only Claude installed: only its button",
+          "claudeInstalled" : true,
+          "codexInstalled" : false,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "only Codex installed: only its button",
+          "claudeInstalled" : false,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "neither installed: no button, and no sign either exists",
+          "claudeInstalled" : false,
+          "codexInstalled" : false,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "a course kept for reference: no button",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : true,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "every problem unticked: shown, not enabled",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : false,
+              "state" : "current"
+            },
+            {
+              "ticked" : false,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : false,
+            "handedOver" : 0,
+            "unticked" : 2,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "the only ticked problem is fixed in the source: left out, so not enabled",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "fixedInTheSource"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : false,
+            "handedOver" : 0,
+            "unticked" : 0,
+            "fixedInTheSource" : 1
+          }
+        },
+        {
+          "name" : "ticked, fixed in the source and unticked together: only the first is handed over",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            },
+            {
+              "ticked" : true,
+              "state" : "fixedInTheSource"
+            },
+            {
+              "ticked" : false,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 1,
+            "fixedInTheSource" : 1
+          }
+        }
+      ],
+      "buttonCasesHow" : "rows lists the record's rows in order, each ticked or not, in the state sectionProblems.rowState gives it. expect: whether each button is shown, whether the buttons are enabled (they are enabled together), and how many rows are handed over, unticked, and left out as fixed in the source.",
+      "greetingCases" : [
+        {
+          "name" : "one problem on a page every section shares",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Math) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/MPM2D/Unit 1/Graphs.md; this page is shared by every section; skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a section's own page is not called shared, a problem with no page names none, and a deploy says so",
+          "course" : "ICS3U",
+          "courseName" : "ICS3U",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "quizzesNotReady",
+              "page" : "section2/Class 4",
+              "prompt" : "“section2/Class 4”, question 2: no answer is marked as right"
+            },
+            {
+              "kind" : "sectionIndexMissing",
+              "page" : "",
+              "prompt" : "ICS3U Section 2 has no front page, so its website opens on a list of files."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “section2/Class 4”, question 2: no answer is marked as right (page: courses/ICS3U/section2/Class 4.md; skill: plantoir-quizzes); 2) ICS3U Section 2 has no front page, so its website opens on a list of files. (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "ten problems are all named",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 10,
+            "kind" : "figuresCouldNotBeDrawn",
+            "page" : "Unit {n}/Graphs",
+            "prompt" : "“Unit {n}/Graphs”, diagram 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 10,
+            "rowsNotNamed" : 0,
+            "atMostCharacters" : 6500
+          }
+        },
+        {
+          "name" : "an eleventh problem is counted, not named",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 11,
+            "kind" : "figuresCouldNotBeDrawn",
+            "page" : "Unit {n}/Graphs",
+            "prompt" : "“Unit {n}/Graphs”, diagram 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 10,
+            "rowsNotNamed" : 1,
+            "atMostCharacters" : 6500,
+            "textHas" : "; and 1 more on the Problems tab. "
+          }
+        },
+        {
+          "name" : "long page names stop the message at its length, and the rest are counted",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 11,
+            "kind" : "geogebraSketchesNotReady",
+            "page" : "Unit {n}/A very long page name about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs",
+            "prompt" : "“Unit {n}”, sketch 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 7,
+            "rowsNotNamed" : 4,
+            "atMostCharacters" : 6500,
+            "textHas" : "; and 4 more on the Problems tab. "
+          }
+        },
+        {
+          "name" : "nothing to hand over is no message",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [],
+          "expect" : null
+        },
+        {
+          "name" : "a row's own braces are handed over as written, and a double quote becomes an apostrophe",
+          "course" : "ICS4U",
+          "courseName" : "Grade 12 \"Computer\" Science",
+          "section" : 3,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "printPdfNotFound",
+              "page" : "Unit 2/Worksheet",
+              "prompt" : "“Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder"
+            },
+            {
+              "kind" : "runnableCodeShownAsPlainCode",
+              "page" : "section3/Class 9",
+              "prompt" : "“section3/Class 9”, a Python block: it is shown as plain code"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS4U (Grade 12 'Computer' Science) in Plantoir. The last preview of Section 3 found problems on its website that I'd like your help to fix: 1) “Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder (page: courses/ICS4U/Unit 2/Worksheet.md; this page is shared by every section; skill: plantoir-printing); 2) “section3/Class 9”, a Python block: it is shown as plain code (page: courses/ICS4U/section3/Class 9.md; skill: plantoir-runnable-code). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 3 so its Problems tab clears."
+          }
+        }
+      ],
+      "greetingCasesHow" : "rows are the handed rows in order (kind, page - empty for none - and prompt). manyRows makes count rows: page and prompt with {n} filled with the row's number from 1, and the prompt then followed by the letter x until it is promptCharacters long. expect null means no message; otherwise rowsNamed and rowsNotNamed, and text (the whole message, exactly), or atMostCharacters and textHas."
+    },
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",

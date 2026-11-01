@@ -79,12 +79,16 @@ nonisolated enum CodexLauncher {
     /// Open a session for one course. Returns false when it could not be
     /// started, so the caller can say so rather than leaving a teacher looking
     /// at nothing.
+    /// - Parameter greeting: the opening message, when it is not the plain
+    ///   one — Fix with Codex… (#717) hands over the problems a teacher
+    ///   ticked (`FixWithAssistant`). Nil sends the plain greeting.
     @discardableResult
     static func open(
         workspacePath: String,
         courseCode: String,
         courseName: String,
-        referenceCourses: [String] = []
+        referenceCourses: [String] = [],
+        greeting openingMessage: String? = nil
     ) -> Bool {
         guard let codex: String = findCodex(),
               let server: String = ClaudeCodeLauncher.findServer() else {
@@ -99,7 +103,8 @@ nonisolated enum CodexLauncher {
                 courseName: courseName,
                 codexPath: codex,
                 serverPath: server,
-                referenceCourses: referenceCourses
+                referenceCourses: referenceCourses,
+                greeting: openingMessage
             )
         } catch {
             return false
@@ -120,13 +125,18 @@ nonisolated enum CodexLauncher {
         courseName: String,
         codexPath: String,
         serverPath: String,
-        referenceCourses: [String] = []
+        referenceCourses: [String] = [],
+        greeting openingMessage: String? = nil
     ) throws -> String {
         // The greeting is the SAME paragraph both doors send. It names no
         // product, and a teacher who tries both should get the same session.
-        let prompt: String = ClaudeCodeLauncher.greeting(
+        // So is Fix with…'s message, when one is given (#717).
+        var prompt: String = ClaudeCodeLauncher.greeting(
             courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
         )
+        if let openingMessage {
+            prompt = openingMessage.replacingOccurrences(of: "\"", with: "'")
+        }
 
         let scriptPath: String = try writeLauncherScript(
             workspacePath: workspacePath,

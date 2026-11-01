@@ -39,9 +39,15 @@ nonisolated struct ProblemsTableRow: Identifiable, Hashable, Sendable {
 }
 
 /// A section's Problems tab (#717): one row per problem its last build met,
-/// with a tick per row — ticked means included, for 717b's Fix with Claude
-/// or Codex — sortable by kind, and the repair inline where a problem has
-/// one, because the alert no longer comes with every build.
+/// with a tick per row — ticked means included in what Fix with Claude… and
+/// Fix with Codex… hand over — sortable by kind, and the repair inline where
+/// a problem has one, because the alert no longer comes with every build.
+///
+/// The two Fix buttons sit under the table (#717 part two,
+/// `FixWithAssistant`): each shown only while its assistant is installed
+/// (`OutsideAssistantPresence`, never asked while this view draws), never on
+/// a course kept for reference, and enabled while a ticked row is still this
+/// section's problem.
 ///
 /// Drawn OVER the section's site, which stays mounted underneath (see
 /// `DetailTabs`).
@@ -62,10 +68,47 @@ struct ProblemsTableView: View {
         KeyPathComparator(\ProblemsTableRow.kindLabel),
     ]
 
+    @Environment(WorkspaceModel.self) var workspace
+
+    /// Why a Fix button's door did not open, for its alert.
+    @State var doorProblem: String?
+
+    /// Which door's alert `doorProblem` is.
+    @State var doorThatFailed: FixWithAssistant.Assistant = .claude
+
+    /// A Claude or Codex session already open on the course, or the course
+    /// busy: the refusal Revise With ▸ makes at the click (#458).
+    @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
+
     // MARK: - Computed properties
 
     var store: SectionProblems {
         return SectionProblems.shared
+    }
+
+    var presence: OutsideAssistantPresence {
+        return OutsideAssistantPresence.shared
+    }
+
+    /// What a Fix button would hand over now.
+    var handover: FixWithAssistant.Handover {
+        return FixWithAssistant.handover(record: record, others: others, isTicked: { (rowID: String) -> Bool in
+            return store.isTicked(rowID, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+        })
+    }
+
+    var showsClaude: Bool {
+        return FixWithAssistant.buttonIsShown(
+            assistantIsInstalled: presence.claudeIsInstalled,
+            courseIsKeptForReference: course.isKeptForReference
+        )
+    }
+
+    var showsCodex: Bool {
+        return FixWithAssistant.buttonIsShown(
+            assistantIsInstalled: presence.codexIsInstalled,
+            courseIsKeptForReference: course.isKeptForReference
+        )
     }
 
     /// Every row, in the order the teacher sorted them.
@@ -117,9 +160,68 @@ struct ProblemsTableView: View {
                 .width(min: 90, ideal: 130)
             }
             .accessibilityIdentifier("problemsTable")
+            if showsClaude || showsCodex {
+                fixButtons
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.background)
+        .alert(
+            doorThatFailed == .claude ? ClaudeCodeLauncher.didNotOpenTitle : CodexLauncher.didNotOpenTitle,
+            isPresented: Binding(
+                get: { doorProblem != nil },
+                set: { showing in
+                    if !showing {
+                        doorProblem = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK") {
+                doorProblem = nil
+            }
+        } message: {
+            Text(doorProblem ?? "")
+        }
+        .alert(
+            reviseRefusal?.title ?? "",
+            isPresented: Binding(
+                get: { reviseRefusal != nil },
+                set: { showing in
+                    if !showing {
+                        reviseRefusal = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK") {
+                reviseRefusal = nil
+            }
+        } message: {
+            Text(reviseRefusal?.message ?? "")
+        }
+    }
+
+    /// Fix with Claude… and Fix with Codex…, trailing under the table.
+    var fixButtons: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            if showsClaude {
+                Button(FixWithAssistant.claudeButtonTitle) {
+                    fix(with: .claude)
+                }
+                .accessibilityIdentifier("fixWithClaude")
+            }
+            if showsCodex {
+                Button(FixWithAssistant.codexButtonTitle) {
+                    fix(with: .codex)
+                }
+                .accessibilityIdentifier("fixWithCodex")
+            }
+        }
+        .disabled(!handover.hasRows)
+        .padding(.horizontal)
+        .padding(.bottom, 10)
     }
 
     // MARK: - Functions
@@ -153,6 +255,60 @@ struct ProblemsTableView: View {
             name: row.kind, sentence: row.sentence, detail: row.detail,
             fixable: row.fixable, course: course.code, section: sectionNumber
         )
+    }
+
+    /// Opens `assistant`'s door with the ticked problems in its opening
+    /// message, after the refusal Revise With ▸ makes at the click; and, once
+    /// it has opened, says so on the trail.
+    func fix(with assistant: FixWithAssistant.Assistant) {
+        let item: CourseActivity.ReviseItem = assistant == .claude ? .claude : .codex
+        if let refusal = workspace.reviseRefusal(item: item, courseCode: course.code, sectionNumber: nil) {
+            reviseRefusal = refusal
+            return
+        }
+        let handedOver: FixWithAssistant.Handover = handover
+        guard let greeting = FixWithAssistant.greeting(
+            rows: handedOver.rows,
+            courseCode: course.code,
+            courseName: course.configuration.courseName,
+            sectionNumber: sectionNumber,
+            occasion: record.occasion
+        ) else {
+            return
+        }
+        let opened: Bool
+        switch assistant {
+        case .claude:
+            opened = ClaudeCodeLauncher.open(
+                workspacePath: folder.path,
+                courseCode: course.code,
+                courseName: course.configuration.courseName,
+                greeting: greeting.text
+            )
+        case .codex:
+            opened = CodexLauncher.open(
+                workspacePath: folder.path,
+                courseCode: course.code,
+                courseName: course.configuration.courseName,
+                greeting: greeting.text
+            )
+        }
+        if opened {
+            FixWithAssistant.noteOnTheTrail(
+                assistant: assistant,
+                handover: handedOver,
+                greeting: greeting,
+                courseCode: course.code,
+                sectionNumber: sectionNumber
+            )
+            return
+        }
+        doorThatFailed = assistant
+        if assistant == .claude {
+            doorProblem = ClaudeCodeLauncher.couldNotStartSentence(courseCode: course.code)
+        } else {
+            doorProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
+        }
     }
 
     func tickBinding(for rowID: String) -> Binding<Bool> {
