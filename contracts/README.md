@@ -1695,9 +1695,17 @@ commit: the "course created" line still does not carry the destination,
 deliberately. **The fixes round** (same branch, same day) grew
 `deployWithoutAnAccountID.cases` 4 → **6** (a malformed ID, and a folder
 refused first) and gave each case `expectOpenSettings` and `expectTrailLine`;
-the census stays **437** (no list added). `activityTrail.mustRecord` 151 →
-**152**: "deploy refused for the Cloudflare Account ID", for both platforms —
-it turns Windows red until it records it.
+the census stays **437** (no list added). `activityTrail.mustRecord` gained
+one event, "deploy refused for the Cloudflare Account ID", for both platforms —
+it turns Windows red until it records it. **The launcher round** (same branch,
+same day) moved two `deployArguments` cases: a Netlify destination now
+expects `--target netlify`, because a `deploy.sh` given no destination reads
+the course's saved ones itself — that ALSO turns Windows red until its
+`DeployCommand` names Netlify. **Re-taken at the merge of `origin/dev`
+df80ae9c3 into the branch:** the walker reads **442** lists (437 + dev's
+five), and `activityTrail.mustRecord` is **153** (dev's 152 + this one). The
+open #717b branch adds one more event, so whichever lands second re-counts
+(154 expected) rather than adding in its head.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

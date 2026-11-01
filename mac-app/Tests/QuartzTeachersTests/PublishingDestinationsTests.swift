@@ -198,10 +198,11 @@ final class PublishingDestinationsTests: XCTestCase {
         for needle in [
             "Text(PublishingDestinations.netlifyNote)",
             "ExampleCaption(PublishingDestinations.cloudflareCaption)",
-            "Text(PublishingDestinations.accountIDCanWait)",
+            "Text(PublishingDestinations.accountIDCanWait + \" \")",
             "accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)",
-            // One orange block for the ID's problem and the 25 MB fact (L5).
-            "Text(CloudflareDetailFields.orangeBlock(accountProblem: accountProblem))",
+            // One block: the ID's problem, the sentence that it can wait
+            // right after it, then the 25 MB fact (L5, L4).
+            "return built + Text(CloudflareDetailFields.sizeNote)",
         ] {
             XCTAssertTrue(source.contains(needle), "PublishingChoiceView no longer shows: \(needle)")
         }

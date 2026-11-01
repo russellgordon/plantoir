@@ -925,13 +925,37 @@ fi
 # below. A leg that fails does not stop the others; the run ends with the
 # first failing leg's exit code.
 #
-# Read with Python (json), the way the token migration further down already
-# is, because the destination is a VALUE in nested JSON. A settings file that
-# is there and cannot be read REFUSES rather than falling back to Netlify:
-# falling back is exactly the silent wrong-host deploy this exists to stop.
+# Read with plutil on a Mac (no host python3, the rule the reference-course
+# check above keeps), and with a Python elsewhere, because the destination is
+# a VALUE in nested JSON. A settings file that is there and cannot be read
+# REFUSES rather than falling back to Netlify: falling back is exactly the
+# silent wrong-host deploy this exists to stop.
 # scripts/test_deploy_sh_destination.py pins it.
 the_saved_destinations() {
-  local config="$1" reader
+  local config="$1" reader primary folder count index kind path
+  # macOS: plutil reads JSON and is on every Mac, Command Line Tools or not —
+  # the rule this script keeps for the reference-course check above (no host
+  # python3; #668 review M1). A file it cannot parse fails, and the caller
+  # refuses; a key that is absent, or null, reads as empty.
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -convert json -o /dev/null "$config" 2>/dev/null || return 1
+    primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
+    folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
+    printf '%s\t%s\n' "${primary:-netlify}" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
+    count="$(plutil -extract additional_deploy_targets raw -o - "$config" 2>/dev/null || true)"
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
+    index=0
+    while [[ "$index" -lt "$count" ]]; do
+      kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
+      path="$(plutil -extract "additional_deploy_targets.${index}.path" raw -o - "$config" 2>/dev/null || true)"
+      if [[ -n "$kind" ]]; then
+        printf '%s\t%s\n' "$kind" "$(printf '%s' "$path" | tr '\t\n' '  ')"
+      fi
+      index=$((index + 1))
+    done
+    return 0
+  fi
+  # Elsewhere (a bash on Windows, Linux) a Python reads it, the same way.
   for reader in python3 python; do
     if command -v "$reader" >/dev/null 2>&1; then
       "$reader" - "$config" <<'PY' && return 0
@@ -940,10 +964,12 @@ with open(sys.argv[1], encoding="utf-8") as handle:
     settings = json.load(handle)
 if not isinstance(settings, dict):
     raise SystemExit(1)
+def text(value):
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else json.dumps(value)
 def one(kind, path):
-    kind = kind if isinstance(kind, str) else ""
-    path = path if isinstance(path, str) else ""
-    print((kind or "netlify") + "\t" + path.replace("\t", " ").replace("\n", " "))
+    print((text(kind) or "netlify") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
 one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
 extras = settings.get("additional_deploy_targets")
 if isinstance(extras, list):
@@ -1003,7 +1029,12 @@ if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]
   if [[ "$_leg_count" -gt 1 ]]; then
     _self="$(pwd)/$(basename "$0")"
     _first_failure=0
-    while IFS=$'\t' read -r _kind _path; do
+    # The list is read on descriptor 3, never on stdin: every leg inherits
+    # stdin, and a leg READS it — `docker exec -i` forwards it to the
+    # container, and a token prompt waits on it — so a list on stdin was
+    # eaten by the first leg and the others never ran (#668 review H1).
+    # Each leg keeps the teacher's own terminal, and is not handed fd 3.
+    while IFS=$'\t' read -r -u 3 _kind _path; do
       [[ -n "$_kind" ]] || continue
       if ! _leg_output="$(flags_for_the_saved_destination "$_kind" "$_path")"; then
         echo ""
@@ -1018,11 +1049,11 @@ if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]
       _leg_status=0
       # Through this shell rather than as a program, so a copy without its
       # execute bit (a fresh download, a test's copy) runs its legs too.
-      "${BASH:-bash}" "$_self" "$COURSE_CODE" "$SECTION_NUM" ${DEPLOY_FLAGS_AS_GIVEN[@]+"${DEPLOY_FLAGS_AS_GIVEN[@]}"} "${_leg_flags[@]}" || _leg_status=$?
+      "${BASH:-bash}" "$_self" "$COURSE_CODE" "$SECTION_NUM" ${DEPLOY_FLAGS_AS_GIVEN[@]+"${DEPLOY_FLAGS_AS_GIVEN[@]}"} "${_leg_flags[@]}" 3<&- || _leg_status=$?
       if [[ "$_leg_status" -ne 0 && "$_first_failure" -eq 0 ]]; then
         _first_failure="$_leg_status"
       fi
-    done <<< "$_saved_destinations"
+    done 3<<< "$_saved_destinations"
     exit "$_first_failure"
   fi
   IFS=$'\t' read -r _kind _path <<< "$_saved_destinations"

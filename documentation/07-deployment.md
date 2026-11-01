@@ -999,8 +999,17 @@ the launcher again with that leg's flag — the app's own shape, so every leg
 meets every check, and a leg that fails does not stop the others. Settings
 that cannot be read REFUSE rather than fall back to Netlify, which is the
 silent wrong-host deploy this exists to stop. A typed `--target` still wins.
-`scripts/test_deploy_sh_destination.py` pins all of it (six cases, listed in
-`verify.sh`). **The app names every leg now** (`DeployCommand.arguments`,
+Two things found by review and fixed the same day: the settings are read
+with **`plutil`** on a Mac — on every Mac, Command Line Tools or not —
+because this launcher keeps the rule that it needs no host `python3` (the
+reference-course check's comment; a Python reads them only where there is no
+`plutil`); and the list of legs is read on **descriptor 3**, never stdin,
+because every leg inherits stdin and READS it (`docker exec -i` forwards it,
+a token prompt waits on it), so a list on stdin was eaten by the first leg
+and the others never ran, the run ending at that leg's exit code.
+`scripts/test_deploy_sh_destination.py` pins all of it (eight cases, listed in
+`verify.sh`; two of them plant a stdin-reading line in every leg and hide
+every Python from PATH). **The app names every leg now** (`DeployCommand.arguments`,
 `--target netlify` included; `deployArguments` cases moved), because the
 Netlify leg of a course with a second destination, passed no flag, would
 otherwise have run both legs again; `verify-deploy.sh` names its Netlify

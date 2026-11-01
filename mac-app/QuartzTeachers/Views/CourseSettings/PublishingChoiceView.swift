@@ -329,15 +329,25 @@ private struct CloudflareDetailFields: View {
         return trimmed
     }
 
-    // MARK: - Functions
+    /// Whether the new-course window's "it can wait" sentence belongs under
+    /// the ID's problem: only there, and only for a MISSING ID (#668).
+    var saysTheIDCanWait: Bool {
+        return accountProblem != nil && accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)
+    }
 
-    /// The one orange block: the Account ID's problem, when there is one,
-    /// then the 25 MB fact.
-    static func orangeBlock(accountProblem: String?) -> String {
+    /// ONE block of text (#668 review, L5 and L4): the ID's problem in
+    /// orange, then — in the new-course window, for a missing ID — the
+    /// sentence that says it can wait, in grey, right after the sentence it
+    /// qualifies, and then the 25 MB fact in orange.
+    var notice: Text {
+        var built: Text = Text("")
         if let accountProblem {
-            return accountProblem + " " + sizeNote
+            built = Text(accountProblem + " ").foregroundStyle(.orange)
+            if saysTheIDCanWait {
+                built = built + Text(PublishingDestinations.accountIDCanWait + " ").foregroundStyle(.secondary)
+            }
         }
-        return sizeNote
+        return built + Text(CloudflareDetailFields.sizeNote).foregroundStyle(.orange)
     }
 
     // MARK: - Body
@@ -371,12 +381,12 @@ private struct CloudflareDetailFields: View {
             }
 
             // What is wrong with the ID this Mac has, and the 25 MB fact,
-            // in ONE orange block when both apply (#668 review, L5): with
+            // in ONE block when both apply (#668 review, L5; `notice`): with
             // Cloudflare the default, a new teacher with no ID would
             // otherwise meet two orange warnings on their first course. Not
             // commentary: in Course Settings the ID's sentence is why a
             // changed destination will not save; in the new-course window a
-            // MISSING ID is a warning and says so underneath, while one that
+            // MISSING ID is a warning and says so right after it, while one that
             // cannot be an ID still refuses Create
             // (`PublishingDestinations.wizardCreateRefusal`).
             //
@@ -385,17 +395,10 @@ private struct CloudflareDetailFields: View {
             // real functional difference between the destinations, so a
             // teacher should meet it while choosing rather than when a
             // deploy fails halfway through an upload.
-            Text(CloudflareDetailFields.orangeBlock(accountProblem: accountProblem))
+            notice
                 .font(.caption)
-                .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier(accountProblem == nil ? "cloudflareSizeNote" : "cloudflareAccountProblem")
-            if accountProblem != nil && accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
-                Text(PublishingDestinations.accountIDCanWait)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("cloudflareAccountCanWait")
-            }
         }
     }
 }
