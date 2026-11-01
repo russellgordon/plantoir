@@ -155,9 +155,9 @@ final class PageTablesSheetTests: XCTestCase {
         XCTAssertEqual(after.height, before.height, "the sheet changed height as the teacher typed")
     }
 
-    /// The later-classes question at Publish and Deploy is the same table:
-    /// Page (with its checkbox) and Date, every class ticked to begin with,
-    /// and a click unticking one.
+    /// The later-classes question at Deploy (and only there, #694) is the
+    /// picker's table: Page (with its checkbox) and Date, every class ticked
+    /// to go out to begin with, and a click unticking one.
     func testTheLaterClassesListIsATableAClickUnticks() throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {

@@ -298,7 +298,8 @@ final class AssistScenarioTests: XCTestCase {
             try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
             try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
             try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
-            // Keep All and Deploy, answered earlier in the window (#475).
+            // The question answered earlier in the window with every class
+            // left ticked (#475; Return since #694).
             if scenario.given["laterClassesKeptAll"] as? Bool == true {
                 let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
                 ClassesDatedLater.keep(

@@ -148,32 +148,6 @@ final class FutureDatedClassesTests: XCTestCase {
         XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: course, today: today).count, 1)
     }
 
-    // MARK: - Publish Pages…
-
-    /// The question asked of hidden pages about to be published: only the
-    /// picked ones, judged against the section's own next class day.
-    func testPickedHiddenPagesAreJudgedAsIfPublished() throws {
-        let course: Course = try makeCourse(from: [
-            "today": "2026-10-08",
-            "pages": [
-                ["path": "All Classes/Unit 2, Day 4.md", "flag": "publish: false", "created": "2026-10-09T07:00:00.000-0400"],
-                ["path": "All Classes/Unit 2, Day 5.md", "flag": "publish: false", "created": "2026-10-14T07:00:00.000-0400"],
-                ["path": "All Classes/Unit 2, Day 6.md", "flag": "publish: false", "created": "2026-10-15T07:00:00.000-0400"],
-            ],
-        ])
-        let today: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-10-08"))
-        let folder: URL = ClassPages.folderURL(forSection: 1, in: course)
-        let picked: [URL] = [
-            folder.appendingPathComponent("Unit 2, Day 4.md"),
-            folder.appendingPathComponent("Unit 2, Day 5.md"),
-        ]
-        var places: [String] = []
-        for page in ClassesDatedLater.flagged(ifPublishing: picked, forSection: 1, in: course, today: today) {
-            places.append(page.place)
-        }
-        XCTAssertEqual(places, ["section1/All Classes/Unit 2, Day 5"], "tomorrow's class is not asked about; Day 6 was not picked")
-    }
-
     // MARK: - Helpers
 
     private func makeCourse(from testCase: [String: Any]) throws -> Course {

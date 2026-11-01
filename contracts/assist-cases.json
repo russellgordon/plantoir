@@ -4244,9 +4244,9 @@
           "sectionWindowOpen" : false,
           "surface" : "mcp"
         },
-        "name" : "once Keep All has been answered in the window, an outside assistant's deploy goes out",
+        "name" : "once the question has been answered in the window with every class left ticked, an outside assistant's deploy goes out",
         "when" : "deploy_section",
-        "why" : "#475, the director's ruling on #457 batch B's implementation review, finding 1. Keep All and Deploy records every listed class as kept at its date (file-formats.json -> laterClassesKept), so the question is asked ONCE: the same section that was held back above now deploys from here, with nothing asked, which is what wording.deployHasClassesDatedLater promises. A pre-populated course, which publishes its whole term ahead, depends on it."
+        "why" : "#475 and #694. Return at the window's question (every class starts ticked to go out, wording.deployTickedButton) records every listed class as kept at its date (file-formats.json -> laterClassesKept), so the question is asked ONCE: the same section that was held back above now deploys from here, with nothing asked, which is what wording.deployHasClassesDatedLater promises. A pre-populated course, which publishes its whole term ahead, depends on it. Until #694 the same answer was the Keep All and Deploy button (the director's ruling on #457 batch B's implementation review, finding 1); given.laterClassesKeptAll still means every listed class kept."
       },
       {
         "expectTranscript" : [

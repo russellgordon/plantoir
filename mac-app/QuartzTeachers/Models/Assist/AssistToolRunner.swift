@@ -2082,8 +2082,8 @@ final class AssistToolRunner {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
 
-        // Not when the change is the classes a teacher ticked to hide at
-        // Deploy (#475): the deploy builds the site itself, straight after.
+        // Not when the change is the classes a teacher unticked at
+        // Deploy (#475, #694): the deploy builds the site itself, straight after.
         var previewNote: String = ""
         if previewFollowsAChange {
             previewNote = await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber)

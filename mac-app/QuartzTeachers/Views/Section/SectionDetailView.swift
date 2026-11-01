@@ -852,7 +852,6 @@ struct SectionDetailView: View {
                 model: model,
                 pressDefault: { pressDefault(in: model) },
                 cancel: { cancelVerbSheet(model) },
-                keepAll: { keepAllAtDeploy(model) },
                 verbs: workspace.sectionVerbsIfMade
             )
         })

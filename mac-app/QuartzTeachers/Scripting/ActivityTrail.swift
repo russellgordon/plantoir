@@ -1224,9 +1224,10 @@ nonisolated enum ActivityTrail {
         /// had a chat for it to be "before".
         case sectionMenuBackedUpACourse = "section menu backed up a course"
         /// The teacher was asked about classes dated after the next class
-        /// (#475) — at Deploy, the in-app assistant's deploy, or Section ▸
-        /// Publish Pages… — and answered: how many were flagged, hidden (or
-        /// left hidden), kept published, or Cancel. Counts and places only.
+        /// (#475) — at Deploy or the in-app assistant's deploy, never at
+        /// Section ▸ Publish Pages… (#694) — and answered: how many were
+        /// flagged, unticked and hidden, kept published, or Cancel. Counts
+        /// and places only.
         /// "Why did my class disappear from the site?" is answered here.
         case laterClassesAsked = "asked about classes dated after the next class"
         /// A deploy went out with classes dated after the next class and
