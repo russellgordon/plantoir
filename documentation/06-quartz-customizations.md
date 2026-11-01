@@ -2727,6 +2727,55 @@ both quizzes' questions, the page's own folded answer in its key, and
 neither quiz's answer nor its explanation. The answer key for quizzes is
 #511's.
 
+**A blank on paper is about two lines tall, the room above it (#733,
+v1.9.1).** The house rule for anything printed (#715, 2026-11-01): a line
+carrying a blank students write on is about two lines tall, so a question
+that wraps still leaves a full line of writing room above the blank. The
+handouts do it with an invisible strut in `\fillin`
+(`\rule[-0.2em]{0pt}{2.1em}`); the site does it in `quiz.scss`:
+
+- **⌘P** (print media): the blank's `<input>` gets `padding-top: 1.6em` over
+  a `line-height: 1.2` line, `font-size: 1em` (the screen's 16 px floor is
+  for iPadOS zoom, which paper does not have), no bottom padding, and a
+  1 px BLACK line. Short answers (`.plantoir-quiz-response`) get the same,
+  overriding the screen's 44 px target.
+- **Print** (the handout): its copy draws each blank as a
+  `span.plantoir-quiz-paper-blank` (`print.inline.ts`), which gets the same
+  room from a rule OUTSIDE `@media print` — the span exists only on paper,
+  and the print layout reads the stylesheet itself whichever way it lays the
+  handout out.
+- **Why 1.6em.** 2.1em at LaTeX's 1.2em leading is 1.75 lines. This site's
+  leading is 1.6, so the same 1.75 lines is 2.8em: 1.6em of room over a
+  1.2em line. The room is on the blank, so only the line that carries it
+  grows; a question's other lines keep their pitch.
+- **Measured** (2026-11-01, Chrome for Testing 155 headless, letter, print
+  media, verify's `Quiz Wrapped Blank` — a 16 px question that wraps —
+  printed to PDF, rendered with `pdftoppm -r 80` and looked at; "before" is
+  the same built page with the previous `index.css`): before, the line
+  carrying the blank sat 29 CSS px (24 px at 80 dpi) below the line above,
+  against 25.6 (21) for any other line — about one line — and **its line was
+  not printed at all**: the print rule drew it in `currentColor` and made the
+  colour transparent to hide what was typed, so the line was transparent too,
+  from #563 until #733. A short answer printed as an empty 44 px box with no
+  line. The handout's span was 1.32em tall: one line. After: 48 CSS px
+  (40 px at 80 dpi) from the line above, 1.9 lines; each blank's box is
+  45.8 CSS px (2.86em) with a visible black line, the short answer's too.
+- **Verified**: `browser-checks/quiz_check.mjs` step 8c, on verify's `Quiz
+  Wrapped Blank`. Under print media each blank's line is drawn; the box is
+  at least 2.5em tall, with its room above, not below; what was typed is
+  not printed. The wrapped question's blank sits on a line after the first,
+  at least 1.75 lines below the one above. `checkHandout` asks the same of
+  every blank in `Quiz Printable`'s handout, at the moment it prints.
+- **Rejected:**
+  - a fixed height in px, which would not follow a teacher's font size;
+  - room below the blank, since the rule is the room above, where the
+    handwriting goes;
+  - leaving the screen alone was never in question: `@media print` only, and
+    the handout's span is not on any screen;
+  - typing empty lines into the page. The printing skill tells assistants
+    never to do that, and it now says the site gives the blank its room
+    itself.
+
 ### J6. Measured (2026-10-17, M4 Pro, macOS 26.6, Chrome for Testing 155)
 
 `browser-checks/quiz_check.mjs` on the verify fixture's `Quiz Playground`
