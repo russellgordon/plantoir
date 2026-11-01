@@ -406,11 +406,11 @@ final class ToolchainFingerprintTests: XCTestCase {
     /// app prunes is under the suite's throwaway home, and the one caller in
     /// the product is the launch task the suite never runs.
     func testAPruneNeverReachesTheRealIndexFolder() throws {
-        let realHome: URL = FileManager.default.homeDirectoryForCurrentUser
-        let realIndexFolder: URL = ToolchainFingerprints.indexFolder(inHomeFolder: realHome)
-        XCTAssertNotEqual(ToolchainFingerprints.indexFolder().standardizedFileURL.path,
-                          realIndexFolder.standardizedFileURL.path,
-                          "under the suite the app's index folder must be the throwaway home's")
+        // The suite's home is the throwaway one (RealHomeTripwireTests holds
+        // that), and the folder the app prunes is under it.
+        XCTAssertTrue(RealHome.isRedirected, "the suite is running against the real home")
+        XCTAssertTrue(ToolchainFingerprints.indexFolder().path.hasPrefix(RealHome.forFiles.path + "/"),
+                      "under the suite the app's index folder must be the throwaway home's")
 
         let repository: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
