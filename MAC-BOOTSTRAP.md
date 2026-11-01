@@ -141,8 +141,14 @@ DEVELOPER_DIR=/Applications/Xcode-27.0.0.app/Contents/Developer \
     -derivedDataPath <scratch>/dd-27 build-for-testing
 ```
 
-Why 26.6 builds releases, and what 27 refused the first time, is in
-`documentation/09-mac-app.md` → "Building with two Xcodes (#613)".
+**The 26.6 half is the one that gets skipped, and it is not optional:** the
+failure can run either way. #744 (2026-11-01) was a view body 27 compiles and
+26.6 gives up on, in Debug and Release alike, and it reached the v1.9.1 cut
+because the pieces before it were tested under `xcode-select`'s 27 only.
+
+Why 26.6 builds releases, what 27 refused the first time, and what 26.6
+refused at the v1.9.1 cut, is in `documentation/09-mac-app.md` → "Building
+with two Xcodes (#613)".
 
 Two things worth knowing:
 

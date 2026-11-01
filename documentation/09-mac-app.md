@@ -12603,12 +12603,72 @@ in the test target, which is `nonisolated` by default); 27 only adds
   instead: a refusal is one more thing to update at every Xcode bump, and is
   worth adding only if a release is ever built with the wrong one.
 
-### Still at the edge
+### Still at the edge — and then over it (#744)
 
 `SectionDetailView.body` took **22,970 ms** to type-check under 26.6 and
 3,516 ms under 27 (full rebuilds, same flag) — the solver changed rather than
-uniformly improved. It compiles under both today, but 23 s is nearly twice
-what the sidebar took before 27 gave up on it; it has its own issue
-(milestone v2.0.0). Every other body measured under about 600 ms.
+uniformly improved. It compiled under both on 2026-10-22, but 23 s was nearly
+twice what the sidebar took before 27 gave up on it, and it was given its own
+issue (milestone v2.0.0). Every other body measured under about 600 ms.
+
+**2026-11-01, the v1.9.1 cut: it went over, and only 26.6 noticed.** #717
+(the Problems tab and its alert), #706 (a deploy's ending shown by whichever
+view comes next) and #668 (Open Settings… on the Cannot Deploy Yet alert)
+had grown the body to one chain of **25 modifiers** on its `VStack`. 26.6
+gave up on it — `SectionDetailView.swift:990:13: the compiler is unable to
+type-check this expression in reasonable time`, pointing at the
+`raiseTheProblemsAlertIfDue()` call in the links checklist's `onDismiss` —
+so `publish.sh -Sign` failed twice at the cut. **Xcode 27 compiles it**, in
+5,649 ms, and every gate before the cut (the mac suite, `verify.sh`, the
+plain Debug builds) runs under `xcode-select`'s 27, so nothing failed until
+the one build that names 26.6. The direction is the reverse of the sidebar's
+in #613: this time 26.6 is the one that gives up.
+
+Measured on `dev` at e28a25de0, this M-series Mac, full builds into a fresh
+`-derivedDataPath`, `-Xfrontend -warn-long-function-bodies`:
+
+| `SectionDetailView` | Xcode 26.6 | Xcode 27.0 |
+|---|---|---|
+| `body`, one chain (before) | 34,492 ms, then gives up — Debug AND Release fail | 5,649 ms (compiles) |
+| after the split, slowest stage (`addingTheToolbarAndTheSectionMenu`) | 40 ms | 35 ms |
+| after the split, `body` itself | under 1 ms | under 1 ms |
+| Release `build` into Russell's DerivedData, wall clock | 50 s, exit 65 (before); 90 s, `BUILD SUCCEEDED` (after) | 86 s, succeeded (after) |
+
+**The split** (no behaviour change): `body` now applies seven stages, each a
+function of its own on the view, in the order the modifiers always ran —
+`sectionLayout` (the notices, the tabs and the `ZStack` the site is laid
+over), then `watchingTheFolderAndTheWindow` (title, the busy/activation/key
+watchers, the window accessor, the scheduled-run counter),
+`addingTheToolbarAndTheSectionMenu` (toolbar and the two
+`focusedSceneValue`s), `registeringWhileItShows` (`onAppear`, the opening
+`task`, `onDisappear`), `presentingTheAlerts` (preview, Cannot Deploy Yet,
+Problems), `followingWhatTheAlertsLeave` (the four `onChange`s after them),
+`presentingTheSheets` (links checklist, the Section menu's sheet) and
+`followingRequestsAndDeployEndings` (the last three `onChange`s). `git diff
+-w` of the piece shows only the added function wrappers: no modifier line
+moved, changed or was dropped. Opaque `some View` returns are a compile-time
+wrapper only, so SwiftUI is handed the same concrete view type as before, and
+the source scans that pin this file (first `.onAppear`, the notice above the
+`ZStack`, every `.task`/`.onAppear` never deploying, the #717/#706/#668
+strings) still read it the same way. **A new modifier goes into the stage it
+belongs to**, never back into one chain — the same rule as the sidebar's
+groups above.
+
+**And a gate:** `RELEASING.md` checklist step 2 now asks for a Release build
+with 26.6 (`DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer
+xcodebuild … -configuration Release … build`) before anything is merged for
+a cut, so the next 26.6-only failure is met before `main` carries a version
+merge that does not compile.
+
+Rejected, for this piece: **`ViewModifier` structs** for the groups (the
+issue's first suggestion) — each stage reads a dozen of the view's
+`@State`s, bindings and functions, and passing them all in is a large
+rewrite of behaviour-carrying code to buy what a function on the view gives
+for free; **computed sub-views** — as for the sidebar, that reshapes the
+view tree and where alerts present; **raising the solver's limit** — hides
+the edge rather than moving away from it; and **building the gates with
+26.6** — 27 is what `xcode-select` and Russell's Dock copy use day to day,
+and the problem is a missing Release-26.6 build at the cut, not the daily
+compiler.
 
 Nothing here reaches Windows: it is the Swift toolchain only.
