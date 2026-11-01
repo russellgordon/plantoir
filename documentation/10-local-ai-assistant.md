@@ -4437,8 +4437,14 @@ assistant working from another app `deployHasClassesDatedLater` — shaped like
 `deployNeedsAnAnswer`, because the cure is the same: answer it once in the
 window, where the answer is remembered (`laterClassesKept`), and it deploys
 from here after that. `publish_class_on`, from any client, records the class
-it published as kept: the teacher named the date. Pinned by three scenarios in
-`assist-cases.json` (the order, the cancel, the outside refusal).
+it published as kept: the teacher named the date. The window's question is
+the one the Deploy button raises, so since #694 its rows start ticked to GO
+OUT and only the unticked are hidden — the in-app assistant follows with no
+code of its own (`classesDatedLaterHoldTheDeploy` raises the same sheet), and
+the MCP refusals are unchanged. Pinned by four scenarios in `assist-cases.json`
+(the order, the cancel, the outside refusal, and "once the question has been
+answered in the window with every class left ticked, an outside assistant's
+deploy goes out" — the Keep All scenario until #694).
 REJECTED: refusing the outside assistant with nothing remembered (it could
 never deploy a section that posts ahead on purpose), and asking after the stop.
 

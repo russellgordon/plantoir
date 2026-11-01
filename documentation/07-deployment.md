@@ -1852,9 +1852,19 @@ window takes it out of the alert only when the checklist will really be shown
 A class page students can see that is dated after the next class day
 (`class-planning.json` → `futureDatedClasses`) is asked about BEFORE a deploy
 from the section window or the in-app assistant — after the deploy's own
-refusals, before anything is stopped or built — and the ticked ones are hidden
-first. A scheduled deploy goes out as it is and records the places on the
-trail ("deployed with classes dated after the next class"); an assistant
+refusals, before anything is stopped or built. Every listed class starts
+ticked and a ticked class goes out; the ones the teacher UNTICKS are hidden
+(unpublished, through `unpublish_pages`) first, so the preview is left showing
+what the deployed site does (#694, Russell's rulings, 2026-10-25). Section ▸
+Publish Pages… never asks and records nothing as kept: publishing changes only
+the local preview, where a teacher publishes next week's classes precisely to
+check them. A scheduled deploy goes out as it is and records the places on the
+trail ("deployed with classes dated after the next class") — so a class
+published for a preview check goes online at the next scheduled deploy
+unasked. Measured for #694 on 2026-11-01: a class published with Publish
+Pages…, dated two days after the next class, went out with the scheduled
+run's own deploy leg (`deploy.sh EXC2O 1 --to-folder … --non-interactive`,
+exit 0, no question), because no launcher reads this rule. An assistant
 working from another app is refused before anything runs
 (`wording.deployHasClassesDatedLater`) until the question has been answered
 once in the window. The whole rule — where it is asked, the order, what each

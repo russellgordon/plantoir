@@ -738,25 +738,18 @@ enum AssistContract {
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
             // Classes dated after the next class (#475): the question asked
-            // at Deploy and at Section ▸ Publish Pages…, and what an
-            // assistant is told when it cannot be asked.
+            // at Deploy (and, since #694, never at Section ▸ Publish
+            // Pages…), and what an assistant is told when it cannot be asked.
             "laterClassesTitle": AssistWording.laterClassesTitle(),
             "laterClassesTitleForAMeeting": AssistWording.laterClassesTitle(noun: .meeting),
             "laterClassesAtDeploy": AssistWording.laterClassesAtDeploy(nextDay: "Friday, 2026-10-09"),
             "laterClassesAtDeployForAMeeting": AssistWording.laterClassesAtDeploy(
                 nextDay: "Friday, 2026-10-09", noun: .meeting
             ),
-            "laterClassesAtPublish": AssistWording.laterClassesAtPublish(nextDay: "Friday, 2026-10-09"),
-            "laterClassesAtPublishForAMeeting": AssistWording.laterClassesAtPublish(
-                nextDay: "Friday, 2026-10-09", noun: .meeting
-            ),
             "laterClassesKeptNote": AssistWording.laterClassesKeptNote(),
             "laterClassesKeptNoteForAMeeting": AssistWording.laterClassesKeptNote(noun: .meeting),
             "laterClassesDay": AssistWording.laterClassesDay(weekday: "Wednesday", date: "2026-10-14"),
-            "hideTickedAndDeployButton": AssistWording.hideTickedAndDeployButton,
-            "keepAllAndDeployButton": AssistWording.keepAllAndDeployButton,
-            "leaveOutAndContinueButton": AssistWording.leaveOutAndContinueButton(count: 2),
-            "publishThemAllButton": AssistWording.publishThemAllButton,
+            "deployTickedButton": AssistWording.deployTickedButton,
             "deployHasClassesDatedLater": AssistWording.deployHasClassesDatedLater(
                 course: course, section: section, pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5"]), count: 1
             ),

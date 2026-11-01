@@ -5,8 +5,7 @@ import Observation
 /// drawing (#457 batch B) — the arrangement `LinksChecklistSheetModel` uses.
 ///
 /// One sheet for every function that needs one, moving through stages:
-/// CHOOSING (which pages, which day, where to make room), then — for Publish
-/// Pages… only — the question about classes dated later (#475), then the
+/// CHOOSING (which pages, which day, where to make room), then the
 /// PLAN (the multi-page change seen before it happens, which is the
 /// assistant's plan card in the menu's form: for Publish Pages…, Hide
 /// Pages… and Publish Class for a Date…, a summary over a table of every
@@ -14,9 +13,13 @@ import Observation
 /// card's own text, `forTheCard`), then WORKING, then FINISHED (what the
 /// tool said). A refusal
 /// at the plan goes straight to FINISHED with OK alone, as the assistant
-/// shows a refusing twin with no Go.
+/// shows a refusing twin with no Go. Publish Pages… never asks about
+/// classes dated later (#694): publishing changes only the preview, and a
+/// teacher publishes next week's classes precisely to check them there.
 ///
-/// The same sheet asks the #475 question at Deploy (`kind == .laterClassesAtDeploy`),
+/// The same sheet asks the #475 question at Deploy (`kind == .laterClassesAtDeploy`,
+/// and the only place it is asked: every class starts ticked, and a ticked
+/// class goes out — #694),
 /// shows the class dates sheet when a function needs dates first
 /// (`.classDates`), and shows the answer of a function that has no sheet of
 /// its own (`.result`: Undo Last Change, a refused Rebuild Preview, Add Next
@@ -113,9 +116,9 @@ final class SectionVerbSheetModel: Identifiable {
     var chosenClass: String = ""
     var howMany: Int = 1
 
-    /// #475: the classes asked about, and the ones ticked to hide (all, to
-    /// begin with). `nextClassDay` is the day they are after, as a row says
-    /// a day.
+    /// #475: the classes asked about at Deploy, and the ones ticked to GO
+    /// OUT (all, to begin with — a ticked box always means included, #694).
+    /// `nextClassDay` is the day they are after, as a row says a day.
     var laterClasses: [ClassesDatedLater.Flagged] = []
     var laterTicked: Set<String> = []
     var nextClassDay: String = ""
@@ -207,13 +210,7 @@ final class SectionVerbSheetModel: Identifiable {
         case .choosing:
             return AssistWording.menuContinueButton
         case .askingAboutLaterClasses:
-            if kind == .laterClassesAtDeploy {
-                return AssistWording.hideTickedAndDeployButton
-            }
-            if laterTicked.isEmpty {
-                return AssistWording.publishThemAllButton
-            }
-            return AssistWording.leaveOutAndContinueButton(count: laterTicked.count)
+            return AssistWording.deployTickedButton
         case .planned:
             switch kind {
             case .hidePages:
@@ -435,7 +432,8 @@ final class SectionVerbSheetModel: Identifiable {
         )
     }
 
-    /// The #475 question's rows: the classes, all ticked to begin with.
+    /// The #475 question's rows: the classes, all ticked to begin with, so
+    /// Return deploys every one of them (#694, Russell's ruling 1).
     func ask(about flagged: [ClassesDatedLater.Flagged], nextDay: CalendarDay?) {
         laterClasses = flagged
         laterTicked = []
@@ -448,19 +446,22 @@ final class SectionVerbSheetModel: Identifiable {
         stage = .askingAboutLaterClasses
     }
 
-    /// The classes asked about that are UNticked: kept published.
+    /// The classes asked about that are TICKED: kept published at their
+    /// dates, and deployed (#694).
     var laterKept: [ClassesDatedLater.Flagged] {
         var kept: [ClassesDatedLater.Flagged] = []
-        for page in laterClasses where !laterTicked.contains(page.place) {
+        for page in laterClasses where laterTicked.contains(page.place) {
             kept.append(page)
         }
         return kept
     }
 
-    /// The classes asked about that are ticked.
+    /// The classes asked about that the teacher UNticked: hidden before the
+    /// deploy, so the preview is left showing what students will see
+    /// (#694, Russell's ruling 2).
     var laterHidden: [ClassesDatedLater.Flagged] {
         var hidden: [ClassesDatedLater.Flagged] = []
-        for page in laterClasses where laterTicked.contains(page.place) {
+        for page in laterClasses where !laterTicked.contains(page.place) {
             hidden.append(page)
         }
         return hidden
@@ -480,10 +481,6 @@ struct SectionVerbSheet: View {
 
     /// Cancel, at every stage it is offered.
     var cancel: () -> Void
-
-    /// Keep All and Deploy, beside the default at #475's question (#475,
-    /// the director's ruling on the implementation review's finding 1).
-    var keepAll: () -> Void = {}
 
     /// The window's runner, read for the copy being saved before a change
     /// while the sheet waits (#351) — read here, in the sheet's own body, so
@@ -879,9 +876,7 @@ struct SectionVerbSheet: View {
 
     @ViewBuilder
     var laterClasses: some View {
-        Text(model.kind == .laterClassesAtDeploy
-             ? AssistWording.laterClassesAtDeploy(nextDay: model.nextClassDay, noun: model.noun)
-             : AssistWording.laterClassesAtPublish(nextDay: model.nextClassDay, noun: model.noun))
+        Text(AssistWording.laterClassesAtDeploy(nextDay: model.nextClassDay, noun: model.noun))
             .fixedSize(horizontal: false, vertical: true)
         // The same shape as the picker (#608): a checkbox and the class's
         // title, then its day.
@@ -932,12 +927,6 @@ struct SectionVerbSheet: View {
                 .keyboardShortcut(.cancelAction)
                 .disabled(model.stage == .working)
                 .accessibilityIdentifier("sectionVerbSheetCancel")
-            }
-            if model.kind == .laterClassesAtDeploy && model.stage == .askingAboutLaterClasses {
-                Button(AssistWording.keepAllAndDeployButton) {
-                    keepAll()
-                }
-                .accessibilityIdentifier("sectionVerbSheetKeepAll")
             }
             defaultButton
         }

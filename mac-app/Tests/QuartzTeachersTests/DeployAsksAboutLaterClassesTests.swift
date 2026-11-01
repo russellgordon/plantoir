@@ -117,6 +117,74 @@ final class DeployAsksAboutLaterClassesTests: XCTestCase {
         XCTAssertTrue(scheduled.contains("recordTheRun(\n                label: label, section: section, fingerprint: fingerprintBeforeRunning"))
     }
 
+    // MARK: - Publish Pages… never asks (#694)
+
+    /// Section ▸ Publish Pages… goes straight from its choice to its plan:
+    /// publishing changes only the preview, so the question is asked at
+    /// Deploy and only there, and nothing is recorded as kept. The window
+    /// cannot be hosted, so the wiring is pinned in the source. MUST FAIL
+    /// with the old `.choosing` question or `flagged(ifPublishing:)` back.
+    func testPublishPagesNeverAsks() throws {
+        let verbs: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
+        ))
+        let press: String = try DeployAsksAboutLaterClassesTests.body(of: "    func pressDefault(in model:", in: verbs)
+        XCTAssertFalse(press.contains("ask(about:"), "Publish Pages… asks nothing about classes dated later")
+        XCTAssertFalse(press.contains("ClassesDatedLater.keep"), "Publish Pages… records nothing as kept")
+        XCTAssertEqual(
+            verbs.components(separatedBy: "model.ask(about:").count - 1, 1,
+            "the question is put in one place: askAboutClassesDatedLater, at Deploy"
+        )
+        let rule: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Models/ClassesDatedLater.swift"
+        ))
+        XCTAssertFalse(rule.contains("ifPublishing"), "no question about pages about to be published")
+    }
+
+    /// The contract says the same (#694): Publish Pages… moved from
+    /// `askedFrom` to `neverAskedFrom`, and the deploy-time-only exclusion
+    /// is recorded as rejected (Russell's ruling 2). MUST FAIL on the old
+    /// shared-rules.json.
+    func testTheContractAsksOnlyAtDeploy() throws {
+        let rules: [String: Any] = try SharedRulesContractTests.section("classesDatedLater")
+        let askedFrom: String = try XCTUnwrap(rules["askedFrom"] as? String)
+        let neverAskedFrom: String = try XCTUnwrap(rules["neverAskedFrom"] as? String)
+        XCTAssertFalse(askedFrom.contains("Publish Pages"), "Publish Pages... is not where it is asked")
+        XCTAssertTrue(neverAskedFrom.contains("Section > Publish Pages..."), "Publish Pages... is where it never is")
+        let rejected: [String] = try XCTUnwrap(rules["rejected"] as? [String])
+        var namesTheDeployOnlyExclusion: Bool = false
+        for reason in rejected where reason.contains("preview") && reason.contains("drift") {
+            namesTheDeployOnlyExclusion = true
+        }
+        XCTAssertTrue(namesTheDeployOnlyExclusion, "the deploy-time-only exclusion is recorded as rejected, with its reason")
+    }
+
+    /// A GUARD rather than a must-fail (the tool never asked, before #694 or
+    /// after): the Section menu's own publish of a class dated later
+    /// publishes it, writes no kept record, and leaves it flagged — so the
+    /// next Deploy still asks about it.
+    func testAClassPublishedFromTheMenuIsStillAskedAboutAtDeploy() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 5", publish: "false", date: "2026-09-11", body: "Later.", in: made.course)
+        let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
+        XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today), [], "hidden: nothing flagged yet")
+        _ = await made.runner.run(call: SectionVerbs.publishPages(
+            course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 2, Day 5"], planning: false
+        ))
+        let kept: URL = ClassesDatedLater.KeptRecord.fileURL(courseDirectory: made.course.directoryURL, section: 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path), "publishing records nothing as kept")
+        var places: [String] = []
+        for page in ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today) {
+            places.append(page.place)
+        }
+        XCTAssertEqual(places, ["section1/All Classes/Unit 2, Day 5"], "published, and still asked about at Deploy")
+    }
+
     // MARK: - Helpers
 
     static func source(_ path: String) throws -> String {

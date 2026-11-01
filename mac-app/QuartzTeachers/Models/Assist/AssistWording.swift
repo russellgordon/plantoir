@@ -2313,31 +2313,32 @@ nonisolated enum AssistWording {
 
     // MARK: - Classes dated after the next class (#475)
     //
-    // Asked at Deploy, and at Section ▸ Publish Pages…, when a class students
-    // can see — or are about to — is dated after the next class day
+    // Asked at Deploy, and only there (#694: Section ▸ Publish Pages… never
+    // asks, because publishing changes only the preview), when a class
+    // students can see is dated after the next class day
     // (`class-planning.json` → `futureDatedClasses`; where it is asked and
-    // where it never is: `shared-rules.json` → `classesDatedLater`).
+    // where it never is: `shared-rules.json` → `classesDatedLater`). Every row
+    // starts ticked, and a ticked class GOES OUT — a ticked box always means
+    // included (Russell, 2026-10-25).
 
     static func laterClassesTitle(noun: ClassNoun = .class) -> String {
-        return "Hide \(noun.plural) dated later?"
+        return "Deploy \(noun.plural) dated later?"
     }
 
     /// At Deploy. `nextDay` is the next class day, as the row writes a day.
     static func laterClassesAtDeploy(nextDay: String, noun: ClassNoun = .class) -> String {
         return "These \(noun.plural) are published but dated after \(nextDay), the next \(noun.singular). "
-             + "Students will see them once this section is deployed. Ticked ones are hidden first, "
-             + "with any page only they link to."
+             + "Ticked ones go to students when this section is deployed. Untick any \(noun.singular) "
+             + "that should not go yet: it is hidden first, with any page only it links to, so the "
+             + "preview shows what students will see."
     }
 
-    /// At Section ▸ Publish Pages…, before the plan.
-    static func laterClassesAtPublish(nextDay: String, noun: ClassNoun = .class) -> String {
-        return "These \(noun.plural) are dated after \(nextDay), the next \(noun.singular). Ticked ones "
-             + "are left hidden; the rest are published with the other pages."
-    }
-
-    /// Under the list, both times.
+    /// Under the list. Unticking unpublishes (#694, Russell's ruling 2), so
+    /// the teacher is told how to take it back — and, since Undo changes the
+    /// preview only, that it goes online at the next deploy.
     static func laterClassesKeptNote(noun: ClassNoun = .class) -> String {
-        return "A \(noun.singular) you untick stays published, and is not asked about again unless its date changes."
+        return "A \(noun.singular) left ticked is not asked about again unless its date changes. "
+             + "Section ▸ Undo Last Change publishes again any you untick; the next deploy sends them out."
     }
 
     /// One row's day: "Wednesday, 2026-10-14".
@@ -2345,22 +2346,13 @@ nonisolated enum AssistWording {
         return "\(weekday), \(date)"
     }
 
-    /// The question's default button at Deploy: the ticked classes are
-    /// hidden, the unticked kept, and the section deployed. With nothing
-    /// ticked it hides nothing.
-    static let hideTickedAndDeployButton: String = "Hide Ticked and Deploy"
-
-    /// Beside it, always (#475, the director's ruling on batch B's
-    /// implementation review, finding 1): every listed class is kept
-    /// published and remembered at its date, so a course that publishes the
-    /// whole term ahead — every pre-populated course does — is asked ONCE.
-    static let keepAllAndDeployButton: String = "Keep All and Deploy"
-
-    static func leaveOutAndContinueButton(count: Int) -> String {
-        return "Leave \(count) Hidden and Continue"
-    }
-
-    static let publishThemAllButton: String = "Publish Them All"
+    /// The question's default button (#694): the ticked classes are kept at
+    /// their dates, the unticked hidden, and the section deployed. Every row
+    /// starts ticked, so Return deploys them all. A fixed label rather than
+    /// one with a count, and no second button: Keep All would only repeat
+    /// Return. (It was "Hide Ticked and Deploy", under the key
+    /// `hideTickedAndDeployButton`, until #694 turned the ticks round.)
+    static let deployTickedButton: String = "Deploy Ticked"
 
     /// An assistant working from another app asked to deploy a section with
     /// a class dated later and no answer on file. Refused before anything is

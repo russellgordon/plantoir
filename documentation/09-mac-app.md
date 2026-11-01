@@ -3703,8 +3703,15 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
 - **An outside assistant** is refused before anything runs
   (`deployHasClassesDatedLater`), until the question has been answered once
   in the window. **A scheduled deploy** goes out and records the places.
-- **Section ▸ Publish Pages…** asks about the classes ticked, before the
-  plan; the ticked ones are left out. **Publish Class for a Date…** (and the
+- **Section ▸ Publish Pages…** never asks, and records nothing as kept
+  (#694): publishing changes only the local preview, where a teacher
+  publishes next week's classes precisely to check them, and students see
+  nothing until a deploy. Until #694 it asked before the plan, with the
+  teacher's own tick turned into "leave it hidden", so Return quietly undid
+  the publish they had asked for. Recording nothing matters as much as not
+  asking: a class kept from here would skip the question at Deploy. The cost
+  is the scheduled deploy, which asks nobody — such a class goes online at
+  the next one (measured, below). **Publish Class for a Date…** (and the
   assistants' `publish_class_on`) records the class it published as kept:
   the teacher named the day. So does **Publish in the links checklist**
   (#379) for a later class it publishes — otherwise the two questions undid
@@ -3721,30 +3728,58 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
   testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
   wrapper both ways).
 
-The sheet lists the flagged classes, every one ticked — since v1.8.6 (#608)
-in the picker's table, Page (with its checkbox) and Date, Space ticking the
-selected row, in a sheet the teacher can resize (#621) — and ALWAYS offers two
-buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
-and Deploy**, which keeps every listed class at its date and hides nothing —
-the director's ruling on the implementation review's finding 1 (Russell may
-overturn it). Every pre-populated course ships its whole term published and
-dated: the review measured 61 classes flagged in 33 of the 39 payloads on
-2026-10-08, every one ticked, with no way to keep them but unticking each.
-Measured on a really installed ICS3U payload the same evening: 61 flagged;
-Keep All and Deploy kept 61 and deployed; the second Deploy asked nothing and
-deployed. Hide Ticked and Deploy records the unticked as kept (`file-formats.json` → `laterClassesKept`,
-`section<N>.later-classes-kept.json` in `.publish_state`, removed on
-rollover) and hides the ticked through Hide Pages…'s own call — a copy of the
-course first, undoable, pages only they link to hidden with them — with no
-preview first (`AssistToolRunner.previewFollowsAChange`). A class still
-visible afterwards stops the deploy, and the sheet says what the hide said.
-The answer acts on the list asked about, never one worked out after midnight.
+The sheet ("Deploy classes dated later?") lists the flagged classes, every
+one TICKED TO GO OUT — since v1.8.6 (#608) in the picker's table, Page (with
+its checkbox) and Date, Space ticking the selected row, in a sheet the teacher
+can resize (#621) — with one button beside Cancel: **Deploy Ticked**
+(`deployTickedButton`, the default, Return). Since #694 a ticked box means
+INCLUDED here as in every checklist in the app (Russell's ruling 1,
+2026-10-25). Deploy Ticked records the ticked as kept (`file-formats.json` →
+`laterClassesKept`, `section<N>.later-classes-kept.json` in `.publish_state`,
+removed on rollover) and hides the UNTICKED through Hide Pages…'s own call — a
+copy of the course first, undoable, pages only they link to hidden with them —
+with no preview first (`AssistToolRunner.previewFollowsAChange`), so the
+preview is left in the same state as the deployed site (ruling 2). An unticked
+class still visible afterwards stops the deploy, and the sheet says what the
+hide said. The answer acts on the list asked about, never one worked out after
+midnight. Every pre-populated course ships its whole term published and dated
+(61 classes flagged in 33 of the 39 payloads on 2026-10-08), and Return with
+every row ticked keeps them all, so such a course is asked once — the job
+Keep All and Deploy did from the fixes round until #694 (measured then on a
+really installed ICS3U payload: 61 flagged, 61 kept, the second Deploy asked
+nothing). The footnote names Section ▸ Undo Last Change, because unticking now
+unpublishes, and says the next deploy sends a class back out, because Undo
+changes the preview only.
 
 Measured by driving the built app with `--state-dir` (2026-10-08, twice): a
 class on the 14th was asked about and tomorrow's was not; Hide 1 and Deploy
 (the default's label then; Hide Ticked and Deploy since the fixes round) hid it, deployed to a folder, and the trail read `asked about classes dated
 after the next class at Deploy — 1 flagged, 1 hidden, 0 kept published`;
 Cancel deployed nothing and left the preview running.
+
+Measured for #694 by driving the built Debug app with `--state-dir` and a
+scratch EXC2O with a folder destination (2026-11-01, Apple M4 Pro, macOS 26.6;
+next class Monday 2026-11-02, a hidden class on the 4th, a published one on
+the 5th): Section ▸ Publish Pages… on the 4th went straight to its plan ("1
+page would change, 3 already visible"), published it, and wrote no
+`later-classes-kept.json` (no `.publish_state` at all). The scheduled run's
+deploy leg run by hand then put the 4th online with no question. Deploy
+listed both classes, both ticked, Cancel and Deploy Ticked alone; unticking
+the 5th and pressing Return wrote a menu backup, hid it ("Section ▸ Hide
+Pages… — carried out, 1 class dated later, unticked at Deploy"), deployed in
+1.5 s, and the trail read `asked about classes dated after the next class at
+Deploy — 2 flagged, 1 hidden, 1 kept published`; the deployed folder held the
+4th and not the 5th, the kept record held the 4th, and Section ▸ Undo Last
+Change published the 5th again.
+
+REJECTED in #694: asking at Publish Pages… (it turned the teacher's tick
+upside down, and publishing reaches nobody); a ticked row meaning "hide";
+leaving an unticked class out of THIS deploy only, still published in the
+preview — a deploy-time exclusion in the build (Russell's ruling 2: the
+preview and the live site would drift apart); keeping Keep All beside the
+default (it would repeat Return; a Hide All can come later if asked for); a
+count in the button's label ("Hide 1 and Deploy"), which the fixes round of
+#475 had already moved away from.
 
 REJECTED: detecting it in `build_site.py` as #379 does (the answer would come
 after the build, so hiding would need a second build, and the container's

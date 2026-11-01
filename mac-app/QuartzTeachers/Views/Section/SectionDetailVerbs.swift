@@ -294,58 +294,19 @@ extension SectionDetailView {
     }
 
     /// The sheet's default button, at whatever stage it is.
+    ///
+    /// Publish Pages… goes straight from its choice to its plan, whatever the
+    /// pages' dates (#694): publishing changes only the local preview, where
+    /// a teacher publishes next week's classes precisely to check them, so
+    /// the question about classes dated later is asked at Deploy and only
+    /// there — and nothing is recorded as kept here, or a class published
+    /// for a preview check would skip that question.
     func pressDefault(in model: SectionVerbSheetModel) {
         switch model.stage {
         case .choosing:
-            if model.kind == .publishPages {
-                var picked: [URL] = []
-                for row in model.tickedRows {
-                    picked.append(row.fileURL)
-                }
-                let today: CalendarDay = CalendarDay.today()
-                let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(
-                    ifPublishing: picked, forSection: sectionNumber, in: course, today: today
-                )
-                if !flagged.isEmpty {
-                    let nextDay: CalendarDay? = ClassesDatedLater.nextClassDay(
-                        after: today, among: ClassesDatedLater.classPages(forSection: sectionNumber, in: course)
-                    )
-                    model.ask(about: flagged, nextDay: nextDay)
-                    return
-                }
-            }
             planTheChoice(model)
         case .askingAboutLaterClasses:
-            if model.kind == .laterClassesAtDeploy {
-                answerAtDeploy(model)
-                return
-            }
-            // Publish Pages…: the ticked classes are left OUT and stay hidden;
-            // the unticked ones go ahead and are remembered as kept.
-            ClassesDatedLater.keep(model.laterKept, forSection: sectionNumber, in: course)
-            ActivityTrail.note(
-                .laterClassesAsked,
-                ClassesDatedLater.askedLine(
-                    route: "Section ▸ Publish Pages…", flagged: model.laterClasses.count,
-                    hidden: model.laterHidden.count, kept: model.laterKept.count, cancelled: false
-                ),
-                course: course.code, section: sectionNumber
-            )
-            for page in model.laterHidden {
-                for row in model.pageRows
-                where ClassesDatedLater.place(of: row.fileURL, courseDirectory: course.directoryURL) == page.place {
-                    model.ticked.remove(row.name)
-                }
-            }
-            if model.ticked.isEmpty {
-                workspace.sectionVerbsIfMade?.noteCancelled(
-                    .publishPages, courseCode: course.code, sectionNumber: sectionNumber,
-                    counts: "every page ticked was a class dated later, left hidden"
-                )
-                verbSheet = nil
-                return
-            }
-            planTheChoice(model)
+            answerAtDeploy(model)
         case .planned:
             goAhead(model)
         case .finished:
@@ -452,7 +413,7 @@ extension SectionDetailView {
                 )
             }
             model.answerAtDeploy?(.cancelled)
-        } else if model.stage == .planned || model.stage == .askingAboutLaterClasses, let item = model.item {
+        } else if model.stage == .planned, let item = model.item {
             workspace.sectionVerbsIfMade?.noteCancelled(
                 item, courseCode: course.code, sectionNumber: sectionNumber, counts: countsLine(model)
             )
@@ -596,15 +557,6 @@ extension SectionDetailView {
         }
     }
 
-    /// Keep All and Deploy (#475, the director's ruling on the implementation
-    /// review's finding 1): every listed class kept at its date, nothing
-    /// hidden, and the deploy goes — so a course that publishes its term
-    /// ahead, as every pre-populated one does, is asked once.
-    func keepAllAtDeploy(_ model: SectionVerbSheetModel) {
-        model.laterTicked = []
-        answerAtDeploy(model)
-    }
-
     /// Whether the question at Deploy brings its window to the front first:
     /// only when the in-app assistant asked — a teacher who pressed Deploy is
     /// already looking at this window.
@@ -618,12 +570,16 @@ extension SectionDetailView {
         workspace.window?.makeKeyAndOrderFront(nil)
     }
 
-    /// Hide Ticked and Deploy (or, from `keepAllAtDeploy`, nothing ticked). The unticked classes are kept;
-    /// the ticked ones are hidden through Hide Pages…'s own call
+    /// Deploy Ticked (#694): the TICKED classes are kept at their dates and
+    /// go out — every class is ticked to begin with, so Return deploys them
+    /// all, and a course that publishes its term ahead, as every
+    /// pre-populated one does, is asked once. The ones the teacher UNticked
+    /// are hidden first, so the preview is left showing what the deployed
+    /// site will (Russell's ruling 2), through Hide Pages…'s own call
     /// (`unpublish_pages` on this window's runner: a copy of the course
     /// first, and Undo Last Change takes it back), without a preview first —
-    /// the deploy builds the site itself straight after. If a ticked class is
-    /// still visible afterwards, nothing is deployed and the sheet says why.
+    /// the deploy builds the site itself straight after. If an unticked class
+    /// is still visible afterwards, nothing is deployed and the sheet says why.
     func answerAtDeploy(_ model: SectionVerbSheetModel) {
         let hidden: [ClassesDatedLater.Flagged] = model.laterHidden
         let kept: [ClassesDatedLater.Flagged] = model.laterKept
@@ -658,7 +614,9 @@ extension SectionDetailView {
             let outcome: AssistToolOutcome = await verbs.perform(
                 SectionVerbs.hidePages(course: course.code, section: sectionNumber, names: names, planning: false),
                 item: .hidePages, courseCode: course.code, sectionNumber: sectionNumber,
-                counts: hidden.count == 1 ? "1 class dated later, at Deploy" : "\(hidden.count) classes dated later, at Deploy"
+                counts: hidden.count == 1
+                    ? "1 class dated later, unticked at Deploy"
+                    : "\(hidden.count) classes dated later, unticked at Deploy"
             )
             verbs.toolRunner.previewFollowsAChange = true
             refreshEditedMarker()

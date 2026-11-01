@@ -30,12 +30,18 @@ import Foundation
 /// **A course that publishes its whole term ahead is asked ONCE.** Every
 /// pre-populated course ships every class published and dated across the
 /// semester, so the rule flags most of them — 61 classes in 33 of the 39
-/// payloads on 2026-10-08, measured by batch B's implementation review. The
-/// question therefore always offers Keep All and Deploy beside Hide Ticked
-/// and Deploy (the director's ruling, Russell may overturn): every listed
-/// class is kept at its date and never asked about again until that date
-/// changes. Without it, the teacher who took example content met a 61-row
-/// sheet whose Return hid half the term.
+/// payloads on 2026-10-08, measured by batch B's implementation review. Since
+/// #694 every listed class starts TICKED, and a ticked class goes out (a
+/// ticked box always means included, Russell 2026-10-25), so Return keeps
+/// them all at their dates and they are not asked about again until a date
+/// changes; a class the teacher unticks is hidden first, so the preview
+/// matches what is deployed. (Until #694 the rows started ticked to HIDE,
+/// with a Keep All and Deploy button beside the default, because Return then
+/// hid half the term of a course that took example content.)
+///
+/// **Asked at Deploy only.** Section ▸ Publish Pages… never asks and records
+/// nothing as kept (#694): publishing changes only the local preview, where a
+/// teacher publishes next week's classes precisely to check them.
 ///
 /// The date is the day as WRITTEN in `created` (`sectionIndexPointer.
 /// dateCases.why`), never converted to this Mac's zone: the class on
@@ -291,35 +297,6 @@ nonisolated enum ClassesDatedLater {
             today: today,
             kept: kept?.kept ?? []
         )
-    }
-
-    /// The same question asked about a set of HIDDEN pages a teacher is about
-    /// to publish (Section ▸ Publish Pages…): which of `picked` would be
-    /// flagged once they are visible. The next class day is the section's own,
-    /// counted over every class page as it is.
-    @MainActor
-    static func flagged(
-        ifPublishing picked: [URL], forSection sectionNumber: Int, in course: Course, today: CalendarDay
-    ) -> [Flagged] {
-        if course.isKeptForReference {
-            return []
-        }
-        var pickedPlaces: Set<String> = []
-        for url in picked {
-            pickedPlaces.insert(place(of: url, courseDirectory: course.directoryURL))
-        }
-        var pages: [Page] = []
-        for page in classPages(forSection: sectionNumber, in: course) {
-            let willBeVisible: Bool = page.isVisible || pickedPlaces.contains(page.place)
-            pages.append(Page(place: page.place, title: page.title, isVisible: willBeVisible, date: page.date))
-        }
-        let kept: KeptRecord? = KeptRecord.read(courseDirectory: course.directoryURL, section: sectionNumber)
-        var found: [Flagged] = []
-        let everyFlagged: [Flagged] = flagged(classPages: pages, today: today, kept: kept?.kept ?? [])
-        for page in everyFlagged where pickedPlaces.contains(page.place) {
-            found.append(page)
-        }
-        return found
     }
 
     /// Remembers `pages` as kept for `sectionNumber`. A record that cannot
