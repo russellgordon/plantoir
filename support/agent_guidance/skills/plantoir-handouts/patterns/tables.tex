@@ -1,10 +1,11 @@
-% Plantoir house style: tables in a handout (the skill's section 9). Three
+% Plantoir house style: tables in a handout (the skill's section 9). Four
 % patterns to copy into a handout, each compiled and checked at 80 and 600 dpi:
 %
 %   A. A NEW table: nicematrix, every rule drawn after the heading's colour.
 %   B. An EXISTING colortbl table that is to stay a tabular: \rowcolor with
 %      its two overhang arguments (inset 0.5pt) - never \cellcolor.
 %   C. Tables side by side: one top edge, one row pitch.
+%   D. Tall rows with room to write, each value centred in its row.
 %
 % Never mix the two kinds in one table. The preamble lines a handout needs
 % are marked "Preamble" below; the starters carry them already, except
@@ -31,16 +32,53 @@
 % - Side by side, plain tabulars with a two-line heading in one of them
 %   drifted 46 px at 600 dpi; pattern C put every rule of three tables at
 %   the same height.
+% - (2026-11-01, replacing that day's first version) A column holding a
+%   negative value, or whole numbers beside decimals, is an N column: each
+%   value right-aligned in a box as wide as the column's widest value
+%   WITHOUT its sign, the box centred in the column (N{$18$} does
+%   \makebox[\widthof{$18$}][r]{...} for every cell). The digits share one
+%   trailing edge and sit centred; a minus sign juts out to the left. A
+%   column with neither is a centred C column. The value columns of one
+%   table are one width (\setvaluecol: the widest value in either, plus
+%   0.5cm). Measured at 600 dpi on this file: in every N column
+%   the digits' right edges agree within 3 px (0.4pt, the glyphs' own side
+%   bearings), and they end where a box centred on the column's middle and
+%   as wide as the widest unsigned value ends.
+% - (2026-11-01, replacing that day's first version) Row pitch: every value is centred in a row \valuepitch
+%   (1.5em) tall, by a strut of equal height and depth around the middle of
+%   a digit in every C and N cell, so the first value's middle is half a
+%   pitch below the heading rule and the last's half a pitch above the
+%   bottom rule. Measured at 600 dpi on this file (poppler, ink of each
+%   value to the middle of each rule): pattern C, pitch 16.76pt, half 8.38pt;
+%   first value's middle 8.10-8.22pt below the heading rule, last 8.52-
+%   8.64pt above the bottom rule, in all four columns. Pattern D (pitch 3em):
+%   33.06pt, half 16.53pt; first 16.44-16.50pt, last 16.80pt. Before, with
+%   \arraystretch 1.2 and TeX's own strut (its baseline 70% down the row): a
+%   column of 8s had pitch 16.64pt, first 7.98pt, last 8.70pt; \arraystretch
+%   2.0: pitch 27.48pt, first 15.60pt, last 11.94pt (half 13.74pt). The
+%   strut is why: equal height and depth about a digit's middle.
 \documentclass[11pt]{article}
 \usepackage[letterpaper, margin=0.75in, bottom=0.9in]{geometry}
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath}
 \usepackage[table]{xcolor}  % Preamble, pattern B only: [table] loads colortbl
-\usepackage{array}          % Preamble: r<{...} in a column spec
-\usepackage{nicematrix}     % Preamble: patterns A and C
+\usepackage{array}          % Preamble: w{c}{...} and \newcolumntype
+\usepackage{nicematrix}     % Preamble: patterns A, C and D
 \definecolor{tablehead}{RGB}{225,232,245}             % Preamble: the heading row's shade
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}    % Preamble: one heading-row height
+% Preamble: the value columns (the skill's section 9). C is centred; N{$18$}
+% right-aligns each value in a box as wide as the column's widest value
+% without its sign, the box centred. Every C and N cell carries a strut
+% \valuepitch tall, centred on the middle of a digit, so every value -
+% first and last included - is centred in a row of one pitch.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 \setlength{\parindent}{0pt}
 \pagestyle{empty}
 \providecommand{\patternbreak}{\par\bigskip\bigskip}
@@ -48,14 +86,17 @@
 \begin{document}
 
 % ---------- A. A new table ----------
-% Per column, by its values: x (1 to 4) has no negative value, so it is
-% centred (c); y holds -3, -4, -3 and 0, so it is right-aligned with 0.25cm
-% of padding before the rule. Zero is not negative and does not make a column
-% "all the same sign". The heading over a right-aligned column is centred
-% with \multicolumn{1}{c}{...}; in a NiceTabular the [hvlines] option draws
-% every rule, so the heading's spec needs no | and no \hline is written.
-{\renewcommand{\arraystretch}{1.25}%
-\begin{NiceTabular}{cr<{\hspace{0.25cm}}}[hvlines]
+% Per column, by its values: x (1 to 4) has no negative value, so it is a
+% centred C column; y holds -3, -4, -3 and 0, so it is N{$4$} - its widest
+% value without the sign is 4. Zero is not negative and does not make a
+% column "all the same sign". A column mixing whole numbers and decimals
+% (2.0 beside 4.5) is an N column too (pattern C's h). The heading over an N
+% column is centred with \multicolumn{1}{c}{...}; in a NiceTabular the
+% [hvlines] option draws every rule, so no | and no \hline is written. The
+% two columns are ONE width - the widest value in either column ($-3$) plus
+% 0.5cm, set by \setvaluecol inside the table's group.
+{\setvaluecol{$-3$}%
+\begin{NiceTabular}{CN{$4$}}[hvlines]
 \CodeBefore
   \rowcolor{tablehead}{1}
 \Body
@@ -78,9 +119,9 @@ $4$ & $0$ \\
 % every tabular's outer frame last (a teacher's template may carry one, as
 % an "Outer border, drawn last" block), which closes it. A table being rewritten anyway
 % becomes pattern A. In a plain tabular the heading's \multicolumn repeats the rules:
-% {|c|} over the first column, {c|} over the others.
-{\renewcommand{\arraystretch}{1.25}%
-\begin{tabular}{|c|r<{\hspace{0.25cm}}|}
+% {|c|} over the first column, {c|} over the others. C and N work here too.
+{\setvaluecol{$-3$}%
+\begin{tabular}{|C|N{$4$}|}
 \hline
 \rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]
 \multicolumn{1}{|c|}{$x$} & \multicolumn{1}{c|}{$y$} \\
@@ -95,17 +136,23 @@ $4$ & $0$ \\ \hline
 
 % ---------- C. Tables side by side ----------
 % Every table in one row: a [t] minipage starting with \vspace{0pt}, [t] on
-% the table, ONE \arraystretch for the row, and \headstrut in every heading
-% row so a one-line heading is as tall as a two-line one. Where tables list
-% the same x values, the rows then line up across the page. In a heading
-% cell made with \multicolumn the strut goes INSIDE it ("Misplaced \omit"
-% otherwise). A two-line heading is \Block{}{First\\differences}.
+% the table, the one \valuepitch for every value row, and \headstrut in
+% every heading row so a one-line heading is as tall as a two-line one.
+% Where tables list the same x values, the rows then line up across the
+% page. In a heading cell made with \multicolumn the strut goes INSIDE it
+% ("Misplaced \omit" otherwise). A two-line heading is
+% \Block{}{First\\differences}.
 % Decimals: in a column mixing whole numbers and decimals, every value has
 % the same places (2.0 beside 4.5, 0.0 beside 0.5) - never a bare whole
-% number, never \phantom. A column of whole numbers gets no decimals.
-{\renewcommand{\arraystretch}{1.25}%
+% number, never \phantom - and the column is an N column, so the decimal
+% points line up (h below). A column of whole numbers gets no decimals, and
+% a sentence about the table never pads: "0.5 m", even beside 0.50.
+% Each table sets ONE \valuecol for its value columns, from its own widest
+% entry (a heading wider than every value, such as $h$ (m), counts).
+{%
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{r<{\hspace{0.25cm}}r<{\hspace{0.25cm}}}[hvlines]
+\setvaluecol{$-18$}%
+\begin{NiceTabular}[t]{N{$2$}N{$18$}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 \multicolumn{1}{c}{\headstrut$x$} & \multicolumn{1}{c}{$y$} \\
 $-2$ & $-6$ \\
@@ -115,7 +162,8 @@ $1$ & $-18$ \\
 \end{NiceTabular}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{ccc}[hvlines]
+\setvaluecol{$7$}%
+\begin{NiceTabular}[t]{CCc}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 \headstrut$x$ & $y$ & \Block{}{First\\differences} \\
 $0$ & $1$ & \\
@@ -125,14 +173,34 @@ $3$ & $7$ & \\
 \end{NiceTabular}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.3\linewidth}\vspace{0pt}\centering
-\begin{NiceTabular}[t]{cc}[hvlines]
+\setvaluecol{$h$ (m)}%
+\begin{NiceTabular}[t]{CN{$4.5$}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
-\headstrut$t$ (s) & $h$ (m) \\
+\headstrut$t$ (s) & \multicolumn{1}{c}{$h$ (m)} \\
 $0$ & $2.0$ \\
 $1$ & $4.5$ \\
 $2$ & $0.5$ \\
 $3$ & $0.0$ \\
 \end{NiceTabular}
 \end{minipage}}
+
+\patternbreak
+
+% ---------- D. Tall rows with room to write ----------
+% A skeleton table students fill in by hand gets a taller pitch for the
+% whole table, \renewcommand{\valuepitch}{3em} inside its group, so every
+% value is still centred in its row and the first and last are half a row
+% from the heading and bottom rules. Never a big \arraystretch for this: it
+% puts each value low in its row. The x and y columns are one width, as
+% always; a table students write in gets the room they need. The
+% difference column has a width of its own (its heading's).
+{\setlength{\valuecol}{1.6cm}\renewcommand{\valuepitch}{3em}%
+\begin{NiceTabular}{CN{$5$}w{c}{2.2cm}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+\headstrut$x$ & \multicolumn{1}{c}{$y$} & \Block{}{First\\differences} \\
+$0$ & $-5$ & \\
+$1$ & $-2$ & \\
+$2$ & $1$ & \\
+\end{NiceTabular}}
 
 \end{document}
