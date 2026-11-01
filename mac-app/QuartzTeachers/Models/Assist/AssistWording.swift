@@ -566,11 +566,19 @@ nonisolated enum AssistWording {
         return "Obsidian is already opening \(course). It will be on screen in a moment."
     }
 
-    /// Nothing on this Mac opens Obsidian's links; the button is greyed out
-    /// for the same reason.
-    static let obsidianIsNotOnThisMac: String =
-        "Obsidian is not on this Mac, so there is nothing to open the page in. Install it from "
-        + "obsidian.md, then ask again."
+    /// Nothing on this computer opens Obsidian's links; the button is greyed
+    /// out for the same reason.
+    ///
+    /// Names the computer through `MachineWord` (#698), as every sentence
+    /// both apps say does: the contract writes it once with the placeholder
+    /// and each app puts in its own word, so Windows says "this PC" from the
+    /// same key rather than from a Windows-only copy of the sentence. Renamed
+    /// from `obsidianIsNotOnThisMac` with it, because a key that says Mac
+    /// for a sentence Windows says too is the drift the placeholder removes.
+    static func obsidianIsNotOnThisMachine(machine: String = MachineWord.onThisPlatform) -> String {
+        return "Obsidian is not on this \(machine), so there is nothing to open the page in. Install it "
+             + "from obsidian.md, then ask again."
+    }
 
     /// An assistant working from another app has no window to read the page
     /// on screen from, or to ask the add-ons question in.
@@ -583,6 +591,20 @@ nonisolated enum AssistWording {
     static func openInObsidianFoundNoWindow(course: String, section: String) -> String {
         return "Open \(course) Section \(section) in Plantoir, then ask again. No window is showing "
              + "it, so nothing was opened in Obsidian."
+    }
+
+    /// The press went ahead but Obsidian was never handed anything (#698):
+    /// the add-ons scan, the add-ons pass or the open itself failed. Says
+    /// plainly that nothing opened, and where to try again — the window's
+    /// own button, which is what the assistant pressed.
+    ///
+    /// Windows answered this with `openInObsidianIsInTheSectionWindow`
+    /// until it had a sentence of its own: every clause of that one is true,
+    /// but it is written for an assistant in ANOTHER app, and reads oddly
+    /// from the window's own.
+    static func openInObsidianDidNotOpen(course: String, section: String) -> String {
+        return "Something went wrong before Obsidian could open \(course) Section \(section), so "
+             + "nothing was opened. Press Open in Obsidian in that section's window to try again."
     }
 
     // MARK: - Taking something back

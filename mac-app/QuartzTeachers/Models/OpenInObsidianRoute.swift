@@ -66,6 +66,19 @@ enum OpenInObsidianPress: Equatable {
     /// No window answered the press — the default for a window that does
     /// not register one.
     case noWindow
+
+    /// The press went ahead but Obsidian was never handed anything — the
+    /// add-ons scan, the add-ons pass or the open itself failed (#698,
+    /// Windows' `DidNotOpen` from #690).
+    ///
+    /// **Nothing on the mac's press path produces it yet**, and that is
+    /// known rather than overlooked: the scan does not throw and
+    /// `FolderActions` ignores the answer `NSWorkspace.open` gives, so on
+    /// this side a press that failed reads as one that opened. The case and
+    /// its sentence exist now so both apps answer a failed press from the
+    /// same contract key; making the mac's route report it is its own piece
+    /// (documentation/10-local-ai-assistant.md → "#610").
+    case didNotOpen
 }
 
 /// What the route did with one press, for its two callers (#610).

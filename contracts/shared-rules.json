@@ -10324,6 +10324,7 @@
         "usedIn": [
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
+          "assist-wording.json:wording.obsidianIsNotOnThisMachine",
           "shared-rules.json:appUpdates.wording.elsewhereWork"
         ],
         "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",

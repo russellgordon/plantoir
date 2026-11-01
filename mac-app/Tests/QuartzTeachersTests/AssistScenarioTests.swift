@@ -425,6 +425,8 @@ final class AssistScenarioTests: XCTestCase {
             return .waitingForAnAnswer
         case "alreadyOpening":
             return .alreadyOpening
+        case "didNotOpen":
+            return .didNotOpen
         default:
             return .noWindow
         }
@@ -718,6 +720,8 @@ final class AssistScenarioTests: XCTestCase {
         var filled: String = template
             .replacingOccurrences(of: AssistContract.coursePlaceholder, with: "ICS3U")
             .replacingOccurrences(of: AssistContract.sectionPlaceholder, with: "1")
+        // #698: a sentence naming the computer says this platform's word.
+        filled = MachineWord.filling(filled)
         // #610: a page an Open in Obsidian case says was opened.
         if let page {
             filled = filled.replacingOccurrences(of: AssistContract.pagePlaceholder, with: page)
