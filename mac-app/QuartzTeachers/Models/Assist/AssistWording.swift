@@ -1616,6 +1616,21 @@ nonisolated enum AssistWording {
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
 
+    /// One teacher action asked the model as many times as one may (#689),
+    /// so the turn was stopped and taken back out of the conversation.
+    ///
+    /// Windows' sentence as it had shipped there since its agent was written,
+    /// with the fact genuinely in doubt added in `answerWasCutOff`'s order:
+    /// **say it did not finish**, **say nothing was changed** — a teacher who
+    /// asked to publish needs to know it did not happen, and it is true on
+    /// every path that reaches the cap (`AssistAgent.sayItWentRoundWithoutFinishing`
+    /// says why) — and **give them something to do**. Names no number and no
+    /// limit: a teacher cannot act on a limit they cannot see, and naming it
+    /// is the machinery rule 1 keeps out of the interface.
+    static let wentRoundWithoutFinishing: String =
+        "I've gone round several times without finishing, so nothing was changed. Tell me what "
+        + "you'd like me to do next."
+
     /// A tool was asked for with no course at all — which reaches the runner
     /// only from outside the app, over MCP, where nothing binds a window's own
     /// course onto the call (issue #198).

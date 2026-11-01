@@ -181,6 +181,18 @@ nonisolated enum ActivityTrail {
         /// believed. Not `assistant could not answer` either: that is for an
         /// engine that FAILED, and here the engine answered perfectly badly.
         case assistantRepeatedTheRequestBack = "assistant repeated the request back"
+        /// One teacher action asked the model as many times as one may
+        /// (#689), so the turn was stopped, nothing more was run, and the
+        /// turn was taken back out of the conversation.
+        ///
+        /// Carries this window's course and section, how many times the
+        /// model was asked, and the tool it last chose, in words — "it kept
+        /// listing pages" and "it kept reading a page" are different reports
+        /// about the model. Never the sentence (`assistant asked` has it) and
+        /// never argument values. Its own event rather than `assistant answer
+        /// was cut off`, whose name would be false: every answer here
+        /// finished, and was simply never the last.
+        case assistantWentRoundWithoutFinishing = "assistant went round without finishing"
         /// The model named a tool that exists but was not among those it was
         /// OFFERED in this window, so the turn was refused and nothing ran
         /// (#327).

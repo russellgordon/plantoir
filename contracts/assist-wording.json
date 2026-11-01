@@ -324,6 +324,7 @@
     "undoIsStillAvailableFromTheMenu" : "That change is still the last one, so Section ▸ Undo Last Change can take it back once you have dealt with the pages left alone.",
     "unitAlreadyHidden" : "Unit 4 is already hidden.",
     "unitAlreadyPublished" : "Unit 4 has already been published.",
+    "wentRoundWithoutFinishing" : "I've gone round several times without finishing, so nothing was changed. Tell me what you'd like me to do next.",
     "whatPublishingMeans" : "Publishing a page decides whether students can see it in this section's website. Deploying sends the whole website out to the web. They are different acts: a page can be published for days and still not be online, and deploying puts everything already published in front of students straight away. Plantoir opens the preview after a change so the teacher can look it over first, which is the safer order.",
     "whereTheOutputIs" : "The output is in that section's window in Plantoir.",
     "wouldAddPages" : "Add 1 class page to Unit 4 of {course} Section {section}, on the day this class actually meets:",

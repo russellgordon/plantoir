@@ -358,6 +358,7 @@ enum AssistContract {
             "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
+            "wentRoundWithoutFinishing": AssistWording.wentRoundWithoutFinishing,
             "noCourseNamed": AssistWording.noCourseNamed,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
