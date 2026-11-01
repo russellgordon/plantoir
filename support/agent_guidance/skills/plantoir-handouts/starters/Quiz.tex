@@ -20,13 +20,23 @@
 \usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the handouts skill's section 9)
 \definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}   % one heading-row height for tables side by side
-% Tables (the handouts skill's section 9): space above and below every value;
-% one width for a table's value columns (\setvaluecol{the widest value});
-% \rowstrut{3em} at the start of a tall row, its value centred.
-\renewcommand{\arraystretch}{1.2}
+% Tables (the handouts skill's section 9). Every value sits in a row \valuepitch tall,
+% centred in it, so the first value is half a row below the heading rule and
+% the last half a row above the bottom rule. The value columns of a table are
+% one width (\setvaluecol{the widest value in either column} sets \valuecol
+% to it plus 0.5cm). C is a centred value column; N{$18$} is for a column
+% holding a negative or whole numbers beside decimals: each value right-
+% aligned in a box as wide as the column's widest value WITHOUT its sign,
+% the box centred - \makebox[\widthof{$18$}][r]{$-6$} in every cell - so the
+% digits share one trailing edge and a minus sign juts out to the left.
+% \renewcommand{\valuepitch}{3em} for a table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
 \newlength{\valuecol}
 \newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
-\newcommand{\rowstrut}[1]{\rule[\dimexpr0.3em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 
 % ---------- Fill in ----------
 \newcommand{\schoolname}{School Name}   % print_school_name in the course's settings

@@ -209,7 +209,14 @@ line.
   one.
 - In a column that mixes whole numbers and decimals, write every value to
   the same places: 2.0 beside 0.5, 0.0 beside 4.5 - and right-align it,
-  `---:`. A column of whole numbers gets no decimals.
+  `---:`. A column of whole numbers gets no decimals. The padded zeros are
+  only for matching the column: **running text never pads** - the
+  sentence under a table that reads 0.80 says 0.8 m.
+- A printed handout centres such a column's digits in a box as wide as its
+  widest value (`plantoir-handouts` section 9). A page cannot: Markdown
+  tables have no box, so on a page the rule stays `---:` for a column with
+  a negative value or with whole numbers beside decimals, and nothing else
+  is needed.
 
 Here $x$ holds negatives and $y$ mixes whole numbers and decimals, so both
 are `---:`:

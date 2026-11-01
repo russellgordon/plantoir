@@ -30,14 +30,17 @@ What it prints:
 
 The x and y columns are one width, from the widest value in either of
 them, and the first- and second-difference columns are one width, from the
-widest line in either, so right-aligned numbers end at the same offset in
-each column. Every value is centred vertically in its row, clear of the
-rules above and below it.
+widest line in either. In a column with a negative value, or whole numbers
+beside decimals, each value is right-aligned in a box as wide as the
+column's widest value without its sign, the box centred (\inbox), as the
+handout's N columns do (tables.tex). Every row is one pitch with its value
+centred in it, so the first and last values sit half a row from the
+heading rule and the bottom rule.
 
 Values may be whole numbers or decimals. If any value in a column has a
 decimal part, every value in it is written with the same number of places
-(2.0 beside 4.5) and, if it mixes whole numbers and decimals, the column is
-right-aligned so the points line up; the differences are written to the y
+(2.0 beside 4.5) and, if it mixes whole numbers and decimals, its values
+are boxed as above so the points line up; the differences are written to the y
 column's places.
 
 A teacher without Python copies the static example in finite_differences.tex
@@ -119,9 +122,11 @@ def mixes_whole_and_decimal(values):
 
 
 def right_aligned(values):
-    """Any negative value, or whole numbers beside decimals, means
-    right-aligned with padding, so the units digits and decimal points line
-    up; any other column of numbers is centred."""
+    """Any negative value, or whole numbers beside decimals, means each
+    value is right-aligned in a box as wide as the column's widest value
+    without its sign, the box centred, so the units digits and decimal
+    points line up and a minus sign juts out to the left; any other column
+    of numbers is centred."""
     return has_negative(values) or mixes_whole_and_decimal(values)
 
 
@@ -134,13 +139,31 @@ def widest_value(values, places, font):
     return widest
 
 
-def column_placement(values, left, width, padding):
-    """The node style and x position for one column of the table. The x and
-    y columns are the same width and share `padding`, so a right-aligned
-    value ends at the same offset in each."""
+def widest_unsigned(values, places):
+    """The widest value of a column written WITHOUT its sign - the width of
+    the box its values are right-aligned in (TeX measures it exactly)."""
+    widest = ""
+    for value in values:
+        text = written(abs(value), places)
+        if len(text) > len(widest):
+            widest = text
+    return widest
+
+
+def column_placement(values, places, left, width):
+    """The x position of one column's values - always the column's middle -
+    and, for a right-aligned column, the widest unsigned value its box is
+    as wide as (None for a centred column)."""
     if not right_aligned(values):
-        return "numc", left + width / 2
-    return "num", left + width - padding
+        return None, left + width / 2
+    return widest_unsigned(values, places), left + width / 2
+
+
+def value_cell(box, text):
+    """A value's node text: right-aligned in the box when there is one."""
+    if box is None:
+        return "$%s$" % text
+    return r"\inbox{$%s$}{$%s$}" % (box, text)
 
 
 def differences_of(values):
@@ -188,12 +211,13 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
     add(r"\begin{tikzpicture}[font=%s]" % number_font)
     add(r"\definecolor{diffcol}{RGB}{%d,%d,%d}" % colour)
     add(r"\definecolor{headfill}{RGB}{70,100,170}")
-    add(r"\tikzset{num/.style={anchor=east, inner sep=0pt, text height=1.6ex, text depth=0.45ex},")
-    add(r"  numc/.style={num, anchor=center},")
-    add(r"  dif/.style={num, text=diffcol, font=%s}," % subtraction_font)
+    add(r"\tikzset{num/.style={anchor=center, inner sep=0pt, text height=1.5ex, text depth=0pt},")
+    add(r"  dif/.style={anchor=east, inner sep=0pt, text height=1.6ex, text depth=0.45ex, text=diffcol, font=%s}," % subtraction_font)
     add(r"  diffarrow/.style={diffcol, thin, -stealth}}")
     add("% The table of values: a shaded heading row, a full outer border, one ruled row for each x;")
     add("% the x and y columns are one width, and each value is centred in its row")
+    add("% \\inbox{widest}{value}: the value right-aligned in a box as wide as the widest, the box centred")
+    add(r"\def\inbox#1#2{\setbox0\hbox{#1}\hbox to\wd0{\hss#2}}")
     add(r"\fill[headfill, fill opacity=0.13] (0,0) rectangle (%.2f,%.2f);" % (table_width, -heading))
     add(r"\draw (0,0) rectangle (%.2f,%.3f);" % (table_width, bottom))
     add(r"\draw (%.2f,0) -- (%.2f,%.3f);" % (x_width, x_width, bottom))
@@ -201,18 +225,18 @@ def scaffold(xs, ys, columns=2, mode="switch", colour=HANDOUT_COLOUR, worked_fir
         add(r"\draw (0,%.3f) -- (%.2f,%.3f);" % (-heading - index * row, table_width, -heading - index * row))
     add(r"\node at (%.3f,%.3f) {$x$};" % (x_width / 2, -heading / 2))
     add(r"\node at (%.3f,%.3f) {$y$};" % (x_width + y_width / 2, -heading / 2))
-    add("% A column with any negative value, or whole numbers beside decimals, is right-aligned")
-    add("% with padding; any other column of numbers is centred")
-    x_style, x_position = column_placement(xs, 0, x_width, padding)
-    y_style, y_position = column_placement(ys, x_width, y_width, padding)
+    add("% A column with any negative value, or whole numbers beside decimals, is right-aligned in")
+    add("% its box (\\inbox); any other column of numbers is centred")
+    x_box, x_position = column_placement(xs, x_places, 0, x_width)
+    y_box, y_position = column_placement(ys, y_places, x_width, y_width)
     for index in range(count):
-        add(r"\node[%s] at (%.2f,%.3f) {$%s$};" % (x_style, x_position, centre_of_row(index), written(xs[index], x_places)))
+        add(r"\node[num] at (%.3f,%.3f) {%s};" % (x_position, centre_of_row(index), value_cell(x_box, written(xs[index], x_places))))
     for index in range(count):
-        y_cell = r"\node[%s] at (%.2f,%.3f) {$%s$};" % (y_style, y_position, centre_of_row(index), written(ys[index], y_places))
+        y_cell = r"\node[num] at (%.3f,%.3f) {%s};" % (y_position, centre_of_row(index), value_cell(y_box, written(ys[index], y_places)))
         if not nothing_worked or mode == "filled":
             add(y_cell)
         elif mode == "switch":
-            add(r"\qa{}{%s}" % y_cell.replace(r"\node[%s]" % y_style, r"\node[%s, text=diffcol]" % y_style))
+            add(r"\qa{}{%s}" % y_cell.replace(r"\node[num]", r"\node[num, text=diffcol]"))
 
     sources = [ys, first]
     results = [first, second]

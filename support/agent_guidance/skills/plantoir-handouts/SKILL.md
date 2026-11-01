@@ -137,7 +137,7 @@ look the same:
 
 - A table is the same table in both: the same orientation (vertical in
   both, or horizontal in both - section 9), the same columns, the same
-  alignment and padding, the same row height.
+  alignment, the same row pitch.
 - A graph is the same grid in both: the same axis ranges, the same scale
   and the same printed size. The question copy shows the empty grid the
   student draws on; the key shows the same grid with the answer on it.
@@ -278,8 +278,9 @@ this session exactly as it is.
 `patterns/tables.tex` beside this file holds the four patterns below,
 compiled and checked, with what was measured in its opening comment. The
 starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
-`\headstrut`, `\arraystretch` 1.2, `\valuecol` with `\setvaluecol`, and
-`\rowstrut`). Copy a pattern into the handout; never edit it here.
+`\headstrut`, `\valuepitch` and `\rowstrut`, `\valuecol` with
+`\setvaluecol`, and the column types `C` and `N`). Copy a pattern into the
+handout; never edit it here.
 
 - **A full outer border on every table**: fill-in tables students
   complete, tables built by a macro, tables on task cards and tables drawn
@@ -311,16 +312,22 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
   anyway becomes pattern A. Never mix the two kinds in one table.
 - **Alignment is decided per column, by that column's values:**
   - A column holding **any negative value**, or **mixing whole numbers
-    and decimals**, is right-aligned, with about 0.25 cm of padding before
-    the rule so the units digits and the decimal points line up and the
-    numbers clear it: `w{r}{\valuecol}<{\hspace{0.25cm}}` (the width rule
-    below), or `r<{\hspace{0.25cm}}`. That includes a column of zeros and
-    negatives (0, -3, -4, -3, 0), a column that is all negative (-6, -10,
-    -14), and a column such as 9.0, 10.5, 12.0 - centring that one shifts
-    the decimal point by half a digit from row to row.
-  - Any other column of numbers is centred (`c`): no negative value, and
-    either all whole numbers or all decimals. Zero is not negative.
-  - The heading over a right-aligned column stays centred:
+    and decimals**, sets each value **right-aligned inside a box as wide
+    as the column's widest value measured WITHOUT its sign, and centres
+    that box in the column**:
+    `\makebox[\widthof{$18$}][r]{$-6$}` in every cell (`\widthof` needs
+    `\usepackage{calc}`), which the starters' column type `N{$18$}` does
+    for you. The digits share one trailing edge, so units digits and
+    decimal points line up, and they sit centred in the column; a minus
+    sign juts out to the left of the box. That includes a column of zeros
+    and negatives (0, -3, -4, -3, 0), an all-negative one (-6, -10, -14),
+    and one such as 9.0, 10.5, 12.0. (This replaces a fixed 0.25 cm of
+    trailing padding: the digits ended up hard against the right side of
+    the column instead of in its middle.)
+  - Any other column of numbers - no negative value, and all whole
+    numbers or all decimals - is centred: `C` (or `c`). Zero is not
+    negative.
+  - The heading over an `N` column is centred:
     `\multicolumn{1}{c}{$y$}` in a `NiceTabular`; in a `tabular` it repeats
     the rules, `\multicolumn{1}{|c|}{$x$}` over the first column and
     `\multicolumn{1}{c|}{$y$}` over the others.
@@ -328,23 +335,28 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
     Value column follows the two rules above. Word columns are left as
     they are.
 - **The x and y columns are the same width**, and so are the first- and
-  second-difference columns, so a right-aligned number ends at the same
-  offset in each column. The width comes from the widest value in EITHER
-  column: `\setvaluecol{$-18$}` (inside the table's group, with that
-  table's widest value) sets `\valuecol` to it plus 0.5 cm, and each value
-  column is `w{c}{\valuecol}` or `w{r}{\valuecol}<{\hspace{0.25cm}}`. A
-  heading wider than every value (`$h$ (m)`) counts as the widest. A
-  column students write in may be set wider for room
-  (`\setlength{\valuecol}{1.6cm}`), but the x and y columns still share
-  it. Never `c` beside `r` with each as wide as its own contents.
-- **Every value has a little space above and below it.** The first row of
-  values never sits against the heading rule: `\arraystretch` 1.2 (the
-  starters set it; at 1.0 a digit sat half as far below the rule above it
-  as above the rule below). A **tall row** with room to write - a skeleton
-  difference table - keeps its value centred in the row:
-  `\rowstrut{3em}` at the start of each such row (pattern D), never a
-  large `\arraystretch`, which puts the value low in its row (measured
-  1.2 mm below the middle at 2.6; `\rowstrut` about 0.1 mm).
+  second-difference columns. The width comes from the widest value in
+  EITHER column: `\setvaluecol{$-18$}` (inside the table's group, with that
+  table's widest value) sets `\valuecol` to it plus 0.5 cm, and `C` and `N`
+  are both `\valuecol` wide. A heading wider than every value (`$h$ (m)`)
+  counts as the widest. A column students write in may be set wider for
+  room (`\setlength{\valuecol}{1.6cm}`), but the x and y columns still
+  share it.
+- **Every value is centred in a row of one pitch.** The gap above the first
+  value (below the heading rule) and below the last (above the bottom rule)
+  is HALF the distance between neighbouring values: if values are 20 pt
+  apart, the first sits 10 pt below the heading rule and the last 10 pt
+  above the bottom rule. `C` and `N` put a strut of equal height and depth
+  about the middle of a digit in every cell (`\rowstrut{\valuepitch}`,
+  1.5em), so every row is one pitch with its value in the middle. A
+  **tall row** with room to write - a skeleton difference table - takes a
+  taller pitch for the whole table, `\renewcommand{\valuepitch}{3em}`
+  inside its group (pattern D), never a large `\arraystretch`, which sets
+  each value low in its row (TeX's own strut puts the line 70% of the way
+  down). Measured at 600 dpi, pitch 16.76 pt: first value 8.1-8.2 pt below
+  the heading rule, last 8.5-8.6 pt above the bottom rule, against 8.38;
+  with `\arraystretch` 2.0 the same values sat 15.6 and 11.9 pt from the
+  rules against 13.7.
 - **Which way a table runs.** A table of values may be horizontal - two
   rows, $x$ across the top and $y$ below - wherever students are NOT asked
   to compute finite differences from it. **Any table used for finite
@@ -354,14 +366,16 @@ starters carry the preamble lines (`nicematrix`, the `tablehead` colour,
   (section 3).
 - **Decimals**: in a column that mixes whole numbers and decimals, write
   every value to the same places - 31.0 beside 18.5, 0.0 beside 0.5, 1.00
-  beside 0.80 - and right-align it with the padding above. Never a bare
-  whole number and never an invisible `\phantom{.5}`. A column of whole
-  numbers gets no decimals.
+  beside 0.80 - and make it an `N` column. Never a bare whole number and
+  never an invisible `\phantom{.5}`. A column of whole numbers gets no
+  decimals. The padded zeros exist only to match the other values in that
+  column: **running text never pads** - a sentence beside a table that
+  reads 0.80 says 0.8 m, and 9 s, not 9.0 s.
 - **Tables side by side** (pattern C: three fill-in tables across a
   warmup, a scaffold beside two tables, a), b), c) of one question) share
   a top edge and, where they list the same x values, the same row height,
   so rows line up across the page: each in a `[t]` minipage that starts
-  with `\vspace{0pt}`, `[t]` on the table, one `\arraystretch` for the
+  with `\vspace{0pt}`, `[t]` on the table, one `\valuepitch` for the
   row, and `\headstrut` in every heading row (inside the `\multicolumn`
   where the heading cell is one), so a one-line heading is as tall as a
   two-line `\Block{}{First\\differences}`.

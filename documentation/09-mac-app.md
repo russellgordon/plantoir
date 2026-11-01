@@ -3425,8 +3425,8 @@ rejected:
   carried as the issue wrote them.
 
 **Graphs, the key's layout, and table widths and spacing (#715 reopened,
-2026-11-01).** Russell added six rules after the merge (issue comments
-12:58-13:14 UTC), landed on `issue/715-graph-and-key-rules`:
+2026-11-01).** Russell added rules and refinements after the merge (issue
+comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
 
 - **Abstract or in context, decided per graph.** A graph of a relation with
   no context is drawn to the edge of the grid with an arrowhead at each end,
@@ -3454,27 +3454,45 @@ rejected:
   both. **Orientation** (section 9): a horizontal two-row table is fine where
   no finite differences are asked; any table used for finite differences is
   vertical; the key follows the question.
-- **One width for the value columns.** x and y share a width, and the two
-  difference columns share one, from the widest value in either:
-  `\setvaluecol{widest}` (width plus 0.5 cm) with `w{c}{\valuecol}` /
-  `w{r}{\valuecol}<{\hspace{0.25cm}}`. Measured at 300 dpi: the
-  right-aligned x and y values of pattern C's first table end 47 px from
-  their right rules in both columns; the `<{\hspace}` padding falls inside
-  the `w` box. `finite_differences.py` now computes one x/y width (widest +
-  0.25 cm each side, at least 0.85 cm; it was 0.8 and 0.95) with a shared
-  0.25 cm padding, and one width for both difference columns; the static
-  `finite_differences.tex` and math-graphs pattern E were regenerated from it.
-- **Space above and below every value.** `\arraystretch` 1.2 in the starters'
-  preamble; a tall skeleton row takes `\rowstrut{3em}` (a strut centred on
-  0.3 em, the middle of a digit). Measured at 300 dpi: at `\arraystretch`
-  1.0 a digit sat 10 px below the heading rule and 18 px above the next; at
-  2.6 its middle sat 14 px (1.2 mm) below the row's middle; with
-  `\rowstrut{3em}`, 1.5 px. REJECTED: a large `\arraystretch` for tall rows,
-  for that reason. `patterns/tables.tex` gains pattern D.
-
+- **One width for the value columns, and digits in a centred box**
+  (13:13, refined 14:19). x and y share a width, and the two difference
+  columns share one, from the widest value in either (`\setvaluecol`, width
+  plus 0.5 cm). A column holding a negative value or whole numbers beside
+  decimals sets each value right-aligned in a box as wide as the column's
+  widest value WITHOUT its sign, the box centred in the column
+  (`\makebox[\widthof{$18$}][r]{…}`; the starters' column type `N{$18$}` does
+  it with `\settowidth` and `\hbox to`, so no calc package is needed), so
+  the digits share one trailing edge, sit centred, and a minus sign juts out
+  left. This REPLACES the first version of that day - a fixed 0.25 cm of
+  trailing padding, which put the digits against the right side of a wide
+  column. Measured at 600 dpi on `tables.tex`: the digits' right edges in
+  every `N` column agree within 3 px (0.4 pt, the glyphs' side bearings).
+  `finite_differences.py` does the same in TikZ with
+  `\inbox{widest}{value}` (`\setbox0\hbox{…}\hbox to\wd0{\hss…}`, plain TeX,
+  which node-tikzjax 1.0.5 drew in 0.36 s); the static
+  `finite_differences.tex` and pattern E were regenerated from it.
+- **Every value centred in a row of one pitch** (13:14, refined 14:22). The
+  gap from the heading rule to the first value, and from the last value to
+  the bottom rule, is half the distance between neighbouring values. `C`
+  and `N` columns put `\rowstrut{\valuepitch}` (1.5em; a strut of equal
+  height and depth about 0.32em, the middle of a digit) in every cell;
+  `\arraystretch` drops to 1.1 so TeX's own strut never outgrows it; a
+  table with room to write takes `\renewcommand{\valuepitch}{3em}`.
+  Measured at 600 dpi (poppler, the ink of each value to the middle of each
+  rule): `tables.tex` pattern C, pitch 16.76 pt, first value 8.10-8.22 pt
+  below the heading rule and last 8.52-8.64 pt above the bottom rule
+  against a half pitch of 8.38; pattern D (3em) 16.44-16.50 and 16.80
+  against 16.53; the scaffold, pitch 17.58 pt, 8.94 and 8.64 against 8.79.
+  Before: `\arraystretch` 1.2 alone gave 7.98 and 8.70 against 8.32, and
+  2.0 gave 15.60 and 11.94 against 13.74 - TeX's strut puts the baseline
+  70% of the way down a row. REJECTED: a large `\arraystretch` for tall
+  rows, for that reason.
+- **Running text never pads decimals** (14:19): 0.8 m in a sentence beside
+  a table that reads 0.80. In both skills. On a page the column rule stays
+  `---:`, since a Markdown table has no box.
 - **A miss in the first merge, corrected: a column mixing whole numbers and
-  decimals is right-aligned** with the same 0.25 cm padding as a negative
-  column (the issue's 12:43 refinement, which the first merge did not
+  decimals is right-aligned** as a negative column is - now in the
+  centred box above (the issue's 12:43 refinement, which the first merge did not
   carry): centring 9.0 beside 10.5 shifts the point by half a digit from
   row to row. Fixed in `plantoir-handouts` section 9, `plantoir-page-authoring`
   section 7 (its example's y column is `---:` now), `tables.tex` pattern

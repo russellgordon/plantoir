@@ -69,14 +69,23 @@
 \definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
 % One heading-row height for tables set side by side (the skill's section 9)
 \newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
-% Tables (the skill's section 9): a little space above and below every value;
-% one width for a table's value columns - \setvaluecol{the widest value in
-% either column} sets \valuecol to it plus 0.5cm; and \rowstrut{3em} at the
-% start of a tall row with room to write, which keeps its value centred.
-\renewcommand{\arraystretch}{1.2}
+% Tables (the skill's section 9). Every value sits in a row \valuepitch tall,
+% centred in it, so the first value is half a row below the heading rule and
+% the last half a row above the bottom rule. The value columns of a table are
+% one width (\setvaluecol{the widest value in either column} sets \valuecol
+% to it plus 0.5cm). C is a centred value column; N{$18$} is for a column
+% holding a negative or whole numbers beside decimals: each value right-
+% aligned in a box as wide as the column's widest value WITHOUT its sign,
+% the box centred - \makebox[\widthof{$18$}][r]{$-6$} in every cell - so the
+% digits share one trailing edge and a minus sign juts out to the left.
+% \renewcommand{\valuepitch}{3em} for a table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
 \newlength{\valuecol}
 \newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
-\newcommand{\rowstrut}[1]{\rule[\dimexpr0.3em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 
 % Section heading for the answer key, where the worked examples are hidden
 \newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
@@ -169,16 +178,17 @@ Evaluate $3x + 2$ when $x = 4$.
 
 \q[9]{3} \onlyq{Complete the table of values for $y = x - 3$.}\onlya{$y = x - 3$:}
 
-% A table: full border, a shaded heading row, each column aligned by its own
-% values - x has no negative value, so it is centred; y has negatives, so it
-% is right-aligned with padding, its heading centred over it. The x and y
-% columns are ONE width; here 1.6cm, so students have room to write in y
-% (a table students do not write in takes \setvaluecol{widest value}).
+% A table: full border, a shaded heading row, each column set by its own
+% values - x has no negative value, so it is a centred C column; y has
+% negatives, so it is N{$3$}: right-aligned in a box as wide as its widest
+% value without the sign, the box centred, its heading centred over it. The
+% x and y columns are ONE width; here 1.6cm, so students have room to write
+% in y (a table students do not write in takes \setvaluecol{widest value}).
 % It is written once: the key switches only the cells (\qa{}{...}), so it is
-% vertical in both copies, with the same alignment and padding.
+% vertical in both copies, with the same alignment and row height.
 \begin{center}
 {\setlength{\valuecol}{1.6cm}%
-\begin{NiceTabular}{w{c}{\valuecol}w{r}{\valuecol}<{\hspace{0.25cm}}}[hvlines]
+\begin{NiceTabular}{CN{$3$}}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 $x$ & \multicolumn{1}{c}{$y$} \\
 $0$ & \qa{}{$-3$} \\

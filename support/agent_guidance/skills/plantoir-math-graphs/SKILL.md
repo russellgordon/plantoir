@@ -294,7 +294,12 @@ column does the same for second differences. It is the same figure a
 printed handout carries (`plantoir-handouts` section 10, whose
 `patterns/finite_differences.py` prints this fence for any table with
 `--page --alt "..."`). By hand: change the y values in the table nodes, then
-each subtraction and its result.
+each subtraction and its result. In a column holding a negative value (or
+whole numbers beside decimals) each value is written
+`\inbox{$widest$}{$value$}`: right-aligned in a box as wide as the column's
+widest value without its sign, the box centred, so the digits line up and a
+minus sign juts out to the left - change the first argument too when the
+widest value changes.
 
 ````
 ```tikz
@@ -303,12 +308,13 @@ each subtraction and its result.
 \begin{tikzpicture}[font=\small]
 \definecolor{diffcol}{RGB}{0,128,128}
 \definecolor{headfill}{RGB}{70,100,170}
-\tikzset{num/.style={anchor=east, inner sep=0pt, text height=1.6ex, text depth=0.45ex},
-  numc/.style={num, anchor=center},
-  dif/.style={num, text=diffcol, font=\footnotesize},
+\tikzset{num/.style={anchor=center, inner sep=0pt, text height=1.5ex, text depth=0pt},
+  dif/.style={anchor=east, inner sep=0pt, text height=1.6ex, text depth=0.45ex, text=diffcol, font=\footnotesize},
   diffarrow/.style={diffcol, thin, -stealth}}
 % The table of values: a shaded heading row, a full outer border, one ruled row for each x;
 % the x and y columns are one width, and each value is centred in its row
+% \inbox{widest}{value}: the value right-aligned in a box as wide as the widest, the box centred
+\def\inbox#1#2{\setbox0\hbox{#1}\hbox to\wd0{\hss#2}}
 \fill[headfill, fill opacity=0.13] (0,0) rectangle (1.74,-0.75);
 \draw (0,0) rectangle (1.74,-3.850);
 \draw (0.87,0) -- (0.87,-3.850);
@@ -319,18 +325,18 @@ each subtraction and its result.
 \draw (0,-3.230) -- (1.74,-3.230);
 \node at (0.435,-0.375) {$x$};
 \node at (1.305,-0.375) {$y$};
-% A column with any negative value, or whole numbers beside decimals, is right-aligned
-% with padding; any other column of numbers is centred
-\node[num] at (0.62,-1.060) {$-2$};
-\node[num] at (0.62,-1.680) {$-1$};
-\node[num] at (0.62,-2.300) {$0$};
-\node[num] at (0.62,-2.920) {$1$};
-\node[num] at (0.62,-3.540) {$2$};
-\node[num] at (1.49,-1.060) {$1$};
-\node[num] at (1.49,-1.680) {$-2$};
-\node[num] at (1.49,-2.300) {$-3$};
-\node[num] at (1.49,-2.920) {$-2$};
-\node[num] at (1.49,-3.540) {$1$};
+% A column with any negative value, or whole numbers beside decimals, is right-aligned in
+% its box (\inbox); any other column of numbers is centred
+\node[num] at (0.435,-1.060) {\inbox{$2$}{$-2$}};
+\node[num] at (0.435,-1.680) {\inbox{$2$}{$-1$}};
+\node[num] at (0.435,-2.300) {\inbox{$2$}{$0$}};
+\node[num] at (0.435,-2.920) {\inbox{$2$}{$1$}};
+\node[num] at (0.435,-3.540) {\inbox{$2$}{$2$}};
+\node[num] at (1.305,-1.060) {\inbox{$1$}{$1$}};
+\node[num] at (1.305,-1.680) {\inbox{$1$}{$-2$}};
+\node[num] at (1.305,-2.300) {\inbox{$1$}{$-3$}};
+\node[num] at (1.305,-2.920) {\inbox{$1$}{$-2$}};
+\node[num] at (1.305,-3.540) {\inbox{$1$}{$1$}};
 % First differences: each arrow starts at the lower value and points up to the one above it;
 % beside it, the subtraction: lower value minus the one above it
 \node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (3.340,-0.700) {First\\differences};
