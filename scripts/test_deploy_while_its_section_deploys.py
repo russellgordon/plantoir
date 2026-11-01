@@ -161,6 +161,34 @@ class TheLauncherCases(unittest.TestCase):
                         self.assertIn("ALLOWED", result.stdout)
                         self.assertEqual(trail, [], "an allowed deploy writes nothing on the trail")
 
+    def test_a_deploy_that_has_ended_since_the_table_was_read_does_not_count(self):
+        # #737: a `deploy.sh ICS4U 2` the table listed has exited by the time
+        # its folder is asked, so lsof says nothing. It used to count, in ANY
+        # folder - a false "already being deployed" whenever a short deploy of
+        # the same course and section ended, anywhere, at the wrong moment.
+        # Mac mechanics (ps then lsof), so it is not a shared launcherCase:
+        # deploy.ps1 reads one snapshot and asks no second question.
+        ended = {"processes": [[700, 1, "/bin/bash ./deploy.sh ICS4U 2"]], "cwd": {},
+                 "endedAfterTheTableWasRead": [700]}
+        still_running = {"processes": [[700, 1, "/bin/bash ./deploy.sh ICS4U 2"]], "cwd": {}}
+        for launcher in ("deploy.sh", "preview.sh"):
+            leg = "deploy" if launcher == "deploy.sh" else "build"
+            with self.subTest(launcher=launcher, case="ended"):
+                result, trail, _course, _section, _leg = self.run_case(dict(ended, leg=leg), launcher)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("ALLOWED", result.stdout)
+                self.assertEqual(trail, [])
+            with self.subTest(launcher=launcher, case="still running, folder unknown"):
+                result, trail, _course, _section, _leg = self.run_case(dict(still_running, leg=leg), launcher)
+                self.assertEqual(result.returncode, 1, "#381's rule: a live deploy whose folder cannot be asked counts")
+                self.assertEqual(len(trail), 1, trail)
+
+    def test_the_liveness_look_is_ps_never_kill(self):
+        # kill -0 fails for another account's process that is still running,
+        # which the guard must still count (#737).
+        code = "\n".join(line for line in the_guard().splitlines() if not line.lstrip().startswith("#"))
+        self.assertIn('ps -p "$pid" -o pid=', code)
+
     def test_the_cases_cover_what_the_review_asked_for(self):
         """#439 plan review, finding 3, and ruling 9."""
         names = " ".join(case["name"] for case in the_rule()["launcherCases"])

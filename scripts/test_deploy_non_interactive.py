@@ -46,6 +46,7 @@ Pure stdlib, no Docker, no network, no credentials. Run with:
 # and prompt() refuses as a catch-all. The belt is redundant rather than
 # missing, and forcing `-i` would also change the MCP path.
 
+import atexit
 import io
 import json
 import os
@@ -55,6 +56,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+# Every launcher run here keeps its trail in a folder of its own (#737, #738):
+# a run refused by a deploy elsewhere on this Mac must never write the
+# teacher's real activity log. Set on this process, so every launcher run
+# below inherits it, whichever way its environment is built.
+_TRAIL_FOLDER = tempfile.mkdtemp(prefix="plantoir-test-trail-")
+os.environ["PLANTOIR_TRAIL_DIR"] = _TRAIL_FOLDER
+atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 

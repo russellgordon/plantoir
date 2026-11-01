@@ -103,6 +103,15 @@ def folder_id(path: str) -> str:
 # rule is exercised against the pid the real code compares.
 FAKE_PS = r"""#!/bin/bash
 echo "ps $*" >> "$FAKE/calls"
+# `ps -p PID -o pid=` (the liveness look, #737): the pid when the table lists
+# it and the case has not ended it since; nothing, and exit 1, otherwise.
+if [ "${1:-}" = "-p" ]; then
+  if [ ! -f "$FAKE/gone/$2" ] && awk -v p="$2" '$1 == p { found = 1 } END { exit !found }' "$FAKE/table"; then
+    echo "$2"
+    exit 0
+  fi
+  exit 1
+fi
 if [ -f "$FAKE/ps_fails" ]; then
   echo "ps: something went wrong" >&2
   exit 1
@@ -170,6 +179,11 @@ class PretendMac:
             (self.fake / "ps_fails").write_text("", encoding="utf-8")
         if case.get("psOmitsThisRun"):
             (self.fake / "omits_this_run").write_text("", encoding="utf-8")
+        # A process the table lists that has ENDED by the time the guard asks
+        # about it (#737): lsof answers nothing, and neither does `ps -p`.
+        (self.fake / "gone").mkdir(exist_ok=True)
+        for pid in case.get("endedAfterTheTableWasRead", []):
+            (self.fake / "gone" / str(pid)).write_text("", encoding="utf-8")
         for pid, where in case.get("cwd", {}).items():
             path = self.here_path if where == "here" else self.elsewhere_path
             (self.fake / "cwd" / str(pid)).write_text(path, encoding="utf-8")
@@ -245,6 +259,19 @@ class TheLauncherCases(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertIn("ALLOWED", result.stdout)
                     self.assertEqual(trail, [], "an allowed preview writes nothing on the trail")
+
+    def test_a_deploy_that_has_ended_since_the_table_was_read_does_not_refuse_a_preview(self):
+        # #737, in #381's guard: the same race as the deploy guard's. Mac
+        # mechanics, so not a shared launcherCase (preview.ps1 reads one
+        # snapshot).
+        ended = {"processes": [[700, 1, "/bin/bash ./deploy.sh ICS4U 2"]], "cwd": {},
+                 "endedAfterTheTableWasRead": [700]}
+        result, trail, _course, _section = self.run_case(ended)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ALLOWED", result.stdout)
+        self.assertEqual(trail, [])
+        result, trail, _course, _section = self.run_case({"processes": ended["processes"], "cwd": {}})
+        self.assertEqual(result.returncode, 1, "a live deploy whose folder cannot be asked still counts")
 
     def test_the_cases_cover_every_kind_of_deployer(self):
         names = " ".join(case["name"] for case in the_rule()["launcherCases"])

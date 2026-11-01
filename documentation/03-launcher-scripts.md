@@ -2024,7 +2024,9 @@ reader of the process table"); what counts is decided here:
   asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
   folders can hold the same course. One whose folder `lsof` cannot answer for
   still counts: a deploy of this very section is proved, only its folder is
-  not. The course and section are matched as the text the arguments of
+  not. Since #737, though, only if `ps -p` still finds it running. A deploy
+  that has ENDED between the table and `lsof` is skipped (see "A deploy that
+  has just ended is not a deploy (#737)", below). The course and section are matched as the text the arguments of
   `deploy.sh` BEGIN with, one space between words and a space after the
   section ("AP CALC 2 "), by the one reader both checks share: a
   course code may hold a space, which `ps` shows as two words, and until #382
@@ -2187,13 +2189,54 @@ the arguments are checked and before anything changes, and both exit 1.
   folder's id is that folder's; a label from before #237 names none and counts.
 - **`deploy.sh C S` for this section in this folder** (the "Terminal pair",
   director's ruling 9), counted as #381 counts it for previews: the program,
-  its working directory asked of `lsof`, still counted when `lsof` cannot say,
-  not counted when it only clears a token or prints its help.
+  its working directory asked of `lsof`, still counted when `lsof` cannot say
+  of one that is still running, not counted when it has ended since the table
+  was read (#737, below), and not counted when it only clears a token or
+  prints its help.
 - **Never this run itself or its ancestors.** A scheduled run's own legs are
   its script's children, and a folder deploy reruns `preview.sh --build-only`
   under its own `deploy.sh`; the reader's `mine` walk leaves both out. A
   second script of the SAME label that is not an ancestor — the newly set
   run's leg while the leftover works — does count.
+
+**A deploy that has just ended is not a deploy (#737, v1.9.1).** Both
+guards read the table and then ask `lsof` for each `deploy.sh C S`'s working
+folder. A `deploy.sh` that EXITS between the two looks leaves `lsof` nothing
+to answer. Under the rule "one whose folder cannot be asked counts", that run
+counted, in ANY folder, so a short deploy of the same course and section
+ending anywhere on the Mac at the wrong moment refused this one with
+"already being deployed".
+
+- **Measured** by the #668 second-fixes review, and again for #737, on this
+  Mac (M4 Pro, macOS 26.6): `scripts/test_deploy_sh_destination.py` passes
+  alone, but with three loops of short-lived `deploy.sh ICS3U 1 --target
+  netlify` running in folders of their own it failed **20 of 20** runs
+  (all "already being deployed"). With the fix, the same file and three
+  other deploy test files pass beside those loops: see the closing comment
+  on #737 for the runs.
+- **The fix.** When `lsof` says nothing, the guard asks `ps -p <pid> -o pid=`.
+  If that finds nothing, the process has ended and is skipped. If it finds
+  it, it counts, as #381 decided. The fix is in `what_is_deploying_this_section`
+  (identical in `deploy.sh` and `preview.sh`) and in #381's
+  `refuse_a_preview_while_its_section_deploys`, which had the same race.
+- **Rejected:**
+  - `kill -0 <pid>`, which the review suggested. It also FAILS for a process
+    of another account that is still running (EPERM), and that is the case
+    `lsof` cannot answer for which #381 counts on purpose.
+    `test_deploy_while_its_section_deploys.py` pins `ps -p` and still forbids
+    `kill -0` in the guard.
+  - Dropping the "cannot be asked counts" rule, which would let a live
+    deploy of this very section through whenever `lsof` failed.
+  - A shared contract case. This is the mac's two-look mechanics. Windows'
+    guards read one Win32_Process snapshot and take the folder from the
+    script's own path on its command line, so they never ask a second
+    question that a process can exit in front of.
+    `endedAfterTheTableWasRead` in the Python tests carries it instead.
+- **The tests' trail.** The four deploy test files the review named
+  (`test_deploy_sh_destination`, `test_deploy_non_interactive`,
+  `test_deploy_sh_questions`, `test_deploy_token_refusal`) set
+  `PLANTOIR_TRAIL_DIR` to a temporary folder, so a refused run in a test
+  never writes the real activity log (#738 covers the rest).
 
 **The table cannot be read: let it through.** Not for #381's reason (the
 leases do NOT cover a leftover run — that is the fault): failing closed would
