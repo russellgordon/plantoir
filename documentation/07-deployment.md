@@ -1868,7 +1868,14 @@ carries one measured line per site ("N file(s) needed asking again, …", or "no
 file needed asking again"). An answer that never comes is still that check's
 failure, judged on the last answer. A plain run asks once, exactly as before,
 and so does the local preview's `check_engine` on any run, since it is no new
-site.
+site. The 60 s is a deadline fixed when the first answer is judged, not a count
+of polls, so how many retries fit depends on how long each answer takes. It is
+half the Cloudflare wait's 120 s because the watcher above saw every file served
+within the minute. Each `check_engine` call keeps its own retry log, so a
+pairing leg that re-checks a site counts only its own retries, never the
+earlier leg's (the #740 review found the pairing line repeating them). A
+genuinely broken first publish now costs up to about a minute per failing file
+before it goes red. That is accepted: the answer is still red.
 
 **Measured at the v1.9.1 gate** (2026-11-01, dev e7a73e082, M4 Pro, home
 network): two `--first-publish` runs in a row failed on the NEW Netlify site
@@ -1892,7 +1899,11 @@ because only Netlify was seen doing it. It was rejected, because a
 first-publish Cloudflare project is just as new and the rule is about the
 site's age, not its host. `--self-test` gained five cases: 404 twice then the
 file; no COEP twice then COEP; never served (still a failure, at the cap);
-the Result block's count; and a plain run judging a 404 at once. Proved
+the Result block's count; and a plain run judging a 404 at once. The
+never-served case asserts a RANGE of retries (2 to 5), and the count case
+asserts the total the log holds, never a fixed number. Pinning "8 retries in
+all" failed 3 of 9 review runs (12/1/0), because a second-granular clock let 3
+retries fit instead of 4. After the change, 12 runs in a row were 13/0/0. Proved
 must-fail by copy-and-restore: with the retry taken out, 4 of the 5 fail, and
 the plain-run case passes either way. **Windows owes the same in
 `verify-deploy.ps1`** (`Check-Engine`, `-SelfTest`).

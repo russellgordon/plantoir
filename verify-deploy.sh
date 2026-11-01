@@ -50,7 +50,7 @@
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
 #                                          # Cloudflare (#665) and its retry of a
-#                                          # new site's files (#740), offline, ~30 s
+#                                          # new site's files (#740), offline, ~25 s
 #   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
 #                                          # publishes as a NEW teacher would:
 #                                          # new sites, both questions asked (#712)
@@ -239,9 +239,13 @@ NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
 # Prints the response headers (\r stripped), as `curl -s -D -` did. "200"
 # wants HTTP 200; "coep" wants HTTP 200 and COEP require-corp.
 fetch_headers() {
-  local want="$1" url="$2" out="/dev/null" headers code start waited tries=0 good
+  local want="$1" url="$2" out="/dev/null" headers code start deadline waited tries=0 good
   [ "${3:-}" = "-o" ] && out="$4"
+  # A deadline fixed once, not a count of polls: how many retries fit before
+  # it depends on how long each answer takes, so nothing may pin that number
+  # (the self-test asserts a range).
   start=$(date +%s)
+  deadline=$(( start + NS_WAIT ))
   while :; do
     headers=$(curl -s -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
@@ -255,7 +259,7 @@ fetch_headers() {
     [ "$good" = true ] && break
     [ "$FIRST_PUBLISH" = true ] || break
     case "$url" in http://localhost:*) break ;; esac  # the preview is no new site
-    [ "$waited" -ge "$NS_WAIT" ] && break
+    [ "$(date +%s)" -ge "$deadline" ] && break
     tries=$((tries+1))
     sleep "$NS_POLL"
   done
@@ -481,9 +485,11 @@ STUB
   started=$(date +%s)
   out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
   elapsed=$(( $(date +%s) - started ))
+  n=$(sed -n 's/.*needed \([0-9][0-9]*\) retr.*/\1/p' "$ST_DIR/said.txt" | head -1)
   if [ "$(code_of "$out")" = "404" ] && grep -q 'never answered as wanted' "$ST_DIR/said.txt" \
+     && [ -n "$n" ] && [ "$n" -ge 2 ] && [ "$n" -le 5 ] \
      && [ "$elapsed" -ge 4 ] && [ "$elapsed" -le 10 ]; then
-    ok "a brand-new site that never serves the file: still the check's failure, judged on the last answer, at the cap (${elapsed} s)"
+    ok "a brand-new site that never serves the file: still the check's failure, judged on the last answer, at the cap (${elapsed} s, ${n} retries)"
   else
     no "a brand-new site that never serves the file: HTTP $(code_of "$out"), ${elapsed} s, said: $(cat "$ST_DIR/said.txt")"
   fi
@@ -491,7 +497,9 @@ STUB
 
   MEASURED=()
   measure_new_site_retries "Netlify" "http://127.0.0.1:"
-  printf '%s\n' "${MEASURED[@]}" | grep -q "3 file(s) needed asking again, 8 retries in all" \
+  total=$(awk -F '\t' '{ t += $2 } END { print t + 0 }' "$NS_RETRY_LOG")
+  printf '%s\n' "${MEASURED[@]}" | grep -q "3 file(s) needed asking again, $total retries in all" \
+    && [ "$(awk -F '\t' '$4 == "true" && $2 == 2' "$NS_RETRY_LOG" | wc -l | tr -d ' ')" -eq 2 ] \
     && ok "the Result block counts them: ${MEASURED[0]#*: }" \
     || no "the Result block's count: ${MEASURED[*]:-nothing}"
 
@@ -941,6 +949,11 @@ url_from_log() {  # url_from_log <logfile>
 # face must come back from the site itself, and Netlify's CSP must no longer
 # name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
 check_engine() {  # check_engine <label> <site base url ending in />
+  # Each call keeps its own retry log, so a pairing leg that checks a site
+  # an earlier leg already checked counts only its own retries (#740 review).
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
   local base="$2" name type code headers csp
   for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
     headers=$(fetch_headers 200 "${base}static/pyodide/$name")
