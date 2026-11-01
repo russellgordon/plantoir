@@ -22,7 +22,8 @@ one rule about lifting them:
     for half six on a laptop that had not joined the network yet) heard "no",
     deleted a good token — and for Cloudflare its account too — and asked for
     another, which a deploy set for later cannot even answer. It now clears
-    the token only on HTTP 400, 401 or 403, keeps it otherwise, and stops
+    the token only on HTTP 400, 401 or 403 whose body is the service's own
+    answer (not a web filter's block page), keeps it otherwise, and stops
     with two lines of its own that the contract lifts the same way. The
     second half of this file RUNS the real launcher's credential section with
     `curl` replaced by a stub that answers with a chosen status, and reads
@@ -270,6 +271,13 @@ class ASavedTokenIsClearedOnlyWhenTheServiceSaysNo(unittest.TestCase):
     def test_cloudflare_an_answer_that_does_not_say_yes_keeps_it_too(self):
         self.assert_kept("cloudflare", "200", "<html>a captive portal</html>")
 
+    def test_cloudflare_a_refusal_that_is_not_cloudflares_keeps_it(self):
+        """A school web filter's block page, or a firewall's challenge in front
+        of the API, comes back as a 403 that never asked Cloudflare."""
+        for status in ("401", "403"):
+            with self.subTest(status=status):
+                self.assert_kept("cloudflare", status, "<html>Blocked by the school's web filter</html>")
+
     def test_cloudflare_an_accepted_token_is_used(self):
         self.assert_used("cloudflare", "200",
                          '{"result":{"status":"active"},"success":true,"errors":[]}')
@@ -277,12 +285,20 @@ class ASavedTokenIsClearedOnlyWhenTheServiceSaysNo(unittest.TestCase):
     def test_netlify_refusals_clear_the_token(self):
         for status in ("401", "403"):
             with self.subTest(status=status):
-                self.assert_cleared("netlify", status, '{"code":401,"message":"Unauthorized"}')
+                self.assert_cleared("netlify", status, '{"code":%s,"message":"Access Denied"}' % status)
 
     def test_netlify_unheard_keeps_the_token_and_stops(self):
         for status in ("000", "502", "503"):
             with self.subTest(status=status):
                 self.assert_kept("netlify", status)
+
+    def test_netlify_a_refusal_that_is_not_netlifys_keeps_it(self):
+        for status in ("401", "403"):
+            with self.subTest(status=status):
+                self.assert_kept("netlify", status, "<html>Blocked by the school's web filter</html>")
+
+    def test_netlify_an_answer_that_is_not_the_account_keeps_it(self):
+        self.assert_kept("netlify", "200", "<html>a captive portal</html>")
 
     def test_netlify_an_accepted_token_is_used(self):
         self.assert_used("netlify", "200", '{"id":"someone"}')

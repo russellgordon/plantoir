@@ -1406,10 +1406,13 @@ validate_cf_token() {
 # What a SAVED token's check heard back, as one word (GitHub #716):
 #
 #   accepted  the service answered and took the token
-#   refused   the service answered and said no: HTTP 400, 401 or 403
+#   refused   the service answered and said no: HTTP 400, 401 or 403 with
+#             the service's own answer in the body
 #   unheard   anything else — no answer at all (offline, a timeout, a name
 #             that did not resolve), a captive portal's page or redirect, a
-#             429, a 5xx, or a 2xx that does not say yes
+#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
+#             is not the service's answer (a school web filter's block page,
+#             a firewall's challenge in front of the API)
 #
 # Only "refused" may clear a saved token. Until #716 the check was the same
 # yes/no probe the PASTE check uses, which throws curl's errors away, so a Mac
@@ -1425,10 +1428,20 @@ validate_cf_token() {
 # that is refused is not saved, so it costs nothing beyond being asked again
 # on the next deploy, and the paste is where #696 will ask again in the sheet.
 #
+# Both bodies are checked because a page is not the service just because it
+# came back over its address: a filter that inspects the school's traffic, or
+# a firewall challenging a VPN, answers 403 with a page of its own, and a
+# token must not be cleared on the word of something that never asked the
+# service. Measured 2026-11-01 with made-up tokens: Cloudflare's refusals say
+# `"success":false` (400 code 6003, 401 code 1000), Netlify's say
+# `{"code":401,"message":"Access Denied"}`, and Netlify's yes is the account,
+# which carries `"id"`.
+#
 # $1 the URL, $2 the token, $3 (optional) an extended regular expression the
-# answer's body must match before a 2xx counts as accepted.
+# answer's body must match before a 2xx counts as accepted, $4 (optional) one
+# it must match before a 400/401/403 counts as refused.
 token_check_answer() {
-  local url="${1:-}" token="${2:-}" body_must_say="${3:-}"
+  local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
   local answer code body
   if [[ -z "$token" ]]; then
     echo "refused"
@@ -1443,7 +1456,11 @@ token_check_answer() {
   body="${answer%$'\n'*}"
   case "$code" in
     400|401|403)
-      echo "refused"
+      if [[ -z "$refusal_must_say" ]] || printf '%s' "$body" | grep -Eq "$refusal_must_say"; then
+        echo "refused"
+      else
+        echo "unheard"
+      fi
       ;;
     2[0-9][0-9])
       if [[ -z "$body_must_say" ]] || printf '%s' "$body" | grep -Eq "$body_must_say"; then
@@ -1621,7 +1638,7 @@ if [[ "$TARGET" == "cloudflare" ]]; then
     # (GitHub #716, above token_check_answer). The run stops there rather than
     # carrying on, because the upload needs the same connection and would only
     # fail later with a less useful message.
-    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true')" in
+    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true' '"success":[[:space:]]*false')" in
       accepted)
         ;;
       refused)
@@ -1733,7 +1750,7 @@ if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
 if [[ -n "$TOKEN" ]]; then
   # Cleared only when Netlify SAYS no, as Cloudflare's is (GitHub #716).
-  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN")" in
+  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN" '"id"[[:space:]]*:' '"code":[[:space:]]*4[0-9][0-9]')" in
     accepted)
       ;;
     refused)

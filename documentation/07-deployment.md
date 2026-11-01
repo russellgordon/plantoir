@@ -1088,13 +1088,23 @@ no `-f`, curl's errors still discarded) and says one of three words:
 
 | Heard | Means | Saved token |
 |---|---|---|
-| `accepted` | 2xx, and for Cloudflare a body saying `"success":true` | used |
-| `refused` | **400, 401 or 403** | cleared (and the Cloudflare account), as before; the question is asked |
-| `unheard` | 000 (no answer, a timeout, a name that did not resolve), a redirect, a captive portal's page, 429, any 5xx, a 2xx that does not say yes | **kept**; the deploy stops, exit 1 |
+| `accepted` | 2xx whose body says yes: Cloudflare's `"success":true`, Netlify's account (`"id":`) | used |
+| `refused` | **400, 401 or 403** whose body is the service's own refusal: Cloudflare's `"success":false`, Netlify's `"code":4xx` | cleared (and the Cloudflare account), as before; the question is asked |
+| `unheard` | 000 (no answer, a timeout, a name that did not resolve), a redirect, a captive portal's page, 429, any 5xx, a 2xx that does not say yes, a 400/401/403 that is not the service's (a school web filter's block page, a firewall's challenge in front of the API) | **kept**; the deploy stops, exit 1 |
 
 400 is a refusal because Cloudflare answers a malformed token with it, and a
 saved token that can never be accepted must not be kept for ever behind a
-sentence about the connection. With the same closed port the new launcher
+sentence about the connection. The BODY is read as well as the status
+(review of #716): a filter that inspects a school's traffic, or a firewall
+challenging a VPN, answers 403 with a page of its own, and a token must not be
+cleared on the word of something that never asked the service — the same
+reason a 200 portal page is not a yes, which until that review held for
+Cloudflare only. Measured 2026-11-01 with made-up tokens: Cloudflare's
+refusals carry `"success":false` (400 code 6003, 401 code 1000), Netlify's
+`{"code":401,"message":"Access Denied"}`. The cost is the other direction: if
+either service ever refused without its JSON, a dead saved token would be
+kept behind the could-not-reach sentence until the teacher replaced it, which
+is the lesser fault — that sentence does not destroy anything. With the same closed port the new launcher
 prints "❌ Plantoir could not reach Cloudflare to check the saved token, so
 this section was not deployed there." and "The token is still saved. Check
 that this computer is online, then try again in a few minutes.", exits 1, and
@@ -1118,9 +1128,12 @@ report carries the sentence — the line belongs with #696's retries).
 **Tested.** `scripts/test_deploy_token_refusal.py` copies `deploy.sh` into a
 scratch folder, stubs every Keychain reader and writer and `curl` (answering
 with a chosen status), stops it before the website builder, and runs the real
-saved-token checks: 400/401/403 clear, 000/429/500/503/302 and a 2xx without
-`"success":true` keep and stop, 200 is used; Netlify likewise. Against the old
-launcher (copied in and restored) five of its twelve tests fail, twelve
+saved-token checks: 400/401/403 with the service's refusal clear;
+000/429/500/503/302, a 2xx without `"success":true`, and a 401/403 block page
+keep and stop; 200 is used; Netlify likewise (a 200 portal page and a 401/403
+block page kept). The three block-page and portal tests added on review fail
+against the launcher before it (five failures counting subtests). Against the pre-#716
+launcher (copied in and restored) five of the twelve tests it had then fail, twelve
 failures counting subtests: every "kept" case, the could-not-reach sentences,
 and the Netlify-refused pair — that last only because the old probe relied on
 `curl -f`, which the stub does not imitate, so it is not evidence of a fault.

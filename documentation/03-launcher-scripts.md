@@ -2329,7 +2329,8 @@ all XNU compares).
     the pasted token against `GET /api/v1/user`, and saves it.
     `--reset-token` (or `--logout`) clears it. A SAVED token (Netlify's or
     Cloudflare's) is cleared on its own only when the service answers 400,
-    401 or 403; with no answer the mac launcher keeps it and stops (#716,
+    401 or 403 in its own words (a web filter's block page is not a
+    refusal); with no answer the mac launcher keeps it and stops (#716,
     `token_check_answer`; `deploy.ps1`'s half is #705) —
     `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
