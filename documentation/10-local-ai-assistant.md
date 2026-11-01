@@ -7918,6 +7918,23 @@ entries and the Windows-only member to delete. How the press
 reports early on Windows, where a question is an awaited dialog, is in
 `12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
+### A third way in: Fix with Claude… / Fix with Codex… (#717, part two)
+
+The Problems tab of a section (`09-mac-app.md` → "Fix with Claude… and Fix with
+Codex… (#717, part two)") opens these SAME two doors, with one difference: the
+opening message lists the problems the teacher ticked — each row's own line,
+its page, and the skill for its kind — in place of the plain greeting
+(`ClaudeCodeLauncher.open(…, greeting:)`, `CodexLauncher.open(…, greeting:)`,
+`app-rules.json` → `outsideAgents.fixWith`). Everything else is the door as
+above: the working folder, the server's arguments, `PLANTOIR_DOOR_COURSE`,
+the script names, Revise With's refusal at the click, and the door's own
+"assistant opened" line (beside it, "asked an assistant to fix problems").
+**No tool, tool description or `AssistWording` byte moved**: the message is a
+launch argument the teacher sees in their terminal, not something either
+assistant is shown as a tool. `test_tool_surface_digest.py` and the hasher
+gave the same digests before and after (local 13 `46b96562…`, MCP 38
+`89641d12…`), so no routing re-measurement was owed.
+
 ## Telling an outside assistant how the course is taught (#209)
 
 Asked "How about my teaching style?", both doors' sessions said they did not

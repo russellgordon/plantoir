@@ -768,8 +768,8 @@ chosen is kept in the store, not the view's `@State`, because
 
 **The table.** One row per problem: a tick (ticked means included — the app's
 checklist rule — and rows start ticked; ticks last while the app is open,
-since a fixed row goes by itself on the next build; 717b's Fix with Claude or
-Codex acts on the ticked rows), Kind (`sectionProblems.kinds[].label`), Page
+since a fixed row goes by itself on the next build; Fix with Claude… and Fix
+with Codex… act on the ticked rows, below), Kind (`sectionProblems.kinds[].label`), Page
 (the place, or Whole section / Whole course), Problem (the row's `item` — the
 piece of the folder problem naming the page, the fence and what was said —
 with the full sentence and detail on hover), First found and Last found.
@@ -877,6 +877,123 @@ across a relaunch, ticks and tab, the trail line, and a source scan that the
 view raises one alert from the record. Must-fail, by copy-and-restore: no
 `pagesShown` guard, "lacks this id" for "no row of that kind", the marker from
 any record, answers kept in memory only — each fails a named test.
+
+### Fix with Claude… and Fix with Codex… (#717, part two)
+
+**What it is.** Two buttons under the Problems table (`ProblemsTableView.
+fixButtons`) that hand the ticked problems to an outside assistant the teacher
+already has (rulings 3, 5 and 6 on #717). They open the SAME two doors as
+Revise With ▸ — `ClaudeCodeLauncher` and `CodexLauncher`, at the WORKING
+folder, where the skills and the guidance are — and the only difference is the
+opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
+in place of the plain greeting. Every word, number and case is
+`app-rules.json` → `outsideAgents.fixWith`.
+
+**Shown, enabled, handed over.** Each button is shown only while its assistant
+is installed, read from `OutsideAssistantPresence` (asked at launch and when
+the app becomes active, never while the table draws — the view's source scan
+holds that it never calls `isAvailable`), and never on a course kept for
+reference: HIDDEN, never greyed, as Revise With ▸ (`hiddenWhenNotInstalled`).
+They are enabled while at least one row is handed over: ticked (absent means
+ticked) AND not `fixedInTheSource`. A ticked row another section's later build
+shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
+the page is already right, this section needs only a build, and an assistant
+asked to fix it would find nothing wrong and might change something that is not
+broken while looking. At the click, the refusal Revise With ▸ makes (#458: a
+Claude or Codex session already open on the course, or the course busy) is
+made here in its own words, and nothing opens.
+
+**The message** (`fixWith.fixGreeting`, one line): the course and its name,
+which build of which section found the problems, then each handed row numbered
+`1) … · 2) …` — its `prompt` verbatim (the record's one bounded line,
+`sectionProblems.prompt`, less its own closing full stop so it never reads
+". ("), then `(page: courses/<COURSE>/<page>.md, a page shared by every
+section, skill: <skill>)`, the middle clause only when the page is not under
+`section<N>/` — then the plantoir tools, the How I Teach sentence verbatim,
+plan-first-and-agree, and a closing that names what clears the rows
+(`closingWhy`): "preview Section N" for almost every kind, "deploy Section N
+to Cloudflare again" when every row is Cloudflare's refusal (a preview never
+runs that check, so it carries the row unchanged — `deployOnlyKinds`), and
+both in one sentence for a mix (review M1). The skill per kind is
+`fixWith.skillForKind` (figures and GeoGebra `plantoir-math-graphs`, Swift and
+runnable code `plantoir-runnable-code`, self-check questions
+`plantoir-quizzes`, a handout `plantoir-printing`, anything else
+`plantoir-page-authoring`); a test holds that every one is a skill the app
+carries and every key a `sectionProblems` kind. The message is filled in ONE
+pass over its template (`FixWithAssistant.fill`), so a row whose words carry
+`{section}` — TeX is braces everywhere — goes over as written.
+
+**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). On
+Windows the door runs `wt.exe -d <folder> cmd /k …` when Windows Terminal is
+there, and `wt` splits its command line at EVERY `;`, inside quotes too,
+because it reads the arguments after the quotes are removed
+(microsoft/terminal #13264; the documented escape is `\;`). A message with a
+semicolon opens cut short, with its tail as a second tab. The first draft used
+`; ` between rows and inside every row, so a ten-row message carried about
+thirty. No piece of `fixGreeting` has one now, and any a row, a page or a
+course name brings (a TeX error often does) is written as a comma. A double
+quote becomes an apostrophe (`greetingCarriesNoDoubleQuotes`). Both
+replacements keep the length. **Rejected:** escaping `;` as `\;` on Windows
+only. It would hold only while every future piece of the message remembered
+it, and the mac would send a different message.
+
+**Bounds.** At most `mostRowsInThePrompt` (10) rows are named, in the record's
+order, and no row is added that would take the whole message past
+`greetingMaxCharacters` (6,500); the first is always named and the rest are
+"and N more on the Problems tab". A page's place is cut at 300 characters and
+the course's name at 80 (`courseNameMaxCharacters`, review L2 — before it, a
+7,000-character name gave an 8,042-character message), so the bound is
+absolute. Characters are Swift's (grapheme clusters, `fixWith.charactersAre`);
+Windows counts UTF-16 units, which can be more, and keeps the whole command
+line under 8,191 of those, with the rest of 6,500's room as the margin. Why
+6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
+characters, and the rest of that line (the terminal, the assistant's path, the
+configuration's) needs room. Measured with the contract's cases: ten 400-character
+rows on ordinary pages make 5,650 characters; long page names (286
+characters each) stop at seven rows and 6,077.
+
+**The trail.** "asked an assistant to fix problems"
+(`ActivityTrail.Event.askedAnAssistantToFixProblems`, `activityTrail.
+mustRecord`): which assistant, how many problems and their KINDS, how many the
+message named, how many were left out (unticked, fixed in the source) — never
+a page. Written only once the door opened, after the door's own "assistant
+opened" line; a door that did not open says so in its own alert
+(`didNotOpenTitle`, `couldNotStart`). No line for a tick.
+
+**Rejected** (`fixWith.rejected`): handing the rows over in a FILE the message
+names — a file in the folder Obsidian watches, that nobody cleans up, when the
+one-line message fits; one session per problem; greying a button for an
+assistant that is not installed; asking a login shell where the tool is
+(1.06 s for `zsh -lic` on the planning Mac, and it runs the teacher's login
+scripts while a view draws — the doors' own `searchedForInOrder` is used, which
+does not cover a CLI bundled inside the Claude desktop app; ruling 3 says "the
+command").
+
+**Measured.** The contract's expectations were computed by an implementation
+written from the rule text (Python), and the Swift, compiled on its own with
+the real `FixWithAssistant.swift`, `SectionProblemsRecord.swift` and
+`SectionProblemsRules.swift`, gives the same answer for all 10 `greetingCases`
+and 8 `buttonCases`. The tool-surface digests did not move (local 13
+`46b96562…`, MCP 38 `89641d12…`): the message is a launch argument, not a tool
+description.
+
+**What Windows owes** (its `windows` issue): the two buttons under its list,
+the same `buttonCases` and `greetingCases`, the trail event, and the message
+through `wt.exe`/`cmd /k`. The message has no `;` for `wt` to split at. A `%`
+the record's prompts already drop, but a page's name can carry one. `^` and
+`!` need checking in its quoting. Measure the whole command line in UTF-16
+units against 8,191.
+
+**Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
+with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
+kinds a deploy writes, both case lists (no message with a semicolon, a newline
+or ". ("), no semicolon and no unbounded name with every input carrying them,
+the closing per kind, rule 1 over the message, the
+real `rowState` leaving a row out, which pages are shared, both doors sending
+the message they are given (and the plain greeting without one), the message
+surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
+apostrophe in it, the trail line against the contract's, and a source scan of
+the view.
 
 ## One folder, however it is spelled
 

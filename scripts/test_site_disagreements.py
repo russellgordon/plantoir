@@ -172,6 +172,21 @@ class SiteDisagreementTests(unittest.TestCase):
         self.assertEqual(facts[0]["page"], "Units/Strings")
         self.assertEqual(facts[0]["line"], 10)
 
+    def test_a_sections_page_the_gate_did_not_place_is_named_where_its_file_is(self):
+        # #717 part two (review L4 of part one's fallback): a section's page
+        # sits at the site's top level, but its file is under section<N>/,
+        # and an outside assistant handed its row must be sent to the file.
+        said = dict(self._said(), everyPlace={"Class 4.md": "section1/Class 4"})
+        facts = site_said.facts_from_site(said, [
+            {"page": "Class 4.md", "language": "python", "block": 1,
+             "reason": "blockAfterUnclosedFence", "code": "print(2)"}])
+        self.assertEqual(facts[0]["page"], "section1/Class 4")
+        quizzes = site_said.quiz_facts_from_site(said, [
+            {"page": "Class 4.md", "n": 1, "line": 3, "reason": "countedDifferently"}])
+        self.assertEqual(quizzes[0]["page"], "section1/Class 4")
+        # A page everyPlace does not name keeps the site path, as before.
+        self.assertEqual(site_said.place_of_a_site_path(said, "Units/Strings.md"), "Units/Strings")
+
     def test_a_page_named_in_another_unicode_form_is_still_found(self):
         """Amendment 6: the site's path and the build's are NFC'd on both sides."""
         composed = unicodedata.normalize("NFC", "Units/Café.md")
@@ -435,6 +450,26 @@ class QuizDisagreementTests(unittest.TestCase):
             "Practice.md": {"place": "Unit 2/Practice", "source": None},
             "Units/Loops.md": {"place": "Units/Loops", "source": str(Path("/c/Unit 1/Loops.md"))}})
 
+
+    def test_the_side_file_names_every_copied_page_where_its_file_is(self):
+        content = self.folder / "content"
+        content.mkdir(parents=True)
+        course = self.folder / "courses" / "ICS3U"
+        saved_sources = dict(build_site._vault_sources)
+        saved_folder = list(build_site._vault_course_folder)
+        build_site.forget_vault_sources(course)
+        build_site.remember_vault_source(content / "Class 4.md", course / "section1" / "Class 4.md", True)
+        build_site.remember_vault_source(content / "Unit 1" / "Loops.md", course / "Unit 1" / "Loops.md", False)
+        build_site.remember_vault_source(content / "Media" / "a.png", course / "Media" / "a.png", False)
+        try:
+            build_site._write_site_said(self.folder / "site", content, "ICS3U", 1, {}, {})
+        finally:
+            build_site._vault_sources.clear()
+            build_site._vault_sources.update(saved_sources)
+            build_site._vault_course_folder.clear()
+            build_site._vault_course_folder.extend(saved_folder)
+        written = json.loads((self.folder / "site" / "quartz" / site_said.SIDE_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(written["everyPlace"], {"Class 4.md": "section1/Class 4", "Unit 1/Loops.md": "Unit 1/Loops"})
 
 if __name__ == "__main__":
     unittest.main()

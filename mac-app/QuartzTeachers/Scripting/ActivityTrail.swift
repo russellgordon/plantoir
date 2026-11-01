@@ -278,6 +278,15 @@ nonisolated enum ActivityTrail {
         /// reads it; and, as a second line of the same event, the answer the
         /// teacher gave the alert about it (#717, `SectionProblems`).
         case problemsChanged = "problems changed"
+        /// Fix with Claude… or Fix with Codex… on a section's Problems tab
+        /// opened its door with the ticked problems in the opening message
+        /// (#717, part two, `FixWithAssistant`): which assistant, how many
+        /// problems went and of what kinds, how many the message named, and
+        /// how many were left out (unticked, or fixed in the source) — never
+        /// a page. Written once the door has opened, beside the door's own
+        /// "assistant opened" line, so a report of "it fixed the wrong thing"
+        /// can tell what it was asked to fix.
+        case askedAnAssistantToFixProblems = "asked an assistant to fix problems"
         /// A folder a feature depends on was put back, at the teacher's
         /// request — or, since #584, something the build put right in the
         /// teacher's own files by itself (`BuildRepairReport`: a front page's

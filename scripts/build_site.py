@@ -2363,6 +2363,25 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
         return {"problems": [], "blocks": 0, "ready": 0}
 
 
+def _every_place_in_the_course(content_root: Path) -> dict:
+    """Every copied page's site path (under `content_root`, forward slashes)
+    to its place in the course folder without .md (`_vault_sources`): what
+    site_said falls back to for a page `places` does not name, so a
+    section's page is named `section<N>/…`, where its file is (#717 part
+    two)."""
+    every = {}
+    root = Path(content_root)
+    for copied, (source, _is_section_page) in _vault_sources.items():
+        if not str(copied).lower().endswith(".md"):
+            continue
+        try:
+            site_path = Path(copied).relative_to(root).as_posix()
+        except ValueError:
+            continue
+        every[site_path] = _name_in_the_course(source)
+    return every
+
+
 def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
                      swift_here: dict, quiz_places: dict = None, problems: dict = None) -> None:
     """
@@ -2396,7 +2415,8 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
         for problem in swift_here.get("problems") or []:
             swift_named.append([problem.get("page", ""), problem.get("block", 1)])
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
-                                  content_root, problems=problems)
+                                  content_root, problems=problems,
+                                  every_place=_every_place_in_the_course(content_root))
     except Exception as error:
         print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
