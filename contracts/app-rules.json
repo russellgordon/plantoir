@@ -702,10 +702,13 @@
         "course" : "ICS3U",
         "expectArguments" : [
           "ICS3U",
-          "1"
+          "1",
+          "--target",
+          "netlify"
         ],
-        "name" : "Netlify, the default, passes no target flag",
-        "section" : 1
+        "name" : "Netlify, what an absent key means, is named like every other destination",
+        "section" : 1,
+        "why" : "Until #668 Netlify passed no flag, as the launcher's default. Since Russell's ruling of 2026-11-01 a deploy.sh given no destination reads the course's SAVED destinations and deploys every one of them, a leg each, so the app names every leg it runs — otherwise the Netlify leg of a course that also deploys elsewhere would run all of them again."
       },
       {
         "cloudflareAccountID" : "0123456789abcdef0123456789abcdef",
@@ -787,7 +790,9 @@
         "expectArguments" : [
           "ICS3U",
           "1",
-          "--non-interactive"
+          "--non-interactive",
+          "--target",
+          "netlify"
         ],
         "name" : "A scheduled deploy says nobody is at the computer",
         "section" : 1,
@@ -835,7 +840,7 @@
         "why" : "A folder deploy asks nothing today — it never reaches a web host and never names a site — so the flag changes nothing here. It is passed anyway because it describes the CALLER, not the destination: it says nobody is at the computer, and that stays true if a question is ever added to this path."
       }
     ],
-    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
+    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Every destination is NAMED, Netlify included (--target netlify) since #668: a deploy.sh given no destination now reads the course's saved destinations itself (Russell, 2026-11-01), so a call from the app must say which leg it is. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
   },
   "failureExplanations" : {
     "cases" : [
@@ -5645,7 +5650,7 @@
       "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
     },
     "whenTheKeyIsAbsent" : "netlify",
-    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup_course.py writes newCourseDefault for a course it makes with no saved file (since Russell's ruling of 2026-11-01), keeps a saved deploy_target when it is run again, and writes NONE over a saved file that names none — that course predates the other destinations and keeps deploying to Netlify. The launchers themselves still read no key: ./deploy.sh at the command line deploys to Netlify unless it is given --target cloudflare, as documentation/07-deployment.md has always said (rejected for this piece: changing the launchers' default, which is the same move as changing the fallback for every older course).",
+    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup_course.py writes newCourseDefault for a course it makes with no saved file (since Russell's ruling of 2026-11-01), keeps a saved deploy_target when it is run again, and writes NONE over a saved file that names none — that course predates the other destinations and keeps deploying to Netlify. And a deploy typed at the command line goes where the course's settings say (Russell, 2026-11-01): deploy.sh, given neither --target nor --to-folder, reads deploy_target — absent still meaning Netlify — and deploys each additional destination as a leg of its own; a typed --target still wins. Since then the app names every leg it runs (deployArguments: --target netlify included). deploy.ps1 matching it is Windows' obligation.",
     "wizardAccountID" : {
       "cases" : [
         {

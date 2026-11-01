@@ -632,7 +632,8 @@ Examples:
 Notes:
 - Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
 - You must build first (the static site goes to 'public/' in that section folder).
-- --target chooses where the built site goes: netlify (the default) or cloudflare.
+- --target chooses where the built site goes: netlify or cloudflare. Without it
+  (or --to-folder), the course's own settings decide, as the app's Deploy does.
 - With --to-folder <path>, the site is deployed to <path>/section<N> on THIS
   computer instead of Netlify — an incremental copy (only changed files move),
   for teachers who upload to their own web host (e.g. over SFTP). A relative
@@ -848,18 +849,26 @@ if [[ -f "$_course_config" ]]; then
 fi
 
 # Parse flags
+# Every flag as typed, kept for the legs of a course with more than one
+# destination (below), which run this script again once per destination.
+DEPLOY_FLAGS_AS_GIVEN=("$@")
 DIAGNOSE=""
 TEAM_SLUG=""
 RESET_TOKEN="false"
 TO_FOLDER=""
 TARGET="netlify"
+# Whether --target was typed. Without it, and without --to-folder, the
+# destination comes from the course's own settings (#668, below).
+TARGET_WAS_GIVEN="false"
 ACCOUNT_ARG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
+      TARGET_WAS_GIVEN="true"
       TARGET="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift ;;
     --target=*)
+      TARGET_WAS_GIVEN="true"
       TARGET="$(printf '%s' "${1#*=}" | tr '[:upper:]' '[:lower:]')" ;;
     --account)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
@@ -898,6 +907,137 @@ if [[ "$TARGET" != "netlify" && "$TARGET" != "cloudflare" ]]; then
   echo
   usage
   exit 1
+fi
+
+# ---- Where this course deploys, when no destination was typed (#668) ----
+# Russell, 2026-11-01: a deploy typed at the command line goes where the
+# course's settings say, as the app's Deploy button does — so a course made
+# for Cloudflare Pages (every new course since #668) is not quietly deployed
+# to Netlify. Read only when neither --target nor --to-folder was given;
+# either one still decides, exactly as before. The mapping is the app's
+# (DeployCommand.arguments, contracts/app-rules.json -> deployArguments):
+#   deploy_target absent, "" or "netlify"  -> Netlify, this script's default
+#   "cloudflare_pages"                      -> --target cloudflare
+#   "local_folder"                          -> --to-folder deploy_folder_path
+# and additional_deploy_targets are deployed after it, one leg each, by
+# running this script again with that leg's flag — the app's own shape
+# (MultiDestinationDeployRunner), so every leg goes through every check
+# below. A leg that fails does not stop the others; the run ends with the
+# first failing leg's exit code.
+#
+# Read with Python (json), the way the token migration further down already
+# is, because the destination is a VALUE in nested JSON. A settings file that
+# is there and cannot be read REFUSES rather than falling back to Netlify:
+# falling back is exactly the silent wrong-host deploy this exists to stop.
+# scripts/test_deploy_sh_destination.py pins it.
+the_saved_destinations() {
+  local config="$1" reader
+  for reader in python3 python; do
+    if command -v "$reader" >/dev/null 2>&1; then
+      "$reader" - "$config" <<'PY' && return 0
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    settings = json.load(handle)
+if not isinstance(settings, dict):
+    raise SystemExit(1)
+def one(kind, path):
+    kind = kind if isinstance(kind, str) else ""
+    path = path if isinstance(path, str) else ""
+    print((kind or "netlify") + "\t" + path.replace("\t", " ").replace("\n", " "))
+one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
+extras = settings.get("additional_deploy_targets")
+if isinstance(extras, list):
+    for extra in extras:
+        if isinstance(extra, dict) and isinstance(extra.get("type"), str) and extra["type"]:
+            one(extra["type"], extra.get("path"))
+PY
+      return 1
+    fi
+  done
+  return 1
+}
+
+# The words a teacher reads for one saved destination.
+destination_words() {
+  case "$1" in
+    cloudflare_pages) echo "Cloudflare Pages" ;;
+    local_folder) echo "a folder on this computer" ;;
+    *) echo "Netlify" ;;
+  esac
+}
+
+# The flag(s) that deploy to one saved destination, one per line, or a
+# refusal on stdout and return 1.
+flags_for_the_saved_destination() {
+  local kind="$1" path="$2"
+  case "$kind" in
+    netlify) printf '%s\n' "--target" "netlify" ;;
+    cloudflare_pages) printf '%s\n' "--target" "cloudflare" ;;
+    local_folder)
+      if [[ -z "$path" ]]; then
+        echo "${COURSE_CODE} deploys to a folder on this computer, but no folder is chosen in its settings."
+        return 1
+      fi
+      printf '%s\n' "--to-folder" "$path" ;;
+    *)
+      echo "${COURSE_CODE}'s settings name a destination Plantoir does not know: ${kind}."
+      return 1 ;;
+  esac
+}
+
+if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
+  if ! _saved_destinations="$(the_saved_destinations "$_course_config" 2>/dev/null)" \
+     || [[ -z "$_saved_destinations" ]]; then
+    echo ""
+    echo "❌ Plantoir could not read where ${COURSE_CODE} deploys from its settings."
+    echo "   Nothing was deployed. Choose one with --target netlify or --target cloudflare."
+    echo ""
+    exit 1
+  fi
+  _leg_count="$(printf '%s\n' "$_saved_destinations" | grep -c .)"
+  if [[ "$RESET_TOKEN" == "true" ]]; then
+    # Clearing a token deploys nothing, so only the main destination is asked.
+    _leg_count=1
+    _saved_destinations="$(printf '%s\n' "$_saved_destinations" | head -n 1)"
+  fi
+  if [[ "$_leg_count" -gt 1 ]]; then
+    _self="$(pwd)/$(basename "$0")"
+    _first_failure=0
+    while IFS=$'\t' read -r _kind _path; do
+      [[ -n "$_kind" ]] || continue
+      if ! _leg_output="$(flags_for_the_saved_destination "$_kind" "$_path")"; then
+        echo ""
+        echo "❌ ${_leg_output} Nothing was deployed there."
+        [[ "$_first_failure" -ne 0 ]] || _first_failure=1
+        continue
+      fi
+      _leg_flags=()
+      while IFS= read -r _flag; do _leg_flags+=("$_flag"); done <<< "$_leg_output"
+      echo ""
+      echo "🎯 Deploying ${COURSE_CODE} section ${SECTION_NUM} to $(destination_words "$_kind"), as its settings say."
+      _leg_status=0
+      # Through this shell rather than as a program, so a copy without its
+      # execute bit (a fresh download, a test's copy) runs its legs too.
+      "${BASH:-bash}" "$_self" "$COURSE_CODE" "$SECTION_NUM" ${DEPLOY_FLAGS_AS_GIVEN[@]+"${DEPLOY_FLAGS_AS_GIVEN[@]}"} "${_leg_flags[@]}" || _leg_status=$?
+      if [[ "$_leg_status" -ne 0 && "$_first_failure" -eq 0 ]]; then
+        _first_failure="$_leg_status"
+      fi
+    done <<< "$_saved_destinations"
+    exit "$_first_failure"
+  fi
+  IFS=$'\t' read -r _kind _path <<< "$_saved_destinations"
+  if ! _leg_output="$(flags_for_the_saved_destination "$_kind" "$_path")"; then
+    echo ""
+    echo "❌ ${_leg_output} Nothing was deployed."
+    echo ""
+    exit 1
+  fi
+  case "$_kind" in
+    cloudflare_pages) TARGET="cloudflare" ;;
+    local_folder) TO_FOLDER="$_path" ;;
+    *) TARGET="netlify" ;;
+  esac
+  echo "🎯 Deploying to $(destination_words "$_kind"), as ${COURSE_CODE}'s settings say."
 fi
 
 # >>> DEPLOY WHILE ITS SECTION DEPLOYS GUARD >>> — identical in deploy.sh and

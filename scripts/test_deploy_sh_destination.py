@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""deploy.sh deploys where the course's settings say when no destination is typed (#668).
+
+Russell, 2026-11-01: a deploy typed at the command line goes where the
+course's own `deploy_target` says, as the app's Deploy button does, so a
+course made for Cloudflare Pages - every new course since #668 - is not
+quietly deployed to Netlify. `--target` and `--to-folder` still decide when
+they are typed. `additional_deploy_targets` are deployed one leg each, by
+running the launcher again with that leg's flag, the app's own shape.
+
+Each case runs a COPY of deploy.sh in an empty folder holding only the
+course's settings: it reads the destination, says it, and then stops at the
+missing recipe for the website builder, long before anything needs Docker,
+the network or a credential. The line it says is what is read here.
+
+Listed in verify.sh; Windows' PythonToolchainTests discovers it, and skips it
+there when no bash can run the launcher (see test_deploy_non_interactive).
+
+    python3 scripts/test_deploy_sh_destination.py
+"""
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import test_deploy_non_interactive as launcher_harness  # noqa: E402
+
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+STOPPED_BEFORE_THE_BUILDER = "missing the recipe for its website builder"
+
+
+class DeployShReadsTheSavedDestination(unittest.TestCase):
+
+    def setUp(self):
+        self.shell = launcher_harness._a_bash_that_can_run_deploy_sh()
+        if self.shell is None:
+            self.skipTest("no bash on this machine that can run a launcher from a native path")
+        probe = subprocess.run(
+            self.shell + ["-c", "command -v python3 || command -v python"],
+            capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+        )
+        if probe.returncode != 0 or not probe.stdout.strip():
+            self.skipTest("the bash that runs the launcher has no python to read the settings with")
+
+    def run_deploy(self, settings, *flags):
+        """Runs a copy of deploy.sh for ICS3U section 1; returns its output and exit code."""
+        with tempfile.TemporaryDirectory() as folder:
+            launcher = Path(folder) / "deploy.sh"
+            launcher.write_bytes((REPOSITORY_ROOT / "deploy.sh").read_bytes())
+            course = Path(folder) / "courses" / "ICS3U"
+            course.mkdir(parents=True)
+            if isinstance(settings, str):
+                (course / "course_config.json").write_text(settings, encoding="utf-8")
+            else:
+                (course / "course_config.json").write_text(json.dumps(settings), encoding="utf-8")
+            result = subprocess.run(
+                self.shell + [str(launcher), "ICS3U", "1", "--non-interactive", *flags],
+                capture_output=True, timeout=180, stdin=subprocess.DEVNULL,
+                encoding="utf-8", errors="replace",
+            )
+            return result.stdout + result.stderr, result.returncode
+
+    def test_a_cloudflare_course_with_no_target_deploys_to_cloudflare(self):
+        said, _ = self.run_deploy({"course_code": "ICS3U", "deploy_target": "cloudflare_pages"})
+        self.assertIn("Deploying to Cloudflare Pages, as ICS3U's settings say.", said)
+        self.assertIn(STOPPED_BEFORE_THE_BUILDER, said, "it stopped before reaching the builder")
+
+    def test_a_typed_target_still_wins(self):
+        said, _ = self.run_deploy(
+            {"course_code": "ICS3U", "deploy_target": "cloudflare_pages"}, "--target", "netlify"
+        )
+        self.assertNotIn("Cloudflare", said, "--target netlify lost to the course's settings")
+        self.assertNotIn("as ICS3U's settings say", said)
+        self.assertIn(STOPPED_BEFORE_THE_BUILDER, said)
+
+    def test_a_course_that_names_no_destination_deploys_to_netlify_as_before(self):
+        said, _ = self.run_deploy({"course_code": "ICS3U"})
+        self.assertIn("Deploying to Netlify, as ICS3U's settings say.", said)
+        self.assertNotIn("Cloudflare", said)
+
+    def test_a_folder_course_deploys_to_its_folder_and_a_folder_with_none_refuses(self):
+        said, code = self.run_deploy({"course_code": "ICS3U", "deploy_target": "local_folder"})
+        self.assertNotEqual(code, 0)
+        self.assertIn("no folder is chosen in its settings", said)
+        self.assertIn("Nothing was deployed.", said)
+
+    def test_every_destination_is_a_leg_of_its_own(self):
+        said, code = self.run_deploy({
+            "course_code": "ICS3U",
+            "deploy_target": "netlify",
+            "additional_deploy_targets": [{"type": "cloudflare_pages"}],
+        })
+        self.assertIn("Deploying ICS3U section 1 to Netlify, as its settings say.", said)
+        self.assertIn("Deploying ICS3U section 1 to Cloudflare Pages, as its settings say.", said)
+        self.assertEqual(said.count(STOPPED_BEFORE_THE_BUILDER), 2,
+                         "each destination should run as its own leg, and every leg go on after one fails")
+        self.assertNotEqual(code, 0, "a run whose legs failed must not end in success")
+
+    def test_settings_that_cannot_be_read_refuse_rather_than_fall_back_to_netlify(self):
+        said, code = self.run_deploy('{"course_code": "ICS3U", "deploy_target": ')
+        self.assertNotEqual(code, 0)
+        self.assertIn("could not read where ICS3U deploys", said)
+        self.assertNotIn(STOPPED_BEFORE_THE_BUILDER, said)
+
+
+if __name__ == "__main__":
+    unittest.main()

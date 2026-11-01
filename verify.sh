@@ -318,6 +318,13 @@ else
   cat /tmp/verify_graded_rerun_test.log
 fi
 
+if (cd scripts && python3 test_deploy_sh_destination.py) >/tmp/verify_deploy_sh_destination_test.log 2>&1; then
+  pass "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
+else
+  fail "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
+  cat /tmp/verify_deploy_sh_destination_test.log
+fi
+
 if (cd scripts && python3 test_setup_course_deploy_target.py) >/tmp/verify_setup_deploy_target_test.log 2>&1; then
   pass "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
 else

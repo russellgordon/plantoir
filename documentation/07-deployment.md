@@ -1,12 +1,17 @@
 # 7. Publishing a built section (`deploy.py`)
 
 > A course chooses **where** it publishes with the `deploy_target` key —
-> which the APP reads and turns into a `--target` argument. **No launcher
-> reads that key**: `deploy.sh`, `deploy.ps1` and `deploy.py` all default to
-> Netlify and change destination only on `--target`, so anything driving a
-> launcher directly — a script, a test harness, a scheduled wrapper — has to
-> pass the flag itself. Setting the key and calling the launcher publishes to
-> Netlify, silently; that is exactly how a deploy harness came to verify a
+> which the APP reads and turns into a `--target` argument, naming every
+> destination (`--target netlify` included, since #668). **`deploy.sh` reads
+> the key too, since #668, but only when it is given no destination**
+> (Russell, 2026-11-01): `./deploy.sh ICS3U 1` deploys where the course's
+> settings say, and every `additional_deploy_targets` entry as a leg of its
+> own; `--target` or `--to-folder` still decides when it is typed ("Choosing
+> a destination (#668)", below). **`deploy.ps1` and `deploy.py` still read
+> no key** and default to Netlify, so anything driving those directly — a
+> script, a test harness, a scheduled wrapper — has to pass the flag itself.
+> Setting the key and calling such a launcher publishes to Netlify,
+> silently; that is exactly how a deploy harness came to verify a
 > `netlify.app` address three times over and report three green Cloudflare
 > publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
@@ -982,13 +987,25 @@ whose file has NO `deploy_target` — every course made before the other
 destinations existed — still deploys to Netlify, and nothing about that
 changed: a re-run of setup over such a file writes none.
 
-**One thing that did not move, and a command-line teacher should know it:**
-the launchers still read no key (see the top of this page). `./deploy.sh
-ICS3U 1` deploys to Netlify unless it is given `--target cloudflare`, even
-for a course whose file says `cloudflare_pages`; the app passes the flag
-for them. Changing the launchers' default was not part of the ruling — it
-is the publishing path and would move every older course's command-line
-deploy too — and is left for its own decision. The rule, the
+**A deploy typed at the command line goes where the course's settings
+say** (Russell, 2026-11-01). Until then the launchers read no key, so
+`./deploy.sh ICS3U 1` deployed a course written for Cloudflare to Netlify.
+Now `deploy.sh`, given neither `--target` nor `--to-folder`, reads
+`deploy_target` (absent or `netlify` → Netlify, `cloudflare_pages` →
+Cloudflare, `local_folder` → its `deploy_folder_path`) and says so ("Deploying
+to Cloudflare Pages, as ICS3U's settings say."); a course with
+`additional_deploy_targets` is deployed one leg per destination, by running
+the launcher again with that leg's flag — the app's own shape, so every leg
+meets every check, and a leg that fails does not stop the others. Settings
+that cannot be read REFUSE rather than fall back to Netlify, which is the
+silent wrong-host deploy this exists to stop. A typed `--target` still wins.
+`scripts/test_deploy_sh_destination.py` pins all of it (six cases, listed in
+`verify.sh`). **The app names every leg now** (`DeployCommand.arguments`,
+`--target netlify` included; `deployArguments` cases moved), because the
+Netlify leg of a course with a second destination, passed no flag, would
+otherwise have run both legs again; `verify-deploy.sh` names its Netlify
+legs for the same reason. **`deploy.ps1` has the same gap** and is Windows'
+obligation; `deploy.py` is unchanged (it does one destination per call). The rule, the
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.
 

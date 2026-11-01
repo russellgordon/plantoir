@@ -129,8 +129,8 @@ final class CloudflareDeployTests: XCTestCase {
                 courseCode: "ICS3U", sectionNumber: 1,
                 configuration: netlify, cloudflareAccountID: "0123456789abcdef0123456789abcdef"
             ),
-            ["ICS3U", "1"],
-            "Netlify is deploy.sh's own default, so it passes no target flag at all"
+            ["ICS3U", "1", "--target", "netlify"],
+            "Netlify is named like every other destination since #668: a deploy.sh given none reads the course's saved destinations"
         )
 
         let cloudflare: CourseConfiguration = try roundTripped([

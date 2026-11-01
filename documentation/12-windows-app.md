@@ -690,9 +690,10 @@ problem — **nobody answers a question at 6 a.m.**
 ## Publishing: the destination is an argument
 
 `deploy_target` in `course_config.json` is read by the **app**, which turns it
-into a `--target` flag. **No launcher reads that key to choose a
-destination** — `deploy.ps1`, `deploy.sh` and `deploy.py` all default to
-Netlify and change destination only on `--target`. (`build_site.py` does read
+into a `--target` flag. **`deploy.ps1` and `deploy.py` read no key to
+choose a destination** — they default to Netlify and change destination
+only on `--target`. (`deploy.sh` reads it since #668 when it is given no
+destination; `deploy.ps1` matching it is the #668 `windows` issue.) (`build_site.py` does read
 it, but for working out a site's domain, not for deciding where to publish.) Anything driving a launcher directly must pass the flag itself;
 see [deployment](07-deployment.md), where the failure that sentence caused is
 recorded.
