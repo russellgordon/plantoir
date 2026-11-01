@@ -949,8 +949,13 @@ line under 8,191 of those, with the rest of 6,500's room as the margin. Why
 6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
 characters, and the rest of that line (the terminal, the assistant's path, the
 configuration's) needs room. Measured with the contract's cases: ten 400-character
-rows on ordinary pages make 5,650 characters; long page names (286
-characters each) stop at seven rows and 6,077.
+rows on ordinary pages make 5,659 characters; long page names (286
+characters each) stop at seven rows and 6,083 (re-measured by the fixes
+review from the branch's own sources). Two small limits, written down
+rather than fixed: a `;` in a page's NAME is written as a comma, so the
+assistant will not find that file by the name alone — the row's line and
+reason still locate it; and a prompt ending "..." reads ".. (" before the
+parenthesis.
 
 **The trail.** "asked an assistant to fix problems"
 (`ActivityTrail.Event.askedAnAssistantToFixProblems`, `activityTrail.
