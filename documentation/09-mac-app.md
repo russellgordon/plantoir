@@ -3787,13 +3787,15 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   looked at in both copies). The header's Name/Date/Class # `\fillblank`
   keeps one line: a two-line strut there would push into `headheight`, and
   those blanks are not prompts. On a page the only blank is a quiz's
-  `` `____` ``, which prints as a line at the site's own height;
+  `` `____` ``, which since [#733](https://github.com/russellgordon/plantoir/issues/733)
+  (v1.9.1, merged the same day) prints as a black line with about two lines
+  of room — 1.6em over a 1.2em line, the `\fillin` strut scaled to the
+  site's leading — where before #733 it had printed with NO line at all
+  (drawn in a colour the print rule made transparent, since #563);
   `plantoir-printing` section 3 says never to fake blanks with underscores
   or typed empty lines, and to make a PDF handout when written answers need
-  the room. NOT changed here: the printed quiz blank's height, which is the
-  site's `quiz.scss` print rule (a product change for both platforms, not
-  a skill's) - that half of the rule is
-  [#733](https://github.com/russellgordon/plantoir/issues/733) (v1.9.1).
+  more room than that. Known, not fixed (#737 review): a guard that asks
+  `ps -p` still counts a zombie process in the instant before it is reaped.
 
 Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
 refinement) now carries these rules - the centred box for a column with a
