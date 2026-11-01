@@ -512,8 +512,8 @@ delete_sites_made() {
     fi
     token=""
     case "$code" in
-      2??) SITES_REPORT+=("$kind $name: created by the first publish as $SURNAME, and DELETED (HTTP $code)") ;;
-      *)   SITES_REPORT+=("$kind $name: created by the first publish as $SURNAME, NOT deleted (HTTP ${code:-none}) - delete it by hand") ;;
+      2??) SITES_REPORT+=("$kind $name: created by the first publish as $surname, and DELETED (HTTP $code)") ;;
+      *)   SITES_REPORT+=("$kind $name: created by the first publish as $surname, NOT deleted (HTTP ${code:-none}) - delete it by hand") ;;
     esac
   done
   SITES_MADE=()
