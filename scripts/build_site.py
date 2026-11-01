@@ -31,6 +31,7 @@ import page_features
 import figures
 import geogebra
 import swift_blocks
+import section_problems
 import site_said
 import print_settings
 import quizzes
@@ -2363,7 +2364,7 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
 
 
 def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
-                     swift_here: dict, quiz_places: dict = None) -> None:
+                     swift_here: dict, quiz_places: dict = None, problems: dict = None) -> None:
     """
     quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
     the site's emitter runs to say the runnable blocks it showed as plain code
@@ -2373,7 +2374,9 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
     students can see, by the gate's own rule, read from the build's copies;
     each page the quiz check examined is added by its place too (#644,
     quizzesReadDifferently, said in the same call), unless it is already
-    there, so a code page keeps its `source`.
+    there, so a code page keeps its `source`. `problems` names this build's
+    Problems record and id (#717), so the site's emitter replaces the rows
+    only the site can say - on every build, something to say or not.
     Never stops a build: if this cannot run, the site keeps its
     `plantoir: error:` lines and says no finding.
     """
@@ -2393,7 +2396,7 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
         for problem in swift_here.get("problems") or []:
             swift_named.append([problem.get("page", ""), problem.get("block", 1)])
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
-                                  content_root)
+                                  content_root, problems=problems)
     except Exception as error:
         print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
@@ -9455,9 +9458,23 @@ def build_section_site(
     # its class's date, and after the How I Teach sweep and the #246 hiding.
     # ALWAYS section: every existing folder picks it up on its next build.
     # Writes only the offer file; no page's visibility changes here.
+    # The pages this build shows, read BEFORE the checklist's offer - which
+    # writes only the offer file and changes no page's visibility, so the
+    # list is the same either side of it - so the section's Problems record
+    # (#717) can be written with it and its marker printed first: the alert
+    # it raises then has the links checklist follow it (#379), as before.
+    visible_places_here = _visible_places(content_root)
+    # === #717: the section's record of its problems ============================
+    # ALWAYS section, after every check and before Quartz (plan review, HIGH
+    # 3): one row per problem, the previous record's site-said and deploy
+    # rows carried, and ONE bounded PLANTOIR_PROBLEMS: line. Never fails the
+    # build (section_problems.write_after_build).
+    section_problems.write_after_build(
+        host_output_dir, course_code, section_number, _this_build_id,
+        "deploy" if build_only else "preview", health_facts, visible_places_here,
+        config=config)
     _offer_the_links_checklist(content_root, course_dir, course_code, section_number,
                                frozen_course, _this_build_id)
-    visible_places_here = _visible_places(content_root)
     # ===========================================================================
 
     # === #545: My Progress =======================================================
@@ -9567,7 +9584,9 @@ def build_section_site(
     # What the site's emitter needs to say a block it shows as plain code as a
     # folder problem (#567), ALWAYS, beside the runner's words.
     _write_site_said(output_dir, content_root, course_code, section_number, swift_here,
-                     quiz_places_here)
+                     quiz_places_here,
+                     problems={"file": str(section_problems.record_path(host_output_dir)),
+                               "buildId": _this_build_id})
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)

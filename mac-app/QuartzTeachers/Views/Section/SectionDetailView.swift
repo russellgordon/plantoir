@@ -170,24 +170,19 @@ struct SectionDetailView: View {
     /// race that usually went the right way. A state, not an ordering.
     @State var unsavedSettingsNoticeOwner: UnsavedSettingsNoticeOwner? = nil
 
-    /// Folder problems the last build reported, shown once when it finishes.
-    ///
-    /// Held here rather than read from the runner at render time so that the
-    /// dialog appears ONCE per run: a teacher who dismisses it and carries on
-    /// editing must not have it thrown at them again on every redraw.
+    /// The folder problems the alert about new problems offers to repair
+    /// (#717): its NEW rows that have a repair, as the findings
+    /// `SiteHealthRepair` acts on. Empty when nothing new can be repaired.
     @State var healthFindings: [SiteHealthFinding] = []
 
-    /// Drives the dialog separately from the findings themselves, so the title
-    /// is not recomputed from an array that the dismissal is clearing.
-    /// Findings that arrived while a dialog was already up, waiting their turn
-    /// — each batch with the occasion it arrived on.
-    ///
-    /// The occasion travels WITH them because it decides what is offered next.
-    /// Held findings used to be shown with whatever the flag happened to be
-    /// from the previous batch, so a preview's findings held behind an
-    /// overnight publish were given the publish sentence, and the reverse told
-    /// somebody who had just published that only their preview was stale.
-    @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
+    /// The record the alert about new problems is about, while it is up
+    /// (#717). The alert replaced the per-build folder-problem dialog: it is
+    /// raised only when a build found something NEW, once per record's alert
+    /// key (`sectionProblems.alert`), and points at the Problems tab. Nothing
+    /// is queued behind another dialog: an alert that is due stays due in the
+    /// store until it is answered, so whatever is in front of it going away
+    /// is enough to raise it (`showAnythingWaiting`).
+    @State var problemsAlert: SectionProblemsRecord?
 
     /// What a repair just did, while that is being shown.
     @State var repairOutcome: SiteHealthRepair.Outcome?
@@ -464,6 +459,20 @@ struct SectionDetailView: View {
                 // whose it is.
                 UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
             }
+            // Website | Problems (#717), only while the section's last build
+            // found something: a section with no problems shows what it
+            // always has. Outside the stack, like the notices, so the site
+            // below never moves between containers.
+            if showsTheProblemsTab {
+                DetailTabs(
+                    tabs: [
+                        (tab: SectionProblems.Tab.website, title: SectionProblemsWording.tabWebsite),
+                        (tab: SectionProblems.Tab.problems, title: SectionProblemsWording.tabProblems),
+                    ],
+                    selection: selectedTabBinding,
+                    identifier: "sectionTabs"
+                )
+            }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
                 // respecting flow. Keeping it mounted means its geometry is
@@ -510,6 +519,36 @@ struct SectionDetailView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("previewWebView")
                 }
+
+                // Top layer: the Problems tab (#717), drawn OVER the site and
+                // the console rather than instead of them, so the live web
+                // view underneath keeps its page and its scroll.
+                if selectedTab == .problems, let folder = workspace.workspaceURL, let record = problemsRecord {
+                    ProblemsTableView(
+                        course: course,
+                        sectionNumber: sectionNumber,
+                        folder: folder,
+                        record: record,
+                        others: SectionProblems.shared.otherRecords(folder: folder, course: course, sectionNumber: sectionNumber),
+                        repair: repairFromTheProblemsTab
+                    )
+                }
+            }
+            // The build's word that this section's Problems record changed
+            // (#717): mid-build, before Quartz, so the alert keeps the timing
+            // the folder-problem dialog had (a missing front page stops the
+            // preview finishing, #153). On the stack rather than the view's
+            // own chain, which is at the type-checker's limit.
+            .onChange(of: previewRunner.problemsMarkers.count) { _, _ in
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
+            }
+            // Any other run in this app that printed one — the in-app
+            // assistant's build of this section above all (implementation
+            // review L5): the open section follows its record whoever built.
+            .onChange(of: SectionProblems.shared.markersArrived) { _, _ in
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
             }
         }
         .navigationTitle(titleText)
@@ -526,6 +565,10 @@ struct SectionDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshEditedMarker()
+            // A build this window did not watch — the MCP server's, a
+            // terminal's — may have rewritten the Problems record (#717).
+            reloadTheProblems()
+            raiseTheProblemsAlertIfDue()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             refreshEditedMarker()
@@ -752,44 +795,25 @@ struct SectionDetailView: View {
             takeAVerbRequestIfItIsMine()
         }
         .task {
-            // Anything the overnight publish found. It ran with the app
-            // closed, so this is the first moment there is anywhere to say it
-            // — and `takeFolderProblems` consumes the record, so it is
-            // reported once rather than every time this window opens.
-            // Guard BEFORE consuming: `takeFolderProblems` deletes the record
-            // as it reads it, so taking it while a dialog is already up threw
-            // the overnight findings away permanently.
-            guard healthFindings.isEmpty, let workingFolderURL = workspace.workspaceURL else {
+            // What a build this window did not watch found — an overnight
+            // deploy, the assistant, the MCP server, a terminal (#717). The
+            // section's Problems record is the one list: it is read here, and
+            // its alert raised when it found something new that nobody has
+            // answered (`sectionProblems.alert`), which replaces showing the
+            // overnight run's folder problems in a dialog of their own.
+            guard let workingFolderURL = workspace.workspaceURL else {
                 return
             }
-            let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+            // The overnight run's own copy of its findings is still TAKEN, so
+            // it does not pile up; its trail line was written by the run. The
+            // record holds the same problems, one row each.
+            _ = ScheduledDeploy.takeFolderProblems(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 inWorkingFolder: workingFolderURL
             )
-            // The #333 finding leaves the alert only when the checklist will
-            // really be shown after it; otherwise the alert is the floor.
+            reloadTheProblems()
             let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
-            // Also left out when the teacher has already answered this very
-            // offer — shown while the window was open, say — so the alert does
-            // not return for a finding they acted on (implementation review, N7).
-            var alreadyAnswered: Bool = false
-            if checklist == nil, !course.isKeptForReference,
-               let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) {
-                alreadyAnswered = !LinksChecklistGate.holdsSomethingNew(
-                    read.offer,
-                    answered: LinksChecklistAnswered.read(courseDirectory: course.directoryURL, section: sectionNumber)
-                )
-            }
-            let waiting: [SiteHealthFinding] = LinksChecklistRouting.findingsForTheAlert(
-                taken, checklistWillBeShown: checklist != nil || alreadyAnswered
-            )
-            if !waiting.isEmpty {
-                healthFindings = waiting
-                // The overnight run PUBLISHED, so the sentence must say that
-                // students are still seeing the old site.
-                healthFindingsCameFromPublishing = true
-                healthDialog = .findings
-            }
+            raiseTheProblemsAlertIfDue()
             // After the alert is up, so it waits behind it.
             if let checklist {
                 requestLinksChecklist(checklist)
@@ -860,6 +884,15 @@ struct SectionDetailView: View {
         .alert(healthAlertTitle, isPresented: healthDialogBinding) {
             switch healthDialog {
             case .findings:
+                // The alert about new problems (#717): Show opens the
+                // section's Problems tab. Every answer is remembered by the
+                // record's alert key, so it is not raised again.
+                Button(SectionProblemsWording.show) {
+                    answerTheProblemsAlert("Show")
+                    if let folder = workspace.workspaceURL {
+                        SectionProblems.shared.show(.problems, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+                    }
+                }
                 // No repair on a course kept for reference. The findings
                 // themselves still REPORT — a teacher may want to know a
                 // folder is missing — but the button would have offered to
@@ -879,6 +912,7 @@ struct SectionDetailView: View {
                         // before this alert appeared, and an alert on this
                         // window does not make it key again.
                         defer { refreshEditedMarker() }
+                        answerTheProblemsAlert("the repair")
                         // Only REMEMBERED here: the outcome is shown once this
                         // alert has actually gone, from `onChange`. Raising a
                         // second alert from inside this action loses one of
@@ -890,11 +924,14 @@ struct SectionDetailView: View {
                     }
                 }
                 // "OK" only when it is the only answer: beside a verb it
-                // reads as "yes, do it" (#457, the HIG sweep).
+                // reads as "yes, do it" (#457, the HIG sweep) — and Show is
+                // always beside it.
                 Button(SiteHealthRepair.dismissTitle(
-                    besideAnAction: !course.isKeptForReference && SiteHealthRepair.buttonTitle(for: healthFindings) != nil,
+                    besideAnAction: true,
                     afterARepair: false
-                ), role: .cancel) { }
+                ), role: .cancel) {
+                    answerTheProblemsAlert("Not Now")
+                }
             case .outcome:
                 if repairOutcome?.canRebuild == true {
                     Button("Preview Again") {
@@ -928,6 +965,7 @@ struct SectionDetailView: View {
         .onChange(of: healthDialog == nil) { _, isGone in
             if isGone {
                 healthFindings = []
+                problemsAlert = nil
                 repairOutcome = nil
                 showAnythingWaiting()
                 showAVerbResultIfWaiting()
@@ -949,6 +987,7 @@ struct SectionDetailView: View {
         .sheet(item: $linksChecklist, onDismiss: {
             refreshEditedMarker()
             showAVerbResultIfWaiting()
+            raiseTheProblemsAlertIfDue()
         }, content: { model in
             LinksChecklistSheet(model: model, onPublished: {
                 refreshEditedMarker()
@@ -994,8 +1033,16 @@ struct SectionDetailView: View {
             unsavedSettingsNotice = notice
             unsavedSettingsNoticeOwner = .deploy
         }
+        // The findings a deploy left are routed for the links checklist
+        // (#379) and nothing more: the alert about them is the Problems
+        // record's, raised below once the deploy has ended — one dialog,
+        // never a second beside it (#717, plan review MED 8).
         if run.takeFindings() {
             showHealthFindings(from: run.runner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        }
+        if !run.isBusy {
+            reloadTheProblems()
+            raiseTheProblemsAlertIfDue()
         }
         // This view is showing how it ended — live, or on appearing — so the
         // next view to come to the section shows its ordinary state.
@@ -1014,17 +1061,15 @@ struct SectionDetailView: View {
         if healthDialog == .outcome {
             return repairOutcome?.headline ?? ""
         }
-        if healthFindings.count == 1 {
-            return healthFindings[0].sentence
-        }
-        if healthFindings.isEmpty {
+        guard let problemsAlert else {
             // Reached only while the alert is being torn down, after the
-            // findings have been cleared. Saying "0 things need your attention"
-            // there is the unreachable-by-design string made reachable, which
-            // this view has now met twice.
+            // record has been let go — the unreachable-by-design string made
+            // reachable, which this view met twice when it counted findings.
             return ""
         }
-        return "\(healthFindings.count) things need your attention"
+        return SectionProblemsWording.alertTitle(
+            newCount: problemsAlert.newIDs.count, course: course.displayCode, section: sectionNumber
+        )
     }
 
     var healthDialogBinding: Binding<Bool> {
@@ -1042,15 +1087,120 @@ struct SectionDetailView: View {
         if healthDialog == .outcome {
             return repairOutcome?.detail ?? ""
         }
-        var paragraphs: [String] = []
-        for finding in healthFindings {
-            if healthFindings.count == 1 {
-                paragraphs.append(finding.detail)
-            } else {
-                paragraphs.append(finding.sentence + "\n" + finding.detail)
-            }
+        guard let problemsAlert else {
+            return ""
         }
-        return paragraphs.joined(separator: "\n\n")
+        return SectionProblemsWording.alertMessage(
+            newRows: SectionDetailView.newRows(of: problemsAlert), goneCount: problemsAlert.goneIDs.count
+        )
+    }
+
+    /// The rows a record found new, in the record's order.
+    static func newRows(of record: SectionProblemsRecord) -> [SectionProblemRow] {
+        var found: [SectionProblemRow] = []
+        for row in record.rows where record.newIDs.contains(row.id) {
+            found.append(row)
+        }
+        return found
+    }
+
+    // MARK: - The section's problems (#717)
+
+    /// This section's Problems record, as the store last read it.
+    var problemsRecord: SectionProblemsRecord? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return SectionProblems.shared.record(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    /// Website | Problems is shown only while the record has rows.
+    var showsTheProblemsTab: Bool {
+        return SectionProblemsRules.markerShows(problemsRecord)
+    }
+
+    /// The tab showing: Website whenever there are no problems to show.
+    var selectedTab: SectionProblems.Tab {
+        guard let folder = workspace.workspaceURL else {
+            return .website
+        }
+        return SectionProblems.shared.tab(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    var selectedTabBinding: Binding<SectionProblems.Tab> {
+        return Binding(
+            get: { selectedTab },
+            set: { chosen in
+                if let folder = workspace.workspaceURL {
+                    SectionProblems.shared.show(chosen, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+                }
+            }
+        )
+    }
+
+    /// Reads this course's records again — every section's, because one
+    /// section's build decides what another's rows say (`rowState`).
+    func reloadTheProblems() {
+        guard let folder = workspace.workspaceURL else {
+            return
+        }
+        SectionProblems.shared.reload(folder: folder, course: course)
+    }
+
+    /// Raises the alert about new problems when this section's record has
+    /// one nobody has answered (`sectionProblems.alert`) and nothing else is
+    /// in front of it. Answers whether it did. Not raised behind another
+    /// dialog or a sheet: it stays due in the store, and each of those
+    /// going away asks again.
+    @discardableResult
+    func raiseTheProblemsAlertIfDue() -> Bool {
+        if healthDialog != nil || previewAlertIsUp {
+            return false
+        }
+        if linksChecklist != nil || verbSheet != nil {
+            return false
+        }
+        guard let folder = workspace.workspaceURL,
+              let due = SectionProblems.shared.recordWithAnAlertDue(
+                folder: folder, courseCode: course.code, sectionNumber: sectionNumber
+              ) else {
+            return false
+        }
+        var repairable: [SiteHealthFinding] = []
+        for row in SectionDetailView.newRows(of: due) where row.fixable {
+            repairable.append(SiteHealthFinding(
+                name: row.kind, sentence: row.sentence, detail: row.detail,
+                fixable: true, course: course.code, section: sectionNumber
+            ))
+        }
+        problemsAlert = due
+        healthFindings = repairable
+        // A deploy's record says students still see the old site.
+        healthFindingsCameFromPublishing = due.occasion == "deploy"
+        healthDialog = .findings
+        return true
+    }
+
+    /// Remembers the answer to the alert on screen, and puts it on the trail.
+    func answerTheProblemsAlert(_ answer: String) {
+        guard let problemsAlert, let folder = workspace.workspaceURL else {
+            return
+        }
+        SectionProblems.shared.answer(
+            problemsAlert, with: answer, folder: folder, courseCode: course.code, sectionNumber: sectionNumber
+        )
+    }
+
+    /// The Problems tab's own repair button: the alert's repair, for one
+    /// problem, with its outcome shown the way the alert shows it.
+    func repairFromTheProblemsTab(_ finding: SiteHealthFinding) {
+        guard healthDialog == nil else {
+            return
+        }
+        let occasion: SiteHealthRepair.Occasion = problemsRecord?.occasion == "deploy" ? .publishing : .building
+        repairOutcome = SiteHealthRepair.outcome(ofRepairing: [finding], in: course, occasion: occasion)
+        healthDialog = .outcome
+        refreshEditedMarker()
     }
 
     /// Shows whatever is queued, now that the dialog it was queued behind has
@@ -1067,11 +1217,9 @@ struct SectionDetailView: View {
             healthDialog = .outcome
             return
         }
-        if !heldHealthFindings.isEmpty {
-            let next = heldHealthFindings.removeFirst()
-            healthFindings = next.findings
-            healthFindingsCameFromPublishing = next.cameFromPublishing
-            healthDialog = .findings
+        // The alert about new problems, when one is due (#717) — before the
+        // links checklist, which follows it.
+        if raiseTheProblemsAlertIfDue() {
             return
         }
         // The links checklist follows the alert (#379), never over it — nor
@@ -1191,11 +1339,14 @@ struct SectionDetailView: View {
         }
     }
 
-    /// Puts a finished run's folder problems in front of the teacher.
+    /// Routes a run's #333 finding to the links checklist (#379).
     ///
-    /// Only when the run actually produced some — a healthy course must never
-    /// see a dialog, which is the difference between a warning that gets read
-    /// and one that gets dismissed by habit.
+    /// Before #717 this also put every finding in a dialog, on every build
+    /// that had any. The section's Problems record is the list now, one row
+    /// per problem, and its alert is raised only when the build found
+    /// something NEW (`raiseTheProblemsAlertIfDue`), from the record's
+    /// marker rather than from these findings. What is left here is the one
+    /// thing a finding still decides: whether the checklist is offered.
     func showHealthFindings(
         from runner: ScriptRunner?, cameFromPublishing: Bool = false, buildHasFinished: Bool = false
     ) {
@@ -1203,35 +1354,12 @@ struct SectionDetailView: View {
             return
         }
         // The #333 finding goes to the links checklist when this build wrote
-        // an offer for it (#379); everything else, and the finding itself
-        // when there is no offer, goes in the alert as before.
-        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+        // an offer for it (#379). The rest — and the finding itself when
+        // there is no offer — are rows on the Problems tab.
+        _ = routeTheLinksFinding(
             in: runner.healthFindings, from: runner,
             cameFromPublishing: cameFromPublishing, buildHasFinished: buildHasFinished
         )
-        if forTheAlert.isEmpty {
-            return
-        }
-        // Never swap the contents of a dialog that is already up: the title
-        // and the message would change under the teacher's cursor, and the
-        // findings they were reading would vanish unacknowledged.
-        //
-        // But HELD, not dropped. Returning early discarded them — and the
-        // failed-deploy path can arrive while the overnight findings are
-        // already on screen, so this is reachable rather than theoretical.
-        // Held behind the preview alert too (#397): the question about
-        // today's class can stay up while an assistant's build finishes.
-        if healthDialog != nil || previewAlertIsUp {
-            // Appended, not assigned: three arrivals during one dialog used to
-            // lose the middle batch.
-            heldHealthFindings.append(
-                (findings: forTheAlert, cameFromPublishing: cameFromPublishing)
-            )
-            return
-        }
-        healthFindings = forTheAlert
-        healthFindingsCameFromPublishing = cameFromPublishing
-        healthDialog = .findings
     }
 
     // MARK: - The links checklist (#379)
@@ -1315,20 +1443,12 @@ struct SectionDetailView: View {
             return
         }
         heldLinksFinding = nil
-        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+        // Offered the checklist when the build wrote an offer; otherwise the
+        // finding is a row on the Problems tab like every other (#717).
+        _ = routeTheLinksFinding(
             in: [held.finding], from: runner,
             cameFromPublishing: held.cameFromPublishing, buildHasFinished: buildHasFinished
         )
-        if forTheAlert.isEmpty {
-            return
-        }
-        if healthDialog != nil || previewAlertIsUp {
-            heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
-            return
-        }
-        healthFindings = forTheAlert
-        healthFindingsCameFromPublishing = held.cameFromPublishing
-        healthDialog = .findings
     }
 
     /// Show it now, or after the alert in front of it.

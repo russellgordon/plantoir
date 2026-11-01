@@ -854,6 +854,10 @@ def _located(figure: dict, problem: dict) -> dict:
     return {
         "page": figure["place"],
         "engine": figure["engine"],
+        # The fence's own key (#717): what a row of the section's Problems
+        # record is identified by, so inserting a fence above it does not
+        # make it a different problem. Named nowhere a teacher reads.
+        "key": figure.get("key"),
         "block": figure["block"],
         "line": line,
         "blockLine": block_line,

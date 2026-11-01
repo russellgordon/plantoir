@@ -410,7 +410,20 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
     // MARK: - Functions
 
     func body(content: Content) -> some View {
-        content.confirmationDialog(
+        // The offer is presented from a view of its OWN behind the window's
+        // content, never from the content itself (#731): a suppression
+        // toggle applies to every dialog presented within the view it is on,
+        // so on the content it put "Don't ask again" on every alert in the
+        // window — the Problems alert (#717) among them, where ticking it
+        // silently turned this offer off.
+        content.background {
+            offerHost
+        }
+    }
+
+    /// The one view the offer, and only the offer, is presented from.
+    private var offerHost: some View {
+        Color.clear.confirmationDialog(
             ObsidianFigureAddOnsWording.offerTitle,
             isPresented: isPresented,
             titleVisibility: .visible,

@@ -1492,7 +1492,12 @@ links with ~190-character page names (4,382 whole) name 9.
   off the runner at render time, so a teacher who dismisses the dialog and
   carries on editing does not meet it again on the next redraw. A healthy course
   must see nothing at all — the failure mode for this whole feature is nagging,
-  and a warning dismissed by habit is dismissed when it matters.
+  and a warning dismissed by habit is dismissed when it matters. **Since #717 the
+  findings no longer have a dialog of their own on the mac**: each is a row of
+  the section's record (below, "A section's record of its problems"), and the
+  one alert is raised only when a build found something NEW, once per record —
+  the same rule taken further. The HEALTH line, the trail line and the
+  assistant's sentences are unchanged.
 
 ### The overnight path's trail line (#153)
 
@@ -1607,6 +1612,139 @@ it, and a trail that could not tell them apart leaves "did they ever fix it?"
 unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
+
+## A section's record of its problems (#717, v1.9.1)
+
+A folder problem used to be said ONCE per build: a `PLANTOIR_HEALTH:` line,
+one dialog in the app, gone when dismissed, and nothing for a build nobody
+watched (a scheduled deploy, the MCP server, a terminal). It was already a
+problem that the build could not draw a figure (#485 E1) — measured on
+`origin/dev` bd32fe9f1, two broken figures gave one line naming both pages,
+diagrams and reasons — so what failed the MPM2D teacher was not detection but
+PROMINENCE, and a reason that was wrong (#718). This keeps every problem the
+last build of a section met, one row each, where both apps can show it.
+
+**The file.** `<builds root>/<COURSE>/section<N>/.problems.json`, beside
+`.build-id` and `.visible-pages.json`, outside `public/` (plan review, MED 4):
+archiving a section (`BuildOutputLocation.discardSectionBuild`) removes it
+with the build; it moves with a renamed course and goes with a discarded one;
+it survives `--full-rebuild` (which empties WORK_DIR, not the builds folder)
+and a recreated workspace. On the mac it is reached through the course's
+`.merged_output` link; on Windows it is `PLANTOIR_BUILD_ROOT`'s. Its format is
+`contracts/shared-rules.json` → `sectionProblems.file`.
+
+**One row per ITEM, worded by the folder problem itself.** A check names up to
+ten items in one finding's detail (one finding per check, #246's lesson, and
+the machine line's 4,000-character cap, #666), so a row cannot be cut out of
+the HEALTH line. Instead `section_problems.rows` calls each list check's own
+maker (`site_health.figures_finding` and its siblings) with ONE item: the
+row's `sentence` is the check's singular sentence, its `detail` the detail for
+that item, and its `item` the very piece the detail names — got by calling the
+maker again with the check's detail replaced by its list placeholder alone
+(`sectionProblems.kinds[].item`), so no rule of how a piece is put together is
+copied. The reasons inside a piece therefore come through the functions the
+console and the HEALTH line use: a figure's through `figureFences.words.reasons`
+and, since #718, `site_health.figure_reason_words` with
+`words.reasonsWithoutDetail` — there is no second table of reasons to keep in
+step. A check with no list (a missing Media folder, a section with no front
+page…) is one row with no page; its `scope` says whether the Page column reads
+"Whole section" or "Whole course".
+
+**A row's id** is its kind and the values of its `identity` fields — never a
+line number, which moves when the teacher types above it. A figure, a
+GeoGebra sketch, a Swift program and a block of runnable code are identified
+by their CONTENT, not their place among the page's blocks: the fence's key
+(`figures._located` and `geogebra._located` carry `key`), the program's key
+(`swift_blocks.prepare`'s problems carry it) and the code hashed
+(`site_said.facts_from_site`). Inserting a block above a broken one therefore
+does not read as one new problem and one gone, which would raise the alert for
+nothing (plan review, MED 5; implementation review L7). **A self-check
+question keeps its place (`n`)**: its content is not in hand where either the
+folder check or the site's safety net reports it, and a nested one has no
+number at all, so inserting a question above a broken one still reads as new
+plus gone — a named limit (`sectionProblems.knownLimits`). Two items with one id (two quizzes nested on one page
+have no number) get `#2`, `#3` (LOW 10). `firstSeen` is carried from the
+previous record by id; `lastSeen` is the build that last found it.
+
+**Three writers, one file, each owning a slice** (`from`):
+
+- `build_site.py` writes it afresh in the ALWAYS section, once the pages the
+  build shows are known (`visible_places_here`, now read just BEFORE the links
+  checklist's offer, which changes no page's visibility) and before Quartz —
+  so #153's mid-build timing holds (a missing front page stops a preview
+  finishing) and its `PLANTOIR_PROBLEMS:` line comes after the HEALTH lines
+  and before `PLANTOIR_LINKS_CHECKLIST:`, which lets the checklist follow the
+  alert. It carries the previous record's `site` and `deploy` rows unchanged,
+  marked `carried`, because this build cannot have checked them yet.
+- `site_said.py`, run by the site's emitter, replaces the `site` rows (blocks
+  of code shown as plain code, #567; quizzes the site read differently, #644)
+  and sets `siteSaidComplete` — **on every build**, not only when something
+  disagrees (plan review, HIGH 1: the emitter used to call Python only then, so
+  a block put right would have kept its row for ever). The build names the
+  record and its id in `quartz/plantoir_site_said.json`; the merge happens only
+  in a record whose `buildId` is its own, so a later build is never overwritten
+  by an earlier site. Cost: one Python start per site build, 24–31 ms in the
+  image (the emitter's own measurement). A side file without a record (an older
+  build, the image's own check) still calls only when something disagrees.
+- `deploy.py` records Cloudflare's refusal of a file over 25 MB as one
+  `filesTooLargeForCloudflare` row per file (worded by
+  `sectionProblems.deployRefusals`, since that text was console-only), and
+  clears them when a Cloudflare deploy finds nothing too large or a Netlify
+  deploy succeeds for a course that no longer sends anything to Cloudflare. A
+  preview never runs that check, which is why the build carries these rows
+  (plan review, MED 6) — **but only while Cloudflare is among the course's
+  destinations**: `build_site.py` drops them at the next build of a course
+  that no longer goes there (implementation review M1). That is what clears a
+  course moved to a FOLDER, whose deploy (`deploy.sh`'s rsync) never enters
+  the Python, and the app's deploy builds first (a destination change counts
+  as content for the freshness check), so no record code was added to the
+  launcher. The one gap, measured by the fixes review (F1): a terminal
+  `deploy.sh --to-folder` on an already-built site does not rebuild, so there
+  the row stays until the next build. Both writers ask one function,
+  `section_problems.cloudflare_is_a_destination` (`deploy_target` or
+  `additional_deploy_targets` is `cloudflare_pages`; settings that cannot be
+  read count as yes, so nothing is dropped on a guess).
+
+**`changed`** — the ids `new` and `gone` against `before`, the previous build's
+rows — is worked out HERE, so the "did the set change?" decision lives in the
+shared code and Windows inherits it. **`alertKey`** is the build's id, plus a
+hash of the refused files when there are any, so the site's merge of the same
+build can never raise a second alert, while a deploy newly refused can.
+
+**The marker.** Every write prints one `PLANTOIR_PROBLEMS:` line with counts
+only (`course, section, buildId, alertKey, rows, new, gone`), a bounded marker
+under `machineLineLength` (worst case pinned in `test_machine_line_length.py`)
+and machinery under `transcriptStripping.machineLines`, so neither app needed a
+new filter. A build prints it twice: the build's, then the site's.
+
+**Never fails a build.** Every write is atomic and wrapped; one that cannot be
+written prints one `ℹ️` line (`test_a_record_that_cannot_be_written_is_one_plain_line`).
+
+**What Windows inherits free:** all of the above — the file, the rows, their
+words, `firstSeen`, `changed`, `alertKey`, the marker, the site's merge and the
+deploy's refusal — because it is the shared Python. What it owes (the tab, the
+table, the marker on the row, the alert and its answers file) is in doc 09's
+section and the `windows` issue.
+
+**Measured.** `scripts/test_section_problems.py` (26 tests, the contract's 10
+`rowCases`) in 0.05 s; verify.sh's two-section check plants a real TeX error
+(`\foo`, not `\textdegree`, which until #718 was a crash reported as a 20 s
+timeout), builds Section 1 twice, Section 2 once, puts the fence right and
+builds Section 1 again: its row goes, and Section 2's record is byte for byte
+what it was — its site still carries the broken page.
+
+**Rejected.** One `PLANTOIR_HEALTH:` line per item: findings are keyed on name,
+course and section in both apps (#246), so they would collide, and the
+dialog/trail/assistant readers would all change. Items in the marker: the cap.
+`.publish_state/` in the course folder: it is synced, it goes into backups, and
+this is a machine's build rather than a teacher's decision. Carrying the site's
+rows over "unchanged" with no `siteSaidComplete`: HIGH 1 above. A deploy
+refusal kept out of the table (the plan's first answer): the director ruled it
+in — a section whose deploy was refused is exactly the one whose site is not
+what the teacher thinks. A fallback alert for a build with HEALTH lines and no
+`PLANTOIR_PROBLEMS:` line (an older image): DROPPED, because the toolchain is
+mirrored with the app, so a build without the marker is a build the app did not
+bring; such a build shows its rows on the next build instead.
 
 ## The curriculum coverage maps: one per curriculum folder (#128)
 
@@ -3178,9 +3316,11 @@ and a `--build-only` run that mirrored nothing prints "Nothing to deploy for
 before v1.4.4, #443) and **exits non-zero**. That
 matters more than the sentence: a publish runs `preview.sh --build-only` and
 then `deploy`, so failing the build stops the run at the step that KNOWS the
-reason. The mac already shows the folder-problem dialog on a failed build, so
-the teacher gets **Put them back** → **Preview Again**; check that each app's
-failed-build path does the same rather than swallowing the findings.
+reason. The mac shows the alert about new problems on a failed build (since
+#717 from the section's record, which the build wrote before it stopped), so
+the teacher gets **Put them back** → **Preview Again**, and the row stays on
+the Problems tab; check that each app's failed-build path does the same
+rather than swallowing the findings.
 
 **The half nobody had named, and the worse one.** The skipped sync left the
 PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it

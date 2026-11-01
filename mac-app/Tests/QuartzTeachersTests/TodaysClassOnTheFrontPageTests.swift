@@ -241,8 +241,12 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
     /// question as they wait behind the folder dialog, and are shown after it.
     func testFolderFindingsWaitBehindThePreviewAlert() throws {
         let view: String = TodaysClassOnTheFrontPageTests.codeOnly(try TodaysClassOnTheFrontPageTests.sectionView())
-        XCTAssertEqual(view.components(separatedBy: "if healthDialog != nil || previewAlertIsUp {").count - 1, 3,
-                       "findings (twice) and the links checklist are held behind the preview alert")
+        // Two since #717: the alert about new problems (one function, which
+        // stays due in the store rather than being queued) and the links
+        // checklist. It was three when every build's findings had a dialog
+        // of their own, raised from two places.
+        XCTAssertEqual(view.components(separatedBy: "if healthDialog != nil || previewAlertIsUp {").count - 1, 2,
+                       "the problems alert and the links checklist are held behind the preview alert")
     }
 
     // MARK: - A front page that must not be written

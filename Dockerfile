@@ -339,6 +339,10 @@ COPY scripts/my_progress.py /opt/scripts/my_progress.py
 # side file, and the site's emitter (plantoirSiteSaid.ts) runs it as a file
 # with the build's own Python (test_baked_modules.py).
 COPY scripts/site_said.py /opt/scripts/site_said.py
+# A section's record of its problems (#717): the rows build_site.py writes
+# beside the built site, site_said.py adds the site's to and deploy.py a
+# refusal to. All three import it by bare name (test_baked_modules.py).
+COPY scripts/section_problems.py /opt/scripts/section_problems.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).
