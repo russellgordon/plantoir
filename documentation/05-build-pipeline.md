@@ -1686,6 +1686,17 @@ previous record by id; `lastSeen` is the build that last found it.
   by an earlier site. Cost: one Python start per site build, 24–31 ms in the
   image (the emitter's own measurement). A side file without a record (an older
   build, the image's own check) still calls only when something disagrees.
+  **A page the side file's `places` does not name** (#717 part two, review L4
+  of part one) used to be named by its SITE path less `.md`. That is right for
+  the course's own pages, but a section's page sits at the site's top level
+  while its file is under `section<N>/`. Its row then called it shared, and
+  an outside assistant handed it was sent to a file that does not exist. The
+  side file now also carries `everyPlace`: every page the build copied from
+  the teacher's folder, site path to place (`_every_place_in_the_course`, from
+  `_vault_sources`). `site_said.place_of_a_site_path` reads it first and falls
+  back to the site path only for a page the build did not copy.
+  `scripts/test_site_disagreements.py` pins both halves, and each test fails
+  against the old file.
 - `deploy.py` records Cloudflare's refusal of a file over 25 MB as one
   `filesTooLargeForCloudflare` row per file (worded by
   `sectionProblems.deployRefusals`, since that text was console-only), and

@@ -67,7 +67,8 @@ def nfc(text) -> str:
 # ---- The build's half: the side file --------------------------------------------
 
 def write_side_file(output_dir, course, section, places: dict, swift_named: list,
-                    content_root, python=None, script=None, problems: dict = None) -> bool:
+                    content_root, python=None, script=None, problems: dict = None,
+                    every_place: dict = None) -> bool:
     """
     Write quartz/plantoir_site_said.json. `places` maps each opted-in page's
     path in the site's content (forward slashes, as Quartz names it) - and
@@ -76,8 +77,14 @@ def write_side_file(output_dir, course, section, places: dict, swift_named: list
     teacher's own file or None}; `swift_named` is [[place, n]] for every
     Swift block swiftCouldNotBePrepared names. `problems` is
     {"file": the section's Problems record, "buildId": this build's id}
-    (#717), or None, and is written only when given. Same input, same bytes;
-    answers whether the file changed.
+    (#717), or None, and is written only when given. `every_place` maps
+    the site path of EVERY page the build copied from the teacher's folder
+    to its place there (#717 part two, review L4 of part one's fallback):
+    a section's page sits at the site's top level but its place starts
+    `section<N>/`, so a block on a page `places` does not name is still
+    named where its file is, and an outside assistant handed its row is
+    sent to a file that exists. Written only when given. Same input, same
+    bytes; answers whether the file changed.
     """
     named = []
     for pair in swift_named:
@@ -93,6 +100,8 @@ def write_side_file(output_dir, course, section, places: dict, swift_named: list
     }
     if problems:
         content["problems"] = {"file": str(problems["file"]), "buildId": str(problems["buildId"])}
+    if every_place:
+        content["everyPlace"] = {nfc(path): nfc(place) for path, place in sorted(every_place.items())}
     data = (json.dumps(content, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
     path = Path(output_dir) / "quartz" / SIDE_FILE
     if path.is_file() and path.read_bytes() == data:
@@ -153,6 +162,21 @@ def _text_of(path):
         return None
 
 
+def place_of_a_site_path(said: dict, path: str) -> str:
+    """
+    A page's place in the course folder when `places` does not name it:
+    the build's `everyPlace` (every page it copied, a section's pages under
+    `section<N>/`), else the site path without `.md` - which is right for
+    the course's own pages, and was the whole answer until #717 part two.
+    """
+    every = {}
+    for site_path, place in (said.get("everyPlace") or {}).items():
+        every[nfc(site_path)] = place
+    if every.get(nfc(path)):
+        return str(every[nfc(path)])
+    return path[:-3] if path.lower().endswith(".md") else path
+
+
 def facts_from_site(said: dict, blocks: list) -> list:
     """
     The `site_disagreements` fact from what the site recorded: each block's
@@ -174,9 +198,7 @@ def facts_from_site(said: dict, blocks: list) -> list:
     facts = []
     for path, _position, block in ordered:
         known = places.get(path) or {}
-        place = known.get("place")
-        if not place:
-            place = path[:-3] if path.lower().endswith(".md") else path
+        place = known.get("place") or place_of_a_site_path(said, path)
         place = nfc(place)
         language = str(block.get("language") or "")
         n = int(block.get("block") or 1)
@@ -217,9 +239,7 @@ def quiz_facts_from_site(said: dict, quizzes: list) -> list:
     facts = []
     for path, _position, quiz in ordered:
         known = places.get(path) or {}
-        place = known.get("place")
-        if not place:
-            place = path[:-3] if path.lower().endswith(".md") else path
+        place = known.get("place") or place_of_a_site_path(said, path)
         n = quiz.get("n")
         line = quiz.get("line")
         fact = {
