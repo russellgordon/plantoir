@@ -1,4 +1,35 @@
 <style>div.sparkle-installed-version, div.sparkle-installed-version ~ div { display: none; }</style>
+<div data-sparkle-version="4497">
+<h2>Plantoir 1.9.1</h2>
+<p>Plantoir 1.9.1 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself. The changes to your class websites reach each site the next time you deploy it, and the first preview after updating takes a few minutes longer while Plantoir rebuilds its website builder.</p>
+<p><strong>Security.</strong> The part of the website builder that deploys to Cloudflare is brought up to date, past known weaknesses in the older version. The website builder now also takes the latest security fixes for the system libraries it runs on each time it is built, and refuses to build with the older compression and encryption libraries that had known weaknesses. And a preview can now be opened only on the Mac that runs it: before, anyone on your school&#x27;s network who knew your Mac&#x27;s address could open a preview while it was running. If you used to look at a preview from another device, deploy the section and look at the site instead.</p>
+<h3>New</h3>
+<ul>
+<li><strong>A Problems tab for each section.</strong> Every problem a preview or a deploy finds, such as a problem in the course folder or a diagram that could not be drawn, is listed in one table on the section&#x27;s Problems tab. The section shows a warning in the sidebar, and after a build one message offers to Show the list. A problem fixed in a page that every section shares clears from every section.</li>
+<li><strong>Fix with Claude… and Fix with Codex…</strong> Tick problems on the Problems tab and hand them to Claude Code or Codex, which opens on the course with each page named and the guidance for that kind of problem. Each button appears only when that assistant is installed on your Mac.</li>
+<li><strong>New courses deploy to Cloudflare Pages</strong> unless you choose otherwise, in the new-course window and at the command line. Courses you already have keep deploying where they do now. Choosing Netlify shows a short note: accounts made since September 2025 have a monthly allowance that every deploy uses, and running out pauses every site on the account. A course can now be made and previewed before you have entered its Cloudflare Account ID; Plantoir asks for it, with Open Settings…, at the first deploy.</li>
+</ul>
+<h3>Improved</h3>
+<ul>
+<li><strong>Diagrams that cannot be drawn now say why</strong>, naming a missing font for instance, instead of saying the drawing took too long. The diagrams after it are drawn as usual.</li>
+<li><strong>Handouts and pages made with an outside assistant follow the house style more closely</strong>: tables with full borders and neatly lined-up numbers, a layout for finite differences, one graph per card, fill-in blanks with two lines of room, and a note of what the class site cannot draw.</li>
+<li><strong>The assistant can no longer go round in circles.</strong> If it keeps looking things up without answering, it stops after a few tries.</li>
+<li><strong>When Obsidian is not on this Mac, or could not be opened,</strong> Open in Obsidian says so plainly.</li>
+<li><strong>Plantoir tidies up after itself.</strong> What it keeps for a working folder you have not opened in 90 days is removed, and what it kept for a folder that is gone is removed with it.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li><strong>Publish Pages… no longer asks whether to hide the classes dated later</strong>, a question that could undo what you had just ticked. That question is asked at Deploy only, and there a ticked class is deployed and an unticked one is kept off the site.</li>
+<li><strong>Coming back to a section part way through its deploy</strong> shows the deploy still running, instead of letting you start a second one that was then refused. Deploy is unavailable until it finishes, and how it ended is shown once.</li>
+<li><strong>Deploying a section again just after a deploy finished</strong> is no longer refused for a moment as though the first were still running.</li>
+<li><strong>A Cloudflare token that Cloudflare does not accept</strong> is now explained in the window, instead of a general error. A saved token is cleared only when Cloudflare itself refuses it, never just because your Mac could not reach Cloudflare.</li>
+<li><strong>A blank in a quiz printed from your class site</strong> can be seen again, and leaves about two lines for the answer, like a handout&#x27;s fill-in blank.</li>
+<li><strong>The tick box beside a task</strong> sits level with its words, on screen and on paper.</li>
+<li><strong>On a course with pages shared by every section</strong>, a problem names the page that really holds it, and dates are written to that page.</li>
+<li><strong>Ticking &quot;Don&#x27;t ask again&quot; on another message</strong> no longer stops Plantoir offering Obsidian&#x27;s add-ons for diagrams and graphs.</li>
+<li><strong>Plantoir builds again with the release toolchain</strong> (an internal fix, nothing you will see).</li>
+</ul>
+</div>
 <div data-sparkle-version="4307">
 <h2>Plantoir 1.9.0</h2>
 <p>Plantoir 1.9.0 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself. The changes to your class websites reach each site the next time you deploy it; the first preview after updating takes a few minutes longer while Plantoir rebuilds its website builder (about 360 MB downloaded once).</p>
