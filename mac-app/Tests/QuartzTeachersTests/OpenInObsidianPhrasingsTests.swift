@@ -56,6 +56,18 @@ final class OpenInObsidianPhrasingsTests: XCTestCase {
         XCTAssertTrue(AssistToolRunner.hiddenFromTheLocalModel.contains("open_in_obsidian"))
     }
 
+    /// The sentence for a computer without Obsidian names the computer
+    /// through the placeholder in the contract and says this Mac here
+    /// (#698), so Windows can say "this PC" from the same key.
+    func testTheNoObsidianSentenceNamesTheComputerThroughThePlaceholder() {
+        let template: String = AssistWording.obsidianIsNotOnThisMachine(machine: MachineWord.placeholder)
+        XCTAssertTrue(template.contains("this " + MachineWord.placeholder), template)
+        XCTAssertFalse(template.contains("Mac"), "the contract's copy names no platform: \(template)")
+        let said: String = AssistWording.obsidianIsNotOnThisMachine()
+        XCTAssertTrue(said.contains("this Mac,"), said)
+        XCTAssertEqual(said, MachineWord.filling(template))
+    }
+
     // MARK: - Reading the contract
 
     private static func family() throws -> [String: Any] {

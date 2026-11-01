@@ -322,11 +322,16 @@ enum AssistContract {
                 course: course, section: section
             ),
             "obsidianIsAlreadyOpening": AssistWording.obsidianIsAlreadyOpening(course: course),
-            "obsidianIsNotOnThisMac": AssistWording.obsidianIsNotOnThisMac,
+            "obsidianIsNotOnThisMachine": AssistWording.obsidianIsNotOnThisMachine(
+                machine: MachineWord.placeholder
+            ),
             "openInObsidianIsInTheSectionWindow": AssistWording.openInObsidianIsInTheSectionWindow(
                 course: course, section: section
             ),
             "openInObsidianFoundNoWindow": AssistWording.openInObsidianFoundNoWindow(
+                course: course, section: section
+            ),
+            "openInObsidianDidNotOpen": AssistWording.openInObsidianDidNotOpen(
                 course: course, section: section
             ),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
@@ -353,6 +358,7 @@ enum AssistContract {
             "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
+            "wentRoundWithoutFinishing": AssistWording.wentRoundWithoutFinishing,
             "noCourseNamed": AssistWording.noCourseNamed,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
@@ -797,6 +803,10 @@ enum AssistContract {
                         + "both renamed and re-dated — here 2",
                 "renaming": "how many of those are also renamed, here 1 in the "
                           + "…AndLinksFollow key and 0 in the …KeepingTheirNames one",
+                "machine": "the teacher's computer as a bare noun, which each app puts in itself: "
+                         + "Mac on the mac, PC on Windows (#698). Recorded in shared-rules.json "
+                         + "-> specialNames.platformWording.machine, whose usedIn names every "
+                         + "sentence that carries it",
             ],
             "wording": table,
         ]

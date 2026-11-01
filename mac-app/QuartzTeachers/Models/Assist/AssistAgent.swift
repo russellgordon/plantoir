@@ -74,6 +74,22 @@ final class AssistAgent {
     /// Whether writes are shown before they happen.
     let planMode: AssistPlanMode
 
+    /// The most times one teacher action may ask the model (#689).
+    ///
+    /// A small model that has lost the thread repeats itself rather than
+    /// stopping, and until #689 nothing on the mac ended that: a read hands
+    /// back for another lap, and a model that kept choosing the same read
+    /// would ask, read and ask again for as long as the window stayed open,
+    /// with nothing said to the teacher. Six is Windows' number
+    /// (`MostStepsPerTurn`, there since that agent was written), so neither
+    /// app's teachers meet a different limit, and it is the number in
+    /// `contracts/shared-rules.json` → `assistantLapLimit`, which a test pins
+    /// this against. Reading, planning and then acting is three; a turn
+    /// that has not finished in six has gone round, not forward. What was
+    /// rejected, and why, is in documentation/10-local-ai-assistant.md →
+    /// "A turn asks the model at most six times (#689)".
+    static let mostModelRequestsPerTurn: Int = 6
+
     /// The messages actually sent, including tool results.
     ///
     /// Readable from a test, not writable: two things about the user message
@@ -90,7 +106,10 @@ final class AssistAgent {
     /// fixed-phrase branch too — that one runs a tool without ever appending
     /// a user message, and the tool result it leaves behind belongs to the
     /// same turn.
-    private var messageCountAtTheStartOfTheTurn: Int = 0
+    ///
+    /// Readable from a test since #689, which pins that Go moves it past the
+    /// approved call's result.
+    private(set) var messageCountAtTheStartOfTheTurn: Int = 0
 
     /// What the teacher typed this turn, trimmed, BEFORE the date line was
     /// put on the end of it.
@@ -101,7 +120,24 @@ final class AssistAgent {
     /// `withTheDaySettled` exists to prevent. Read by
     /// `theReplyIsTheRequestBackAgain`, so that a model echoing the sentence
     /// WITHOUT the parenthetical is recognised as the same fault.
-    private var sentenceThisTurnBeganWith: String = ""
+    ///
+    /// Emptied when Go moves the turn past the approved call's result
+    /// (#689), as Windows' `Approve` empties `_typedThisTurn`: a lap after
+    /// Go begins with a tool result, not with anything the teacher typed,
+    /// so settlers S1 and S3 have no sentence to read there. Readable from
+    /// a test, which pins that.
+    private(set) var sentenceThisTurnBeganWith: String = ""
+
+    /// How many times this turn has asked the model so far (#689).
+    ///
+    /// A "turn" is one thing the teacher did: a sentence (`say`) or Go
+    /// (`approvePending`), and both put it back to nought. Counted at the
+    /// one place every request is made, `think()`, because a turn re-enters
+    /// it from two places — a read handing back (`execute`) and a tool
+    /// name that exists nowhere ("There is no tool by that name.", in
+    /// `run(settledCall:)`) — and a cap on either alone would leave the
+    /// other unbounded.
+    private var modelRequestsThisTurn: Int = 0
 
     /// Where the record of each turn is written. Replaceable so a test can
     /// point it somewhere of its own.
@@ -177,6 +213,7 @@ final class AssistAgent {
         // wound back to exactly here. See `sayTheAnswerDidNotFinish`.
         messageCountAtTheStartOfTheTurn = messages.count
         sentenceThisTurnBeganWith = trimmed
+        modelRequestsThisTurn = 0
         entries.append(Entry(speaker: .teacher, text: trimmed))
 
         // Recorded HERE — the moment the teacher's words are accepted, before
@@ -361,7 +398,10 @@ final class AssistAgent {
         ))
         pendingApproval = nil
         planMode.recordAccepted()
-        await execute(call: pending.call)
+        // Go is a teacher action of its own, so it gets its own six (#689),
+        // as Windows' `Approve` does.
+        modelRequestsThisTurn = 0
+        await execute(call: pending.call, approvedByTheTeacher: true)
     }
 
     /// Decline the waiting deploy.
@@ -399,6 +439,13 @@ final class AssistAgent {
 
     /// Ask the model what to do next, then do it.
     private func think() async {
+        // The lap cap (#689), at the ONE place a request is made. The
+        // request that would be the seventh is never sent.
+        if modelRequestsThisTurn >= AssistAgent.mostModelRequestsPerTurn {
+            sayItWentRoundWithoutFinishing()
+            return
+        }
+        modelRequestsThisTurn += 1
         activity = .thinking
         let askedAt: Date = Date()
         do {
@@ -858,14 +905,61 @@ final class AssistAgent {
             + "nothing was run from it, and the turn was taken back out of the conversation"
     }
 
+    /// Stop a turn that has asked the model as many times as one turn may,
+    /// and say so (#689).
+    ///
+    /// **Wound back, like every other turn the app abandons.** Six laps of
+    /// the same call are exactly the poisoned history #215 measured: kept in
+    /// the conversation, a model at temperature 0 copies what it can see, so
+    /// the teacher's next sentence would start from six repeats of the
+    /// pattern that ran away. Only `messages` is wound back; `entries` — the
+    /// transcript the teacher reads — keeps every tool line the turn showed,
+    /// and the sentence below goes there alone.
+    ///
+    /// **"Nothing was changed" is true here, and it was checked rather than
+    /// assumed** — the same argument as `AssistWording.answerWasCutOff`'s. A
+    /// turn only laps after an outcome with `shouldContinue` (a read, a read
+    /// that could not answer, or a plan held behind the card) or after a
+    /// tool name that exists nowhere, so everything this turn ran was a read.
+    /// After Go the mark is moved past the approved call's result
+    /// (`execute(call:approvedByTheTeacher:)`), so winding back can never
+    /// erase a call that has run — Windows' `Approve` does the same.
+    private func sayItWentRoundWithoutFinishing() {
+        // The tool the turn kept choosing, read BEFORE the wind-back takes
+        // its result away. In words, never its arguments.
+        var lastTool: String? = nil
+        var position: Int = messageCountAtTheStartOfTheTurn
+        while position < messages.count {
+            if messages[position].role == "tool" {
+                lastTool = messages[position].name
+            }
+            position += 1
+        }
+        windTheTurnBack()
+        entries.append(Entry(speaker: .assistant, text: AssistWording.wentRoundWithoutFinishing))
+        var said: String = "the assistant went round \(modelRequestsThisTurn) times in one turn without finishing"
+        if let lastTool {
+            said += ", last choosing " + AssistAgent.inWords(lastTool)
+        }
+        said += " — stopped there, nothing more was run, and the turn was taken back out of the conversation"
+        ActivityTrail.note(
+            .assistantWentRoundWithoutFinishing,
+            said,
+            course: courseCode,
+            section: sectionNumber
+        )
+        activity = .idle
+    }
+
     /// Take the whole turn back out of the conversation, down to where it
     /// began.
     ///
-    /// Shared by the four places that abandon a turn — an answer that did
+    /// Shared by every place that abandons a turn — an answer that did
     /// not finish, a request that named another course, a reply that was
-    /// the request back again, and a tool the model was not offered (#327) —
-    /// because they make the same claim about the history and the four must
-    /// not drift. What the teacher can SEE is
+    /// the request back again, a tool the model was not offered (#327),
+    /// and, since #689, a turn that reached the lap cap, among others —
+    /// because they make the same claim about the history and must not
+    /// drift. What the teacher can SEE is
     /// untouched: `entries` keeps their sentence on every path.
     ///
     /// Two reasons it is the whole turn rather than the reply alone, and both
@@ -1559,7 +1653,15 @@ final class AssistAgent {
     }
 
     /// Actually run it, and hand the result back to the model.
-    private func execute(call: AssistToolCall) async {
+    ///
+    /// `approvedByTheTeacher` is true for the call Go ran. A lap after it
+    /// begins at its RESULT (#689), so a turn wound back from that lap —
+    /// at the lap cap, or for any other reason — can never erase a call
+    /// that has already run. No approval-gated call laps today (each answers
+    /// `wrote` or `refused`), so this is safety by construction rather than
+    /// a mend; Windows' `Approve` moves its mark the same way, and empties
+    /// the teacher's sentence with it, as this does.
+    private func execute(call: AssistToolCall, approvedByTheTeacher: Bool = false) async {
         activity = .running(toolName: call.function.name)
         let outcome: AssistToolOutcome = await tools.run(call: call)
 
@@ -1571,6 +1673,10 @@ final class AssistAgent {
         messages.append(AssistMessage.toolResult(
             callID: call.id, name: call.function.name, text: outcome.detail
         ))
+        if approvedByTheTeacher {
+            messageCountAtTheStartOfTheTurn = messages.count
+            sentenceThisTurnBeganWith = ""
+        }
 
         // A read hands back to the model so it can answer the question it was
         // reading for. A write is the end of the turn: the teacher asked for

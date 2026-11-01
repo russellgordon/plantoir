@@ -1313,6 +1313,52 @@ which is exactly what #92 and #378 exist to prevent.
 `scripts/test_deploy_cloudflare_project.py` pins both halves, and
 `CloudflareProjectRemadeReportTests` the app's reader.
 
+**wrangler 4.108 and later can send a NEW project to Workers (#699).** Since
+4.108, when wrangler believes an AI agent is driving it — `CLAUDECODE`,
+`AI_AGENT`, `CODEX_THREAD_ID`, `GEMINI_CLI` and others in its environment,
+or an agent among its ancestors (`maybeDelegatePagesToWorkers` in 4.156.0's
+`cli.js`) — a deploy that would create a new static project is delegated to
+"the latest version of Cloudflare Pages, now part of Cloudflare Workers": a
+Worker at `*.workers.dev`, not the Pages project at the `*.pages.dev`
+address `deploy.py` prints and the app records. `deploy.py`'s call cannot be
+delegated, for three reasons, any one of which is enough:
+
+- **`--branch=main`** is in wrangler's own list of arguments the delegation
+  does not support (`getUnsupportedDeployDelegateArgs`), so it declines
+  before looking at anything else (read in 4.156.0's `cli.js` by the review: `--branch`
+  alone blocks it). `--commit-dirty` is in the same list. So `--branch` is
+  load-bearing twice now: it answers the production-branch question, and it
+  keeps the deploy on Pages.
+- **The project exists before wrangler runs**: `ensure_pages_project` makes
+  it through the API on a first publish, and `remake_pages_project_if_gone`
+  on a deleted one, so wrangler never sees a project to create.
+- **On the mac, `docker exec` hands wrangler six named variables only**
+  (`deploy.sh`), so a teacher's `CLAUDECODE` never reaches it. On Windows
+  `deploy.py` runs natively and the teacher's environment does reach wrangler
+  — under Claude Code, `CLAUDECODE=1` — so the first two guards are the ones
+  that hold there.
+
+`verify-deploy.sh` fails a Cloudflare leg whose log carries the delegation's
+notice ("now part of Cloudflare Workers"), and was run with `CLAUDECODE` and
+`AI_AGENT` set in its own environment on 2026-10-31: every leg stayed on
+Pages. **Do not drop `--branch`** to "simplify" the call, and do not pass
+`--force`: wrangler documents `--force` as the opt-out, but it also prints a
+"Notice to agents" line, and the guards above already make it unnecessary.
+
+**A brand-new project's address can be unknown to a resolver for up to 30
+minutes (#712).** Measured 2026-10-31 on the mac's first `--first-publish`
+run: the moment the first upload returned, this Mac's resolver asked for
+the new `<project>.pages.dev`, got NODATA under the project's own zone, and
+kept that answer for the zone's negative TTL of **1800 s**, while 1.1.1.1,
+8.8.8.8 and the router already answered with Cloudflare's addresses.
+`*.netlify.app` answers for any name, so Netlify never shows it. A teacher
+who opens a new Cloudflare site the instant it is published can meet the
+same wait in a browser; it ends on its own. `verify-deploy.sh
+--first-publish` therefore waits for 1.1.1.1 to answer for a new site before
+anything on the Mac looks it up, and reports how long that took; on the
+first run, which did not, 43 Cloudflare checks failed (HTTP 000, or no answer) against a site that
+was serving.
+
 ## A folder on this PC (`--to-folder`)
 
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
@@ -1695,6 +1741,50 @@ The same run mirrored **57** differences (the measurement above, plus one
 more file under `contracts/` by the time it ran), rebuilt the section from
 scratch in **32 s** (the image's layers were cached), and found the folder
 still on this checkout's recipe at the end.
+
+
+**A first publish, on the mac too (`--first-publish`, #712, 2026-10-31).** The
+plain run always answered the surname question "Testing" and so reused
+`ada1o-s1-2026-testing` for ever: no upload it made was a first-ever one,
+which is the case #699 needed to compare. A random surname alone would change
+nothing, because `deploy.py` reuses a recorded site and never asks (the plan
+review's finding). So `--first-publish` does what Windows' `-FirstPublish`
+does, path for path: the saved surname (`courses/.internal/profile.json` and
+the legacy `_secrets/profile.json`), the section's Netlify record (and the
+legacy per-section `.netlify_site.json`) and its Cloudflare record are
+RENAMED to `<path>.verify-deploy-hidden`, a sentinel
+(`courses/.verify-deploy-first-publish.txt`) records after each step whether
+each path was hidden or absent, and the restore deletes a record only when
+its original is safe beside it or there never was one — so a failed move can
+never cost the course its real records, and a run killed outright is put right
+by the next run's preflight. The surname is `Testing` plus six random
+letters. **Unlike Windows, it deletes the two sites it made** at the end, via
+Netlify's `DELETE /api/v1/sites/{id}` and Cloudflare's `DELETE
+/accounts/{id}/pages/projects/{name}` (the token on curl's stdin, never a
+command line), and only a site whose name carries the surname of the run
+that made it. That surname is the sentinel's first line (`surname<TAB>…`), so
+a run killed half way is cleaned up by the next run's preflight against ITS
+surname — never the new run's random one, and never the bare `Testing` of a
+plain run — and a sentinel without one (written before this) deletes nothing
+and names the site for deleting by hand. The comparison is in lower case,
+since Netlify kept the first run's `Testingwqvxbk` as typed and a
+case-sensitive test left it behind (deleted by hand, HTTP 204). The Result
+block says which were deleted and which need deleting by hand.
+
+**Ctrl-C ends the run; it does not just tidy up.** The trap used to be
+`trap restore_what_was_borrowed EXIT INT TERM`, and a trap on INT that does
+not exit RETURNS to the script: measured with a stand-in under its own
+session, `killpg(SIGINT)` printed the trap's line, then the script's next
+line, then the trap again, and exited 0. With `--first-publish` that would
+put the records back, delete the two new sites, and then keep publishing —
+as repeat publishes to the section's own sites, checked at addresses just
+deleted. Now INT exits 130 and TERM 143, and the EXIT trap restores once
+(the restore and the deletion are idempotent anyway).
+
+Measured 2026-10-31: 173 passed, 1 failed (a Netlify link that was HTTP 404
+on the brand-new site and 200 by hand minutes later) on wrangler 4.80.0;
+175 passed, 0 failed on 4.156.0; transcripts in
+`research/wrangler/2026-10-31-first-upload.md`.
 
 ## The scheduled task never refuses over FOLDER PROBLEMS
 

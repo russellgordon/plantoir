@@ -2045,6 +2045,52 @@ else
   fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
 fi
 
+# Debian's security floors (#714): every pin that names a `debianPackage` is
+# a FLOOR, and the package the image actually carries must be at least it,
+# compared by dpkg itself (Debian's version order, not a string's). The
+# Dockerfile's own `dpkg --compare-versions` line fails the build first; this
+# is the same question asked of the image that was built, so a floor raised
+# in the contract and not in the recipe, or a layer that stopped running,
+# fails here by package, version found and floor.
+DEBIAN_FLOOR_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'FLOORPY'
+import json, subprocess, sys
+floors = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p.get("debianPackage")]
+if not floors:
+    print("PROBLEMS the contract names no pin with a debianPackage")
+    sys.exit(0)
+inside = r"""
+for pair in "$@"; do
+  package=${pair%%=*}; floor=${pair#*=}
+  version=$(dpkg-query -W -f='${Version}' "$package" 2>/dev/null)
+  if [ -n "$version" ] && dpkg --compare-versions "$version" ge "$floor"; then
+    echo "OK $package $version $floor"
+  else
+    echo "LOW $package ${version:-missing} $floor"
+  fi
+done
+"""
+pairs = [p["debianPackage"] + "=" + p["value"] for p in floors]
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", inside, "sh"] + pairs,
+                     capture_output=True, text=True)
+seen, problems = [], []
+for line in run.stdout.splitlines():
+    word, package, version, floor = line.split(" ", 3)
+    if word == "OK":
+        seen.append(f"{package} {version} (at least {floor})")
+    else:
+        problems.append(f"{package} is {version}, older than its floor {floor}")
+if len(seen) + len(problems) != len(floors):
+    problems.append("the image answered for " + str(len(seen) + len(problems)) + " of " + str(len(floors))
+                    + " floors: " + (run.stderr.strip()[-200:] or "no output"))
+print(("PROBLEMS " + "; ".join(problems)) if problems else ("OK " + ", ".join(seen)))
+FLOORPY
+)"
+if [[ "$DEBIAN_FLOOR_REPORT" == OK* ]]; then
+  pass "The image's Debian packages are at least their security floors (#714): ${DEBIAN_FLOOR_REPORT#OK }"
+else
+  fail "The image's Debian packages do not meet contracts/toolchain.json's floors (#714): ${DEBIAN_FLOOR_REPORT#PROBLEMS }"
+fi
+
 # Node, and the wrangler that runs on it (#640). The image's `node --version`
 # is exactly the contract's pin; wrangler is the pinned version and RUNS on it
 # (`--version` exits 0); its own package.json's engines.node is what the

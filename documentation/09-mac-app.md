@@ -4589,8 +4589,13 @@ answer read ONCE at the press (the reply names the page from it, never from a
 second look at the web view —
 `testTheAssistantsPressReadsThePageOnceAndReportsThePageThatOpened`),
 `.waitingForAnAnswer` when a question is up, `.alreadyOpening` for a second
-press during a scan (no trail line, as today), and `.noWindow`, the default of
-a window that registers nothing. The trail line is the route's, written once
+press during a scan (no trail line, as today), `.noWindow`, the default of
+a window that registers nothing, and — since #698 — `.didNotOpen`, for a press
+that went ahead but handed Obsidian nothing. The route does not return
+`.didNotOpen` yet: the scan does not throw and `FolderActions` ignores
+`NSWorkspace.open`'s answer, so on the mac a failed open still reads as
+`.opened`; the case exists so the assistant's sentence for it is the contract's
+(Windows' `DidNotOpen`), and making the route report it is a follow-up. The trail line is the route's, written once
 per press (`testTheAssistantsPressLeavesOneTrailLine`); the assistant adds
 only its usual turn line. With no section window on screen the runner brings
 one up with `revealSectionOnScreen`, as a rebuild or a deploy does; a freshly
