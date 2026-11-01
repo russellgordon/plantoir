@@ -176,6 +176,36 @@ wait_for_cloudflare_production() {  # wait_for_cloudflare_production <label> <pr
   return 1
 }
 
+# A FIRST publish asks for an address that did not exist a few seconds
+# earlier (#712). Measured 2026-10-31 on the first --first-publish run: the
+# moment the first Cloudflare upload returned, the wait above asked this
+# Mac's resolver for the new <project>.pages.dev, got NODATA under the
+# project's own zone, and the resolver kept that answer for the zone's
+# negative TTL - 1800 s - so every Cloudflare check read HTTP 000 for half an
+# hour while 1.1.1.1, 8.8.8.8 and the router all answered with Cloudflare's
+# addresses. (*.netlify.app answers for any name, so Netlify never showed
+# it.) So before anything on this Mac looks a NEW site up, this waits for a
+# public resolver to answer for it, and only then lets curl and Python ask
+# the system's; the wait is reported, never hidden. A plain run publishes to
+# sites that already exist and returns at once.
+wait_for_new_address() {  # wait_for_new_address <label> <url>
+  local label="$1" host start waited
+  [ "$FIRST_PUBLISH" = true ] || return 0
+  host="${2#*://}"; host="${host%%/*}"
+  start=$(date +%s)
+  while :; do
+    waited=$(( $(date +%s) - start ))
+    if dig +short +time=3 +tries=1 @1.1.1.1 "$host" A 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+      MEASURED+=("$label: the new address $host answered at 1.1.1.1 after $waited s, before anything here looked it up")
+      return 0
+    fi
+    [ "$waited" -ge "$CF_WAIT" ] && break
+    sleep "$CF_POLL"
+  done
+  no "$label — the new address $host had no answer at 1.1.1.1 after $CF_WAIT s"
+  return 1
+}
+
 # ----------------------------------------------------------------- self-test
 # The wait above, proved against a stub server on 127.0.0.1 that serves the
 # OLD bytes for the first K requests to a path and the NEW after: no
@@ -416,6 +446,9 @@ PY2
     fi
   done
   rm -f "$FIRST_PUBLISH_SENTINEL"
+  # deploy.py makes .internal/ to save the surname; when there was no saved
+  # surname before the run, an empty one is all it left, and it goes too.
+  rmdir "$WORKING_FOLDER/courses/.internal" 2>/dev/null
   echo "  ↩︎  put the saved surname and the section's own site records back"
 }
 hide_first_publish_state() {
@@ -441,7 +474,10 @@ delete_sites_made() {
   local entry kind name id code token
   for entry in ${SITES_MADE[@]+"${SITES_MADE[@]}"}; do
     IFS=$'\t' read -r kind name id <<<"$entry"
-    case "$name" in
+    # Netlify keeps the name as typed ("Testingabcdef", measured on the first
+    # run, whose case-sensitive test left that site behind), so compare in
+    # lower case.
+    case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
       *"$SURNAME_IN_NAMES"*) ;;
       *) SITES_REPORT+=("$kind $name: NOT deleted (its name does not carry this run's surname $SURNAME_IN_NAMES)"); continue ;;
     esac
@@ -989,9 +1025,11 @@ measure_deploy() {  # measure_deploy <label> <logfile> <args...>
   run_deploy "$log" "$@"; rc=$?
   finish=$(date +%s); after=$(obytes)
   # Pages' line is "Uploaded N files (M already uploaded)" in 4.80.0 and
-  # 4.156.0 alike, but a first-ever upload has nothing already uploaded, and
-  # the old pattern, which required the parenthesis, never matched one (#712).
-  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files?( \([0-9]+ already uploaded\))?" "$log" | tail -1)
+  # 4.156.0 alike, but a first-ever upload has nothing already uploaded and
+  # prints "Uploaded N files (4.85 sec)", which the old pattern, requiring the
+  # parenthesis, never matched (#712, measured). "files" exactly, so Netlify's
+  # own "Uploaded N file(s)" line is not read as a Cloudflare count.
+  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files( \([0-9]+ already uploaded\))?" "$log" | tail -1)
   MEASURED+=("$label: $((finish - start)) s, ${files:-no upload count}, $(( (${after:-0} - ${before:-0}) / 1024 )) KiB sent on ${NET_IFACE:-?}")
   return $rc
 }
@@ -1123,6 +1161,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
   measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" \
     && ok "publish to Netlify exited 0" || no "publish to Netlify failed"
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
+  [ -n "$NETLIFY_URL" ] && wait_for_new_address "Netlify" "$NETLIFY_URL"
   [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
   [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
   [ -n "$NETLIFY_URL" ] && check_page_links "Netlify" "$NETLIFY_URL/" netlify
@@ -1139,6 +1178,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   check_no_delegation "Cloudflare Pages" "$WORK/deploy-cloudflare.log"
   snapshot_cloudflare_upload "Cloudflare Pages" "$WORK/deploy-cloudflare.log" "$WORK/cf-alone"; CF_SNAPPED=$?
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
+  [ -n "$CF_URL" ] && wait_for_new_address "Cloudflare Pages" "$CF_URL"
   [ -n "$CF_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare Pages" "$CF_URL" "$WORK/cf-alone"
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
