@@ -120,7 +120,13 @@ final class AssistAgent {
     /// `withTheDaySettled` exists to prevent. Read by
     /// `theReplyIsTheRequestBackAgain`, so that a model echoing the sentence
     /// WITHOUT the parenthetical is recognised as the same fault.
-    private var sentenceThisTurnBeganWith: String = ""
+    ///
+    /// Emptied when Go moves the turn past the approved call's result
+    /// (#689), as Windows' `Approve` empties `_typedThisTurn`: a lap after
+    /// Go begins with a tool result, not with anything the teacher typed,
+    /// so settlers S1 and S3 have no sentence to read there. Readable from
+    /// a test, which pins that.
+    private(set) var sentenceThisTurnBeganWith: String = ""
 
     /// How many times this turn has asked the model so far (#689).
     ///
@@ -1653,7 +1659,8 @@ final class AssistAgent {
     /// at the lap cap, or for any other reason — can never erase a call
     /// that has already run. No approval-gated call laps today (each answers
     /// `wrote` or `refused`), so this is safety by construction rather than
-    /// a mend; Windows' `Approve` moves its mark the same way.
+    /// a mend; Windows' `Approve` moves its mark the same way, and empties
+    /// the teacher's sentence with it, as this does.
     private func execute(call: AssistToolCall, approvedByTheTeacher: Bool = false) async {
         activity = .running(toolName: call.function.name)
         let outcome: AssistToolOutcome = await tools.run(call: call)
@@ -1668,6 +1675,7 @@ final class AssistAgent {
         ))
         if approvedByTheTeacher {
             messageCountAtTheStartOfTheTurn = messages.count
+            sentenceThisTurnBeganWith = ""
         }
 
         // A read hands back to the model so it can answer the question it was

@@ -147,23 +147,32 @@ final class AssistLapCapTests: XCTestCase {
         XCTAssertFalse(transcript(of: agent).contains(AssistWording.wentRoundWithoutFinishing))
     }
 
-    /// The count is per teacher action, not per window: two turns of three
-    /// requests each are both answered.
+    /// The count is per teacher action, not per window: two turns of four
+    /// requests each (three reads, then an answer) are both answered.
+    ///
+    /// Four and four on purpose: eight in all is past the cap, so without
+    /// `say()` starting the count again the second turn's third read would
+    /// be the seventh request, and the turn would end on
+    /// `AssistWording.wentRoundWithoutFinishing` after six requests rather
+    /// than on its answer after eight. Three and three (six in all) would
+    /// pass with the reset deleted.
     func testEachSentenceStartsTheCountAgain() async throws {
         let made: AssistFixture.Made = try AssistFixture.makeRunner()
         defer { try? FileManager.default.removeItem(at: made.root) }
         let engine: StubEngine = try StubEngine()
         defer { engine.stop() }
+        let listPages: String = AssistLapCapTests.listPages
         engine.serve([
-            AssistLapCapTests.listPages, AssistLapCapTests.listPages, Canned.text("First answer."),
-            AssistLapCapTests.listPages, AssistLapCapTests.listPages, Canned.text("Second answer."),
+            listPages, listPages, listPages, Canned.text("First answer."),
+            listPages, listPages, listPages, Canned.text("Second answer."),
         ])
 
         let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
         await agent.say(AssistLapCapTests.sentence)
         await agent.say(AssistLapCapTests.sentence)
 
-        XCTAssertEqual(engine.requestCount, 6)
+        XCTAssertGreaterThan(8, AssistAgent.mostModelRequestsPerTurn, "the two turns together must pass the cap")
+        XCTAssertEqual(engine.requestCount, 8)
         XCTAssertEqual(agent.entries.last?.text, "Second answer.")
         XCTAssertTrue(transcript(of: agent).contains("First answer."))
         XCTAssertFalse(transcript(of: agent).contains(AssistWording.wentRoundWithoutFinishing))
@@ -214,6 +223,7 @@ final class AssistLapCapTests: XCTestCase {
         await agent.say("Publish Unit 1, Day 1")
         XCTAssertNotNil(agent.pendingApproval, "the card this test presses Go on did not come up")
         XCTAssertEqual(agent.messageCountAtTheStartOfTheTurn, 1)
+        XCTAssertEqual(agent.sentenceThisTurnBeganWith, "Publish Unit 1, Day 1")
 
         await agent.approvePending()
 
@@ -223,6 +233,9 @@ final class AssistLapCapTests: XCTestCase {
             agent.messageCountAtTheStartOfTheTurn, agent.messages.count,
             "a lap after Go would wind back past a call that has already run"
         )
+        // A lap after Go begins with a tool result, so there is no sentence
+        // for the settlers to read (Windows empties `_typedThisTurn` here).
+        XCTAssertEqual(agent.sentenceThisTurnBeganWith, "", "Go kept the sentence of the turn before it")
     }
 
     /// The number is the contract's, and the scenario counts it.

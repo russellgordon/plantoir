@@ -1923,7 +1923,18 @@ could have failed for reasons nothing to do with the cap.
 
 **Measured** with copy-and-restore must-fails: the guard removed, the two
 headline tests, the trail test and the scenario fail (21 requests and 43 messages
-where 6 and 1 were expected); the mark move removed, the Go test fails (1 ≠ 2).
+where 6 and 1 were expected); the mark move removed, the Go test fails (1 ≠ 2);
+`say()`'s reset removed, `testEachSentenceStartsTheCountAgain` fails (6 ≠ 8
+requests, the second turn ending on `wording.wentRoundWithoutFinishing`) — it
+serves two turns of three reads and an answer, eight requests in all, because
+the first version's two turns of two reads and an answer (six in all) passed
+with the reset deleted, which the implementation review found; Go's emptying
+of the teacher's sentence removed, the Go test fails (the sentence of the turn
+before is still there). That last is a mirror of Windows' `Approve`, which
+empties `_typedThisTurn` when it moves the mark: a lap after Go begins with a
+tool result, so settlers S1 and S3 have no sentence of the teacher's to read.
+Go's own reset of the count is not observable today, since no approved call
+laps.
 
 **Rejected, and why:**
 

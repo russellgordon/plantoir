@@ -10575,8 +10575,8 @@ Windows cannot regenerate `assist-wording.json`. Windows says
 scenario "open in Obsidian on a Mac without Obsidian presses nothing (#610)"
 against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
 (v1.9.1), which asks for `{machine}` in that sentence. **Landed on the mac
-2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` ("…not on this
-{machine}…", recorded in `specialNames.platformWording.machine.usedIn`) and the
+2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` (recorded in
+`specialNames.platformWording.machine.usedIn`) and the
 scenario is renamed "open in Obsidian where Obsidian is not installed presses
 nothing (#610)"; the mac also added `wording.openInObsidianDidNotOpen` and a
 `given.obsidianPress: "didNotOpen"` scenario for `DidNotOpen` (below). Until
