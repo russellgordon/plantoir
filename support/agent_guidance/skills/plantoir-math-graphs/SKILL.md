@@ -1,6 +1,6 @@
 ---
 name: plantoir-math-graphs
-description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit" - and a GeoGebra sketch students drag, a slider, or a .ggb file. Says when to use an interactive functionplot graph, a static TikZ diagram and a GeoGebra sketch, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line), the limits, what to avoid, and how a figure that cannot be drawn shows up.
+description: Use when a Plantoir course page needs a graph of a function, a parabola or line, a linear system, a geometry or similar-triangles diagram, a number line, a probability tree, a circuit, or any drawn figure - anything that would be "graph", "plot", "sketch", "diagram", "TikZ", "triangle", "tree diagram" or "circuit" - and a GeoGebra sketch students drag, a slider, or a .ggb file. Says when to use an interactive functionplot graph, a static TikZ diagram and a GeoGebra sketch, gives complete patterns to paste (parabola with its parent, two lines meeting, labelled similar triangles, a number line, the finite-difference scaffold), the limits, what to avoid, and how a figure that cannot be drawn shows up.
 ---
 
 # Graphs and diagrams on a Plantoir page
@@ -116,9 +116,24 @@ y = -x + 4
   `tikz-3dplot`, `amsmath`, `amssymb`, `graphicx`; libraries `angles`,
   `quotes`, `arrows.meta`, `calc`, `positioning`, `decorations.markings`
   and TikZ's other standard ones. **Not available (measured):** `siunitx`,
-  `mathtools`, `tkz-euclide`, and the pgfplots library `fillbetween` - shade
-  with `\fill` and a closed path instead. Any other package: preview once
-  before relying on it. Write units by hand: `$5\,\mathrm{cm}$`.
+  `mathtools`, `tkz-euclide`, and the pgfplots libraries `fillbetween` -
+  shade with `\fill` and a closed path instead - and `groupplots` - one
+  graph per fence instead. Any other package: preview once before relying
+  on it. Write units by hand: `$5\,\mathrm{cm}$`.
+- **Write these instead (measured):** each of the left-hand forms stops the
+  whole drawing on the site, though it works in a LaTeX handout.
+  - A dot inside an `axis`: not `\fill (axis cs:1,1) circle (2pt);` - a
+    radius in brackets fails inside an axis, with or without `axis cs:`.
+    Write `\addplot[only marks, mark=*] coordinates {(1,1)};`, or
+    `\fill (axis cs:1,1) circle[radius=2pt];`. Outside an axis,
+    `circle (2pt)` draws.
+  - A degree sign: not `\textdegree`; write `$^{\circ}$`.
+  - A dollar sign: not `\$` or `\textdollar`; write `\char36`.
+
+  `\textdegree`, `\$` and `\textdollar` stop the drawing in any fence, not
+  only in an axis label, and the build may then give the wrong reason for
+  it (that it took too long); check for them first when a figure with a
+  degree or a dollar sign is not drawn.
 - Comments with ONE `%`. A `%%` anywhere on a page is removed by the
   website before it reads the page (inside fences too).
 - Colours: black and white follow the reader's theme; other colours are
@@ -127,6 +142,8 @@ y = -x + 4
 - Use 1 unit = 1 cm and keep a diagram about 6-12 units wide.
 
 ## 4. Worked patterns (paste, then change the numbers)
+
+Five patterns: A to D below, and E, the finite-difference scaffold.
 
 ### A. A transformed parabola beside its parent
 
@@ -225,6 +242,82 @@ them by eye; one similar pair is enough per figure.
 
 A closed circle (`x >= -2`) is `fill=red` instead of `fill=white`.
 
+### E. The finite-difference scaffold
+
+The first table of a day that meets first or second differences carries
+this figure; later tables that day are plain Markdown tables. A curved arrow
+starts at each lower value and points up to the one above it, labelled with
+the whole subtraction, lower minus upper, negatives in brackets; a second
+column does the same for second differences. It is the same figure a
+printed handout carries (`plantoir-handouts` section 10, whose
+`patterns/finite_differences.py` prints this fence for any table with
+`--page --alt "..."`). By hand: change the y values in the table nodes, then
+each subtraction and its result.
+
+````
+```tikz
+% alt: A table of y = x^2 - 3 for x from -2 to 2, with arrows from each y value up to the one above it labelled with the subtraction: first differences -3, -1, 1, 3 and second differences 2, 2, 2.
+\begin{document}
+\begin{tikzpicture}[font=\small]
+\definecolor{diffcol}{RGB}{0,128,128}
+\definecolor{headfill}{RGB}{70,100,170}
+\tikzset{num/.style={anchor=east, inner sep=0pt, text height=1.6ex, text depth=0.45ex},
+  numc/.style={num, anchor=center},
+  dif/.style={num, text=diffcol, font=\footnotesize},
+  diffarrow/.style={diffcol, thin, -stealth}}
+% The table of values: a shaded heading row, a full outer border, one ruled row for each x
+\fill[headfill, fill opacity=0.13] (0,0) rectangle (1.75,-0.75);
+\draw (0,0) rectangle (1.75,-3.850);
+\draw (0.80,0) -- (0.80,-3.850);
+\draw (0,-0.750) -- (1.75,-0.750);
+\draw (0,-1.370) -- (1.75,-1.370);
+\draw (0,-1.990) -- (1.75,-1.990);
+\draw (0,-2.610) -- (1.75,-2.610);
+\draw (0,-3.230) -- (1.75,-3.230);
+\node at (0.400,-0.375) {$x$};
+\node at (1.275,-0.375) {$y$};
+% A column with any negative value is right-aligned with padding; one with none is centred
+\node[num] at (0.59,-1.060) {$-2$};
+\node[num] at (0.59,-1.680) {$-1$};
+\node[num] at (0.59,-2.300) {$0$};
+\node[num] at (0.59,-2.920) {$1$};
+\node[num] at (0.59,-3.540) {$2$};
+\node[num] at (1.50,-1.060) {$1$};
+\node[num] at (1.50,-1.680) {$-2$};
+\node[num] at (1.50,-2.300) {$-3$};
+\node[num] at (1.50,-2.920) {$-2$};
+\node[num] at (1.50,-3.540) {$1$};
+% First differences: each arrow starts at the lower value and points up to the one above it;
+% beside it, the subtraction: lower value minus the one above it
+\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (3.350,-0.700) {First\\differences};
+\draw[diffarrow] (1.820,-1.630) .. controls (2.236,-1.604) and (2.124,-1.370) .. (1.890,-1.110);
+\node[dif] at (3.780,-1.370) {$-2 - 1$}; \node[dif, anchor=west] at (3.780,-1.370) {${}= -3$};
+\draw[diffarrow] (1.820,-2.250) .. controls (2.236,-2.224) and (2.124,-1.990) .. (1.890,-1.730);
+\node[dif] at (3.780,-1.990) {$-3 - (-2)$}; \node[dif, anchor=west] at (3.780,-1.990) {${}= -1$};
+\draw[diffarrow] (1.820,-2.870) .. controls (2.236,-2.844) and (2.124,-2.610) .. (1.890,-2.350);
+\node[dif] at (3.780,-2.610) {$-2 - (-3)$}; \node[dif, anchor=west] at (3.780,-2.610) {${}= 1$};
+\draw[diffarrow] (1.820,-3.490) .. controls (2.236,-3.464) and (2.124,-3.230) .. (1.890,-2.970);
+\node[dif] at (3.780,-3.230) {$1 - (-2)$}; \node[dif, anchor=west] at (3.780,-3.230) {${}= 3$};
+% Second differences: each arrow starts at the lower value and points up to the one above it;
+% beside it, the subtraction: lower value minus the one above it
+\node[font=\scriptsize\sffamily\bfseries, align=center, anchor=south] at (6.305,-0.700) {Second\\differences};
+\draw[diffarrow] (4.860,-1.916) .. controls (5.276,-1.892) and (5.164,-1.680) .. (4.930,-1.444);
+\node[dif] at (6.820,-1.680) {$-1 - (-3)$}; \node[dif, anchor=west] at (6.820,-1.680) {${}= 2$};
+\draw[diffarrow] (4.860,-2.536) .. controls (5.276,-2.512) and (5.164,-2.300) .. (4.930,-2.064);
+\node[dif] at (6.820,-2.300) {$1 - (-1)$}; \node[dif, anchor=west] at (6.820,-2.300) {${}= 2$};
+\draw[diffarrow] (4.860,-3.156) .. controls (5.276,-3.132) and (5.164,-2.920) .. (4.930,-2.684);
+\node[dif] at (6.820,-2.920) {$3 - 1$}; \node[dif, anchor=west] at (6.820,-2.920) {${}= 2$};
+\node[font=\scriptsize, text=gray, anchor=north, text width=7.18cm, align=center] at (3.715,-3.950) {Each difference is the lower value minus the one above it.};
+\end{tikzpicture}
+\end{document}
+```
+````
+
+For first differences only (the first time differences appear in a unit),
+leave out the "Second differences" heading and its three arrows and lines,
+and move the caption's `at (...)` x to half the new width. Never on a quiz
+or test page.
+
 ## 5. Where a fence can go
 
 At the top level, inside a callout (folded or not - every line starting
@@ -269,6 +362,8 @@ remembered, so it is quick.
 
 - `\documentclass`, `\usepackage{tikz}` (harmless but pointless), two
   pictures in one fence, `%%`, `siunitx`.
+- `groupplots`, `\textdegree`, `\$`, `\textdollar`, and a dot drawn as
+  `circle (2pt)` inside an `axis` - section 3 says what to write instead.
 - In functionplot: `**`, `ln`, `pi`, `e`, `|x|`, `sin x`, `x(x - 1)`,
   settings below the functions, bounds that hide what matters.
 - A picture, screenshot or embed of a graph that a fence can draw.
