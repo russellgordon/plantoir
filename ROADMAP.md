@@ -26,6 +26,26 @@ need to read those to use Plantoir.
 
 ---
 
+## Version 1.9.2
+
+Mac first. The Windows app follows in its own update.
+
+- **Unit planning beside Plantoir.** When Claude Code or Codex is installed,
+  the course page gains a Planning tab: an assistant helps you plan a unit —
+  a calendar across your sections, lesson cards, day materials, assessment
+  drafts, a curriculum correlation — and the plan shows right there, with
+  the files it links. ([#707](https://github.com/russellgordon/plantoir/issues/707),
+  [#708](https://github.com/russellgordon/plantoir/issues/708))
+- **Share a unit plan with a colleague.** Publish the plan as its own small
+  website, kept well apart from your class sites, optionally behind a
+  username and password, and stop sharing it when you're done.
+  ([#709](https://github.com/russellgordon/plantoir/issues/709))
+- **Reference courses, more flexible.** Add or import a course straight to
+  your reference shelf — even for a course code you're already teaching —
+  arrange the shelf in groups you make yourself, and replace a reference
+  course with a newer version (with a backup kept first).
+  ([#572](https://github.com/russellgordon/plantoir/issues/572))
+
 ## Version 2.0
 
 - **PhET science simulations on your pages**, from the University of
@@ -38,11 +58,6 @@ need to read those to use Plantoir.
   success-criteria headings in Course Settings, a way for students to narrow
   the page to a date or a unit, and a check that it prints well.
   ([#595](https://github.com/russellgordon/plantoir/issues/595))
-- **Reference courses, more flexible.** Add a ready-made course straight to
-  your reference shelf — even for a course code you're already teaching —
-  arrange the shelf in groups you make yourself, and replace a reference
-  course with a newer version (with a backup kept first). Still being
-  decided. ([#572](https://github.com/russellgordon/plantoir/issues/572))
 - **Backups and archives, made clearer.** These two features overlap; the
   plan is to decide whether to combine them into one place for every kept
   copy of a course, or to give archives the same browsing that backups have.
