@@ -69,16 +69,35 @@ nonisolated enum SectionProblemsRules {
         guard let builtHere = record.builtAt else {
             return .current
         }
-        for other in others {
-            if fixesThePage(other, of: row, builtAfter: builtHere) {
-                return .fixedInTheSource
-            }
+        // The LATEST other record that shows the page decides, never any
+        // clean one (implementation review L1): a section clean at ten
+        // proves nothing once another has broken the page again at eleven.
+        guard let latest = latestShowing(row.page, among: others) else {
+            return .current
+        }
+        if fixesThePage(latest, of: row, builtAfter: builtHere) {
+            return .fixedInTheSource
         }
         return .current
     }
 
-    /// Whether one other section's record shows `row`'s page with no problem
-    /// of its kind, and is later than this one.
+    /// Of `others`, the latest record whose pages include `page`.
+    static func latestShowing(_ page: String, among others: [SectionProblemsRecord]) -> SectionProblemsRecord? {
+        var latest: SectionProblemsRecord?
+        for other in others {
+            guard let builtThere = other.builtAt, other.pagesShown.contains(page) else {
+                continue
+            }
+            if let current = latest, let currentTime = current.builtAt, currentTime >= builtThere {
+                continue
+            }
+            latest = other
+        }
+        return latest
+    }
+
+    /// Whether that record shows `row`'s page with no problem of its kind,
+    /// and is later than this one.
     static func fixesThePage(
         _ other: SectionProblemsRecord,
         of row: SectionProblemRow,

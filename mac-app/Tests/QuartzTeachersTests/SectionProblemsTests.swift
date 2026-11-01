@@ -343,6 +343,37 @@ final class SectionProblemsTests: XCTestCase {
                        "one warning glyph on a row")
     }
 
+    /// #731 (implementation review H1): the add-ons offer's "Don't ask
+    /// again" is presented from a view of its own, so it never reaches the
+    /// Problems alert — where ticking it silently turned the offer off.
+    /// There is ONE suppression toggle in the app's views, inside the offer's
+    /// own host, and none in the section's view.
+    func testOnlyTheAddOnsOfferCarriesASuppressionToggle() throws {
+        let main: String = try readSource("QuartzTeachers/Views/MainWindowView.swift")
+        let offer: String = try body(of: "private struct ObsidianAddOnsOfferDialog: ViewModifier {", in: main)
+        let host: String = try body(of: "private var offerHost: some View {", in: offer)
+        XCTAssertTrue(host.contains(".dialogSuppressionToggle("), "the offer keeps its box")
+        XCTAssertTrue(host.contains("Color.clear.confirmationDialog("), "on a view of its own")
+        let presenting: String = try body(of: "func body(content: Content) -> some View {", in: offer)
+        XCTAssertFalse(presenting.contains("dialogSuppressionToggle"), "never on the window's content")
+        XCTAssertTrue(presenting.contains("content.background {"))
+        var toggles: Int = 0
+        let views: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("QuartzTeachers/Views")
+        let walker: FileManager.DirectoryEnumerator? = FileManager.default.enumerator(at: views, includingPropertiesForKeys: nil)
+        while let file = walker?.nextObject() as? URL {
+            if file.pathExtension != "swift" {
+                continue
+            }
+            let text: String = try String(contentsOf: file, encoding: .utf8)
+            toggles += text.components(separatedBy: ".dialogSuppressionToggle(").count - 1
+        }
+        XCTAssertEqual(toggles, 1, "one suppression toggle in the app's views: the add-ons offer's")
+        let section: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        XCTAssertFalse(section.contains("dialogSuppressionToggle"))
+    }
+
     // MARK: - Helpers
 
     static let recordJSON: String = """

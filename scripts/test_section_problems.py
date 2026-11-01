@@ -17,6 +17,7 @@ Run with:
 
     python3 scripts/test_section_problems.py
 """
+import hashlib
 import io
 import json
 import shutil
@@ -150,6 +151,11 @@ class Prompts(unittest.TestCase):
         self.assertLessEqual(len(prompt), rules("prompt", "maxCharacters"))
         self.assertTrue(prompt.endswith("…"))
 
+    def test_a_percent_sign_is_written_as_words_between_spaces(self):
+        """#717 review L2: "50% done" read "50percent sign done"."""
+        self.assertEqual(section_problems.prompt_line("50% done, 100%"),
+                         "50 percent sign done, 100 percent sign")
+
     def test_ten_prompts_fit_a_windows_command_line_with_room_to_spare(self):
         self.assertLess(10 * rules("prompt", "maxCharacters"), 8191 // 2)
 
@@ -198,7 +204,7 @@ class TheSiteSays(unittest.TestCase):
         self.path.write_text(json.dumps(record), encoding="utf-8")
 
     def _carried_site_row(self):
-        return {"id": "runnableCodeShownAsPlainCode|Unit 2/Loops|python|1", "kind": "runnableCodeShownAsPlainCode",
+        return {"id": "runnableCodeShownAsPlainCode|Unit 2/Loops|python|k1", "kind": "runnableCodeShownAsPlainCode",
                 "page": "Unit 2/Loops", "from": "site", "firstSeen": "2026-10-30T08:00:00Z", "carried": True}
 
     def test_the_site_saying_nothing_takes_its_carried_rows_away(self):
@@ -210,7 +216,7 @@ class TheSiteSays(unittest.TestCase):
         merged = section_problems.read(self.path)
         self.assertEqual(merged["rows"], [])
         self.assertTrue(merged["siteSaidComplete"])
-        self.assertEqual(merged["changed"]["gone"], ["runnableCodeShownAsPlainCode|Unit 2/Loops|python|1"])
+        self.assertEqual(merged["changed"]["gone"], ["runnableCodeShownAsPlainCode|Unit 2/Loops|python|k1"])
         self.assertEqual(merged["alertKey"], "B2", "the site's merge keeps the build's alert key")
         self.assertEqual(len(said), 1)
 
@@ -218,7 +224,8 @@ class TheSiteSays(unittest.TestCase):
         self._write(built({}, previous_record([self._carried_site_row()])))
         section_problems.merge_site_said(
             self.path, "B2",
-            [{"page": "Unit 2/Loops", "language": "python", "block": 1, "line": 6, "reason": "blockNotPrepared"}],
+            [{"page": "Unit 2/Loops", "language": "python", "block": 1, "key": "k1", "line": 6,
+              "reason": "blockNotPrepared"}],
             [], "MPM2D", 1, printer=lambda line: None)
         merged = section_problems.read(self.path)
         self.assertEqual(len(merged["rows"]), 1)
@@ -247,7 +254,8 @@ class TheSiteSays(unittest.TestCase):
         order = [line.split(":")[0] + ":" for line in printed if line.startswith("PLANTOIR_")]
         self.assertEqual(order, [health, problems])
         merged = section_problems.read(self.path)
-        self.assertEqual([row["id"] for row in merged["rows"]], ["runnableCodeShownAsPlainCode|Units/Other|python|1"])
+        key = hashlib.sha256(b"print(1)").hexdigest()
+        self.assertEqual([row["id"] for row in merged["rows"]], [f"runnableCodeShownAsPlainCode|Units/Other|python|{key}"])
 
     def test_a_side_file_names_the_record_only_when_given_one(self):
         output = self.folder / "site"
@@ -293,6 +301,47 @@ class TheDeployRefuses(unittest.TestCase):
         cleared = section_problems.read(self.path)
         self.assertEqual([row["id"] for row in cleared["rows"]], [FIGURE_ID])
         self.assertEqual(cleared["alertKey"], "B3")
+
+    def test_a_course_that_no_longer_goes_to_cloudflare_drops_the_refusal_at_its_next_build(self):
+        """#717 review M1: deploy.sh's folder path never enters the Python,
+        so the build drops a Cloudflare refusal once the course no longer
+        goes there; while it still does, the build carries it."""
+        refused = section_problems.deploy_rows([("Media/talk.mp4", 40 * 1024 * 1024)], "MPM2D", 1)
+        for row in refused:
+            row["firstSeen"] = "2026-10-30T08:00:00Z"
+        previous = previous_record(refused)
+        facts = dict(HEALTHY)
+        to_a_folder = {"deploy_target": "local_folder"}
+        both = {"deploy_target": "local_folder", "additional_deploy_targets": [{"type": "cloudflare_pages"}]}
+        folder = Path(tempfile.mkdtemp())
+        try:
+            (folder / section_problems.RECORD_FILE).write_text(json.dumps(previous), encoding="utf-8")
+            section_problems.write_after_build(folder, "MPM2D", 1, "B2", "deploy", facts, [],
+                                               printer=lambda line: None, config=both)
+            kept = section_problems.read(folder / section_problems.RECORD_FILE)
+            self.assertEqual([row["id"] for row in kept["rows"]], ["filesTooLargeForCloudflare|Media/talk.mp4"])
+            section_problems.write_after_build(folder, "MPM2D", 1, "B3", "deploy", facts, [],
+                                               printer=lambda line: None, config=to_a_folder)
+            dropped = section_problems.read(folder / section_problems.RECORD_FILE)
+            self.assertEqual(dropped["rows"], [])
+            self.assertEqual(dropped["changed"]["gone"], ["filesTooLargeForCloudflare|Media/talk.mp4"])
+        finally:
+            shutil.rmtree(folder)
+        self.assertTrue(section_problems.cloudflare_is_a_destination(None), "unreadable settings never drop it")
+        self.assertTrue(section_problems.cloudflare_is_a_destination({"deploy_target": "cloudflare_pages"}))
+
+    def test_a_swift_program_and_a_block_of_code_are_known_by_their_content(self):
+        """#717 review L7: a block moved down the page keeps its row."""
+        swift = {"page": "Unit 2/Swift", "block": 1, "key": "s1", "line": 5, "blockLine": None,
+                 "reason": "notCompiled", "said": ""}
+        first = built({"swift_problems": [swift]})
+        moved = built({"swift_problems": [dict(swift, block=3, line=40)]}, previous_record(first["rows"]))
+        self.assertEqual(moved["changed"], {"new": [], "gone": []})
+        code = {"page": "Unit 2/Loops", "language": "python", "block": 1, "key": "c1", "line": 6,
+                "reason": "blockNotPrepared"}
+        rows = section_problems.site_rows([code], [], "MPM2D", 1)
+        again = section_problems.site_rows([dict(code, block=4, line=60)], [], "MPM2D", 1)
+        self.assertEqual(rows[0]["id"], again[0]["id"])
 
     def test_nothing_refused_and_nothing_kept_writes_nothing(self):
         said = []

@@ -540,6 +540,13 @@ struct SectionDetailView: View {
                 reloadTheProblems()
                 raiseTheProblemsAlertIfDue()
             }
+            // Any other run in this app that printed one — the in-app
+            // assistant's build of this section above all (implementation
+            // review L5): the open section follows its record whoever built.
+            .onChange(of: SectionProblems.shared.markersArrived) { _, _ in
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
+            }
         }
         .navigationTitle(titleText)
         .task {

@@ -1281,14 +1281,7 @@ def deploys_to_cloudflare(course_dir: Path) -> bool:
         config = json.loads((course_dir / "course_config.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return True
-    if not isinstance(config, dict):
-        return True
-    if config.get("deploy_target") == "cloudflare_pages":
-        return True
-    for extra in config.get("additional_deploy_targets") or []:
-        if isinstance(extra, dict) and extra.get("type") == "cloudflare_pages":
-            return True
-    return False
+    return section_problems.cloudflare_is_a_destination(config)
 
 
 def main():

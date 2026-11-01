@@ -15,6 +15,7 @@ Run with:
 
     python3 scripts/test_site_disagreements.py
 """
+import hashlib
 import json
 import os
 import shutil
@@ -155,7 +156,10 @@ class SiteDisagreementTests(unittest.TestCase):
         facts = site_said.facts_from_site(said, [
             {"page": "Units/Loops.md", "language": "python", "block": 1,
              "reason": "blockAfterUnclosedFence", "code": "print(2)"}])
+        # "key" is the block's code, hashed: its row's identity in the
+        # section's Problems record (#717 review L7).
         self.assertEqual(facts, [{"page": "Unit 1/Loops", "language": "python", "block": 1,
+                                  "key": hashlib.sha256(b"print(2)").hexdigest(),
                                   "line": 10, "reason": "blockAfterUnclosedFence"}])
 
     def test_a_page_the_build_did_not_place_is_named_by_its_path_and_read_from_the_content(self):

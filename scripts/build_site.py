@@ -9471,7 +9471,8 @@ def build_section_site(
     # build (section_problems.write_after_build).
     section_problems.write_after_build(
         host_output_dir, course_code, section_number, _this_build_id,
-        "deploy" if build_only else "preview", health_facts, visible_places_here)
+        "deploy" if build_only else "preview", health_facts, visible_places_here,
+        config=config)
     _offer_the_links_checklist(content_root, course_dir, course_code, section_number,
                                frozen_course, _this_build_id)
     # ===========================================================================

@@ -781,8 +781,11 @@ contract's sentence in secondary style. A course kept for reference shows the
 table without repairs.
 
 **Fixed in the source** (`SectionProblemsRules.state`, `sectionProblems.
-rowState`): a row clears to that state only when ANOTHER section's LATER
-record shows the page and has no row of the same kind on it — not merely no
+rowState`): of the other sections' records that show the page, the LATEST
+alone decides — never any clean one (implementation review L1: a section clean
+at ten proves nothing once another broke the page again at eleven). A row
+clears to that state only when that record is later than this one and has no
+row of the same kind on the page — not merely no
 row with this id, because a renumbered fence's id is not the fence it was
 (MED 5) — the kind depends on the page alone (`clearsAcrossSections`: not a
 link into a hidden page, which depends on what THIS section hides), the reason
@@ -805,13 +808,28 @@ glyphs, two meanings).
 **The alert.** Raised only when the record found something NEW
 (`changed.new`) and its `alertKey` has not been answered
 (`SectionProblemsRules.alertIsDue`). Raised by the section's own view: mid-build
-when its preview prints the marker (the #153 timing), when its deploy ends
+when its preview prints the marker (the #153 timing), when ANY run in this app
+prints one (`SectionProblems.markersArrived` — the in-app assistant's build of
+the open section among them; implementation review L5), when its deploy ends
 (`takeWhatTheDeployLeft`), and when the section is opened, or the app comes
-back to the front, onto a record nobody has answered. Title from
+back to the front (the MCP server's builds, a terminal's), onto a record
+nobody has answered. **By design, and so stated** (L6): the site's merge of a
+build keeps that build's alert key, so a row the site adds after the alert was
+answered raises nothing — it is on the tab and keeps the marker on — and the
+trail's line, written once per alert key when the app first reads the
+record, counts the rows the record had then (in a run the app watched, the
+build's, before the site's). Title from
 `sectionProblems.words` (one or several new problems), message: the new
 problem's own sentence when there is one, where Show takes you, how many went.
 Buttons: **Show** (selects the Problems tab), the repair when a NEW problem has
-one, and **Not Now**. Every answer is remembered by alert key in
+one, and **Not Now**. No "Don't ask again" box: the #495 add-ons offer's
+suppression toggle sat on the window's whole content, and a suppression toggle
+applies to every dialog presented within the view it is on, so it appeared on
+this alert too (#731, found driving this piece) — ticking it silently turned
+the add-ons offer off. The offer is now presented from a view of its own
+behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
+`testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
+toggle in the app's views, there. Every answer is remembered by alert key in
 `~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
 (last 20 per section), so a relaunch does not raise yesterday's alert again
 (plan review, HIGH 2) — never in the record, which the build rewrites. A record
@@ -852,7 +870,7 @@ alert with Show and the repair, the answers file, `rowState`/`sectionMarker`/
 `alert` cases, and the trail event. The record, its rows and their words are
 free: Windows runs the same Python.
 
-**Tests.** `SectionProblemsTests` (12): the three case lists, the lists and
+**Tests.** `SectionProblemsTests` (13, with #731's): the three case lists, the lists and
 words pinned key by key, rule 1 over every word, the marker read from its
 prefix onward, a record read as the build writes it, the store's key, answers
 across a relaunch, ticks and tab, the trail line, and a source scan that the

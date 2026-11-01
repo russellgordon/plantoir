@@ -40,6 +40,7 @@ cannot count on finding its neighbours. Never raises past main: whatever goes
 wrong costs the finding, never the site, and exits 0.
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -188,6 +189,9 @@ def facts_from_site(said: dict, blocks: list) -> list:
             "page": place,
             "language": language,
             "block": n,
+            # The block's own code, hashed (#717 review L7): what identifies
+            # its row in the section's Problems record, wherever it moves.
+            "key": hashlib.sha256(str(block.get("code") or "").encode("utf-8")).hexdigest(),
             "line": opening_line(source, language, str(block.get("code") or "")),
             "reason": str(block.get("reason") or "blockNotPrepared"),
         })

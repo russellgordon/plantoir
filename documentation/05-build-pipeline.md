@@ -1644,18 +1644,25 @@ maker again with the check's detail replaced by its list placeholder alone
 (`sectionProblems.kinds[].item`), so no rule of how a piece is put together is
 copied. The reasons inside a piece therefore come through the functions the
 console and the HEALTH line use: a figure's through `figureFences.words.reasons`
-and, once #718 lands, `site_health.figure_reason_words` with
+and, since #718, `site_health.figure_reason_words` with
 `words.reasonsWithoutDetail` — there is no second table of reasons to keep in
 step. A check with no list (a missing Media folder, a section with no front
 page…) is one row with no page; its `scope` says whether the Page column reads
 "Whole section" or "Whole course".
 
 **A row's id** is its kind and the values of its `identity` fields — never a
-line number, which moves when the teacher types above it. A figure and a
-GeoGebra sketch are identified by the fence's own content key, not its place
-among the page's fences (`figures._located` and `geogebra._located` now carry
-`key`), so inserting a fence above a broken one does not make it a new problem
-(plan review, MED 5). Two items with one id (two quizzes nested on one page
+line number, which moves when the teacher types above it. A figure, a
+GeoGebra sketch, a Swift program and a block of runnable code are identified
+by their CONTENT, not their place among the page's blocks: the fence's key
+(`figures._located` and `geogebra._located` carry `key`), the program's key
+(`swift_blocks.prepare`'s problems carry it) and the code hashed
+(`site_said.facts_from_site`). Inserting a block above a broken one therefore
+does not read as one new problem and one gone, which would raise the alert for
+nothing (plan review, MED 5; implementation review L7). **A self-check
+question keeps its place (`n`)**: its content is not in hand where either the
+folder check or the site's safety net reports it, and a nested one has no
+number at all, so inserting a question above a broken one still reads as new
+plus gone — a named limit (`sectionProblems.knownLimits`). Two items with one id (two quizzes nested on one page
 have no number) get `#2`, `#3` (LOW 10). `firstSeen` is carried from the
 previous record by id; `lastSeen` is the build that last found it.
 
@@ -1683,11 +1690,17 @@ previous record by id; `lastSeen` is the build that last found it.
   `filesTooLargeForCloudflare` row per file (worded by
   `sectionProblems.deployRefusals`, since that text was console-only), and
   clears them when a Cloudflare deploy finds nothing too large or a Netlify
-  deploy succeeds for a course that no longer sends anything to Cloudflare
-  (`deploys_to_cloudflare` reads `deploy_target` and
-  `additional_deploy_targets`; unreadable settings never clear on a guess). A
+  deploy succeeds for a course that no longer sends anything to Cloudflare. A
   preview never runs that check, which is why the build carries these rows
-  (plan review, MED 6).
+  (plan review, MED 6) — **but only while Cloudflare is among the course's
+  destinations**: `build_site.py` drops them at the next build of a course
+  that no longer goes there (implementation review M1). That is what clears a
+  course moved to a FOLDER, whose deploy (`deploy.sh`'s rsync) never enters
+  the Python; every deploy builds first, so no record code was added to the
+  launcher. Both writers ask one function,
+  `section_problems.cloudflare_is_a_destination` (`deploy_target` or
+  `additional_deploy_targets` is `cloudflare_pages`; settings that cannot be
+  read count as yes, so nothing is dropped on a guess).
 
 **`changed`** — the ids `new` and `gone` against `before`, the previous build's
 rows — is worked out HERE, so the "did the set change?" decision lives in the
@@ -1710,7 +1723,7 @@ deploy's refusal — because it is the shared Python. What it owes (the tab, the
 table, the marker on the row, the alert and its answers file) is in doc 09's
 section and the `windows` issue.
 
-**Measured.** `scripts/test_section_problems.py` (23 tests, the contract's 10
+**Measured.** `scripts/test_section_problems.py` (26 tests, the contract's 10
 `rowCases`) in 0.05 s; verify.sh's two-section check plants a real TeX error
 (`\foo`, not `\textdegree`, which until #718 was a crash reported as a 20 s
 timeout), builds Section 1 twice, Section 2 once, puts the fence right and

@@ -106,6 +106,23 @@ def section_number(section):
         return section
 
 
+def cloudflare_is_a_destination(config) -> bool:
+    """Whether a course sends a site to Cloudflare Pages, first or as well
+    (file-formats.json: deploy_target, additional_deploy_targets). True when
+    the settings are not a dict, so a refusal is never dropped on a guess.
+    The one rule for build_site.py (which drops a Cloudflare refusal at the
+    next build of a course that no longer goes there) and deploy.py (which
+    does at a deploy elsewhere): sectionProblems.deployRefusals.carryOver."""
+    if not isinstance(config, dict):
+        return True
+    if config.get("deploy_target") == "cloudflare_pages":
+        return True
+    for extra in config.get("additional_deploy_targets") or []:
+        if isinstance(extra, dict) and extra.get("type") == "cloudflare_pages":
+            return True
+    return False
+
+
 def now_text() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -121,9 +138,12 @@ def prompt_line(text: str) -> str:
     character, which appears in what an engine says.
     """
     spec = rules("prompt")
-    line = " ".join(str(text or "").split())
+    line = str(text or "")
     for pair in spec["replace"]:
         line = line.replace(pair[0], pair[1])
+    # After the replacing, so " percent sign " never leaves two spaces or
+    # one at an end (#717 review L2).
+    line = " ".join(line.split())
     most = int(spec["maxCharacters"])
     if len(line) > most:
         line = line[:most - 1].rstrip() + "…"
@@ -322,7 +342,8 @@ def announce(record: dict, printer=print) -> None:
 
 
 def made_after_build(previous: dict | None, course: str, section, build_id: str, occasion: str,
-                     facts: dict, pages_shown: list, built_at: str) -> dict:
+                     facts: dict, pages_shown: list, built_at: str,
+                     cloudflare_is_a_destination: bool = True) -> dict:
     """The record build_site writes, as a pure function of the previous one."""
     earlier = []
     if previous and str(previous.get("course")) == str(course) and str(previous.get("section")) == str(section):
@@ -330,7 +351,13 @@ def made_after_build(previous: dict | None, course: str, section, build_id: str,
     found = rows(facts, course, section)
     _keep_when_first_found(found, earlier, built_at)
     for row in earlier:
-        if row.get("from") in ("site", "deploy"):
+        if row.get("from") == "site":
+            found.append(_carried(row))
+        # A Cloudflare refusal lives only while Cloudflare is among the
+        # course's destinations (#717 review M1): a course moved to Netlify or
+        # a folder drops it at its next build, which every way of deploying
+        # makes or has made - deploy.sh's folder path included.
+        elif row.get("from") == "deploy" and cloudflare_is_a_destination:
             found.append(_carried(row))
     record = {
         "version": VERSION,
@@ -348,12 +375,15 @@ def made_after_build(previous: dict | None, course: str, section, build_id: str,
 
 
 def write_after_build(host_output_dir, course: str, section, build_id: str, occasion: str,
-                      facts: dict, pages_shown: list, printer=print, built_at: str = None) -> None:
-    """build_site.py's write, wrapped so it never breaks a build."""
+                      facts: dict, pages_shown: list, printer=print, built_at: str = None,
+                      config=None) -> None:
+    """build_site.py's write, wrapped so it never breaks a build. `config`
+    is the course's settings, for cloudflare_is_a_destination."""
     try:
         path = record_path(host_output_dir)
         record = made_after_build(read(path), course, section, build_id, occasion, facts,
-                                  pages_shown, built_at or now_text())
+                                  pages_shown, built_at or now_text(),
+                                  cloudflare_is_a_destination=cloudflare_is_a_destination(config))
         _write(path, record)
         announce(record, printer=printer)
     except Exception as error:
