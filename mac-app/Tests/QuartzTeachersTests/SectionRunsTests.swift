@@ -1,0 +1,291 @@
+import XCTest
+@testable import QuartzTeachers
+
+/// A section's deploy outlives the view that started it (GitHub #706).
+///
+/// The defect: the section view is rebuilt for every selection, and its
+/// deploy runner was the view's own state, so coming back to a section
+/// mid-deploy showed a fresh, blank runner with Deploy enabled — and a press
+/// then reached the launcher's "already being deployed" refusal, or during
+/// the deploy's build started a second build that ended the first. The rule
+/// is `contracts/shared-rules.json` → `returningToASectionMidDeploy`, walked
+/// here as data; the view's half — that it binds to the store and never
+/// deploys on appearing — is the source scan at the end, and the real
+/// window is `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy`.
+///
+/// Serial with `CourseActivityTests` and the other classes that reset
+/// process-wide statics: the scheme runs test classes one at a time.
+@MainActor
+final class SectionRunsTests: XCTestCase {
+
+    // MARK: - Set up
+
+    override func setUp() async throws {
+        SectionRuns.shared.reset()
+        CourseActivity.reset()
+    }
+
+    override func tearDown() async throws {
+        SectionRuns.shared.reset()
+        CourseActivity.reset()
+    }
+
+    // MARK: - The store
+
+    /// The defect itself: the view that comes back must find the run the
+    /// deploy is still writing — the same object, however the folder is
+    /// spelled — and Deploy must be unavailable while it runs.
+    func testReturningToASectionFindsItsDeployStillRunning() throws {
+        let folder: URL = try makeFolder()
+        let spelledWithPrivate: URL = URL(fileURLWithPath: FolderIdentity.canonicalPath(folder.path))
+        var spelledWithoutPrivate: URL = spelledWithPrivate
+        if spelledWithPrivate.path.hasPrefix("/private/var/") {
+            spelledWithoutPrivate = URL(fileURLWithPath: String(spelledWithPrivate.path.dropFirst("/private".count)))
+        }
+
+        let leaving: SectionDeployRun = SectionRuns.shared.deploy(
+            folder: spelledWithPrivate, courseCode: "EXC2O", sectionNumber: 1
+        )
+        leaving.runner.isRunning = true
+
+        let returning: SectionDeployRun = SectionRuns.shared.deploy(
+            folder: spelledWithoutPrivate, courseCode: "exc2o", sectionNumber: 1
+        )
+        XCTAssertTrue(
+            leaving === returning,
+            "The view that comes back must bind to the run the deploy is still writing, not a fresh one"
+        )
+        XCTAssertFalse(
+            SectionDetailView.deployIsAvailable(
+                run: returning, folderPath: spelledWithoutPrivate.path, courseCode: "EXC2O", sectionNumber: 1,
+                isBeingCopied: false, folderIsGettingReady: false
+            ),
+            "Deploy must be unavailable while the section's deploy runs"
+        )
+        XCTAssertNil(
+            SectionRuns.shared.existingDeploy(folder: spelledWithPrivate, courseCode: "EXC2O", sectionNumber: 2),
+            "Another section has no run until it is asked for one"
+        )
+    }
+
+    /// A deploy of the section this app has under way that the section's run
+    /// cannot see — the assistant with no window, or a run whose view has
+    /// gone — still makes Deploy unavailable; another section stays
+    /// available.
+    func testDeployIsUnavailableWhileThisAppDeploysTheSectionFromAnywhere() throws {
+        let folder: URL = try makeFolder()
+        CourseActivity.beginPublish(folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1)
+
+        let sectionOne: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+        let sectionTwo: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 2)
+        XCTAssertFalse(sectionOne.isBusy, "the run itself knows nothing of the windowless deploy")
+        XCTAssertFalse(
+            SectionDetailView.deployIsAvailable(
+                run: sectionOne, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
+                isBeingCopied: false, folderIsGettingReady: false
+            ),
+            "A deploy of this section anywhere in this app makes Deploy unavailable"
+        )
+        XCTAssertTrue(
+            SectionDetailView.deployIsAvailable(
+                run: sectionTwo, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 2,
+                isBeingCopied: false, folderIsGettingReady: false
+            ),
+            "Another section's Deploy is left as it was"
+        )
+
+        CourseActivity.endPublish(folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1)
+        XCTAssertTrue(
+            SectionDetailView.deployIsAvailable(
+                run: sectionOne, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
+                isBeingCopied: false, folderIsGettingReady: false
+            ),
+            "Once it has ended, Deploy is available again"
+        )
+    }
+
+    /// A finished run keeps its outcome for the view that comes back, and its
+    /// findings are taken by exactly one view.
+    func testAFinishedRunKeepsItsOutcomeAndFindings() throws {
+        let folder: URL = try makeFolder()
+        let run: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+        let startedAt: Date = Date(timeIntervalSince1970: 1_790_000_000)
+        run.runner.startedAt = startedAt
+        let endingsBefore: Int = run.endings
+
+        run.noteEnded()
+
+        let returning: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+        XCTAssertTrue(run === returning)
+        XCTAssertEqual(returning.runner.startedAt, startedAt, "the finished run is the one shown, not a fresh one")
+        XCTAssertEqual(returning.endings, endingsBefore + 1, "a view showing the section is told it ended")
+        XCTAssertTrue(returning.takeFindings(), "the first view to look takes the findings")
+        XCTAssertFalse(returning.takeFindings(), "a second view on the same section does not raise them again")
+        XCTAssertTrue(
+            SectionDetailView.deployIsAvailable(
+                run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
+                isBeingCopied: false, folderIsGettingReady: false
+            ),
+            "a finished deploy leaves Deploy available"
+        )
+    }
+
+    // MARK: - The contract
+
+    /// `shared-rules.json` → `returningToASectionMidDeploy.cases`, each set up
+    /// as its `startedBy` says and asked as a returning view asks.
+    func testReturningToASectionMidDeployCases() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 8)
+        for testCase in cases {
+            SectionRuns.shared.reset()
+            CourseActivity.reset()
+            let startedBy: String = try XCTUnwrap(testCase["startedBy"] as? String)
+            let then: String = try XCTUnwrap(testCase["then"] as? String)
+            let label: String = "\(startedBy) / \(then)"
+            let folder: URL = try makeFolder()
+            let otherFolder: URL = try makeFolder()
+
+            // Who started it, and where — written the way the app writes it.
+            var startedFolder: URL = folder
+            var startedSection: Int = 1
+            var startedWithTheRun: Bool = true
+            switch startedBy {
+            case "thisSectionBeforeLeaving":
+                break
+            case "anotherWindowSameFolder":
+                // Another window's view, the folder reached by another name.
+                startedFolder = URL(fileURLWithPath: FolderIdentity.canonicalPath(folder.path))
+            case "theAssistantWithNoWindow":
+                startedWithTheRun = false
+            case "anotherSection":
+                startedSection = 2
+            case "anotherWorkingFolder":
+                startedFolder = otherFolder
+            default:
+                XCTFail("\(label): a startedBy this test does not know")
+            }
+            var started: SectionDeployRun? = nil
+            if startedWithTheRun {
+                started = SectionRuns.shared.deploy(folder: startedFolder, courseCode: "EXC2O", sectionNumber: startedSection)
+            }
+            if then == "returned" {
+                started?.runner.isRunning = true
+                CourseActivity.beginPublish(folderPath: startedFolder.path, courseCode: "EXC2O", sectionNumber: startedSection)
+            } else {
+                started?.noteEnded()
+            }
+
+            // The teacher comes back to section 1 of the first folder.
+            let returning: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+            let available: Bool = SectionDetailView.deployIsAvailable(
+                run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1,
+                isBeingCopied: false, folderIsGettingReady: false
+            )
+            let underWay: Bool = SectionDetailView.deployIsUnderWay(
+                run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1
+            )
+            var showsTheRun: Bool = false
+            if let started {
+                showsTheRun = started === returning
+            }
+
+            XCTAssertEqual(available, testCase["deployAvailable"] as? Bool, "\(label): deployAvailable")
+            XCTAssertEqual(showsTheRun, testCase["showsTheRun"] as? Bool, "\(label): showsTheRun")
+            // Coming back asks the store and nothing else; the source scan
+            // below is what holds the view to that.
+            XCTAssertEqual(testCase["selectingStartsALauncher"] as? Bool, false, "\(label): selecting never starts anything")
+            // A press reaches a launcher only when `deployAndWait`'s first
+            // busy check lets it through.
+            XCTAssertEqual(!underWay, testCase["aPressStartsALauncher"] as? Bool, "\(label): aPressStartsALauncher")
+        }
+    }
+
+    // MARK: - The view
+
+    /// The view's half of the rule, which no model test can reach: its
+    /// deploy state is the store's, nothing that runs on appearing deploys,
+    /// and the deploy itself uses one run, taken once (#706 plan review, H1).
+    /// Fails on the code before #706, which held `@State var deployRunner`.
+    func testTheSectionViewBindsToTheStoreAndNeverDeploysOnAppearing() throws {
+        let source: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
+        XCTAssertFalse(source.contains("@State var deployRunner"), "the deploy runner must not be the view's own state")
+        XCTAssertFalse(source.contains("@State var isPreparingDeploy"), "nor whether a deploy is being prepared")
+        XCTAssertTrue(
+            source.contains("SectionRuns.shared.deploy("),
+            "the view must find its section's run in the store"
+        )
+
+        for opening in [".onAppear {", ".task {"] {
+            var remaining: Substring = Substring(source)
+            while let range = remaining.range(of: opening) {
+                let body: String = bodyFrom(range.lowerBound, in: remaining)
+                XCTAssertFalse(body.contains("startDeploy("), "\(opening) must never start a deploy")
+                // The assistant's registration names `deployAndWait` as a
+                // closure it may CALL later; calling it is what is forbidden.
+                XCTAssertFalse(body.contains("await deployAndWait(pressedByTheAssistant: false)"), "\(opening) must never deploy")
+                remaining = remaining[range.upperBound...]
+            }
+        }
+
+        let deployBody: String = try XCTUnwrap(
+            bodyOfFunction(startingWith: "func deployAndWait(", in: source)
+        )
+        XCTAssertFalse(deployBody.contains("deployRunner"), "deployAndWait must use the run it took once")
+        XCTAssertFalse(deployBody.contains("isPreparingDeploy"), "deployAndWait must use the run it took once")
+        XCTAssertFalse(deployBody.contains("deployRun."), "deployAndWait must not ask for the run again")
+        XCTAssertTrue(deployBody.contains("let run: SectionDeployRun = SectionRuns.shared.deploy("))
+        let cancelBody: String = try XCTUnwrap(bodyOfFunction(startingWith: "func cancelDeploy(", in: source))
+        XCTAssertTrue(cancelBody.contains("run.folder"), "Cancel aims at the folder the deploy noted")
+    }
+
+    // MARK: - Helpers
+
+    private func makeFolder() throws -> URL {
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SectionRunsTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        return folder
+    }
+
+    private func readSource(_ relativePath: String) throws -> String {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func bodyOfFunction(startingWith opening: String, in source: String) -> String? {
+        guard let start = source.range(of: opening) else {
+            return nil
+        }
+        return bodyFrom(start.lowerBound, in: Substring(source))
+    }
+
+    /// The text from the first opening brace at or after `start` to its
+    /// matching closing brace.
+    private func bodyFrom(_ start: Substring.Index, in source: Substring) -> String {
+        guard let firstBrace = source[start...].firstIndex(of: "{") else {
+            return ""
+        }
+        var depth: Int = 0
+        var body: String = ""
+        for character in source[firstBrace...] {
+            body.append(character)
+            if character == "{" {
+                depth += 1
+            } else if character == "}" {
+                depth -= 1
+                if depth == 0 {
+                    break
+                }
+            }
+        }
+        return body
+    }
+}
