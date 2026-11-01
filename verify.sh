@@ -2509,7 +2509,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
-        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" \
+        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" "$HIT_COURSE/Quiz Wrapped Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Task Loose.md" "$HIT_COURSE/Progress Fixture.md" \
@@ -3619,6 +3619,15 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz One Blank.md").write_text(
     "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
     "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
+# #733: a question long enough to wrap, with a blank on a line after its
+# first, and a short-answer question, for what paper gives a blank: about two
+# lines, the room above it (browser-checks/quiz_check.mjs).
+(course / "Quiz Wrapped Blank.md").write_text(
+    "---\ntitle: Quiz Wrapped Blank\n---\nA blank on paper (plantoir-quiz-wrapped-blank-733).\n\n"
+    "> [!quiz] In a closed system the total mass of the reactants always equals the total mass of the products, "
+    "and chemists call this idea the law of conservation of `____`, which every balanced equation keeps true "
+    "from one side to the other.\n> > [!answer]-\n> > mass\n\n"
+    "> [!quiz] Name the gas that relights a glowing splint.\n> > [!answer]-\n> > oxygen\n", encoding="utf-8")
 (course / "Quiz Read Differently.md").write_text(
     "---\ntitle: Quiz Read Differently\n---\nRead differently by the site (plantoir-quiz-read-differently-644).\n\n"
     "> [!quiz] Which is the right choice?\n> <img alt=\"x>y\" src=\"Media/plantoir-quiz-choice.png\">\n"
@@ -5713,7 +5722,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
   if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
-    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only, every blank on paper drawn and about two lines tall with the room above it (#733) - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
   else
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log

@@ -258,6 +258,17 @@
   }
 }
 
+// The handout's copy draws each blank as a span (print.inline.ts,
+// questionsOnlyQuizzes), which exists only on paper. It gets the same room
+// above it as a blank printed from ⌘P (#733, below). Outside @media print so
+// the print layout, which reads this stylesheet itself, applies it whichever
+// way the handout is laid out.
+.plantoir-quiz .plantoir-quiz-paper-blank {
+  line-height: 1.2;
+  padding-top: 1.6em;
+  vertical-align: baseline;
+}
+
 // On paper (ruling Q8): the question only. Nothing a student did, and no
 // answer, reaches the paper; choices are drawn as empty boxes.
 @media print {
@@ -294,10 +305,28 @@
       flex: none;
     }
 
-    & .plantoir-quiz-blank {
+    // A blank students write on (#733). The line carrying it is about two of
+    // the page's lines tall, and the extra room is ABOVE the blank, the way
+    // the handouts' \fillin strut does it (\rule[-0.2em]{0pt}{2.1em}: 2.1em
+    // at LaTeX's 1.2em leading is 1.75 lines; at this site's 1.6 it is 2.8em,
+    // which is what 1.6em of room over a 1.2em line gives). So a question that
+    // wraps still leaves a full line to write on above the blank. Never hand
+    // spaced: the room comes from the blank itself, on that line only.
+    //
+    // The line is drawn in black, not currentColor: the colour is made
+    // transparent just below so nothing typed reaches the paper, and a
+    // currentColor line went transparent with it - until #733 a blank
+    // printed from ⌘P had no line at all (measured, 2026-11-01).
+    & .plantoir-quiz-blank,
+    & .plantoir-quiz-response .plantoir-quiz-blank {
       min-height: 0;
+      height: auto;
+      font-size: 1em;
+      line-height: 1.2;
+      padding: 1.6em 0.25em 0;
+      vertical-align: baseline;
       border: none;
-      border-bottom: 1px solid currentColor;
+      border-bottom: 1px solid #000;
       border-radius: 0;
       background: none;
       color: transparent !important;

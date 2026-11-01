@@ -31,7 +31,9 @@
 //  8. on paper (print media) nothing a quiz holds back, and no button,
 //     shows, and choices are drawn as empty circles; a printable page's
 //     handout holds a quiz's question and neither its answer nor its
-//     explanation (ruling Q8);
+//     explanation (ruling Q8); on `Quiz Wrapped Blank`, and in that
+//     handout, a blank's line is drawn, about two lines tall with the room
+//     above the blank, and what was typed in it is not printed (#733);
 //  9. live input (#583): served with the isolation headers (the preview's
 //     own rule), code in a choice and in an explanation asks live, and
 //     Return in its answer field ticks nothing, checks nothing and folds
@@ -448,6 +450,24 @@ async function connect(chunk) {
       await evaluate("window.__quiz.type(1, ['Paris']); window.__quiz.press(1, 'check')")
       expect("one blank, right, says right", (await evaluate("window.__quiz.feedback(1)")) === blanksSay(1, 1))
 
+      // 8c. A blank on paper (#733): the line carrying it is about two of the
+      // page's lines tall with the room ABOVE the blank, its line is drawn,
+      // and nothing typed in it reaches the paper - for a blank on a line
+      // after a wrapped question's first, and for a short answer.
+      if (!(await open(base + "/Quiz-Wrapped-Blank.html"))) return finish(1, "FAIL: Quiz Wrapped Blank did not load")
+      await evaluate("window.__quiz.type(1, ['typed-733'])")
+      await send("Emulation.setEmulatedMedia", { media: "print", features: [{ name: "prefers-color-scheme", value: "light" }] })
+      const blanksOnPaper = await evaluate(BLANKS_ON_PAPER)
+      await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "prefers-color-scheme", value: "light" }] })
+      expect("on paper the wrapped question's blank and the short answer's are measured", blanksOnPaper.length === 2, blanksOnPaper)
+      for (const blank of blanksOnPaper) {
+        expect("on paper a blank's line is drawn", blank.lineDrawn, blank)
+        expect("on paper the line carrying a blank is about two lines tall, the room above it", blank.ems >= 2.5 && blank.roomAbove > blank.roomBelow, blank)
+        expect("on paper what was typed in a blank is not printed", blank.inkless, blank)
+      }
+      expect("on paper the wrapped question's blank is on a line after its first, a line and more below the one above it",
+        blanksOnPaper[0]?.linesAbove >= 1 && blanksOnPaper[0]?.pitchInLines >= 1.75, blanksOnPaper[0])
+
       // 6. Five changes of page, then back.
       await open(playground)
       const before = await listenersOn("window")
@@ -558,6 +578,50 @@ async function connect(chunk) {
   }
 }
 
+// Every quiz blank on the page as print media lays it out (#733): its height
+// in ems of its own text, the room above and below its text, whether its line
+// is drawn and its text is not, and - for a blank inside a paragraph - how many
+// lines of the question come before it and how far its line sits below the
+// one above, in the paragraph's lines.
+const BLANKS_ON_PAPER = `(() => {
+  const found = []
+  for (const blank of document.querySelectorAll(".plantoir-quiz input.plantoir-quiz-blank")) {
+    const style = getComputedStyle(blank)
+    const box = blank.getBoundingClientRect()
+    const size = parseFloat(style.fontSize)
+    const entry = {
+      ems: Math.round((box.height / size) * 100) / 100,
+      roomAbove: parseFloat(style.paddingTop), roomBelow: parseFloat(style.paddingBottom),
+      lineDrawn: parseFloat(style.borderBottomWidth) >= 0.5 && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(style.borderBottomColor),
+      inkless: /rgba\\(0, 0, 0, 0\\)|transparent/.test(style.webkitTextFillColor || style.color),
+    }
+    const paragraph = blank.closest("p")
+    if (paragraph) {
+      const bottoms = new Set()
+      const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT)
+      while (walker.nextNode()) {
+        const node = walker.currentNode
+        for (let at = 0; at < node.length; at += 1) {
+          if (/\\s/.test(node.data[at])) continue
+          const range = document.createRange()
+          range.setStart(node, at)
+          range.setEnd(node, at + 1)
+          const rect = range.getBoundingClientRect()
+          if (rect.height > 0) bottoms.add(Math.round(rect.bottom))
+        }
+      }
+      const above = [...bottoms].filter((bottom) => bottom < box.top + 2).sort((a, b) => a - b)
+      const sameLine = [...bottoms].filter((bottom) => bottom >= box.top + 2 && bottom <= box.bottom + 2)
+      const lineHeight = parseFloat(getComputedStyle(paragraph).lineHeight)
+      entry.linesAbove = above.length
+      entry.pitchInLines = above.length > 0 && sameLine.length > 0
+        ? Math.round(((Math.max(...sameLine) - above[above.length - 1]) / lineHeight) * 100) / 100 : null
+    }
+    found.push(entry)
+  }
+  return found
+})()`
+
 // The handout as the page prints it: caught in its frame at the moment it
 // prints, the way print_handout.mjs catches it.
 async function checkHandout(url, pageUrl) {
@@ -588,6 +652,12 @@ async function checkHandout(url, pageUrl) {
       if (node.tagName === "IFRAME") node.contentWindow.print = () => {
         node.contentWindow.dispatchEvent(new Event("beforeprint"))
         window.__handout = node.contentDocument.body.innerText
+        // #733: each blank as the handout prints it, in ems of its own text.
+        window.__handoutBlanks = Array.from(node.contentDocument.querySelectorAll(".plantoir-quiz-paper-blank"), (blank) => {
+          const style = node.contentWindow.getComputedStyle(blank)
+          return { ems: Math.round((blank.getBoundingClientRect().height / parseFloat(style.fontSize)) * 100) / 100,
+            roomAbove: parseFloat(style.paddingTop), roomBelow: parseFloat(style.paddingBottom) }
+        })
         node.contentWindow.dispatchEvent(new Event("afterprint"))
       } } })
       .observe(document, { childList: true, subtree: true })`,
@@ -598,6 +668,7 @@ async function checkHandout(url, pageUrl) {
     await pause(250)
     text = (await evaluate("window.__handout ?? null")) ?? null
   }
+  const blanks = (await evaluate("window.__handoutBlanks ?? []")) ?? []
   socket.close()
   const problems = []
   if (text === null) {
@@ -609,5 +680,11 @@ async function checkHandout(url, pageUrl) {
   if (/printable-explain-7f3a/.test(text)) problems.push("a quiz's explanation is in the handout")
   if (/Show answer|\bCheck\b/.test(text)) problems.push("a quiz's buttons are in the handout: " + JSON.stringify(text.slice(0, 1500)))
   if (!/x\^2 \+ x - 6|x2\+x−6|x\s*2\s*\+\s*x\s*−\s*6/.test(text)) problems.push("the page's own folded answer is missing from the key")
+  if (blanks.length === 0) problems.push("the handout drew no blank for the short-answer quiz")
+  for (const blank of blanks) {
+    if (!(blank.ems >= 2.5 && blank.roomAbove > blank.roomBelow)) {
+      problems.push("a blank in the handout is not about two lines tall with the room above it (#733): " + JSON.stringify(blank))
+    }
+  }
   return problems
 }

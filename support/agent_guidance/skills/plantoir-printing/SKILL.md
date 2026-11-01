@@ -134,12 +134,12 @@ key "3. a) 7x - 2y  b) 7a - 11b".
   underscores, no `\_\_\_`, and no empty lines or `<br>`s typed to leave
   writing room, which print at whatever height the page happens to give
   them. The house rule for paper is that a line carrying a blank is about
-  two lines tall, so a wrapped prompt still leaves a full line to write on;
-  when a sheet needs that room for written answers, make it a PDF handout
-  instead (`plantoir-handouts`, section 4) and hand it out from the page
-  (section 4 below). If the room makes it a page longer, accept it and say
-  so. (Giving a printed quiz blank that room itself is Plantoir's to do, not
-  yours: issue #733.)
+  two lines tall, so a wrapped prompt still leaves a full line to write on,
+  and the site does that itself: a quiz blank prints as a line with the
+  room above it, from Print and from ⌘P alike. When a sheet needs more room
+  than that for written answers, make it a PDF handout instead
+  (`plantoir-handouts`, section 4) and hand it out from the page (section 4
+  below). If the room makes it a page longer, accept it and say so.
 
 ## 4. Handing out a PDF the teacher already has
 
