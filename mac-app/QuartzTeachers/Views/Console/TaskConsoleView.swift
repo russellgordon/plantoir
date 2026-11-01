@@ -73,6 +73,13 @@ struct TaskConsoleView: View {
                 .onChange(of: runner.transcript.lines.count) {
                     proxy.scrollTo("consoleBottom", anchor: .bottom)
                 }
+                // A console that opens on a run already under way, or
+                // finished — a section the teacher came back to (#706) —
+                // opens at its end, where the outcome is; the change above
+                // only fires for lines that arrive while it is showing.
+                .onAppear {
+                    proxy.scrollTo("consoleBottom", anchor: .bottom)
+                }
             }
             .background(.background.secondary)
 

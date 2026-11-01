@@ -515,9 +515,13 @@ third review.** They answer different questions and they are allowed to differ:
   in? Written where a piece of work's folder is DECIDED: `startPreview()`
   beside the lease, and `deployAndWait()` — the latter AFTER any running
   preview has been stopped, so a deploy cannot retarget that preview's own
-  stop. Read by `stopPreview`, `stopPreviewAndWait`, `cancelPreview` and
-  `cancelDeploy`. Nil means there is nothing to stop, and every reader is
-  already guarded by a runner's `isRunning`.
+  stop. Read by `stopPreview`, `stopPreviewAndWait` and `cancelPreview`. Nil
+  means there is nothing to stop, and every reader is already guarded by a
+  runner's `isRunning`. **Since #706 the deploy's folder is ALSO noted on the
+  section's `SectionDeployRun.folder`**, and that is what `cancelDeploy` reads:
+  the view pressing Cancel may be one that came back to the section after the
+  view that started the deploy had gone, and its own note is nil (below, "A
+  section's deploy outlives its view").
 
 One property served both jobs until the third review, and the state that broke
 it is one render pass wide: `chooseWorkspace` clears the selection
@@ -550,6 +554,171 @@ half that is easy to leave out, and leaving it out would be worse than no
 guard: delete a capture and every stop reads a permanently nil property and
 does nothing at all, wearing the shape of the fix working. The behaviour itself
 was verified by reading the teardown path.
+
+## A section's deploy outlives its view (#706)
+
+**The fault.** Russell, 2026-10-29: Deploy on ICS3U section 1, a click on
+section 2, a click back, and section 1 showed "already being deployed …
+Nothing was changed." under both destinations, with "Something went wrong".
+Nothing re-issued the deploy. There are four ways in — the toolbar button,
+Section ▸ Deploy… and ⇧⌘D (`performSiteMenuItem`), the assistant through the
+window (`SectionWindowControllers`' `deploy:` closure) and the assistant with
+no window (`AssistSiteWork.deploy`) — and no `.onAppear` or `.task` calls any
+of them. What happened instead:
+
+1. `MainWindowView` gives the detail view `.id("\(code)-\(sectionNumber)")`,
+   so every selection builds a new `SectionDetailView`.
+2. The deploy runner and `isPreparingDeploy` were that view's `@State`. The
+   `Task` `startDeploy()` began kept the OLD runner alive, so the deploy went
+   on unseen; `onDisappear` stops only the preview.
+3. The view that came back had a fresh runner: a blank console, and Deploy
+   enabled, because the button asked only that runner.
+4. The teacher pressed it (Russell confirmed, 2026-11-01).
+
+**Measured.** A Swift harness using the real `.id` and `@State`, selecting
+1 → 2 → 1: on return, section 1's runner had `isRunning=false lines=0` while
+the orphaned task wrote `lines=5` into another one. Reproduced in the real app
+on 2026-11-01 (Debug build, `--state-dir`, a scratch folder holding EXC2O with
+a folder destination and 3,000 extra pages, so the deploy's build took 32 s):
+on return the window read "No Preview Running" with Deploy enabled. A press
+during the deploy's BUILD leg was worse than the report: it started a second
+`preview.sh --build-only`, and the first deploy's build ended "failed (exit 1)
+after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counts a
+running `deploy.sh`, and the first deploy had not reached it yet. After the
+fix, the same steps showed the live progress with Cancel, Deploy greyed, one
+launcher start in total (the press and ⇧⌘D started nothing), and a deploy
+that finished while the teacher was on section 2 showed "Done" on return.
+
+**The shape.** `Models/SectionRuns.swift`:
+
+- `SectionRuns.shared` is an app-lifetime index of one `SectionDeployRun`
+  per key. The key is `FolderIdentity.canonicalPath` of the folder, the course
+  code lowercased and the section, made canonical when the key is BUILT, so
+  `/var/…` and `/private/var/…` are one run. The index is NOT `@Observable`
+  on purpose: `body` asks for the run, the first ask creates it, and creating
+  into an observed dictionary from `body` would be a state change during a
+  view update. The run itself is observable.
+- `SectionDeployRun` holds the runner, `isPreparing`, the deploy's `folder`,
+  its unsaved-settings sentence (#335), and `findingsAreWaiting` plus an
+  `endings` counter. **It is never replaced**: a running task holds it, and a
+  view that found a new object would watch something nothing writes. A
+  finished run keeps its legs until that section's next deploy starts over
+  the same runner, but it is SHOWN only by the rule in the next bullet. It
+  lives in memory only, until quit. It is not cleared on a change of working
+  folder, because windows each have their own folder and the key already
+  carries it (#706 plan review, M3).
+- The view's `deployRun` is a computed pass-through for `body`, and so are
+  `deployRunner` and `isPreparingDeploy`. **`deployAndWait` and
+  `cancelDeploy` take the run ONCE**, from the folder they have already
+  checked, and use only that object. A computed property is asked again on
+  every read, and `pointAtFolder` can move the window during one of
+  `deployAndWait`'s awaits. Re-keying there would leave the first folder's run
+  "preparing" until quit and drive the second folder's runner (plan review,
+  H1). `run.isPreparing` is cleared by a `defer` on every return.
+- Findings go through the run: `deployAndWait` calls `run.noteEnded()`.
+  Whichever view shows the section takes them, in `.onChange(of:
+  deployRun.endings)` or on appearing. `takeFindings()` reads and clears, so
+  two windows on one section raise the dialog once.
+- `SectionDetailView.deployIsAvailable` and `deployIsUnderWay` add
+  `CourseActivity.sectionPublishIsRunning`. That record is written by the
+  window's deploy (through `claimAPublish`) and by the assistant's windowless
+  deploy, so it covers a deploy the returning view's run cannot see. The
+  button, the Section menu, ⇧⌘D, `deployAndWait`'s first busy check and
+  `deployWillBeRefused` all ask it. The last matters because #475's question
+  must not be asked before a refusal (plan review, M2).
+- **A finished deploy is shown on return only until one view has displayed
+  its ending** (implementation review M1, ruled by the director 2026-11-01 in
+  Russell's absence and flagged for his review). The first build of this fix
+  showed the finished panel on every visit until quit — a red "Something went
+  wrong" included — and a view that came back had a fresh preview runner
+  with no start time (`?? .distantPast`), so an 8 am deploy won
+  `showsDeployProgress` over an 11 am preview of the same section. Now:
+  - `SectionDeployRun.endingShown` records the last ending a view put on
+    screen. `takeWhatTheDeployLeft` sets it, live (`.onChange` of `endings`)
+    or on appearing, whenever the run has ended and is not busy.
+  - On appearing, the view first stores `endingToHideOnAppearing()` in its
+    `@State deployEndingHiddenHere`: the current ending if some view has
+    already shown it. `body` gives the console to the deploy only when
+    `isShown(hidingEnding:)` says so — always while busy (preparing
+    included, so a first-ever deploy now shows "Preparing to deploy…"
+    rather than the placeholder), otherwise only with output, an ending this
+    view did not hide, and no later preview. A NEW ending is a new number, so
+    the next deploy in that same view is shown as ever.
+  - `startPreview` tells the section's run when a preview started
+    (`notePreviewStarted`), and `showsDeployProgress` is given
+    `previewRunner.startedAt ?? deployRun.previewLastStartedAt`, so the
+    preview wins the comparison when it is the more recent run.
+  - Rejected: keeping the panel until the next deploy (the first build, above);
+    forgetting it only when a preview starts (a deploy watched to the end would
+    still come back on every visit). The contract cases
+    `watchedToTheEndThenPreviewed`, `watchedToTheEnd` (no preview: only the
+    shown-once clause makes it false) and
+    `finishedWhileAwayThenPreviewedFromAnotherWindow` (nobody saw the ending:
+    only the later-preview clause makes it false) hold it. The last two were
+    added by the fixes review (L1), which measured that an implementation
+    with EITHER clause alone passed the first. `SectionRunsTests`' source scan
+    also pins `previewRunner.startedAt ?? deployRun.previewLastStartedAt` in
+    `showsDeployProgress` and the `notePreviewStarted` call in `startPreview`
+    (L3), since the model tests recompute the first inline and cannot see the
+    second.
+- `TaskConsoleView` scrolls to its end on appearing, so a returned, finished
+  console opens where the outcome is. That applies to every console, the
+  preview's included, which is harmless: a console that has just appeared has
+  nothing the teacher has scrolled back to.
+
+**What stays per window, and why.** A preview being built is still stopped
+when its section is left. Its port lease, its web view and #232's ⌘Q record
+belong to the window, and a stopped preview comes back idle, never as a
+failure. `deployRefusal` (the alert) stays per view: it is raised before any
+run exists.
+
+**Known limits.**
+- The windowless assistant's deploy runs on `AssistSiteWork`'s own runner, so
+  a section selected meanwhile greys Deploy but shows nothing in the console.
+- Another PROGRAM's deploy (a deploy set for later, an outside assistant, a
+  command line) does not grey the button. Work leases are per course and on
+  disk, and nothing in the app watches them change, so a button greyed from
+  them would stay grey after that program had finished. A press then is
+  refused in words: by `claimAPublish` (`builtElsewhere`) when that program
+  holds leases, or by the launcher when it holds none.
+
+Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
+
+**Rejected.**
+- (a) Only greying Deploy: the console stays blank and Cancel cannot be
+  reached.
+- (b) Dropping `.id`: both apps keep it so that state never leaks between
+  sections (Windows `MainWindow.xaml.cs` `ShowDetailForSelection`).
+- (c) Keeping hidden views alive: each costs a web view, and appearing would
+  stop meaning anything.
+- (d) Cancelling on navigation: it throws away work the teacher asked for.
+- (e) Moving all of `deployAndWait` into the store: a much larger diff for
+  the same behaviour.
+- A trail line on returning: it is navigation. The fix REMOVES lines instead
+  (the second "started deploy.sh" and the launcher's refusal).
+
+**Tests.** `SectionRunsTests`:
+- the store, and `===` across two spellings of one folder;
+- the `CourseActivity` clause;
+- a finished run, and findings taken once;
+- an ending shown once is not shown again, and a later deploy's is;
+- a later preview of the section wins over a finished deploy, even in a view
+  with no preview start of its own;
+- the nine contract cases;
+- a source scan that the view holds no `@State` deploy runner, that nothing
+  on appearing deploys, and that `deployAndWait` names only its captured run.
+
+Must-fail, by copy-and-restore:
+- the store always creating turns three tests red;
+- dropping the `CourseActivity` clause turns two red;
+- the scan over `origin/dev`'s view is red;
+- `isShown` reduced to the first build's rule (busy or any output) turns the
+  two M1 tests and the `watchedToTheEndThenPreviewed` case red; dropping only
+  the shown-once clause, or only the later-preview clause, turns its own test
+  red.
+
+`QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
+a stub `deploy.sh` that counts its own starts. It is part of no gate.
 
 ## One folder, however it is spelled
 

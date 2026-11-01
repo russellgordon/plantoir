@@ -483,7 +483,14 @@ extension SectionDetailView {
         guard let workspaceURL = workspace.workspaceURL else {
             return true
         }
-        if isPreparingDeploy || deployRunner.isRunning {
+        // `deployAndWait`'s own busy check (#706): this section's run, and
+        // any deploy of it this app has under way, from any window or none.
+        let run: SectionDeployRun = SectionRuns.shared.deploy(
+            folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+        )
+        if SectionDetailView.deployIsUnderWay(
+            run: run, folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        ) {
             return true
         }
         if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {

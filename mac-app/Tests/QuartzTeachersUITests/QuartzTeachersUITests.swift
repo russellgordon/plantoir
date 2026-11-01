@@ -752,6 +752,99 @@ final class QuartzTeachersUITests: XCTestCase {
         XCTAssertTrue(application.staticTexts["taskMilestoneLabel"].exists, "Progress should still be shown while publishing")
     }
 
+    /// Coming back to a section whose deploy is still running shows that
+    /// deploy and starts nothing (GitHub #706): the progress is there, Deploy
+    /// is unavailable, and neither selecting the section nor ⇧⌘D runs the
+    /// launcher a second time. The stub counts its own starts in a file
+    /// beside it, which is what `selectingStartsALauncher` and
+    /// `aPressStartsALauncher` in
+    /// `shared-rules.json` → `returningToASectionMidDeploy.cases` describe.
+    func testReturningToASectionMidDeployShowsTheDeploy() throws {
+        let fixtureURL: URL = try FixtureWorkspace.materialize()
+
+        // A built site so the deploy does not rebuild first — the stub
+        // `deploy.sh` is the only launcher this test runs.
+        let publicURL: URL = fixtureURL
+            .appendingPathComponent("courses/EXC2O/.merged_output/section1/public")
+        try FileManager.default.createDirectory(at: publicURL, withIntermediateDirectories: true)
+        try "<html></html>".write(to: publicURL.appendingPathComponent("index.html"), atomically: true, encoding: .utf8)
+
+        let callsURL: URL = fixtureURL.appendingPathComponent("deploy-calls.txt")
+        let stubDeploy: String = """
+        #!/bin/bash
+        echo "$*" >> "$(dirname "$0")/deploy-calls.txt"
+        echo "Getting this folder's website builder ready…"
+        echo "Deploying from local build"
+        sleep 30
+        """
+        let stubURL: URL = fixtureURL.appendingPathComponent("deploy.sh")
+        try stubDeploy.write(to: stubURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubURL.path)
+
+        let application: XCUIApplication = try IsolatedLaunch.launch(workspace: fixtureURL).application
+
+        let courseRow: XCUIElement = application.outlines.staticTexts["EXC2O"]
+        XCTAssertTrue(courseRow.waitForExistence(timeout: 10))
+        courseRow.click()
+        application.typeKey(.rightArrow, modifierFlags: [])
+        let sectionOne: XCUIElement = application.outlines.staticTexts["Section 1"]
+        let sectionTwo: XCUIElement = application.outlines.staticTexts["Section 2"]
+        XCTAssertTrue(sectionOne.waitForExistence(timeout: 10))
+        sectionOne.click()
+
+        application.buttons["deployButton"].click()
+        // #475's question, when the fixture has classes dated after the
+        // next one: keep them all, which deploys straight on.
+        let keepAll: XCUIElement = application.buttons["sectionVerbSheetKeepAll"]
+        if keepAll.waitForExistence(timeout: 3) {
+            keepAll.click()
+        }
+        let milestoneLabel: XCUIElement = application.staticTexts["taskMilestoneLabel"]
+        XCTAssertTrue(milestoneLabel.waitForExistence(timeout: 15), "The deploy should be under way")
+        XCTAssertTrue(waitForLines(in: callsURL, count: 1, timeout: 15), "The stub should have started once")
+
+        sectionTwo.click()
+        XCTAssertTrue(application.buttons["deployButton"].waitForExistence(timeout: 10))
+        sectionOne.click()
+
+        let deployButton: XCUIElement = application.buttons["deployButton"]
+        XCTAssertTrue(deployButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            application.staticTexts["taskMilestoneLabel"].waitForExistence(timeout: 10),
+            "Coming back must show the deploy still running, not a blank console"
+        )
+        XCTAssertFalse(deployButton.isEnabled, "Deploy must be unavailable while the section deploys")
+        saveScreenshot(named: "706-returned-mid-deploy", of: application)
+
+        application.typeKey("d", modifierFlags: [.command, .shift])
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertEqual(linesIn(callsURL), 1, "Neither coming back nor ⇧⌘D may start the launcher again")
+    }
+
+    private func linesIn(_ url: URL) -> Int {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return 0
+        }
+        var count: Int = 0
+        for line in text.split(separator: "\n") {
+            if !line.isEmpty {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    private func waitForLines(in url: URL, count: Int, timeout: TimeInterval) -> Bool {
+        let deadline: Date = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if linesIn(url) >= count {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        return linesIn(url) >= count
+    }
+
     func testCancelRevertsEdits() throws {
         let application: XCUIApplication = try launchApp()
 

@@ -12,22 +12,18 @@ struct SectionDetailView: View {
 
     @State var previewRunner = ScriptRunner()
 
-    /// Runs every configured destination in sequence — see
-    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
-    /// courses (exactly one destination) this behaves exactly like a
-    /// single `ScriptRunner` always did.
-    @State var deployRunner = MultiDestinationDeployRunner()
+    /// The run this view shows while the window has no working folder — a
+    /// moment, not a state anyone deploys from (`deployAndWait` refuses
+    /// without a folder). Every real deploy lives in `SectionRuns` (#706);
+    /// see `deployRun`.
+    @State var deployRunWithNoFolder: SectionDeployRun = SectionDeployRun()
 
-    /// True from the moment Deploy is pressed until `deployRunner` actually
-    /// starts running — the span spent stopping any preview and doing the
-    /// pre-flight checks below, before there is any real progress to show.
-    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
-    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
-    /// that has nothing to say yet — a fresh, idle runner renders as
-    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
-    /// runner still holding last time's finished outcome is no better,
-    /// since neither is what is actually happening right now.
-    @State var isPreparingDeploy: Bool = false
+    /// The section deploy's ending this view keeps off its console: set on
+    /// appearing when some view has already shown that ending (#706 review,
+    /// M1), so a finished deploy is shown on return only until one view has
+    /// displayed it. A later ending is a different number, so the next
+    /// deploy is shown as ever.
+    @State var deployEndingHiddenHere: Int? = nil
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
@@ -307,6 +303,46 @@ struct SectionDetailView: View {
         return previewRunner.isRunning || deployRunner.isRunning
     }
 
+    /// This section's deploy, as the app holds it for the life of the app
+    /// rather than for the life of this view (#706): the view is rebuilt on
+    /// every selection, and a deploy outlives it. A view that comes back to
+    /// the section finds the same object the deploy is still writing.
+    ///
+    /// For `body` only. Anything that AWAITS — `deployAndWait`,
+    /// `cancelDeploy` — takes the run once, from the folder it has already
+    /// checked, and keeps that object: this property is asked again on
+    /// every read, and a window pointed at another folder mid-deploy would
+    /// otherwise hand the second half of a deploy a different run (#706
+    /// plan review, H1).
+    var deployRun: SectionDeployRun {
+        guard let folder = workspace.workspaceURL else {
+            return deployRunWithNoFolder
+        }
+        return SectionRuns.shared.deploy(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    /// Runs every configured destination in sequence — see
+    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
+    /// courses (exactly one destination) this behaves exactly like a
+    /// single `ScriptRunner` always did. Read through `deployRun`, so it is
+    /// the section's runner, not this view's.
+    var deployRunner: MultiDestinationDeployRunner {
+        return deployRun.runner
+    }
+
+    /// True from the moment Deploy is pressed until `deployRunner` actually
+    /// starts running — the span spent stopping any preview and doing the
+    /// pre-flight checks below, before there is any real progress to show.
+    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
+    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
+    /// that has nothing to say yet — a fresh, idle runner renders as
+    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
+    /// runner still holding last time's finished outcome is no better,
+    /// since neither is what is actually happening right now.
+    var isPreparingDeploy: Bool {
+        return deployRun.isPreparing
+    }
+
     /// Whether Option re-titles THIS window's Preview button (#504): only
     /// while the window is key. `controlActiveState` is read first, so a
     /// window that is not key never reads the watcher and is not redrawn as
@@ -335,7 +371,59 @@ struct SectionDetailView: View {
     /// The Deploy button's enablement — read by the button and by Section ▸
     /// Deploy… alike (#457). See the button for each clause's reason.
     var deployButtonIsEnabled: Bool {
-        return !(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+        return SectionDetailView.deployIsAvailable(
+            run: deployRun,
+            folderPath: workspace.workspaceURL?.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            isBeingCopied: workspace.isBeingCopied(course.code),
+            folderIsGettingReady: workspace.folderIsGettingReady
+        )
+    }
+
+    /// Whether Deploy may be pressed for a section (#706) — the button,
+    /// Section ▸ Deploy… and ⇧⌘D all ask this, and `deployAndWait` and
+    /// `deployWillBeRefused` ask its first half, `deployIsUnderWay`.
+    ///
+    /// Not while a copy of the course is being zipped (#351): a removal
+    /// waiting on that zip deletes what this would publish. Not while the
+    /// folder's tools are still being copied (#476).
+    static func deployIsAvailable(
+        run: SectionDeployRun,
+        folderPath: String?,
+        courseCode: String,
+        sectionNumber: Int,
+        isBeingCopied: Bool,
+        folderIsGettingReady: Bool
+    ) -> Bool {
+        if deployIsUnderWay(run: run, folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber) {
+            return false
+        }
+        return !(isBeingCopied || folderIsGettingReady)
+    }
+
+    /// Whether this app is deploying the section already (#706): its run is
+    /// preparing or running, or — from any window, or the assistant with no
+    /// window at all — `CourseActivity` has the section publishing. The
+    /// second clause is what a view that came back to the section cannot
+    /// see in its run when the deploy was started by somebody else in this
+    /// app. Another PROGRAM's deploy is not asked here: see
+    /// `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
+    static func deployIsUnderWay(
+        run: SectionDeployRun,
+        folderPath: String?,
+        courseCode: String,
+        sectionNumber: Int
+    ) -> Bool {
+        if run.isPreparing || run.runner.isRunning {
+            return true
+        }
+        guard let folderPath else {
+            return false
+        }
+        return CourseActivity.sectionPublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
     }
 
     // MARK: - Body
@@ -380,7 +468,7 @@ struct SectionDetailView: View {
                 // which is what dragged the progress header under the
                 // window's toolbar when a preview was restarted.
                 VStack(spacing: 0) {
-                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRun.isShown(hidingEnding: deployEndingHiddenHere) {
                         consoleArea
                     } else {
                         // Fills the height it is offered, which is what keeps
@@ -612,6 +700,12 @@ struct SectionDetailView: View {
             // job, above. The trail line belongs to the run, not to either of
             // these reads.
             loadStoppedScheduledPublish()
+            // A deploy of this section that outlived the view before this one
+            // (#706): what it left for whoever shows the section next. An
+            // ending some view has already shown is kept off this console
+            // first (#706 review, M1), before this view counts as showing it.
+            deployEndingHiddenHere = deployRun.endingToHideOnAppearing()
+            takeWhatTheDeployLeft(onAppearing: true)
             guard let folder = workspace.workspaceURL else {
                 return
             }
@@ -862,6 +956,35 @@ struct SectionDetailView: View {
             if isGone {
                 showAVerbResultIfWaiting()
             }
+        }
+        // A deploy of this section ended — started here, or by a view of it
+        // that has since gone (#706).
+        .onChange(of: deployRun.endings) { _, _ in
+            takeWhatTheDeployLeft(onAppearing: false)
+        }
+    }
+
+    /// Takes what this section's deploy left for the view showing it
+    /// (#706): its folder problems once it has ended, and — on appearing,
+    /// while it still runs — the sentence it said about unsaved settings.
+    ///
+    /// The findings are TAKEN, read and cleared on the run, so exactly one
+    /// view raises the dialog: the one showing the section when the deploy
+    /// ended, or else the next one to appear. Two windows on one section
+    /// would otherwise both raise it (#706 plan review, L5).
+    func takeWhatTheDeployLeft(onAppearing: Bool) {
+        let run: SectionDeployRun = deployRun
+        if onAppearing, run.isBusy, unsavedSettingsNotice == nil, let notice = run.unsavedSettingsNotice {
+            unsavedSettingsNotice = notice
+            unsavedSettingsNoticeOwner = .deploy
+        }
+        if run.takeFindings() {
+            showHealthFindings(from: run.runner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        }
+        // This view is showing how it ended — live, or on appearing — so the
+        // next view to come to the section shows its ordinary state.
+        if !run.isBusy && run.endings > 0 {
+            run.noteEndingShown()
         }
     }
 
@@ -1645,7 +1768,7 @@ struct SectionDetailView: View {
         return SectionDetailView.showsDeployProgress(
             previewIsRunning: previewRunner.isRunning,
             deployIsRunning: deployRunner.isRunning,
-            previewStartedAt: previewRunner.startedAt,
+            previewStartedAt: previewRunner.startedAt ?? deployRun.previewLastStartedAt,
             deployStartedAt: deployRunner.startedAt
         )
     }
@@ -1966,6 +2089,14 @@ struct SectionDetailView: View {
                 arguments: [course.code, String(sectionNumber), "--port", String(lease.port)],
                 workingDirectory: workspaceURL
             )
+            // Said to the section's run, so a view that comes back later
+            // knows this preview is newer than the last deploy (#706 review,
+            // M1): its own preview runner will have no start time at all.
+            if let previewStartedAt = previewRunner.startedAt {
+                SectionRuns.shared.deploy(
+                    folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+                ).notePreviewStarted(at: previewStartedAt)
+            }
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas, startRequest: request)
 
             // A second chance, for the ordinary case where the wait finished
@@ -2042,15 +2173,21 @@ struct SectionDetailView: View {
     }
 
     /// Cancels the running deploy from the progress view.
+    ///
+    /// Against the folder the DEPLOY noted (`SectionDeployRun.folder`), not
+    /// this view's note: the view pressing Cancel may be one that came back
+    /// to the section after the view that started the deploy had gone
+    /// (#706), and it never noted anything.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
+        let run: SectionDeployRun = deployRun
+        if run.runner.isRunning, let workspaceURL = run.folder {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL
             )
         }
-        deployRunner.cancel()
+        run.runner.cancel()
     }
 
     /// Hands the port back, whatever ended the preview.
@@ -2240,12 +2377,26 @@ struct SectionDetailView: View {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
-        // The toolbar button disables itself on `isPreparingDeploy`, but the
-        // assistant reaches this function directly, with no button to have
-        // disabled — guard here too, or two overlapping deploys can run at
-        // once and stomp on `deployRunner`'s shared state (legs, startedAt)
-        // as each writes over the other's.
-        if isPreparingDeploy || deployRunner.isRunning {
+        // The section's run, taken ONCE from the folder just checked, and the
+        // only one this function touches from here on (#706 plan review, H1):
+        // `deployRun` is asked again on every read, and a window pointed at
+        // another folder during one of the awaits below would hand the rest
+        // of this deploy a different section's run.
+        let run: SectionDeployRun = SectionRuns.shared.deploy(
+            folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+        )
+        // The toolbar button disables itself while the section deploys, but
+        // the assistant reaches this function directly, with no button to
+        // have disabled — guard here too, or two overlapping deploys can run
+        // at once and stomp on the runner's shared state (legs, startedAt) as
+        // each writes over the other's. `deployIsUnderWay` also asks
+        // `CourseActivity`, so a deploy of this section started from a view
+        // that has since gone, another window, or the assistant with no
+        // window is refused in words here rather than reaching the launcher
+        // (#706).
+        if SectionDetailView.deployIsUnderWay(
+            run: run, folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        ) {
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -2330,22 +2481,31 @@ struct SectionDetailView: View {
 
         // Claim the console for the deploy panel before touching the preview
         // runner below. Stopping a running preview here sets its own
-        // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
+        // `wasStoppedByUser`, which — until `run.runner.run()` gives this a
         // real timestamp a little further down — left `showsDeployProgress`
         // comparing stale timestamps and picking the just-stopped preview
         // panel, flashing "Stopped" for a beat before the deploy panel took
         // over. Marking the deploy as started immediately keeps the console
         // on the deploy panel through that whole window.
         //
-        // `isPreparingDeploy` covers what that timestamp alone does not:
-        // `deployRunner.legs` still holds the PREVIOUS deploy's runners
+        // `run.isPreparing` covers what that timestamp alone does not:
+        // `run.runner.legs` still holds the PREVIOUS deploy's runners
         // (finished, one way or another) until `run()` replaces them with
         // fresh ones a little further down, and `consoleArea` must not show
         // either that stale outcome or the flat-out blank a fresh, unstarted
         // runner renders as — neither is what is actually happening right
         // now, which is: getting ready to deploy.
-        deployRunner.startedAt = Date()
-        isPreparingDeploy = true
+        run.runner.startedAt = Date()
+        run.isPreparing = true
+        // Cleared on EVERY way out, not only the two this function names
+        // below: nothing else resets it now that the run outlives the view
+        // (#706 plan review, L5), and one left true would hold the section's
+        // Deploy unavailable until quit.
+        defer {
+            run.isPreparing = false
+        }
+        // What the previous deploy left and nobody took is about that deploy.
+        run.findingsAreWaiting = false
 
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
@@ -2364,6 +2524,7 @@ struct SectionDetailView: View {
         // still see why — and the next preview or deploy replaces it.
         unsavedSettingsNotice = uses.notice
         unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy
+        run.unsavedSettingsNotice = uses.notice
         if uses.notice != nil {
             SettingsSaveNotice.noteDeployUsedTheSavedSettings(
                 act: pressedByTheAssistant
@@ -2385,12 +2546,12 @@ struct SectionDetailView: View {
         // two lines up, at whatever the window happens to show now.
         // `cancelDeploy()` reclaims the container-side build against it.
         folderThisSectionWorksIn = workspaceURL
+        run.folder = workspaceURL
 
         // What the Deploy button's `disabled` says, said in words. The
         // assistant reaches this by pressing the button while a deploy is
         // already running in this window.
-        if deployRunner.isRunning {
-            isPreparingDeploy = false
+        if run.runner.isRunning {
             return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -2401,16 +2562,16 @@ struct SectionDetailView: View {
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: saved, sectionNumber: sectionNumber)
 
-        // The real progress panel takes over from here — `deployRunner.run()`
-        // is about to give `deployRunner.legs` fresh runners of its own and
-        // start reporting real progress on them.
-        isPreparingDeploy = false
+        // The real progress panel takes over from here — `run.runner.run()`
+        // is about to give its legs fresh runners of their own and start
+        // reporting real progress on them.
+        run.isPreparing = false
 
         // What the launcher is asked to do, for each destination, is
         // decided in one place — shared with the scheduled deploy and the
         // assistant's headless path, so an alarm set for half six sends
         // the site to the same destinations this button does.
-        await deployRunner.run(
+        await run.runner.run(
             course: saved,
             sectionNumber: sectionNumber,
             destinations: destinations,
@@ -2427,14 +2588,16 @@ struct SectionDetailView: View {
         // (#439) is said as itself, not as "could not be built" — the shared
         // answer, which the windowless assistant asks too, decides which.
         if let buildAnswer = MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish(
-            course: course.code, section: String(sectionNumber), firstLeg: deployRunner.legs.first
+            course: course.code, section: String(sectionNumber), firstLeg: run.runner.legs.first
         ) {
             // Show the folder problems HERE too. A build that failed because
             // the curriculum folder or Media is missing is the case where the
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
-            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+            // Through the run (#706): the view that pressed Deploy may have
+            // gone, and whichever view shows the section takes them.
+            run.noteEnded()
             return said(buildAnswer)
         }
 
@@ -2442,13 +2605,14 @@ struct SectionDetailView: View {
         // paths above, so a deploy that did not publish is not headlined by a
         // folder warning. Taken from the FIRST leg: every destination publishes
         // the same built site, so a second leg only repeats the findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        // Handed over through the run, as above (#706).
+        run.noteEnded()
 
         return said(MultiDestinationDeployRunner.result(
             course: course.code,
             section: String(sectionNumber),
             destinationCount: destinations.count,
-            outcome: deployRunner.outcome
+            outcome: run.runner.outcome
         ))
     }
 
