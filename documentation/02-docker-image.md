@@ -1082,7 +1082,9 @@ retries), and only then. One more exposure fact, not this piece's to fix: the
 preview ports are published on every interface (`lsof` shows `TCP *:8133` and
 others held by Colima's forwarder), so the accepted ws and serve-handler
 denials of service are reachable from the school network while a preview
-runs.
+runs. *(Closed by GitHub #684 in v1.9.1: every address is published on
+127.0.0.1 now, so they are reachable from this Mac only —
+[03](03-launcher-scripts.md) → "Every preview address is this Mac's own".)*
 
 **Revisited at every cut** (RELEASING.md step 2). Read verify.sh's npm-audit
 line; a SKIP means it was not checked, so run it again online. Then run

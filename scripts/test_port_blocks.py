@@ -141,7 +141,7 @@ case "$1" in
     cat "$FAKE/context" 2>/dev/null || echo "colima"
     exit 0 ;;
   port)
-    if [ -f "$FAKE/remade" ]; then echo "0.0.0.0:$(cat "$FAKE/port_after")"; else echo "0.0.0.0:$(cat "$FAKE/port" 2>/dev/null || echo 8081)"; fi
+    if [ -f "$FAKE/remade" ]; then echo "127.0.0.1:$(cat "$FAKE/port_after")"; else echo "127.0.0.1:$(cat "$FAKE/port" 2>/dev/null || echo 8081)"; fi
     exit 0 ;;
   ps)
     if [ "${2:-}" = "-a" ]; then cat "$FAKE/workspaces" 2>/dev/null; else cat "$FAKE/running" 2>/dev/null; fi
@@ -158,6 +158,11 @@ case "$1" in
         line=$(awk -v x="$4" '$1 == x || $2 == x { print $2; exit }' "$FAKE/ids" 2>/dev/null)
         if [ -z "$line" ]; then echo "Error: No such object: $4" >&2; exit 1; fi
         cat "$FAKE/state" 2>/dev/null || echo "true 100"
+        exit 0 ;;
+      "{{range \$p, \$b := .HostConfig.PortBindings}}{{range \$b}}[{{.HostIp}}]{{end}}{{end}}")
+        # $FAKE/host_addresses is what the workspace's bindings read as (#684).
+        if [ -f "$FAKE/inspect_fails" ]; then echo "Error: No such object: $4" >&2; exit 1; fi
+        cat "$FAKE/host_addresses" 2>/dev/null
         exit 0 ;;
     esac
     shift 3
@@ -384,9 +389,11 @@ def published_bases(calls: list) -> list:
     bases = []
     for call in calls:
         if call.startswith("docker run "):
-            match = re.search(r"-p (\d+)-(\d+):8081-8084 -p (\d+)-(\d+):9081-9084", call)
+            # Every address on 127.0.0.1, this Mac's own (#684): a workspace
+            # made any other way is a failure of every test that makes one.
+            match = re.search(r"-p 127\.0\.0\.1:(\d+)-(\d+):8081-8084 -p 127\.0\.0\.1:(\d+)-(\d+):9081-9084", call)
             if match is None:
-                raise AssertionError("a workspace was made without the eight addresses: " + call)
+                raise AssertionError("a workspace was made without the eight addresses on this Mac only: " + call)
             bases.append(int(match.group(1)))
     return bases
 
@@ -1068,6 +1075,28 @@ LOOKS = {
 }
 
 
+def remade_trail_entry() -> dict:
+    rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+    for entry in rules["activityTrail"]["mustRecord"]:
+        if entry["event"] == "folder set up again":
+            return entry
+    raise AssertionError("the contract has no 'folder set up again' event (#684)")
+
+
+def remade_trail_words() -> dict:
+    return remade_trail_entry()["whyWords"]
+
+
+def remade_marker(launcher: str, because: str) -> str:
+    """The line the app reads onto the trail (#684): prefix, reason, place."""
+    return f"{remade_trail_entry()['marker']['prefix']} {because} {place_of(launcher)}"
+
+
+def remade_markers(result: subprocess.CompletedProcess) -> list:
+    prefix = remade_trail_entry()["marker"]["prefix"]
+    return [line for line in result.stdout.decode("utf-8").splitlines() if line.startswith(prefix)]
+
+
 def place_of(launcher: str) -> str:
     return "setup" if launcher == "setup.sh" else "ICS4U/2"
 
@@ -1154,13 +1183,36 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
 
     def test_every_remake_reason_calls_the_block(self):
         # preview.sh's sixth is #310's: an announced address that turned
-        # out to be another account's.
-        expected = {"setup.sh": 8, "preview.sh": 6, "deploy.sh": 7}
+        # out to be another account's. #684 added one each to setup.sh and
+        # preview.sh (previews open to the network), and gave every call
+        # its reason, which must be one the trail has words for.
+        expected = {"setup.sh": 9, "preview.sh": 7, "deploy.sh": 7}
+        words = remade_trail_words()
         for launcher, count in expected.items():
             text = launcher_text(launcher)
             outside = text.replace(between(text, BLOCK_START, BLOCK_END), "")
             with self.subTest(launcher=launcher):
-                self.assertEqual(len(re.findall(r"^\s*remake_the_workspace$", outside, flags=re.MULTILINE)), count)
+                self.assertEqual(re.findall(r"^\s*remake_the_workspace$", outside, flags=re.MULTILINE), [],
+                                 "a remake with no reason leaves a trail line that does not say why")
+                reasons = re.findall(r"^\s*remake_the_workspace (\w+)$", outside, flags=re.MULTILINE)
+                self.assertEqual(len(reasons), count)
+                for reason in reasons:
+                    self.assertIn(reason, words, f"{launcher} remakes for a reason the trail has no words for")
+
+    def test_the_new_check_is_where_the_contract_says(self):
+        """#684: setup.sh and preview.sh remake a workspace whose addresses
+        are open to the network; deploy.sh never does (bindsTo.how)."""
+        again = in_use_rules()["sentences"]["whenItNeedsSettingUpAgain"]["forThisMacOnly"]
+        for launcher in LAUNCHERS:
+            text = launcher_text(launcher)
+            outside = text.replace(between(text, BLOCK_START, BLOCK_END), "")
+            with self.subTest(launcher=launcher):
+                if launcher == "deploy.sh":
+                    self.assertNotIn("every_published_address_is_this_macs_only", outside)
+                    self.assertNotIn(again, text)
+                else:
+                    self.assertIn("  elif ! every_published_address_is_this_macs_only; then", outside)
+                    self.assertIn(f'echo "{again}"\n    remake_the_workspace thisMacOnly\n', outside)
 
     def test_the_numbers_are_the_contracts(self):
         waiting = in_use_rules()["waiting"]
@@ -1190,8 +1242,8 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
         """#378: 'Your workspace was built from an older version…' and its
         siblings, in every launcher that says them."""
         again = in_use_rules()["sentences"]["whenItNeedsSettingUpAgain"]
-        says = {"setup.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews"],
-                "preview.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews"],
+        says = {"setup.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews", "forThisMacOnly"],
+                "preview.sh": ["afterAnUpdate", "forBuiltWebsitesOutside", "forSeveralPreviews", "forThisMacOnly"],
                 "deploy.sh": ["forBuiltWebsitesOutside"]}
         for launcher, keys in says.items():
             text = launcher_text(launcher)
@@ -1444,7 +1496,7 @@ class WhatCountsAsRunning(unittest.TestCase):
 @unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
 class TheRemake(unittest.TestCase):
 
-    def remake(self, launcher: str, looks: list, setup=None) -> tuple:
+    def remake(self, launcher: str, looks: list, setup=None, because: str = "update") -> tuple:
         with tempfile.TemporaryDirectory() as scratch:
             pretend = AWorkspaceInUse(Path(scratch))
             pretend.exists({CONTAINER: OLD_ID})
@@ -1455,7 +1507,7 @@ class TheRemake(unittest.TestCase):
             pretend.launchers([ITS_LAUNCHER, THE_PUBLISHES_LAUNCHER, THE_BUILDS_LAUNCHER])
             if setup is not None:
                 setup(pretend)
-            result, calls = pretend.run(launcher, 'remake_the_workspace; echo "CARRIED ON"')
+            result, calls = pretend.run(launcher, f'remake_the_workspace {because}; echo "CARRIED ON"')
             return result, calls
 
     def said(self, result: subprocess.CompletedProcess) -> list:
@@ -1498,6 +1550,13 @@ class TheRemake(unittest.TestCase):
                         self.assertEqual(stopped_markers, [], said)
                         self.assertFalse([line for line in said if line.startswith("🧹")], said)
                     markers = [line for line in said if line.startswith(prefix)]
+                    if case["expect"] == "remade":
+                        self.assertEqual(remade_markers(result), [remade_marker(launcher, "update")], said)
+                        # Only once the new workspace exists (#684).
+                        self.assertLess(said.index(remade_marker(launcher, "update")), said.index("CARRIED ON"))
+                    else:
+                        # #94 refused it, so nothing was set up again (#684).
+                        self.assertEqual(remade_markers(result), [], said)
                     if case["expect"] == "remade":
                         self.assertEqual(result.returncode, 0, output_of(result))
                         self.assertIn("CARRIED ON", said)
@@ -1560,6 +1619,33 @@ class TheRemake(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertEqual(engine_calls(calls, "top") + engine_calls(calls, "rm"), [])
                 self.assertEqual(len(engine_calls(calls, "run")), 1)
+                # Still a remake a teacher pays for, so still on the trail (#684).
+                self.assertEqual(remade_markers(result), [remade_marker(launcher, "update")])
+
+    def test_every_reason_reaches_the_app_in_the_contracts_shape(self):
+        """#684: the marker carries the reason word and the place; the words
+        themselves are the app's (FolderSetUpAgainReport). A remake called
+        with no reason still says it happened, as 'unknown'."""
+        for launcher in LAUNCHERS:
+            for because in list(remade_trail_words()) + [""]:
+                with self.subTest(launcher=launcher, because=because):
+                    result, calls = self.remake(launcher, ["nothing"], because=because)
+                    self.assertEqual(result.returncode, 0, output_of(result))
+                    self.assertEqual(remade_markers(result), [remade_marker(launcher, because or "unknown")])
+
+    def test_a_course_with_a_space_is_one_word_on_the_marker(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            mac = PretendMac(Path(scratch))
+            result = mac.run("preview.sh", 'WORKSPACE_TRAIL_PLACE="AP CALC/2"; note_that_this_folder_was_set_up_again buildsOutside')
+            self.assertEqual(result.stdout.decode("utf-8").splitlines(), [remade_trail_entry()["marker"]["examples"][2]])
+
+    def test_the_trail_words_name_no_machinery(self):
+        line = remade_trail_entry()["line"]
+        for because, words in remade_trail_words().items():
+            found = set(re.findall(r"[a-z]+", (line + " " + words).lower()))
+            for forbidden in ["docker", "container", "port", "ports", "toolchain", "script", "localhost",
+                              "workspace", "launcher", "image"]:
+                self.assertNotIn(forbidden, found, because)
 
     def test_one_already_removed_by_another_launcher_is_no_failure(self):
         """The id is gone: another launcher removed it first. Its new
@@ -1864,6 +1950,65 @@ class TheBuildersOwnWalk(unittest.TestCase):
         self.assertEqual(self.build_site.first_free_preview_port(8083, is_free), 8473)
         busy.add(8473)
         self.assertEqual(self.build_site.first_free_preview_port(8083, is_free), 8083)
+
+
+# ======================================================================
+# #684: every address on this Mac only, and a workspace made before it
+# made again once.
+# ======================================================================
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class TheAddressesAreThisMacsOnly(unittest.TestCase):
+
+    def answer(self, launcher: str, host_addresses, fails: bool = False) -> int:
+        with tempfile.TemporaryDirectory() as scratch:
+            mac = PretendMac(Path(scratch))
+            if host_addresses is not None:
+                mac.flag("host_addresses", host_addresses)
+            if fails:
+                mac.flag("inspect_fails")
+            result = mac.run(launcher, "if every_published_address_is_this_macs_only; then echo MINE; else echo OPEN; fi")
+            said = result.stdout.decode("utf-8").split()
+            self.assertEqual(result.returncode, 0, output_of(result))
+            return said[-1]
+
+    def test_the_workspaces_this_check_meets(self):
+        """What `docker inspect` answers through the bracket template,
+        measured: a workspace made before #684 reads [] eight times, one
+        made after it [127.0.0.1] eight times."""
+        cases = [
+            ("made before #684", "[]" * 8 + "\n", "OPEN"),
+            ("made after #684", "[127.0.0.1]" * 8 + "\n", "MINE"),
+            ("only the site addresses moved", "[127.0.0.1]" * 4 + "[]" * 4 + "\n", "OPEN"),
+            ("every interface spelled out", "[0.0.0.0]" * 8 + "\n", "OPEN"),
+            ("an address that only starts the same", "[127.0.0.12]" * 8 + "\n", "OPEN"),
+            ("no bindings at all", "\n", "OPEN"),
+            ("no answer", None, "OPEN"),
+        ]
+        for launcher in LAUNCHERS:
+            for name, host_addresses, expected in cases:
+                with self.subTest(launcher=launcher, case=name):
+                    self.assertEqual(self.answer(launcher, host_addresses), expected)
+            with self.subTest(launcher=launcher, case="inspect refused"):
+                self.assertEqual(self.answer(launcher, "[127.0.0.1]" * 8, fails=True), "OPEN")
+
+    def test_the_contract_names_the_address_the_launchers_use(self):
+        binds = the_rules()["bindsTo"]
+        self.assertEqual(binds["address"], "127.0.0.1")
+        for launcher in LAUNCHERS:
+            create = function_named(between(launcher_text(launcher), BLOCK_START, BLOCK_END),
+                                    "create_the_workspace_on_free_ports")
+            with self.subTest(launcher=launcher):
+                published = re.findall(r'-p "([^"]*)"', create)
+                self.assertEqual(len(published), 2, published)
+                for value in published:
+                    self.assertTrue(value.startswith(binds["address"] + ":"), value)
+
+    def test_the_sentence_names_no_machinery(self):
+        line = in_use_rules()["sentences"]["whenItNeedsSettingUpAgain"]["forThisMacOnly"]
+        words = set(re.findall(r"[a-z]+", line.lower()))
+        for forbidden in ["docker", "container", "port", "ports", "localhost", "address", "addresses",
+                          "interface", "network", "workspace", "loopback"]:
+            self.assertNotIn(forbidden, words, line)
 
 
 if __name__ == "__main__":

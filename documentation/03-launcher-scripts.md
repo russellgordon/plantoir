@@ -474,6 +474,93 @@ Three layers now, each closing a hole the others cannot:
 - **No ceiling** — the refusal would be unreachable and untestable, and past
   block 99 the site ports sit on the first block's websockets.
 
+### Every preview address is this Mac's own (GitHub #684)
+
+Found by #667's audit, decided by Russell on 2026-10-31: **localhost only**.
+Until v1.9.1 the launchers published `-p <base>-<base+3>:8081-8084` with no
+host address, which Docker reads as every interface, so a running preview and
+its live-reload connection answered anyone on the same network — and two of
+the preview-only packages the audit accepted (serve-handler, ws) carry
+denial-of-service advisories. Both `-p` values now start `127.0.0.1:`, in
+`create_the_workspace_on_free_ports` inside the PREVIEW PORT BLOCK, so the
+three launchers make a workspace the same way and cannot remake it away from
+each other. The rule is `contracts/app-rules.json` → `previewPorts.bindsTo`.
+
+**Measured** (2026-11-01, Colima's ssh forwarder, two throwaway workspaces
+side by side, the Mac at 192.168.1.124 on Wi-Fi):
+
+| | Published `127.0.0.1:8301…` | Published the old way, `8311…` |
+|---|---|---|
+| `lsof -nP -iTCP -sTCP:LISTEN` | `ssh 127.0.0.1:8301`, `ssh 127.0.0.1:9301` | `ssh *:8311`, `ssh *:9311` |
+| `docker inspect`, `[{{.HostIp}}]` per binding | `[127.0.0.1]` × 8 | `[]` × 8 |
+| `docker port … 8081/tcp` | `127.0.0.1:8301` | `0.0.0.0:8311`, `[::]:8311` |
+| `curl` to 127.0.0.1 and to localhost, site and websocket | 200 | 200 |
+| `curl` to the Mac's network address | refused (exit 7) | **200** |
+| `curl` to `[::1]` | refused | refused — nothing ever listened there |
+
+A block another workspace holds is refused in both directions as `Bind for
+127.0.0.1:<port> failed: port is already allocated`, which
+`it_was_a_port_clash` already reads; `preview.sh`'s announcement keeps the
+text after the last colon of `docker port`, so it reads the new answer
+unchanged. Nothing a teacher uses connects from anywhere else: the preview
+pane opens `http://localhost:<port>/`, Safari is handed `127.0.0.1`, #234's
+reach check curls `127.0.0.1`, and the live-reload client is `ws://localhost:`.
+
+**An existing workspace is made again once.** A published address cannot be
+changed afterwards, so `setup.sh` and `preview.sh` gained one more remake
+reason, after the 9084 check: `every_published_address_is_this_macs_only`
+reads every binding through `{{range $p, $b := .HostConfig.PortBindings}}
+{{range $b}}[{{.HostIp}}]{{end}}{{end}}` and passes only when the answer is
+non-empty and nothing is left once every `[127.0.0.1]` is removed. **The
+brackets are the point**: an old workspace's host address is EMPTY, so a
+check that every listed word is `127.0.0.1` passes it by finding no words.
+The console says `whenItNeedsSettingUpAgain.forThisMacOnly`, and the remake
+goes through `remake_the_workspace`, so #94's wait and its "preview … is
+still open" refusal apply; the check is stateless, so a refused remake is
+simply done by the next preview. **In v1.9.1 this fires on its own almost
+never**: the image changed in the same release, so the update's remake comes
+first in the chain and already makes the workspace the new way. It is the
+safety net for a workspace the image check passed. `verify.sh` 6c2 plants a
+workspace whose only fault is open addresses and checks the sentence, the
+bindings, the marker and `lsof`.
+
+**Every remake now leaves a trail line, with its reason** (the director's
+ruling on #684's plan review): until then only a WAIT before a remake reached
+the trail, so the commonest remake — after an update, which makes the next
+preview about two minutes slower — left nothing. Each caller passes one word
+(`update`, `thisMacOnly`, `buildsOutside`, `addressTaken` …); once the new
+workspace exists the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
+<place>`, and the app writes `folder set up again` from it
+(`FolderSetUpAgainReport`, in `ScriptRunner` and `ScheduledDeploy`). A
+remake #94 refused prints nothing. The words live in the contract's
+`whyWords`; a reason the app does not know writes the line without one.
+
+**What was rejected, and why:**
+
+- **Leaving the preview open on purpose, for an iPad or a phone on the same
+  Wi-Fi.** Nobody was found relying on it. If it is ever wanted it needs a
+  setting a teacher turns on and a trail line, not a default.
+- **Binding Colima's forwarder or Lima's `hostIP` instead.** Colima is shared
+  with other projects on this Mac (CLAUDE.md rule 7), and it would not cover
+  Docker Desktop.
+- **Serving Quartz on 127.0.0.1 inside the workspace.** Docker's forward
+  connects to the workspace's own address, so the preview would not answer at
+  all — the reason Windows' loopback rewrite is native-only.
+- **Remaking in `deploy.sh` too.** It serves nothing, so an open address costs
+  it nothing, and a publish at six in the morning keeps its warm builder.
+- **The launcher writing the remake line itself, under `workspace was in
+  use`** (the plan's first proposal, as for #310 below): that event's lines
+  come from its own marker and say a remake with nothing running writes
+  nothing, and a new event written only by a launcher would have no app call
+  site (`ActivityTrailWiringTests`). The remakes got their own mac-only event,
+  read from a marker like every other.
+
+**Windows** already binds its native preview to `127.0.0.1`
+(`windows-app/Vendor/fetch-runtime.ps1`, commit 2d32ca9e5, 2026-08-19, which
+rewrites both of Quartz's bind sites in `handlers.js`). Its guard passes when
+only ONE of the two was rewritten, so a drifted websocket line would stay open
+without anyone noticing; that is a `windows` issue (#684's).
+
 ### Staying up to date
 
 The image tag is a hash of the folder's build recipe, so staleness is
@@ -1040,10 +1127,13 @@ started as:
 docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
     --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
     --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-    -p "${base}-$((base + 3)):8081-8084" \
-    -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+    -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
+    -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
     "$IMAGE" tail -f /dev/null
 ```
+
+Every address is published on `127.0.0.1` only, since GitHub #684 — see
+"Every preview address is this Mac's own" above.
 
 where `WORKDIR_ID` is the folder hash and `base` the walked port block. Since
 #280 this is made in ONE place, `create_the_workspace_on_free_ports` in the
@@ -1079,14 +1169,22 @@ section said "every launcher" until #94 counted them (2026-09-25):
 | No builds mount (`buildOutputLocation` — every container made before built sites moved out) | yes | yes | yes |
 | Running a different image than the recipe resolves (a container keeps the version it was made from) | yes | yes | **no** |
 | Missing the 9081–9084 live-reload ports (published ports cannot be added later) | yes | yes | **no** |
+| Its addresses published on every interface rather than on 127.0.0.1 (#684; made before it) | yes | yes | **no** |
 | `courses/` was created by this very run | yes | — | — |
 | Mount correct but not writable (a probe file made and deleted inside; macOS permission/ACL oddities after a move or restore) — while running, and again after starting | yes | **no** | yes |
 | The connection has gone stale (`getent hosts` of the destination fails; not for a folder publish) — while running, and again after starting | — | — | yes |
 
-That is **twenty places** (8 + 5 + 7), plus the three that retired the old
-shared `teaching-quartz` workspace. `deploy.sh` never checks the image or
-the live-reload ports: a publish runs in whatever workspace the last preview
-or build left, and the next preview remakes it. That is an inconsistency, not
+That is **twenty-two places** (9 + 6 + 7; #684 added one each to `setup.sh`
+and `preview.sh`), plus the three that retired the old shared
+`teaching-quartz` workspace, `preview.sh`'s #310 remake of an address another
+account held, and `start_the_existing_workspace`'s two remakes onto free
+addresses. Every one of them now passes its reason to `remake_the_workspace`
+as one word, and the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
+<place>` once the new workspace exists, which the app writes onto the trail
+as `folder set up again` (#684, `contracts/shared-rules.json`). `deploy.sh`
+never checks the image, the live-reload ports or the bindings: a publish runs
+in whatever workspace the last preview or build left, and the next preview
+remakes it. That is an inconsistency, not
 a decision — written down here rather than fixed by #94, which is about what
 a remake may END, not about when one is due. `preview.sh` has no writability
 check and no comment in it says why.

@@ -1995,7 +1995,7 @@ below, and it is neither: not knowing.)
 The builder can be asked directly, and its answer is proof rather than
 inference: `docker exec <container> curl …` against the port INSIDE the
 builder. The port matters — the host port differs for every working folder
-after the first (this Mac's own folder runs `0.0.0.0:8091->8081/tcp`), so
+after the first (this Mac's own folder runs `127.0.0.1:8091->8081/tcp` since #684), so
 asking the builder about a host port asks it about a site it has never heard
 of, and the answer, "no", is the sentence that blames the teacher's pages.
 
