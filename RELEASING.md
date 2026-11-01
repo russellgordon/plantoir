@@ -146,7 +146,8 @@ releases.
 For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 1. **Everything merged and green?** Both sides on `main`; `dotnet test` passes
-   in `windows-app/`; the mac unit suite passes. **Then open
+   in `windows-app/`; the mac unit suite passes, and so does a Release build
+   with Xcode 26.6 (the checklist's step 2 has the command, #744). **Then open
    `windows-app/Plantoir.Tests/NamedGapLedger.cs`** — green can carry named
    gaps, and step 2 says what to check in it. Then **actually publish a
    section from an app** — see step 2 for why that is not optional. And
@@ -278,7 +279,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    which breaks students' bookmarks unless the course has a custom domain
    (a teacher-facing message, and probably a period of publishing to both).
 2. **Full test pass**: `dotnet test Plantoir.Tests` and the mac unit suite, plus
-   a hand smoke of create → preview → publish on a real course.
+   a hand smoke of create → preview → publish on a real course. **And a
+   Release build of the mac app with Xcode 26.6, before anything is merged
+   for the cut** — `cd mac-app; DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg build`
+   must end `** BUILD SUCCEEDED **` (about 90 s): the suite and every other
+   gate build with `xcode-select`'s Xcode 27, which type-checks what 26.6
+   gives up on, so v1.9.1's `publish.sh -Sign` was the first build to fail
+   (#744; `documentation/09-mac-app.md` → "Building with two Xcodes").
 
    > **Check the TOTALS line before calling it green**, or use
    > `.\run-tests.ps1`, which reads it for you. `dotnet test` exits 1 for a

@@ -427,6 +427,26 @@ struct SectionDetailView: View {
     // MARK: - Body
 
     var body: some View {
+        // Built in stages, each a function below, applied in the order the
+        // modifiers have always been applied — the same modifiers on the same
+        // view, so nothing a teacher sees moved. One chain of all of them was
+        // more than Xcode 26.6 would type-check, and 26.6 builds the releases
+        // (#744, `documentation/09-mac-app.md` → "Building with two Xcodes").
+        // A new modifier goes into the stage it belongs to, never back into
+        // one long chain here.
+        let layout: some View = sectionLayout
+        let watching: some View = watchingTheFolderAndTheWindow(layout)
+        let withToolbar: some View = addingTheToolbarAndTheSectionMenu(watching)
+        let registered: some View = registeringWhileItShows(withToolbar)
+        let alerting: some View = presentingTheAlerts(registered)
+        let followingTheAlerts: some View = followingWhatTheAlertsLeave(alerting)
+        let withSheets: some View = presentingTheSheets(followingTheAlerts)
+        return followingRequestsAndDeployEndings(withSheets)
+    }
+
+    /// The notices, the tabs and the stack the site is laid over — what the
+    /// stages below are applied to.
+    var sectionLayout: some View {
         // The notice is ABOVE everything this section can show, including the
         // site — one band, in one place, in every state.
         //
@@ -551,472 +571,515 @@ struct SectionDetailView: View {
                 raiseTheProblemsAlertIfDue()
             }
         }
-        .navigationTitle(titleText)
-        .task {
-            refreshEditedMarker()
-        }
-        .onChange(of: isBusy) { _, nowBusy in
-            // A publish clears the marker; a preview leaves the content
-            // alone but is the other moment the folder has just been read.
-            if !nowBusy {
+    }
+
+    /// The title, and what the section watches while it shows: the folder
+    /// being read, the app and its window coming to the front, and a
+    /// scheduled run's record.
+    func watchingTheFolderAndTheWindow(_ content: some View) -> some View {
+        content
+            .navigationTitle(titleText)
+            .task {
                 refreshEditedMarker()
+            }
+            .onChange(of: isBusy) { _, nowBusy in
+                // A publish clears the marker; a preview leaves the content
+                // alone but is the other moment the folder has just been read.
+                if !nowBusy {
+                    refreshEditedMarker()
+                    offerTheLinksChecklistIfWaiting()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                refreshEditedMarker()
+                // A build this window did not watch — the MCP server's, a
+                // terminal's — may have rewritten the Problems record (#717).
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+                refreshEditedMarker()
+                // A publish this window did not watch — scheduled, the assistant,
+                // the MCP server, a terminal — published as it is; the checklist
+                // is offered now (Russell's decision 3 on #379). Only when THIS
+                // window became key: the notification is app-wide, and the sheet
+                // belongs on the window the teacher is looking at (review, N5).
+                if let window = notification.object as? NSWindow, let ownWindowID,
+                   ObjectIdentifier(window) != ownWindowID {
+                    return
+                }
                 offerTheLinksChecklistIfWaiting()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshEditedMarker()
-            // A build this window did not watch — the MCP server's, a
-            // terminal's — may have rewritten the Problems record (#717).
-            reloadTheProblems()
-            raiseTheProblemsAlertIfDue()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
-            refreshEditedMarker()
-            // A publish this window did not watch — scheduled, the assistant,
-            // the MCP server, a terminal — published as it is; the checklist
-            // is offered now (Russell's decision 3 on #379). Only when THIS
-            // window became key: the notification is app-wide, and the sheet
-            // belongs on the window the teacher is looking at (review, N5).
-            if let window = notification.object as? NSWindow, let ownWindowID,
-               ObjectIdentifier(window) != ownWindowID {
-                return
+            .background(WindowAccessor { window in
+                ownWindowID = ObjectIdentifier(window)
+            })
+            // A scheduled run is a separate process, so the FILE it writes is the
+            // only event there is. Reading the watcher's counter here is what
+            // registers this view as an observer of it; when it moves — a record
+            // arrived, one was cleared, or the app came back to the front — the
+            // section re-reads its own record and the band appears where the
+            // teacher is already looking, instead of waiting for them to click away
+            // and back. The sidebar's badge follows the same counter, so the two
+            // move together.
+            .onChange(of: ScheduledPublishWatcher.shared.generation) { _, _ in
+                loadStoppedScheduledPublish()
             }
-            offerTheLinksChecklistIfWaiting()
-        }
-        .background(WindowAccessor { window in
-            ownWindowID = ObjectIdentifier(window)
-        })
-        // A scheduled run is a separate process, so the FILE it writes is the
-        // only event there is. Reading the watcher's counter here is what
-        // registers this view as an observer of it; when it moves — a record
-        // arrived, one was cleared, or the app came back to the front — the
-        // section re-reads its own record and the band appears where the
-        // teacher is already looking, instead of waiting for them to click away
-        // and back. The sidebar's badge follows the same counter, so the two
-        // move together.
-        .onChange(of: ScheduledPublishWatcher.shared.generation) { _, _ in
-            loadStoppedScheduledPublish()
-        }
-        .toolbar {
-            // Every item is ALWAYS present (disabled when inapplicable):
-            // conditionally inserting toolbar items makes macOS rebuild
-            // the toolbar, which briefly mis-lays-out the title area.
-            ToolbarItemGroup(placement: .navigation) {
-                Button("Back", systemImage: "chevron.left") {
-                    previewController.goBack()
-                }
-                .disabled(previewURL == nil || !previewController.canGoBack)
-                .help("Go back a page")
-                .accessibilityIdentifier("previewBackButton")
+    }
 
-                Button("Forward", systemImage: "chevron.right") {
-                    previewController.goForward()
-                }
-                .disabled(previewURL == nil || !previewController.canGoForward)
-                .help("Go forward a page")
-                .accessibilityIdentifier("previewForwardButton")
-
-                Button("Reload", systemImage: "arrow.clockwise") {
-                    previewController.reload()
-                }
-                .disabled(previewURL == nil)
-                .help("Reload this page")
-                .accessibilityIdentifier("previewReloadButton")
-            }
-            ToolbarItemGroup {
-                Button("Open in Obsidian", systemImage: "square.and.pencil") {
-                    // The one route (#457, the HIG sweep): on a course kept
-                    // for reference it re-locks the pages and shows the note
-                    // the first time, as the row and the menu bar do.
-                    // #518: the page the preview shows, while it shows one.
-                    workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)
-                }
-                .disabled(!FolderActions.obsidianIsInstalled)
-                .help("Edit this section's pages in Obsidian")
-                .accessibilityIdentifier("openInObsidianButton")
-
-                // One stable item that changes face, not two swapped
-                // items — swapping rebuilds the toolbar (same glitch).
-                //
-                // #504: the title says what a press will do — "Preview" or
-                // "Preview at Last Viewed", the setting's or, while Option is
-                // held, the other — from the one function Section ▸ Preview
-                // uses too. The watcher only TITLES it; the press reads the
-                // keyboard at the moment it happens, which is the authority.
-                Button(
-                    PreviewStartPage.buttonTitle(
-                        setting: AppSettings.shared.previewOpensAt,
-                        optionHeld: optionRetitlesThisWindow,
-                        previewIsRunning: previewRunner.isRunning
-                    ),
-                    systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
-                ) {
-                    previewButtonPressed(opensAt: PreviewStartPage.opensAt(
-                        setting: AppSettings.shared.previewOpensAt,
-                        optionHeld: PreviewStartPage.optionIsHeld(NSEvent.modifierFlags)
-                    ))
-                }
-                // The icon alone doesn't say what these two buttons do, so
-                // they wear their titles; the neighbouring icons are the
-                // familiar Obsidian and Safari actions and stay icon-only.
-                .labelStyle(.titleAndIcon)
-                // Nor while a copy of the course is being zipped (#351): a
-                // restore or removal is waiting on that zip to replace the
-                // folder a preview would be serving from.
-                // Nor while the folder's tools are still being copied, or
-                // that copy failed (#476): the help says why, no dialog.
-                .disabled(!previewButtonIsEnabled)
-                .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
-                .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
-
-                // "Deploy", NOT "Publish" — a page is published (the
-                // `publish:` flag decides whether students see it); the
-                // whole site is deployed. One word for both had the
-                // teacher and the assistant talking past each other.
-                // NOT DRAWN on a course kept for reference. The refusal
-                // behind it stays — every other way in still meets it — but a
-                // teacher meets this as a button that is not there, which is
-                // the same rule the sidebar follows for Schedule Deploy…: a
-                // greyed-out control that can never become available is a
-                // standing invitation to wonder what is wrong.
-                if !course.isKeptForReference {
-                Button("Deploy", systemImage: "paperplane.fill") {
-                    startDeploy()
-                }
-                .labelStyle(.titleAndIcon)
-                // `isPreparingDeploy` closes a real window, not just a
-                // display one: `deployRunner.isRunning` alone stays false
-                // through `deployAndWait()`'s whole prep phase (stopping any
-                // preview, waiting for containers to clear), and the button
-                // was clickable again the instant that phase started — a
-                // second click there raced its own stop-preview-then-deploy
-                // sequence against the first's.
-                // Nor while a copy of the course is being zipped (#351): a
-                // removal waiting on that zip deletes what this would publish.
-                .disabled(!deployButtonIsEnabled)
-                .help(workspace.folderReadinessReason ?? "Deploy this section's website")
-                .accessibilityIdentifier("deployButton")
-                }
-
-                Button("Open in Browser", systemImage: "safari") {
-                    openInBrowser()
-                }
-                .disabled(previewURL == nil)
-                .help("Open this preview in your web browser")
-                .accessibilityIdentifier("openInBrowserButton")
-
-            }
-        }
-        .focusedSceneValue(\.previewController, previewURL != nil ? previewController : nil)
-        // Section ▸ Preview, Deploy… and Open in Browser (#457): the
-        // toolbar's own actions and predicates, so the menu item and the
-        // button beside it cannot disagree.
-        .focusedSceneValue(\.sectionSiteMenu, SectionSiteCommands(
-            previewIsRunning: previewRunner.isRunning,
-            previewButtonEnabled: previewButtonIsEnabled,
-            deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
-            previewIsShowing: previewURL != nil,
-            lastChangeIsHere: lastMenuChangeIsHere,
-            verbIsRunning: verbIsRunningHere,
-            previewOpensAt: AppSettings.shared.previewOpensAt,
-            perform: performSiteMenuItem,
-            preview: previewFromTheSectionMenu
-        ))
-        // The assistant cannot drive a preview itself — it holds neither the
-        // port lease nor the web view — so this window hands it the things it
-        // alone can do. Registered rather than observed: the assistant has to
-        // stop the preview, change files, and start it again IN THAT ORDER,
-        // and an observer that acts whenever SwiftUI next evaluates a body
-        // cannot promise the stop happened before the writes.
-        //
-        // Deploy is here for a different reason and the same conclusion. The
-        // assistant COULD run `deploy.sh` itself, and used to; what it cannot
-        // do is show it happening. The console, the progress header and the
-        // live-site link all belong to this window, so a deploy run anywhere
-        // else is a teacher watching a spinner for four minutes beside a
-        // window that says nothing is running.
-        //
-        // These are the same functions the toolbar buttons call, so the
-        // assistant and the buttons can never drift apart.
-        .onAppear {
-            // Looked for on every appearance rather than once at launch: a
-            // section opened after a run finished must show what it left, and
-            // this is also what a window restored at launch reads. A run that
-            // finishes while this section is ALREADY showing is the watcher's
-            // job, above. The trail line belongs to the run, not to either of
-            // these reads.
-            loadStoppedScheduledPublish()
-            // A deploy of this section that outlived the view before this one
-            // (#706): what it left for whoever shows the section next. An
-            // ending some view has already shown is kept off this console
-            // first (#706 review, M1), before this view counts as showing it.
-            deployEndingHiddenHere = deployRun.endingToHideOnAppearing()
-            takeWhatTheDeployLeft(onAppearing: true)
-            guard let folder = workspace.workspaceURL else {
-                return
-            }
-            // The key this section is about to register under, noted while
-            // the window still points here — `onDisappear` runs when it may
-            // not. This is the property's ONLY write; see its comment.
-            folderThisSectionRegisteredIn = folder
-            SectionWindowControllers.shared.register(
-                folderPath: folder.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber,
-                controller: SectionWindowControllers.Controller(
-                    // `previewURL` is the honest signal for "on screen": it
-                    // is cleared at the start of every build and set only when
-                    // the server has answered.
-                    previewState: {
-                        if !previewRunner.isRunning {
-                            return .notRunning
-                        }
-                        return previewURL == nil ? .building : .showing
-                    },
-                    startPreview: { startPreview() },
-                    stopPreview: { await stopPreviewAndWait() },
-                    deploy: { await deployAndWait(pressedByTheAssistant: true) },
-                    // #475: the in-app assistant's deploy asks HERE, before
-                    // it stops anything, as the Deploy button does.
-                    askAboutClassesDatedLater: {
-                        await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
-                    },
-                    // #518: what Open in Obsidian opens for this section.
-                    previewedPage: { previewedPagePath() },
-                    // #610: the assistant presses this window's own Open in
-                    // Obsidian, on this window's model, as the button does.
-                    openInObsidian: {
-                        await workspace.openInObsidianAndWait(course: course, sectionNumber: sectionNumber)
+    /// The toolbar, and what the Section menu and the browser commands read
+    /// from this window.
+    func addingTheToolbarAndTheSectionMenu(_ content: some View) -> some View {
+        content
+            .toolbar {
+                // Every item is ALWAYS present (disabled when inapplicable):
+                // conditionally inserting toolbar items makes macOS rebuild
+                // the toolbar, which briefly mis-lays-out the title area.
+                ToolbarItemGroup(placement: .navigation) {
+                    Button("Back", systemImage: "chevron.left") {
+                        previewController.goBack()
                     }
-                )
-            )
-            // A function asked for from this row's context menu before this
-            // window was showing it (#457 batch B).
-            takeAVerbRequestIfItIsMine()
-        }
-        .task {
-            // What a build this window did not watch found — an overnight
-            // deploy, the assistant, the MCP server, a terminal (#717). The
-            // section's Problems record is the one list: it is read here, and
-            // its alert raised when it found something new that nobody has
-            // answered (`sectionProblems.alert`), which replaces showing the
-            // overnight run's folder problems in a dialog of their own.
-            guard let workingFolderURL = workspace.workspaceURL else {
-                return
+                    .disabled(previewURL == nil || !previewController.canGoBack)
+                    .help("Go back a page")
+                    .accessibilityIdentifier("previewBackButton")
+
+                    Button("Forward", systemImage: "chevron.right") {
+                        previewController.goForward()
+                    }
+                    .disabled(previewURL == nil || !previewController.canGoForward)
+                    .help("Go forward a page")
+                    .accessibilityIdentifier("previewForwardButton")
+
+                    Button("Reload", systemImage: "arrow.clockwise") {
+                        previewController.reload()
+                    }
+                    .disabled(previewURL == nil)
+                    .help("Reload this page")
+                    .accessibilityIdentifier("previewReloadButton")
+                }
+                ToolbarItemGroup {
+                    Button("Open in Obsidian", systemImage: "square.and.pencil") {
+                        // The one route (#457, the HIG sweep): on a course kept
+                        // for reference it re-locks the pages and shows the note
+                        // the first time, as the row and the menu bar do.
+                        // #518: the page the preview shows, while it shows one.
+                        workspace.openInObsidian(course: course, sectionNumber: sectionNumber, atThePreviewedPage: true)
+                    }
+                    .disabled(!FolderActions.obsidianIsInstalled)
+                    .help("Edit this section's pages in Obsidian")
+                    .accessibilityIdentifier("openInObsidianButton")
+
+                    // One stable item that changes face, not two swapped
+                    // items — swapping rebuilds the toolbar (same glitch).
+                    //
+                    // #504: the title says what a press will do — "Preview" or
+                    // "Preview at Last Viewed", the setting's or, while Option is
+                    // held, the other — from the one function Section ▸ Preview
+                    // uses too. The watcher only TITLES it; the press reads the
+                    // keyboard at the moment it happens, which is the authority.
+                    Button(
+                        PreviewStartPage.buttonTitle(
+                            setting: AppSettings.shared.previewOpensAt,
+                            optionHeld: optionRetitlesThisWindow,
+                            previewIsRunning: previewRunner.isRunning
+                        ),
+                        systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
+                    ) {
+                        previewButtonPressed(opensAt: PreviewStartPage.opensAt(
+                            setting: AppSettings.shared.previewOpensAt,
+                            optionHeld: PreviewStartPage.optionIsHeld(NSEvent.modifierFlags)
+                        ))
+                    }
+                    // The icon alone doesn't say what these two buttons do, so
+                    // they wear their titles; the neighbouring icons are the
+                    // familiar Obsidian and Safari actions and stay icon-only.
+                    .labelStyle(.titleAndIcon)
+                    // Nor while a copy of the course is being zipped (#351): a
+                    // restore or removal is waiting on that zip to replace the
+                    // folder a preview would be serving from.
+                    // Nor while the folder's tools are still being copied, or
+                    // that copy failed (#476): the help says why, no dialog.
+                    .disabled(!previewButtonIsEnabled)
+                    .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
+                    .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
+
+                    // "Deploy", NOT "Publish" — a page is published (the
+                    // `publish:` flag decides whether students see it); the
+                    // whole site is deployed. One word for both had the
+                    // teacher and the assistant talking past each other.
+                    // NOT DRAWN on a course kept for reference. The refusal
+                    // behind it stays — every other way in still meets it — but a
+                    // teacher meets this as a button that is not there, which is
+                    // the same rule the sidebar follows for Schedule Deploy…: a
+                    // greyed-out control that can never become available is a
+                    // standing invitation to wonder what is wrong.
+                    if !course.isKeptForReference {
+                    Button("Deploy", systemImage: "paperplane.fill") {
+                        startDeploy()
+                    }
+                    .labelStyle(.titleAndIcon)
+                    // `isPreparingDeploy` closes a real window, not just a
+                    // display one: `deployRunner.isRunning` alone stays false
+                    // through `deployAndWait()`'s whole prep phase (stopping any
+                    // preview, waiting for containers to clear), and the button
+                    // was clickable again the instant that phase started — a
+                    // second click there raced its own stop-preview-then-deploy
+                    // sequence against the first's.
+                    // Nor while a copy of the course is being zipped (#351): a
+                    // removal waiting on that zip deletes what this would publish.
+                    .disabled(!deployButtonIsEnabled)
+                    .help(workspace.folderReadinessReason ?? "Deploy this section's website")
+                    .accessibilityIdentifier("deployButton")
+                    }
+
+                    Button("Open in Browser", systemImage: "safari") {
+                        openInBrowser()
+                    }
+                    .disabled(previewURL == nil)
+                    .help("Open this preview in your web browser")
+                    .accessibilityIdentifier("openInBrowserButton")
+
+                }
             }
-            // The overnight run's own copy of its findings is still TAKEN, so
-            // it does not pile up; its trail line was written by the run. The
-            // record holds the same problems, one row each.
-            _ = ScheduledDeploy.takeFolderProblems(
-                courseCode: course.code, sectionNumber: sectionNumber,
-                inWorkingFolder: workingFolderURL
-            )
-            reloadTheProblems()
-            let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
-            raiseTheProblemsAlertIfDue()
-            // After the alert is up, so it waits behind it.
-            if let checklist {
-                requestLinksChecklist(checklist)
-            }
-        }
-        .onDisappear {
-            // FIRST, and unconditionally: the wait, and with it ⌘Q's record
-            // of a preview being built (issue #232). `stopPreview()` below
-            // ends it too; saying so here keeps a window that is going away
-            // from depending on what that function happens to do today.
-            previewBuildWait.end()
-            // The key this section registered under, never the folder its
-            // work belongs to and never the window's current one.
-            if let folder = folderThisSectionRegisteredIn {
-                SectionWindowControllers.shared.unregister(
+            .focusedSceneValue(\.previewController, previewURL != nil ? previewController : nil)
+            // Section ▸ Preview, Deploy… and Open in Browser (#457): the
+            // toolbar's own actions and predicates, so the menu item and the
+            // button beside it cannot disagree.
+            .focusedSceneValue(\.sectionSiteMenu, SectionSiteCommands(
+                previewIsRunning: previewRunner.isRunning,
+                previewButtonEnabled: previewButtonIsEnabled,
+                deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
+                previewIsShowing: previewURL != nil,
+                lastChangeIsHere: lastMenuChangeIsHere,
+                verbIsRunning: verbIsRunningHere,
+                previewOpensAt: AppSettings.shared.previewOpensAt,
+                perform: performSiteMenuItem,
+                preview: previewFromTheSectionMenu
+            ))
+    }
+
+    /// What appearing and going away do: the registration the assistant
+    /// reaches this window through, the Problems record on opening, and
+    /// the preview stopped on the way out.
+    func registeringWhileItShows(_ content: some View) -> some View {
+        content
+            // The assistant cannot drive a preview itself — it holds neither the
+            // port lease nor the web view — so this window hands it the things it
+            // alone can do. Registered rather than observed: the assistant has to
+            // stop the preview, change files, and start it again IN THAT ORDER,
+            // and an observer that acts whenever SwiftUI next evaluates a body
+            // cannot promise the stop happened before the writes.
+            //
+            // Deploy is here for a different reason and the same conclusion. The
+            // assistant COULD run `deploy.sh` itself, and used to; what it cannot
+            // do is show it happening. The console, the progress header and the
+            // live-site link all belong to this window, so a deploy run anywhere
+            // else is a teacher watching a spinner for four minutes beside a
+            // window that says nothing is running.
+            //
+            // These are the same functions the toolbar buttons call, so the
+            // assistant and the buttons can never drift apart.
+            .onAppear {
+                // Looked for on every appearance rather than once at launch: a
+                // section opened after a run finished must show what it left, and
+                // this is also what a window restored at launch reads. A run that
+                // finishes while this section is ALREADY showing is the watcher's
+                // job, above. The trail line belongs to the run, not to either of
+                // these reads.
+                loadStoppedScheduledPublish()
+                // A deploy of this section that outlived the view before this one
+                // (#706): what it left for whoever shows the section next. An
+                // ending some view has already shown is kept off this console
+                // first (#706 review, M1), before this view counts as showing it.
+                deployEndingHiddenHere = deployRun.endingToHideOnAppearing()
+                takeWhatTheDeployLeft(onAppearing: true)
+                guard let folder = workspace.workspaceURL else {
+                    return
+                }
+                // The key this section is about to register under, noted while
+                // the window still points here — `onDisappear` runs when it may
+                // not. This is the property's ONLY write; see its comment.
+                folderThisSectionRegisteredIn = folder
+                SectionWindowControllers.shared.register(
                     folderPath: folder.path,
                     courseCode: course.code,
-                    sectionNumber: sectionNumber
+                    sectionNumber: sectionNumber,
+                    controller: SectionWindowControllers.Controller(
+                        // `previewURL` is the honest signal for "on screen": it
+                        // is cleared at the start of every build and set only when
+                        // the server has answered.
+                        previewState: {
+                            if !previewRunner.isRunning {
+                                return .notRunning
+                            }
+                            return previewURL == nil ? .building : .showing
+                        },
+                        startPreview: { startPreview() },
+                        stopPreview: { await stopPreviewAndWait() },
+                        deploy: { await deployAndWait(pressedByTheAssistant: true) },
+                        // #475: the in-app assistant's deploy asks HERE, before
+                        // it stops anything, as the Deploy button does.
+                        askAboutClassesDatedLater: {
+                            await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
+                        },
+                        // #518: what Open in Obsidian opens for this section.
+                        previewedPage: { previewedPagePath() },
+                        // #610: the assistant presses this window's own Open in
+                        // Obsidian, on this window's model, as the button does.
+                        openInObsidian: {
+                            await workspace.openInObsidianAndWait(course: course, sectionNumber: sectionNumber)
+                        }
+                    )
                 )
+                // A function asked for from this row's context menu before this
+                // window was showing it (#457 batch B).
+                takeAVerbRequestIfItIsMine()
             }
-            stopPreview()
-        }
-        .alert(previewAlertTitle, isPresented: $previewAlertIsUp) {
-            switch previewAlert {
-            case .todaysClass(let offer):
-                // Each answer only RECORDS; the preview starts from
-                // `afterThePreviewAlert`, once this alert has gone.
-                Button(FrontPageWording.show) {
-                    answerTodaysClass(offer, show: true)
+            .task {
+                // What a build this window did not watch found — an overnight
+                // deploy, the assistant, the MCP server, a terminal (#717). The
+                // section's Problems record is the one list: it is read here, and
+                // its alert raised when it found something new that nobody has
+                // answered (`sectionProblems.alert`), which replaces showing the
+                // overnight run's folder problems in a dialog of their own.
+                guard let workingFolderURL = workspace.workspaceURL else {
+                    return
                 }
-                Button(FrontPageWording.notToday, role: .cancel) {
-                    answerTodaysClass(offer, show: false)
+                // The overnight run's own copy of its findings is still TAKEN, so
+                // it does not pile up; its trail line was written by the run. The
+                // record holds the same problems, one row each.
+                _ = ScheduledDeploy.takeFolderProblems(
+                    courseCode: course.code, sectionNumber: sectionNumber,
+                    inWorkingFolder: workingFolderURL
+                )
+                reloadTheProblems()
+                let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
+                raiseTheProblemsAlertIfDue()
+                // After the alert is up, so it waits behind it.
+                if let checklist {
+                    requestLinksChecklist(checklist)
                 }
-            case .refusal:
-                Button("OK") { }
             }
-        } message: {
-            Text(previewAlertMessage)
-        }
-        .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
-            // The Account ID is put right in Settings, so the refusal that
-            // names it offers the way there (#668) — the refusal every new
-            // course meets at its first deploy now that Cloudflare Pages is
-            // the default. OK stays the default button.
-            if PublishingDestinations.deployRefusalOpensSettings(
-                refusal: deployRefusal ?? "", cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-            ) {
-                Button("Open Settings…") {
+            .onDisappear {
+                // FIRST, and unconditionally: the wait, and with it ⌘Q's record
+                // of a preview being built (issue #232). `stopPreview()` below
+                // ends it too; saying so here keeps a window that is going away
+                // from depending on what that function happens to do today.
+                previewBuildWait.end()
+                // The key this section registered under, never the folder its
+                // work belongs to and never the window's current one.
+                if let folder = folderThisSectionRegisteredIn {
+                    SectionWindowControllers.shared.unregister(
+                        folderPath: folder.path,
+                        courseCode: course.code,
+                        sectionNumber: sectionNumber
+                    )
+                }
+                stopPreview()
+            }
+    }
+
+    /// The three alerts: the preview's, the deploy refusal, and the Problems
+    /// alert (which also says what a repair did), in that order.
+    func presentingTheAlerts(_ content: some View) -> some View {
+        content
+            .alert(previewAlertTitle, isPresented: $previewAlertIsUp) {
+                switch previewAlert {
+                case .todaysClass(let offer):
+                    // Each answer only RECORDS; the preview starts from
+                    // `afterThePreviewAlert`, once this alert has gone.
+                    Button(FrontPageWording.show) {
+                        answerTodaysClass(offer, show: true)
+                    }
+                    Button(FrontPageWording.notToday, role: .cancel) {
+                        answerTodaysClass(offer, show: false)
+                    }
+                case .refusal:
+                    Button("OK") { }
+                }
+            } message: {
+                Text(previewAlertMessage)
+            }
+            .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
+                // The Account ID is put right in Settings, so the refusal that
+                // names it offers the way there (#668) — the refusal every new
+                // course meets at its first deploy now that Cloudflare Pages is
+                // the default. OK stays the default button.
+                if PublishingDestinations.deployRefusalOpensSettings(
+                    refusal: deployRefusal ?? "", cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+                ) {
+                    Button("Open Settings…") {
+                        deployRefusal = nil
+                        SettingsPane.select(.deploying)
+                        openSettings()
+                    }
+                }
+                Button("OK") {
                     deployRefusal = nil
-                    SettingsPane.select(.deploying)
-                    openSettings()
                 }
+            } message: {
+                Text(deployRefusal ?? "")
             }
-            Button("OK") {
-                deployRefusal = nil
-            }
-        } message: {
-            Text(deployRefusal ?? "")
-        }
-        // ONE alert for both the findings and what a repair did, switched by
-        // `healthDialog`, rather than two `.alert` modifiers on the same view.
-        //
-        // Two was a crash, not a style preference: SwiftUI's alert bridge
-        // segfaulted in `updateExistingAlert` while closing a sheet, reliably,
-        // once this view carried four alerts. A view presents one alert at a
-        // time anyway, so modelling that explicitly is both what SwiftUI wants
-        // and what the sequencing needs.
-        .alert(healthAlertTitle, isPresented: healthDialogBinding) {
-            switch healthDialog {
-            case .findings:
-                // The alert about new problems (#717): Show opens the
-                // section's Problems tab. Every answer is remembered by the
-                // record's alert key, so it is not raised again.
-                Button(SectionProblemsWording.show) {
-                    answerTheProblemsAlert("Show")
-                    if let folder = workspace.workspaceURL {
-                        SectionProblems.shared.show(.problems, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+            // ONE alert for both the findings and what a repair did, switched by
+            // `healthDialog`, rather than two `.alert` modifiers on the same view.
+            //
+            // Two was a crash, not a style preference: SwiftUI's alert bridge
+            // segfaulted in `updateExistingAlert` while closing a sheet, reliably,
+            // once this view carried four alerts. A view presents one alert at a
+            // time anyway, so modelling that explicitly is both what SwiftUI wants
+            // and what the sequencing needs.
+            .alert(healthAlertTitle, isPresented: healthDialogBinding) {
+                switch healthDialog {
+                case .findings:
+                    // The alert about new problems (#717): Show opens the
+                    // section's Problems tab. Every answer is remembered by the
+                    // record's alert key, so it is not raised again.
+                    Button(SectionProblemsWording.show) {
+                        answerTheProblemsAlert("Show")
+                        if let folder = workspace.workspaceURL {
+                            SectionProblems.shared.show(.problems, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+                        }
                     }
-                }
-                // No repair on a course kept for reference. The findings
-                // themselves still REPORT — a teacher may want to know a
-                // folder is missing — but the button would have offered to
-                // fix it and then said "That is already put right. Nothing
-                // needed changing." about a folder that is really gone,
-                // because the repair returns no attempts and the zero-attempt
-                // branch reads as "nothing needed doing". Found by review,
-                // 2026-09-20.
-                if !course.isKeptForReference,
-                   let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
-                    Button(title) {
-                        // The marker is refreshed because a repair CHANGES the
-                        // section's content on the teacher's behalf, and
-                        // nothing else here would: `refreshEditedMarker` runs
-                        // on appear, when the section stops being busy, and on
-                        // window activation — the section stopped being busy
-                        // before this alert appeared, and an alert on this
-                        // window does not make it key again.
-                        defer { refreshEditedMarker() }
-                        answerTheProblemsAlert("the repair")
-                        // Only REMEMBERED here: the outcome is shown once this
-                        // alert has actually gone, from `onChange`. Raising a
-                        // second alert from inside this action loses one of
-                        // them, and the one lost is the report just asked for.
-                        pendingRepairOutcome = SiteHealthRepair.outcome(
-                            ofRepairing: healthFindings, in: course,
-                            occasion: healthFindingsCameFromPublishing ? .publishing : .building
-                        )
+                    // No repair on a course kept for reference. The findings
+                    // themselves still REPORT — a teacher may want to know a
+                    // folder is missing — but the button would have offered to
+                    // fix it and then said "That is already put right. Nothing
+                    // needed changing." about a folder that is really gone,
+                    // because the repair returns no attempts and the zero-attempt
+                    // branch reads as "nothing needed doing". Found by review,
+                    // 2026-09-20.
+                    if !course.isKeptForReference,
+                       let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                        Button(title) {
+                            // The marker is refreshed because a repair CHANGES the
+                            // section's content on the teacher's behalf, and
+                            // nothing else here would: `refreshEditedMarker` runs
+                            // on appear, when the section stops being busy, and on
+                            // window activation — the section stopped being busy
+                            // before this alert appeared, and an alert on this
+                            // window does not make it key again.
+                            defer { refreshEditedMarker() }
+                            answerTheProblemsAlert("the repair")
+                            // Only REMEMBERED here: the outcome is shown once this
+                            // alert has actually gone, from `onChange`. Raising a
+                            // second alert from inside this action loses one of
+                            // them, and the one lost is the report just asked for.
+                            pendingRepairOutcome = SiteHealthRepair.outcome(
+                                ofRepairing: healthFindings, in: course,
+                                occasion: healthFindingsCameFromPublishing ? .publishing : .building
+                            )
+                        }
                     }
-                }
-                // "OK" only when it is the only answer: beside a verb it
-                // reads as "yes, do it" (#457, the HIG sweep) — and Show is
-                // always beside it.
-                Button(SiteHealthRepair.dismissTitle(
-                    besideAnAction: true,
-                    afterARepair: false
-                ), role: .cancel) {
-                    answerTheProblemsAlert("Not Now")
-                }
-            case .outcome:
-                if repairOutcome?.canRebuild == true {
-                    Button("Preview Again") {
-                        rebuildAfterRepair()
+                    // "OK" only when it is the only answer: beside a verb it
+                    // reads as "yes, do it" (#457, the HIG sweep) — and Show is
+                    // always beside it.
+                    Button(SiteHealthRepair.dismissTitle(
+                        besideAnAction: true,
+                        afterARepair: false
+                    ), role: .cancel) {
+                        answerTheProblemsAlert("Not Now")
                     }
+                case .outcome:
+                    if repairOutcome?.canRebuild == true {
+                        Button("Preview Again") {
+                            rebuildAfterRepair()
+                        }
+                    }
+                    Button(SiteHealthRepair.dismissTitle(
+                        besideAnAction: repairOutcome?.canRebuild == true,
+                        afterARepair: true
+                    ), role: .cancel) { }
+                case .none:
+                    Button("OK") { }
                 }
-                Button(SiteHealthRepair.dismissTitle(
-                    besideAnAction: repairOutcome?.canRebuild == true,
-                    afterARepair: true
-                ), role: .cancel) { }
-            case .none:
-                Button("OK") { }
+            } message: {
+                Text(healthAlertMessage)
             }
-        } message: {
-            Text(healthAlertMessage)
-        }
-        // Findings go up as soon as the build reports them, NOT when the
-        // preview finishes.
-        //
-        // Driving the real app is what found this. Deleting a section's
-        // index.md produces the "no front page" finding — and also makes every
-        // request 404, so `waitForPreviewServer` never succeeds and the call
-        // after it is never reached. The dialog was gated behind a preview that
-        // the very problem it reports prevents from completing: the worse the
-        // course, the less likely the teacher was to be told.
-        .onChange(of: previewRunner.healthFindings.count) { _, count in
-            if count > 0 {
-                showHealthFindings(from: previewRunner)
+    }
+
+    /// What follows an alert going up or going away, and the build's word
+    /// about the links checklist.
+    func followingWhatTheAlertsLeave(_ content: some View) -> some View {
+        content
+            // Findings go up as soon as the build reports them, NOT when the
+            // preview finishes.
+            //
+            // Driving the real app is what found this. Deleting a section's
+            // index.md produces the "no front page" finding — and also makes every
+            // request 404, so `waitForPreviewServer` never succeeds and the call
+            // after it is never reached. The dialog was gated behind a preview that
+            // the very problem it reports prevents from completing: the worse the
+            // course, the less likely the teacher was to be told.
+            .onChange(of: previewRunner.healthFindings.count) { _, count in
+                if count > 0 {
+                    showHealthFindings(from: previewRunner)
+                }
             }
-        }
-        .onChange(of: healthDialog == nil) { _, isGone in
-            if isGone {
-                healthFindings = []
-                problemsAlert = nil
-                repairOutcome = nil
-                showAnythingWaiting()
-                showAVerbResultIfWaiting()
+            .onChange(of: healthDialog == nil) { _, isGone in
+                if isGone {
+                    healthFindings = []
+                    problemsAlert = nil
+                    repairOutcome = nil
+                    showAnythingWaiting()
+                    showAVerbResultIfWaiting()
+                }
             }
-        }
-        .onChange(of: previewAlertIsUp) { _, isUp in
-            if !isUp {
-                afterThePreviewAlert()
+            .onChange(of: previewAlertIsUp) { _, isUp in
+                if !isUp {
+                    afterThePreviewAlert()
+                }
             }
-        }
-        // The build's word that it wrote the links checklist offer (#379).
-        // Printed after the date passes, so it follows the #333 finding.
-        .onChange(of: previewRunner.linksChecklistMarkers.count) { _, _ in
-            // The build has said whether it wrote an offer — mid-build, which
-            // is enough: the file is written before the marker. So the held
-            // finding is settled as though the build had finished.
-            settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
-        }
-        .sheet(item: $linksChecklist, onDismiss: {
-            refreshEditedMarker()
-            showAVerbResultIfWaiting()
-            raiseTheProblemsAlertIfDue()
-        }, content: { model in
-            LinksChecklistSheet(model: model, onPublished: {
+            // The build's word that it wrote the links checklist offer (#379).
+            // Printed after the date passes, so it follows the #333 finding.
+            .onChange(of: previewRunner.linksChecklistMarkers.count) { _, _ in
+                // The build has said whether it wrote an offer — mid-build, which
+                // is enough: the file is written before the marker. So the held
+                // finding is settled as though the build had finished.
+                settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
+            }
+    }
+
+    /// The links checklist and the Section menu's own sheet.
+    func presentingTheSheets(_ content: some View) -> some View {
+        content
+            .sheet(item: $linksChecklist, onDismiss: {
                 refreshEditedMarker()
-            })
-        })
-        // The Section menu's functions (#457 batch B) and #475's question.
-        .sheet(item: $verbSheet, onDismiss: {
-            verbSheetWentAway()
-        }, content: { model in
-            SectionVerbSheet(
-                model: model,
-                pressDefault: { pressDefault(in: model) },
-                cancel: { cancelVerbSheet(model) },
-                verbs: workspace.sectionVerbsIfMade
-            )
-        })
-        .onChange(of: workspace.sectionVerbRequest) { _, _ in
-            takeAVerbRequestIfItIsMine()
-        }
-        .onChange(of: deployRefusal == nil) { _, isGone in
-            if isGone {
                 showAVerbResultIfWaiting()
+                raiseTheProblemsAlertIfDue()
+            }, content: { model in
+                LinksChecklistSheet(model: model, onPublished: {
+                    refreshEditedMarker()
+                })
+            })
+            // The Section menu's functions (#457 batch B) and #475's question.
+            .sheet(item: $verbSheet, onDismiss: {
+                verbSheetWentAway()
+            }, content: { model in
+                SectionVerbSheet(
+                    model: model,
+                    pressDefault: { pressDefault(in: model) },
+                    cancel: { cancelVerbSheet(model) },
+                    verbs: workspace.sectionVerbsIfMade
+                )
+            })
+    }
+
+    /// A request from the Section menu, a deploy refusal answered, and a
+    /// deploy of this section ending.
+    func followingRequestsAndDeployEndings(_ content: some View) -> some View {
+        content
+            .onChange(of: workspace.sectionVerbRequest) { _, _ in
+                takeAVerbRequestIfItIsMine()
             }
-        }
-        // A deploy of this section ended — started here, or by a view of it
-        // that has since gone (#706).
-        .onChange(of: deployRun.endings) { _, _ in
-            takeWhatTheDeployLeft(onAppearing: false)
-        }
+            .onChange(of: deployRefusal == nil) { _, isGone in
+                if isGone {
+                    showAVerbResultIfWaiting()
+                }
+            }
+            // A deploy of this section ended — started here, or by a view of it
+            // that has since gone (#706).
+            .onChange(of: deployRun.endings) { _, _ in
+                takeWhatTheDeployLeft(onAppearing: false)
+            }
     }
 
     /// Takes what this section's deploy left for the view showing it
