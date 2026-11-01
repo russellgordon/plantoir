@@ -707,6 +707,17 @@ else
   cat /tmp/verify_deploy_folder_target_test.log
 fi
 
+# A refused publishing token is explained in the launchers' own words, and a
+# SAVED token is cleared only when the service says no (GitHub #695, #716):
+# pins both launchers' lines to app-rules.json -> failureExplanations, and
+# RUNS deploy.sh's saved-token checks with curl answering 000/4xx/5xx.
+if (cd scripts && python3 test_deploy_token_refusal.py) >/tmp/verify_deploy_token_refusal_test.log 2>&1; then
+  pass "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
+else
+  fail "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
+  cat /tmp/verify_deploy_token_refusal_test.log
+fi
+
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else
