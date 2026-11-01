@@ -474,6 +474,112 @@ Three layers now, each closing a hole the others cannot:
 - **No ceiling** — the refusal would be unreachable and untestable, and past
   block 99 the site ports sit on the first block's websockets.
 
+### Every preview address is this Mac's own (GitHub #684)
+
+Found by #667's audit, decided by Russell on 2026-10-31: **localhost only**.
+Until v1.9.1 the launchers published `-p <base>-<base+3>:8081-8084` with no
+host address, which Docker reads as every interface, so a running preview and
+its live-reload connection answered anyone on the same network — and two of
+the preview-only packages the audit accepted (serve-handler, ws) carry
+denial-of-service advisories. Both `-p` values now start `127.0.0.1:`, in
+`create_the_workspace_on_free_ports` inside the PREVIEW PORT BLOCK, so the
+three launchers make a workspace the same way and cannot remake it away from
+each other. The rule is `contracts/app-rules.json` → `previewPorts.bindsTo`.
+
+**Measured** (2026-11-01, Colima's ssh forwarder, two throwaway workspaces
+side by side, the Mac at 192.168.1.124 on Wi-Fi):
+
+| | Published `127.0.0.1:8301…` | Published the old way, `8311…` |
+|---|---|---|
+| `lsof -nP -iTCP -sTCP:LISTEN` | `ssh 127.0.0.1:8301`, `ssh 127.0.0.1:9301` | `ssh *:8311`, `ssh *:9311` |
+| `docker inspect`, `[{{.HostIp}}]` per binding | `[127.0.0.1]` × 8 | `[]` × 8 |
+| `docker port … 8081/tcp` | `127.0.0.1:8301` | `0.0.0.0:8311`, `[::]:8311` |
+| `curl` to 127.0.0.1 and to localhost, site and websocket | 200 | 200 |
+| `curl` to the Mac's network address | refused (exit 7) | **200** |
+| `curl` to `[::1]` | refused | refused — nothing ever listened there |
+
+A block another workspace holds is refused in both directions as `Bind for
+127.0.0.1:<port> failed: port is already allocated`, which
+`it_was_a_port_clash` already reads; `preview.sh`'s announcement keeps the
+text after the last colon of `docker port`, so it reads the new answer
+unchanged. Nothing a teacher uses connects from anywhere else: the preview
+pane opens `http://localhost:<port>/`, Safari is handed `127.0.0.1`, #234's
+reach check curls `127.0.0.1`, and the live-reload client is `ws://localhost:`.
+
+**An existing workspace is made again once.** A published address cannot be
+changed afterwards, so `setup.sh` and `preview.sh` gained one more remake
+reason, after the 9084 check: `every_published_address_is_this_macs_only`
+reads every binding through `{{range $p, $b := .HostConfig.PortBindings}}
+{{range $b}}[{{.HostIp}}]{{end}}{{end}}` and passes only when the answer is
+non-empty and nothing is left once every `[127.0.0.1]` is removed. **The
+brackets are the point**: an old workspace's host address is EMPTY, so a
+check that every listed word is `127.0.0.1` passes it by finding no words.
+The console says `whenItNeedsSettingUpAgain.forThisMacOnly`, and the remake
+goes through `remake_the_workspace`, so #94's wait and its "preview … is
+still open" refusal apply; the check is stateless, so a refused remake is
+simply done by the next preview. **In v1.9.1 this fires on its own almost
+never**: the image changed in the same release, so the update's remake comes
+first in the chain and already makes the workspace the new way. It is the
+safety net for a workspace the image check passed. `verify.sh` 6c2 plants a
+workspace whose only fault is open addresses and checks the sentence, the
+bindings, the marker and `lsof`.
+
+**Every remake now leaves a trail line, with its reason** (the director's
+ruling on #684's plan review): until then only a WAIT before a remake reached
+the trail, so the commonest remake — after an update, which makes the next
+preview about two minutes slower — left nothing. Each caller passes one word
+(`update`, `thisMacOnly`, `buildsOutside`, `addressTaken` …); once the new
+workspace exists the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
+<place>`, and the app writes `folder set up again` from it
+(`FolderSetUpAgainReport`, in `ScriptRunner` and `ScheduledDeploy`). A
+remake #94 refused prints nothing. The words live in the contract's
+`whyWords`; a reason the app does not know writes the line without one.
+
+**Two lines for one remake is deliberate, where #310 already writes one.**
+When another account, macOS or something else on the Mac holds a preview
+address and the workspace is made again for it (`start_the_existing_workspace`
+before a start, or `preview.sh`'s look before the announcement), the trail
+gets #310's `preview address held by another account` line AND this one.
+They are two facts, not one fact twice: #310's says WHY, and names the
+address and who held it; this one says WHAT was done to the folder, in the
+same words as every other remake, so a reader looking for "when was this
+folder set up again, and why was the next preview slow?" finds every remake
+under one event. The plain port-clash remake (a start Docker refused) writes
+only this line, since nothing else records it. Skipping the marker where
+#310's line exists was rejected: it would make the one event that answers
+that question incomplete exactly when an address was taken (#684 review L1).
+
+**What was rejected, and why:**
+
+- **Leaving the preview open on purpose, for an iPad or a phone on the same
+  Wi-Fi.** Nobody was found relying on it. If it is ever wanted it needs a
+  setting a teacher turns on and a trail line, not a default.
+- **Binding Colima's forwarder or Lima's `hostIP` instead.** Colima is shared
+  with other projects on this Mac (CLAUDE.md rule 7), and it would not cover
+  Docker Desktop.
+- **Serving Quartz on 127.0.0.1 inside the workspace.** Docker's forward
+  connects to the workspace's own address, so the preview would not answer at
+  all — the reason Windows' loopback rewrite is native-only.
+- **Remaking in `deploy.sh` too.** It serves nothing, so an open address costs
+  it nothing, and a publish at six in the morning keeps its warm builder.
+  Measured (#684 review L2): a folder that only ever deploys keeps an old workspace's open forwards —
+  lsof shows `ssh … *:<port> (LISTEN)` — but with nothing serving, a request
+  from the school network gets an empty reply (curl exit 52) and no page. So
+  the port is visible to a scan and gives nothing away; the next setup or
+  preview of that folder makes it again on 127.0.0.1.
+- **The launcher writing the remake line itself, under `workspace was in
+  use`** (the plan's first proposal, as for #310 below): that event's lines
+  come from its own marker and say a remake with nothing running writes
+  nothing, and a new event written only by a launcher would have no app call
+  site (`ActivityTrailWiringTests`). The remakes got their own mac-only event,
+  read from a marker like every other.
+
+**Windows** already binds its native preview to `127.0.0.1`
+(`windows-app/Vendor/fetch-runtime.ps1`, commit 2d32ca9e5, 2026-08-19, which
+rewrites both of Quartz's bind sites in `handlers.js`). Its guard passes when
+only ONE of the two was rewritten, so a drifted websocket line would stay open
+without anyone noticing; that is a `windows` issue (#684's).
+
 ### Staying up to date
 
 The image tag is a hash of the folder's build recipe, so staleness is
@@ -1040,10 +1146,13 @@ started as:
 docker run -dit --name "teaching-quartz-${WORKDIR_ID}" \
     --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
     --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-    -p "${base}-$((base + 3)):8081-8084" \
-    -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+    -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
+    -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
     "$IMAGE" tail -f /dev/null
 ```
+
+Every address is published on `127.0.0.1` only, since GitHub #684 — see
+"Every preview address is this Mac's own" above.
 
 where `WORKDIR_ID` is the folder hash and `base` the walked port block. Since
 #280 this is made in ONE place, `create_the_workspace_on_free_ports` in the
@@ -1079,16 +1188,26 @@ section said "every launcher" until #94 counted them (2026-09-25):
 | No builds mount (`buildOutputLocation` — every container made before built sites moved out) | yes | yes | yes |
 | Running a different image than the recipe resolves (a container keeps the version it was made from) | yes | yes | **no** |
 | Missing the 9081–9084 live-reload ports (published ports cannot be added later) | yes | yes | **no** |
+| Its addresses published on every interface rather than on 127.0.0.1 (#684; made before it) | yes | yes | **no** |
 | `courses/` was created by this very run | yes | — | — |
 | Mount correct but not writable (a probe file made and deleted inside; macOS permission/ACL oddities after a move or restore) — while running, and again after starting | yes | **no** | yes |
 | The connection has gone stale (`getent hosts` of the destination fails; not for a folder publish) — while running, and again after starting | — | — | yes |
 
-That is **twenty places** (8 + 5 + 7), plus the three that retired the old
-shared `teaching-quartz` workspace. `deploy.sh` never checks the image or
-the live-reload ports: a publish runs in whatever workspace the last preview
-or build left, and the next preview remakes it. That is an inconsistency, not
+That is **twenty-two places** (9 + 6 + 7; #684 added one each to `setup.sh`
+and `preview.sh`), plus the three that retired the old shared
+`teaching-quartz` workspace, `preview.sh`'s #310 remake of an address another
+account held, and `start_the_existing_workspace`'s two remakes onto free
+addresses. Every one of them now passes its reason to `remake_the_workspace`
+as one word, and the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
+<place>` once the new workspace exists, which the app writes onto the trail
+as `folder set up again` (#684, `contracts/shared-rules.json`). `deploy.sh`
+never checks the image or the live-reload ports: a publish runs
+in whatever workspace the last preview or build left, and the next preview
+remakes it. That is an inconsistency, not
 a decision — written down here rather than fixed by #94, which is about what
-a remake may END, not about when one is due. `preview.sh` has no writability
+a remake may END, not about when one is due. (Not checking the BINDINGS there
+is the one part that IS a decision, #684: see "Remaking in `deploy.sh` too"
+among the rejected options above.) `preview.sh` has no writability
 check and no comment in it says why.
 
 Otherwise the container is started if stopped (`start_the_existing_workspace`
@@ -1905,7 +2024,9 @@ reader of the process table"); what counts is decided here:
   asked of `lsof -a -p <pid> -d cwd`, because this year's and last year's
   folders can hold the same course. One whose folder `lsof` cannot answer for
   still counts: a deploy of this very section is proved, only its folder is
-  not. The course and section are matched as the text the arguments of
+  not. Since #737, though, only if `ps -p` still finds it running. A deploy
+  that has ENDED between the table and `lsof` is skipped (see "A deploy that
+  has just ended is not a deploy (#737)", below). The course and section are matched as the text the arguments of
   `deploy.sh` BEGIN with, one space between words and a space after the
   section ("AP CALC 2 "), by the one reader both checks share: a
   course code may hold a space, which `ps` shows as two words, and until #382
@@ -2068,13 +2189,54 @@ the arguments are checked and before anything changes, and both exit 1.
   folder's id is that folder's; a label from before #237 names none and counts.
 - **`deploy.sh C S` for this section in this folder** (the "Terminal pair",
   director's ruling 9), counted as #381 counts it for previews: the program,
-  its working directory asked of `lsof`, still counted when `lsof` cannot say,
-  not counted when it only clears a token or prints its help.
+  its working directory asked of `lsof`, still counted when `lsof` cannot say
+  of one that is still running, not counted when it has ended since the table
+  was read (#737, below), and not counted when it only clears a token or
+  prints its help.
 - **Never this run itself or its ancestors.** A scheduled run's own legs are
   its script's children, and a folder deploy reruns `preview.sh --build-only`
   under its own `deploy.sh`; the reader's `mine` walk leaves both out. A
   second script of the SAME label that is not an ancestor — the newly set
   run's leg while the leftover works — does count.
+
+**A deploy that has just ended is not a deploy (#737, v1.9.1).** Both
+guards read the table and then ask `lsof` for each `deploy.sh C S`'s working
+folder. A `deploy.sh` that EXITS between the two looks leaves `lsof` nothing
+to answer. Under the rule "one whose folder cannot be asked counts", that run
+counted, in ANY folder, so a short deploy of the same course and section
+ending anywhere on the Mac at the wrong moment refused this one with
+"already being deployed".
+
+- **Measured** by the #668 second-fixes review, and again for #737, on this
+  Mac (M4 Pro, macOS 26.6): `scripts/test_deploy_sh_destination.py` passes
+  alone, but with three loops of short-lived `deploy.sh ICS3U 1 --target
+  netlify` running in folders of their own it failed **20 of 20** runs
+  (all "already being deployed"). With the fix, the same file and three
+  other deploy test files pass beside those loops: see the closing comment
+  on #737 for the runs.
+- **The fix.** When `lsof` says nothing, the guard asks `ps -p <pid> -o pid=`.
+  If that finds nothing, the process has ended and is skipped. If it finds
+  it, it counts, as #381 decided. The fix is in `what_is_deploying_this_section`
+  (identical in `deploy.sh` and `preview.sh`) and in #381's
+  `refuse_a_preview_while_its_section_deploys`, which had the same race.
+- **Rejected:**
+  - `kill -0 <pid>`, which the review suggested. It also FAILS for a process
+    of another account that is still running (EPERM), and that is the case
+    `lsof` cannot answer for which #381 counts on purpose.
+    `test_deploy_while_its_section_deploys.py` pins `ps -p` and still forbids
+    `kill -0` in the guard.
+  - Dropping the "cannot be asked counts" rule, which would let a live
+    deploy of this very section through whenever `lsof` failed.
+  - A shared contract case. This is the mac's two-look mechanics. Windows'
+    guards read one Win32_Process snapshot and take the folder from the
+    script's own path on its command line, so they never ask a second
+    question that a process can exit in front of.
+    `endedAfterTheTableWasRead` in the Python tests carries it instead.
+- **The tests' trail.** The four deploy test files the review named
+  (`test_deploy_sh_destination`, `test_deploy_non_interactive`,
+  `test_deploy_sh_questions`, `test_deploy_token_refusal`) set
+  `PLANTOIR_TRAIL_DIR` to a temporary folder, so a refused run in a test
+  never writes the real activity log (#738 covers the rest).
 
 **The table cannot be read: let it through.** Not for #381's reason (the
 leases do NOT cover a leftover run — that is the fault): failing closed would
@@ -2327,7 +2489,12 @@ all XNU compares).
     OS credential store, then delete the legacy entry.
   - On first run the script opens the Netlify token-creation page, validates
     the pasted token against `GET /api/v1/user`, and saves it.
-    `--reset-token` (or `--logout`) clears it.
+    `--reset-token` (or `--logout`) clears it. A SAVED token (Netlify's or
+    Cloudflare's) is cleared on its own only when the service answers 400,
+    401 or 403 in its own words (a web filter's block page is not a
+    refusal); with no answer the mac launcher keeps it and stops (#716,
+    `token_check_answer`; `deploy.ps1`'s half is #705) —
+    `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in

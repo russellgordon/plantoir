@@ -76,7 +76,9 @@ class PageSourcesTests(unittest.TestCase):
 
     def _copy_like_the_build(self, shared_folders, per_section_folders):
         """The copy in `build_section_site`, in its order: the front page, the
-        shared folders, then the per-section folders over them."""
+        shared folders, then the per-section folders over them. The last step
+        is the build's own function (#678), so what is credited to a section
+        here is exactly what the build credits."""
         bs = self.build_site
         bs.forget_vault_sources(self.course)
         self.content.mkdir(parents=True, exist_ok=True)
@@ -93,16 +95,7 @@ class PageSourcesTests(unittest.TestCase):
                     shutil.copy2(Path(root) / file, self.content / relative / file)
                     bs.remember_vault_source(self.content / relative / file, Path(root) / file,
                                              is_section_page=False)
-        for name in per_section_folders:
-            source_folder = self.section / name
-            destination = self.content / name
-            if source_folder.exists():
-                shutil.copytree(source_folder, destination, dirs_exist_ok=True)
-                for root, _dirs, files in os.walk(destination):
-                    for file in files:
-                        copied = Path(root) / file
-                        bs.remember_vault_source(copied, source_folder / copied.relative_to(destination),
-                                                 is_section_page=True)
+        bs.copy_the_per_section_folders(self.section, self.content, per_section_folders, 1)
 
     def _lay_out_the_course(self, front_page_text):
         _write(self.section / "index.md", front_page_text)
@@ -163,17 +156,43 @@ class PageSourcesTests(unittest.TestCase):
         self.assertNotIn("Unit-1/Notes.MD", pages)
 
     def test_a_shared_page_in_a_folder_that_is_per_section_too_names_the_shared_file(self):
-        # "Unit 1" is both shared and per-section in this course, and the
-        # per-section walk credits every file under it to section1/ - Lesson 3
-        # included, which section1/ does not have (#518 plan, noted for a
-        # toolchain issue). The list names the shared file that made it.
+        # "Unit 1" is both shared and per-section in this course. Lesson 3 is
+        # shared only, so it keeps the shared credit; Homework is the
+        # section's own, so the section's file is credited AND copied (#678;
+        # until then every file under the folder was credited to section1/,
+        # Lesson 3 included, which section1/ does not have).
         pages = self._the_list()["pages"]
-        found = self.build_site._vault_sources[self.content / "Unit 1" / "Lesson 3.md"]
-        self.assertEqual(found, (self.section / "Unit 1" / "Lesson 3.md", True), "the trap is still there")
+        bs = self.build_site
+        lesson = self.content / "Unit 1" / "Lesson 3.md"
+        homework = self.content / "Unit 1" / "Homework.md"
+        self.assertEqual(bs._vault_sources[lesson], (self.course / "Unit 1" / "Lesson 3.md", False),
+                         "a shared page is credited to a section file that does not exist")
+        self.assertEqual(bs._vault_sources[homework], (self.section / "Unit 1" / "Homework.md", True))
+        self.assertIn("This section's homework.", homework.read_text(encoding="utf-8"),
+                      "the section's page no longer wins over the shared one")
+        # The readers of the record: the names in folder problems, and the
+        # teacher's file the figure, quiz, GeoGebra and runnable-Swift checks
+        # read line numbers from.
+        self.assertEqual(bs._place_in_the_course(lesson, self.content), "Unit 1/Lesson 3")
+        self.assertTrue(bs._vault_source_of(lesson).is_file())
         self.assertEqual(pages["Unit-1/Lesson-3"]["source"], "Unit 1/Lesson 3.md")
+        for copied, (source, _is_section_page) in bs._vault_sources.items():
+            if copied.name != "My Progress.md":
+                self.assertTrue(source.is_file(), f"{copied} is credited to {source}, which is not there")
         for entry in pages.values():
             if "source" in entry:
                 self.assertTrue((self.course / entry["source"]).is_file(), entry)
+
+    def test_a_link_into_a_hidden_shared_page_names_the_shared_file(self):
+        # The #333 finding names both ends by their place in the course
+        # folder; a hidden shared page in a folder that is per-section too
+        # was named `section1/Unit 1/Hidden` until #678.
+        self._lay_out_the_course("---\ntitle: Section 1\n---\nWelcome.\n")
+        _write(self.section / "All Classes" / "Unit 1, Day 3.md",
+               "---\ntitle: Unit 1, Day 3\n---\nRead [[Hidden]] today.\n")
+        self._copy_like_the_build(["Unit 1"], ["Unit 1", "All Classes"])
+        found = self.build_site._links_into_hidden_pages(self.content)
+        self.assertIn({"from": "section1/All Classes/Unit 1, Day 3", "to": "Unit 1/Hidden"}, found)
 
     def test_the_front_page_that_only_embeds_a_class_shows_it(self):
         index = self._the_list()["pages"]["index"]

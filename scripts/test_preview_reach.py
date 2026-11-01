@@ -538,8 +538,9 @@ class WhoseAddressItIs(unittest.TestCase):
         # The remade line only after the remake returned (#310 review): a
         # remake #94 refused must never be recorded as done.
         body = function_named("announce_the_preview_address")
-        self.assertLess(body.find("    remake_the_workspace\n"),
-                        body.find('tell_the_app_the_address_was_held remade'))
+        remake = body.find("    remake_the_workspace addressTaken\n")
+        self.assertGreater(remake, -1, "the remake is no longer called with its reason (#684)")
+        self.assertLess(remake, body.find('tell_the_app_the_address_was_held remade'))
 
 
 def the_hostblock_remade_lines() -> list:

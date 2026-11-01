@@ -322,11 +322,16 @@ enum AssistContract {
                 course: course, section: section
             ),
             "obsidianIsAlreadyOpening": AssistWording.obsidianIsAlreadyOpening(course: course),
-            "obsidianIsNotOnThisMac": AssistWording.obsidianIsNotOnThisMac,
+            "obsidianIsNotOnThisMachine": AssistWording.obsidianIsNotOnThisMachine(
+                machine: MachineWord.placeholder
+            ),
             "openInObsidianIsInTheSectionWindow": AssistWording.openInObsidianIsInTheSectionWindow(
                 course: course, section: section
             ),
             "openInObsidianFoundNoWindow": AssistWording.openInObsidianFoundNoWindow(
+                course: course, section: section
+            ),
+            "openInObsidianDidNotOpen": AssistWording.openInObsidianDidNotOpen(
                 course: course, section: section
             ),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
@@ -353,6 +358,7 @@ enum AssistContract {
             "unitAlreadyHidden": AssistWording.unitAlreadyHidden(unitWord: "Unit", unit: 4),
             "answerWasCutOff": AssistWording.answerWasCutOff,
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
+            "wentRoundWithoutFinishing": AssistWording.wentRoundWithoutFinishing,
             "noCourseNamed": AssistWording.noCourseNamed,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
@@ -732,25 +738,18 @@ enum AssistContract {
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
             // Classes dated after the next class (#475): the question asked
-            // at Deploy and at Section ▸ Publish Pages…, and what an
-            // assistant is told when it cannot be asked.
+            // at Deploy (and, since #694, never at Section ▸ Publish
+            // Pages…), and what an assistant is told when it cannot be asked.
             "laterClassesTitle": AssistWording.laterClassesTitle(),
             "laterClassesTitleForAMeeting": AssistWording.laterClassesTitle(noun: .meeting),
             "laterClassesAtDeploy": AssistWording.laterClassesAtDeploy(nextDay: "Friday, 2026-10-09"),
             "laterClassesAtDeployForAMeeting": AssistWording.laterClassesAtDeploy(
                 nextDay: "Friday, 2026-10-09", noun: .meeting
             ),
-            "laterClassesAtPublish": AssistWording.laterClassesAtPublish(nextDay: "Friday, 2026-10-09"),
-            "laterClassesAtPublishForAMeeting": AssistWording.laterClassesAtPublish(
-                nextDay: "Friday, 2026-10-09", noun: .meeting
-            ),
             "laterClassesKeptNote": AssistWording.laterClassesKeptNote(),
             "laterClassesKeptNoteForAMeeting": AssistWording.laterClassesKeptNote(noun: .meeting),
             "laterClassesDay": AssistWording.laterClassesDay(weekday: "Wednesday", date: "2026-10-14"),
-            "hideTickedAndDeployButton": AssistWording.hideTickedAndDeployButton,
-            "keepAllAndDeployButton": AssistWording.keepAllAndDeployButton,
-            "leaveOutAndContinueButton": AssistWording.leaveOutAndContinueButton(count: 2),
-            "publishThemAllButton": AssistWording.publishThemAllButton,
+            "deployTickedButton": AssistWording.deployTickedButton,
             "deployHasClassesDatedLater": AssistWording.deployHasClassesDatedLater(
                 course: course, section: section, pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5"]), count: 1
             ),
@@ -797,6 +796,10 @@ enum AssistContract {
                         + "both renamed and re-dated — here 2",
                 "renaming": "how many of those are also renamed, here 1 in the "
                           + "…AndLinksFollow key and 0 in the …KeepingTheirNames one",
+                "machine": "the teacher's computer as a bare noun, which each app puts in itself: "
+                         + "Mac on the mac, PC on Windows (#698). Recorded in shared-rules.json "
+                         + "-> specialNames.platformWording.machine, whose usedIn names every "
+                         + "sentence that carries it",
             ],
             "wording": table,
         ]

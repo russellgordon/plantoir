@@ -12,22 +12,18 @@ struct SectionDetailView: View {
 
     @State var previewRunner = ScriptRunner()
 
-    /// Runs every configured destination in sequence — see
-    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
-    /// courses (exactly one destination) this behaves exactly like a
-    /// single `ScriptRunner` always did.
-    @State var deployRunner = MultiDestinationDeployRunner()
+    /// The run this view shows while the window has no working folder — a
+    /// moment, not a state anyone deploys from (`deployAndWait` refuses
+    /// without a folder). Every real deploy lives in `SectionRuns` (#706);
+    /// see `deployRun`.
+    @State var deployRunWithNoFolder: SectionDeployRun = SectionDeployRun()
 
-    /// True from the moment Deploy is pressed until `deployRunner` actually
-    /// starts running — the span spent stopping any preview and doing the
-    /// pre-flight checks below, before there is any real progress to show.
-    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
-    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
-    /// that has nothing to say yet — a fresh, idle runner renders as
-    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
-    /// runner still holding last time's finished outcome is no better,
-    /// since neither is what is actually happening right now.
-    @State var isPreparingDeploy: Bool = false
+    /// The section deploy's ending this view keeps off its console: set on
+    /// appearing when some view has already shown that ending (#706 review,
+    /// M1), so a finished deploy is shown on return only until one view has
+    /// displayed it. A later ending is a different number, so the next
+    /// deploy is shown as ever.
+    @State var deployEndingHiddenHere: Int? = nil
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
@@ -174,24 +170,19 @@ struct SectionDetailView: View {
     /// race that usually went the right way. A state, not an ordering.
     @State var unsavedSettingsNoticeOwner: UnsavedSettingsNoticeOwner? = nil
 
-    /// Folder problems the last build reported, shown once when it finishes.
-    ///
-    /// Held here rather than read from the runner at render time so that the
-    /// dialog appears ONCE per run: a teacher who dismisses it and carries on
-    /// editing must not have it thrown at them again on every redraw.
+    /// The folder problems the alert about new problems offers to repair
+    /// (#717): its NEW rows that have a repair, as the findings
+    /// `SiteHealthRepair` acts on. Empty when nothing new can be repaired.
     @State var healthFindings: [SiteHealthFinding] = []
 
-    /// Drives the dialog separately from the findings themselves, so the title
-    /// is not recomputed from an array that the dismissal is clearing.
-    /// Findings that arrived while a dialog was already up, waiting their turn
-    /// — each batch with the occasion it arrived on.
-    ///
-    /// The occasion travels WITH them because it decides what is offered next.
-    /// Held findings used to be shown with whatever the flag happened to be
-    /// from the previous batch, so a preview's findings held behind an
-    /// overnight publish were given the publish sentence, and the reverse told
-    /// somebody who had just published that only their preview was stale.
-    @State var heldHealthFindings: [(findings: [SiteHealthFinding], cameFromPublishing: Bool)] = []
+    /// The record the alert about new problems is about, while it is up
+    /// (#717). The alert replaced the per-build folder-problem dialog: it is
+    /// raised only when a build found something NEW, once per record's alert
+    /// key (`sectionProblems.alert`), and points at the Problems tab. Nothing
+    /// is queued behind another dialog: an alert that is due stays due in the
+    /// store until it is answered, so whatever is in front of it going away
+    /// is enough to raise it (`showAnythingWaiting`).
+    @State var problemsAlert: SectionProblemsRecord?
 
     /// What a repair just did, while that is being shown.
     @State var repairOutcome: SiteHealthRepair.Outcome?
@@ -236,6 +227,9 @@ struct SectionDetailView: View {
 
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
+
+    /// For the deploy refusal's Open Settings… (#668).
+    @Environment(\.openSettings) var openSettings
 
     /// Whether this section's pages have changed since it last published
     /// — the " — Edited" marker in the title bar.
@@ -307,6 +301,46 @@ struct SectionDetailView: View {
         return previewRunner.isRunning || deployRunner.isRunning
     }
 
+    /// This section's deploy, as the app holds it for the life of the app
+    /// rather than for the life of this view (#706): the view is rebuilt on
+    /// every selection, and a deploy outlives it. A view that comes back to
+    /// the section finds the same object the deploy is still writing.
+    ///
+    /// For `body` only. Anything that AWAITS — `deployAndWait`,
+    /// `cancelDeploy` — takes the run once, from the folder it has already
+    /// checked, and keeps that object: this property is asked again on
+    /// every read, and a window pointed at another folder mid-deploy would
+    /// otherwise hand the second half of a deploy a different run (#706
+    /// plan review, H1).
+    var deployRun: SectionDeployRun {
+        guard let folder = workspace.workspaceURL else {
+            return deployRunWithNoFolder
+        }
+        return SectionRuns.shared.deploy(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    /// Runs every configured destination in sequence — see
+    /// `MultiDestinationDeployRunner`. For the overwhelming majority of
+    /// courses (exactly one destination) this behaves exactly like a
+    /// single `ScriptRunner` always did. Read through `deployRun`, so it is
+    /// the section's runner, not this view's.
+    var deployRunner: MultiDestinationDeployRunner {
+        return deployRun.runner
+    }
+
+    /// True from the moment Deploy is pressed until `deployRunner` actually
+    /// starts running — the span spent stopping any preview and doing the
+    /// pre-flight checks below, before there is any real progress to show.
+    /// `consoleArea` shows a plain "Preparing to deploy…" placeholder while
+    /// this is true, instead of `TaskProgressView` bound to a `deployRunner`
+    /// that has nothing to say yet — a fresh, idle runner renders as
+    /// nothing at all (see `deployAndWait()`), and the PREVIOUS deploy's
+    /// runner still holding last time's finished outcome is no better,
+    /// since neither is what is actually happening right now.
+    var isPreparingDeploy: Bool {
+        return deployRun.isPreparing
+    }
+
     /// Whether Option re-titles THIS window's Preview button (#504): only
     /// while the window is key. `controlActiveState` is read first, so a
     /// window that is not key never reads the watcher and is not redrawn as
@@ -335,7 +369,59 @@ struct SectionDetailView: View {
     /// The Deploy button's enablement — read by the button and by Section ▸
     /// Deploy… alike (#457). See the button for each clause's reason.
     var deployButtonIsEnabled: Bool {
-        return !(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+        return SectionDetailView.deployIsAvailable(
+            run: deployRun,
+            folderPath: workspace.workspaceURL?.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            isBeingCopied: workspace.isBeingCopied(course.code),
+            folderIsGettingReady: workspace.folderIsGettingReady
+        )
+    }
+
+    /// Whether Deploy may be pressed for a section (#706) — the button,
+    /// Section ▸ Deploy… and ⇧⌘D all ask this, and `deployAndWait` and
+    /// `deployWillBeRefused` ask its first half, `deployIsUnderWay`.
+    ///
+    /// Not while a copy of the course is being zipped (#351): a removal
+    /// waiting on that zip deletes what this would publish. Not while the
+    /// folder's tools are still being copied (#476).
+    static func deployIsAvailable(
+        run: SectionDeployRun,
+        folderPath: String?,
+        courseCode: String,
+        sectionNumber: Int,
+        isBeingCopied: Bool,
+        folderIsGettingReady: Bool
+    ) -> Bool {
+        if deployIsUnderWay(run: run, folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber) {
+            return false
+        }
+        return !(isBeingCopied || folderIsGettingReady)
+    }
+
+    /// Whether this app is deploying the section already (#706): its run is
+    /// preparing or running, or — from any window, or the assistant with no
+    /// window at all — `CourseActivity` has the section publishing. The
+    /// second clause is what a view that came back to the section cannot
+    /// see in its run when the deploy was started by somebody else in this
+    /// app. Another PROGRAM's deploy is not asked here: see
+    /// `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
+    static func deployIsUnderWay(
+        run: SectionDeployRun,
+        folderPath: String?,
+        courseCode: String,
+        sectionNumber: Int
+    ) -> Bool {
+        if run.isPreparing || run.runner.isRunning {
+            return true
+        }
+        guard let folderPath else {
+            return false
+        }
+        return CourseActivity.sectionPublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
     }
 
     // MARK: - Body
@@ -373,6 +459,20 @@ struct SectionDetailView: View {
                 // whose it is.
                 UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
             }
+            // Website | Problems (#717), only while the section's last build
+            // found something: a section with no problems shows what it
+            // always has. Outside the stack, like the notices, so the site
+            // below never moves between containers.
+            if showsTheProblemsTab {
+                DetailTabs(
+                    tabs: [
+                        (tab: SectionProblems.Tab.website, title: SectionProblemsWording.tabWebsite),
+                        (tab: SectionProblems.Tab.problems, title: SectionProblemsWording.tabProblems),
+                    ],
+                    selection: selectedTabBinding,
+                    identifier: "sectionTabs"
+                )
+            }
             ZStack {
                 // Base layer: always laid out in the normal, safe-area
                 // respecting flow. Keeping it mounted means its geometry is
@@ -380,7 +480,7 @@ struct SectionDetailView: View {
                 // which is what dragged the progress header under the
                 // window's toolbar when a preview was restarted.
                 VStack(spacing: 0) {
-                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRun.isShown(hidingEnding: deployEndingHiddenHere) {
                         consoleArea
                     } else {
                         // Fills the height it is offered, which is what keeps
@@ -419,6 +519,36 @@ struct SectionDetailView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("previewWebView")
                 }
+
+                // Top layer: the Problems tab (#717), drawn OVER the site and
+                // the console rather than instead of them, so the live web
+                // view underneath keeps its page and its scroll.
+                if selectedTab == .problems, let folder = workspace.workspaceURL, let record = problemsRecord {
+                    ProblemsTableView(
+                        course: course,
+                        sectionNumber: sectionNumber,
+                        folder: folder,
+                        record: record,
+                        others: SectionProblems.shared.otherRecords(folder: folder, course: course, sectionNumber: sectionNumber),
+                        repair: repairFromTheProblemsTab
+                    )
+                }
+            }
+            // The build's word that this section's Problems record changed
+            // (#717): mid-build, before Quartz, so the alert keeps the timing
+            // the folder-problem dialog had (a missing front page stops the
+            // preview finishing, #153). On the stack rather than the view's
+            // own chain, which is at the type-checker's limit.
+            .onChange(of: previewRunner.problemsMarkers.count) { _, _ in
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
+            }
+            // Any other run in this app that printed one — the in-app
+            // assistant's build of this section above all (implementation
+            // review L5): the open section follows its record whoever built.
+            .onChange(of: SectionProblems.shared.markersArrived) { _, _ in
+                reloadTheProblems()
+                raiseTheProblemsAlertIfDue()
             }
         }
         .navigationTitle(titleText)
@@ -435,6 +565,10 @@ struct SectionDetailView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshEditedMarker()
+            // A build this window did not watch — the MCP server's, a
+            // terminal's — may have rewritten the Problems record (#717).
+            reloadTheProblems()
+            raiseTheProblemsAlertIfDue()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             refreshEditedMarker()
@@ -612,6 +746,12 @@ struct SectionDetailView: View {
             // job, above. The trail line belongs to the run, not to either of
             // these reads.
             loadStoppedScheduledPublish()
+            // A deploy of this section that outlived the view before this one
+            // (#706): what it left for whoever shows the section next. An
+            // ending some view has already shown is kept off this console
+            // first (#706 review, M1), before this view counts as showing it.
+            deployEndingHiddenHere = deployRun.endingToHideOnAppearing()
+            takeWhatTheDeployLeft(onAppearing: true)
             guard let folder = workspace.workspaceURL else {
                 return
             }
@@ -655,44 +795,25 @@ struct SectionDetailView: View {
             takeAVerbRequestIfItIsMine()
         }
         .task {
-            // Anything the overnight publish found. It ran with the app
-            // closed, so this is the first moment there is anywhere to say it
-            // — and `takeFolderProblems` consumes the record, so it is
-            // reported once rather than every time this window opens.
-            // Guard BEFORE consuming: `takeFolderProblems` deletes the record
-            // as it reads it, so taking it while a dialog is already up threw
-            // the overnight findings away permanently.
-            guard healthFindings.isEmpty, let workingFolderURL = workspace.workspaceURL else {
+            // What a build this window did not watch found — an overnight
+            // deploy, the assistant, the MCP server, a terminal (#717). The
+            // section's Problems record is the one list: it is read here, and
+            // its alert raised when it found something new that nobody has
+            // answered (`sectionProblems.alert`), which replaces showing the
+            // overnight run's folder problems in a dialog of their own.
+            guard let workingFolderURL = workspace.workspaceURL else {
                 return
             }
-            let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+            // The overnight run's own copy of its findings is still TAKEN, so
+            // it does not pile up; its trail line was written by the run. The
+            // record holds the same problems, one row each.
+            _ = ScheduledDeploy.takeFolderProblems(
                 courseCode: course.code, sectionNumber: sectionNumber,
                 inWorkingFolder: workingFolderURL
             )
-            // The #333 finding leaves the alert only when the checklist will
-            // really be shown after it; otherwise the alert is the floor.
+            reloadTheProblems()
             let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
-            // Also left out when the teacher has already answered this very
-            // offer — shown while the window was open, say — so the alert does
-            // not return for a finding they acted on (implementation review, N7).
-            var alreadyAnswered: Bool = false
-            if checklist == nil, !course.isKeptForReference,
-               let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) {
-                alreadyAnswered = !LinksChecklistGate.holdsSomethingNew(
-                    read.offer,
-                    answered: LinksChecklistAnswered.read(courseDirectory: course.directoryURL, section: sectionNumber)
-                )
-            }
-            let waiting: [SiteHealthFinding] = LinksChecklistRouting.findingsForTheAlert(
-                taken, checklistWillBeShown: checklist != nil || alreadyAnswered
-            )
-            if !waiting.isEmpty {
-                healthFindings = waiting
-                // The overnight run PUBLISHED, so the sentence must say that
-                // students are still seeing the old site.
-                healthFindingsCameFromPublishing = true
-                healthDialog = .findings
-            }
+            raiseTheProblemsAlertIfDue()
             // After the alert is up, so it waits behind it.
             if let checklist {
                 requestLinksChecklist(checklist)
@@ -733,6 +854,19 @@ struct SectionDetailView: View {
             Text(previewAlertMessage)
         }
         .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
+            // The Account ID is put right in Settings, so the refusal that
+            // names it offers the way there (#668) — the refusal every new
+            // course meets at its first deploy now that Cloudflare Pages is
+            // the default. OK stays the default button.
+            if PublishingDestinations.deployRefusalOpensSettings(
+                refusal: deployRefusal ?? "", cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            ) {
+                Button("Open Settings…") {
+                    deployRefusal = nil
+                    SettingsPane.select(.deploying)
+                    openSettings()
+                }
+            }
             Button("OK") {
                 deployRefusal = nil
             }
@@ -750,6 +884,15 @@ struct SectionDetailView: View {
         .alert(healthAlertTitle, isPresented: healthDialogBinding) {
             switch healthDialog {
             case .findings:
+                // The alert about new problems (#717): Show opens the
+                // section's Problems tab. Every answer is remembered by the
+                // record's alert key, so it is not raised again.
+                Button(SectionProblemsWording.show) {
+                    answerTheProblemsAlert("Show")
+                    if let folder = workspace.workspaceURL {
+                        SectionProblems.shared.show(.problems, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+                    }
+                }
                 // No repair on a course kept for reference. The findings
                 // themselves still REPORT — a teacher may want to know a
                 // folder is missing — but the button would have offered to
@@ -769,6 +912,7 @@ struct SectionDetailView: View {
                         // before this alert appeared, and an alert on this
                         // window does not make it key again.
                         defer { refreshEditedMarker() }
+                        answerTheProblemsAlert("the repair")
                         // Only REMEMBERED here: the outcome is shown once this
                         // alert has actually gone, from `onChange`. Raising a
                         // second alert from inside this action loses one of
@@ -780,11 +924,14 @@ struct SectionDetailView: View {
                     }
                 }
                 // "OK" only when it is the only answer: beside a verb it
-                // reads as "yes, do it" (#457, the HIG sweep).
+                // reads as "yes, do it" (#457, the HIG sweep) — and Show is
+                // always beside it.
                 Button(SiteHealthRepair.dismissTitle(
-                    besideAnAction: !course.isKeptForReference && SiteHealthRepair.buttonTitle(for: healthFindings) != nil,
+                    besideAnAction: true,
                     afterARepair: false
-                ), role: .cancel) { }
+                ), role: .cancel) {
+                    answerTheProblemsAlert("Not Now")
+                }
             case .outcome:
                 if repairOutcome?.canRebuild == true {
                     Button("Preview Again") {
@@ -818,6 +965,7 @@ struct SectionDetailView: View {
         .onChange(of: healthDialog == nil) { _, isGone in
             if isGone {
                 healthFindings = []
+                problemsAlert = nil
                 repairOutcome = nil
                 showAnythingWaiting()
                 showAVerbResultIfWaiting()
@@ -839,6 +987,7 @@ struct SectionDetailView: View {
         .sheet(item: $linksChecklist, onDismiss: {
             refreshEditedMarker()
             showAVerbResultIfWaiting()
+            raiseTheProblemsAlertIfDue()
         }, content: { model in
             LinksChecklistSheet(model: model, onPublished: {
                 refreshEditedMarker()
@@ -852,7 +1001,6 @@ struct SectionDetailView: View {
                 model: model,
                 pressDefault: { pressDefault(in: model) },
                 cancel: { cancelVerbSheet(model) },
-                keepAll: { keepAllAtDeploy(model) },
                 verbs: workspace.sectionVerbsIfMade
             )
         })
@@ -863,6 +1011,43 @@ struct SectionDetailView: View {
             if isGone {
                 showAVerbResultIfWaiting()
             }
+        }
+        // A deploy of this section ended — started here, or by a view of it
+        // that has since gone (#706).
+        .onChange(of: deployRun.endings) { _, _ in
+            takeWhatTheDeployLeft(onAppearing: false)
+        }
+    }
+
+    /// Takes what this section's deploy left for the view showing it
+    /// (#706): its folder problems once it has ended, and — on appearing,
+    /// while it still runs — the sentence it said about unsaved settings.
+    ///
+    /// The findings are TAKEN, read and cleared on the run, so exactly one
+    /// view raises the dialog: the one showing the section when the deploy
+    /// ended, or else the next one to appear. Two windows on one section
+    /// would otherwise both raise it (#706 plan review, L5).
+    func takeWhatTheDeployLeft(onAppearing: Bool) {
+        let run: SectionDeployRun = deployRun
+        if onAppearing, run.isBusy, unsavedSettingsNotice == nil, let notice = run.unsavedSettingsNotice {
+            unsavedSettingsNotice = notice
+            unsavedSettingsNoticeOwner = .deploy
+        }
+        // The findings a deploy left are routed for the links checklist
+        // (#379) and nothing more: the alert about them is the Problems
+        // record's, raised below once the deploy has ended — one dialog,
+        // never a second beside it (#717, plan review MED 8).
+        if run.takeFindings() {
+            showHealthFindings(from: run.runner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        }
+        if !run.isBusy {
+            reloadTheProblems()
+            raiseTheProblemsAlertIfDue()
+        }
+        // This view is showing how it ended — live, or on appearing — so the
+        // next view to come to the section shows its ordinary state.
+        if !run.isBusy && run.endings > 0 {
+            run.noteEndingShown()
         }
     }
 
@@ -876,17 +1061,15 @@ struct SectionDetailView: View {
         if healthDialog == .outcome {
             return repairOutcome?.headline ?? ""
         }
-        if healthFindings.count == 1 {
-            return healthFindings[0].sentence
-        }
-        if healthFindings.isEmpty {
+        guard let problemsAlert else {
             // Reached only while the alert is being torn down, after the
-            // findings have been cleared. Saying "0 things need your attention"
-            // there is the unreachable-by-design string made reachable, which
-            // this view has now met twice.
+            // record has been let go — the unreachable-by-design string made
+            // reachable, which this view met twice when it counted findings.
             return ""
         }
-        return "\(healthFindings.count) things need your attention"
+        return SectionProblemsWording.alertTitle(
+            newCount: problemsAlert.newIDs.count, course: course.displayCode, section: sectionNumber
+        )
     }
 
     var healthDialogBinding: Binding<Bool> {
@@ -904,15 +1087,120 @@ struct SectionDetailView: View {
         if healthDialog == .outcome {
             return repairOutcome?.detail ?? ""
         }
-        var paragraphs: [String] = []
-        for finding in healthFindings {
-            if healthFindings.count == 1 {
-                paragraphs.append(finding.detail)
-            } else {
-                paragraphs.append(finding.sentence + "\n" + finding.detail)
-            }
+        guard let problemsAlert else {
+            return ""
         }
-        return paragraphs.joined(separator: "\n\n")
+        return SectionProblemsWording.alertMessage(
+            newRows: SectionDetailView.newRows(of: problemsAlert), goneCount: problemsAlert.goneIDs.count
+        )
+    }
+
+    /// The rows a record found new, in the record's order.
+    static func newRows(of record: SectionProblemsRecord) -> [SectionProblemRow] {
+        var found: [SectionProblemRow] = []
+        for row in record.rows where record.newIDs.contains(row.id) {
+            found.append(row)
+        }
+        return found
+    }
+
+    // MARK: - The section's problems (#717)
+
+    /// This section's Problems record, as the store last read it.
+    var problemsRecord: SectionProblemsRecord? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return SectionProblems.shared.record(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    /// Website | Problems is shown only while the record has rows.
+    var showsTheProblemsTab: Bool {
+        return SectionProblemsRules.markerShows(problemsRecord)
+    }
+
+    /// The tab showing: Website whenever there are no problems to show.
+    var selectedTab: SectionProblems.Tab {
+        guard let folder = workspace.workspaceURL else {
+            return .website
+        }
+        return SectionProblems.shared.tab(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+    }
+
+    var selectedTabBinding: Binding<SectionProblems.Tab> {
+        return Binding(
+            get: { selectedTab },
+            set: { chosen in
+                if let folder = workspace.workspaceURL {
+                    SectionProblems.shared.show(chosen, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
+                }
+            }
+        )
+    }
+
+    /// Reads this course's records again — every section's, because one
+    /// section's build decides what another's rows say (`rowState`).
+    func reloadTheProblems() {
+        guard let folder = workspace.workspaceURL else {
+            return
+        }
+        SectionProblems.shared.reload(folder: folder, course: course)
+    }
+
+    /// Raises the alert about new problems when this section's record has
+    /// one nobody has answered (`sectionProblems.alert`) and nothing else is
+    /// in front of it. Answers whether it did. Not raised behind another
+    /// dialog or a sheet: it stays due in the store, and each of those
+    /// going away asks again.
+    @discardableResult
+    func raiseTheProblemsAlertIfDue() -> Bool {
+        if healthDialog != nil || previewAlertIsUp {
+            return false
+        }
+        if linksChecklist != nil || verbSheet != nil {
+            return false
+        }
+        guard let folder = workspace.workspaceURL,
+              let due = SectionProblems.shared.recordWithAnAlertDue(
+                folder: folder, courseCode: course.code, sectionNumber: sectionNumber
+              ) else {
+            return false
+        }
+        var repairable: [SiteHealthFinding] = []
+        for row in SectionDetailView.newRows(of: due) where row.fixable {
+            repairable.append(SiteHealthFinding(
+                name: row.kind, sentence: row.sentence, detail: row.detail,
+                fixable: true, course: course.code, section: sectionNumber
+            ))
+        }
+        problemsAlert = due
+        healthFindings = repairable
+        // A deploy's record says students still see the old site.
+        healthFindingsCameFromPublishing = due.occasion == "deploy"
+        healthDialog = .findings
+        return true
+    }
+
+    /// Remembers the answer to the alert on screen, and puts it on the trail.
+    func answerTheProblemsAlert(_ answer: String) {
+        guard let problemsAlert, let folder = workspace.workspaceURL else {
+            return
+        }
+        SectionProblems.shared.answer(
+            problemsAlert, with: answer, folder: folder, courseCode: course.code, sectionNumber: sectionNumber
+        )
+    }
+
+    /// The Problems tab's own repair button: the alert's repair, for one
+    /// problem, with its outcome shown the way the alert shows it.
+    func repairFromTheProblemsTab(_ finding: SiteHealthFinding) {
+        guard healthDialog == nil else {
+            return
+        }
+        let occasion: SiteHealthRepair.Occasion = problemsRecord?.occasion == "deploy" ? .publishing : .building
+        repairOutcome = SiteHealthRepair.outcome(ofRepairing: [finding], in: course, occasion: occasion)
+        healthDialog = .outcome
+        refreshEditedMarker()
     }
 
     /// Shows whatever is queued, now that the dialog it was queued behind has
@@ -929,11 +1217,9 @@ struct SectionDetailView: View {
             healthDialog = .outcome
             return
         }
-        if !heldHealthFindings.isEmpty {
-            let next = heldHealthFindings.removeFirst()
-            healthFindings = next.findings
-            healthFindingsCameFromPublishing = next.cameFromPublishing
-            healthDialog = .findings
+        // The alert about new problems, when one is due (#717) — before the
+        // links checklist, which follows it.
+        if raiseTheProblemsAlertIfDue() {
             return
         }
         // The links checklist follows the alert (#379), never over it — nor
@@ -1053,11 +1339,14 @@ struct SectionDetailView: View {
         }
     }
 
-    /// Puts a finished run's folder problems in front of the teacher.
+    /// Routes a run's #333 finding to the links checklist (#379).
     ///
-    /// Only when the run actually produced some — a healthy course must never
-    /// see a dialog, which is the difference between a warning that gets read
-    /// and one that gets dismissed by habit.
+    /// Before #717 this also put every finding in a dialog, on every build
+    /// that had any. The section's Problems record is the list now, one row
+    /// per problem, and its alert is raised only when the build found
+    /// something NEW (`raiseTheProblemsAlertIfDue`), from the record's
+    /// marker rather than from these findings. What is left here is the one
+    /// thing a finding still decides: whether the checklist is offered.
     func showHealthFindings(
         from runner: ScriptRunner?, cameFromPublishing: Bool = false, buildHasFinished: Bool = false
     ) {
@@ -1065,35 +1354,12 @@ struct SectionDetailView: View {
             return
         }
         // The #333 finding goes to the links checklist when this build wrote
-        // an offer for it (#379); everything else, and the finding itself
-        // when there is no offer, goes in the alert as before.
-        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+        // an offer for it (#379). The rest — and the finding itself when
+        // there is no offer — are rows on the Problems tab.
+        _ = routeTheLinksFinding(
             in: runner.healthFindings, from: runner,
             cameFromPublishing: cameFromPublishing, buildHasFinished: buildHasFinished
         )
-        if forTheAlert.isEmpty {
-            return
-        }
-        // Never swap the contents of a dialog that is already up: the title
-        // and the message would change under the teacher's cursor, and the
-        // findings they were reading would vanish unacknowledged.
-        //
-        // But HELD, not dropped. Returning early discarded them — and the
-        // failed-deploy path can arrive while the overnight findings are
-        // already on screen, so this is reachable rather than theoretical.
-        // Held behind the preview alert too (#397): the question about
-        // today's class can stay up while an assistant's build finishes.
-        if healthDialog != nil || previewAlertIsUp {
-            // Appended, not assigned: three arrivals during one dialog used to
-            // lose the middle batch.
-            heldHealthFindings.append(
-                (findings: forTheAlert, cameFromPublishing: cameFromPublishing)
-            )
-            return
-        }
-        healthFindings = forTheAlert
-        healthFindingsCameFromPublishing = cameFromPublishing
-        healthDialog = .findings
     }
 
     // MARK: - The links checklist (#379)
@@ -1177,20 +1443,12 @@ struct SectionDetailView: View {
             return
         }
         heldLinksFinding = nil
-        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+        // Offered the checklist when the build wrote an offer; otherwise the
+        // finding is a row on the Problems tab like every other (#717).
+        _ = routeTheLinksFinding(
             in: [held.finding], from: runner,
             cameFromPublishing: held.cameFromPublishing, buildHasFinished: buildHasFinished
         )
-        if forTheAlert.isEmpty {
-            return
-        }
-        if healthDialog != nil || previewAlertIsUp {
-            heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
-            return
-        }
-        healthFindings = forTheAlert
-        healthFindingsCameFromPublishing = held.cameFromPublishing
-        healthDialog = .findings
     }
 
     /// Show it now, or after the alert in front of it.
@@ -1646,7 +1904,7 @@ struct SectionDetailView: View {
         return SectionDetailView.showsDeployProgress(
             previewIsRunning: previewRunner.isRunning,
             deployIsRunning: deployRunner.isRunning,
-            previewStartedAt: previewRunner.startedAt,
+            previewStartedAt: previewRunner.startedAt ?? deployRun.previewLastStartedAt,
             deployStartedAt: deployRunner.startedAt
         )
     }
@@ -1967,6 +2225,14 @@ struct SectionDetailView: View {
                 arguments: [course.code, String(sectionNumber), "--port", String(lease.port)],
                 workingDirectory: workspaceURL
             )
+            // Said to the section's run, so a view that comes back later
+            // knows this preview is newer than the last deploy (#706 review,
+            // M1): its own preview runner will have no start time at all.
+            if let previewStartedAt = previewRunner.startedAt {
+                SectionRuns.shared.deploy(
+                    folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+                ).notePreviewStarted(at: previewStartedAt)
+            }
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas, startRequest: request)
 
             // A second chance, for the ordinary case where the wait finished
@@ -2043,15 +2309,21 @@ struct SectionDetailView: View {
     }
 
     /// Cancels the running deploy from the progress view.
+    ///
+    /// Against the folder the DEPLOY noted (`SectionDeployRun.folder`), not
+    /// this view's note: the view pressing Cancel may be one that came back
+    /// to the section after the view that started the deploy had gone
+    /// (#706), and it never noted anything.
     func cancelDeploy() {
-        if deployRunner.isRunning, let workspaceURL = folderThisSectionWorksIn {
+        let run: SectionDeployRun = deployRun
+        if run.runner.isRunning, let workspaceURL = run.folder {
             PreviewStopper.stopSectionProcesses(
                 courseCode: course.code,
                 sectionNumber: sectionNumber,
                 workspaceURL: workspaceURL
             )
         }
-        deployRunner.cancel()
+        run.runner.cancel()
     }
 
     /// Hands the port back, whatever ended the preview.
@@ -2241,12 +2513,26 @@ struct SectionDetailView: View {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
-        // The toolbar button disables itself on `isPreparingDeploy`, but the
-        // assistant reaches this function directly, with no button to have
-        // disabled — guard here too, or two overlapping deploys can run at
-        // once and stomp on `deployRunner`'s shared state (legs, startedAt)
-        // as each writes over the other's.
-        if isPreparingDeploy || deployRunner.isRunning {
+        // The section's run, taken ONCE from the folder just checked, and the
+        // only one this function touches from here on (#706 plan review, H1):
+        // `deployRun` is asked again on every read, and a window pointed at
+        // another folder during one of the awaits below would hand the rest
+        // of this deploy a different section's run.
+        let run: SectionDeployRun = SectionRuns.shared.deploy(
+            folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+        )
+        // The toolbar button disables itself while the section deploys, but
+        // the assistant reaches this function directly, with no button to
+        // have disabled — guard here too, or two overlapping deploys can run
+        // at once and stomp on the runner's shared state (legs, startedAt) as
+        // each writes over the other's. `deployIsUnderWay` also asks
+        // `CourseActivity`, so a deploy of this section started from a view
+        // that has since gone, another window, or the assistant with no
+        // window is refused in words here rather than reaching the launcher
+        // (#706).
+        if SectionDetailView.deployIsUnderWay(
+            run: run, folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        ) {
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -2294,6 +2580,13 @@ struct SectionDetailView: View {
         // redundancy run would waste the teacher's time and let some
         // destinations quietly go out while others never got the chance.
         if let problem = uses.refusal {
+            // On the trail when it is the Account ID (#668): the refusal a
+            // new course meets at its first deploy, by kind, never the ID.
+            if let line = ActivityTrail.deployRefusedForTheAccountIDLine(
+                destinations: destinations, cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            ) {
+                ActivityTrail.note(.deployRefusedForTheAccountID, line, course: saved.code, section: sectionNumber)
+            }
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
             )
@@ -2331,22 +2624,31 @@ struct SectionDetailView: View {
 
         // Claim the console for the deploy panel before touching the preview
         // runner below. Stopping a running preview here sets its own
-        // `wasStoppedByUser`, which — until `deployRunner.run()` gives this a
+        // `wasStoppedByUser`, which — until `run.runner.run()` gives this a
         // real timestamp a little further down — left `showsDeployProgress`
         // comparing stale timestamps and picking the just-stopped preview
         // panel, flashing "Stopped" for a beat before the deploy panel took
         // over. Marking the deploy as started immediately keeps the console
         // on the deploy panel through that whole window.
         //
-        // `isPreparingDeploy` covers what that timestamp alone does not:
-        // `deployRunner.legs` still holds the PREVIOUS deploy's runners
+        // `run.isPreparing` covers what that timestamp alone does not:
+        // `run.runner.legs` still holds the PREVIOUS deploy's runners
         // (finished, one way or another) until `run()` replaces them with
         // fresh ones a little further down, and `consoleArea` must not show
         // either that stale outcome or the flat-out blank a fresh, unstarted
         // runner renders as — neither is what is actually happening right
         // now, which is: getting ready to deploy.
-        deployRunner.startedAt = Date()
-        isPreparingDeploy = true
+        run.runner.startedAt = Date()
+        run.isPreparing = true
+        // Cleared on EVERY way out, not only the two this function names
+        // below: nothing else resets it now that the run outlives the view
+        // (#706 plan review, L5), and one left true would hold the section's
+        // Deploy unavailable until quit.
+        defer {
+            run.isPreparing = false
+        }
+        // What the previous deploy left and nobody took is about that deploy.
+        run.findingsAreWaiting = false
 
         // Stop any running or building preview before deploying, and wait for
         // container processes to exit so they cannot kill or race the deploy build.
@@ -2365,6 +2667,7 @@ struct SectionDetailView: View {
         // still see why — and the next preview or deploy replaces it.
         unsavedSettingsNotice = uses.notice
         unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy
+        run.unsavedSettingsNotice = uses.notice
         if uses.notice != nil {
             SettingsSaveNotice.noteDeployUsedTheSavedSettings(
                 act: pressedByTheAssistant
@@ -2386,12 +2689,12 @@ struct SectionDetailView: View {
         // two lines up, at whatever the window happens to show now.
         // `cancelDeploy()` reclaims the container-side build against it.
         folderThisSectionWorksIn = workspaceURL
+        run.folder = workspaceURL
 
         // What the Deploy button's `disabled` says, said in words. The
         // assistant reaches this by pressing the button while a deploy is
         // already running in this window.
-        if deployRunner.isRunning {
-            isPreparingDeploy = false
+        if run.runner.isRunning {
             return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
@@ -2402,16 +2705,16 @@ struct SectionDetailView: View {
 
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: saved, sectionNumber: sectionNumber)
 
-        // The real progress panel takes over from here — `deployRunner.run()`
-        // is about to give `deployRunner.legs` fresh runners of its own and
-        // start reporting real progress on them.
-        isPreparingDeploy = false
+        // The real progress panel takes over from here — `run.runner.run()`
+        // is about to give its legs fresh runners of their own and start
+        // reporting real progress on them.
+        run.isPreparing = false
 
         // What the launcher is asked to do, for each destination, is
         // decided in one place — shared with the scheduled deploy and the
         // assistant's headless path, so an alarm set for half six sends
         // the site to the same destinations this button does.
-        await deployRunner.run(
+        await run.runner.run(
             course: saved,
             sectionNumber: sectionNumber,
             destinations: destinations,
@@ -2428,14 +2731,16 @@ struct SectionDetailView: View {
         // (#439) is said as itself, not as "could not be built" — the shared
         // answer, which the windowless assistant asks too, decides which.
         if let buildAnswer = MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish(
-            course: course.code, section: String(sectionNumber), firstLeg: deployRunner.legs.first
+            course: course.code, section: String(sectionNumber), firstLeg: run.runner.legs.first
         ) {
             // Show the folder problems HERE too. A build that failed because
             // the curriculum folder or Media is missing is the case where the
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
-            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+            // Through the run (#706): the view that pressed Deploy may have
+            // gone, and whichever view shows the section takes them.
+            run.noteEnded()
             return said(buildAnswer)
         }
 
@@ -2443,13 +2748,14 @@ struct SectionDetailView: View {
         // paths above, so a deploy that did not publish is not headlined by a
         // folder warning. Taken from the FIRST leg: every destination publishes
         // the same built site, so a second leg only repeats the findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        // Handed over through the run, as above (#706).
+        run.noteEnded()
 
         return said(MultiDestinationDeployRunner.result(
             course: course.code,
             section: String(sectionNumber),
             destinationCount: destinations.count,
-            outcome: deployRunner.outcome
+            outcome: run.runner.outcome
         ))
     }
 

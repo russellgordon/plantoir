@@ -32,8 +32,12 @@
 #
 # WHAT IT DOES NOT COVER, AND WHY THAT IS HONEST
 # ==============================================
-# `additional_deploy_targets` is not handled by `deploy.sh` at all — the APP
-# loops over the destinations and calls the launcher once per destination.
+# The APP loops over a course's destinations and calls the launcher once per
+# destination, naming each one — `--target netlify` included since #668,
+# because a `deploy.sh` given NO destination now reads the course's saved
+# destinations itself and runs every one of them (Russell, 2026-11-01). Every
+# call here names its destination for the same reason, so a Netlify leg of a
+# pairing never runs the pairing's other leg as well.
 # So this script exercises the pairings the way the app does, by running the
 # same sequence of launcher calls, which is a real test of the launcher half.
 # That the APP produces exactly those argument lists is a separate question,
@@ -45,16 +49,42 @@
 #   ./verify-deploy.sh                     # uses the defaults below
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
-#                                          # Cloudflare, offline, in ~20 s (#665)
+#                                          # Cloudflare (#665) and its retry of a
+#                                          # new site's files (#740), offline, ~25 s
+#   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
+#                                          # publishes as a NEW teacher would:
+#                                          # new sites, both questions asked (#712)
 #
 # It uses ONE course throughout, on purpose: a Netlify site and a Cloudflare
 # project are created once and reused, rather than littering the accounts with
 # one per case. The names are printed at the end so they can be deleted.
+#
+# --first-publish (#712, the mac's copy of Windows' -FirstPublish, #123/#623)
+# moves aside what makes a publish a REPEAT one - the saved surname (and its
+# pre-.internal location), the section's Netlify record (and its legacy
+# per-section one) and its Cloudflare record - and answers the surname
+# question with "Testing" plus six random letters, so deploy.py names, and
+# creates, a Netlify site and a Cloudflare project nobody has ever uploaded
+# to. A random surname alone changes nothing while the records are there:
+# deploy.py reuses a recorded site and never asks (#699's plan review, B1).
+# Everything moved aside is put back on every exit - Ctrl-C or a TERM ends
+# the run there (130/143) rather than letting it publish on - and a run killed
+# outright is put right by the next run's preflight, against the surname that
+# run wrote into its sentinel. The two sites it made are DELETED
+# at the end of the run, through the hosts' own APIs, and the Result block
+# names them either way, so nothing is left on the accounts unannounced.
 
 set -u
 
 SELF_TEST=false
-if [ "${1:-}" = "--self-test" ]; then SELF_TEST=true; shift; fi
+FIRST_PUBLISH=false
+while :; do
+  case "${1:-}" in
+    --self-test)     SELF_TEST=true; shift ;;
+    --first-publish) FIRST_PUBLISH=true; shift ;;
+    *) break ;;
+  esac
+done
 
 WORKING_FOLDER="${1:-$HOME/Desktop/plantoir-overnight}"
 COURSE="${2:-ADA1O}"
@@ -151,6 +181,104 @@ wait_for_cloudflare_production() {  # wait_for_cloudflare_production <label> <pr
   no "$label — production did not serve this deployment within $CF_WAIT s; judging what it does serve"
   MEASURED+=("$label: production had not switched to this deployment after $CF_WAIT s")
   return 1
+}
+
+# A FIRST publish asks for an address that did not exist a few seconds
+# earlier (#712). Measured 2026-10-31 on the first --first-publish run: the
+# moment the first Cloudflare upload returned, the wait above asked this
+# Mac's resolver for the new <project>.pages.dev, got NODATA under the
+# project's own zone, and the resolver kept that answer for the zone's
+# negative TTL - 1800 s - so every Cloudflare check read HTTP 000 for half an
+# hour while 1.1.1.1, 8.8.8.8 and the router all answered with Cloudflare's
+# addresses. (*.netlify.app answers for any name, so Netlify never showed
+# it.) So before anything on this Mac looks a NEW site up, this waits for a
+# public resolver to answer for it, and only then lets curl and Python ask
+# the system's; the wait is reported, never hidden. A plain run publishes to
+# sites that already exist and returns at once.
+wait_for_new_address() {  # wait_for_new_address <label> <url>
+  local label="$1" host start waited
+  [ "$FIRST_PUBLISH" = true ] || return 0
+  host="${2#*://}"; host="${host%%/*}"
+  start=$(date +%s)
+  while :; do
+    waited=$(( $(date +%s) - start ))
+    if dig +short +time=3 +tries=1 @1.1.1.1 "$host" A 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+      MEASURED+=("$label: the new address $host answered at 1.1.1.1 after $waited s, before anything here looked it up")
+      return 0
+    fi
+    [ "$waited" -ge "$CF_WAIT" ] && break
+    sleep "$CF_POLL"
+  done
+  no "$label — the new address $host had no answer at 1.1.1.1 after $CF_WAIT s"
+  return 1
+}
+
+# ------------------------------- a brand-new site's files, retried (#740)
+# On a site this run has just CREATED, Netlify's edges are not yet of one
+# mind. Measured at the v1.9.1 gate (2026-11-01, dev e7a73e082, M4 Pro, home
+# network): two consecutive --first-publish runs went red on the NEW Netlify
+# site only - run 1 a 404 for static/pyodide/pyodide.mjs and no COEP on
+# static/swift/plantoir-swift-worker.js, run 2 a 404 ('text/plain') for the
+# swift worker while pyodide.mjs and its COEP passed - a different file each
+# time, never on Cloudflare, and a watcher fetching both files every 5 s from
+# the moment the site was live got 24 of 24 HTTP 200 with the right type and
+# COEP in the same minute. The plain run against the long-lived sites was
+# 174/0/0. So on a FIRST publish (and only there: a plain run's sites are old,
+# and a wrong answer from them is a fault) a per-file fetch-back that does not
+# get the answer its check wants is asked again every NS_POLL s for at most
+# NS_WAIT s, each retry is written down and counted in the Result block, and
+# an answer that never comes is still the check's failure, judged on the last
+# answer. Rejected: a fixed sleep after creating the site (a guessed duration
+# for a race, and the edges disagree file by file, so "long enough" for one
+# file says nothing about the next); retrying on a plain run too (it would
+# hide a real 404 on a site that has existed for weeks).
+NS_POLL="${VERIFY_DEPLOY_NS_POLL:-5}"
+NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
+
+# fetch_headers <want: 200|coep> <url> [-o <file>]
+# Prints the response headers (\r stripped), as `curl -s -D -` did. "200"
+# wants HTTP 200; "coep" wants HTTP 200 and COEP require-corp.
+fetch_headers() {
+  local want="$1" url="$2" out="/dev/null" headers code start deadline waited tries=0 good
+  [ "${3:-}" = "-o" ] && out="$4"
+  # A deadline fixed once, not a count of polls: how many retries fit before
+  # it depends on how long each answer takes, so nothing may pin that number
+  # (the self-test asserts a range).
+  start=$(date +%s)
+  deadline=$(( start + NS_WAIT ))
+  while :; do
+    headers=$(curl -s -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    good=false
+    if [ "$code" = "200" ]; then
+      if [ "$want" != "coep" ] || printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+        good=true
+      fi
+    fi
+    waited=$(( $(date +%s) - start ))
+    [ "$good" = true ] && break
+    [ "$FIRST_PUBLISH" = true ] || break
+    case "$url" in http://localhost:*) break ;; esac  # the preview is no new site
+    [ "$(date +%s)" -ge "$deadline" ] && break
+    tries=$((tries+1))
+    sleep "$NS_POLL"
+  done
+  if [ "$tries" -gt 0 ]; then
+    echo "  ↻ a brand-new site: $url needed $tries retr$([ "$tries" -eq 1 ] && echo y || echo ies) over $waited s ($([ "$good" = true ] && echo "then answered" || echo "never answered as wanted"))" >&2
+    printf '%s\t%s\t%s\t%s\n' "$url" "$tries" "$waited" "$good" >>"${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}"
+  fi
+  printf '%s\n' "$headers"
+}
+
+# One line per site for the Result block: how many of its files a brand-new
+# site needed asking again, and the most it took.
+measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in />
+  local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
+  [ "$FIRST_PUBLISH" = true ] || return 0
+  case "$2" in http://localhost:*) return 0 ;; esac
+  line=$(awk -F '\t' -v b="$2" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
+    END { if (n == 0) print "no file needed asking again"; else printf "%d file(s) needed asking again, %d retries in all, at most %d for one file, the longest %d s", n, t, m, w }' "$log" 2>/dev/null)
+  MEASURED+=("$1, a brand-new site's files (#740): ${line:-no file needed asking again}")
 }
 
 # ----------------------------------------------------------------- self-test
@@ -292,6 +420,100 @@ STUB
     && ok "an upload whose page of runnable code lacks this run's mark is a failure, since the wait could not tell it from the last" \
     || no "an upload without this run's mark: rc $rc, said: ${out:-nothing}"
 
+  hdr "Self-test — a brand-new site's files, asked again (#740)"
+  cat >"$ST_DIR/files.py" <<'STUB'
+import http.server, os, pathlib, sys
+portfile, mode = sys.argv[1:3]
+kind, _, limit = mode.partition(":")
+seen = {"n": 0}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.do_GET()
+    def do_GET(self):
+        n = seen["n"]; seen["n"] = n + 1
+        early = limit == "inf" or n < int(limit)
+        if kind == "404" and early:
+            body = b"Not Found - Request ID: stub\n"
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+        else:
+            body = b"self.onmessage = () => {};\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=UTF-8")
+            if not (kind == "nocoep" and early):
+                self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+STUB
+  fs_start() {  # fs_start <mode>: 404:K, 404:inf or nocoep:K
+    rm -f "$ST_DIR/fport"
+    python3 -I "$ST_DIR/files.py" "$ST_DIR/fport" "$1" &
+    STUB_PID=$!
+    for _ in $(seq 1 100); do [ -s "$ST_DIR/fport" ] && break; sleep 0.1; done
+    FS_URL="http://127.0.0.1:$(cat "$ST_DIR/fport" 2>/dev/null)/static/swift/plantoir-swift-worker.js"
+  }
+  code_of() { printf '%s\n' "$1" | awk 'NR==1{print $2}'; }
+  NS_POLL=1; NS_WAIT=4
+  NS_RETRY_LOG="$ST_DIR/retries.tsv"; : >"$NS_RETRY_LOG"
+
+  FIRST_PUBLISH=true
+  fs_start 404:2
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  if [ "$(code_of "$out")" = "200" ] && printf '%s' "$out" | grep -qi '^content-type: application/javascript' \
+     && grep -q 'needed 2 retries' "$ST_DIR/said.txt" && grep -q $'\t2\t[0-9]*\ttrue$' "$NS_RETRY_LOG"; then
+    ok "a brand-new site answers 404 twice, then the file: asked again, it passes, and the log says it took 2 retries"
+  else
+    no "a brand-new site answers 404 twice, then the file: got HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  fs_start nocoep:2
+  out=$(fetch_headers coep "$FS_URL" 2>"$ST_DIR/said.txt")
+  printf '%s\n' "$out" | grep -qi '^cross-origin-embedder-policy: require-corp' \
+    && ok "a brand-new site sends the file without COEP twice, then with it: asked again, the COEP check passes" \
+    || no "a brand-new site sends the file without COEP twice: said: $(cat "$ST_DIR/said.txt")"
+  st_stop
+
+  fs_start 404:inf
+  started=$(date +%s)
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  elapsed=$(( $(date +%s) - started ))
+  n=$(sed -n 's/.*needed \([0-9][0-9]*\) retr.*/\1/p' "$ST_DIR/said.txt" | head -1)
+  if [ "$(code_of "$out")" = "404" ] && grep -q 'never answered as wanted' "$ST_DIR/said.txt" \
+     && [ -n "$n" ] && [ "$n" -ge 2 ] && [ "$n" -le 5 ] \
+     && [ "$elapsed" -ge 4 ] && [ "$elapsed" -le 10 ]; then
+    ok "a brand-new site that never serves the file: still the check's failure, judged on the last answer, at the cap (${elapsed} s, ${n} retries)"
+  else
+    no "a brand-new site that never serves the file: HTTP $(code_of "$out"), ${elapsed} s, said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  MEASURED=()
+  measure_new_site_retries "Netlify" "http://127.0.0.1:"
+  total=$(awk -F '\t' '{ t += $2 } END { print t + 0 }' "$NS_RETRY_LOG")
+  printf '%s\n' "${MEASURED[@]}" | grep -q "3 file(s) needed asking again, $total retries in all" \
+    && [ "$(awk -F '\t' '$4 == "true" && $2 == 2' "$NS_RETRY_LOG" | wc -l | tr -d ' ')" -eq 2 ] \
+    && ok "the Result block counts them: ${MEASURED[0]#*: }" \
+    || no "the Result block's count: ${MEASURED[*]:-nothing}"
+
+  FIRST_PUBLISH=false
+  : >"$NS_RETRY_LOG"
+  fs_start 404:2
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  if [ "$(code_of "$out")" = "404" ] && [ ! -s "$ST_DIR/said.txt" ] && [ ! -s "$NS_RETRY_LOG" ]; then
+    ok "a plain run's long-lived site answers 404: judged at once, never asked again"
+  else
+    no "a plain run's 404: HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
   hdr "Result"
   echo "  $PASS passed, $FAIL failed, $SKIP skipped"
   [ "$FAIL" -eq 0 ] || exit 1
@@ -315,7 +537,160 @@ STASHED_INDEX="$WORK/index.md.stashed"
 # section so every destination carries the Python engine and the site's own
 # KaTeX; removed on any exit.
 RUNNER_PAGE="$WORKING_FOLDER/courses/$COURSE/section$SECTION/Runner Deploy Check.md"
+
+# ------------------------------------------------- a FIRST publish (#712)
+# What a first publish reads, moved aside so deploy.py asks for a surname and
+# names new sites - the same five paths as Windows' verify-deploy.ps1.
+#
+# THE ORIGINALS ARE NEVER DELETED, only renamed to <path>.verify-deploy-hidden,
+# and the sentinel records, path by path and AFTER each step, whether that
+# path's original was hidden or absent. Restoring deletes what is at a path
+# only when its original is safe beside it (hidden) or there never was one
+# (absent): then it is a record deploy.py wrote for the test's site. Anything
+# else - a move that failed, a kill between a move and the sentinel - is left
+# alone, and a hidden original is always moved back. So a run killed half way
+# is put right by the NEXT run's preflight, and no failure on the way can
+# cost the course its real records (Windows' Opus review of the same code).
+FIRST_PUBLISH_STATE=(
+  "$WORKING_FOLDER/courses/.internal/profile.json"
+  "$WORKING_FOLDER/courses/_secrets/profile.json"
+  "$WORKING_FOLDER/courses/$COURSE/.netlify_sites/section$SECTION.json"
+  "$WORKING_FOLDER/courses/$COURSE/.cloudflare_sites/section$SECTION.json"
+  "$WORKING_FOLDER/courses/$COURSE/section$SECTION/.netlify_site.json"
+)
+FIRST_PUBLISH_SENTINEL="$WORKING_FOLDER/courses/.verify-deploy-first-publish.txt"
+SITES_MADE=()      # "netlify<TAB>name<TAB>site id<TAB>surname" / "cloudflare<TAB>name<TAB>account id<TAB>surname"
+SITES_REPORT=()    # what the Result block says about each, deleted or not
+SURNAME="Testing"
+if [ "$FIRST_PUBLISH" = true ]; then
+  # Letters only, as deploy.py asks. The host may keep the capital or fold
+  # it (Netlify keeps it, measured), so the deletion below compares the site's
+  # name with the surname in lower case. The surname is written into the
+  # sentinel too, so a run killed half way is cleaned up against ITS surname.
+  SURNAME="Testing$(LC_ALL=C tr -dc 'a-z' </dev/urandom | head -c 6)"
+fi
+first_publish_anything_hidden() {
+  local path
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] && return 0
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do [ -e "$path.verify-deploy-hidden" ] && return 0; done
+  return 1
+}
+first_publish_recorded() {  # first_publish_recorded <path> -> hidden|absent|""
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] || return 0
+  awk -F '\t' -v p="$1" '$2 == p { v = $1 } END { if (v != "") print v }' "$FIRST_PUBLISH_SENTINEL"
+}
+first_publish_surname() {  # the surname the run that wrote the sentinel used, or ""
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] || return 0
+  awk -F '\t' '$1 == "surname" { v = $2 } END { if (v != "") print v }' "$FIRST_PUBLISH_SENTINEL"
+}
+restore_first_publish_state() {
+  local path hidden safe recorded line surname
+  first_publish_anything_hidden || return 0
+  # The surname of the run that hid these records - this run's, or a killed
+  # earlier run's - never the current run's guess. Empty (a sentinel written
+  # before #699's fixes, or none at all) means no site is deleted, only named.
+  surname=$(first_publish_surname)
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do
+    hidden="$path.verify-deploy-hidden"
+    safe=false; [ -e "$hidden" ] && safe=true
+    recorded=$(first_publish_recorded "$path")
+    if [ -e "$path" ] && { [ "$safe" = true ] || [ "$recorded" = absent ]; }; then
+      # A record deploy.py wrote for the test's site: its name (and the id the
+      # host's API deletes it by) is kept for the Result block, then it goes.
+      line=$(python3 - "$path" <<'PY2'
+import json, sys
+path = sys.argv[1]
+try:
+    record = json.load(open(path))
+except Exception:
+    sys.exit(0)
+name = record.get("name") or ""
+if not name:
+    sys.exit(0)
+if "cloudflare_sites" in path:
+    print("cloudflare\t" + name + "\t" + (record.get("account_id") or ""))
+elif "netlify" in path:
+    print("netlify\t" + name + "\t" + (record.get("site_id") or record.get("id") or ""))
+PY2
+)
+      [ -n "$line" ] && SITES_MADE+=("$line"$'\t'"$surname")
+      rm -f "$path"
+    fi
+    if [ "$safe" = true ]; then
+      mv -f "$hidden" "$path" 2>/dev/null \
+        || { echo "  ⚠️  could not put $path back from $hidden - move it back by hand"; return 1; }
+    elif [ "$recorded" = hidden ]; then
+      echo "  ⚠️  $path was recorded as moved aside but $hidden is not there; left as it is"
+    fi
+  done
+  rm -f "$FIRST_PUBLISH_SENTINEL"
+  # deploy.py makes .internal/ to save the surname; when there was no saved
+  # surname before the run, an empty one is all it left, and it goes too.
+  rmdir "$WORKING_FOLDER/courses/.internal" 2>/dev/null
+  echo "  ↩︎  put the saved surname and the section's own site records back"
+}
+hide_first_publish_state() {
+  local path
+  printf 'surname\t%s\n' "$SURNAME" >"$FIRST_PUBLISH_SENTINEL" \
+    || { echo "could not write $FIRST_PUBLISH_SENTINEL"; return 1; }
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do
+    if [ -e "$path" ]; then
+      mv "$path" "$path.verify-deploy-hidden" 2>/dev/null || { echo "could not move $path aside"; return 1; }
+      printf 'hidden\t%s\n' "$path" >>"$FIRST_PUBLISH_SENTINEL"
+    else
+      printf 'absent\t%s\n' "$path" >>"$FIRST_PUBLISH_SENTINEL"
+    fi
+  done
+  return 0
+}
+# Deletes the sites a first publish made, through each host's own API, so a
+# release's first-publish run leaves nothing on the accounts. Only a site whose
+# record deploy.py wrote while the originals were hidden (collected by the
+# restore above) and whose name carries the random surname of the run that hid
+# them - read from the sentinel, so a killed run's sites are matched against
+# ITS surname - is ever touched; never the section's own sites, whose records
+# were hidden and are now back. The token
+# goes to curl on stdin (-H @-), never on a command line.
+delete_sites_made() {
+  local entry kind name id surname code token
+  for entry in ${SITES_MADE[@]+"${SITES_MADE[@]}"}; do
+    IFS=$'\t' read -r kind name id surname <<<"$entry"
+    if [ -z "$surname" ]; then
+      SITES_REPORT+=("$kind $name: NOT deleted (the run that made it left no surname to check it against) - delete it by hand if it is a test site")
+      continue
+    fi
+    surname=$(printf '%s' "$surname" | tr 'A-Z' 'a-z')
+    # Netlify keeps the name as typed ("Testingabcdef", measured on the first
+    # run, whose case-sensitive test left that site behind), so compare in
+    # lower case.
+    case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
+      *"$surname"*) ;;
+      *) SITES_REPORT+=("$kind $name: NOT deleted (its name does not carry the surname $surname of the run that made it)"); continue ;;
+    esac
+    code=""
+    if [ "$kind" = netlify ] && [ -n "$id" ]; then
+      token=$(security find-generic-password -s "containerized-quartz-netlify" -w 2>/dev/null)
+      code=$(printf 'Authorization: Bearer %s\n' "$token" | curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+        -X DELETE -H @- "https://api.netlify.com/api/v1/sites/$id")
+    elif [ "$kind" = cloudflare ] && [ -n "$id" ]; then
+      token=$(security find-generic-password -s "containerized-quartz-cloudflare" -w 2>/dev/null)
+      code=$(printf 'Authorization: Bearer %s\n' "$token" | curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+        -X DELETE -H @- "https://api.cloudflare.com/client/v4/accounts/$id/pages/projects/$name")
+    fi
+    token=""
+    case "$code" in
+      2??) SITES_REPORT+=("$kind $name: created by the first publish as $surname, and DELETED (HTTP $code)") ;;
+      *)   SITES_REPORT+=("$kind $name: created by the first publish as $surname, NOT deleted (HTTP ${code:-none}) - delete it by hand") ;;
+    esac
+  done
+  SITES_MADE=()
+}
+
 restore_what_was_borrowed() {
+  restore_first_publish_state
+  delete_sites_made
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "  ↩︎  $line"; done
+  SITES_REPORT=()
   if [ -f "$RUNNER_PAGE" ]; then
     rm -f "$RUNNER_PAGE" && echo "  ↩︎  took the borrowed page of runnable code away"
   fi
@@ -339,7 +714,13 @@ if [ -n "$CANONICAL_FOLDER" ] && [ "$CANONICAL_FOLDER" = "$CLASS_WEBSITES" ]; th
   echo "  ❌ $WORKING_FOLDER is the teaching folder (Class Websites); run this against a test folder"
   exit 1
 fi
-trap restore_what_was_borrowed EXIT INT TERM
+# INT and TERM EXIT, and the EXIT trap puts things back once. A trap on INT
+# that only restored would return to the script, which then kept publishing -
+# as repeat publishes to the section's own sites, against addresses the
+# restore had just deleted (#699 implementation review, measured).
+trap restore_what_was_borrowed EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------- preflight
 hdr "Preflight — refuse clearly rather than half-running"
@@ -359,6 +740,21 @@ else
   skip "no Cloudflare credentials — Cloudflare cases will be skipped, not failed"
 fi
 CF_ACCOUNT=$(security find-generic-password -s "containerized-quartz-cloudflare-account" -w 2>/dev/null || echo "")
+
+if first_publish_anything_hidden; then
+  restore_first_publish_state
+  delete_sites_made
+  ok "a FIRST-publish run before this one was stopped half way: its surname and site records were put back first"
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "    $line"; done
+  SITES_REPORT=()
+fi
+if [ "$FIRST_PUBLISH" = true ]; then
+  HIDE_PROBLEM=$(hide_first_publish_state) || {
+    no "FIRST publish: ${HIDE_PROBLEM} - refusing to publish, and putting back what was moved"
+    exit 1
+  }
+  ok "FIRST publish: the surname and the section's site records are moved aside; deploy.py will be told '$SURNAME'"
+fi
 
 # ------------------------------------- the recipe the launchers run (#665)
 # The checks read THIS checkout's contracts/ (check_engine_folder), but the
@@ -449,7 +845,7 @@ run_deploy() {  # run_deploy <logfile> <args...>
     log_file -a {$log}
     spawn ./deploy.sh $*
     expect {
-      -re {last name.*: }        { send \"Testing\r\"; exp_continue }
+      -re {last name.*: }        { send \"$SURNAME\r\"; exp_continue }
       -re {Netlify site name.*]} { send \"\r\"; exp_continue }
       -re {Enter Netlify site name} { send \"\r\"; exp_continue }
       -re {different Netlify site name} { send \"\r\"; exp_continue }
@@ -525,6 +921,22 @@ check_folder() {  # check_folder <label> <dir>
   fi
 }
 
+# wrangler 4.108 and later sends a NEW static project to Workers instead of
+# Pages when it believes an AI agent is driving it (CLAUDECODE, AI_AGENT, ...
+# in its environment, or an agent among its ancestors) - a different product
+# at a different address. deploy.py is guarded three ways (--branch is an
+# argument the delegation refuses, the project is made through the API before
+# wrangler runs, and docker exec hands the container six named variables
+# only), so a leg that prints the delegation's notice is a FAILURE: the site a
+# teacher was told about is not the one that was made (#699).
+check_no_delegation() {  # check_no_delegation <label> <logfile>
+  if grep -aq "now part of Cloudflare Workers" "$2" 2>/dev/null; then
+    no "$1 — wrangler delegated the upload to Cloudflare Workers instead of Pages"
+  else
+    ok "$1 — uploaded to Cloudflare Pages itself, with no delegation to Workers"
+  fi
+}
+
 url_from_log() {  # url_from_log <logfile>
   grep -aoE "https://[a-zA-Z0-9._-]+\.(netlify\.app|pages\.dev)" "$1" | tail -1
 }
@@ -537,9 +949,14 @@ url_from_log() {  # url_from_log <logfile>
 # face must come back from the site itself, and Netlify's CSP must no longer
 # name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
 check_engine() {  # check_engine <label> <site base url ending in />
+  # Each call keeps its own retry log, so a pairing leg that checks a site
+  # an earlier leg already checked counts only its own retries (#740 review).
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
   local base="$2" name type code headers csp
   for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}static/pyodide/$name")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     case "$name" in
@@ -555,7 +972,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
       ok "$1 sends static/pyodide/$name (HTTP 200${type:+, $type})"
     fi
   done
-  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/plantoir-worker.js" 2>/dev/null | tr -d '\r')
+  headers=$(fetch_headers 200 "${base}static/pyodide/plantoir-worker.js")
   csp=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-security-policy:"{ $1=""; print }' | tail -1)
   if [ -z "$csp" ] || printf '%s' "$csp" | grep -Eq "'(unsafe-eval|wasm-unsafe-eval)'"; then
     ok "$1's worker may compile WebAssembly (${csp:+CSP allows it}${csp:-no CSP})"
@@ -575,7 +992,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   # program is compiled from its bytes, so its type does not decide whether
   # it runs; it is said, not required (review N4).
   for name in plantoir-swift-worker.js plantoir-wasi.mjs; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/swift/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}static/swift/$name")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     if [ "$code" = "200" ] && printf '%s' "$type" | grep -q javascript; then
@@ -589,7 +1006,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   if [ -z "$program" ]; then
     no "$1's page of runnable code carries no Swift program"
   else
-    headers=$(curl -s -D - -o "$WORK/program.wasm" --max-time 30 "${base}$program" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}$program" -o "$WORK/program.wasm")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     if [ "$code" = "200" ] && [ "$(head -c 4 "$WORK/program.wasm" | od -An -tx1 | tr -d ' \n')" = "0061736d" ]; then
@@ -612,7 +1029,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
     no "$1 does not send COOP and COEP on the page of runnable code, so it keeps the input box"
   fi
   for name in pyodide/pyodide.mjs pyodide/plantoir-worker.js swift/plantoir-wasi.mjs swift/plantoir-swift-worker.js; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers coep "${base}static/$name")
     if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
       ok "$1 sends COEP on static/$name"
     else
@@ -625,13 +1042,13 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     ok "$1 sends no COEP on the front page, which has no runnable code"
   fi
-  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/katex/katex.min.css" 2>/dev/null | tr -d '\r')
+  headers=$(fetch_headers 200 "${base}static/katex/katex.min.css")
   if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
     ok "$1 serves KaTeX's stylesheet itself (text/css)"
   else
     no "$1 does not serve static/katex/katex.min.css as text/css"
   fi
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" 2>/dev/null)
+  code=$(fetch_headers 200 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" | awk 'NR==1{print $2}')
   [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
   headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r')
   if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
@@ -639,6 +1056,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     ok "$1's CSP names no CDN for the maths"
   fi
+  measure_new_site_retries "$1" "$base"
 }
 
 # The pinned engine files, byte for byte, in a folder publish.
@@ -804,7 +1222,12 @@ measure_deploy() {  # measure_deploy <label> <logfile> <args...>
   before=$(obytes); start=$(date +%s)
   run_deploy "$log" "$@"; rc=$?
   finish=$(date +%s); after=$(obytes)
-  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files \([0-9]+ already uploaded\)" "$log" | tail -1)
+  # Pages' line is "Uploaded N files (M already uploaded)" in 4.80.0 and
+  # 4.156.0 alike, but a first-ever upload has nothing already uploaded and
+  # prints "Uploaded N files (4.85 sec)", which the old pattern, requiring the
+  # parenthesis, never matched (#712, measured). "files" exactly, so Netlify's
+  # own "Uploaded N file(s)" line is not read as a Cloudflare count.
+  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files( \([0-9]+ already uploaded\))?" "$log" | tail -1)
   MEASURED+=("$label: $((finish - start)) s, ${files:-no upload count}, $(( (${after:-0} - ${before:-0}) / 1024 )) KiB sent on ${NET_IFACE:-?}")
   return $rc
 }
@@ -933,9 +1356,10 @@ hdr "Destination 2 of 3 — Netlify"
 if [ "$HAVE_NETLIFY" = true ]; then
   set_destination "netlify" "" ""
   : >"$WORK/deploy-netlify.log"
-  measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" \
+  measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" --target netlify \
     && ok "publish to Netlify exited 0" || no "publish to Netlify failed"
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
+  [ -n "$NETLIFY_URL" ] && wait_for_new_address "Netlify" "$NETLIFY_URL"
   [ -n "$NETLIFY_URL" ] && check_url "Netlify" "$NETLIFY_URL" || no "no Netlify address in the output"
   [ -n "$NETLIFY_URL" ] && check_engine "Netlify" "$NETLIFY_URL/"
   [ -n "$NETLIFY_URL" ] && check_page_links "Netlify" "$NETLIFY_URL/" netlify
@@ -949,8 +1373,10 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/deploy-cloudflare.log"
   measure_deploy "Cloudflare, first publish with the engine" "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "publish to Cloudflare exited 0" || no "publish to Cloudflare failed"
+  check_no_delegation "Cloudflare Pages" "$WORK/deploy-cloudflare.log"
   snapshot_cloudflare_upload "Cloudflare Pages" "$WORK/deploy-cloudflare.log" "$WORK/cf-alone"; CF_SNAPPED=$?
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
+  [ -n "$CF_URL" ] && wait_for_new_address "Cloudflare Pages" "$CF_URL"
   [ -n "$CF_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare Pages" "$CF_URL" "$WORK/cf-alone"
   [ -n "$CF_URL" ] && check_url "Cloudflare Pages" "$CF_URL" || no "no Cloudflare address in the output"
   [ -n "$CF_URL" ] && check_engine "Cloudflare Pages" "$CF_URL/"
@@ -967,11 +1393,12 @@ hdr "Pairing 1 of 3 — Netlify primary, Cloudflare also"
 if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   set_destination "netlify" "" '[{"type":"cloudflare_pages"}]'
   : >"$WORK/pair-nc.log"
-  measure_deploy "Netlify, second publish" "$WORK/pair-nc.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
+  measure_deploy "Netlify, second publish" "$WORK/pair-nc.log" "$COURSE" "$SECTION" --target netlify && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
   N_URL=$(url_from_log "$WORK/pair-nc.log")
   : >"$WORK/pair-nc2.log"
   measure_deploy "Cloudflare, second publish" "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 2 (Cloudflare) exited 0" || no "leg 2 (Cloudflare) failed"
+  check_no_delegation "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log"
   snapshot_cloudflare_upload "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log" "$WORK/cf-with-netlify"; CF_SNAPPED=$?
   C_URL=$(url_from_log "$WORK/pair-nc2.log")
   [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with Netlify)" "$C_URL" "$WORK/cf-with-netlify"
@@ -990,7 +1417,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
   rm -rf "$FOLDER_TARGET"; mkdir -p "$FOLDER_TARGET"
   set_destination "netlify" "$FOLDER_TARGET" "[{\"type\":\"local_folder\",\"path\":\"$FOLDER_TARGET\"}]"
   : >"$WORK/pair-nf.log"
-  run_deploy "$WORK/pair-nf.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
+  run_deploy "$WORK/pair-nf.log" "$COURSE" "$SECTION" --target netlify && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
   N_URL=$(url_from_log "$WORK/pair-nf.log")
   : >"$WORK/pair-nf2.log"
   run_deploy "$WORK/pair-nf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \
@@ -1011,6 +1438,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/pair-cf.log"
   run_deploy "$WORK/pair-cf.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 1 (Cloudflare) exited 0" || no "leg 1 (Cloudflare) failed"
+  check_no_delegation "Cloudflare (paired with a folder)" "$WORK/pair-cf.log"
   # Kept NOW: the folder leg below can rebuild the section before production
   # is judged.
   snapshot_cloudflare_upload "Cloudflare (paired with a folder)" "$WORK/pair-cf.log" "$WORK/cf-with-folder"; CF_SNAPPED=$?
@@ -1108,6 +1536,12 @@ RECIPE_AT_END=$(recipe_differences)
   && ok "the folder still runs this checkout's recipe at the end of the run" \
   || no "the folder's recipe differs from this checkout's in $RECIPE_AT_END place(s) at the end - something re-mirrored it during the run"
 
+# A first publish's records are put back, and the sites it made deleted,
+# BEFORE the Result block, so the block can name them. The exit trap does it
+# again, harmlessly, on every other path.
+restore_first_publish_state
+delete_sites_made
+
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
 echo "  recipe: this checkout at $RECIPE_COMMIT$( [ "$RECIPE_DIRTY" -gt 0 ] && echo " with $RECIPE_DIRTY uncommitted change(s)" || echo ", clean"); $RECIPE_CHANGED difference(s) mirrored into the folder"
@@ -1117,9 +1551,17 @@ if [ "${#MEASURED[@]}" -gt 0 ]; then
   for line in "${MEASURED[@]}"; do echo "    $line"; done
 fi
 echo
-echo "  Sites this created (delete them when you are done):"
-[ -n "${NETLIFY_URL:-}${N_URL:-}" ] && echo "    Netlify:    ${NETLIFY_URL:-$N_URL}"
-[ -n "${CF_URL:-}${C_URL:-}" ]      && echo "    Cloudflare: ${CF_URL:-$C_URL}"
-echo "    Folder:     $FOLDER_TARGET"
+if [ "$FIRST_PUBLISH" = true ]; then
+  echo "  A FIRST publish, as surname '$SURNAME'. The sites it made:"
+  [ "${#SITES_REPORT[@]}" -gt 0 ] || echo "    none recorded (no publish to Netlify or Cloudflare wrote a record)"
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "    $line"; done
+  SITES_REPORT=()
+  echo "    Folder:     $FOLDER_TARGET"
+else
+  echo "  Sites this published to (the section's own; delete them when you are done with the folder):"
+  [ -n "${NETLIFY_URL:-}${N_URL:-}" ] && echo "    Netlify:    ${NETLIFY_URL:-$N_URL}"
+  [ -n "${CF_URL:-}${C_URL:-}" ]      && echo "    Cloudflare: ${CF_URL:-$C_URL}"
+  echo "    Folder:     $FOLDER_TARGET"
+fi
 echo "  Logs: $WORK"
 [ "$FAIL" -eq 0 ] || exit 1

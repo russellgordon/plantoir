@@ -148,45 +148,76 @@ nonisolated enum ClaudeCodeLauncher {
     /// Open a session for one course. Returns false when it could not be
     /// started, so the caller can say so rather than leaving a teacher looking
     /// at nothing.
+    /// - Parameter greeting: the opening message, when it is not the plain
+    ///   one — Fix with Claude… (#717) hands over the problems a teacher
+    ///   ticked (`FixWithAssistant`). Nil sends `greeting(courseCode:…)`.
     @discardableResult
     static func open(
         workspacePath: String,
         courseCode: String,
         courseName: String,
-        referenceCourses: [String] = []
+        referenceCourses: [String] = [],
+        greeting openingMessage: String? = nil
     ) -> Bool {
         guard let claude: String = findClaude(),
               let server: String = findServer() else {
             return false
         }
 
-        let configPath: String
-        do {
-            configPath = try writeConfig(workspacePath: workspacePath, courseCode: courseCode, serverPath: server)
-        } catch {
-            return false
-        }
-
-        let prompt: String = greeting(
-            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
-        )
-
         let scriptPath: String
         do {
-            scriptPath = try writeLauncherScript(
+            scriptPath = try prepareSession(
                 workspacePath: workspacePath,
                 courseCode: courseCode,
+                courseName: courseName,
                 claudePath: claude,
-                configPath: configPath,
-                prompt: prompt
+                serverPath: server,
+                referenceCourses: referenceCourses,
+                greeting: openingMessage
             )
         } catch {
             return false
         }
 
+        return launchTerminal(scriptPath: scriptPath)
+    }
+
+    /// Everything the door does except hand the script to a terminal: writes
+    /// the configuration and the script and records the line on the trail,
+    /// returning the script's path — `CodexLauncher.prepareSession`'s shape,
+    /// split out so a test can read what is written without a terminal
+    /// window opening on somebody's Mac.
+    static func prepareSession(
+        workspacePath: String,
+        courseCode: String,
+        courseName: String,
+        claudePath: String,
+        serverPath: String,
+        referenceCourses: [String] = [],
+        greeting openingMessage: String? = nil
+    ) throws -> String {
+        let configPath: String = try writeConfig(
+            workspacePath: workspacePath, courseCode: courseCode, serverPath: serverPath
+        )
+
+        var prompt: String = greeting(
+            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
+        )
+        if let openingMessage {
+            prompt = openingMessage.replacingOccurrences(of: "\"", with: "'")
+        }
+
+        let scriptPath: String = try writeLauncherScript(
+            workspacePath: workspacePath,
+            courseCode: courseCode,
+            claudePath: claudePath,
+            configPath: configPath,
+            prompt: prompt
+        )
+
         ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode))
 
-        return launchTerminal(scriptPath: scriptPath)
+        return scriptPath
     }
 
     /// What a teacher is told when the door did not open.

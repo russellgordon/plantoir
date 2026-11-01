@@ -341,6 +341,29 @@ offered a download that is not there). A ⚠️ (network problem reaching the si
 a confirmed mismatch) is worth one retry of `--verify-deploy` before treating
 it as a real problem.
 
+3. **Tell Russell how many people are using Plantoir — the backwards-looking
+   estimate (standing order, 2026-10-31, #510).** There is no census feature,
+   by decision: the GitHub download count per release asset is the census.
+   Since 1.4.0 every installed Mac fetches each new DMG or delta from the
+   release itself through the updater, and since 1.4.2 Windows fetches the
+   installer the same way, so a release that draws a steady 4–8 downloads
+   within a day or two of shipping is installed copies updating, not
+   curiosity clicks. After the release is public, run:
+
+```bash
+GH_TOKEN="$(gh auth token --user russellgordon)" gh api --paginate repos/russellgordon/plantoir/releases \
+  --jq '.[] | "\(.tag_name)\t\(.published_at[:10])\t" + ([.assets[] | select(.name|test("dmg$|Setup.exe$|win-x64.zip$")) | "\(.name)=\(.download_count)"] | join("  "))'
+```
+
+   Then give him, in the hand-over, a short table of the last few releases
+   per platform and ONE rough estimate of the installed base, saying what it
+   cannot tell apart (his own machines, the cut's own verification downloads,
+   deltas versus full DMGs, a download that was never installed). The first
+   reading, 2026-10-31: Mac DMGs 4–8 per release through 1.8.x and 8 for
+   1.9.0; Windows installers 19 and 16 in August 2026, then 3–13; estimate
+   "a handful of real Macs, probably under ten, and a few Windows installs,
+   most of them August trials". The estimate is for him, not for the notes.
+
 **Redraw the brand images in the same commit as the version line.** After
 editing `website/site.json` and rebuilding, and before tagging, run:
 

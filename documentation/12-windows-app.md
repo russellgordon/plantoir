@@ -690,9 +690,10 @@ problem — **nobody answers a question at 6 a.m.**
 ## Publishing: the destination is an argument
 
 `deploy_target` in `course_config.json` is read by the **app**, which turns it
-into a `--target` flag. **No launcher reads that key to choose a
-destination** — `deploy.ps1`, `deploy.sh` and `deploy.py` all default to
-Netlify and change destination only on `--target`. (`build_site.py` does read
+into a `--target` flag. **`deploy.ps1` and `deploy.py` read no key to
+choose a destination** — they default to Netlify and change destination
+only on `--target`. (`deploy.sh` reads it since #668 when it is given no
+destination; `deploy.ps1` matching it is the #668 `windows` issue.) (`build_site.py` does read
 it, but for working out a site's domain, not for deciding where to publish.) Anything driving a launcher directly must pass the flag itself;
 see [deployment](07-deployment.md), where the failure that sentence caused is
 recorded.
@@ -1855,8 +1856,16 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
   `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code`,
   `plantoir-quizzes` (#563) and `plantoir-handouts` (#631, a PDF made from
-  LaTeX rather than a page, with starter `.tex` files in a subfolder;
-  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"). `AgentGuidance.Write` enumerates the folder, so a
+  LaTeX rather than a page, with starter `.tex` files in a subfolder, and
+  since #715 a `patterns` subfolder holding `.tex` files and one `.py` -
+  copied like any other file, never run by the app;
+  `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"
+  and "Tables, the scaffold, cards and the remembered folder (#715)"). The
+  handouts skill has an assistant write ONE file inside a course,
+  `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
+  handouts are kept); the app neither reads it nor needs to, and a backup,
+  archive, restore or reference import should carry it as it carries the
+  rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
   skill teaches — the `> [!quiz]` callout and what the site does with it — is
   [06 → J](06-quartz-customizations.md#j-self-check-quizzes-563-v180), and
@@ -4376,7 +4385,12 @@ stayed in the ledger against #360. It was built in parity bundle 6a —
 and `NamedGapLedger` was empty from bundle 9, but for a few hours on
 2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
 until #548 landed them — and since 2026-10-28 it holds two entries against
-mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.)
+mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.
+Mac #698 landed on 2026-10-31: the key is now `obsidianIsNotOnThisMachine`,
+carrying `{machine}`, and the scenario is "open in Obsidian where Obsidian is
+not installed presses nothing (#610)", so both entries are deleted with the
+commit that takes the regenerated contract — the `windows` issue opened with
+#698 lists them.)
 
 ---
 
@@ -7711,6 +7725,23 @@ parent + `vendor`; `figures.helper_command` runs `node` from PATH.
   answered `tookTooLong` and the next diagram still drawn, both in **23.5 s**
   — the 20-second clock plus the helper's restart and the engine's second
   load.
+- **A diagram that crashes the engine** (#718, mac 2026-11-01; know, owe
+  nothing): `\$`, `\textdegree` and the other text symbols that need the
+  font `tcrm1000` used to come back `tookTooLong` (pgfplots) or `texSaid`
+  with nothing said (plain TikZ). The shared `figures.py` and
+  `plantoir-figures.mjs` now answer `fontMissing` (cached), `drawingStopped`
+  (cached) or `drawingEnded` (not cached), and start a fresh helper after a
+  crash — Windows runs both files natively, so it inherits this as it is.
+  The same font gap is EXPECTED there (same engine, same BaKoMa set) but is
+  unmeasured on a PC; `NativeFiguresTests`' endless case still gets
+  `tookTooLong`, correctly, and the first build after the update redraws
+  every figure once (the engine id covers the helper). The helper exits in
+  the answer's write CALLBACK, not straight after it, precisely because pipe
+  semantics differ on Windows. Adding a crash case to `NativeFiguresTests`
+  is optional; [05 → "A diagram that crashes the engine"](05-build-pipeline.md)
+  has the reasons and the measurements. A helper ended with nothing said
+  (a signal, the memory running out) is worded from
+  `words.reasonsWithoutDetail`, never "()" — the same Python prints it there.
 - **Path length.** The longest path under `tikz-engine\` is 134 characters
   (`…\@jsonjoy.com\json-pack\lib\nfs\v4\server\operations\node\Nfsv4OperationsNode.js.map`;
   the longest code file is 130). Installed at
@@ -8617,9 +8648,11 @@ which breaks the 2560 x 1720 match with the mac (#557), and (c) shorter
 quizzes, which changes what teachers are shown to fit a capture. On the mac
 the page runs under an invisible title bar with no buttons
 (`webwindow.swift`), so the old top margin was only space, not clearance.
-**The mac's two pictures were taken under 40/56 and must be retaken with
-the new scripts** (`capture.py --quizzes --quiz-shots
-quiz-math,quiz-code-run`) so the twins frame alike; that is mac #710.
+**The mac's two pictures were retaken under the new scripts on
+2026-11-01** (`capture.py --quizzes --quiz-shots quiz-math,quiz-code-run`,
+mac #710), so the twins frame alike: both moved exactly 32 pt down
+(an edge-scan of the old and new pictures), and nothing else in them
+changed.
 The other quiz and code scripts keep 40/56.
 
 **`--geogebra`.** The Windows twin of `capture.py --geogebra`, in
@@ -10490,8 +10523,11 @@ Obsidian; nothing was opened). It reads a little oddly from the in-app
 assistant, which is IN Plantoir. The contract has no sentence for a press that
 failed, and that gap is the mac's to fill, since Windows cannot regenerate
 `assist-wording.json`: mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`.
-`AFailedPressIsAnsweredWithoutAFalseSentence` and
+asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`
+— landed 2026-10-31 as `wording.openInObsidianDidNotOpen` and the scenario
+"open in Obsidian whose press failed before Obsidian was handed anything says
+nothing was opened (#698)", which this app switches to with the regenerated
+contract. `AFailedPressIsAnsweredWithoutAFalseSentence` and
 `TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 
 **Two divergences from the mac, chosen here (the mac should KNOW):**
@@ -10566,7 +10602,14 @@ Windows cannot regenerate `assist-wording.json`. Windows says
 `ContractTests.WindowsOnlyWording`), and `NamedGapLedger` holds the key and the
 scenario "open in Obsidian on a Mac without Obsidian presses nothing (#610)"
 against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-(v1.9.1), which asks for `{machine}` in that sentence.
+(v1.9.1), which asks for `{machine}` in that sentence. **Landed on the mac
+2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` (recorded in
+`specialNames.platformWording.machine.usedIn`) and the
+scenario is renamed "open in Obsidian where Obsidian is not installed presses
+nothing (#610)"; the mac also added `wording.openInObsidianDidNotOpen` and a
+`given.obsidianPress: "didNotOpen"` scenario for `DidNotOpen` (below). Until
+Windows takes the regenerated contract, the paragraph above describes this
+app as it stands.
 
 **The scenario runner** implements `given.obsidianPress`, `given.obsidianPage`
 (fills `{page}` through an async-local the static `Sentence()` reads),

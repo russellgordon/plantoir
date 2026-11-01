@@ -23,11 +23,29 @@ struct PagesDatedByTheBuild: Equatable {
     /// anything written on the page.
     let pages: [String]
 
+    /// The build's own count of the pages it dated, when it SHORTENED its line
+    /// to stay under `contracts/shared-rules.json` → `machineLineLength`
+    /// (#666, #704): the line then names only the first pages and carries the
+    /// true total here. `nil` for a whole line, which names every page.
+    let count: Int?
+
     // MARK: - Computed properties
+
+    /// How many pages the build dated: the line's `count` when it carries one,
+    /// and never fewer than the names it carries — a count smaller than its
+    /// own list is not believed over the list (Windows reads it the same way).
+    nonisolated var total: Int {
+        let counted: Int = count ?? 0
+        if counted > pages.count {
+            return counted
+        }
+        return pages.count
+    }
 
     /// The trail line, in the shape `contracts/shared-rules.json` →
     /// `pagesDatedByTheBuild.trailLine` gives: the count first, so a long list
-    /// can be shortened without losing how many there were.
+    /// can be shortened without losing how many there were. "and N more" when
+    /// some are not named; "N not named" when the line named none at all.
     nonisolated var trailSentence: String {
         var shown: [String] = []
         for page in pages {
@@ -37,12 +55,27 @@ struct PagesDatedByTheBuild: Equatable {
             shown.append(page)
         }
         var names: String = shown.joined(separator: ", ")
-        let notShown: Int = pages.count - shown.count
+        let notShown: Int = total - shown.count
         if notShown > 0 {
-            names += " and \(notShown) more"
+            if shown.isEmpty {
+                names = "\(notShown) not named"
+            } else {
+                names += " and \(notShown) more"
+            }
         }
-        let noun: String = pages.count == 1 ? "page" : "pages"
-        return "the build gave \(pages.count) \(noun) the date of their class: \(names)"
+        let noun: String = total == 1 ? "page" : "pages"
+        return "the build gave \(total) \(noun) the date of their class: \(names)"
+    }
+
+    // MARK: - Initializer
+
+    /// `count` is left out for a whole line, which is every line the build
+    /// printed before #666 and every line short enough to need no shortening.
+    nonisolated init(course: String, section: Int, pages: [String], count: Int? = nil) {
+        self.course = course
+        self.section = section
+        self.pages = pages
+        self.count = count
     }
 
     // MARK: - Functions
@@ -75,11 +108,17 @@ struct PagesDatedByTheBuild: Equatable {
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let course = object["course"] as? String,
                   let section = object["section"] as? Int,
-                  let pages = object["pages"] as? [String],
-                  !pages.isEmpty else {
+                  let pages = object["pages"] as? [String] else {
                 continue
             }
-            found.append(PagesDatedByTheBuild(course: course, section: section, pages: pages))
+            // A shortened line can name no page at all and still report
+            // some (k = 0, `machineLineLength.readerExamples`); only a line
+            // with neither names nor a count reports nothing.
+            let count: Int? = object["count"] as? Int
+            if pages.isEmpty && (count ?? 0) == 0 {
+                continue
+            }
+            found.append(PagesDatedByTheBuild(course: course, section: section, pages: pages, count: count))
         }
         return found
     }

@@ -16,6 +16,27 @@
 \usepackage{fancyhdr}
 \usepackage{lastpage}
 \usepackage{needspace}
+\usepackage{array}
+\usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the handouts skill's section 9)
+\definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
+\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}   % one heading-row height for tables side by side
+% Tables (the handouts skill's section 9). Every value sits in a row \valuepitch tall,
+% centred in it, so the first value is half a row below the heading rule and
+% the last half a row above the bottom rule. The value columns of a table are
+% one width (\setvaluecol{the widest value in either column} sets \valuecol
+% to it plus 0.5cm). C is a centred value column; N{$18$} is for a column
+% holding a negative or whole numbers beside decimals: each value right-
+% aligned in a box as wide as the column's widest value WITHOUT its sign,
+% the box centred - \makebox[\widthof{$18$}][r]{$-6$} in every cell - so the
+% digits share one trailing edge and a minus sign juts out to the left.
+% \renewcommand{\valuepitch}{3em} for a table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 
 % ---------- Fill in ----------
 \newcommand{\schoolname}{School Name}   % print_school_name in the course's settings
@@ -28,6 +49,13 @@
 \newcommand{\qa}[2]{\ifanswers #2\else #1\fi}
 \newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
+
+% A blank students write on, in a question (the skill's section 4): an
+% invisible strut makes its line about two lines tall, so a wrapped prompt
+% still leaves a full line of writing room above the blank. \fillin{answer}
+% or \fillin[5cm]{answer}: the student copy shows the blank, the answer key
+% writes the answer on the same line, at the same height.
+\newcommand{\fillin}[2][3.2cm]{\ \qa{\rule[-0.2em]{#1}{0.4pt}}{\makebox[#1]{#2}\llap{\rule[-0.2em]{#1}{0.4pt}}}\rule[-0.2em]{0pt}{2.1em}}
 
 \ifanswers
   \newcommand{\doctitle}{\quiztitle\ --- Solutions}

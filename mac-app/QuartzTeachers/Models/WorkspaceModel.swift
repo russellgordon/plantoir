@@ -1530,6 +1530,11 @@ class WorkspaceModel {
             ),
             applied: ToolchainFingerprints.read(indexURL)
         )
+        // Used now (#683), whether or not this pass rewrites it: the
+        // launch-time sweep removes an index by its age, and marking it at
+        // READ time — not after the pass — is what keeps that sweep from
+        // removing the index of a folder being opened at the same moment.
+        ToolchainFingerprints.markUsed(indexURL)
         var announced: Bool = false
         // Says once, the moment a file is actually written or removed — the
         // banner's cue (#476); a pass that changes nothing never says it.

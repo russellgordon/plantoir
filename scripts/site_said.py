@@ -12,8 +12,10 @@ about a block only once Quartz has parsed the page (codeRunnerBlocks.
 siteDisagrees), and in a preview Quartz is one `quartz build --serve` process
 that never hands control back to build_site.py. So the site's emitter
 (support/quartz/plugins/emitters/plantoirSiteSaid.ts) runs THIS file, once per
-site-building process and only when a block or a quiz disagrees, with what
-the site's transformers recorded on stdin. It prints the finding with site_health's own
+site-building process, with what the site's transformers recorded on stdin -
+on every build whose side file names the section's Problems record (#717),
+which this file then gives the site's rows (none, when nothing disagrees),
+and otherwise only when a block or a quiz disagrees. It prints the finding with site_health's own
 `announce` - the ⚠️ lines and ONE `PLANTOIR_HEALTH:` line - so both apps, the
 assistant and a scheduled deploy's record read it the way they read every
 other folder problem, with no new reader.
@@ -38,6 +40,7 @@ cannot count on finding its neighbours. Never raises past main: whatever goes
 wrong costs the finding, never the site, and exits 0.
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -64,15 +67,24 @@ def nfc(text) -> str:
 # ---- The build's half: the side file --------------------------------------------
 
 def write_side_file(output_dir, course, section, places: dict, swift_named: list,
-                    content_root, python=None, script=None) -> bool:
+                    content_root, python=None, script=None, problems: dict = None,
+                    every_place: dict = None) -> bool:
     """
     Write quartz/plantoir_site_said.json. `places` maps each opted-in page's
     path in the site's content (forward slashes, as Quartz names it) - and
     each page the quiz check examined (#644) - to
     {"place": its place in the course folder without .md, "source": the
     teacher's own file or None}; `swift_named` is [[place, n]] for every
-    Swift block swiftCouldNotBePrepared names. Same input, same bytes;
-    answers whether the file changed.
+    Swift block swiftCouldNotBePrepared names. `problems` is
+    {"file": the section's Problems record, "buildId": this build's id}
+    (#717), or None, and is written only when given. `every_place` maps
+    the site path of EVERY page the build copied from the teacher's folder
+    to its place there (#717 part two, review L4 of part one's fallback):
+    a section's page sits at the site's top level but its place starts
+    `section<N>/`, so a block on a page `places` does not name is still
+    named where its file is, and an outside assistant handed its row is
+    sent to a file that exists. Written only when given. Same input, same
+    bytes; answers whether the file changed.
     """
     named = []
     for pair in swift_named:
@@ -86,6 +98,10 @@ def write_side_file(output_dir, course, section, places: dict, swift_named: list
         "places": {nfc(path): value for path, value in sorted(places.items())},
         "swiftNamed": sorted(named),
     }
+    if problems:
+        content["problems"] = {"file": str(problems["file"]), "buildId": str(problems["buildId"])}
+    if every_place:
+        content["everyPlace"] = {nfc(path): nfc(place) for path, place in sorted(every_place.items())}
     data = (json.dumps(content, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
     path = Path(output_dir) / "quartz" / SIDE_FILE
     if path.is_file() and path.read_bytes() == data:
@@ -146,6 +162,21 @@ def _text_of(path):
         return None
 
 
+def place_of_a_site_path(said: dict, path: str) -> str:
+    """
+    A page's place in the course folder when `places` does not name it:
+    the build's `everyPlace` (every page it copied, a section's pages under
+    `section<N>/`), else the site path without `.md` - which is right for
+    the course's own pages, and was the whole answer until #717 part two.
+    """
+    every = {}
+    for site_path, place in (said.get("everyPlace") or {}).items():
+        every[nfc(site_path)] = place
+    if every.get(nfc(path)):
+        return str(every[nfc(path)])
+    return path[:-3] if path.lower().endswith(".md") else path
+
+
 def facts_from_site(said: dict, blocks: list) -> list:
     """
     The `site_disagreements` fact from what the site recorded: each block's
@@ -167,9 +198,7 @@ def facts_from_site(said: dict, blocks: list) -> list:
     facts = []
     for path, _position, block in ordered:
         known = places.get(path) or {}
-        place = known.get("place")
-        if not place:
-            place = path[:-3] if path.lower().endswith(".md") else path
+        place = known.get("place") or place_of_a_site_path(said, path)
         place = nfc(place)
         language = str(block.get("language") or "")
         n = int(block.get("block") or 1)
@@ -182,6 +211,9 @@ def facts_from_site(said: dict, blocks: list) -> list:
             "page": place,
             "language": language,
             "block": n,
+            # The block's own code, hashed (#717 review L7): what identifies
+            # its row in the section's Problems record, wherever it moves.
+            "key": hashlib.sha256(str(block.get("code") or "").encode("utf-8")).hexdigest(),
             "line": opening_line(source, language, str(block.get("code") or "")),
             "reason": str(block.get("reason") or "blockNotPrepared"),
         })
@@ -207,9 +239,7 @@ def quiz_facts_from_site(said: dict, quizzes: list) -> list:
     facts = []
     for path, _position, quiz in ordered:
         known = places.get(path) or {}
-        place = known.get("place")
-        if not place:
-            place = path[:-3] if path.lower().endswith(".md") else path
+        place = known.get("place") or place_of_a_site_path(said, path)
         n = quiz.get("n")
         line = quiz.get("line")
         fact = {
@@ -254,6 +284,21 @@ def say(payload: dict, printer=print) -> None:
         site_health.announce(found, printer=printer)
     except Exception as error:
         printer(f"ℹ️  Could not say what the website found in {course} Section {section}: {error}")
+    # The section's Problems record (#717): the site's rows replaced on every
+    # build - none, when nothing disagrees - so a fixed block's row goes.
+    # After the HEALTH lines, and only for the build that named the record.
+    problems = payload.get("problems")
+    if isinstance(problems, dict) and problems.get("file") and problems.get("buildId"):
+        try:
+            import section_problems
+            section_problems.merge_site_said(
+                problems["file"], problems["buildId"],
+                facts_from_site(payload, payload.get("blocks") or []),
+                quiz_facts_from_site(payload, payload.get("quizzes") or []),
+                course, section, printer=printer)
+        except Exception as error:
+            printer(f"ℹ️  Could not add what the website found to the list of problems for "
+                    f"{course} Section {section}: {error}")
 
 
 def main() -> int:

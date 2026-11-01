@@ -318,6 +318,20 @@ else
   cat /tmp/verify_graded_rerun_test.log
 fi
 
+if (cd scripts && python3 test_deploy_sh_destination.py) >/tmp/verify_deploy_sh_destination_test.log 2>&1; then
+  pass "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
+else
+  fail "deploy.sh with no destination typed deploys where the course's settings say, each saved destination a leg of its own, and a typed --target still wins (scripts/test_deploy_sh_destination.py, #668)"
+  cat /tmp/verify_deploy_sh_destination_test.log
+fi
+
+if (cd scripts && python3 test_setup_course_deploy_target.py) >/tmp/verify_setup_deploy_target_test.log 2>&1; then
+  pass "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
+else
+  fail "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
+  cat /tmp/verify_setup_deploy_target_test.log
+fi
+
 if (cd scripts && python3 test_graded_folders_new_course.py) >/tmp/verify_graded_new_course_test.log 2>&1; then
   pass "setup_course.py: a new course is written its marks pool, as both apps write it (scripts/test_graded_folders_new_course.py)"
 else
@@ -705,6 +719,17 @@ if (cd scripts && python3 test_deploy_folder_target.py) >/tmp/verify_deploy_fold
 else
   fail "deploy.sh: a publish to a folder lands in the folder it names, and a copy that did not finish says so (scripts/test_deploy_folder_target.py)"
   cat /tmp/verify_deploy_folder_target_test.log
+fi
+
+# A refused publishing token is explained in the launchers' own words, and a
+# SAVED token is cleared only when the service says no (GitHub #695, #716):
+# pins both launchers' lines to app-rules.json -> failureExplanations, and
+# RUNS deploy.sh's saved-token checks with curl answering 000/4xx/5xx.
+if (cd scripts && python3 test_deploy_token_refusal.py) >/tmp/verify_deploy_token_refusal_test.log 2>&1; then
+  pass "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
+else
+  fail "deploy.sh: a refused token is explained in the launchers' words, and a saved one is cleared only when the service says no (scripts/test_deploy_token_refusal.py)"
+  cat /tmp/verify_deploy_token_refusal_test.log
 fi
 
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
@@ -1743,6 +1768,7 @@ check_baked scripts/contracts.py          /opt/scripts/contracts.py
 check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
+check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
@@ -2032,6 +2058,52 @@ if [[ "$CA_STORE_REPORT" == OK* ]]; then
   pass "The image's certificate store is ${CA_STORE_REPORT#OK } (#639)"
 else
   fail "The image's certificate store does not match contracts/toolchain.json -> caCertificates: ${CA_STORE_REPORT#PROBLEMS }"
+fi
+
+# Debian's security floors (#714): every pin that names a `debianPackage` is
+# a FLOOR, and the package the image actually carries must be at least it,
+# compared by dpkg itself (Debian's version order, not a string's). The
+# Dockerfile's own `dpkg --compare-versions` line fails the build first; this
+# is the same question asked of the image that was built, so a floor raised
+# in the contract and not in the recipe, or a layer that stopped running,
+# fails here by package, version found and floor.
+DEBIAN_FLOOR_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'FLOORPY'
+import json, subprocess, sys
+floors = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p.get("debianPackage")]
+if not floors:
+    print("PROBLEMS the contract names no pin with a debianPackage")
+    sys.exit(0)
+inside = r"""
+for pair in "$@"; do
+  package=${pair%%=*}; floor=${pair#*=}
+  version=$(dpkg-query -W -f='${Version}' "$package" 2>/dev/null)
+  if [ -n "$version" ] && dpkg --compare-versions "$version" ge "$floor"; then
+    echo "OK $package $version $floor"
+  else
+    echo "LOW $package ${version:-missing} $floor"
+  fi
+done
+"""
+pairs = [p["debianPackage"] + "=" + p["value"] for p in floors]
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c", inside, "sh"] + pairs,
+                     capture_output=True, text=True)
+seen, problems = [], []
+for line in run.stdout.splitlines():
+    word, package, version, floor = line.split(" ", 3)
+    if word == "OK":
+        seen.append(f"{package} {version} (at least {floor})")
+    else:
+        problems.append(f"{package} is {version}, older than its floor {floor}")
+if len(seen) + len(problems) != len(floors):
+    problems.append("the image answered for " + str(len(seen) + len(problems)) + " of " + str(len(floors))
+                    + " floors: " + (run.stderr.strip()[-200:] or "no output"))
+print(("PROBLEMS " + "; ".join(problems)) if problems else ("OK " + ", ".join(seen)))
+FLOORPY
+)"
+if [[ "$DEBIAN_FLOOR_REPORT" == OK* ]]; then
+  pass "The image's Debian packages are at least their security floors (#714): ${DEBIAN_FLOOR_REPORT#OK }"
+else
+  fail "The image's Debian packages do not meet contracts/toolchain.json's floors (#714): ${DEBIAN_FLOOR_REPORT#PROBLEMS }"
 fi
 
 # Node, and the wrangler that runs on it (#640). The image's `node --version`
@@ -2437,10 +2509,10 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz Printable.md" "$HIT_COURSE/Quiz Hidden.md" "$HIT_COURSE/Quiz Source.md" \
         "$HIT_COURSE/Quiz Host.md" "$HIT_COURSE/Quiz Playground.md" "$HIT_COURSE/Media/plantoir-quiz-choice.png" \
         "$HIT_COURSE/Quiz Code Shown.md" "$HIT_COURSE/Quiz Summary.md" "$HIT_COURSE/Quiz Twice.md" \
-        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" \
+        "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" "$HIT_COURSE/Quiz Wrapped Blank.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
-        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
+        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Task Loose.md" "$HIT_COURSE/Progress Fixture.md" \
         "$HIT_COURSE/Wrap Fixture.md" "$HIT_COURSE/Wrap Plain Twin.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
@@ -3547,6 +3619,15 @@ crlf = [case for case in rules["recognise"]["cases"] if "\r" in case["markdown"]
 (course / "Quiz One Blank.md").write_text(
     "---\ntitle: Quiz One Blank\n---\nOne blank (plantoir-quiz-one-blank-7f3a).\n\n"
     "> [!quiz] The capital of France is `____`.\n> > [!answer]-\n> > Paris\n", encoding="utf-8")
+# #733: a question long enough to wrap, with a blank on a line after its
+# first, and a short-answer question, for what paper gives a blank: about two
+# lines, the room above it (browser-checks/quiz_check.mjs).
+(course / "Quiz Wrapped Blank.md").write_text(
+    "---\ntitle: Quiz Wrapped Blank\n---\nA blank on paper (plantoir-quiz-wrapped-blank-733).\n\n"
+    "> [!quiz] In a closed system the total mass of the reactants always equals the total mass of the products, "
+    "and chemists call this idea the law of conservation of `____`, which every balanced equation keeps true "
+    "from one side to the other.\n> > [!answer]-\n> > mass\n\n"
+    "> [!quiz] Name the gas that relights a glowing splint.\n> > [!answer]-\n> > oxygen\n", encoding="utf-8")
 (course / "Quiz Read Differently.md").write_text(
     "---\ntitle: Quiz Read Differently\n---\nRead differently by the site (plantoir-quiz-read-differently-644).\n\n"
     "> [!quiz] Which is the right choice?\n> <img alt=\"x>y\" src=\"Media/plantoir-quiz-choice.png\">\n"
@@ -3599,7 +3680,9 @@ QUIZPLANTS
 # browser check proves the reuse happened before it trusts what it reads);
 # Task Printable: a printable page with a task list (what paper shows); Task
 # Raw Box: a checkbox the page writes in HTML, which is no task item and is
-# left alone (6l must not count it - review F5).
+# left alone (6l must not count it - review F5); Task Loose: a LOOSE list
+# (li > p > label > input), where the browser check measures where the box
+# sits as it does on the tight ones (#693).
 # Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE" <<'TASKPLANTS'
 import json, sys
@@ -3631,6 +3714,9 @@ for twin in ("A", "B"):
     "---\ntitle: Task Printable\nprintable: true\n---\nA printable checklist (plantoir-task-printable-7f3a).\n\n"
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
+(course / "Task Loose.md").write_text(
+    "---\ntitle: Task Loose\n---\nA loose task list (plantoir-task-loose-7f3a).\n\n"
+    "- [ ] Loose first item\n\n- [ ] Loose second item\n", encoding="utf-8")
 TASKPLANTS
 # ---- #653: text blocks that wrap, planted for the same build ----
 # Wrap Fixture: a ```text wrap {2,101} block of 120 lines (a three-digit
@@ -3820,6 +3906,15 @@ if script -q /tmp/verify_main_build.log ./preview.sh EXC2O 1 --image "$DEV_TEST_
   pass "preview.sh completed against $DEV_TEST_IMAGE"
 else
   fail "preview.sh exited non-zero"
+fi
+# The workspace that run made publishes every address on this Mac only
+# (#684): eight bindings, each [127.0.0.1]. A workspace made before #684
+# reads [] for each - an EMPTY host address, which is every interface.
+_bindings="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}[{{.HostIp}}]{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)"
+if [[ "$_bindings" == "$(printf '[127.0.0.1]%.0s' 1 2 3 4 5 6 7 8)" ]]; then
+  pass "the folder's website builder publishes all eight preview addresses on this Mac only (#684)"
+else
+  fail "the folder's website builder publishes its preview addresses as '$_bindings', not on 127.0.0.1 alone (#684)"
 fi
 # Nothing Node printed reached the console (#640). On Node 22 every Quartz
 # build printed "(node:N) [DEP0040] DeprecationWarning: The `punycode` module
@@ -5157,6 +5252,15 @@ def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
             re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', html_text or "")]
+def right_cells_holding(html, number):
+    """How many right-aligned table cells are the one KaTeX number `number` -
+    the cell itself, so a "0.0" elsewhere on the page does not count (#715
+    L5). Right-aligned since #715's refinement of 2026-11-01: a column that
+    mixes whole numbers and decimals is right-aligned, so its points line up."""
+    cell = r'<td style="text-align:right;"><span class="katex">(?:(?!</td>).)*?<span class="mord">' + re.escape(number) + r'</span>(?:(?!</td>).)*?</td>'
+    return len(re.findall(cell, html, re.S))
+
+
 # (a text only that example holds, what it must build as, the check)
 claims = [
     ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
@@ -5173,6 +5277,11 @@ claims = [
      lambda a, p: '<code class="mermaid"' in a and "pie title" in a),
     ("| Representation | Shows best | Hides |", "a table with maths in a cell",
      lambda a, p: "<table>" in a and re.search(r"<td>Equation <span class=\"katex\"", a)),
+    ("| $x$ | $y = 0.5x^2$ |", "a table of values: the column with negatives and the one mixing whole numbers and decimals both right-aligned under their headings, 2.0 beside 0.5 (#715)",
+     lambda a, p: len(re.findall(r'<td style="text-align:right;"><span class="katex"', a)) == 10
+     and len(re.findall(r'<td style="text-align:center;"><span class="katex"', a)) == 0
+     and len(re.findall(r'<th style="text-align:right;"><span class="katex"', a)) == 2
+     and right_cells_holding(a, "2.0") == 2 and right_cells_holding(a, "0.0") == 1),
     ("Chemistry works too", "inline, display and chemistry maths",
      lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
@@ -5258,7 +5367,7 @@ print(f"   {len(examples)} examples, {len(claims)} claims")
 sys.exit(1 if problems else 0)
 AUTHORPY
 then
-  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, a table of values aligned by column (#715), maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
 else
   fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
 fi
@@ -5613,7 +5722,7 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #563: the self-check quizzes as a student answers them, against a server
   # the check starts itself.
   if node browser-checks/quiz_check.mjs "$PRINT_CHROME" "$SITE_PUBLIC" >/tmp/verify_quiz_check.log 2>&1; then
-    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
+    pass "self-check quizzes in a browser: every kind wrong then right in the contract's words, the explanation's text shown and its graph drawn, Show answer with KaTeX, nothing asked of any website while answering, the shuffle and its print order, keyboard folds and inert folded content, the score kept, cleared and storage refused, five page changes clean, a transcluded quiz on its own, code in a choice and an explanation asking live with Return ticking, checking and folding nothing (#583), and paper and the handout questions only, every blank on paper drawn and about two lines tall with the room above it (#733) - $(head -1 /tmp/verify_quiz_check.log | sed 's/^OK: //') (#563, browser-checks/quiz_check.mjs)"
   else
     fail "self-check quizzes did not answer in a browser as the contract says (browser-checks/quiz_check.mjs, #563)"
     cat /tmp/verify_quiz_check.log
@@ -5710,6 +5819,100 @@ if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
 else
   fail "runnable Swift: a second build compiled again or changed the Swift page (#493)"
   grep -n "Swift" /tmp/verify_figures_second.log | head -5
+fi
+
+# ---- 6i-p. A section's record of its problems (#717) ----
+# The main build's record names the planted diagram TeX cannot draw (\foo, a
+# real TeX error) as one row on its page, with the site's own say included
+# (siteSaidComplete: the site's emitter called Python on a real build); the
+# second build found the same rows, nothing new, and kept when each was first
+# found. Then the shared page is built for Section 2 too, the fence is put
+# right, and Section 1 is built again: its row goes, and Section 2's record -
+# whose site still carries the broken page - is left exactly as it was.
+PROBLEMS_ONE="$HIT_COURSE/.merged_output/section1/.problems.json"
+PROBLEMS_TWO="$HIT_COURSE/.merged_output/section2/.problems.json"
+rm -f /tmp/verify_problems_*.log /tmp/verify_problems_*.json
+cp "$PROBLEMS_ONE" /tmp/verify_problems_after_second.json 2>/dev/null || true
+PROBLEMS_OK=true
+if ! ./preview.sh EXC2O 2 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_problems_section2.log 2>&1; then
+  PROBLEMS_OK=false
+  echo "   Section 2 did not build"
+fi
+cp "$PROBLEMS_TWO" /tmp/verify_problems_section2_before.json 2>/dev/null || true
+python3 - "$HIT_COURSE/Figures Fixture.md" <<'UNFOO'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+path.write_text("".join(line for line in lines if line.strip() != "\\foo"), encoding="utf-8")
+UNFOO
+if ! ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_problems_fixed.log 2>&1; then
+  PROBLEMS_OK=false
+  echo "   Section 1 did not build after the fence was put right"
+fi
+# Read now: the stages after this one build the section again.
+cp "$PROBLEMS_ONE" /tmp/verify_problems_section1_fixed.json 2>/dev/null || true
+cp "$PROBLEMS_TWO" /tmp/verify_problems_section2_after.json 2>/dev/null || true
+if $PROBLEMS_OK && python3 - /tmp/verify_main_build.log /tmp/verify_problems_after_second.json \
+     /tmp/verify_problems_section2_before.json /tmp/verify_problems_section1_fixed.json \
+     /tmp/verify_problems_section2_after.json /tmp/verify_problems_fixed.log <<'PROBLEMSPY'
+import json, re, sys
+from pathlib import Path
+main_log, second, two_before, one_now, two_now, fixed_log = [Path(arg) for arg in sys.argv[1:7]]
+problems = []
+def read(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+said = main_log.read_text(encoding="utf-8", errors="ignore")
+markers = re.findall(r"PLANTOIR_PROBLEMS: (\{[^\n]*\})", said)
+if len(markers) != 2:
+    problems.append(f"the main build printed {len(markers)} PLANTOIR_PROBLEMS: lines, not two (the build's, then the site's)")
+health_at = said.find("PLANTOIR_HEALTH:")
+problems_at = said.find("PLANTOIR_PROBLEMS:")
+links_at = said.find("PLANTOIR_LINKS_CHECKLIST:")
+if problems_at < 0 or health_at > problems_at or (links_at >= 0 and links_at < problems_at):
+    problems.append("the record's marker is not after the folder problems and before the links checklist's")
+after_second = read(second)
+if after_second is None:
+    problems.append("no record after the second build of Section 1")
+else:
+    # The page holds two figures that cannot be drawn (\\foo and a graph's
+    # "ln"): each is its own row, and the \\foo diagram is exactly one.
+    figures_here = [row for row in after_second["rows"] if row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture"]
+    figure = [row for row in figures_here if "\\foo" in row["item"]]
+    if len(figures_here) < 2 or len(figure) != 1 or "|tikz|" not in figure[0]["id"]:
+        problems.append(f"the record does not name the diagram TeX cannot draw as one row: {figure}")
+    if not after_second.get("siteSaidComplete"):
+        problems.append("the site did not say into the record (siteSaidComplete)")
+    if after_second["changed"] != {"new": [], "gone": []}:
+        problems.append(f"the second build changed the set: {after_second['changed']}")
+    if figure and figure[0]["firstSeen"] == figure[0]["lastSeen"]:
+        problems.append("the second build did not keep when the diagram's problem was first found")
+two = read(two_before)
+if two is None or not any(row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture" for row in two["rows"]):
+    problems.append("Section 2's record does not name the shared page's diagram")
+one = read(one_now)
+if one is None:
+    problems.append("no record after Section 1 was built with the fence put right")
+else:
+    if any(row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture" and "\\foo" in row["item"] for row in one["rows"]):
+        problems.append("the diagram put right is still a row of Section 1's record")
+    if after_second is not None and figure and figure[0]["id"] not in one["changed"]["gone"]:
+        problems.append(f"the diagram put right is not among the gone: {one['changed']}")
+    if "Figures Fixture" not in one.get("pagesShown", []):
+        problems.append("Section 1's record does not list the shared page among the pages it shows")
+if two_now.read_bytes() != two_before.read_bytes() if two_now.is_file() and two_before.is_file() else True:
+    problems.append("Section 1's build changed Section 2's record")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PROBLEMSPY
+then
+  pass "a section's record of its problems: the diagram TeX cannot draw is one row on its page, the site says into it, a second build finds nothing new and keeps when it was first found, and putting it right takes it out of Section 1's record while Section 2's is left as it was (#717)"
+else
+  fail "a section's record of its problems: one of the checks above failed (#717)"
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT
@@ -5890,6 +6093,80 @@ elif grep -q "Could not read allowed sections" /tmp/verify_old_container.log; th
   fail "a preview still prints 'Could not read allowed sections', which was never true"
 else
   pass "a preview no longer prints 'Could not read allowed sections'"
+fi
+
+# -------------------- 6c2. A workspace open to the network is made again ---
+# GitHub #684. Every workspace made before it publishes its eight addresses
+# on every interface, and a published address cannot be changed afterwards.
+# This puts one back - with the builds mount, this run's image and all eight
+# addresses, so that NOTHING but the open addresses is wrong with it and no
+# earlier remake reason can be what fires - on a block the launchers' own walk
+# says is free, and asks preview.sh to cope. It must say the contract's
+# sentence, make the workspace again on 127.0.0.1, print the marker the app
+# writes the trail line from, with its reason, and the Mac must then listen
+# on 127.0.0.1 only.
+echo ""
+echo "🚦 Putting back a website builder whose preview addresses are open to the network (#684)…"
+rm -f /tmp/verify_open_addresses.log
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+_open_base="$(CONTAINER_NAME="$CONTAINER_NAME" bash -c 'eval "$(sed -n "/^# >>> PREVIEW PORT BLOCK >>>/,/^# <<< PREVIEW PORT BLOCK <<</p" preview.sh)"; find_free_port_block 8081 kept' 2>/dev/null)" || _open_base=""
+if [[ -n "$_open_base" ]] && docker run -dit --name "$CONTAINER_NAME" \
+     --mount "$(bind_mount_argument "$(pwd)/courses" /teaching/courses)" \
+     --mount "$(bind_mount_argument "$EXPECTED_BUILD_ROOT" "$EXPECTED_BUILD_ROOT")" \
+     -p "${_open_base}-$((_open_base + 3)):8081-8084" \
+     -p "$((_open_base + 1000))-$((_open_base + 1003)):9081-9084" \
+     "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1; then
+  _bindings="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}[{{.HostIp}}]{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)"
+  if [[ "$_bindings" == "[][][][][][][][]" ]]; then
+    pass "the stand-in publishes its eight addresses the old way, on every interface ($_open_base)"
+  else
+    fail "the stand-in does not read as a workspace made before #684: '$_bindings'"
+  fi
+  if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_open_addresses.log 2>&1; then
+    pass "a build in a workspace whose addresses were open to the network still works (#684)"
+  else
+    fail "a build in a workspace whose addresses were open to the network FAILED (#684)"
+    tail -30 /tmp/verify_open_addresses.log
+  fi
+  _this_mac_only="$(python3 -c 'import json; print(json.load(open("contracts/app-rules.json"))["previewPorts"]["whenTheWorkspaceIsInUse"]["sentences"]["whenItNeedsSettingUpAgain"]["forThisMacOnly"])')"
+  if grep -Fq -- "$_this_mac_only" /tmp/verify_open_addresses.log; then
+    pass "and it said it was setting the folder up again so its previews open on this Mac only, in the contract's words"
+  else
+    fail "it did not say the contract's forThisMacOnly sentence, so some other branch remade it, or none did"
+  fi
+  _bindings="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}[{{.HostIp}}]{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)"
+  if [[ "$_bindings" == "$(printf '[127.0.0.1]%.0s' 1 2 3 4 5 6 7 8)" ]]; then
+    pass "and the workspace it made publishes all eight addresses on 127.0.0.1"
+  else
+    fail "the workspace it made publishes '$_bindings', not 127.0.0.1 alone"
+  fi
+  _remade_marker="$(python3 -c '
+import json
+entry = [e for e in json.load(open("contracts/shared-rules.json"))["activityTrail"]["mustRecord"] if e["event"] == "folder set up again"][0]
+print(entry["marker"]["prefix"] + " thisMacOnly EXC2O/1")')"
+  if grep -Fxq -- "$_remade_marker" /tmp/verify_open_addresses.log; then
+    pass "and it told the app the folder was set up again, and why, for the trail (#684)"
+  else
+    fail "it printed no '$_remade_marker' line, so the trail would not say why the next preview was slow"
+  fi
+  # What this Mac actually listens on for the new site address: 127.0.0.1,
+  # and never *: the forward appears a moment after the start, so ask for up
+  # to ten seconds.
+  _site_port="$(docker port "$CONTAINER_NAME" 8081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+  _ws_port="$(docker port "$CONTAINER_NAME" 9081/tcp 2>/dev/null | head -1 | sed 's/.*://')"
+  _listening=""
+  for _try in 1 2 3 4 5 6 7 8 9 10; do
+    _listening="$(lsof -nP -iTCP:"${_site_port:-0}" -iTCP:"${_ws_port:-0}" -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { print $9 }' | sort -u | tr '\n' ' ')"
+    [[ -n "$_listening" ]] && break
+    sleep 1
+  done
+  if [[ -n "$_site_port" && "$_listening" == *"127.0.0.1:$_site_port"* && "$_listening" == *"127.0.0.1:$_ws_port"* && "$_listening" != *"*:"* ]]; then
+    pass "and this Mac listens for its preview and live-reload addresses on 127.0.0.1 only ($_listening)"
+  else
+    fail "this Mac listens for the preview at '$_listening' (site $_site_port, live reload $_ws_port), not on 127.0.0.1 alone"
+  fi
+else
+  fail "could not put back a website builder whose addresses are open to the network (#684)"
 fi
 
 # -------------------- 6d. --stop stops this section, and only this one ------

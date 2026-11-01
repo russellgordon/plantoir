@@ -232,7 +232,9 @@ final class AdditionalDeployTargetsTests: XCTestCase {
             CourseConfiguration.AdditionalDeployTarget(type: "cloudflare_pages", path: ""),
         ]
 
-        XCTAssertEqual(held.view.availableAdditionalDeployTargetTypes, ["netlify", "cloudflare_pages"])
+        // In the picker's order, Cloudflare Pages first since #668
+        // (`publishingDestinations.pickerOrder`).
+        XCTAssertEqual(held.view.availableAdditionalDeployTargetTypes, ["cloudflare_pages", "netlify"])
         XCTAssertTrue(held.view.toggleBinding(forType: "netlify").wrappedValue)
         XCTAssertTrue(held.view.toggleBinding(forType: "cloudflare_pages").wrappedValue)
         XCTAssertNil(held.view.problem)

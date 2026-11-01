@@ -301,7 +301,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
    > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
    > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
-   > with them in it. The boundary and the reasoning
+   > with them in it. Mac #698 landed on 2026-10-31 (the key renamed
+   > `obsidianIsNotOnThisMachine`, with `{machine}`), so a Windows v1.9.1 cut
+   > needs both entries DELETED, with the regenerated contract taken, before
+   > it — at 1.9.1 the rule above turns them red. The boundary and the reasoning
    > are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
@@ -369,6 +372,17 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > **creates real, globally unique sites that nothing deletes** — so no suite
    > runs it and none should. Delete the sites it made when you are done.
    >
+   > **On the mac, run it once with `--first-publish` too** (#712): it moves
+   > the section's saved surname and site records aside (crash-safe, put
+   > back on every exit; Ctrl-C stops the run there), answers the surname question with `Testing` and six
+   > random letters, and so publishes to a NEW Netlify site and a NEW
+   > Cloudflare project, the only way to see a first-ever upload. Unlike the
+   > plain run, it **deletes the two sites it made** at the end, through the
+   > hosts' APIs (only names carrying that run's surname), and the Result
+   > block says which were deleted and which, if any, need deleting by hand.
+   > A cut needs both: `./verify-deploy.sh --first-publish`, then a plain
+   > `./verify-deploy.sh` against the sites the section already has.
+   >
    > **On Windows, run it from the checkout being released, and once with
    > `-FirstPublish`** (#630, #623). It mirrors that checkout's launchers and
    > recipe into the working folder's `.toolchain\` before anything runs,
@@ -390,7 +404,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline,
    > about 20 s, no credentials: it proves the wait for Cloudflare's
    > production address against a stub, so a real run's Cloudflare lines can
-   > be trusted.
+   > be trusted. On the mac, since #740, it also proves that a `--first-publish`
+   > run retries a brand-new site's files for up to 60 s before failing one
+   > (about 25 s in all). The run's Result block counts the retries.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,

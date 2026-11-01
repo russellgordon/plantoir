@@ -86,9 +86,10 @@
         "values": [
           "",
           "cloudflare_pages",
-          "local_folder"
+          "local_folder",
+          "netlify"
         ],
-        "why": "EMPTY means Netlify, and that is not an oversight: every course written before the other destinations existed has no key at all, and must keep working."
+        "why": "EMPTY or ABSENT means Netlify, and that is not an oversight: every course written before the other destinations existed has no key at all, and must keep working. Both apps' new-course windows WRITE the key for every course they make — `netlify` when a teacher picks it, and `cloudflare_pages` unless they do, the new-course default since #668 (app-rules.json -> publishingDestinations, whose whyTheyDiffer says why the default and the fallback differ). setup_course.py writes `cloudflare_pages` for a course it makes with no saved file (Russell, 2026-11-01: \"Cloudflare everywhere\"), keeps a saved key when run again, and writes none over a saved file that names none."
       },
       {
         "default": 7,
@@ -484,7 +485,7 @@
       "answeredAt": "UTC, yyyy-MM-ddTHH:mm:ssZ, when the last page was added",
       "kept": "[{place, date}]: each class page the teacher left published when asked about classes dated after the next class day (#475), by its place in the course folder without .md (the links checklist's `place`), with the day its `created` named then, yyyy-MM-dd as written. One row per place: a later answer replaces that place's older date."
     },
-    "writtenBy": "the app only, never the build: when the teacher UNTICKS a class in the question at Deploy or at Section > Publish Pages... (shared-rules.json -> classesDatedLater), when the teacher presses Keep All and Deploy (every listed class), when a class is published by naming its date (Section > Publish Class for a Date..., or publish_class_on from either assistant), and when a class dated later is published from the links checklist (#379) - a date the teacher named is not a mistake to catch. Removed on rollover, with linksChecklistAnswered.",
+    "writtenBy": "the app only, never the build: when the teacher leaves a class TICKED in the question at Deploy (shared-rules.json -> classesDatedLater; Return keeps every listed class, #694 - never from Section > Publish Pages..., which asks nothing and records nothing), when a class is published by naming its date (Section > Publish Class for a Date..., or publish_class_on from either assistant), and when a class dated later is published from the links checklist (#379) - a date the teacher named is not a mistake to catch. Removed on rollover, with linksChecklistAnswered.",
     "rule": "class-planning.json -> futureDatedClasses: a flagged class whose place is here WITH THE SAME date is not asked about again; re-dated since, it is. A row for a page that is gone, or hidden, stops nothing and is harmless.",
     "whyHidden": "Inside `.publish_state`, like frontPageNotToday and linksChecklistAnswered: hidden from the course's fingerprint and from the “— Edited” marker, and never published. Not the app's preferences: those are per Mac, and the outside assistant (a separate process) must read the same answer to know a deploy is no longer held back."
   },

@@ -35,6 +35,7 @@ import hashlib
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import threading
@@ -65,6 +66,20 @@ JOB_SECONDS = 20
 START_SECONDS = 120
 # A cached figure nobody has used for this long is removed.
 PRUNE_DAYS = 90
+# The answers that are never cached, so the next build tries again
+# (contracts/shared-rules.json -> figureFences.cache.notCached, which a test
+# pins this to). tookTooLong and engineMissing say nothing about the figure;
+# drawingEnded (#718) is a helper that died without answering - a signal, the
+# memory running out, the builder being stopped - which could stick to a good
+# figure until it changed. fontMissing and drawingStopped ARE cached: the
+# same fence and engine crash the same way every time (3 of 3, measured).
+NOT_CACHED = ("tookTooLong", "engineMissing", "drawingEnded")
+# The answers after which the helper is not used again (#718): it crashed, and
+# after an uncaught crash it exits, so the next job would otherwise meet the
+# end of its output and be blamed for it.
+CRASHED = ("fontMissing", "drawingStopped")
+_FONT_MISSING = re.compile(r"Could not find font ([A-Za-z0-9]+)")
+_A_PATH = re.compile(r"(?:/[^\s/'\"]+){2,}")
 
 # JavaScript's String.prototype.trim() set: WhiteSpace and LineTerminator.
 # Python's str.strip() is a DIFFERENT set (it strips U+001C-U+001F and U+0085,
@@ -302,6 +317,9 @@ class _Helper:
     a thread so the clock works on Windows too (no `select` on a pipe)."""
 
     def __init__(self, command: list):
+        # True once its output has ended - the process exited or crashed -
+        # as against the clock running out (#718).
+        self.ended = False
         # The same Node environment as Quartz's (#640), so every node the
         # build starts is under one rule. Measured on Node 22.23.4 the helper
         # prints nothing to stderr with or without it (a diagram and a graph);
@@ -314,7 +332,8 @@ class _Helper:
         self.lines = queue.Queue()
         self.complaints = []
         threading.Thread(target=self._read, daemon=True).start()
-        threading.Thread(target=self._drain, daemon=True).start()
+        self.drainer = threading.Thread(target=self._drain, daemon=True)
+        self.drainer.start()
 
     def _read(self):
         for line in self.process.stdout:
@@ -338,6 +357,7 @@ class _Helper:
             except queue.Empty:
                 return None
             if line is None:
+                self.ended = True
                 return None
             try:
                 return json.loads(line)
@@ -362,6 +382,32 @@ class _Helper:
         except (OSError, subprocess.TimeoutExpired):
             pass
 
+    def why_it_ended(self) -> dict:
+        """What a helper that ended without answering said on its way out
+        (#718): its stderr, read to the end once it has exited. A missing
+        font is said there too when the answer could not be written, and is
+        the same answer as one that was; anything else is drawingEnded, with
+        the first "Error: ..." line."""
+        try:
+            self.process.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            self.kill()
+        self.drainer.join(timeout=2)
+        complaints = list(self.complaints)
+        for complaint in complaints:
+            font = _FONT_MISSING.search(complaint)
+            if font:
+                name = None if font.group(1).isdigit() else font.group(1)
+                return {"ok": False, "reason": "fontMissing", "texLine": None, "name": name, "said": ""}
+        said = ""
+        for complaint in complaints:
+            if complaint.lstrip().startswith("Error"):
+                said = complaint
+                break
+        if not said and complaints:
+            said = complaints[0]
+        return {"ok": False, "reason": "drawingEnded", "texLine": None, "name": None, "said": one_line(said)}
+
     def close(self):
         try:
             self.process.stdin.close()
@@ -371,6 +417,13 @@ class _Helper:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.kill()
+
+
+def one_line(text: str) -> str:
+    """One line of what an engine said, never a path, at most 160 characters:
+    it reaches a teacher's console and the folder-problem finding (#718)."""
+    first = _A_PATH.sub("…", str(text or "").split("\n")[0]).strip()
+    return first if len(first) <= 160 else first[:159] + "…"
 
 
 def helper_command(output_dir) -> list:
@@ -391,7 +444,11 @@ def run_jobs(jobs: list, command: list, job_seconds=JOB_SECONDS, start_seconds=S
     past `job_seconds` is answered {"ok": False, "reason": "tookTooLong"}, the
     helper is ended and started again for the rest; one that cannot be
     answered because the engine is missing, {"reason": "engineMissing"}.
-    Neither of those two is ever cached.
+    A job whose helper ENDED without answering (#718) is answered from what
+    it said on its way out: fontMissing, or drawingEnded. None of those
+    three - tookTooLong, engineMissing, drawingEnded - is ever cached
+    (NOT_CACHED). After a crash the helper answered (fontMissing,
+    drawingStopped), the next job gets a fresh helper.
     """
     results = {}
     pending = list(jobs)
@@ -436,6 +493,15 @@ def run_jobs(jobs: list, command: list, job_seconds=JOB_SECONDS, start_seconds=S
             tikz_ready = True
         helper.send({"id": job["id"], "engine": job["engine"], "body": job["body"]})
         answer = helper.read(job_seconds)
+        if answer is None and helper.ended:
+            # It ended rather than ran out of time (#718): a crash, read
+            # from what it said on its way out. Each figure is still tried
+            # once a build, so an uncached drawingEnded costs one helper
+            # start a build, no more.
+            results[job["id"]] = helper.why_it_ended()
+            helper = None
+            pending.pop(0)
+            continue
         if answer is None or answer.get("id") != job["id"]:
             helper.kill()
             helper = None
@@ -444,6 +510,14 @@ def run_jobs(jobs: list, command: list, job_seconds=JOB_SECONDS, start_seconds=S
             continue
         results[job["id"]] = answer
         pending.pop(0)
+        if answer.get("reason") in CRASHED:
+            # It answered and then, after an uncaught crash, exits: a fresh
+            # helper for the next job, so that job is never blamed for the
+            # end of this one's output (a knock-on this answer would
+            # otherwise bring with it; before #718 a crash was never
+            # answered, and the helper was restarted after it already).
+            helper.kill()
+            helper = None
     if helper is not None:
         helper.close()
     return results
@@ -601,14 +675,10 @@ def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None, 
 # ---- The words a teacher reads -------------------------------------------------
 
 def reason_sentence(problem: dict, said: dict) -> str:
-    reasons = said["reasons"]
-    reason = problem.get("reason") or "texSaid"
-    text = reasons.get(reason) or reasons["texSaid"]
-    return site_health.filled(text, {
-        "name": problem.get("name") or "",
-        "said": problem.get("said") or "",
-        "seconds": JOB_SECONDS,
-    })
+    # With nothing said, a reason never reads "()" (#718 review M1): the
+    # one function the folder problem uses too.
+    return site_health.figure_reason_words(problem, said["reasons"], said.get("reasonsWithoutDetail"),
+                                           JOB_SECONDS)
 
 
 def error_line(problem: dict, said: dict, kind="error") -> str:
@@ -684,7 +754,7 @@ def prepare(pages: list, output_dir, cache_root, full_rebuild=False, command=Non
             answer = results.get(job["id"]) or {"ok": False, "reason": "engineMissing"}
             answer = _kept_answer(job["engine"], answer)
             answers[(job["engine"], job["key"])] = answer
-            if answer.get("reason") not in ("tookTooLong", "engineMissing"):
+            if answer.get("reason") not in NOT_CACHED:
                 cache.put(job["engine"], job["key"], answer)
             if job["engine"] == "tikz" and answer.get("ok"):
                 outcome["drawn"] += 1
@@ -784,6 +854,10 @@ def _located(figure: dict, problem: dict) -> dict:
     return {
         "page": figure["place"],
         "engine": figure["engine"],
+        # The fence's own key (#717): what a row of the section's Problems
+        # record is identified by, so inserting a fence above it does not
+        # make it a different problem. Named nowhere a teacher reads.
+        "key": figure.get("key"),
         "block": figure["block"],
         "line": line,
         "blockLine": block_line,

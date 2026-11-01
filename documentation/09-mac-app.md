@@ -515,9 +515,13 @@ third review.** They answer different questions and they are allowed to differ:
   in? Written where a piece of work's folder is DECIDED: `startPreview()`
   beside the lease, and `deployAndWait()` — the latter AFTER any running
   preview has been stopped, so a deploy cannot retarget that preview's own
-  stop. Read by `stopPreview`, `stopPreviewAndWait`, `cancelPreview` and
-  `cancelDeploy`. Nil means there is nothing to stop, and every reader is
-  already guarded by a runner's `isRunning`.
+  stop. Read by `stopPreview`, `stopPreviewAndWait` and `cancelPreview`. Nil
+  means there is nothing to stop, and every reader is already guarded by a
+  runner's `isRunning`. **Since #706 the deploy's folder is ALSO noted on the
+  section's `SectionDeployRun.folder`**, and that is what `cancelDeploy` reads:
+  the view pressing Cancel may be one that came back to the section after the
+  view that started the deploy had gone, and its own note is nil (below, "A
+  section's deploy outlives its view").
 
 One property served both jobs until the third review, and the state that broke
 it is one render pass wide: `chooseWorkspace` clears the selection
@@ -550,6 +554,451 @@ half that is easy to leave out, and leaving it out would be worse than no
 guard: delete a capture and every stop reads a permanently nil property and
 does nothing at all, wearing the shape of the fix working. The behaviour itself
 was verified by reading the teardown path.
+
+## A section's deploy outlives its view (#706)
+
+**The fault.** Russell, 2026-10-29: Deploy on ICS3U section 1, a click on
+section 2, a click back, and section 1 showed "already being deployed …
+Nothing was changed." under both destinations, with "Something went wrong".
+Nothing re-issued the deploy. There are four ways in — the toolbar button,
+Section ▸ Deploy… and ⇧⌘D (`performSiteMenuItem`), the assistant through the
+window (`SectionWindowControllers`' `deploy:` closure) and the assistant with
+no window (`AssistSiteWork.deploy`) — and no `.onAppear` or `.task` calls any
+of them. What happened instead:
+
+1. `MainWindowView` gives the detail view `.id("\(code)-\(sectionNumber)")`,
+   so every selection builds a new `SectionDetailView`.
+2. The deploy runner and `isPreparingDeploy` were that view's `@State`. The
+   `Task` `startDeploy()` began kept the OLD runner alive, so the deploy went
+   on unseen; `onDisappear` stops only the preview.
+3. The view that came back had a fresh runner: a blank console, and Deploy
+   enabled, because the button asked only that runner.
+4. The teacher pressed it (Russell confirmed, 2026-11-01).
+
+**Measured.** A Swift harness using the real `.id` and `@State`, selecting
+1 → 2 → 1: on return, section 1's runner had `isRunning=false lines=0` while
+the orphaned task wrote `lines=5` into another one. Reproduced in the real app
+on 2026-11-01 (Debug build, `--state-dir`, a scratch folder holding EXC2O with
+a folder destination and 3,000 extra pages, so the deploy's build took 32 s):
+on return the window read "No Preview Running" with Deploy enabled. A press
+during the deploy's BUILD leg was worse than the report: it started a second
+`preview.sh --build-only`, and the first deploy's build ended "failed (exit 1)
+after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counts a
+running `deploy.sh`, and the first deploy had not reached it yet. After the
+fix, the same steps showed the live progress with Cancel, Deploy greyed, one
+launcher start in total (the press and ⇧⌘D started nothing), and a deploy
+that finished while the teacher was on section 2 showed "Done" on return.
+
+**The shape.** `Models/SectionRuns.swift`:
+
+- `SectionRuns.shared` is an app-lifetime index of one `SectionDeployRun`
+  per key. The key is `FolderIdentity.canonicalPath` of the folder, the course
+  code lowercased and the section, made canonical when the key is BUILT, so
+  `/var/…` and `/private/var/…` are one run. The index is NOT `@Observable`
+  on purpose: `body` asks for the run, the first ask creates it, and creating
+  into an observed dictionary from `body` would be a state change during a
+  view update. The run itself is observable.
+- `SectionDeployRun` holds the runner, `isPreparing`, the deploy's `folder`,
+  its unsaved-settings sentence (#335), and `findingsAreWaiting` plus an
+  `endings` counter. **It is never replaced**: a running task holds it, and a
+  view that found a new object would watch something nothing writes. A
+  finished run keeps its legs until that section's next deploy starts over
+  the same runner, but it is SHOWN only by the rule in the next bullet. It
+  lives in memory only, until quit. It is not cleared on a change of working
+  folder, because windows each have their own folder and the key already
+  carries it (#706 plan review, M3).
+- The view's `deployRun` is a computed pass-through for `body`, and so are
+  `deployRunner` and `isPreparingDeploy`. **`deployAndWait` and
+  `cancelDeploy` take the run ONCE**, from the folder they have already
+  checked, and use only that object. A computed property is asked again on
+  every read, and `pointAtFolder` can move the window during one of
+  `deployAndWait`'s awaits. Re-keying there would leave the first folder's run
+  "preparing" until quit and drive the second folder's runner (plan review,
+  H1). `run.isPreparing` is cleared by a `defer` on every return.
+- Findings go through the run: `deployAndWait` calls `run.noteEnded()`.
+  Whichever view shows the section takes them, in `.onChange(of:
+  deployRun.endings)` or on appearing. `takeFindings()` reads and clears, so
+  two windows on one section raise the dialog once. (Since #717 the findings
+  only route the links checklist; the dialog is the section's Problems alert,
+  raised from its record when the deploy has ended — "A section's Problems
+  tab, its marker and its alert" below.)
+- `SectionDetailView.deployIsAvailable` and `deployIsUnderWay` add
+  `CourseActivity.sectionPublishIsRunning`. That record is written by the
+  window's deploy (through `claimAPublish`) and by the assistant's windowless
+  deploy, so it covers a deploy the returning view's run cannot see. The
+  button, the Section menu, ⇧⌘D, `deployAndWait`'s first busy check and
+  `deployWillBeRefused` all ask it. The last matters because #475's question
+  must not be asked before a refusal (plan review, M2).
+- **A finished deploy is shown on return only until one view has displayed
+  its ending** (implementation review M1, ruled by the director 2026-11-01 in
+  Russell's absence and flagged for his review). The first build of this fix
+  showed the finished panel on every visit until quit — a red "Something went
+  wrong" included — and a view that came back had a fresh preview runner
+  with no start time (`?? .distantPast`), so an 8 am deploy won
+  `showsDeployProgress` over an 11 am preview of the same section. Now:
+  - `SectionDeployRun.endingShown` records the last ending a view put on
+    screen. `takeWhatTheDeployLeft` sets it, live (`.onChange` of `endings`)
+    or on appearing, whenever the run has ended and is not busy.
+  - On appearing, the view first stores `endingToHideOnAppearing()` in its
+    `@State deployEndingHiddenHere`: the current ending if some view has
+    already shown it. `body` gives the console to the deploy only when
+    `isShown(hidingEnding:)` says so — always while busy (preparing
+    included, so a first-ever deploy now shows "Preparing to deploy…"
+    rather than the placeholder), otherwise only with output, an ending this
+    view did not hide, and no later preview. A NEW ending is a new number, so
+    the next deploy in that same view is shown as ever.
+  - `startPreview` tells the section's run when a preview started
+    (`notePreviewStarted`), and `showsDeployProgress` is given
+    `previewRunner.startedAt ?? deployRun.previewLastStartedAt`, so the
+    preview wins the comparison when it is the more recent run.
+  - Rejected: keeping the panel until the next deploy (the first build, above);
+    forgetting it only when a preview starts (a deploy watched to the end would
+    still come back on every visit). The contract cases
+    `watchedToTheEndThenPreviewed`, `watchedToTheEnd` (no preview: only the
+    shown-once clause makes it false) and
+    `finishedWhileAwayThenPreviewedFromAnotherWindow` (nobody saw the ending:
+    only the later-preview clause makes it false) hold it. The last two were
+    added by the fixes review (L1), which measured that an implementation
+    with EITHER clause alone passed the first. `SectionRunsTests`' source scan
+    also pins `previewRunner.startedAt ?? deployRun.previewLastStartedAt` in
+    `showsDeployProgress` and the `notePreviewStarted` call in `startPreview`
+    (L3), since the model tests recompute the first inline and cannot see the
+    second.
+- `TaskConsoleView` scrolls to its end on appearing, so a returned, finished
+  console opens where the outcome is. That applies to every console, the
+  preview's included, which is harmless: a console that has just appeared has
+  nothing the teacher has scrolled back to.
+
+**What stays per window, and why.** A preview being built is still stopped
+when its section is left. Its port lease, its web view and #232's ⌘Q record
+belong to the window, and a stopped preview comes back idle, never as a
+failure. `deployRefusal` (the alert) stays per view: it is raised before any
+run exists.
+
+**Known limits.**
+- The windowless assistant's deploy runs on `AssistSiteWork`'s own runner, so
+  a section selected meanwhile greys Deploy but shows nothing in the console.
+- Another PROGRAM's deploy (a deploy set for later, an outside assistant, a
+  command line) does not grey the button. Work leases are per course and on
+  disk, and nothing in the app watches them change, so a button greyed from
+  them would stay grey after that program had finished. A press then is
+  refused in words: by `claimAPublish` (`builtElsewhere`) when that program
+  holds leases, or by the launcher when it holds none.
+
+Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
+
+**Rejected.**
+- (a) Only greying Deploy: the console stays blank and Cancel cannot be
+  reached.
+- (b) Dropping `.id`: both apps keep it so that state never leaks between
+  sections (Windows `MainWindow.xaml.cs` `ShowDetailForSelection`).
+- (c) Keeping hidden views alive: each costs a web view, and appearing would
+  stop meaning anything.
+- (d) Cancelling on navigation: it throws away work the teacher asked for.
+- (e) Moving all of `deployAndWait` into the store: a much larger diff for
+  the same behaviour.
+- A trail line on returning: it is navigation. The fix REMOVES lines instead
+  (the second "started deploy.sh" and the launcher's refusal).
+
+**Tests.** `SectionRunsTests`:
+- the store, and `===` across two spellings of one folder;
+- the `CourseActivity` clause;
+- a finished run, and findings taken once;
+- an ending shown once is not shown again, and a later deploy's is;
+- a later preview of the section wins over a finished deploy, even in a view
+  with no preview start of its own;
+- the nine contract cases;
+- a source scan that the view holds no `@State` deploy runner, that nothing
+  on appearing deploys, and that `deployAndWait` names only its captured run.
+
+Must-fail, by copy-and-restore:
+- the store always creating turns three tests red;
+- dropping the `CourseActivity` clause turns two red;
+- the scan over `origin/dev`'s view is red;
+- `isShown` reduced to the first build's rule (busy or any output) turns the
+  two M1 tests and the `watchedToTheEndThenPreviewed` case red; dropping only
+  the shown-once clause, or only the later-preview clause, turns its own test
+  red.
+
+`QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
+a stub `deploy.sh` that counts its own starts. It is part of no gate.
+
+## A section's Problems tab, its marker and its alert (#717)
+
+**What it replaced.** Every build that met a folder problem put ALL of them in
+one alert, mid-build, which the teacher dismissed and nothing kept; a build
+nobody watched (a scheduled deploy, the MCP server, a terminal) left only the
+overnight record that `takeFolderProblems` consumed on opening. Russell's
+rulings on #717: a TAB on the section (ruling 9), a proper macOS table with a
+tick per row (5, 6), every problem a preview or deploy can report (8), a
+warning on the section's sidebar row until its own next build is clean (10),
+an alert only when the set CHANGED that offers Show (7), and a shared page's
+problem shown "fixed in the source" in a section that has not been built since
+(11). The record itself is the shared Python's (doc 05, "A section's record of
+its problems"); this is the mac's half, and what Windows owes.
+
+**The store.** `Models/SectionProblems.swift`: `SectionProblems.shared`,
+`@MainActor @Observable`, keyed by `SectionRuns.key` (#706's canonical folder,
+course lowercased, section — one spelling of the key). It holds the records it
+has READ, the tab each section shows and the rows the teacher UNticked, all in
+memory. It reads a record at the moments one can have changed and never from a
+`body`: a `PLANTOIR_PROBLEMS:` marker in any run of this app
+(`ScriptRunner.problemsMarkers`, and `noteAMarkerArrived()` so the sidebar
+reloads even for a deploy that outlived its view), the section appearing, the
+app becoming active (the MCP server's builds), the scheduled-deploy watcher
+moving, and the window's courses loading. The sidebar row reads
+`hasProblems`, which is memory only (plan review, MED 7). A course is read
+WHOLE, because one section's record decides what another's rows say.
+
+**The tabs: Website | Problems.** `Views/Section/DetailTabs.swift`, a
+segmented control in a thin bar above the section's content, shown only while
+the section's own record has rows; with none, the section looks as it always
+has, and the tab falls back to Website. The Problems tab (`ProblemsTableView`)
+is drawn OVER the console and the site as a top layer of the existing stack.
+**Rejected: a `TabView`** — the site is a live `WKWebView` scrolled to where the
+teacher left it, and moving it between containers is how that is thrown away
+(the comment on the cover layer). **Rejected: the toolbar's principal slot**
+(the plan's place) — the section's toolbar keeps every item ALWAYS present,
+because inserting one conditionally makes macOS rebuild the toolbar and
+mis-lay-out the title (the comment on `.toolbar`), and the switch exists only
+while there are problems. `DetailTabs` is generic over its tab type so #708's
+Settings | Unit plan on a course adds a tab rather than a second shell. The tab
+chosen is kept in the store, not the view's `@State`, because
+`.id("code-section")` rebuilds the view and Show must survive that.
+
+**The table.** One row per problem: a tick (ticked means included — the app's
+checklist rule — and rows start ticked; ticks last while the app is open,
+since a fixed row goes by itself on the next build; Fix with Claude… and Fix
+with Codex… act on the ticked rows, below), Kind (`sectionProblems.kinds[].label`), Page
+(the place, or Whole section / Whole course), Problem (the row's `item` — the
+piece of the folder problem naming the page, the fence and what was said —
+with the full sentence and detail on hover), First found and Last found.
+Sorted by Kind to begin with; every column but the tick and the Problem sorts.
+A problem with a repair (a missing Media folder, a missing front page) has its
+button in the row, because the alert no longer comes with every build; its
+outcome is shown the way the alert's was. A `fixedInTheSource` row reads the
+contract's sentence in secondary style. A course kept for reference shows the
+table without repairs.
+
+**Fixed in the source** (`SectionProblemsRules.state`, `sectionProblems.
+rowState`): of the other sections' records that show the page, the LATEST
+alone decides — never any clean one (implementation review L1: a section clean
+at ten proves nothing once another broke the page again at eleven). A row
+clears to that state only when that record is later than this one and has no
+row of the same kind on the page — not merely no
+row with this id, because a renumbered fence's id is not the fence it was
+(MED 5) — the kind depends on the page alone (`clearsAcrossSections`: not a
+link into a hidden page, which depends on what THIS section hides), the reason
+is not about the machine (`notAboutThePage`: a time-out, an engine or Swift
+not there yet, geogebra.org out of reach), and for a kind the site says, that
+record's site has said (`siteSaidComplete`). The section's marker stays
+either way: its deployed site still carries the broken page (ruling 11).
+
+**The marker.** ONE `exclamationmark.triangle.fill`, orange, on the row
+(`SidebarView.sectionRowLabel`), shown while the section's OWN record has a
+row; another section's build never puts it on or takes it off. The stopped
+scheduled deploy already drew the same glyph, so when both apply it is still
+one glyph, and its help and accessibility label say each sentence that applies
+(`warningTooltip`); the clock beside it keeps saying a deploy is scheduled.
+Identifier `problemsBadge-section<N>`, or `stoppedPublishBadge-section<N>`
+when the stopped deploy applies, so the tests that find that one still do.
+**Rejected:** a second triangle (plan review, MED 7 — two near-identical
+glyphs, two meanings).
+
+**The alert.** Raised only when the record found something NEW
+(`changed.new`) and its `alertKey` has not been answered
+(`SectionProblemsRules.alertIsDue`). Raised by the section's own view: mid-build
+when its preview prints the marker (the #153 timing), when ANY run in this app
+prints one (`SectionProblems.markersArrived` — the in-app assistant's build of
+the open section among them; implementation review L5), when its deploy ends
+(`takeWhatTheDeployLeft`), and when the section is opened, or the app comes
+back to the front (the MCP server's builds, a terminal's), onto a record
+nobody has answered. **By design, and so stated** (L6): the site's merge of a
+build keeps that build's alert key, so a row the site adds after the alert was
+answered raises nothing — it is on the tab and keeps the marker on — and the
+trail's line, written once per alert key when the app first reads the
+record, counts the rows the record had then (in a run the app watched, the
+build's, before the site's). Title from
+`sectionProblems.words` (one or several new problems), message: the new
+problem's own sentence when there is one, where Show takes you, how many went.
+Buttons: **Show** (selects the Problems tab), the repair when a NEW problem has
+one, and **Not Now**. No "Don't ask again" box: the #495 add-ons offer's
+suppression toggle sat on the window's whole content, and a suppression toggle
+applies to every dialog presented within the view it is on, so it appeared on
+this alert too (#731, found driving this piece) — ticking it silently turned
+the add-ons offer off. The offer is now presented from a view of its own
+behind the content (`ObsidianAddOnsOfferDialog.offerHost`), and
+`testOnlyTheAddOnsOfferCarriesASuppressionToggle` holds that there is one
+toggle in the app's views, there. Every answer is remembered by alert key in
+`~/Library/Application Support/Plantoir/problems-acknowledged/<folder id>.json`
+(last 20 per section), so a relaunch does not raise yesterday's alert again
+(plan review, HIGH 2) — never in the record, which the build rewrites. A record
+whose changes are all GONE raises nothing (ruling 7 says "finds new"): the
+marker and the tab go by themselves.
+
+**One dialog.** The alert IS the old `.findings` case of the view's one
+health alert, so the repair outcome, the preview alert (#397) and the links
+checklist (#379) keep their order: the checklist follows the alert. Nothing is
+queued behind another dialog any more (`heldHealthFindings` is gone): an alert
+that is due stays due in the store until answered, so whatever is in front of
+it going away asks again (`showAnythingWaiting`, the checklist sheet's
+dismissal). `showHealthFindings` now only routes the #333 finding to the
+checklist. #706's findings left by a deploy that outlived its view come to this
+alert rather than to a second one (plan review, MED 8). On opening, the
+overnight record (`takeFolderProblems`) is still TAKEN, so it does not pile up,
+but its findings no longer have a dialog of their own: the section's record
+holds the same problems, one row each. The PLANTOIR_HEALTH: line, the
+"folder problem found" trail line and the assistant's sentences
+(`SiteHealthFinding.appending`) are unchanged — no tool description or
+`AssistWording` byte moved (`test_tool_surface_digest.py` before and after).
+
+**The trail.** "problems changed" (`ActivityTrail.Event.problemsChanged`,
+`activityTrail.mustRecord`): one line per alert key whose set changed, the
+first time the app reads it — counts and KINDS, never a page — remembered beside
+the answers so a relaunch does not write it again; and a second line with the
+answer to the alert. Nothing for a tick or for opening the tab.
+
+**Measured.** See the closing comment on #717 for the real-app drive
+(screenshots in the run's scratchpad): a planted `\foo` diagram, a preview,
+the alert, Show, the tab, the table, the marker; the fence put right, a
+preview, the row and the marker gone.
+
+**What Windows owes** (the `windows` issue): a store keyed like #706's, the
+Website | Problems switch with WebView2 kept mounted, a check-box list sortable
+by kind, the Segoe Fluent warning glyph on the section row (one, as above), the
+alert with Show and the repair, the answers file, `rowState`/`sectionMarker`/
+`alert` cases, and the trail event. The record, its rows and their words are
+free: Windows runs the same Python.
+
+**Tests.** `SectionProblemsTests` (13, with #731's): the three case lists, the lists and
+words pinned key by key, rule 1 over every word, the marker read from its
+prefix onward, a record read as the build writes it, the store's key, answers
+across a relaunch, ticks and tab, the trail line, and a source scan that the
+view raises one alert from the record. Must-fail, by copy-and-restore: no
+`pagesShown` guard, "lacks this id" for "no row of that kind", the marker from
+any record, answers kept in memory only — each fails a named test.
+
+### Fix with Claude… and Fix with Codex… (#717, part two)
+
+**What it is.** Two buttons under the Problems table (`ProblemsTableView.
+fixButtons`) that hand the ticked problems to an outside assistant the teacher
+already has (rulings 3, 5 and 6 on #717). They open the SAME two doors as
+Revise With ▸ — `ClaudeCodeLauncher` and `CodexLauncher`, at the WORKING
+folder, where the skills and the guidance are — and the only difference is the
+opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
+in place of the plain greeting. Every word, number and case is
+`app-rules.json` → `outsideAgents.fixWith`.
+
+**Shown, enabled, handed over.** Each button is shown only while its assistant
+is installed, read from `OutsideAssistantPresence` (asked at launch and when
+the app becomes active, never while the table draws — the view's source scan
+holds that it never calls `isAvailable`), and never on a course kept for
+reference: HIDDEN, never greyed, as Revise With ▸ (`hiddenWhenNotInstalled`).
+They are enabled while at least one row is handed over: ticked (absent means
+ticked) AND not `fixedInTheSource`. A ticked row another section's later build
+shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
+the page is already right, this section needs only a build, and an assistant
+asked to fix it would find nothing wrong and might change something that is not
+broken while looking. At the click, the refusal Revise With ▸ makes (#458: a
+Claude or Codex session already open on the course, or the course busy) is
+made here in its own words, and nothing opens.
+
+**The message** (`fixWith.fixGreeting`, one line): the course and its name,
+which build of which section found the problems, then each handed row numbered
+`1) … · 2) …` — its `prompt` verbatim (the record's one bounded line,
+`sectionProblems.prompt`, less its own closing full stop so it never reads
+". ("), then `(page: courses/<COURSE>/<page>.md, a page shared by every
+section, skill: <skill>)`, the middle clause only when the page is not under
+`section<N>/` — then the plantoir tools, the How I Teach sentence verbatim,
+plan-first-and-agree, and a closing that names what clears the rows
+(`closingWhy`): "preview Section N" for almost every kind, "deploy Section N
+to Cloudflare again" when every row is Cloudflare's refusal (a preview never
+runs that check, so it carries the row unchanged — `deployOnlyKinds`), and
+both in one sentence for a mix (review M1). The skill per kind is
+`fixWith.skillForKind` (figures and GeoGebra `plantoir-math-graphs`, Swift and
+runnable code `plantoir-runnable-code`, self-check questions
+`plantoir-quizzes`, a handout `plantoir-printing`, anything else
+`plantoir-page-authoring`); a test holds that every one is a skill the app
+carries and every key a `sectionProblems` kind. The message is filled in ONE
+pass over its template (`FixWithAssistant.fill`), so a row whose words carry
+`{section}` — TeX is braces everywhere — goes over as written.
+
+**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). On
+Windows the door runs `wt.exe -d <folder> cmd /k …` when Windows Terminal is
+there, and `wt` splits its command line at EVERY `;`, inside quotes too,
+because it reads the arguments after the quotes are removed
+(microsoft/terminal #13264; the documented escape is `\;`). A message with a
+semicolon opens cut short, with its tail as a second tab. The first draft used
+`; ` between rows and inside every row, so a ten-row message carried about
+thirty. No piece of `fixGreeting` has one now, and any a row, a page or a
+course name brings (a TeX error often does) is written as a comma. A double
+quote becomes an apostrophe (`greetingCarriesNoDoubleQuotes`). Both
+replacements keep the length. **Rejected:** escaping `;` as `\;` on Windows
+only. It would hold only while every future piece of the message remembered
+it, and the mac would send a different message.
+
+**Bounds.** At most `mostRowsInThePrompt` (10) rows are named, in the record's
+order, and no row is added that would take the whole message past
+`greetingMaxCharacters` (6,500); the first is always named and the rest are
+"and N more on the Problems tab". A page's place is cut at 300 characters and
+the course's name at 80 (`courseNameMaxCharacters`, review L2 — before it, a
+7,000-character name gave an 8,042-character message), so the bound is
+absolute. Characters are Swift's (grapheme clusters, `fixWith.charactersAre`);
+Windows counts UTF-16 units, which can be more, and keeps the whole command
+line under 8,191 of those, with the rest of 6,500's room as the margin. Why
+6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
+characters, and the rest of that line (the terminal, the assistant's path, the
+configuration's) needs room. Measured with the contract's cases: ten 400-character
+rows on ordinary pages make 5,659 characters; long page names (286
+characters each) stop at seven rows and 6,083 (re-measured by the fixes
+review from the branch's own sources). Two small limits, written down
+rather than fixed: a `;` in a page's NAME is written as a comma, so the
+assistant will not find that file by the name alone — the row's line and
+reason still locate it; and a prompt ending "..." reads ".. (" before the
+parenthesis.
+
+**The trail.** "asked an assistant to fix problems"
+(`ActivityTrail.Event.askedAnAssistantToFixProblems`, `activityTrail.
+mustRecord`): which assistant, how many problems and their KINDS, how many the
+message named, how many were left out (unticked, fixed in the source) — never
+a page. Written only once the door opened, after the door's own "assistant
+opened" line; a door that did not open says so in its own alert
+(`didNotOpenTitle`, `couldNotStart`). No line for a tick.
+
+**Rejected** (`fixWith.rejected`): handing the rows over in a FILE the message
+names — a file in the folder Obsidian watches, that nobody cleans up, when the
+one-line message fits; one session per problem; greying a button for an
+assistant that is not installed; asking a login shell where the tool is
+(1.06 s for `zsh -lic` on the planning Mac, and it runs the teacher's login
+scripts while a view draws — the doors' own `searchedForInOrder` is used, which
+does not cover a CLI bundled inside the Claude desktop app; ruling 3 says "the
+command").
+
+**Measured.** The contract's expectations were computed by an implementation
+written from the rule text (Python), and the Swift, compiled on its own with
+the real `FixWithAssistant.swift`, `SectionProblemsRecord.swift` and
+`SectionProblemsRules.swift`, gives the same answer for all 10 `greetingCases`
+and 8 `buttonCases`. The tool-surface digests did not move (local 13
+`46b96562…`, MCP 38 `89641d12…`): the message is a launch argument, not a tool
+description.
+
+**What Windows owes** (its `windows` issue): the two buttons under its list,
+the same `buttonCases` and `greetingCases`, the trail event, and the message
+through `wt.exe`/`cmd /k`. The message has no `;` for `wt` to split at. A `%`
+the record's prompts already drop, but a page's name can carry one. `^` and
+`!` need checking in its quoting. Measure the whole command line in UTF-16
+units against 8,191.
+
+**Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
+with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
+kinds a deploy writes, both case lists (no message with a semicolon, a newline
+or ". ("), no semicolon and no unbounded name with every input carrying them,
+the closing per kind, rule 1 over the message, the
+real `rowState` leaving a row out, which pages are shared, both doors sending
+the message they are given (and the plain greeting without one), the message
+surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
+apostrophe in it, the trail line against the contract's, and a source scan of
+the view.
 
 ## One folder, however it is spelled
 
@@ -1826,7 +2275,7 @@ below, and it is neither: not knowing.)
 The builder can be asked directly, and its answer is proof rather than
 inference: `docker exec <container> curl …` against the port INSIDE the
 builder. The port matters — the host port differs for every working folder
-after the first (this Mac's own folder runs `0.0.0.0:8091->8081/tcp`), so
+after the first (this Mac's own folder runs `127.0.0.1:8091->8081/tcp` since #684), so
 asking the builder about a host port asks it about a site it has never heard
 of, and the answer, "no", is the sentence that blames the teacher's pages.
 
@@ -2133,6 +2582,18 @@ The build's `PLANTOIR_MAPS:` line is read by `CoverageMapsBuilt` (console and
 scheduled log) into `curriculum maps built` on the trail, and since this piece
 `BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
 the app has no reader for yet never reaches a teacher as raw JSON.
+
+**A shortened machine line (#704, v1.9.1).** Since #666 the shared Python
+caps every machine line at 4,000 characters, so a `PLANTOIR_DATED:`,
+`PLANTOIR_KEPT_OFF:` or `PLANTOIR_MAPS:` line with a long list keeps its first
+entries and carries `count`, the true total. `PagesDatedByTheBuild`,
+`HowITeachKeptOffReport` and `CoverageMapsBuilt` read it into their `count`
+and word the trail from `total` (the larger of `count` and the entries shown),
+ending "and M more", or "M not named" when the line named none. An empty list
+with a count is a report, not none. `MachineLineLengthReaderTests` runs the
+contract's six `machineLineLength.readerExamples` through each reader, the
+console and a scheduled publish's log. Why, what was measured and what was
+rejected: `05-build-pipeline.md` → "How long a machine line may be (#666)".
 
 ## The wizard's Starting Content section, and what governs what
 
@@ -2908,7 +3369,7 @@ asked that `plantoir-math-graphs` teach an assistant to build a page with a
 figure productively, not only the fence syntax, so it carries when to use
 which fence, four complete patterns (a parabola beside its parent, two lines
 meeting — interactive and with the point marked, labelled similar triangles,
-a number line), the measured package list, the limits on paper and time,
+a number line; #715 added a fifth, the finite-difference scaffold), the measured package list, the limits on paper and time,
 how a failure shows up, what to avoid, and what cannot be done (a slider
 is for GeoGebra, arriving in the next release, with several curves for
 several values of the parameter offered meanwhile — as of 2026-10-09;
@@ -3057,10 +3518,13 @@ to OFFER it first whenever something is to be printed, beside
 - **Sources and answer keys are kept OUT of `courses/`.** Every file in a
   course folder that is not a page is copied to the site (Quartz's Assets
   emitter globs everything but `*.md`), so an answer key kept beside the
-  pages is one students can download. The skill suggests a
-  `handouts/<CODE>/` folder beside `courses/` when the teacher has no place
-  of their own, and the student copy alone goes into `Media` when it should
-  also be handed out from the site (`printPdf:`).
+  pages is one students can download. The skill suggested a
+  `handouts/<CODE>/` folder beside `courses/` when the teacher had no place
+  of their own, and the student copy alone went into `Media` when it should
+  also be handed out from the site (`printPdf:`). **Since #715** the course
+  remembers its folder and a worksheet's merged `- with Answers.pdf` may go
+  on the site - see "Tables, the scaffold, cards and the remembered folder
+  (#715)" below.
 - **The corners follow the course's print settings** - `print_school_name`,
   `print_school_name_at`, `print_course_code_at` and `print_blanks`, read as
   `scripts/print_settings.py` reads them - because the issue's fixed layout
@@ -3093,6 +3557,255 @@ one run each:
 |---|---|---|
 | `claude -p` (2.1.309, `--permission-mode acceptEdits`), working folder root | `Make me a short warmup worksheet on solving one-step linear equations for MPM2D, with an answer key.` | PASS - built from the skill's starter in `handouts/MPM2D/`, the school's name from the course's settings, `- Answers` wrapper, both PDFs rendered and looked at, a separate reviewer re-solved every answer, no build files left. **Confounded:** Russell's own `~/.claude/CLAUDE.md` carries the same style, so this run says the skill was followed, not that it alone was enough |
 | `codex exec` (0.162.0, `-s workspace-write --skip-git-repo-check`), working folder root | `Make me a short quiz on factoring for MPM2D that I can print, with solutions.` | PASS - read `plantoir-handouts` (and `plantoir-printing`), wrote `Factoring Quiz.tex` with `- Solutions`, `\score` marks and `\work` in the solutions, in `handouts/MPM2D/`; all five answers re-checked by hand here and right. No global instructions on this side, so this is the clean run |
+
+**Tables, the scaffold, cards and the remembered folder (#715, v1.9.1).**
+Russell settled six rules with an assistant on 2026-10-31 while sweeping the
+MPM2D Thread 1 and 2 handouts and pages; they lived only in his own
+`~/.claude/CLAUDE.md` and memory. They are now in `plantoir-handouts`
+(sections 9-11 and section 2), `plantoir-page-authoring` (section 7) and
+`plantoir-math-graphs` (sections 3, 4E and 8), with worked sources in the
+handouts skill's `patterns/` folder - `tables.tex`, `finite_differences.tex`
+and `finite_differences.py` - which are not starters and so not in the
+contract's `starters` list. What was decided, what was measured, and what was
+rejected:
+
+- **A shaded heading: nicematrix for new tables, the inset `\rowcolor` for
+  existing ones - and NOT a bare `\rowcolor`.** The issue's comments credited
+  `\rowcolor` at the row start (instead of `\cellcolor` in a `\multicolumn`)
+  with closing tables that looked "open at the top". Measured with tectonic
+  and poppler, the two draw **byte-identical** PDF: colortbl paints a cell's
+  fill after the rule above it and the rule on its left. At 600 dpi nothing
+  is covered; at 80 dpi - the skill's own look-at-every-page check - both
+  lose the whole top rule (58 px) and 19 px of the left rule, and a table
+  with no fill loses none. What actually fixed Russell's Day 2 Summary was
+  `\rowcolor{tablehead}[\dimexpr\tabcolsep-0.5pt\relax][\dimexpr\tabcolsep-0.5pt\relax]`
+  (fill stops 0.5 pt short of each side rule: left 0 px lost, top still lost
+  at 80 dpi wherever the table happens to sit - below) PLUS a global redraw
+  of every `tabular`'s outer frame in his preamble (0 px lost). `NiceTabular[hvlines]` with
+  `\CodeBefore \rowcolor{tablehead}{1}` paints colours first and every rule
+  after: 0 px lost at 80, 100, 150 and 600 dpi, same geometry as a
+  `tabular` (bounding box and rule positions equal at 300 dpi), and it is in
+  tectonic's bundle. Measured again for the shipped `patterns/tables.tex`
+  (gap counts top/bottom/left/right): pattern A 0/0/0/0 at 80 and 600 dpi;
+  each of pattern C's three tables 0/0/0/0 at both, and the starter's new
+  table 0/0/0/0 at both. Pattern B is **position-dependent**: 54-56 of the
+  58-59 px top rule lost at 80 dpi at 6 of 12 positions, 0 at 600 dpi. That
+  is from the fixes round (2026-11-01, tectonic 0.17.0, poppler 25.09.1,
+  `pdftoppm -gray -r 80`), which set the three kinds of table on twelve
+  pages, each nudged 0.17 pt down and 0.13 pt right from the one before,
+  because the implementation review could not reproduce the first
+  "54/0/0/0" and found the loss followed where the table sat. Top-rule
+  pixels lost at 80 dpi, positions 1-12:
+  - pattern A: 0 at all 12;
+  - pattern B: 0, 0, 56, 55, 55, 0, 0, 54, 55, 56, 0, 0 - and its right rule
+    loses 3-4 single pixels at the corners and row joins at 5-6 of the 12
+    (re-measured by the fixes review, within 1 px), near-invisible and
+    changing no advice;
+  - a bare `\rowcolor`: 0, 0, 56, 57, 58, 0, 0, 57, 56, 56, 0, 0 - the same
+    six positions - and 18-19 px of the left rule at 7 of 12;
+  - B and the bare `\rowcolor` with Russell's templates' "Outer border, drawn
+    last" redraw in the preamble: 0 at all 12 (side rules at most 1 px);
+  - at 600 dpi: 0 for every kind at every position.
+
+  So a 600 dpi look can never show B's open top, and the skill says to look
+  at the top edge at 80 dpi and, if it is gone, rewrite the table as
+  pattern A - or keep the redraw if the preamble copied from the templates
+  already has it, which is what closes B.
+  CoreGraphics (Preview's engine) thins the same top rule at 80 dpi too
+  (mean grey 141 with no fill, 190 with `\rowcolor`), so it is not one
+  renderer's quirk. REJECTED: the frame-redraw hack as the skill's pattern -
+  it fixes the outer edges only and redefines `tabular` for the whole
+  document (the skill names it as what closes B where a copied preamble
+  already carries it, and does not add it); and `\rowcolor` alone, which the
+  measurement shows fixes nothing.
+- **The "notched" right-hand rule was not reproduced.** The card skeleton
+  table, `p{}` with `\raggedleft` and trailing `\hspace`/`\hspace*`, with and
+  without the frame hack, at 600/1200 dpi in poppler and 300/600 in
+  CoreGraphics: every outer rule continuous. So the skill prescribes a 600-dpi
+  look at every table rather than naming a cause it cannot show.
+- **Side by side:** `[t]` minipages starting `\vspace{0pt}`, `[t]` tables, one
+  `\arraystretch`, and `\headstrut` (`\rule[-1.1em]{0pt}{2.6em}`) in every
+  heading row put every rule of three tables (a one-line heading, a two-line
+  `\Block`, units) at the same height - measured, rows at y 72, 104, 123,
+  143, 162, 181 px at 80 dpi for all three. The strut goes INSIDE a
+  `\multicolumn` ("Misplaced \omit" otherwise). Plain `tabular`s with a
+  nested two-line heading drifted 46 px at 600 dpi.
+- **Alignment and decimals** follow the issue's final ruling (its first
+  comment replaced the body's "mixes positive and negative"): any negative
+  value in a column means right-aligned with 0.25 cm padding; none means
+  centred; zero is not negative. Whole numbers beside decimals carry the
+  places (2.0 beside 4.5), never `\phantom`. On a page `---:` and `:---:` say
+  the same, and need no CSS: Quartz writes `style="text-align:right;"` on
+  the cells, the site pads every cell (0.7rem on screen, 5pt printed), and
+  the HEADING follows its column, so the skill does not claim a centred
+  heading over a `---:` column. `verify.sh` 6n builds the new example and
+  checks five right-aligned and five centred maths cells, a right-aligned
+  heading, and that "2.0" and "0.0" are each a centred cell of their own
+  (two and one), not merely somewhere on the page (the fixes round, review
+  L5). **Corrected 2026-11-01:** this merge missed the issue's 12:43
+  refinement - a column mixing whole numbers and decimals is right-aligned
+  too, so its points line up - and centred such a column in both skills,
+  the page example, `tables.tex`, the contract clause and 6n. The second
+  round (below) fixes all of them; 6n now counts ten right-aligned cells,
+  no centred one, two right-aligned headings, and "2.0" and "0.0" as
+  right-aligned cells of their own.
+- **The finite-difference scaffold** ships as a static example
+  (`finite_differences.tex`, and pattern E in math-graphs for a page) beside
+  a cleaned copy of the generator Russell's session wrote
+  (`finite_differences.py`), because a Windows teacher may have no Python.
+  Its default works the first TWO first differences (the generator's own
+  default was one - rule 4's fix for the giveaway), and its output was diffed
+  against the measured originals: identical apart from two comments. Decimal
+  values are written to the column's places, using `Decimal` so a
+  difference never prints as 0.30000000000000004. The skill says to RUN it,
+  never import it: an import would leave a `__pycache__` under
+  `support/agent_guidance`, which `verify.sh` hashes into the image tag. The
+  page fence draws on the site's engine in about a second (limit 20 s) and
+  carries no `%%`.
+- **The site engine's limits** (node-tikzjax 1.0.5, measured with the pinned
+  `support/figures` driven as `plantoir-figures.mjs` drives it): `groupplots`
+  is not carried; a dot drawn with a radius in parentheses, `circle (2pt)`,
+  inside an `axis` fails, with or without `axis cs:`, while `circle[radius=2pt]` and
+  `\addplot[only marks]` draw (the issue named `\fill … circle` as the
+  culprit, which is too broad: outside an axis it draws). Those three are
+  `figureFences.texErrors` cases. `\textdegree`, `\$` and `\textdollar` end
+  the engine itself in a pgfplots label ("Could not find font tcrm1000").
+  Before #718 the build reported that as `tookTooLong`, uncached and retried
+  every build, so #715 first wrote them up as a `knownLimits` entry rather
+  than as cases; #718 (merged first) makes the build name it, `fontMissing`,
+  pins it with its own `texErrors` cases and carries the `knownLimits` entry
+  with the nine symbols measured, so #715's entry was dropped and
+  `plantoir-math-graphs` section 3 lists the nine and names the
+  `figureFences.words.reasons.fontMissing` line. `$^{\circ}$` and `\char36`
+  draw.
+- **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
+  (`{folder, teacherSaid, recorded}`), read and written by the assistant
+  only. It sits inside the course so it travels with a backup, an archive
+  and a restore, as `.internal/timetable/` does; a reference import keeps
+  `.internal` minus `activity`. It never reaches a site: discovery skips
+  dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
+  `.internal` is a page or an asset. The skill says the folder back on every
+  use, because a course outlives a `2026-27` path, and asks again when the
+  folder is gone (another Mac, a rename). The default suggestion is
+  `handouts/<CODE>/` in the teacher's Documents folder. REJECTED: a
+  `course_config.json` key - it would need a `file-formats.json` key both
+  apps show in Course Settings, and the skill tells assistants not to edit
+  that file (unknown keys are preserved, so it stays possible later); a
+  line in How I Teach - that page is pedagogy, written through gated tools
+  with a backup; a visible file in the course - it would be copied to the
+  site; one folder for the whole working folder - Russell asked for per
+  course; and an entry in `contracts/file-formats.json`, which describes
+  files the APPS write - this skill and this section are its one home.
+- **What goes on the site** is one rule now, not two: `Name.pdf`, or for a
+  worksheet whose page gives the answers a merged `Name - with Answers.pdf`
+  (`pdfunite`), as Russell's own Thread 2 pages do; a quiz or test may go
+  there, its solutions never. The PDF is copied again after every change.
+- **Task cards**: one relation per grid, never "on the same axes", at most
+  four graphs per set, discussion pages mirror the cards word for word -
+  carried as the issue wrote them.
+
+**Graphs, the key's layout, and table widths and spacing (#715 reopened,
+2026-11-01).** Russell added rules and refinements after the merge (issue
+comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
+
+- **Abstract or in context, decided per graph.** A graph of a relation with
+  no context is drawn to the edge of the grid with an arrowhead at each end,
+  its plotted points kept; one that models a context stops at the end points
+  the situation gives it, with no arrowheads. `plantoir-handouts` section 12
+  and `plantoir-math-graphs` section 4 carry it; pattern B's static fence and
+  the handout starter's question 2 now follow it. MEASURED on the site's
+  engine (node-tikzjax 1.0.5, `support/figures` driven through
+  `figures.run_jobs` in the `quartz-teacher:dev-test` image, the SVG
+  rasterised with rsvg-convert): `<->, >=latex` on an `\addplot` inside an
+  `axis` draws both arrowheads, as do `>=stealth` and `arrows.meta`'s
+  `{Latex}-{Latex}` (each about 0.7 s). A `domain` that runs PAST the grid's
+  edge loses both arrowheads, because the axis clips the curve and its tips
+  with it - measured on the engine and in tectonic alike - so the skills
+  say to solve for where the curve leaves the grid. functionplot cannot end
+  a curve or draw an arrowhead (it draws every function across the window),
+  so it stays the tool for an abstract relation explored on screen and a
+  context graph is a `tikz` fence. REJECTED: adding arrowheads to functionplot
+  (it is the vendored function-plot's drawing, and a plain line on an
+  interactive graph a student drags past its edge says the same thing).
+- **The answer key keeps the question copy's layout** (`plantoir-handouts`
+  section 3): one table and one grid, authored once, with only the cells and
+  the plotted answer switched by `\qa`/`\onlya`. The starter's question 2
+  used to draw its grid only in the key; it now draws the same grid in
+  both. **Orientation** (section 9): a horizontal two-row table is fine where
+  no finite differences are asked; any table used for finite differences is
+  vertical; the key follows the question.
+- **One width for the value columns, and digits in a centred box**
+  (13:13, refined 14:19). x and y share a width, and the two difference
+  columns share one, from the widest value in either (`\setvaluecol`, width
+  plus 0.5 cm). A column holding a negative value or whole numbers beside
+  decimals sets each value right-aligned in a box as wide as the column's
+  widest value WITHOUT its sign, the box centred in the column
+  (`\makebox[\widthof{$18$}][r]{…}`; the starters' column type `N{$18$}` does
+  it with `\settowidth` and `\hbox to`, so no calc package is needed), so
+  the digits share one trailing edge, sit centred, and a minus sign juts out
+  left. This REPLACES the first version of that day - a fixed 0.25 cm of
+  trailing padding, which put the digits against the right side of a wide
+  column. Measured at 600 dpi on `tables.tex`: the digits' right edges in
+  every `N` column agree within 3 px (0.4 pt, the glyphs' side bearings).
+  `finite_differences.py` does the same in TikZ with
+  `\inbox{widest}{value}` (`\setbox0\hbox{…}\hbox to\wd0{\hss…}`, plain TeX,
+  which node-tikzjax 1.0.5 drew in 0.36 s); the static
+  `finite_differences.tex` and pattern E were regenerated from it.
+- **Every value centred in a row of one pitch** (13:14, refined 14:22). The
+  gap from the heading rule to the first value, and from the last value to
+  the bottom rule, is half the distance between neighbouring values. `C`
+  and `N` columns put `\rowstrut{\valuepitch}` (1.5em; a strut of equal
+  height and depth about 0.32em, the middle of a digit) in every cell;
+  `\arraystretch` drops to 1.1 so TeX's own strut never outgrows it; a
+  table with room to write takes `\renewcommand{\valuepitch}{3em}`.
+  Measured at 600 dpi (poppler, the ink of each value to the middle of each
+  rule): `tables.tex` pattern C, pitch 16.76 pt, first value 8.10-8.22 pt
+  below the heading rule and last 8.52-8.64 pt above the bottom rule
+  against a half pitch of 8.38; pattern D (3em) 16.44-16.50 and 16.80
+  against 16.53; the scaffold, pitch 17.58 pt, 8.94 and 8.64 against 8.79.
+  Before: `\arraystretch` 1.2 alone gave 7.98 and 8.70 against 8.32, and
+  2.0 gave 15.60 and 11.94 against 13.74 - TeX's strut puts the baseline
+  70% of the way down a row. REJECTED: a large `\arraystretch` for tall
+  rows, for that reason.
+- **Running text never pads decimals** (14:19): 0.8 m in a sentence beside
+  a table that reads 0.80. In both skills. On a page the column rule stays
+  `---:`, since a Markdown table has no box.
+- **A miss in the first merge, corrected: a column mixing whole numbers and
+  decimals is right-aligned** as a negative column is - now in the
+  centred box above (the issue's 12:43 refinement, which the first merge did not
+  carry): centring 9.0 beside 10.5 shifts the point by half a digit from
+  row to row. Fixed in `plantoir-handouts` section 9, `plantoir-page-authoring`
+  section 7 (its example's y column is `---:` now), `tables.tex` pattern
+  C's h column, `finite_differences.py` (`right_aligned`: any negative, or
+  whole beside decimal), the contract's `handoutsSkill.rule`, and 6n.
+
+- **A blank students write on is about two lines tall** (12:58). The
+  starters gain `\fillin[width]{answer}`: the blank on the student copy,
+  the answer written on the same line in the key, and an invisible
+  `\rule[-0.2em]{0pt}{2.1em}` strut either way, so a wrapped prompt keeps a
+  full line of room above the blank (Handout's new question 4, compiled and
+  looked at in both copies). The header's Name/Date/Class # `\fillblank`
+  keeps one line: a two-line strut there would push into `headheight`, and
+  those blanks are not prompts. On a page the only blank is a quiz's
+  `` `____` ``, which since [#733](https://github.com/russellgordon/plantoir/issues/733)
+  (v1.9.1, merged the same day) prints as a black line with about two lines
+  of room — 1.6em over a 1.2em line, the `\fillin` strut scaled to the
+  site's leading — where before #733 it had printed with NO line at all
+  (drawn in a colour the print rule made transparent, since #563);
+  `plantoir-printing` section 3 says never to fake blanks with underscores
+  or typed empty lines, and to make a PDF handout when written answers need
+  more room than that. Known, not fixed (#737 review): a guard that asks
+  `ps -p` still counts a zombie process in the instant before it is reaped.
+
+Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
+refinement) now carries these rules - the centred box for a column with a
+negative value, matched decimal places without `\phantom`, no padding in
+running text, equal x and y widths, fill-in blanks, graphs and the key's
+layout - except for two phrases left from the morning's wording: a mixed
+whole/decimal column is right-aligned "with the same trailing padding", and
+equal widths make aligned numbers "sit at one offset in both" columns. The
+skills follow the 14:19 refinement in both places. That file is his, not
+this repository's, and was left alone.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
@@ -3691,8 +4404,15 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
 - **An outside assistant** is refused before anything runs
   (`deployHasClassesDatedLater`), until the question has been answered once
   in the window. **A scheduled deploy** goes out and records the places.
-- **Section ▸ Publish Pages…** asks about the classes ticked, before the
-  plan; the ticked ones are left out. **Publish Class for a Date…** (and the
+- **Section ▸ Publish Pages…** never asks, and records nothing as kept
+  (#694): publishing changes only the local preview, where a teacher
+  publishes next week's classes precisely to check them, and students see
+  nothing until a deploy. Until #694 it asked before the plan, with the
+  teacher's own tick turned into "leave it hidden", so Return quietly undid
+  the publish they had asked for. Recording nothing matters as much as not
+  asking: a class kept from here would skip the question at Deploy. The cost
+  is the scheduled deploy, which asks nobody — such a class goes online at
+  the next one (measured, below). **Publish Class for a Date…** (and the
   assistants' `publish_class_on`) records the class it published as kept:
   the teacher named the day. So does **Publish in the links checklist**
   (#379) for a later class it publishes — otherwise the two questions undid
@@ -3709,30 +4429,58 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
   testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
   wrapper both ways).
 
-The sheet lists the flagged classes, every one ticked — since v1.8.6 (#608)
-in the picker's table, Page (with its checkbox) and Date, Space ticking the
-selected row, in a sheet the teacher can resize (#621) — and ALWAYS offers two
-buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
-and Deploy**, which keeps every listed class at its date and hides nothing —
-the director's ruling on the implementation review's finding 1 (Russell may
-overturn it). Every pre-populated course ships its whole term published and
-dated: the review measured 61 classes flagged in 33 of the 39 payloads on
-2026-10-08, every one ticked, with no way to keep them but unticking each.
-Measured on a really installed ICS3U payload the same evening: 61 flagged;
-Keep All and Deploy kept 61 and deployed; the second Deploy asked nothing and
-deployed. Hide Ticked and Deploy records the unticked as kept (`file-formats.json` → `laterClassesKept`,
-`section<N>.later-classes-kept.json` in `.publish_state`, removed on
-rollover) and hides the ticked through Hide Pages…'s own call — a copy of the
-course first, undoable, pages only they link to hidden with them — with no
-preview first (`AssistToolRunner.previewFollowsAChange`). A class still
-visible afterwards stops the deploy, and the sheet says what the hide said.
-The answer acts on the list asked about, never one worked out after midnight.
+The sheet ("Deploy classes dated later?") lists the flagged classes, every
+one TICKED TO GO OUT — since v1.8.6 (#608) in the picker's table, Page (with
+its checkbox) and Date, Space ticking the selected row, in a sheet the teacher
+can resize (#621) — with one button beside Cancel: **Deploy Ticked**
+(`deployTickedButton`, the default, Return). Since #694 a ticked box means
+INCLUDED here as in every checklist in the app (Russell's ruling 1,
+2026-10-25). Deploy Ticked records the ticked as kept (`file-formats.json` →
+`laterClassesKept`, `section<N>.later-classes-kept.json` in `.publish_state`,
+removed on rollover) and hides the UNTICKED through Hide Pages…'s own call — a
+copy of the course first, undoable, pages only they link to hidden with them —
+with no preview first (`AssistToolRunner.previewFollowsAChange`), so the
+preview is left in the same state as the deployed site (ruling 2). An unticked
+class still visible afterwards stops the deploy, and the sheet says what the
+hide said. The answer acts on the list asked about, never one worked out after
+midnight. Every pre-populated course ships its whole term published and dated
+(61 classes flagged in 33 of the 39 payloads on 2026-10-08), and Return with
+every row ticked keeps them all, so such a course is asked once — the job
+Keep All and Deploy did from the fixes round until #694 (measured then on a
+really installed ICS3U payload: 61 flagged, 61 kept, the second Deploy asked
+nothing). The footnote names Section ▸ Undo Last Change, because unticking now
+unpublishes, and says the next deploy sends a class back out, because Undo
+changes the preview only.
 
 Measured by driving the built app with `--state-dir` (2026-10-08, twice): a
 class on the 14th was asked about and tomorrow's was not; Hide 1 and Deploy
 (the default's label then; Hide Ticked and Deploy since the fixes round) hid it, deployed to a folder, and the trail read `asked about classes dated
 after the next class at Deploy — 1 flagged, 1 hidden, 0 kept published`;
 Cancel deployed nothing and left the preview running.
+
+Measured for #694 by driving the built Debug app with `--state-dir` and a
+scratch EXC2O with a folder destination (2026-11-01, Apple M4 Pro, macOS 26.6;
+next class Monday 2026-11-02, a hidden class on the 4th, a published one on
+the 5th): Section ▸ Publish Pages… on the 4th went straight to its plan ("1
+page would change, 3 already visible"), published it, and wrote no
+`later-classes-kept.json` (no `.publish_state` at all). The scheduled run's
+deploy leg run by hand then put the 4th online with no question. Deploy
+listed both classes, both ticked, Cancel and Deploy Ticked alone; unticking
+the 5th and pressing Return wrote a menu backup, hid it ("Section ▸ Hide
+Pages… — carried out, 1 class dated later, unticked at Deploy"), deployed in
+1.5 s, and the trail read `asked about classes dated after the next class at
+Deploy — 2 flagged, 1 hidden, 1 kept published`; the deployed folder held the
+4th and not the 5th, the kept record held the 4th, and Section ▸ Undo Last
+Change published the 5th again.
+
+REJECTED in #694: asking at Publish Pages… (it turned the teacher's tick
+upside down, and publishing reaches nobody); a ticked row meaning "hide";
+leaving an unticked class out of THIS deploy only, still published in the
+preview — a deploy-time exclusion in the build (Russell's ruling 2: the
+preview and the live site would drift apart); keeping Keep All beside the
+default (it would repeat Return; a Hide All can come later if asked for); a
+count in the button's label ("Hide 1 and Deploy"), which the fixes round of
+#475 had already moved away from.
 
 REJECTED: detecting it in `build_site.py` as #379 does (the answer would come
 after the build, so hiding would need a second build, and the container's
@@ -3896,7 +4644,12 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   Deploying section and the wizard SHOW it read-only with **Open Settings…**,
   which selects the Deploying pane first (`SettingsPane`). With no ID the
   wizard still refuses Create with the contract's existing sentence (unchanged,
-  so nothing goes red on Windows), now beside that button. Driven: typing an ID
+  so nothing goes red on Windows), now beside that button. **Since #668 it does
+  not:** Cloudflare Pages is the new-course default, so a MISSING ID is a
+  warning (the same sentence, with `PublishingDestinations.accountIDCanWait`
+  under it) and the first deploy refuses instead; an ID that cannot be one
+  still refuses Create — [07](07-deployment.md) → "Choosing a destination
+  (#668)". Driven: typing an ID
   in Settings updated an open course's Deploying section at once. No data
   moved — the value was always app-wide (`AppSettings.cloudflareAccountID`) —
   so nothing was migrated. The one-tab objection recorded in
@@ -4577,8 +5330,13 @@ answer read ONCE at the press (the reply names the page from it, never from a
 second look at the web view —
 `testTheAssistantsPressReadsThePageOnceAndReportsThePageThatOpened`),
 `.waitingForAnAnswer` when a question is up, `.alreadyOpening` for a second
-press during a scan (no trail line, as today), and `.noWindow`, the default of
-a window that registers nothing. The trail line is the route's, written once
+press during a scan (no trail line, as today), `.noWindow`, the default of
+a window that registers nothing, and — since #698 — `.didNotOpen`, for a press
+that went ahead but handed Obsidian nothing. The route does not return
+`.didNotOpen` yet: the scan does not throw and `FolderActions` ignores
+`NSWorkspace.open`'s answer, so on the mac a failed open still reads as
+`.opened`; the case exists so the assistant's sentence for it is the contract's
+(Windows' `DidNotOpen`), and making the route report it is a follow-up. The trail line is the route's, written once
 per press (`testTheAssistantsPressLeavesOneTrailLine`); the assistant adds
 only its usual turn line. With no section window on screen the runner brings
 one up with `revealSectionOnScreen`, as a rebuild or a deploy does; a freshly
@@ -8655,6 +9413,97 @@ piece is the same case for every folder: installed from the DMG, its first
 launch reads each copy once; installed by a delta, it reads nothing (the
 times answer). **At the cut**, `RELEASING.md` step 4 asks for the check.
 
+#### Pruning the index (#683, 2026-11-01)
+
+`toolchain-index/` gains one file per working folder the app (or
+`--mcp-stdio`) has ever opened without `--state-dir`, scratch folders and
+deleted folders included, and until #683 nothing removed one. **Measured on
+Russell's Mac, 2026-11-01:** 24 KB, two files of 11,811 bytes and 92 lines,
+both LIVE (`~/Desktop/Class Websites` and the warm-up folder, which has no
+builds folder) — 0 dead. "About 2 MB per folder" is the ceiling: a full
+index is the manifest's size (1,998,309 bytes, 12,932 lines); an index kept
+up by deltas holds only what they changed. So the issue's leak is a
+developer's, not yet a teacher's — but a teacher's Mac gathers folders over
+years at up to 2 MB each, and the fix is small.
+
+**What it does.**
+
+- **Every pass marks its folder's index USED** (`ToolchainFingerprints.markUsed`,
+  `utimes` to now), at the START of the pass, right after the index is read,
+  whether or not the pass then rewrites it. Before this, an index's time
+  meant "last CHANGED": a pass with nothing to change does not rewrite it,
+  so a folder opened every day would have looked unused after ninety.
+  Nothing else reads the index's own time.
+- **Once a launch**, in the same off-main-thread task as the builds sweep,
+  `ToolchainFingerprints.pruneIndexes(in:now:)` removes every `*.hashes`
+  unused for **more than 90 days**, and every `*.hashes.<pid>.tmp` (left only
+  by an interrupted write) older than a day — plain files only; a folder, a
+  link or any other name is left alone. It takes its folder as an argument
+  with no default, and the app passes `indexFolder()`, which `RealHome`
+  puts under the throwaway home in the unit suite and under the state folder
+  with `--state-dir`; the suite never runs the launch task, and a test
+  (`testAPruneNeverReachesTheRealIndexFolder`) holds both — comparing the
+  folder with the REAL one, built from the real home and never opened (an
+  allowance in `RealHomeTripwireTests`), because a comparison with the
+  suite's own home could not fail.
+- **The builds sweep takes the index with the builds.** When
+  `discardBuildsForMissingWorkingFolders` removes `builds/<id>` (a folder
+  under the home that is gone), it removes `toolchain-index/<id>.hashes`,
+  named by the builds folder's OWN name. Not by hashing the recorded path
+  again: `folderIdentifier` resolves the path through the folder itself
+  (`F_GETPATH`), and a folder that no longer exists is not guaranteed to
+  give the same eight characters back. The index folder is the one under the
+  home the sweep was given, so a test passing its own home never reaches the
+  real one.
+
+**The race, and which side of it this is on.** The prune runs at launch
+while a reopened folder's first pass may be reading its index. Marking at
+READ time means a folder being opened has a fresh time before the prune can
+look at it in almost every interleaving. Two are left, and they end the same
+way: the prune removes the index between the pass's read and its mark, or
+the prune reads the OLD time, the pass then reads and marks the index, and
+the prune removes it on the time it read. Either way `utimes` does not
+recreate the file, the pass does not rewrite an index it thinks unchanged,
+and the next pass reads in full and writes it again. That costs one full
+read, and nothing else.
+
+**Why 90 days.** A wrongly removed index costs one pass that hashes every
+copy once: **0.95 s for 12,928 files (40 MB) on an M4 Pro**, measured warm
+on 2026-11-01 (Python's `hashlib` over the Debug bundle's four mirrored
+folders; #663's own pass measured 1.09–2.46 s). A dead index costs at most
+about 2 MB. So the window only has to outlast the longest ordinary gap
+between openings, the summer (about 70 days), and a developer's scratch
+folders still go within a term. **No trail line**: a teacher cannot notice
+a prune, and a pass that lost its index already says "read in full" on the
+existing mirror line.
+
+**Not reached by this:** the access time is no substitute for the mark —
+APFS moves `atime` only when it is older than the modification time, so an
+index read on 2026-10-31 still had an `atime` of 2026-10-24, its last write.
+And the builds sweep's home-only guard still leaves builds folders for
+folders outside the home (11 of 23 on this Mac, all under `/private/tmp`);
+their indexes go by age.
+
+**Rejected:**
+
+- **A sidecar file naming each index's working folder**, so the prune could
+  ask whether the folder exists. A new format for a cache whose loss costs
+  about a second, and folders outside the home would still be outside the
+  guard; the age rule covers both.
+- **Re-hashing a builds folder's recorded path to find its index** (the
+  review's M1, above).
+- **Pruning on the next mirror pass instead of at launch.** A pass knows
+  only its own folder; the dead ones are exactly the folders no pass will
+  ever open again.
+
+**Windows** has the same index (`ToolchainMirror.IndexPathFor` →
+`AppDataRoot\toolchain-index\<id>.hashes`) and the same leak; its issue
+carries the mark, the 90 days, the `.tmp` sweep, removal with its own builds
+sweep (`DiscardBuildsForMissingWorkingFolders`), and the one trap there:
+its `ToolchainFingerprintTests` write to the real `AppDataRoot`, so a prune
+must not run in that test host. NTFS last-access times are unreliable too,
+so it must mark the file explicitly.
+
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
 Windows found (#465) that its daily check could run before the first window
@@ -11342,7 +12191,7 @@ Keychain never comes into it, because the real launcher never runs.
 |---|---|
 | The launcher's own prompts (surname, site name, the fallback when a saved site was deleted) | **Yes, today.** `verify-deploy.sh` drives every deploy through `expect` and answers by prompt TEXT (`:110-136`). Opt-in, real credentials, real sites — deliberately. |
 | The app's DIALOG — surname sheet once, address pre-filled, Cancel cancels, typed name is what is sent, trail records the ask | **Covered since #154** by `NewSiteDialogUITests`, with a stubbed `deploy.sh` whose prompts are read from `contracts/app-rules.json`. In the UI target, which is part of no gate. |
-| A publish with a genuinely invalid saved token | **Not covered and not automatable**, for the Keychain reason above. |
+| A publish with a genuinely invalid saved token | **The launcher's half is covered since #716**: `scripts/test_deploy_token_refusal.py` runs `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed and pins which answers clear the token. The app's half — the window with a real refused token in the real Keychain — is still **not automatable**, for the Keychain reason above; its sentence is a `failureExplanations` case (#695). |
 
 The first row used to be the reverse of Windows: `verify-deploy.ps1` redirected
 stdin so `sys.stdin.isatty()` was false and `deploy.py` asked nothing, leaving

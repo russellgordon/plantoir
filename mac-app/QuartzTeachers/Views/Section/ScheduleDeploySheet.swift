@@ -43,6 +43,16 @@ struct ScheduleDeploySheet: View {
         )
     }
 
+    /// The short Netlify note (#668), when the SAVED course deploys to
+    /// Netlify, primary or additional — the same settings the plan is worked
+    /// out from, for the reason `whatTheSheetShows` gives.
+    var netlifyNote: String? {
+        guard let saved = try? course.asSavedNow() else {
+            return nil
+        }
+        return ScheduleDeploySheet.netlifyNote(for: saved.configuration)
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -67,6 +77,19 @@ struct ScheduleDeploySheet: View {
                 displayedComponents: [.date, .hourAndMinute]
             )
             .accessibilityIdentifier("scheduleDeployDatePicker")
+
+            if let netlifyNote {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    Text(netlifyNote)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                }
+                .accessibilityIdentifier("scheduleDeployNetlifyNote")
+            }
 
             Divider()
 
@@ -110,6 +133,19 @@ struct ScheduleDeploySheet: View {
     }
 
     // MARK: - Functions
+
+    /// `PublishingDestinations.netlifyScheduleNote` when these settings
+    /// deploy to Netlify anywhere, otherwise nil.
+    static func netlifyNote(for configuration: CourseConfiguration) -> String? {
+        var additionalTypes: [String] = []
+        for target in configuration.additionalDeployTargets {
+            additionalTypes.append(target.type)
+        }
+        if PublishingDestinations.showsNetlifyNote(primary: configuration.deployTarget, additional: additionalTypes) {
+            return PublishingDestinations.netlifyScheduleNote
+        }
+        return nil
+    }
 
     /// What the sheet shows (#335): the plan worked out from the course as
     /// its settings file says it is NOW, why it cannot be worked out when the

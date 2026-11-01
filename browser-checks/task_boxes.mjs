@@ -26,8 +26,13 @@
 //  8. with storage refused, boxes still tick and the console stays clean;
 //  1b. on screen the box's edge and tick, and a ticked item's words, are the
 //     page's dark grey, with no fill (taskBoxes.look);
+// 1c. every box is 16px tall and its centre is within half a pixel of the
+//     middle of its words' capitals (#693), on Task Fixture (tight items,
+//     callouts), Task Loose (a loose list) and Task Printable (10.95pt on
+//     paper), on screen and under print media;
 // 10. the handout (Print > Questions only) carries the student's ticks
-//     (taskBoxes.print, ruling Q1);
+//     (taskBoxes.print, ruling Q1), and its boxes sit as 1c says INSIDE
+//     Paged.js's frame, which re-parses the stylesheets (#693);
 //  9. on paper (⌘P, background graphics off) a ticked box is inked and an
 //     unticked one is an empty box, in the light and the dark theme - read
 //     from the PDF's pixels with poppler's pdftoppm, as
@@ -124,6 +129,37 @@ function finish(code, message) {
 const timer = setTimeout(() => finish(1, "FAIL: the task boxes were not checked within 300 s"), 300000)
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
+// Where each task box sits against its words (#693), for a document: the
+// box's height, and how far its centre is from the middle of the capitals,
+// read from a zero-width probe of height 1cap set on the words' baseline just
+// after the box (canvas's measureText("H") agrees with 1cap to 0.01px in
+// every font measured, so the probe is not measuring the rule against
+// itself). Only boxes that are laid out are read: a box in a collapsed
+// callout has no position to be wrong about. Distances are divided by the
+// box's own scale, so a frame drawn smaller (a handout's pages) reads in CSS
+// pixels.
+const POSITIONS = `(document) => {
+  const rows = []
+  for (const box of document.querySelectorAll("input.plantoir-task")) {
+    const rect = box.getBoundingClientRect()
+    if (rect.height === 0 || box.offsetHeight === 0) continue
+    const probe = document.createElement("span")
+    probe.style.cssText = "display:inline-block;width:0;height:1cap;vertical-align:baseline;margin:0;padding:0;border:0"
+    box.after(probe)
+    const mark = probe.getBoundingClientRect()
+    probe.remove()
+    const scale = rect.height / box.offsetHeight
+    const capMiddle = mark.bottom - mark.height / 2
+    rows.push({
+      words: (box.closest("label")?.textContent ?? "").trim().slice(0, 30),
+      height: box.offsetHeight,
+      off: Math.round(((rect.top + rect.bottom) / 2 - capMiddle) / scale * 100) / 100,
+    })
+  }
+  return rows
+}`
+const POSITION_TOLERANCE = 0.5
+
 // Helpers that run in the page.
 const PAGE_HELPERS = `
 window.__task = {
@@ -133,6 +169,7 @@ window.__task = {
   defaults: () => window.__task.boxes().map((box) => (box.defaultChecked ? "x" : "_")).join(""),
   stored: () => Object.keys(localStorage).filter((key) => key.startsWith("plantoir:task:")).sort()
     .map((key) => key + "=" + localStorage.getItem(key)),
+  positions: (${POSITIONS}),
   centre: (element) => {
     element.scrollIntoView({ block: "center", behavior: "instant" })
     const box = element.getBoundingClientRect()
@@ -219,6 +256,16 @@ async function connect(chunk) {
   const expect = (what, ok, detail) => {
     if (!ok) problems.push(`${what}${detail === undefined ? "" : ": " + JSON.stringify(detail).slice(0, 400)}`)
   }
+  const expectPositions = (where, rows, atLeast) => {
+    let worst = 0
+    for (const row of rows) worst = Math.max(worst, Math.abs(row.off))
+    expect(`${where}: there are boxes to measure`, rows.length >= atLeast, rows)
+    expect(`${where}: every box is 16px tall (Quartz's size, which the 8px in tasks.scss is half of)`,
+      rows.every((row) => row.height === 16), rows.filter((row) => row.height !== 16))
+    expect(`${where}: every box is centred on its words' capitals, within ${POSITION_TOLERANCE}px`,
+      worst <= POSITION_TOLERANCE, rows.filter((row) => Math.abs(row.off) > POSITION_TOLERANCE))
+    measured.push(`${where}: ${rows.length} boxes, at most ${worst}px off the capitals' middle`)
+  }
   const listenersOn = async (expression) => {
     const handle = await send("Runtime.evaluate", { expression })
     const listed = await send("DOMDebugger.getEventListeners", { objectId: handle.result.objectId })
@@ -268,7 +315,25 @@ async function connect(chunk) {
         look.untickedEdge === look.darkgray && look.tickedEdge === look.darkgray && look.tick === look.darkgray &&
         look.words === look.darkgray && look.tickedFill === "rgba(0, 0, 0, 0)", look)
 
+      // 1c. Where the box sits (#693): 16px tall, centred on the capitals,
+      // tight and loose, on screen and under print media.
+      for (const [name, page] of [["Task Fixture", "/Task-Fixture.html"], ["Task Loose", "/Task-Loose.html"], ["Task Printable", "/Task-Printable.html"]]) {
+        if (!(await open(base + page))) {
+          expect(`${name} loaded to measure where its boxes sit`, false)
+          continue
+        }
+        await evaluate("document.fonts.ready.then(() => true)")
+        for (const media of ["screen", "print"]) {
+          await send("Emulation.setEmulatedMedia", { media: media === "print" ? "print" : "", features: [{ name: "prefers-color-scheme", value: "light" }] })
+          await pause(200)
+          const rows = await evaluate("window.__task.positions(document)")
+          expectPositions(`${name} (${media})`, rows, page === "/Task-Loose.html" ? 2 : 3)
+        }
+        await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "prefers-color-scheme", value: "light" }] })
+      }
+
       // 2. A click writes the contract's key; unticking an [x] writes "0".
+      await open(fixture)
       await click(`window.__task.box(${JSON.stringify(PENCIL.id)})`)
       const afterTick = await evaluate("window.__task.stored()")
       expect("a click on a box writes exactly the contract's key with 1",
@@ -415,6 +480,7 @@ async function connect(chunk) {
           if (node.tagName === "IFRAME") node.contentWindow.print = () => {
             node.contentWindow.dispatchEvent(new Event("beforeprint"))
             window.__handoutBoxes = Array.from(node.contentDocument.querySelectorAll("input.plantoir-task")).map((box) => (box.checked ? "x" : "_")).join("")
+            window.__handoutPositions = (${POSITIONS})(node.contentDocument)
             node.contentWindow.dispatchEvent(new Event("afterprint"))
           } } }).observe(document, { childList: true, subtree: true })`,
       })
@@ -428,6 +494,7 @@ async function connect(chunk) {
         handoutBoxes = (await evaluate("window.__handoutBoxes ?? null").catch(() => null)) ?? null
       }
       expect("the handout shows the student's ticks, as the page did", onScreen === "x__" && handoutBoxes === onScreen, { onScreen, handoutBoxes })
+      expectPositions("the handout's frame", (await evaluate("window.__handoutPositions ?? []")) ?? [], 3)
       measured.push(`handout boxes ${handoutBoxes} (the page showed ${onScreen})`)
 
       // 8. Storage refused: boxes still tick, and the task boxes add no error
@@ -544,9 +611,14 @@ function readPgm(file) {
 // box does not show on paper (Quartz's own unticked box, in its light grey).
 function boxInk(image, area) {
   const scale = DPI / 72
-  // The box is not centred on the word's own box, so each row from the top
-  // of the word to its middle is tried as the row its sides cross.
-  for (let row = Math.round(area.yMin * scale); row <= Math.round(((area.yMin + area.yMax) / 2) * scale); row += 1) {
+  // The box is not centred on the word's own box, so each row from the
+  // word's middle up to its top is tried as the row its sides cross - from
+  // the MIDDLE up, so the box found is this line's. pdftotext's word box is
+  // as tall as the line and more (31pt for 12pt words), so its top reaches
+  // into the line above; scanning from the top found the previous item's box
+  // once #693 made a task row 4px shorter (measured: the unticked box read
+  // 62 inked pixels, the ticked one's count, though the PDF draws it empty).
+  for (let row = Math.round(((area.yMin + area.yMax) / 2) * scale); row >= Math.round(area.yMin * scale); row -= 1) {
     const found = boxInkThrough(image, area, row)
     if (found.found) return found
   }

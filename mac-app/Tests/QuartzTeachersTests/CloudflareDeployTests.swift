@@ -49,7 +49,7 @@ final class CloudflareDeployTests: XCTestCase {
     @MainActor
     func testTheOtherDestinationsAreNotMistakenForCloudflare() throws {
         let netlify: CourseConfiguration = try roundTripped(["course_code": "ICS3U"])
-        XCTAssertEqual(netlify.deployTarget, "netlify", "Netlify stays the default")
+        XCTAssertEqual(netlify.deployTarget, "netlify", "a file with no destination still deploys to Netlify (a NEW course is written as Cloudflare since #668)")
         XCTAssertFalse(netlify.deploysToCloudflare)
 
         let folder: CourseConfiguration = try roundTripped([
@@ -129,8 +129,8 @@ final class CloudflareDeployTests: XCTestCase {
                 courseCode: "ICS3U", sectionNumber: 1,
                 configuration: netlify, cloudflareAccountID: "0123456789abcdef0123456789abcdef"
             ),
-            ["ICS3U", "1"],
-            "Netlify is deploy.sh's own default, so it passes no target flag at all"
+            ["ICS3U", "1", "--target", "netlify"],
+            "Netlify is named like every other destination since #668: a deploy.sh given none reads the course's saved destinations"
         )
 
         let cloudflare: CourseConfiguration = try roundTripped([

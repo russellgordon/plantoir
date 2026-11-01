@@ -1,12 +1,17 @@
 # 7. Publishing a built section (`deploy.py`)
 
 > A course chooses **where** it publishes with the `deploy_target` key —
-> which the APP reads and turns into a `--target` argument. **No launcher
-> reads that key**: `deploy.sh`, `deploy.ps1` and `deploy.py` all default to
-> Netlify and change destination only on `--target`, so anything driving a
-> launcher directly — a script, a test harness, a scheduled wrapper — has to
-> pass the flag itself. Setting the key and calling the launcher publishes to
-> Netlify, silently; that is exactly how a deploy harness came to verify a
+> which the APP reads and turns into a `--target` argument, naming every
+> destination (`--target netlify` included, since #668). **`deploy.sh` reads
+> the key too, since #668, but only when it is given no destination**
+> (Russell, 2026-11-01): `./deploy.sh ICS3U 1` deploys where the course's
+> settings say, and every `additional_deploy_targets` entry as a leg of its
+> own; `--target` or `--to-folder` still decides when it is typed ("Choosing
+> a destination (#668)", below). **`deploy.ps1` and `deploy.py` still read
+> no key** and default to Netlify, so anything driving those directly — a
+> script, a test harness, a scheduled wrapper — has to pass the flag itself.
+> Setting the key and calling such a launcher publishes to Netlify,
+> silently; that is exactly how a deploy harness came to verify a
 > `netlify.app` address three times over and report three green Cloudflare
 > publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
@@ -14,8 +19,8 @@
 >
 > | `deploy_target` | Where it goes | Who does the work |
 > |---|---|---|
-> | `netlify` (default) | A Netlify site per section | `deploy.py`, Netlify REST API |
-> | `cloudflare_pages` | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
+> | `netlify` (what an ABSENT key means, and the launchers' default) | A Netlify site per section | `deploy.py`, Netlify REST API |
+> | `cloudflare_pages` (the new-course default in both apps since #668 — see "Choosing a destination (#668)" below) | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
 > | `local_folder` | A folder on the teacher's own machine, one `sectionN` subfolder per section | the **launcher**, host-side — the container is never involved |
 >
 > Whichever is chosen, the thing published is the same built
@@ -971,6 +976,148 @@ so it falls back to the raw output until Cloudflare has a sentence of its own;
 matching the nameless `API error 429` was rejected for exactly that case.
 `app-rules.json` → `failureExplanations.cases` pins all three.
 
+## Choosing a destination (#668)
+
+**Every NEW course deploys to Cloudflare Pages, made in the app or at the
+command line** (Russell, 2026-11-01: "Cloudflare everywhere"), unless the
+teacher picks something else. Either app's new-course window writes
+`cloudflare_pages` and lists it first; `setup_course.py` writes it for a
+course it makes with no saved file (`NEW_COURSE_DEPLOY_TARGET`). A course
+whose file has NO `deploy_target` — every course made before the other
+destinations existed — still deploys to Netlify, and nothing about that
+changed: a re-run of setup over such a file writes none.
+
+**A deploy typed at the command line goes where the course's settings
+say** (Russell, 2026-11-01). Until then the launchers read no key, so
+`./deploy.sh ICS3U 1` deployed a course written for Cloudflare to Netlify.
+Now `deploy.sh`, given neither `--target` nor `--to-folder`, reads
+`deploy_target` (absent or `netlify` → Netlify, `cloudflare_pages` →
+Cloudflare, `local_folder` → its `deploy_folder_path`) and says so ("Deploying
+to Cloudflare Pages, as ICS3U's settings say."); a course with
+`additional_deploy_targets` is deployed one leg per destination, by running
+the launcher again with that leg's flag — the app's own shape, so every leg
+meets every check, and a leg that fails does not stop the others. Settings
+that cannot be read REFUSE rather than fall back to Netlify, which is the
+silent wrong-host deploy this exists to stop. A typed `--target` still wins.
+Two things found by review and fixed the same day: the settings are read
+with **`plutil`** on a Mac — on every Mac, Command Line Tools or not —
+because this launcher keeps the rule that it needs no host `python3` (the
+reference-course check's comment; a Python reads them only where there is no
+`plutil`); and the list of legs is read on **descriptor 3**, never stdin,
+because every leg inherits stdin and READS it (`docker exec -i` forwards it,
+a token prompt waits on it), so a list on stdin was eaten by the first leg
+and the others never ran, the run ending at that leg's exit code.
+`scripts/test_deploy_sh_destination.py` pins all of it (eight cases, listed in
+`verify.sh`; two of them plant a stdin-reading line in every leg and hide
+every Python from PATH). **The app names every leg now** (`DeployCommand.arguments`,
+`--target netlify` included; `deployArguments` cases moved), because the
+Netlify leg of a course with a second destination, passed no flag, would
+otherwise have run both legs again; `verify-deploy.sh` names its Netlify
+legs for the same reason. **`deploy.ps1` has the same gap** and is Windows'
+obligation; `deploy.py` is unchanged (it does one destination per call). The rule, the
+sentences and every case are `contracts/app-rules.json` →
+`publishingDestinations`; the Swift is `PublishingDestinations`.
+
+**Why.** Netlify moved new accounts to a credit-based plan, and the free one
+is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
+(the issue's own table, read 2026-10-23, agrees):
+
+| What | Credits |
+|---|---|
+| Free plan allowance | 300 a month, a hard limit (no way to buy more on Free) |
+| A production deploy | 15 each (deploy previews are free) |
+| Bandwidth | 20 per GB |
+| Web requests | 2 per 10,000 |
+
+"Starting on September 4, 2025, all new Netlify accounts will use the new
+credit-based pricing plans"; an account made before then is on a Legacy plan
+and is unaffected unless it switches. When the balance is used up, "all of
+your web projects (sites/apps) are paused", each showing "Site not available"
+until the next cycle. **Each section is its own site, so one deploy of a
+three-section course is three production deploys, 45 credits** — twenty
+production deploys, fewer than seven deploys of that course, is the whole
+allowance before a single student has loaded a page. Traffic is a small part of it: about 90 students reading a few pages a
+day is roughly 1.6 GB, some 32 credits plus ~15 for requests.
+
+Cloudflare Pages, read the same day: static asset requests are "free and
+unlimited" on every plan; 20,000 files a site, 25 MiB a file (already said in
+the app, `cloudflareSizeNote`), and **100 projects an account**, "not
+routinely increased". The limits page also lists "500 builds per month" on
+Free, but describes builds only as pushes to a Git repository; neither it nor
+the Direct Upload page says whether an upload with `wrangler pages deploy`
+counts. **So the app makes no claim about Cloudflare's limits on deploys** —
+only that its free plan has no limit on visitors, which its pricing page says
+in so many words. The 100-project cap, which a teacher who rolls over many
+sections a year could reach in about seven years, is #723.
+
+**What the teacher is told.** No figures in the app — the hosts change them;
+the dated figures are here and on plantoir.app's deploying page. Every
+sentence says DEPLOY for what spends the allowance, because in Plantoir
+publishing marks a page and costs nothing. `netlifyNote` sits under Netlify
+wherever it is configured (primary or additional, the new-course window and
+Course Settings, and an absent key counts as Netlify); `cloudflareCaption`
+sits wherever Cloudflare is; `netlifyScheduleNote` is in Schedule a deploy
+when the SAVED settings deploy to Netlify; the window's section caption is
+`wizardCaption`.
+
+**The Account ID.** Before #668 the new-course window refused Create with no
+Cloudflare Account ID in Settings. With Cloudflare the default that stops
+every first-time teacher at their first course, before they have seen a
+page. Now a MISSING ID is a warning: the orange
+`cloudflareAccountProblem` sentence stays beside Open Settings…, with
+`accountIDCanWait` under it, and Create goes ahead; previews never need the
+ID. An ID that cannot be one (not 32 hexadecimal characters) still refuses
+Create, because something is saved and it is wrong. The refusal moves to the
+first DEPLOY, where it already was: `MultiDestinationDeployRunner.refusalReason`
+(the Deploy button, the assistant, an MCP client), scheduling, and saving
+Course Settings with a changed destination all refuse a Cloudflare
+destination with no ID and name Plantoir ▸ Settings ▸ Deploying. Since that
+refusal is now the path every new teacher meets, the Deploy button's "Cannot
+Deploy Yet" alert offers **Open Settings…** beside OK when its sentence is
+the Account ID's (`PublishingDestinations.deployRefusalOpensSettings`; a
+folder's refusal, put right in Course Settings, does not), and the refusal
+is **on the trail** by kind — "deploy refused: no Cloudflare Account ID is
+saved in Settings", or "…is not a whole ID", never the ID (event `deploy
+refused for the Cloudflare Account ID`, rule 5). Both halves are contract
+cases (`wizardAccountID`, `deployWithoutAnAccountID`, six cases with
+`expectOpenSettings` and `expectTrailLine`).
+
+**One orange block, not two.** With Cloudflare the default, a new teacher
+with no ID would have met two orange warnings on their first course: the
+ID's sentence and the fixed 25 MB fact. When both apply they are one block,
+the ID's sentence first, then "it can wait", then the 25 MB note, as one block (#668 second fixes round).
+
+**What was rejected, and why.**
+- *Letting the launcher ask for the ID at the first deploy.* The plan's first
+  idea. It cannot work: the app refuses before `deploy.sh` runs, and the
+  launcher keeps an answer in the Keychain
+  (`containerized-quartz-cloudflare-account`), not in the app's settings, so
+  every app-side check would go on failing after it.
+- *Defaulting to Cloudflare only when Settings already has an ID.* A
+  first-time teacher has none, so this gives Netlify to exactly the teachers
+  the change is for — and it makes the default depend on the machine the
+  tests run on (the suite's settings folder is empty).
+- *Changing the absent-key fallback.* It moves a working class site to a
+  host the teacher has no account with, at its next deploy, with nothing to
+  say so. `setup_course.py` therefore writes the new-course default only
+  where there is no saved file, keeps a saved `deploy_target`, and writes
+  none over a saved file that names none
+  (`scripts/test_setup_course_deploy_target.py`, four cases).
+- *A command-line course on Netlify.* What the first version of this piece
+  did, by leaving `setup_course.py` alone; Russell ruled it out on
+  2026-11-01 ("Cloudflare everywhere").
+- *Figures in the app's sentences.* The hosts change them, and a sentence
+  in the app cannot carry a date the way this page does.
+- *Recording the destination on the "course created" trail line.* That line's
+  `carries` says, deliberately, "not where it publishes", and
+  `course_config.json` already answers the question.
+
+**Windows** owes the same default, order, sentences, the warning in place of
+the refusal, Open Settings… on the refusal, the trail event, and a test that
+its new-course dialog WRITES `newCourseDefault`. Its goldens hold the
+setup answers rather than the written file, so none of them moves. The
+command-line half is shared Python and reaches it free.
+
 ## Cloudflare Pages (`--target cloudflare`)
 
 Chosen with `deploy_target: "cloudflare_pages"`. Each section becomes its
@@ -1013,6 +1160,133 @@ Two things are needed, and only one comes from the teacher directly:
   garbled. (On Windows the app's own sentences say File ▸ Settings ▸
   Deploying, where the item is there; the launchers keep one sentence for
   both platforms, Russell's ruling on #490.)
+
+### A token Cloudflare refuses (#695), and a saved one is cleared only on a refusal (#716)
+
+**What a teacher saw.** Russell, 2026-10-27, deploying ICS3U-S1 to Netlify +
+Cloudflare Pages: Netlify deployed, the saved Cloudflare token was refused and
+cleared, the "Connect to Cloudflare" steps were shown, the token he pasted was
+refused too — and the window said only "Something went wrong". The reason was
+two lines at the bottom of the console, behind "Show details":
+`validate_cf_token` failed, `deploy.sh` printed "Cloudflare did not accept
+that token." and the permission hint, and exited 1. `failureExplanations` had
+no case for it, so `FailureExplainer` fell through to the generic failure.
+
+**The fix is a LIFT, not a new sentence.** Four cases in
+`contracts/app-rules.json` → `failureExplanations.cases` (23 → 27), and
+`FailureExplainer.tokenRefusedExplanation` / `savedTokenUnheardExplanation`
+through one `liftedAndJoinedSentence`: find the line carrying the launcher's
+words, take everything before its first letter off (the ❌, mojibake or a `?`,
+as `liftedSentence` does for #471), and join the next line that has words on
+it. The launchers' two lines already are the sentence a teacher acts on, and a
+second wording of one refusal is how a rule comes to be said two ways — the
+same reasoning as the "cannot tell" refusal in "A course kept for reference".
+`scripts/test_deploy_token_refusal.py` pins both launchers' printed lines to
+the contract's `expect`, so changing the words in a launcher fails until the
+contract moves with them. It is in verify.sh's step 0 and in Windows'
+`PythonToolchainTests` by discovery.
+
+The bash case is **the whole transcript**, re-captured 2026-11-01 by driving
+the real `deploy.sh` through a terminal in a scratch folder (USER set to an
+account with no Keychain entries; one stub entry made for the run and removed
+by the launcher's own refusal) — the "saved token no longer works" line, the
+full heredoc, the prompt and the refusal — with the Netlify leg's success
+lines in front, written from `deploy.py`'s own `print`s since that leg needs a
+real site.
+That pins that nothing earlier in the transcript answers first, on BOTH
+platforms, without writing an order of checks into the contract — the two
+apps' explainer chains are hand-ordered and not in the same order. The second
+case is `deploy.ps1`'s shape: no cross, no indent, same words.
+
+**An offline Mac is NOT told apart at the paste check, and that is a known
+limit, not something the order fixes.** `validate_cf_token` sends curl's
+errors to `/dev/null` (and `Test-CloudflareToken` is `catch { return $false
+}`), so a paste made with no connection prints the same two refusal lines and
+none of `connectionExplanation`'s signs: that teacher is told to check the
+permission. The paste check is deliberately left as it was: a refused paste is
+not saved, so it costs a re-paste on the next deploy and nothing else, and the
+paste is where #696 asks again in the sheet instead of failing.
+
+**The hint itself may be the wrong hint, and is shipped anyway.**
+`/user/tokens/verify` does not check permissions — it answers `active` for a
+Pages-only token (above) — so a refusal more likely means a partial paste, a
+revoked or expired token, or (unmeasured) a token made under the account's API
+Tokens page rather than My Profile. Measured 2026-11-01 against the live
+endpoint with made-up tokens: three characters → **HTTP 400**, code 6003
+"Invalid format for Authorization header"; forty characters of nonsense →
+**HTTP 401**, code 1000 "Invalid API Token"; no header → 400, code 1001.
+Russell's ruling: ship the lift, since it is what the launchers already say;
+measuring real tokens of each kind against both verify endpoints is #696, and
+if the hint proves wrong both launchers are reworded there and the drift test
+moves the contract with them.
+
+**A SAVED token is cleared only when the service says no (#716).** The
+saved-token checks used the same yes/no probe, so a Mac on a captive portal,
+on school Wi-Fi that dropped for a moment, or running a deploy set for half
+six before the laptop had joined the network, heard "no" — and `deploy.sh`
+deleted a good token and, for Cloudflare, its account, and asked for another.
+Measured on the old launcher with its connection sent to a closed port
+(`https_proxy=http://127.0.0.1:9`) and `--non-interactive`: "The saved
+Cloudflare token no longer works, so it has been cleared.", the Keychain entry
+gone, then the token question refused with exit 3 — a scheduled deploy that
+destroys the credential it needed and then says nobody was there to give a new
+one. `token_check_answer` now reads the HTTP status (`curl -w '%{http_code}'`,
+no `-f`, curl's errors still discarded) and says one of three words:
+
+| Heard | Means | Saved token |
+|---|---|---|
+| `accepted` | 2xx whose body says yes: Cloudflare's `"success":true`, Netlify's account (`"id":`) | used |
+| `refused` | **400, 401 or 403** whose body is the service's own refusal: Cloudflare's `"success":false`, Netlify's `"code":4xx` | cleared (and the Cloudflare account), as before; the question is asked |
+| `unheard` | 000 (no answer, a timeout, a name that did not resolve), a redirect, a captive portal's page, 429, any 5xx, a 2xx that does not say yes, a 400/401/403 that is not the service's (a school web filter's block page, a firewall's challenge in front of the API) | **kept**; the deploy stops, exit 1 |
+
+400 is a refusal because Cloudflare answers a malformed token with it, and a
+saved token that can never be accepted must not be kept for ever behind a
+sentence about the connection. The BODY is read as well as the status
+(review of #716): a filter that inspects a school's traffic, or a firewall
+challenging a VPN, answers 403 with a page of its own, and a token must not be
+cleared on the word of something that never asked the service — the same
+reason a 200 portal page is not a yes, which until that review held for
+Cloudflare only. Measured 2026-11-01 with made-up tokens: Cloudflare's
+refusals carry `"success":false` (400 code 6003, 401 code 1000), Netlify's
+`{"code":401,"message":"Access Denied"}`. The cost is the other direction: if
+either service ever refused without its JSON, a dead saved token would be
+kept behind the could-not-reach sentence until the teacher replaced it, which
+is the lesser fault — that sentence does not destroy anything. With the same closed port the new launcher
+prints "❌ Plantoir could not reach Cloudflare to check the saved token, so
+this section was not deployed there." and "The token is still saved. Check
+that this computer is online, then try again in a few minutes.", exits 1, and
+the Keychain entry is still there; Netlify's twin says the same with its name.
+Those two lines are the other two contract cases, lifted the same way. It
+STOPS rather than carrying on because the upload needs the same connection
+and would fail later with a less useful message. The paste checks and the
+legacy-file migration keep `validate_token` / `validate_cf_token` unchanged —
+Netlify's `validate_token` still shows curl's own error, which is how an
+offline Netlify paste is explained as a connection today.
+
+**Rejected.** A reworded sentence in the app (two wordings of one refusal); a
+new exit code for "could not check" (the explainer reads the words, and exit 3
+already means "a question went unanswered"); carrying on to the upload when
+the check was unheard (it fails anyway, later, less clearly); treating only
+401/403 as a refusal (a saved malformed token would never be cleared); a trail
+line for the refusal (Russell's ruling for v1.9.1: the trail already shows
+"asked for a publishing credential" then the failed run, and the problem
+report carries the sentence — the line belongs with #696's retries).
+
+**Tested.** `scripts/test_deploy_token_refusal.py` copies `deploy.sh` into a
+scratch folder, stubs every Keychain reader and writer and `curl` (answering
+with a chosen status), stops it before the website builder, and runs the real
+saved-token checks: 400/401/403 with the service's refusal clear;
+000/429/500/503/302, a 2xx without `"success":true`, and a 401/403 block page
+keep and stop; 200 is used; Netlify likewise (a 200 portal page and a 401/403
+block page kept). The three block-page and portal tests added on review fail
+against the launcher before it (five failures counting subtests). Against the pre-#716
+launcher (copied in and restored) five of the twelve tests it had then fail, twelve
+failures counting subtests: every "kept" case, the could-not-reach sentences,
+and the Netlify-refused pair — that last only because the old probe relied on
+`curl -f`, which the stub does not imitate, so it is not evidence of a fault.
+**Windows:** `deploy.ps1`'s half is #705; until it lands the two "could not
+reach" cases are matched by the explainer only, and the drift test asks only
+that IF `deploy.ps1` prints those lines they say what the contract says.
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
@@ -1198,6 +1472,52 @@ could ask. On a pseudo-terminal nobody is watching it would wait for ever,
 which is exactly what #92 and #378 exist to prevent.
 `scripts/test_deploy_cloudflare_project.py` pins both halves, and
 `CloudflareProjectRemadeReportTests` the app's reader.
+
+**wrangler 4.108 and later can send a NEW project to Workers (#699).** Since
+4.108, when wrangler believes an AI agent is driving it — `CLAUDECODE`,
+`AI_AGENT`, `CODEX_THREAD_ID`, `GEMINI_CLI` and others in its environment,
+or an agent among its ancestors (`maybeDelegatePagesToWorkers` in 4.156.0's
+`cli.js`) — a deploy that would create a new static project is delegated to
+"the latest version of Cloudflare Pages, now part of Cloudflare Workers": a
+Worker at `*.workers.dev`, not the Pages project at the `*.pages.dev`
+address `deploy.py` prints and the app records. `deploy.py`'s call cannot be
+delegated, for three reasons, any one of which is enough:
+
+- **`--branch=main`** is in wrangler's own list of arguments the delegation
+  does not support (`getUnsupportedDeployDelegateArgs`), so it declines
+  before looking at anything else (read in 4.156.0's `cli.js` by the review: `--branch`
+  alone blocks it). `--commit-dirty` is in the same list. So `--branch` is
+  load-bearing twice now: it answers the production-branch question, and it
+  keeps the deploy on Pages.
+- **The project exists before wrangler runs**: `ensure_pages_project` makes
+  it through the API on a first publish, and `remake_pages_project_if_gone`
+  on a deleted one, so wrangler never sees a project to create.
+- **On the mac, `docker exec` hands wrangler six named variables only**
+  (`deploy.sh`), so a teacher's `CLAUDECODE` never reaches it. On Windows
+  `deploy.py` runs natively and the teacher's environment does reach wrangler
+  — under Claude Code, `CLAUDECODE=1` — so the first two guards are the ones
+  that hold there.
+
+`verify-deploy.sh` fails a Cloudflare leg whose log carries the delegation's
+notice ("now part of Cloudflare Workers"), and was run with `CLAUDECODE` and
+`AI_AGENT` set in its own environment on 2026-10-31: every leg stayed on
+Pages. **Do not drop `--branch`** to "simplify" the call, and do not pass
+`--force`: wrangler documents `--force` as the opt-out, but it also prints a
+"Notice to agents" line, and the guards above already make it unnecessary.
+
+**A brand-new project's address can be unknown to a resolver for up to 30
+minutes (#712).** Measured 2026-10-31 on the mac's first `--first-publish`
+run: the moment the first upload returned, this Mac's resolver asked for
+the new `<project>.pages.dev`, got NODATA under the project's own zone, and
+kept that answer for the zone's negative TTL of **1800 s**, while 1.1.1.1,
+8.8.8.8 and the router already answered with Cloudflare's addresses.
+`*.netlify.app` answers for any name, so Netlify never shows it. A teacher
+who opens a new Cloudflare site the instant it is published can meet the
+same wait in a browser; it ends on its own. `verify-deploy.sh
+--first-publish` therefore waits for 1.1.1.1 to answer for a new site before
+anything on the Mac looks it up, and reports how long that took; on the
+first run, which did not, 43 Cloudflare checks failed (HTTP 000, or no answer) against a site that
+was serving.
 
 ## A folder on this PC (`--to-folder`)
 
@@ -1521,7 +1841,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline in about 20 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740, the retry below) in about 25 s,
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -1535,6 +1855,58 @@ the script: with the wait returning at once, 4 of the 8 fail (the mac's
 figure; Windows' is in 12); comparing the
 front page only fails the static-files case; without the `\r` strip the two
 transcript cases fail.
+
+**A brand-new site's files, asked again (#740, 2026-11-01).** On a
+`--first-publish` run, every per-file fetch-back in `check_engine` (the
+Python engine's files, the worker's CSP, Swift's thread and program, the COEP
+on the engine folders, KaTeX's stylesheet and face) goes through
+`fetch_headers`: an answer that is not what its check wants (HTTP 200, plus
+COEP `require-corp` for the COEP checks) is asked again every 5 s for at most
+60 s (`VERIFY_DEPLOY_NS_POLL`, `VERIFY_DEPLOY_NS_WAIT`). Each retry prints a
+`↻` line naming the file, the count and the seconds, and the Result block
+carries one measured line per site ("N file(s) needed asking again, …", or "no
+file needed asking again"). An answer that never comes is still that check's
+failure, judged on the last answer. A plain run asks once, exactly as before,
+and so does the local preview's `check_engine` on any run, since it is no new
+site. The 60 s is a deadline fixed when the first answer is judged, not a count
+of polls, so how many retries fit depends on how long each answer takes. It is
+half the Cloudflare wait's 120 s because the watcher above saw every file served
+within the minute. Each `check_engine` call keeps its own retry log, so a
+pairing leg that re-checks a site counts only its own retries, never the
+earlier leg's (the #740 review found the pairing line repeating them). A
+genuinely broken first publish now costs up to about a minute per failing file
+before it goes red. That is accepted: the answer is still red.
+
+**Measured at the v1.9.1 gate** (2026-11-01, dev e7a73e082, M4 Pro, home
+network): two `--first-publish` runs in a row failed on the NEW Netlify site
+only. Run 1 failed 2 checks: a 404 for `static/pyodide/pyodide.mjs`, and no COEP
+on `static/swift/plantoir-swift-worker.js`. Run 2 failed 1: a 404 (`text/plain`)
+for the swift worker, while both of run 1's checks passed. So it was a
+different file each time, never on Cloudflare. A watcher fetching both files
+every 5 s from the moment the site answered got 24 of 24 HTTP 200, with the
+right type and COEP, in the same minute. The plain run against the long-lived
+sites was 174/0/0. That is a site seconds old whose edges do not yet agree,
+not the build. (The 2026-10-31 first-publish run's one failure, a 404 on a
+page link, was the same thing. `check_page_links` is not retried, because its
+fetches run inside the Python program that Windows reads out of this script.)
+
+Rejected: *a fixed sleep after the site is made*, which is a guessed duration
+for a race. Also, the edges disagree file by file, so "long enough" for one
+file says nothing about the next. Rejected too: *retrying on the plain run*,
+which would hide a real 404 from a site that has existed for weeks. That is
+what this harness exists to catch. *Retrying only Netlify* was considered,
+because only Netlify was seen doing it. It was rejected, because a
+first-publish Cloudflare project is just as new and the rule is about the
+site's age, not its host. `--self-test` gained five cases: 404 twice then the
+file; no COEP twice then COEP; never served (still a failure, at the cap);
+the Result block's count; and a plain run judging a 404 at once. The
+never-served case asserts a RANGE of retries (2 to 5), and the count case
+asserts the total the log holds, never a fixed number. Pinning "8 retries in
+all" failed 3 of 9 review runs (12/1/0), because a second-granular clock let 3
+retries fit instead of 4. After the change, 12 runs in a row were 13/0/0. Proved
+must-fail by copy-and-restore: with the retry taken out, 4 of the 5 fail, and
+the plain-run case passes either way. **Windows owes the same in
+`verify-deploy.ps1`** (`Check-Engine`, `-SelfTest`).
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the
@@ -1581,6 +1953,50 @@ The same run mirrored **57** differences (the measurement above, plus one
 more file under `contracts/` by the time it ran), rebuilt the section from
 scratch in **32 s** (the image's layers were cached), and found the folder
 still on this checkout's recipe at the end.
+
+
+**A first publish, on the mac too (`--first-publish`, #712, 2026-10-31).** The
+plain run always answered the surname question "Testing" and so reused
+`ada1o-s1-2026-testing` for ever: no upload it made was a first-ever one,
+which is the case #699 needed to compare. A random surname alone would change
+nothing, because `deploy.py` reuses a recorded site and never asks (the plan
+review's finding). So `--first-publish` does what Windows' `-FirstPublish`
+does, path for path: the saved surname (`courses/.internal/profile.json` and
+the legacy `_secrets/profile.json`), the section's Netlify record (and the
+legacy per-section `.netlify_site.json`) and its Cloudflare record are
+RENAMED to `<path>.verify-deploy-hidden`, a sentinel
+(`courses/.verify-deploy-first-publish.txt`) records after each step whether
+each path was hidden or absent, and the restore deletes a record only when
+its original is safe beside it or there never was one — so a failed move can
+never cost the course its real records, and a run killed outright is put right
+by the next run's preflight. The surname is `Testing` plus six random
+letters. **Unlike Windows, it deletes the two sites it made** at the end, via
+Netlify's `DELETE /api/v1/sites/{id}` and Cloudflare's `DELETE
+/accounts/{id}/pages/projects/{name}` (the token on curl's stdin, never a
+command line), and only a site whose name carries the surname of the run
+that made it. That surname is the sentinel's first line (`surname<TAB>…`), so
+a run killed half way is cleaned up by the next run's preflight against ITS
+surname — never the new run's random one, and never the bare `Testing` of a
+plain run — and a sentinel without one (written before this) deletes nothing
+and names the site for deleting by hand. The comparison is in lower case,
+since Netlify kept the first run's `Testingwqvxbk` as typed and a
+case-sensitive test left it behind (deleted by hand, HTTP 204). The Result
+block says which were deleted and which need deleting by hand.
+
+**Ctrl-C ends the run; it does not just tidy up.** The trap used to be
+`trap restore_what_was_borrowed EXIT INT TERM`, and a trap on INT that does
+not exit RETURNS to the script: measured with a stand-in under its own
+session, `killpg(SIGINT)` printed the trap's line, then the script's next
+line, then the trap again, and exited 0. With `--first-publish` that would
+put the records back, delete the two new sites, and then keep publishing —
+as repeat publishes to the section's own sites, checked at addresses just
+deleted. Now INT exits 130 and TERM 143, and the EXIT trap restores once
+(the restore and the deletion are idempotent anyway).
+
+Measured 2026-10-31: 173 passed, 1 failed (a Netlify link that was HTTP 404
+on the brand-new site and 200 by hand minutes later) on wrangler 4.80.0;
+175 passed, 0 failed on 4.156.0; transcripts in
+`research/wrangler/2026-10-31-first-upload.md`.
 
 ## The scheduled task never refuses over FOLDER PROBLEMS
 
@@ -1635,9 +2051,19 @@ window takes it out of the alert only when the checklist will really be shown
 A class page students can see that is dated after the next class day
 (`class-planning.json` → `futureDatedClasses`) is asked about BEFORE a deploy
 from the section window or the in-app assistant — after the deploy's own
-refusals, before anything is stopped or built — and the ticked ones are hidden
-first. A scheduled deploy goes out as it is and records the places on the
-trail ("deployed with classes dated after the next class"); an assistant
+refusals, before anything is stopped or built. Every listed class starts
+ticked and a ticked class goes out; the ones the teacher UNTICKS are hidden
+(unpublished, through `unpublish_pages`) first, so the preview is left showing
+what the deployed site does (#694, Russell's rulings, 2026-10-25). Section ▸
+Publish Pages… never asks and records nothing as kept: publishing changes only
+the local preview, where a teacher publishes next week's classes precisely to
+check them. A scheduled deploy goes out as it is and records the places on the
+trail ("deployed with classes dated after the next class") — so a class
+published for a preview check goes online at the next scheduled deploy
+unasked. Measured for #694 on 2026-11-01: a class published with Publish
+Pages…, dated two days after the next class, went out with the scheduled
+run's own deploy leg (`deploy.sh EXC2O 1 --to-folder … --non-interactive`,
+exit 0, no question), because no launcher reads this rule. An assistant
 working from another app is refused before anything runs
 (`wording.deployHasClassesDatedLater`) until the question has been answered
 once in the window. The whole rule — where it is asked, the order, what each
@@ -4041,7 +4467,9 @@ mac's "on and awake then, with the lid open." through one constant,
   start may run when the PC wakes, inside the lateness window, so that sentence
   may be untrue. It has to be MEASURED before it is reworded, and a `windows`
   issue ([#554](https://github.com/russellgordon/plantoir/issues/554)) asks
-  for that.
+  for that. *(Measured and reworded since, 2026-10-31: see "A sleep across
+  the moment, measured (#554)" under the Windows section below. The sentence
+  WAS untrue.)*
 
 **REJECTED, again:** a wake timer (`pmset schedule wake` /
 `IOPMSchedulePowerEvent` — needs administrator rights and fails silently; the
@@ -4200,12 +4628,74 @@ locale date format is guessed). `TaskDefinitionTests` schedules through
 a task registered with its start two minutes already past did NOT run within
 15 minutes (Last Result 267011) — a start already past when the task was
 registered is not treated as missed. Two earlier simulations (before the fix)
-agreed. **Not measured:** a start missed while the PC is asleep or off; that
-such a start runs once Windows is available again is Microsoft's documented
-behaviour for `StartWhenAvailable`, unmeasured here (it would have suspended the
-machine the run was on). If it holds, the lateness window decides whether the
-late run is still worth doing, so `tooLateToRun` has a real path; its ten cases
-run either way.
+agreed. A start missed while the PC was ASLEEP is measured since 2026-10-31 —
+the next paragraph; one missed while it was switched OFF is still not.
+
+**A sleep across the moment, measured (#554).** The machine: Lenovo
+20QES70500, Intel i5-8365U, Windows 11 Pro 26200, on mains; `powercfg /a` lists
+Modern Standby (S0 Low Power Idle) and Hibernate, no S3. The installed
+Plantoir 1.9.0 scheduled ICS3U Section 1 of a test working folder to a FOLDER
+destination through `plantoir-mcp.exe` (`plan_scheduled_deploy`, then
+`schedule_deploy`), for T = 19:33:00. The registered task read back
+`StartWhenAvailable` true, both battery gates false, `MultipleInstancesPolicy`
+`Queue`, no `WakeToRun`. A separate task of the probe's own, registered as the
+ordinary user (no administrator rights needed) with `<WakeToRun>true</WakeToRun>`,
+was set for T + 3 min, and the PC was suspended at T − 1 min through
+`SetSuspendState(FALSE, FALSE, FALSE)` (P/Invoke; `rundll32
+powrprof.dll,SetSuspendState` was avoided, because it cannot pass the BOOLEANs
+and is known to hibernate). The System log (Kernel-Power 42/107/506/507,
+Power-Troubleshooter 1), the task's `LastRunTime`, and the trail:
+
+| time | what happened |
+|---|---|
+| 19:32:00.1 | suspend called; Kernel-Power 42 "entering sleep", reason Application API, target state 5 — this PC HIBERNATED, not Modern Standby |
+| 19:33:00 | T — the PC is hibernating; nothing runs |
+| 19:35:48.5 | woken by the timer (Power-Troubleshooter: "Wake Source: Timer — … 'Plantoir 554 wake probe' …"), 12 s before that task's own 19:36:00; the PC comes back into Modern Standby, screen off |
+| 19:35:48 | **Plantoir's task starts** (`LastRunTime`) — 2 min 48 s after T, the same second the PC woke |
+| 19:37:36 | trail: "got the working folder ready for a scheduled deploy — 34 files brought up to date … in 100.4 s"; the build starts 19:37:42 |
+| 19:38:09 | Kernel-Power 42 again, reason **System Idle**, target state 5: the PC hibernated by itself, 2 min 20 s after the timer wake, mid-build |
+| 20:15:35 | woken again (wake source Unknown — the power button); the same run carries on |
+| 20:15:49 | trail: the deploy finished; the folder destination written; run record `succeeded`; the task and the job gone |
+| 20:15:50 | trail: "told the teacher how a scheduled deploy went, with a notification" |
+
+So **"If it is asleep at that time, nothing happens" was untrue.** A moment
+missed while the PC slept ran when it next woke, inside the window (the
+default week), and the run SURVIVED a second hibernation mid-build and finished
+on the wake after — 42 min 49 s after T in all. `Describe()` now says so:
+"Plantoir does not wake the computer up. If it is asleep at that time, Windows
+runs the deploy when the computer next wakes instead — which could be well after
+the class it was meant for. If that is more than {window} after the time you
+chose, Plantoir cancels the deploy and the site stays as it is." — the mac's
+own shape (its `plan_scheduled_deploy` line), with the course's own window
+named in the setting's words (`ScheduledDeploy.WindowInWords`, pinned against
+`scheduledDeployCancellation.wording.settingChoices` by
+`ScheduledDeployTests.TheWindowIsSaidInTheSettingsOwnWords`; Windows offers no
+control for the setting yet, so a window chosen on a Mac is the only way it is
+not a week). The bullets above it ("switched on, and awake — not asleep…") and
+the dialog's "Plantoir does not wake it up." stay: they are about deploying ON
+TIME, and both are still true.
+
+What this does and does not show:
+
+- **The wake was the probe's, not Plantoir's.** Plantoir still sets no wake
+  timer (the top of `ScheduledDeploy.cs`). The run started at whatever woke the
+  PC; with no probe it would have been the power button at 20:15, 42 minutes late.
+  That a non-admin user CAN register `WakeToRun` was confirmed on the way
+  (it read back true) — it is not a reason to adopt one: a timer wake here gave
+  2 min 20 s of screen-off Modern Standby before the PC hibernated again on
+  idle, less than one cold run's folder refresh (100 s) plus a build, so the
+  deploy finished only on the NEXT wake anyway.
+- **It hibernated, both times.** The suspend call and the later idle sleep both
+  logged target state 5 and resumed "from Hibernate". A plain Modern Standby
+  across the moment (screen off, no hibernation) was not isolated; the run
+  did make progress during the 2 min 20 s of Modern Standby after the timer
+  wake, so a task can run in it.
+- **Switched off** across the moment: not measured.
+- **Woken OUTSIDE the window: not measurable here today.** The shortest window
+  is a day, so the run's `tooLateToRun` path after a real sleep would need the
+  PC asleep for over 24 hours. The decision itself is pure code
+  (the `scheduledDeployCancellation` lateness cases, run by
+  `ScheduledRunTests`), and the run reads it the same way whatever woke the PC.
 
 **A crash between writing the job and replacing the task** (the fix round's
 order, job first): the task's arguments carry the setting's TOKEN as well as its

@@ -90,6 +90,17 @@ nonisolated enum ToolchainFingerprints {
             .appendingPathComponent("toolchain-index", isDirectory: true)
     }
 
+    /// How long an index may go unused before the launch-time sweep removes
+    /// it (#683). Longer than the longest ordinary gap in a school year, the
+    /// summer (about seventy days), because a folder whose index went is
+    /// read in full once — about a second or two — and an index kept costs
+    /// at most about 2 MB.
+    static let unusedIndexLifetime: TimeInterval = 90 * 24 * 60 * 60
+
+    /// How old a temporary index (`<id>.hashes.<pid>.tmp`, left only when a
+    /// write was interrupted) must be before the sweep removes it.
+    static let leftoverTemporaryIndexLifetime: TimeInterval = 24 * 60 * 60
+
     /// One working folder's index, named by the same eight characters its
     /// builds folder and its container are (`BuildOutputLocation.folderIdentifier`).
     static func indexURL(forWorkingFolder workingFolderURL: URL, in indexFolder: URL) -> URL {
@@ -192,6 +203,78 @@ nonisolated enum ToolchainFingerprints {
             )
         }
         return entries
+    }
+
+    /// Marks an index USED, now (#683): its modification time is set to the
+    /// moment, so that time means "last used" rather than "last changed".
+    /// Called at the START of a pass, as soon as the index has been read, so
+    /// the launch-time sweep cannot mistake a folder being opened for one
+    /// left alone. Nothing else reads the index's own time, and the access
+    /// time is no substitute: APFS moves it only when it is older than the
+    /// modification time (measured on 2026-11-01: an index read on Oct 31
+    /// still had an access time of Oct 24, its last write).
+    static func markUsed(_ url: URL) {
+        _ = utimes(url.path, nil)
+    }
+
+    /// Removes the indexes in `indexFolder` that have gone unused for longer
+    /// than `lifetime`, and temporary indexes older than a day, and nothing
+    /// else (#683). Answers the names it removed.
+    ///
+    /// An index names no working folder — only eight characters of a hash
+    /// of its path — so whether its folder still exists cannot be asked of
+    /// it; age is the rule. A wrongly removed index costs one pass that
+    /// reads the copies in full and writes it again. Never given a default
+    /// folder: the caller names the folder, so a test cannot reach the real
+    /// one by leaving an argument out.
+    @discardableResult
+    static func pruneIndexes(
+        in indexFolder: URL,
+        now: Date,
+        unusedFor lifetime: TimeInterval = unusedIndexLifetime
+    ) -> [String] {
+        let fileManager: FileManager = FileManager.default
+        guard let names = try? fileManager.contentsOfDirectory(atPath: indexFolder.path) else {
+            return []
+        }
+        var removed: [String] = []
+        for name in names.sorted() {
+            let isIndex: Bool = name.hasSuffix(".hashes")
+            let isLeftover: Bool = name.hasSuffix(".tmp") && name.contains(".hashes.")
+            if !isIndex && !isLeftover {
+                continue
+            }
+            let url: URL = indexFolder.appendingPathComponent(name)
+            // Never follows a link: only a plain file is one of ours.
+            guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+                  let type = attributes[.type] as? FileAttributeType,
+                  type == .typeRegular,
+                  let modified = attributes[.modificationDate] as? Date else {
+                continue
+            }
+            let limit: TimeInterval = isIndex ? lifetime : leftoverTemporaryIndexLifetime
+            if now.timeIntervalSince(modified) <= limit {
+                continue
+            }
+            if (try? fileManager.removeItem(at: url)) != nil {
+                removed.append(name)
+            }
+        }
+        return removed
+    }
+
+    /// Removes the index named by a builds folder's own NAME (#683) — the
+    /// same eight characters — when the builds sweep has found that folder's
+    /// working folder gone. By name, never by hashing the recorded path
+    /// again: `folderIdentifier` resolves the path through the folder
+    /// itself, which no longer exists, so it is not guaranteed to give the
+    /// same eight characters back.
+    static func removeIndex(named identifier: String, in indexFolder: URL) {
+        if identifier.isEmpty || identifier.contains("/") {
+            return
+        }
+        let url: URL = indexFolder.appendingPathComponent(identifier + ".hashes")
+        try? FileManager.default.removeItem(at: url)
     }
 
     /// Writes an index whole or not at all: a temporary file beside it, then

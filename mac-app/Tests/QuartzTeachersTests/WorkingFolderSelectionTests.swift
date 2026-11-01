@@ -229,7 +229,7 @@ final class WorkingFolderSelectionTests: XCTestCase {
 
         // The stops, which must read the captured folder and never the model.
         let stops: [String] = [
-            "func stopPreview()", "func stopPreviewAndWait()", "func cancelPreview()", "func cancelDeploy()",
+            "func stopPreview()", "func stopPreviewAndWait()", "func cancelPreview()",
         ]
         for function in stops {
             let body: String = try XCTUnwrap(
@@ -246,6 +246,30 @@ final class WorkingFolderSelectionTests: XCTestCase {
                 + "current folder is the wrong one to aim at"
             )
         }
+
+        // A deploy's Cancel reads the folder the DEPLOY noted on its run
+        // (#706): the view pressing it may have come back to the section
+        // after the view that started the deploy had gone, and its own note
+        // is nil. Still never the model's current folder.
+        let cancelDeployBody: String = try XCTUnwrap(
+            bodyOfFunction(startingWith: "func cancelDeploy()", in: source),
+            "func cancelDeploy() is no longer in SectionDetailView"
+        )
+        XCTAssertTrue(
+            cancelDeployBody.contains("run.folder"),
+            "cancelDeploy must stop against the folder the deploy's work belongs to"
+        )
+        XCTAssertFalse(
+            cancelDeployBody.contains("workspace.workspaceURL"),
+            "cancelDeploy runs after a folder change may have moved the window on"
+        )
+        let deployCaptureBody: String = try XCTUnwrap(
+            bodyOfFunction(startingWith: "func deployAndWait(pressedByTheAssistant:", in: source)
+        )
+        XCTAssertTrue(
+            deployCaptureBody.contains("run.folder = workspaceURL"),
+            "deployAndWait must note on the run the folder cancelDeploy reclaims against"
+        )
 
         // The captures, without which every one of those stops is a no-op.
         // A piece of work's folder is decided in two places, and each has to

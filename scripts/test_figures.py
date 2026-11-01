@@ -52,9 +52,14 @@ def rules(*keys):
 # The stand-in for the drawing engine. It speaks the helper's protocol and
 # draws nothing: a body holding SLEEP never answers, FAIL fails as TeX would,
 # FONTS:a,b names those faces in its drawing, and a graph using ln( is refused.
+# The crashes the real engine has (#718): CRASH ends it without an answer,
+# saying why on stderr (with a path in it, as Node's own words carry);
+# FONTCRASH answers fontMissing and then ends, as the helper does after a
+# throw nothing caught; FONTEOF ends without an answer, naming the font only
+# on stderr; STOPPED answers drawingStopped and carries on.
 # Every start is counted in the file named by its first argument.
 STAND_IN = textwrap.dedent('''
-    import json, sys, time
+    import json, os, signal, sys, time
     with open(sys.argv[1], "a") as starts:
         starts.write("started\\n")
     if len(sys.argv) > 2 and sys.argv[2] == "never-ready":
@@ -74,6 +79,41 @@ STAND_IN = textwrap.dedent('''
         body = message["body"]
         if "SLEEP" in body:
             time.sleep(60)
+        if "FONTCRASH" in body:
+            send({"id": message["id"], "ok": False, "reason": "fontMissing", "texLine": None,
+                  "name": "tcrm1000", "said": ""})
+            sys.exit(1)
+        if "SELFKILL" in body or "SELFTERM" in body:
+            # Ended by a signal mid-diagram, saying nothing at all (#718
+            # review M1). Windows has no SIGKILL; SIGTERM ends it there.
+            ending = getattr(signal, "SIGKILL", signal.SIGTERM) if "SELFKILL" in body else signal.SIGTERM
+            os.kill(os.getpid(), ending)
+            time.sleep(60)
+        if "STOPPEDQUIET" in body:
+            send({"id": message["id"], "ok": False, "reason": "drawingStopped", "texLine": None,
+                  "name": None, "said": ""})
+            continue
+        if "NODEPRINT" in body:
+            # Node's own print of a throw nothing caught: the source line
+            # first, quoting the message's start, then the message.
+            sys.stderr.write("/opt/vendor/tikz-engine/node_modules/x/fonts.js:12\\n")
+            sys.stderr.write('    throw new Error("Could not find font " + name);\\n')
+            sys.stderr.write("    ^\\n\\nError: Could not find font tcrm1000\\n")
+            sys.stderr.flush()
+            sys.exit(1)
+        if "FONTEOF" in body:
+            sys.stderr.write("Error: Could not find font tcrm1000\\n")
+            sys.stderr.flush()
+            sys.exit(1)
+        if "CRASH" in body:
+            sys.stderr.write("Error: the reader broke at /opt/vendor/tikz-engine/node_modules/x/parser.js:485\\n")
+            sys.stderr.write("    at Parser.parse (/opt/vendor/tikz-engine/node_modules/x/parser.js:485:11)\\n")
+            sys.stderr.flush()
+            sys.exit(1)
+        if "STOPPED" in body:
+            send({"id": message["id"], "ok": False, "reason": "drawingStopped", "texLine": None,
+                  "name": None, "said": "something was not ready"})
+            continue
         if message["engine"] == "tikz":
             if "FAIL" in body:
                 send({"id": message["id"], "ok": False, "reason": "undefinedCommand",
@@ -307,6 +347,110 @@ class PrepareTests(unittest.TestCase):
         cached = sorted(path.name for path in self.space.cache.rglob("*.json"))
         self.assertEqual(cached, [f"tikz-{figures.key_of(quick)}.json"], "tookTooLong is never cached")
 
+    # ---- A crash is not a diagram that took too long (#718) ----
+
+    def two_diagrams(self, first_word):
+        crashed = "\\begin{document}\n" + first_word + "\n\\end{document}"
+        quick = "\\begin{document}\nquick\n\\end{document}"
+        return crashed, quick, [page("```tikz\n" + crashed + "\n```\n\n```tikz\n" + quick + "\n```\n", place="P")]
+
+    def cached_names(self):
+        return sorted(path.name for path in self.space.cache.rglob("*.json"))
+
+    def test_a_crash_with_no_answer_is_drawing_ended_not_cached_and_the_next_one_drawn(self):
+        crashed, quick, pages = self.two_diagrams("CRASH")
+        started = time.monotonic()
+        outcome = self.space.prepare(pages)
+        self.assertLess(time.monotonic() - started, 10, "a crash is answered at once, not after the clock")
+        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["drawingEnded"])
+        said = outcome["problems"][0]["said"]
+        self.assertTrue(said.startswith("Error: the reader broke at "), said)
+        self.assertNotIn("/opt", said, "never a path")
+        self.assertNotIn("\n", said)
+        self.assertLessEqual(len(said), 160)
+        self.assertEqual(outcome["drawn"], 1, "the diagram after it was still drawn")
+        self.assertEqual(self.cached_names(), [f"tikz-{figures.key_of(quick)}.json"], "drawingEnded is never cached")
+        before = self.space.started()
+        again = self.space.prepare(pages)
+        self.assertEqual([problem["reason"] for problem in again["problems"]], ["drawingEnded"])
+        self.assertEqual(self.space.started(), before + 1, "tried again, once, the next build")
+
+    def test_a_missing_font_is_answered_cached_and_the_next_one_drawn(self):
+        crashed, quick, pages = self.two_diagrams("FONTCRASH")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([(problem["reason"], problem.get("name")) for problem in outcome["problems"]],
+                         [("fontMissing", "tcrm1000")])
+        self.assertEqual(outcome["drawn"], 1, "the next diagram is never blamed for the helper ending")
+        self.assertEqual(self.space.started(), 2, "a fresh helper after the crash")
+        said = [line for line in self.space.said if line.startswith("plantoir: error:")]
+        self.assertEqual(said, ["plantoir: error: P.md: tikz block 1: " + rules("words", "reasons")["fontMissing"]])
+        before = self.space.started()
+        again = self.space.prepare(pages)
+        self.assertEqual([problem["reason"] for problem in again["problems"]], ["fontMissing"])
+        self.assertEqual(self.space.started(), before, "cached: the second build starts nothing")
+
+    def test_a_missing_font_said_only_on_the_way_out_is_still_a_missing_font(self):
+        crashed, quick, pages = self.two_diagrams("FONTEOF")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([(problem["reason"], problem.get("name")) for problem in outcome["problems"]],
+                         [("fontMissing", "tcrm1000")])
+        self.assertEqual(outcome["drawn"], 1)
+        self.assertEqual(len(self.cached_names()), 2, "the same answer as one that was written, so cached")
+
+    def test_nodes_own_print_of_the_crash_names_the_font_not_the_source_line(self):
+        crashed, quick, pages = self.two_diagrams("NODEPRINT")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([(problem["reason"], problem.get("name")) for problem in outcome["problems"]],
+                         [("fontMissing", "tcrm1000")])
+
+    def test_a_drawing_that_stopped_is_cached_and_the_engine_started_afresh(self):
+        crashed, quick, pages = self.two_diagrams("STOPPED")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["drawingStopped"])
+        self.assertEqual(outcome["drawn"], 1)
+        self.assertEqual(self.space.started(), 2)
+        self.assertEqual(len(self.cached_names()), 2)
+        line = [line for line in self.space.said if line.startswith("plantoir: error:")][0]
+        self.assertIn("(something was not ready)", line)
+
+    def test_a_helper_ended_by_a_signal_says_so_without_empty_brackets(self):
+        """#718 review M1, measured on the real engine: SIGKILL or SIGTERM
+        mid-diagram leaves nothing on stderr, and the teacher read
+        "drawing it stopped part-way () - …". Now the sentence without detail."""
+        bare = rules("words", "reasonsWithoutDetail")["drawingEnded"]
+        for word in ("SELFKILL", "SELFTERM"):
+            with self.subTest(signal=word):
+                space = Workspace()
+                try:
+                    crashed, quick, pages = self.two_diagrams(word)
+                    started = time.monotonic()
+                    outcome = space.prepare(pages)
+                    self.assertLess(time.monotonic() - started, 10)
+                    self.assertEqual([(problem["reason"], problem["said"]) for problem in outcome["problems"]],
+                                     [("drawingEnded", "")])
+                    self.assertEqual(outcome["drawn"], 1)
+                    said = [line for line in space.said if line.startswith("plantoir: error:")]
+                    self.assertEqual(said, ["plantoir: error: P.md: tikz block 1: " + bare])
+                    facts = {"media_target_exists": True, "section_index_exists": True,
+                             "figure_problems": outcome["problems"]}
+                    found = [item for item in site_health.findings(facts, "MPM2D", 1)
+                             if item.name == "figuresCouldNotBeDrawn"]
+                    self.assertIn(bare, found[0].detail)
+                    self.assertNotIn("()", found[0].detail)
+                finally:
+                    space.close()
+
+    def test_a_drawing_that_stopped_with_nothing_said_has_no_empty_brackets(self):
+        crashed, quick, pages = self.two_diagrams("STOPPEDQUIET")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["drawingStopped"])
+        line = [line for line in self.space.said if line.startswith("plantoir: error:")][0]
+        self.assertEqual(line, "plantoir: error: P.md: tikz block 1: "
+                         + rules("words", "reasonsWithoutDetail")["drawingStopped"])
+
+    def test_what_is_never_cached_is_the_contracts_list(self):
+        self.assertEqual(sorted(figures.NOT_CACHED), sorted(rules("cache", "notCached")))
+
     def test_an_engine_that_cannot_draw_diagrams_still_checks_graphs_and_caches_nothing_for_them(self):
         space = Workspace(mode="no-tikz")
         try:
@@ -495,12 +639,35 @@ class WordsTests(unittest.TestCase):
         for case in rules("functionplot", "expressionCases", "cases"):
             if case["problem"]:
                 named.add(case["problem"])
-        named.update(["engineMissing", "graphEngineMissing", "unknownSetting", "missingAlt"])
+        named.update(["engineMissing", "graphEngineMissing", "unknownSetting", "missingAlt",
+                      "fontMissing", "drawingStopped", "drawingEnded"])
         self.assertEqual(sorted(named - set(reasons)), [])
+
+    def test_no_reason_ever_reads_empty_when_nothing_was_said(self):
+        """#718 review M1: every reason, said with an empty `said`, in both
+        places a reason is worded - never "()", a dangling colon or a blank."""
+        reasons = rules("words", "reasons")
+        bare = rules("words", "reasonsWithoutDetail")
+        said = figures.words()
+        holding = [reason for reason, text in reasons.items() if "{said}" in text]
+        self.assertEqual(sorted(holding), sorted(bare), "every reason that carries {said} has words without it")
+        for reason in list(reasons) + ["somethingNew"]:
+            for nothing in ("", "   ", None):
+                problem = {"reason": reason, "said": nothing, "name": "\\foo"}
+                for sentence in (figures.reason_sentence(problem, said),
+                                 site_health.figure_reason_words(problem, reasons, bare, 20)):
+                    with self.subTest(reason=reason, said=nothing):
+                        self.assertNotIn("()", sentence)
+                        self.assertNotIn("{said}", sentence)
+                        self.assertFalse(sentence.rstrip().endswith(":"), sentence)
+                        self.assertTrue(sentence.strip(), reason)
+        # Something said is still said.
+        self.assertIn("(it broke)", figures.reason_sentence({"reason": "drawingEnded", "said": "it broke"}, said))
 
     def test_no_word_names_the_machinery(self):
         forbidden = contracts.section("shared-rules", "userFacingLabelWords", "forbidden")
-        said = list(rules("words", "site").values()) + list(rules("words", "reasons").values())
+        said = list(rules("words", "site").values()) + list(rules("words", "reasons").values()) \
+            + list(rules("words", "reasonsWithoutDetail").values())
         for check in contracts.section("shared-rules", "siteHealth", "checks"):
             if check["name"] == "figuresCouldNotBeDrawn":
                 said += [check["sentence"], check["sentenceForSeveral"], check["detail"]]

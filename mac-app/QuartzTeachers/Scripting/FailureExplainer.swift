@@ -38,6 +38,12 @@ struct FailureExplainer {
         if let reason = connectionExplanation(in: output) {
             return reason
         }
+        if let reason = tokenRefusedExplanation(in: output) {
+            return reason
+        }
+        if let reason = savedTokenUnheardExplanation(in: output) {
+            return reason
+        }
         if let reason = unreadableFrontPageExplanation(in: output) {
             return reason
         }
@@ -389,6 +395,67 @@ struct FailureExplainer {
             if output.contains(sign) {
                 return "Your computer couldn't reach the internet. Check your connection, then try again."
             }
+        }
+        return nil
+    }
+
+    /// The words both launchers print when Cloudflare refuses a token that
+    /// was just pasted (GitHub #695): `deploy.sh` with a cross in front,
+    /// `deploy.ps1` without.
+    static let tokenRefusedMarker: String = "Cloudflare did not accept that token"
+
+    /// The words `deploy.sh` prints when a SAVED token could not be checked
+    /// because the service did not answer, and the token was kept (#716).
+    static let savedTokenUnheardMarker: String = "to check the saved token, so this section was not deployed there"
+
+    /// Cloudflare refused the token the teacher pasted. LIFTED, as the
+    /// "cannot tell" refusal is: the launcher's two lines already are the
+    /// sentence a teacher acts on, so they are joined rather than reworded,
+    /// and `scripts/test_deploy_token_refusal.py` pins both launchers' lines
+    /// to the contract's expect.
+    ///
+    /// Asked after `connectionExplanation`, though nothing depends on that
+    /// today: the paste check throws curl's own errors away, so an offline
+    /// Mac prints this refusal and none of the connection signs, and is told
+    /// to check the permission. That is a known limit of the paste check,
+    /// recorded in documentation/07-deployment.md, not something this order
+    /// can fix. The contract's case is the whole transcript Russell met, so
+    /// it also pins that nothing earlier in it answers first.
+    static func tokenRefusedExplanation(in output: String) -> String? {
+        return liftedAndJoinedSentence(startingWith: tokenRefusedMarker, in: output)
+    }
+
+    /// Cloudflare or Netlify could not be asked about the saved token, so it
+    /// was kept and the deploy stopped (#716). Lifted and joined like the
+    /// refusal above.
+    static func savedTokenUnheardExplanation(in output: String) -> String? {
+        return liftedAndJoinedSentence(startingWith: savedTokenUnheardMarker, in: output)
+    }
+
+    /// The first line carrying `marker`, lifted, with the next line that has
+    /// words on it joined after a space — the launchers break one sentence
+    /// over two lines for the width of a Terminal, and the app has no such
+    /// width. Nil when no line carries the marker.
+    static func liftedAndJoinedSentence(startingWith marker: String, in output: String) -> String? {
+        let lines: [Substring] = output.split(separator: "\n", omittingEmptySubsequences: false)
+        var index: Int = 0
+        while index < lines.count {
+            if !lines[index].contains(marker) {
+                index += 1
+                continue
+            }
+            var sentence: String = liftedSentence(from: lines[index])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            var next: Int = index + 1
+            while next < lines.count {
+                let reason: String = String(lines[next]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !reason.isEmpty {
+                    sentence += " " + reason
+                    break
+                }
+                next += 1
+            }
+            return sentence
         }
         return nil
     }

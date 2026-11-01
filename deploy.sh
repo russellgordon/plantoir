@@ -632,7 +632,8 @@ Examples:
 Notes:
 - Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
 - You must build first (the static site goes to 'public/' in that section folder).
-- --target chooses where the built site goes: netlify (the default) or cloudflare.
+- --target chooses where the built site goes: netlify or cloudflare. Without it
+  (or --to-folder), the course's own settings decide, as the app's Deploy does.
 - With --to-folder <path>, the site is deployed to <path>/section<N> on THIS
   computer instead of Netlify — an incremental copy (only changed files move),
   for teachers who upload to their own web host (e.g. over SFTP). A relative
@@ -848,18 +849,26 @@ if [[ -f "$_course_config" ]]; then
 fi
 
 # Parse flags
+# Every flag as typed, kept for the legs of a course with more than one
+# destination (below), which run this script again once per destination.
+DEPLOY_FLAGS_AS_GIVEN=("$@")
 DIAGNOSE=""
 TEAM_SLUG=""
 RESET_TOKEN="false"
 TO_FOLDER=""
 TARGET="netlify"
+# Whether --target was typed. Without it, and without --to-folder, the
+# destination comes from the course's own settings (#668, below).
+TARGET_WAS_GIVEN="false"
 ACCOUNT_ARG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
+      TARGET_WAS_GIVEN="true"
       TARGET="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift ;;
     --target=*)
+      TARGET_WAS_GIVEN="true"
       TARGET="$(printf '%s' "${1#*=}" | tr '[:upper:]' '[:lower:]')" ;;
     --account)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
@@ -900,6 +909,168 @@ if [[ "$TARGET" != "netlify" && "$TARGET" != "cloudflare" ]]; then
   exit 1
 fi
 
+# ---- Where this course deploys, when no destination was typed (#668) ----
+# Russell, 2026-11-01: a deploy typed at the command line goes where the
+# course's settings say, as the app's Deploy button does — so a course made
+# for Cloudflare Pages (every new course since #668) is not quietly deployed
+# to Netlify. Read only when neither --target nor --to-folder was given;
+# either one still decides, exactly as before. The mapping is the app's
+# (DeployCommand.arguments, contracts/app-rules.json -> deployArguments):
+#   deploy_target absent, "" or "netlify"  -> Netlify, this script's default
+#   "cloudflare_pages"                      -> --target cloudflare
+#   "local_folder"                          -> --to-folder deploy_folder_path
+# and additional_deploy_targets are deployed after it, one leg each, by
+# running this script again with that leg's flag — the app's own shape
+# (MultiDestinationDeployRunner), so every leg goes through every check
+# below. A leg that fails does not stop the others; the run ends with the
+# first failing leg's exit code.
+#
+# Read with plutil on a Mac (no host python3, the rule the reference-course
+# check above keeps), and with a Python elsewhere, because the destination is
+# a VALUE in nested JSON. A settings file that is there and cannot be read
+# REFUSES rather than falling back to Netlify: falling back is exactly the
+# silent wrong-host deploy this exists to stop.
+# scripts/test_deploy_sh_destination.py pins it.
+the_saved_destinations() {
+  local config="$1" reader primary folder count index kind path
+  # macOS: plutil reads JSON and is on every Mac, Command Line Tools or not —
+  # the rule this script keeps for the reference-course check above (no host
+  # python3; #668 review M1). A file it cannot parse fails, and the caller
+  # refuses; a key that is absent, or null, reads as empty.
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -convert json -o /dev/null "$config" 2>/dev/null || return 1
+    primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
+    folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
+    printf '%s\t%s\n' "${primary:-netlify}" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
+    count="$(plutil -extract additional_deploy_targets raw -o - "$config" 2>/dev/null || true)"
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
+    index=0
+    while [[ "$index" -lt "$count" ]]; do
+      kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
+      path="$(plutil -extract "additional_deploy_targets.${index}.path" raw -o - "$config" 2>/dev/null || true)"
+      if [[ -n "$kind" ]]; then
+        printf '%s\t%s\n' "$kind" "$(printf '%s' "$path" | tr '\t\n' '  ')"
+      fi
+      index=$((index + 1))
+    done
+    return 0
+  fi
+  # Elsewhere (a bash on Windows, Linux) a Python reads it, the same way.
+  for reader in python3 python; do
+    if command -v "$reader" >/dev/null 2>&1; then
+      "$reader" - "$config" <<'PY' && return 0
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    settings = json.load(handle)
+if not isinstance(settings, dict):
+    raise SystemExit(1)
+def text(value):
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else json.dumps(value)
+def one(kind, path):
+    print((text(kind) or "netlify") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
+one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
+extras = settings.get("additional_deploy_targets")
+if isinstance(extras, list):
+    for extra in extras:
+        if isinstance(extra, dict) and isinstance(extra.get("type"), str) and extra["type"]:
+            one(extra["type"], extra.get("path"))
+PY
+      return 1
+    fi
+  done
+  return 1
+}
+
+# The words a teacher reads for one saved destination.
+destination_words() {
+  case "$1" in
+    cloudflare_pages) echo "Cloudflare Pages" ;;
+    local_folder) echo "a folder on this computer" ;;
+    *) echo "Netlify" ;;
+  esac
+}
+
+# The flag(s) that deploy to one saved destination, one per line, or a
+# refusal on stdout and return 1.
+flags_for_the_saved_destination() {
+  local kind="$1" path="$2"
+  case "$kind" in
+    netlify) printf '%s\n' "--target" "netlify" ;;
+    cloudflare_pages) printf '%s\n' "--target" "cloudflare" ;;
+    local_folder)
+      if [[ -z "$path" ]]; then
+        echo "${COURSE_CODE} deploys to a folder on this computer, but no folder is chosen in its settings."
+        return 1
+      fi
+      printf '%s\n' "--to-folder" "$path" ;;
+    *)
+      echo "${COURSE_CODE}'s settings name a destination Plantoir does not know: ${kind}."
+      return 1 ;;
+  esac
+}
+
+if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
+  if ! _saved_destinations="$(the_saved_destinations "$_course_config" 2>/dev/null)" \
+     || [[ -z "$_saved_destinations" ]]; then
+    echo ""
+    echo "❌ Plantoir could not read where ${COURSE_CODE} deploys from its settings."
+    echo "   Nothing was deployed. Choose one with --target netlify or --target cloudflare."
+    echo ""
+    exit 1
+  fi
+  _leg_count="$(printf '%s\n' "$_saved_destinations" | grep -c .)"
+  if [[ "$RESET_TOKEN" == "true" ]]; then
+    # Clearing a token deploys nothing, so only the main destination is asked.
+    _leg_count=1
+    _saved_destinations="$(printf '%s\n' "$_saved_destinations" | head -n 1)"
+  fi
+  if [[ "$_leg_count" -gt 1 ]]; then
+    _self="$(pwd)/$(basename "$0")"
+    _first_failure=0
+    # The list is read on descriptor 3, never on stdin: every leg inherits
+    # stdin, and a leg READS it — `docker exec -i` forwards it to the
+    # container, and a token prompt waits on it — so a list on stdin was
+    # eaten by the first leg and the others never ran (#668 review H1).
+    # Each leg keeps the teacher's own terminal, and is not handed fd 3.
+    while IFS=$'\t' read -r -u 3 _kind _path; do
+      [[ -n "$_kind" ]] || continue
+      if ! _leg_output="$(flags_for_the_saved_destination "$_kind" "$_path")"; then
+        echo ""
+        echo "❌ ${_leg_output} Nothing was deployed there."
+        [[ "$_first_failure" -ne 0 ]] || _first_failure=1
+        continue
+      fi
+      _leg_flags=()
+      while IFS= read -r _flag; do _leg_flags+=("$_flag"); done <<< "$_leg_output"
+      echo ""
+      echo "🎯 Deploying ${COURSE_CODE} section ${SECTION_NUM} to $(destination_words "$_kind"), as its settings say."
+      _leg_status=0
+      # Through this shell rather than as a program, so a copy without its
+      # execute bit (a fresh download, a test's copy) runs its legs too.
+      "${BASH:-bash}" "$_self" "$COURSE_CODE" "$SECTION_NUM" ${DEPLOY_FLAGS_AS_GIVEN[@]+"${DEPLOY_FLAGS_AS_GIVEN[@]}"} "${_leg_flags[@]}" 3<&- || _leg_status=$?
+      if [[ "$_leg_status" -ne 0 && "$_first_failure" -eq 0 ]]; then
+        _first_failure="$_leg_status"
+      fi
+    done 3<<< "$_saved_destinations"
+    exit "$_first_failure"
+  fi
+  IFS=$'\t' read -r _kind _path <<< "$_saved_destinations"
+  if ! _leg_output="$(flags_for_the_saved_destination "$_kind" "$_path")"; then
+    echo ""
+    echo "❌ ${_leg_output} Nothing was deployed."
+    echo ""
+    exit 1
+  fi
+  case "$_kind" in
+    cloudflare_pages) TARGET="cloudflare" ;;
+    local_folder) TO_FOLDER="$_path" ;;
+    *) TARGET="netlify" ;;
+  esac
+  echo "🎯 Deploying to $(destination_words "$_kind"), as ${COURSE_CODE}'s settings say."
+fi
+
 # >>> DEPLOY WHILE ITS SECTION DEPLOYS GUARD >>> — identical in deploy.sh and
 # preview.sh; scripts/test_deploy_while_its_section_deploys.py checks that the
 # two copies match and runs every case against them. Keep the markers.
@@ -936,7 +1107,9 @@ fi
 #     its leases as well, and its script is in the table.
 #   - "another": `deploy.sh C S` as the program, working in THIS folder (its
 #     working directory, asked of lsof; one that cannot be asked counts, as in
-#     #381), and not only clearing a token or printing its help.
+#     #381, while `ps -p` still finds it running - one that has ended since
+#     the table was read does not, #737), and not only clearing a token or
+#     printing its help.
 # This run, its ancestors and its descendants never count (the reader's
 # family rule), so a scheduled run's own legs are never refused by its own
 # wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
@@ -972,6 +1145,15 @@ what_is_deploying_this_section() {
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        # Nothing from lsof, and the process has ENDED since the table was
+        # read: skipped (#737). A deploy.sh that exits between the two looks,
+        # in any folder, used to count. One still running whose folder lsof
+        # cannot answer for still counts, as #381 decided. `ps -p`, never
+        # `kill -0`, which also fails for another account's process that is
+        # running, and which this guard must still count.
+        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
+          continue
+        fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           seen="another"
         fi ;;
@@ -1403,6 +1585,78 @@ validate_cf_token() {
     | grep -q '"success":[[:space:]]*true'
 }
 
+# What a SAVED token's check heard back, as one word (GitHub #716):
+#
+#   accepted  the service answered and took the token
+#   refused   the service answered and said no: HTTP 400, 401 or 403 with
+#             the service's own answer in the body
+#   unheard   anything else — no answer at all (offline, a timeout, a name
+#             that did not resolve), a captive portal's page or redirect, a
+#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
+#             is not the service's answer (a school web filter's block page,
+#             a firewall's challenge in front of the API)
+#
+# Only "refused" may clear a saved token. Until #716 the check was the same
+# yes/no probe the PASTE check uses, which throws curl's errors away, so a Mac
+# on a captive portal or a school network that dropped for a moment lost a
+# good token (and, for Cloudflare, its account) and was sent to make another.
+# 400 is a refusal because Cloudflare answers a malformed token with it
+# (measured 2026-11-01: a three-character token gets 400, code 6003 "Invalid
+# format for Authorization header"; forty characters of nonsense get 401, code
+# 1000 "Invalid API Token"), and a saved token that can never be accepted must
+# not be kept for ever behind a sentence about the connection.
+#
+# The PASTE checks above and below are deliberately left as they were: a paste
+# that is refused is not saved, so it costs nothing beyond being asked again
+# on the next deploy, and the paste is where #696 will ask again in the sheet.
+#
+# Both bodies are checked because a page is not the service just because it
+# came back over its address: a filter that inspects the school's traffic, or
+# a firewall challenging a VPN, answers 403 with a page of its own, and a
+# token must not be cleared on the word of something that never asked the
+# service. Measured 2026-11-01 with made-up tokens: Cloudflare's refusals say
+# `"success":false` (400 code 6003, 401 code 1000), Netlify's say
+# `{"code":401,"message":"Access Denied"}`, and Netlify's yes is the account,
+# which carries `"id"`.
+#
+# $1 the URL, $2 the token, $3 (optional) an extended regular expression the
+# answer's body must match before a 2xx counts as accepted, $4 (optional) one
+# it must match before a 400/401/403 counts as refused.
+token_check_answer() {
+  local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
+  local answer code body
+  if [[ -z "$token" ]]; then
+    echo "refused"
+    return 0
+  fi
+  # -w puts the status on a line of its own after the body; curl writes it
+  # even when it gets no answer at all, as 000. No -f, so a 401 is READ
+  # rather than turned into an exit code that looks like a dropped network.
+  answer="$(curl -sS --max-time 20 -w '\n%{http_code}' \
+    -H "Authorization: Bearer $token" "$url" 2>/dev/null)" || true
+  code="${answer##*$'\n'}"
+  body="${answer%$'\n'*}"
+  case "$code" in
+    400|401|403)
+      if [[ -z "$refusal_must_say" ]] || printf '%s' "$body" | grep -Eq "$refusal_must_say"; then
+        echo "refused"
+      else
+        echo "unheard"
+      fi
+      ;;
+    2[0-9][0-9])
+      if [[ -z "$body_must_say" ]] || printf '%s' "$body" | grep -Eq "$body_must_say"; then
+        echo "accepted"
+      else
+        echo "unheard"
+      fi
+      ;;
+    *)
+      echo "unheard"
+      ;;
+  esac
+}
+
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
 # in the dashboard, and asking for it loses people.
@@ -1561,11 +1815,26 @@ CF_TOKEN=""
 CF_ACCOUNT=""
 if [[ "$TARGET" == "cloudflare" ]]; then
   CF_TOKEN="$(get_cf_token_keychain)"
-  if [[ -n "$CF_TOKEN" ]] && ! validate_cf_token "$CF_TOKEN"; then
-    echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
-    delete_cf_token_keychain
-    delete_cf_account_keychain
-    CF_TOKEN=""
+  if [[ -n "$CF_TOKEN" ]]; then
+    # Cleared only when Cloudflare SAYS no; kept when it could not be asked
+    # (GitHub #716, above token_check_answer). The run stops there rather than
+    # carrying on, because the upload needs the same connection and would only
+    # fail later with a less useful message.
+    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true' '"success":[[:space:]]*false')" in
+      accepted)
+        ;;
+      refused)
+        echo "⚠️ The saved Cloudflare token no longer works, so it has been cleared."
+        delete_cf_token_keychain
+        delete_cf_account_keychain
+        CF_TOKEN=""
+        ;;
+      *)
+        echo "❌ Plantoir could not reach Cloudflare to check the saved token, so this section was not deployed there."
+        echo "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+        exit 1
+        ;;
+    esac
   fi
   if [[ -z "$CF_TOKEN" ]]; then
     cat <<'MSG'
@@ -1661,10 +1930,22 @@ fi
 TOKEN=""
 if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
-if [[ -n "$TOKEN" ]] && ! validate_token "$TOKEN"; then
-  echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
-  delete_token_keychain
-  TOKEN=""
+if [[ -n "$TOKEN" ]]; then
+  # Cleared only when Netlify SAYS no, as Cloudflare's is (GitHub #716).
+  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN" '"id"[[:space:]]*:' '"code":[[:space:]]*4[0-9][0-9]')" in
+    accepted)
+      ;;
+    refused)
+      echo "⚠️ The saved Netlify token no longer works, so it has been cleared."
+      delete_token_keychain
+      TOKEN=""
+      ;;
+    *)
+      echo "❌ Plantoir could not reach Netlify to check the saved token, so this section was not deployed there."
+      echo "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+      exit 1
+      ;;
+  esac
 fi
 
 # If legacy file exists, try to migrate it (XOR+base64 scheme first)
@@ -2945,6 +3226,15 @@ say_there_is_no_room_for_previews() {
 # of a refused attempt is removed with a plain `docker rm` — never -f: it was
 # never started, and -f is what would kill a workspace another launcher made
 # under this name a moment ago, mid-publish (#94's shape).
+#
+# Every address is published on 127.0.0.1, this Mac's own, and on nothing
+# else (GitHub #684): without the prefix Docker publishes on every
+# interface, and under Colima its forward listened on `*:<port>`, so anyone
+# on the school's network could open a running preview and its live-reload
+# connection. The app opens localhost and Safari 127.0.0.1, so nothing a
+# teacher uses changes. contracts/app-rules.json -> previewPorts.bindsTo
+# says what was measured and what was rejected (opening it for an iPad
+# needs a setting and a trail line, not a default).
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
   local next output running named_already=false
@@ -2959,8 +3249,8 @@ create_the_workspace_on_free_ports() {
         --name "$CONTAINER_NAME" \
         --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
         --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-        -p "${base}-$((base + 3)):8081-8084" \
-        -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+        -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
+        -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
         "$IMAGE" \
         tail -f /dev/null 2>&1)"; then
       return 0
@@ -3032,6 +3322,7 @@ start_the_existing_workspace() {
       # is never printed for a rebuild that did not happen (a refused
       # remove, or another launcher's workspace used as it is).
       tell_the_app_the_address_was_held before-start "$taken"
+      note_that_this_folder_was_set_up_again addressTaken
       return 0
     fi
     # Refused: another launcher got here first and it is running again. Use it.
@@ -3053,6 +3344,7 @@ start_the_existing_workspace() {
   say_this_folder_is_set_up_again_on_free_addresses
   if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
     run_container_with_mount
+    note_that_this_folder_was_set_up_again addressTaken
     return 0
   fi
   # Refused: another launcher got here first and it is running again. Use it.
@@ -3690,9 +3982,44 @@ tell_the_app_the_workspace_was_in_use() {
   echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${place// /+}${3:+ $3}"
 }
 
+# The line the app reads onto the activity trail when this folder's workspace
+# HAS been made again (GitHub #684, rule 5): contracts/shared-rules.json ->
+# activityTrail.mustRecord."folder set up again" -> marker. Printed after the
+# new workspace exists, so a remake #94 refused (it exits inside
+# remake_the_workspace with its own line) never claims one. A remake costs
+# the next preview about two minutes, and "why was the first preview after
+# the update so slow?" is asked days later; until #684 only a WAIT before a
+# remake reached the trail, and an ordinary one left nothing. The reason is
+# one word, a key of the contract's whyWords; the app holds the words, and a
+# word it does not know writes the line without a reason rather than a wrong
+# one. Machinery, so the console a teacher reads leaves it out; the line the
+# caller printed before the remake already said why in words.
+# "<reason> <where this run was for>".
+note_that_this_folder_was_set_up_again() {
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_FOLDER_SET_UP_AGAIN: ${1:-unknown} ${place// /+}"
+}
+
+# Whether every address this folder's workspace publishes is on 127.0.0.1,
+# this Mac's own (GitHub #684). Published addresses cannot be changed after
+# a workspace is made, so one made before #684 — every address open to the
+# network — is made again, once, through remake_the_workspace. Each binding
+# is read in brackets: a workspace made before #684 has an EMPTY host
+# address, and a check that every listed word is 127.0.0.1 would pass it by
+# finding no words at all. Nothing read (no workspace, no answer) counts as
+# not yet, the same way the 9084 check before it reads a missing answer.
+every_published_address_is_this_macs_only() {
+  local bindings
+  bindings="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}[{{.HostIp}}]{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)" || return 1
+  [ -n "$bindings" ] || return 1
+  [ -z "${bindings//\[127.0.0.1\]/}" ]
+}
+
 # Removes this folder's workspace and makes it again, once nothing whose
 # owner is running is at work in it. Every remake goes through here: the
-# launchers' own checks say WHY in one line, then call this.
+# launchers' own checks say WHY in one line, then call this with the reason
+# as one word (a key of the contract's "folder set up again".whyWords), which
+# the app records once the new workspace exists (GitHub #684).
 #
 # The workspace is stopped and removed by its ID, never by name and never
 # with -f. Two launchers started together after an update can both find the
@@ -3711,10 +4038,11 @@ tell_the_app_the_workspace_was_in_use() {
 # look-then-stop window of tens of milliseconds — is ended unnamed, which is
 # #94's own known limit (contracts: whatCountsAsRunning.knownLimits).
 remake_the_workspace() {
-  local id waited=0 said="" waited_for=""
+  local because="${1:-}" id waited=0 said="" waited_for=""
   id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" || id=""
   if [ -z "$id" ]; then
     run_container_with_mount
+    note_that_this_folder_was_set_up_again "$because"
     return 0
   fi
   while true; do
@@ -3767,6 +4095,7 @@ remake_the_workspace() {
     fi
   fi
   run_container_with_mount
+  note_that_this_folder_was_set_up_again "$because"
 }
 
 # The one shared workspace from before working folders each had their own.
@@ -3868,27 +4197,27 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
     echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
-    remake_the_workspace
+    remake_the_workspace coursesNotFound
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
     echo "🔀 This folder's website builder was set up for a folder somewhere else:"
     echo "   • Set up for:  $CURRENT_MOUNT_SRC"
     echo "   • This folder: $HOST_COURSES"
     echo "♻️  Setting it up again for this folder…"
-    remake_the_workspace
+    remake_the_workspace otherFolder
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
     # mount this container was made without. A mount cannot be added to a
     # container that already exists.
     echo "♻️  Setting this folder up again so built websites can be kept outside your course folder…"
-    remake_the_workspace
+    remake_the_workspace buildsOutside
   else
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       if ! probe_container_write; then
         echo "🛑 The website builder could not save into 'courses/', so Plantoir is setting this folder up again…"
-        remake_the_workspace
+        remake_the_workspace couldNotSave
       elif ! probe_container_network; then
         echo "🔌 Plantoir lost its connection to the website builder, so it is setting this folder up again…"
-        remake_the_workspace
+        remake_the_workspace lostConnection
       else
         echo "✅ This folder's website builder is already running, and can save into 'courses/'."
       fi
@@ -3897,10 +4226,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       start_the_existing_workspace
       if ! probe_container_write; then
         echo "🛑 The website builder could not save into 'courses/' after it started, so Plantoir is setting this folder up again…"
-        remake_the_workspace
+        remake_the_workspace couldNotSave
       elif ! probe_container_network; then
         echo "🔌 Plantoir lost its connection to the website builder after starting it, so it is setting this folder up again…"
-        remake_the_workspace
+        remake_the_workspace lostConnection
       fi
     fi
   fi

@@ -85,8 +85,8 @@ WRANGLER = "wrangler.cmd" if os.name == "nt" else "wrangler"
 # console as machinery (CLAUDE.md rule 1). Node 20 printed nothing. Only that
 # one code is silenced - NOT NODE_NO_WARNINGS, which hides every warning,
 # including the ones a real break would print. `--disable-warning` is accepted
-# from Node 20.11 (measured on 20.20.2 and 22.23.4), so the flag is safe on
-# Windows' Node 20 runtime too.
+# from Node 20.11 (measured on 20.20.2 and 22.23.4): Windows' runtime ran
+# Node 20 until #675 and took the flag safely; both run 22.23.4 now.
 NODE_QUIET_DEPRECATION = "--disable-warning=DEP0040"
 
 

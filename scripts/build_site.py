@@ -31,6 +31,7 @@ import page_features
 import figures
 import geogebra
 import swift_blocks
+import section_problems
 import site_said
 import print_settings
 import quizzes
@@ -2362,8 +2363,27 @@ def _prepare_runnable_swift(content_root: Path, output_dir: Path, course_dir: Pa
         return {"problems": [], "blocks": 0, "ready": 0}
 
 
+def _every_place_in_the_course(content_root: Path) -> dict:
+    """Every copied page's site path (under `content_root`, forward slashes)
+    to its place in the course folder without .md (`_vault_sources`): what
+    site_said falls back to for a page `places` does not name, so a
+    section's page is named `section<N>/…`, where its file is (#717 part
+    two)."""
+    every = {}
+    root = Path(content_root)
+    for copied, (source, _is_section_page) in _vault_sources.items():
+        if not str(copied).lower().endswith(".md"):
+            continue
+        try:
+            site_path = Path(copied).relative_to(root).as_posix()
+        except ValueError:
+            continue
+        every[site_path] = _name_in_the_course(source)
+    return every
+
+
 def _write_site_said(output_dir: Path, content_root: Path, course_code, section_number,
-                     swift_here: dict, quiz_places: dict = None) -> None:
+                     swift_here: dict, quiz_places: dict = None, problems: dict = None) -> None:
     """
     quartz/plantoir_site_said.json (#567; scripts/site_said.py): which Python
     the site's emitter runs to say the runnable blocks it showed as plain code
@@ -2373,7 +2393,9 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
     students can see, by the gate's own rule, read from the build's copies;
     each page the quiz check examined is added by its place too (#644,
     quizzesReadDifferently, said in the same call), unless it is already
-    there, so a code page keeps its `source`.
+    there, so a code page keeps its `source`. `problems` names this build's
+    Problems record and id (#717), so the site's emitter replaces the rows
+    only the site can say - on every build, something to say or not.
     Never stops a build: if this cannot run, the site keeps its
     `plantoir: error:` lines and says no finding.
     """
@@ -2393,7 +2415,8 @@ def _write_site_said(output_dir: Path, content_root: Path, course_code, section_
         for problem in swift_here.get("problems") or []:
             swift_named.append([problem.get("page", ""), problem.get("block", 1)])
         site_said.write_side_file(output_dir, course_code, section_number, places, swift_named,
-                                  content_root)
+                                  content_root, problems=problems,
+                                  every_place=_every_place_in_the_course(content_root))
     except Exception as error:
         print(f"⚠️ Could not let the website say what it read differently (code shown as plain code, quizzes it could not check): {error}")
 
@@ -3601,24 +3624,19 @@ def _vault_relative_source(copied: Path, course_dir: Path,
     or None when the build made it, the file is gone, or it is not in the
     course folder.
 
-    One correction on the way: the per-section folder copy credits EVERY file
-    under a folder it copied to the section, so when a folder name is both
-    shared and per-section, a shared page copied there first is credited to a
-    section file that does not exist. The file that made the page is then the
-    shared one at the same place in the course folder, which is what is
-    listed. (The record itself is left alone here; that trap is a toolchain
-    issue of its own, #518's plan.)"""
+    Read straight from the build's record. Until #678 the per-section folder
+    copy credited every file under a folder that is both shared and
+    per-section to the section, and this function corrected it for its own
+    list; the record is right at the source now
+    (`copy_the_per_section_folders`), so every reader of it gets the shared
+    file. A regression now shows as a page missing from the list, which
+    test_page_sources.py fails on, rather than being quietly put right here.
+    `content_root` is no longer read; it is kept so the callers stay as
+    they are."""
     found = _vault_sources.get(copied)
     if found is None:
         return None
-    source, is_section_page = found
-    if not source.is_file() and is_section_page and content_root is not None:
-        try:
-            shared = course_dir / copied.relative_to(content_root)
-        except ValueError:
-            shared = None
-        if shared is not None and shared.is_file():
-            source = shared
+    source, _is_section_page = found
     if not source.is_file():
         return None
     try:
@@ -3793,7 +3811,15 @@ def _class_embed_target(line: str) -> str | None:
 # `build_section_site`, one build of one section per process, and read by
 # `_date_pages_from_their_classes`, which writes a page's date back into the
 # file it came from (#275, #276). A page the build made itself has no entry and
-# is never written back.
+# is never written back. Every source recorded here is a file the course folder
+# really has: in a folder that is both shared and per-section, a page is
+# credited to the section only when the section's folder has it, and keeps its
+# shared credit otherwise (`copy_the_per_section_folders`, #678). Every reader
+# depends on that - the date write-back, the names in folder problems and in
+# links into hidden pages, the name of a page whose settings cannot be read,
+# figure/quiz/GeoGebra line numbers, the runnable-Swift check, the site-said
+# side file and the visible-pages list - so it is put right once, here, rather
+# than in each of them.
 _vault_sources: dict[Path, tuple[Path, bool]] = {}
 _vault_course_folder: list[Path] = []
 
@@ -4474,6 +4500,52 @@ def copy_the_section_front_page(course_dir: Path, section_dir: Path, content_roo
     rewrite_section_wikilinks(dest)
     print(f"  🏠 Copied section index.md to content/index.md")
     return True
+
+
+def copy_the_per_section_folders(section_dir: Path, content_root: Path, per_section_folders,
+                                 section_number: int) -> None:
+    """
+    Copies each of the section's own folders over the build's copy, and
+    records which file in the course folder each page came from (#678).
+
+    A folder name can be shared AND per-section at once: section overrides
+    are what that is for, and the preflight adds a per-section name by itself
+    as soon as a teacher makes a section-only page in a folder named like a
+    shared one. The shared folder was copied first, so after `copytree` the
+    folder in the build holds both the shared pages and the section's. Only a
+    file the section's folder really has is credited to the section; every
+    other file keeps the shared credit the shared copy recorded. Crediting
+    every file under the folder to the section, as this loop did until #678,
+    named section files that do not exist - so the date write-back skipped
+    every linked shared page in that folder without a word, and a folder
+    problem named `section1/<folder>/<page>`.
+
+    `lexists`, not `exists`: a section page that is a link to a file elsewhere
+    is the section's page all the same, and the write-back must see it as one
+    to say it was left alone. The frontmatter pass and the wikilink rewrite
+    still run on every file in the folder, shared pages included, as before.
+
+    Called at the same point in the build as the loop it replaced: after the
+    shared folders and files, before the section's loose files, so a section's
+    page still wins over a shared one of the same name. Factored out of
+    `build_section_site` so the tests drive exactly what the build runs.
+    """
+    print(f"\n📥 Copying per-section folders...")
+    for folder in per_section_folders:
+        src = section_dir / folder
+        dest = content_root / folder
+        if src.exists():
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+            for root, dirs, files in os.walk(dest):
+                for file in files:
+                    fp = Path(root) / file
+                    section_file = src / fp.relative_to(dest)
+                    if os.path.lexists(section_file):
+                        remember_vault_source(fp, section_file, is_section_page=True)
+                    process_frontmatter(fp, section_number)
+                    if fp.suffix.lower() == ".md":
+                        rewrite_section_wikilinks(fp)
+            print(f"  📁 Copied per-section folder: {folder}")
 # ===========================================================================
 
 
@@ -9251,21 +9323,9 @@ def build_section_site(
             process_frontmatter(dest, section_number)
             print(f"  📄 Copied shared file: {file_name}")
 
-    # Copy per-section folders
-    print(f"\n📥 Copying per-section folders...")
-    for folder in per_section_folders:
-        src = section_dir / folder
-        dest = content_root / folder
-        if src.exists():
-            shutil.copytree(src, dest, dirs_exist_ok=True)
-            for root, dirs, files in os.walk(dest):
-                for file in files:
-                    fp = Path(root) / file
-                    remember_vault_source(fp, src / fp.relative_to(dest), is_section_page=True)
-                    process_frontmatter(fp, section_number)
-                    if fp.suffix.lower() == ".md":
-                        rewrite_section_wikilinks(fp)
-            print(f"  📁 Copied per-section folder: {folder}")
+    # Copy per-section folders, over the shared ones (#678: only the section's
+    # own files are credited to the section)
+    copy_the_per_section_folders(section_dir, content_root, per_section_folders, section_number)
 
     # Copy per-section files
     print(f"\n📥 Copying per-section files...")
@@ -9455,9 +9515,23 @@ def build_section_site(
     # its class's date, and after the How I Teach sweep and the #246 hiding.
     # ALWAYS section: every existing folder picks it up on its next build.
     # Writes only the offer file; no page's visibility changes here.
+    # The pages this build shows, read BEFORE the checklist's offer - which
+    # writes only the offer file and changes no page's visibility, so the
+    # list is the same either side of it - so the section's Problems record
+    # (#717) can be written with it and its marker printed first: the alert
+    # it raises then has the links checklist follow it (#379), as before.
+    visible_places_here = _visible_places(content_root)
+    # === #717: the section's record of its problems ============================
+    # ALWAYS section, after every check and before Quartz (plan review, HIGH
+    # 3): one row per problem, the previous record's site-said and deploy
+    # rows carried, and ONE bounded PLANTOIR_PROBLEMS: line. Never fails the
+    # build (section_problems.write_after_build).
+    section_problems.write_after_build(
+        host_output_dir, course_code, section_number, _this_build_id,
+        "deploy" if build_only else "preview", health_facts, visible_places_here,
+        config=config)
     _offer_the_links_checklist(content_root, course_dir, course_code, section_number,
                                frozen_course, _this_build_id)
-    visible_places_here = _visible_places(content_root)
     # ===========================================================================
 
     # === #545: My Progress =======================================================
@@ -9567,7 +9641,9 @@ def build_section_site(
     # What the site's emitter needs to say a block it shows as plain code as a
     # folder problem (#567), ALWAYS, beside the runner's words.
     _write_site_said(output_dir, content_root, course_code, section_number, swift_here,
-                     quiz_places_here)
+                     quiz_places_here,
+                     problems={"file": str(section_problems.record_path(host_output_dir)),
+                               "buildId": _this_build_id})
     # KaTeX from the site itself (#494), ALWAYS and on every site: the
     # stylesheet, copy-tex and the woff2 faces the maths is set in.
     install_katex_assets(output_dir)

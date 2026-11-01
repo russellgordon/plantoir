@@ -181,7 +181,10 @@ and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
 When a page the settings had listed is dropped, the build prints
 `PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
 (`How I Teach page kept off the website`) — once, at the transition, not on every
-build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+build. A line the build had to shorten (below, "How long a machine line may be")
+can carry an EMPTY `pages` list with a `count`: that is a report of `count` pages
+kept off, none of them named, and both apps write it ("3 not named"); only an
+empty list with no count reports nothing. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
 `verify.sh`'s real build, which plants pages with sentinel phrases and greps the
 whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
 two absent, the look-alike present so the check cannot pass by building nothing.
@@ -898,15 +901,21 @@ implementer's call, not Russell's ruling, and is flagged as such
 **Where a page came from** is recorded as the build copies it
 (`remember_vault_source`, beside each `shutil.copy2`): the section's
 `index.md`, each shared folder and file (a course page), each per-section folder
-and file (a section page). A page the build made itself has no source and is
-never written back.
+and file (a section page). In a folder that is both shared and per-section, a
+page is a section page only when the section's folder has that file; a shared
+page copied there keeps its course credit (`copy_the_per_section_folders`,
+#678 — until then such a page was credited to a section file that does not
+exist, and its date was never written back: "Which file each page came from",
+below). A page the build made itself has no source and is never written back.
 
 #### The trail
 
 When anything was rewritten, the build prints a plain sentence and one
 `PLANTOIR_DATED: {"course", "section", "pages"}` line naming each page by its
 place in the course folder (`shared-rules.json` → `pagesDatedByTheBuild`). The
-mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
+number on the trail is the line's `count` when it carries one — a line the build
+shortened to stay under 4,000 characters names only its first pages ("How long
+a machine line may be (#666)", below). The mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
 `ScriptRunner`), shows the teacher only the sentence, and prints nothing when
 nothing changed. A SCHEDULED publish records the same line from its own log:
 `ScheduledDeploy.recordFolderProblems` already reads that run's part of the log
@@ -1363,7 +1372,39 @@ what the line left out. Without that the trail would say "the build gave 206
 pages…" for a build that dated 300 (the count-first reasoning of
 `pagesDatedByTheBuild.trailLine.why`). Russell's ruling on the plan: the true
 count travels as its own field, and both apps' readers use it (Windows in
-#666, the mac by its own issue).
+#666, the mac in #704).
+
+**The mac's readers (#704, mac v1.9.1).** `PagesDatedByTheBuild`,
+`HowITeachKeptOffReport` and `CoverageMapsBuilt` each carry the line's `count`
+(`nil` for a whole line) and word the trail from `total`, the LARGER of
+`count` and the entries the line carries — the rule Windows' readers use
+(`PagesDatedByTheBuild.cs`, `HowITeachPage.cs`, `CoverageMapsBuilt.cs`), so a
+malformed line reads the same on both. The sentence ends "and M more" when
+some are not named and "M not named" when the line named none, with M =
+`total` minus the names shown, and the plural follows `total`. DATED and
+KEPT_OFF used to drop a line with an empty list; they now drop it only when
+it has no `count` either (an empty list with no count is still no report).
+MAPS checks `total == 0`, not an empty list, before its "no curriculum map"
+sentence, so an empty list with no count stays "none" and one with a count
+is maps made. The mac's own 40-name cap on the DATED trail line is
+unchanged and applies to what the line carries: 300 dated pages, of which a
+shortened line keeps 206, reach the trail as 40 names "and 260 more". Both
+of the mac's paths reach the same objects — the console of a run the app
+started (`ScriptRunner.rememberHealthFindings`), which the MCP door uses
+too, and a scheduled publish's log (`ScheduledDeploy.recordFolderProblems`)
+— and `MachineLineLengthReaderTests` runs all six `readerExamples` rows
+through each reader and both paths, and pins the count at 6, so a row added
+on Windows later turns the mac suite red as a request. Measured on the
+readers as they were before #704: 16 failures, every row wrong (the three
+shortened rows said 2, 1 and 1 for 300, 200 and 100; the DATED and KEPT_OFF
+k = 0 rows recorded nothing; the MAPS k = 0 row said "no curriculum map").
+On the mac the cap protects nothing a teacher would otherwise lose: the
+kernel pseudo terminal never splits a line, and `ScriptRunner` carries an
+unfinished line in `pendingLine` with no length limit
+(`collectCompleteLines`), so before the cap a long line arrived whole. What
+the cap costs the mac is names, and what the count gives back is the true
+number. Rejected: trusting `count` alone — a count smaller than the line's
+own list is not believed over the list, on either platform.
 
 **The numbers.** The mac's kernel pseudo terminal never splits a line.
 Windows' pseudo console does, when a line longer than the console wraps on the
@@ -1455,7 +1496,12 @@ links with ~190-character page names (4,382 whole) name 9.
   off the runner at render time, so a teacher who dismisses the dialog and
   carries on editing does not meet it again on the next redraw. A healthy course
   must see nothing at all — the failure mode for this whole feature is nagging,
-  and a warning dismissed by habit is dismissed when it matters.
+  and a warning dismissed by habit is dismissed when it matters. **Since #717 the
+  findings no longer have a dialog of their own on the mac**: each is a row of
+  the section's record (below, "A section's record of its problems"), and the
+  one alert is raised only when a build found something NEW, once per record —
+  the same rule taken further. The HEALTH line, the trail line and the
+  assistant's sentences are unchanged.
 
 ### The overnight path's trail line (#153)
 
@@ -1571,6 +1617,150 @@ unanswerable. Both are in `contracts/shared-rules.json` → `activityTrail`, and
 the repair rules themselves are in `siteHealth.repair`.
 
 
+## A section's record of its problems (#717, v1.9.1)
+
+A folder problem used to be said ONCE per build: a `PLANTOIR_HEALTH:` line,
+one dialog in the app, gone when dismissed, and nothing for a build nobody
+watched (a scheduled deploy, the MCP server, a terminal). It was already a
+problem that the build could not draw a figure (#485 E1) — measured on
+`origin/dev` bd32fe9f1, two broken figures gave one line naming both pages,
+diagrams and reasons — so what failed the MPM2D teacher was not detection but
+PROMINENCE, and a reason that was wrong (#718). This keeps every problem the
+last build of a section met, one row each, where both apps can show it.
+
+**The file.** `<builds root>/<COURSE>/section<N>/.problems.json`, beside
+`.build-id` and `.visible-pages.json`, outside `public/` (plan review, MED 4):
+archiving a section (`BuildOutputLocation.discardSectionBuild`) removes it
+with the build; it moves with a renamed course and goes with a discarded one;
+it survives `--full-rebuild` (which empties WORK_DIR, not the builds folder)
+and a recreated workspace. On the mac it is reached through the course's
+`.merged_output` link; on Windows it is `PLANTOIR_BUILD_ROOT`'s. Its format is
+`contracts/shared-rules.json` → `sectionProblems.file`.
+
+**One row per ITEM, worded by the folder problem itself.** A check names up to
+ten items in one finding's detail (one finding per check, #246's lesson, and
+the machine line's 4,000-character cap, #666), so a row cannot be cut out of
+the HEALTH line. Instead `section_problems.rows` calls each list check's own
+maker (`site_health.figures_finding` and its siblings) with ONE item: the
+row's `sentence` is the check's singular sentence, its `detail` the detail for
+that item, and its `item` the very piece the detail names — got by calling the
+maker again with the check's detail replaced by its list placeholder alone
+(`sectionProblems.kinds[].item`), so no rule of how a piece is put together is
+copied. The reasons inside a piece therefore come through the functions the
+console and the HEALTH line use: a figure's through `figureFences.words.reasons`
+and, since #718, `site_health.figure_reason_words` with
+`words.reasonsWithoutDetail` — there is no second table of reasons to keep in
+step. A check with no list (a missing Media folder, a section with no front
+page…) is one row with no page; its `scope` says whether the Page column reads
+"Whole section" or "Whole course".
+
+**A row's id** is its kind and the values of its `identity` fields — never a
+line number, which moves when the teacher types above it. A figure, a
+GeoGebra sketch, a Swift program and a block of runnable code are identified
+by their CONTENT, not their place among the page's blocks: the fence's key
+(`figures._located` and `geogebra._located` carry `key`), the program's key
+(`swift_blocks.prepare`'s problems carry it) and the code hashed
+(`site_said.facts_from_site`). Inserting a block above a broken one therefore
+does not read as one new problem and one gone, which would raise the alert for
+nothing (plan review, MED 5; implementation review L7). **A self-check
+question keeps its place (`n`)**: its content is not in hand where either the
+folder check or the site's safety net reports it, and a nested one has no
+number at all, so inserting a question above a broken one still reads as new
+plus gone — a named limit (`sectionProblems.knownLimits`). Two items with one id (two quizzes nested on one page
+have no number) get `#2`, `#3` (LOW 10). `firstSeen` is carried from the
+previous record by id; `lastSeen` is the build that last found it.
+
+**Three writers, one file, each owning a slice** (`from`):
+
+- `build_site.py` writes it afresh in the ALWAYS section, once the pages the
+  build shows are known (`visible_places_here`, now read just BEFORE the links
+  checklist's offer, which changes no page's visibility) and before Quartz —
+  so #153's mid-build timing holds (a missing front page stops a preview
+  finishing) and its `PLANTOIR_PROBLEMS:` line comes after the HEALTH lines
+  and before `PLANTOIR_LINKS_CHECKLIST:`, which lets the checklist follow the
+  alert. It carries the previous record's `site` and `deploy` rows unchanged,
+  marked `carried`, because this build cannot have checked them yet.
+- `site_said.py`, run by the site's emitter, replaces the `site` rows (blocks
+  of code shown as plain code, #567; quizzes the site read differently, #644)
+  and sets `siteSaidComplete` — **on every build**, not only when something
+  disagrees (plan review, HIGH 1: the emitter used to call Python only then, so
+  a block put right would have kept its row for ever). The build names the
+  record and its id in `quartz/plantoir_site_said.json`; the merge happens only
+  in a record whose `buildId` is its own, so a later build is never overwritten
+  by an earlier site. Cost: one Python start per site build, 24–31 ms in the
+  image (the emitter's own measurement). A side file without a record (an older
+  build, the image's own check) still calls only when something disagrees.
+  **A page the side file's `places` does not name** (#717 part two, review L4
+  of part one) used to be named by its SITE path less `.md`. That is right for
+  the course's own pages, but a section's page sits at the site's top level
+  while its file is under `section<N>/`. Its row then called it shared, and
+  an outside assistant handed it was sent to a file that does not exist. The
+  side file now also carries `everyPlace`: every page the build copied from
+  the teacher's folder, site path to place (`_every_place_in_the_course`, from
+  `_vault_sources`). `site_said.place_of_a_site_path` reads it first and falls
+  back to the site path only for a page the build did not copy.
+  `scripts/test_site_disagreements.py` pins both halves, and each test fails
+  against the old file.
+- `deploy.py` records Cloudflare's refusal of a file over 25 MB as one
+  `filesTooLargeForCloudflare` row per file (worded by
+  `sectionProblems.deployRefusals`, since that text was console-only), and
+  clears them when a Cloudflare deploy finds nothing too large or a Netlify
+  deploy succeeds for a course that no longer sends anything to Cloudflare. A
+  preview never runs that check, which is why the build carries these rows
+  (plan review, MED 6) — **but only while Cloudflare is among the course's
+  destinations**: `build_site.py` drops them at the next build of a course
+  that no longer goes there (implementation review M1). That is what clears a
+  course moved to a FOLDER, whose deploy (`deploy.sh`'s rsync) never enters
+  the Python, and the app's deploy builds first (a destination change counts
+  as content for the freshness check), so no record code was added to the
+  launcher. The one gap, measured by the fixes review (F1): a terminal
+  `deploy.sh --to-folder` on an already-built site does not rebuild, so there
+  the row stays until the next build. Both writers ask one function,
+  `section_problems.cloudflare_is_a_destination` (`deploy_target` or
+  `additional_deploy_targets` is `cloudflare_pages`; settings that cannot be
+  read count as yes, so nothing is dropped on a guess).
+
+**`changed`** — the ids `new` and `gone` against `before`, the previous build's
+rows — is worked out HERE, so the "did the set change?" decision lives in the
+shared code and Windows inherits it. **`alertKey`** is the build's id, plus a
+hash of the refused files when there are any, so the site's merge of the same
+build can never raise a second alert, while a deploy newly refused can.
+
+**The marker.** Every write prints one `PLANTOIR_PROBLEMS:` line with counts
+only (`course, section, buildId, alertKey, rows, new, gone`), a bounded marker
+under `machineLineLength` (worst case pinned in `test_machine_line_length.py`)
+and machinery under `transcriptStripping.machineLines`, so neither app needed a
+new filter. A build prints it twice: the build's, then the site's.
+
+**Never fails a build.** Every write is atomic and wrapped; one that cannot be
+written prints one `ℹ️` line (`test_a_record_that_cannot_be_written_is_one_plain_line`).
+
+**What Windows inherits free:** all of the above — the file, the rows, their
+words, `firstSeen`, `changed`, `alertKey`, the marker, the site's merge and the
+deploy's refusal — because it is the shared Python. What it owes (the tab, the
+table, the marker on the row, the alert and its answers file) is in doc 09's
+section and the `windows` issue.
+
+**Measured.** `scripts/test_section_problems.py` (26 tests, the contract's 10
+`rowCases`) in 0.05 s; verify.sh's two-section check plants a real TeX error
+(`\foo`, not `\textdegree`, which until #718 was a crash reported as a 20 s
+timeout), builds Section 1 twice, Section 2 once, puts the fence right and
+builds Section 1 again: its row goes, and Section 2's record is byte for byte
+what it was — its site still carries the broken page.
+
+**Rejected.** One `PLANTOIR_HEALTH:` line per item: findings are keyed on name,
+course and section in both apps (#246), so they would collide, and the
+dialog/trail/assistant readers would all change. Items in the marker: the cap.
+`.publish_state/` in the course folder: it is synced, it goes into backups, and
+this is a machine's build rather than a teacher's decision. Carrying the site's
+rows over "unchanged" with no `siteSaidComplete`: HIGH 1 above. A deploy
+refusal kept out of the table (the plan's first answer): the director ruled it
+in — a section whose deploy was refused is exactly the one whose site is not
+what the teacher thinks. A fallback alert for a build with HEALTH lines and no
+`PLANTOIR_PROBLEMS:` line (an older image): DROPPED, because the toolchain is
+mirrored with the app, so a build without the marker is a build the app did not
+bring; such a build shows its rows on the next build instead.
+
 ## The curriculum coverage maps: one per curriculum folder (#128)
 
 Until #128 a course had ONE coverage map, built from ONE folder, and its
@@ -1670,7 +1860,10 @@ names the colliding title through `{page}`.
 **The trail.** Every build whose section wants the map prints
 `PLANTOIR_MAPS: {"course", "section", "maps": [{title, folder, expectations}]}`
 — an empty list included, because "my College Board map is missing" is the
-question it answers (`coverageMapsBuilt`). The mac reads it from the console
+question it answers (`coverageMapsBuilt`). An empty list means none only when
+the line carries no `count`: a line the build shortened can keep no map at all
+and carry `count`, and that is a report of maps made, none of them named ("5
+not named"; "How long a machine line may be (#666)"). The mac reads it from the console
 (`ScriptRunner`) and from a scheduled publish's log
 (`ScheduledDeploy.recordFolderProblems`) and writes `curriculum maps built`.
 Nothing is printed when the map is switched off for the section. And since
@@ -1833,7 +2026,9 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    again for the rest; it is `tookTooLong` and NOT cached, so the next build
    tries again (review S5 — a slow moment must not become a permanent
    failure). `\def\x{\x}\x` loops for ever and says nothing, measured;
-   that is the case the clock exists for.
+   that is the case the clock exists for. A helper that ENDS rather than
+   runs out of time is told apart since #718 — see "A diagram that crashes
+   the engine" below.
 6. **What is answered.** TikZ: the SVG, or the reason from TeX's console —
    the first `! ` line, and `l.N`, which is the tidied fence's line N − 1
    (node-tikzjax puts a one-line preamble in front; measured), mapped back
@@ -1842,7 +2037,8 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    their file. Reasons: `undefinedCommand`, `missingPackage`,
    `missingDocument`, `documentClassNotNeeded` (an Overleaf paste — the line
    is NOT removed, so Obsidian and the site still agree; review S6),
-   `texSaid`, `tookTooLong`, `engineMissing`. functionplot: the 1.2.1 parse,
+   `texSaid`, `tookTooLong`, `engineMissing`, and since #718 `fontMissing`,
+   `drawingStopped` and `drawingEnded` (below). functionplot: the 1.2.1 parse,
    then each function tried at three points with function-plot's own
    evaluator (a name it does not know is only found by evaluating) and
    sampled at 51 points across the bounds (`sin x` is NaN everywhere and
@@ -1885,6 +2081,103 @@ stopped at its 20-second clock and the next one drawn, both in 23.5 s. The
 first build is mostly the new section's Quartz scaffold, not TeX (18.6 s with
 one diagram). The rest, and what was checked in the browser:
 [12 → Diagrams and graphs](12-windows-app.md#diagrams-and-graphs-485-e1-v170-the-runtime-carries-the-engines-503).
+
+**A diagram that crashes the engine (GitHub #718).** Found by #715's planner:
+some symbols written as TEXT need a font the engine does not carry
+(`tcrm1000`), and node-tikzjax's DVI reader THROWS "Could not find font
+tcrm1000" rather than letting TeX stop. Measured 2026-11-01 (node-tikzjax
+1.0.5, the dev-test image, Colima on an M4 Pro): `\$`, `\textdollar`,
+`\textdegree`, `\S`, `\pounds`, `\copyright`, `\textbullet`, `\textmu` and
+`\textcent` all do it, in plain TikZ and in a pgfplots label. It has two
+shapes, and until #718 the build told the teacher the wrong thing for both:
+
+| Where the symbol is | What the engine did | What the build said before | Since #718 |
+|---|---|---|---|
+| a pgfplots label | the throw is outside drawTikz's `catch`; Node ended the helper (exit 1) after **0.53–0.57 s** | `tookTooLong` — not cached, tried again every build | `fontMissing`, cached; answered in 0.40–0.57 s |
+| plain TikZ `\node{…}` | the `catch` swallowed it; TeX printed no `! ` line (0.02 s) | `texSaid` with nothing said ("LaTeX stopped here: ") | `fontMissing`, cached |
+
+**It never cost 20 seconds**, which is what #715's review and the issue's
+title assumed: `read()` returned None at the end of the helper's output as
+well as on the clock, so a crash cost one helper restart (old code: 11.7 s for
+the 20-job measurement, new code 13.0 s — the new one restarts after a crash
+it answered too). The cost was the wrong reason and a retry on every build.
+
+What the helper does now (`plantoir-figures.mjs`): the message the `catch`
+used to drop is kept, and a `process.on("uncaughtException")` handler answers
+the job being drawn the same way. One classifier for both: "Could not find
+font X" is `fontMissing` with X as `name` — never a font NUMBER, which
+dvi2html's parser throws as a bare string ("Could not find font 7.") — and
+any other throw with no `! ` line from TeX is `drawingStopped` with one line
+of the message (at most 160 characters, never a path or a stack: it reaches a
+teacher's console and the folder-problem finding). After an uncaught throw
+the helper exits, in the answer's write callback rather than straight after
+the write, because how much of a pipe write lands before an exit differs by
+platform and Windows runs this natively. It also writes "Error: <message>"
+to stderr.
+
+What `figures.py` does now: `_Helper.read` says whether the output ENDED
+(`helper.ended`) as against the clock running out. A helper that ended without
+answering is waited for (5 s), its stderr drained to the end, and read:
+"Could not find font X" anywhere in it is `fontMissing` again — so an old
+helper, or an answer the pipe lost, still names the font; Node's own print of
+a throw quotes the source line (`throw new Error("Could not find font " +
+…`), so the name must be letters and digits, not the `"` that follows —
+anything else is `drawingEnded` with the first "Error: …" line. After any
+crash it answered (`fontMissing`, `drawingStopped`) the next job gets a fresh
+helper. **That guard is new to this design, not a bug that shipped**: before
+#718 a crash was never answered, and the end of the output already restarted
+the helper; a helper that answers and THEN exits would have handed the next
+job an ended pipe and blamed it.
+
+What is cached (`NOT_CACHED`, pinned to `figureFences.cache.notCached`):
+`fontMissing` and `drawingStopped` are cached — the same fence and engine
+crash the same way every time (3 of 3, measured by the planner), and `engineId` covers the
+helper, so this change cleared every cache once, the empty-`said` entries
+included. `drawingEnded` is NOT: a death with no answer can be a signal, the
+memory running out or the builder being stopped, and cached it would stick to
+a good figure until the fence changed. It is bounded the way `tookTooLong`
+is: each figure is tried once a build, so it costs at most one helper start a
+build. The reason strings are stable, for #717's record.
+
+**Nothing said is never "()".** The implementation review measured it on the
+real engine: a helper killed mid-diagram with SIGKILL or SIGTERM (6.6 s, the
+next diagram drawn) leaves stderr EMPTY, so `drawingEnded` — whose sentence
+was "drawing it stopped part-way ({said}) - …" — read "drawing it stopped
+part-way () - it will be tried again next time" in the console and in the
+folder problem. That is the ordinary shape of `drawingEnded`, not an edge.
+So `figureFences.words.reasonsWithoutDetail` gives every reason whose
+sentence carries `{said}` (`drawingEnded`, `drawingStopped`, `texSaid`,
+`expressionNotUnderstood`) a sentence for when nothing was said (blank after
+trimming), and `site_health.figure_reason_words` is the one function both the
+build's `plantoir: error:` line and `figuresCouldNotBeDrawn` word a reason
+with — they had two copies of the fill until then. `test_figures.py` renders
+every reason with an empty `said` in both places and refuses "()", a dangling
+colon and a `{said}` left in; its stand-in ends itself by SIGKILL and SIGTERM.
+Rejected: stripping the empty brackets out in code (the sentence then
+reads "stopped part-way  - …" with a double space and nothing to say what,
+where the authored no-detail sentence is written to read whole), and filling the gap with a stock
+phrase such as "no reason given" inside the brackets (it still reads as a
+fault in the wording rather than a sentence).
+
+`$^\circ$` and `\char36` draw in both shapes (0.04–0.61 s), and rendered
+with the site's own faces they are a degree sign and a dollar sign (looked at,
+2026-11-01); the `fontMissing` sentence says so, and names the rule (a symbol
+written as text needs lettering diagrams don't have) rather than only the
+two it was found with. `\textsf`, `\texttt`, `\textsc`, `\mathbb` and bold
+italic draw (measured by the plan's review). `figureFences.knownLimits` lists the measured symbols;
+`check_figure_rules_against_the_site.py` (verify.sh) runs a dollar sign in
+plain TikZ and a degree sign in a pgfplots label on the real engine, placed
+before the graph cases so the run also proves the job after a crash is
+answered by a fresh helper — red on the old helper (`texSaid`; and
+`tookTooLong` with the old `figures.py`).
+
+**Rejected:** caching every ended helper (a signal or a stopped builder would
+stick to a good figure); reading stderr ALONE for the reason (the drain thread
+can lose the race with the exit, so the answer on stdout comes first and
+stderr is the fallback); shipping `tcrm1000` (it is not in the engine's
+BaKoMa set and no licensed source was found — a separate issue if wanted);
+keeping the helper after a caught crash (the engine's state after a throw
+mid-drawing is not known; a restart costs about 0.5 s).
 
 **The live-preview edge.** The preview's live reload re-reads `content/`,
 not the teacher's vault, so a fence edited in Obsidian reaches the site on
@@ -2951,8 +3244,9 @@ reaches `main()`, so no node server is left behind. Pinned by
     `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL`, which the rebuild's guard
     reads too — instead of raising "Cloudflare's deploy tool exited with
     code …" with a traceback. Measured inside the image with a stand-in API
-    that never answers: **wrangler 4.80.0 exits 0 on SIGINT** (its `pages`
-    commands install a handler that calls `process.exit()`), so the guard
+    that never answers: **wrangler 4.80.0 and 4.156.0 both exit 0 on SIGINT**
+    (re-measured for #699, 2026-10-31, under Python's `Popen` with SIG_DFL
+    restored, SIGINT at 2 s and at 6 s: 0.01–0.02 s each), so the guard
     cannot see that shape — `deploy.py`'s own interrupt is what covers it, and
     with the whole group signalled, as the app's `^C` does, the real wrangler
     run exits 130 with nothing on stderr and no wrangler left running. (A
@@ -2982,7 +3276,9 @@ reaches `main()`, so no node server is left behind. Pinned by
       the app ends the launcher two seconds after its `^C`.)
     - wrangler uploads every asset first and creates the Pages deployment —
       the step that changes the site — only after (`pages deploy` in
-      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`).
+      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`;
+      the same order in 4.156.0's, read for #699: the upload, then the
+      upsert of hashes, then the deployment).
       A Cancel before that step publishes nothing; `subprocess.run` kills
       wrangler 0.25 s after the interrupt if it has not left on its own.
 
@@ -3035,9 +3331,11 @@ and a `--build-only` run that mirrored nothing prints "Nothing to deploy for
 before v1.4.4, #443) and **exits non-zero**. That
 matters more than the sentence: a publish runs `preview.sh --build-only` and
 then `deploy`, so failing the build stops the run at the step that KNOWS the
-reason. The mac already shows the folder-problem dialog on a failed build, so
-the teacher gets **Put them back** → **Preview Again**; check that each app's
-failed-build path does the same rather than swallowing the findings.
+reason. The mac shows the alert about new problems on a failed build (since
+#717 from the section's record, which the build wrote before it stopped), so
+the teacher gets **Put them back** → **Preview Again**, and the row stays on
+the Problems tab; check that each app's failed-build path does the same
+rather than swallowing the findings.
 
 **The half nobody had named, and the worse one.** The skipped sync left the
 PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it
@@ -3850,13 +4148,75 @@ the class it embeds is hidden, and the trail's "(hidden from students)" is
 said of the file that opens, so the front page's own `hidden` cannot stand
 in for it (#518 implementation review).
 
-**One correction, one trap left alone.** The per-section folder copy credits
-EVERY file under a folder it copied to the section, so when a folder name is
-both shared and per-section, a shared page copied there first is credited to
-a section file that does not exist. The list names the shared file at the
-same place instead. The record itself (`_vault_sources`, which the date pass
-also writes back through) is unchanged; that trap is a toolchain issue of its
-own (#518's plan, recommended for v2.0.0).
+**A shared page keeps its shared credit, in every reader (#678).** A folder
+name can be shared AND per-section at once — section overrides are what that
+is for, and the preflight adds a per-section name by itself the moment a
+teacher makes a section-only page in a folder named like a shared one. The
+shared folder is copied first and the section's folder over it, so the build's
+folder then holds both. Until #678 the per-section copy credited EVERY file
+under it to the section, so each shared page there was credited to a section
+file that does not exist. This list corrected it for itself (#518); the
+record's other readers did not. Since #678, `copy_the_per_section_folders`
+credits a file to the section only when `os.path.lexists` finds it in the
+section's folder, and every other file keeps the shared credit the shared copy
+recorded; the #518 correction in `_vault_relative_source` is gone.
+
+- **What it cost a teacher, measured.** A driver (kept with #678's closing
+  comment, not in the repository) runs the real `build_section_site("EXC2O", 1, …)` (Quartz stubbed, stopped after the
+  date pass; `python3.11`, which has `frontmatter`) on fresh copies of
+  `courses/EXC2O` with every shared page's `createdSection1` stripped, so the
+  write-back has work to do. A: EXC2O as shipped. B: a page
+  `section1/Tasks/Section Task.md` added and `Tasks` added to
+  `per_section_folders`. C: the same page, settings untouched (the preflight
+  adds `Tasks` itself). Run back to back, 2026-11-01:
+
+  | Scenario | Pages | Credited to a missing file | Write-backs | Written | Skipped without a word |
+  |---|---:|---:|---:|---:|---:|
+  | A, before and after | 270 | 0 | 99 | 98 | 0 |
+  | B and C, before | 271 | **12** | 99 | 88 | **10** |
+  | B and C, after | 271 | 0 | 99 | 98 | 0 |
+
+  The ten skipped were the linked shared pages in `Tasks` (Lab Reports and
+  Unit 2 Test among them): their SITE copy was dated, their file in the vault
+  was not, and nothing said so. The written count is compared with A on the
+  same day rather than fixed, because it moves with today's date and the
+  fixture. It spies on `_write_date_into_the_teachers_page`; the site-only
+  pass cannot see this, and neither can `verify.sh`'s `--site` check, whose
+  EXC2O has no folder that is both shared and per-section.
+- **Who it reached.** Only a folder a teacher made by hand that is both
+  shared and per-section, since v1.4.0 (2026-09-27; the write-back came in
+  1bf84d415 on 2026-09-25). No payload, skeleton or app feature makes one —
+  none of the 39 payloads has a per-section folder other than `All Classes`.
+  The first build after the fix writes the missing dates itself, so there is
+  no migration.
+- **Every reader of the record is mended by the one change**: the date
+  write-back, the names in folder problems (`_place_in_the_course`) and in
+  links into hidden pages, the name of a page whose settings cannot be read,
+  the teacher's file the figure, quiz, GeoGebra and runnable-Swift checks read
+  line numbers from (`_vault_source_of`, which fell back to the build's copy
+  and so gave a wrong line), the site-said side file, and this list.
+  `test_page_sources.py` and `test_dates_follow_the_class.py` drive the
+  build's own `copy_the_per_section_folders` rather than a retyped loop, so a
+  must-fail against them proves something; with the old credit restored,
+  four page-source tests and the new date test fail.
+- **`lexists`, not `exists`**: a section page that is a link to a file
+  elsewhere is the section's page all the same, and the write-back must see
+  it as one to say "left linked".
+- **Left as it was, and known:** two names that differ only by case. In the
+  container the content root is on ext4, so a shared `x.md` and a section
+  `X.md` both land there; `lexists(section/…/x.md)` asks the host's
+  case-insensitive disk through the mount and answers yes, so the shared page
+  is still credited to the section and its date goes into `X.md`. #678 does
+  not make that worse; an exact-name check (`name in os.listdir(parent)`)
+  would close it, and is not in this piece.
+- **Rejected:** correcting each reader, as #518 did for this list — eight
+  readers, each one a place to forget; walking the section's folder instead of
+  the build's — it would stop the frontmatter pass and the wikilink rewrite
+  reaching the shared pages in a mixed folder, which they reach today;
+  keeping the #518 correction as a safety net — it hid exactly this fault,
+  and without it a regression is a page missing from the list, which
+  `test_page_sources.py` fails on; a folder problem of its own for a folder
+  that is both shared and per-section — it is a legitimate, designed shape.
 
 **Measured against Quartz itself.** `scripts/test_page_sources.py` runs the
 slug cases and a course copied the way the build copies it, in the image

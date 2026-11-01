@@ -702,10 +702,13 @@
         "course" : "ICS3U",
         "expectArguments" : [
           "ICS3U",
-          "1"
+          "1",
+          "--target",
+          "netlify"
         ],
-        "name" : "Netlify, the default, passes no target flag",
-        "section" : 1
+        "name" : "Netlify, what an absent key means, is named like every other destination",
+        "section" : 1,
+        "why" : "Until #668 Netlify passed no flag, as the launcher's default. Since Russell's ruling of 2026-11-01 a deploy.sh given no destination reads the course's SAVED destinations and deploys every one of them, a leg each, so the app names every leg it runs — otherwise the Netlify leg of a course that also deploys elsewhere would run all of them again."
       },
       {
         "cloudflareAccountID" : "0123456789abcdef0123456789abcdef",
@@ -787,7 +790,9 @@
         "expectArguments" : [
           "ICS3U",
           "1",
-          "--non-interactive"
+          "--non-interactive",
+          "--target",
+          "netlify"
         ],
         "name" : "A scheduled deploy says nobody is at the computer",
         "section" : 1,
@@ -835,7 +840,7 @@
         "why" : "A folder deploy asks nothing today — it never reaches a web host and never names a site — so the flag changes nothing here. It is passed anyway because it describes the CALLER, not the destination: it says nobody is at the computer, and that stays true if a question is ever added to this path."
       }
     ],
-    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Netlify passes NO target flag at all — it is the launcher's default, and every course written before Cloudflare existed relies on that. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
+    "note" : "Given a course's configuration, what deploy.sh is asked to do. One place must decide this in each app — on the mac it is DeployCommand.arguments, shared by the Deploy button, the assistant and the scheduled-deploy alarm. Built separately anywhere and this happens: the assistant path never passed --target cloudflare, and a Cloudflare course deployed to Netlify. Nothing failed; the site simply appeared on the wrong host. Every destination is NAMED, Netlify included (--target netlify) since #668: a deploy.sh given no destination now reads the course's saved destinations itself (Russell, 2026-11-01), so a call from the app must say which leg it is. A course can configure more than one destination now (additional_deploy_targets, in file-formats.json) — Deploy walks them in order and calls this same argument-building logic once per destination, so every case above still applies per leg; there is no separate multi-destination argument shape to test. A case may carry `unattended: true`, which is what the SCHEDULED deploy passes and nothing else does — the Deploy button, the assistant and an MCP client all leave it off. It adds `--non-interactive`, which tells the launcher that any question a teacher would have to answer must become a refusal rather than a prompt nobody can answer or a default nobody chose. What it refuses, on both platforms, is launcherFlags.nonInteractive."
   },
   "failureExplanations" : {
     "cases" : [
@@ -889,6 +894,26 @@
       {
         "expect" : "Your computer couldn't reach the internet. Check your connection, then try again.",
         "output" : "Temporary failure in name resolution"
+      },
+      {
+        "expect" : "Cloudflare did not accept that token. Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "output" : " Netlify requires 3 file(s) for this deploy.\n✅ Delta deploy created (production).\n Deploy ID: 6716a2f0c3e1b40008d2c9a1\n Site URL: https://ics3u-s1-2026-gordon.netlify.app\n\n✅ Deploy complete.\n🕒 Host timezone offset: -0400\n⚠️ The saved Cloudflare token no longer works, so it has been cleared.\n\nConnect to Cloudflare.\n\nCloudflare hosts this section's website for free, and it needs to know that\nthe deploys are coming from you. It does that with an API token — a long\ncode that acts like a password made just for this app. Creating one takes\nabout two minutes, and you will not be asked again: it is saved securely on\nthis computer.\n\n  1. Open this page:  https://dash.cloudflare.com/profile/api-tokens\n     (Sign in if you are asked to.)\n  2. Choose \"Create Token\", then \"Create Custom Token\".\n  3. Name it something you will recognise later, such as \"Class websites\".\n  4. Give it ONE permission, chosen from the three dropdowns:\n     Account  ->  Cloudflare Pages  ->  Edit\n  5. Under \"Account Resources\", choose \"Include\" and then your own account\n     by name. A token that names no account cannot deploy anything, and\n     what you get back if you skip this does not mention accounts at all.\n  6. Under \"TTL\", set the end date to after the end of your school year —\n     next July is a safe choice — or leave it with no end date. An expired\n     token stops your deploys working, with nothing to say why.\n  7. Choose \"Continue to summary\", then \"Create Token\".\n  8. Copy the long code Cloudflare shows you — it is only shown once — and\n     paste it below. Nothing appears as you paste; that is normal.\n\nPaste Cloudflare token: \n❌ Cloudflare did not accept that token.\n   Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "why" : "GitHub #695. The transcript Russell met on 2026-10-27, re-captured 2026-11-01 by driving the real deploy.sh through a terminal in a scratch folder (the Netlify leg's lines in front are deploy.py's own prints, since that leg needs a real site): the Netlify leg of a Netlify + Cloudflare deploy finished, the saved Cloudflare token was refused and cleared, the 'Connect to Cloudflare' steps were shown, and the token pasted was refused too. The window said only 'Something went wrong'. The launcher's two lines are LIFTED and joined, as the 'cannot tell' refusal is, rather than reworded: they already are the sentence a teacher acts on. The whole transcript is the case so that it also pins that nothing earlier in it fires another explanation (the heredoc, the Netlify leg's success lines), which is what makes the order of the checks safe on both platforms without writing that order down. Asking again in the sheet instead of failing is #696."
+      },
+      {
+        "expect" : "Cloudflare did not accept that token. Check that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "output" : "Paste Cloudflare token: \nCloudflare did not accept that token.\nCheck that it has the 'Cloudflare Pages - Edit' permission, then try again.",
+        "why" : "GitHub #695, deploy.ps1's shape of the same refusal: no cross and no indent. One sentence for both launchers; scripts/test_deploy_token_refusal.py pins both launchers' lines to this expect."
+      },
+      {
+        "expect" : "Plantoir could not reach Cloudflare to check the saved token, so this section was not deployed there. The token is still saved. Check that this computer is online, then try again in a few minutes.",
+        "output" : "🕒 Host timezone offset: -0400\n❌ Plantoir could not reach Cloudflare to check the saved token, so this section was not deployed there.\n   The token is still saved. Check that this computer is online, then try again in a few minutes.",
+        "why" : "GitHub #716. A SAVED token is cleared only when Cloudflare answers 400, 401 or 403. With no answer at all (offline, a timeout, a captive portal, a 429 or a 5xx) it is kept and the deploy stops with these two lines, lifted and joined. Captured 2026-11-01 from the real deploy.sh with its connection sent to a closed port. Until #716 the same run deleted the token and its account from the Keychain and asked for a new one, which a deploy set for later cannot answer."
+      },
+      {
+        "expect" : "Plantoir could not reach Netlify to check the saved token, so this section was not deployed there. The token is still saved. Check that this computer is online, then try again in a few minutes.",
+        "output" : "🕒 Host timezone offset: -0400\n❌ Plantoir could not reach Netlify to check the saved token, so this section was not deployed there.\n   The token is still saved. Check that this computer is online, then try again in a few minutes.",
+        "why" : "GitHub #716, Netlify's saved token: the same rule and the same two lines, so the two destinations behave alike. Captured 2026-11-01 the same way."
       },
       {
         "expect" : "This website hasn't been built yet. Preview it once, then deploy.",
@@ -2806,6 +2831,463 @@
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. What points a session at one course is the greeting. Both doors ALSO name their course to the server, in its environment (doorCourseVariable) - to HOLD it, never to narrow: the server takes an assist lease on it (shared-rules.json -> doorCourseHold), and every course stays reachable. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
     "doorCourseVariable" : "PLANTOIR_DOOR_COURSE",
     "doorCourseVariableWhy" : "The one name both platforms read: both doors write it into their server's environment (each agent's serverEnvironment: the Claude door in its configuration's env, the Codex door as a -c override), and the server - Plantoir --mcp-stdio on the mac since #458, plantoir-mcp on Windows since #430 - holds an assist lease on that course when the folder has it. An environment variable rather than an argument because the argv is the folder alone (serverArguments) and #430's trap was a course in the argv being read as a lock.",
+    "fixWith" : {
+      "note" : "Fix with Claude… and Fix with Codex… on a section's Problems tab (#717 part two, 717b; Russell's rulings 3, 5 and 6 on #717): the problems a teacher ticked, handed to an outside assistant through the SAME two doors as Revise With ▸ (agents, above), with an opening message that lists them in place of the plain greeting. AUTHORED, not generated. The rows' own words are the record's `prompt` (shared-rules.json -> sectionProblems.prompt), used verbatim.",
+      "buttons" : [
+        {
+          "key" : "claude",
+          "title" : "Fix with Claude…"
+        },
+        {
+          "key" : "codex",
+          "title" : "Fix with Codex…"
+        }
+      ],
+      "where" : "Under the table on the section's Problems tab, Claude's first.",
+      "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
+      "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
+      "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
+      "atTheClick" : "The same refusal Revise With ▸ makes at the click (a Claude or Codex session already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
+      "opensAt" : "The working folder, as both doors always do: that is where the skills and the guidance are. The message names each page by its place from there, courses/<COURSE>/<page>.md.",
+      "fixGreeting" : {
+        "openingOne" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found a problem on its website that I'd like your help to fix: ",
+        "openingSeveral" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found problems on its website that I'd like your help to fix: ",
+        "rowWithAPage" : "{number}) {prompt} (page: {file}{shared}, skill: {skill})",
+        "rowWithoutAPage" : "{number}) {prompt} (skill: {skill})",
+        "sharedPage" : ", a page shared by every section",
+        "rowSeparator" : " · ",
+        "more" : " · and {count} more on the Problems tab",
+        "afterTheRows" : ". Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. ",
+        "planFirst" : " Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. ",
+        "closingPreview" : "When you are done, preview Section {section} so its Problems tab clears.",
+        "closingDeploy" : "When you are done, deploy Section {section} to Cloudflare again so its Problems tab clears.",
+        "closingBoth" : "When you are done, preview Section {section} and then deploy it to Cloudflare again so its Problems tab clears."
+      },
+      "fixGreetingIsOneLine" : "Windows hands the message to cmd /k, which cannot carry a newline, so rows are numbered on one line (1) … · 2) …) rather than set one per line (plan review, MED 9), and with no semicolon anywhere (replaceInTheMessageWhy).",
+      "fixGreetingMustSay" : [
+        "the course, by code, and its name when that differs, and whether a preview or a deploy found the problems, and of which section",
+        "each handed row's prompt, verbatim, numbered",
+        "for a row with a page, the page's place from the working folder (courses/<COURSE>/<page>.md), and that the page is shared by every section when it is not under section<N>/",
+        "the skill for each row's kind (skillForKind)",
+        "that the plantoir tools are the way to do anything to do with this course",
+        "greetingHowITeachSentence, verbatim",
+        "that before anything is changed the teacher is shown what will change, in plain words, and agrees",
+        "that when it is done this section is previewed - or deployed to Cloudflare again, for a refusal only a deploy clears - so its Problems tab clears (closingWhy)"
+      ],
+      "deployOnlyKinds" : [
+        "filesTooLargeForCloudflare"
+      ],
+      "closingWhy" : "A preview clears every problem but Cloudflare's refusal: a preview never runs that check and carries the row unchanged (shared-rules.json -> sectionProblems.deployRefusals.filesTooLargeForCloudflare.carryOver), so only a deploy clears it. closingPreview when every handed row is cleared by a preview, closingDeploy when every one is a deployOnlyKinds row, closingBoth otherwise (717b review M1).",
+      "replaceInTheMessage" : [
+        [
+          "\"",
+          "'"
+        ],
+        [
+          ";",
+          ","
+        ]
+      ],
+      "replaceInTheMessageWhy" : "A double quote would end the argument's quoting (greetingCarriesNoDoubleQuotes). A semicolon would split it: Windows Terminal reads its command line after the quotes are removed and treats EVERY ; as the start of a new tab's command, inside quotes too (microsoft/terminal #13264; the documented escape is \\;), so the message would open cut short and its tail as a second tab (717b review H1). No piece of fixGreeting has a semicolon, and any a row brings - a TeX error, a sentence - is written as a comma. Each replacement keeps the length.",
+      "skillForKind" : {
+        "figuresCouldNotBeDrawn" : "plantoir-math-graphs",
+        "geogebraSketchesNotReady" : "plantoir-math-graphs",
+        "swiftCouldNotBePrepared" : "plantoir-runnable-code",
+        "runnableCodeShownAsPlainCode" : "plantoir-runnable-code",
+        "quizzesNotReady" : "plantoir-quizzes",
+        "quizzesReadDifferently" : "plantoir-quizzes",
+        "printPdfNotFound" : "plantoir-printing"
+      },
+      "otherwiseSkill" : "plantoir-page-authoring",
+      "skillForKindWhy" : "Each skill is one of the guidance skills the app writes into the working folder (support/agent_guidance/skills). Figures and GeoGebra sketches are plantoir-math-graphs, which knows what this site can draw; Swift and runnable code plantoir-runnable-code; self-check questions plantoir-quizzes; a handout plantoir-printing; everything else - links, page settings, a front page, the curriculum map, a file too large - plantoir-page-authoring, which the others defer to.",
+      "mostRowsInThePrompt" : 10,
+      "greetingMaxCharacters" : 6500,
+      "pagePlaceMaxCharacters" : 300,
+      "courseNameMaxCharacters" : 80,
+      "charactersAre" : "Every count here is in characters as the mac's Swift counts them (String.count: grapheme clusters - one emoji, one accented letter, is one). Windows counts UTF-16 units (String.Length), which can be more for the same text (an emoji is two, and a family emoji is many), and cmd's 8,191-character limit is in UTF-16 units: so Windows applies the same bounds in Swift's characters where it can (StringInfo text elements), and must ALSO keep the whole command line's UTF-16 length under 8,191 - the 1,691 left over by 6,500 is the margin for that, measured with the longest greetingCases case (717b review L1). When Windows' own UTF-16 bound bites before the character bound, it drops rows from the END and says so with the `more` clause, exactly as the character bound does (717b fixes review L2).",
+      "boundsWhy" : "The course name is cut at courseNameMaxCharacters (with …), so the bound holds whatever the course is called (717b review L2). Rows are named in the record's order until mostRowsInThePrompt are, or until the next would take the WHOLE message past greetingMaxCharacters; the first is always named, and the rest are 'and N more on the Problems tab'. A row's prompt is at most 400 characters (sectionProblems.prompt) and its page place at most pagePlaceMaxCharacters (cut with …), so ten ordinary rows fit, and 6,500 leaves room under cmd's 8,191-character command line for the terminal, the assistant's path and the configuration's.",
+      "rejected" : [
+        "Handing the rows over in a file the message names (plan review, MED 9's other option): it is a file written where the assistant can read it - the working folder, which Obsidian is watching - and nobody cleans it up; the one-line message fits.",
+        "One session per problem: a shared page's problems are one fix, and ten terminals are not triage.",
+        "Greying a button when its assistant is not installed: hiddenWhenNotInstalled, as Revise With ▸.",
+        "Asking a shell where the tool is: slow (1.06 s for zsh -lic on the planning Mac), and it runs the teacher's login scripts while a view draws. The doors' own search list (searchedForInOrder) is used."
+      ],
+      "buttonCases" : [
+        {
+          "name" : "both assistants installed, one problem ticked",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "only Claude installed: only its button",
+          "claudeInstalled" : true,
+          "codexInstalled" : false,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "only Codex installed: only its button",
+          "claudeInstalled" : false,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "neither installed: no button, and no sign either exists",
+          "claudeInstalled" : false,
+          "codexInstalled" : false,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "a course kept for reference: no button",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : true,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : false,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "every problem unticked: shown, not enabled",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : false,
+              "state" : "current"
+            },
+            {
+              "ticked" : false,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : false,
+            "handedOver" : 0,
+            "unticked" : 2,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "the only ticked problem is fixed in the source: left out, so not enabled",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "fixedInTheSource"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : false,
+            "handedOver" : 0,
+            "unticked" : 0,
+            "fixedInTheSource" : 1
+          }
+        },
+        {
+          "name" : "ticked, fixed in the source and unticked together: only the first is handed over",
+          "claudeInstalled" : true,
+          "codexInstalled" : true,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            },
+            {
+              "ticked" : true,
+              "state" : "fixedInTheSource"
+            },
+            {
+              "ticked" : false,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : true,
+            "codexShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 1,
+            "fixedInTheSource" : 1
+          }
+        }
+      ],
+      "buttonCasesHow" : "rows lists the record's rows in order, each ticked or not, in the state sectionProblems.rowState gives it. expect: whether each button is shown, whether the buttons are enabled (they are enabled together), and how many rows are handed over, unticked, and left out as fixed in the source.",
+      "greetingCases" : [
+        {
+          "name" : "one problem on a page every section shares",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Math) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/MPM2D/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a section's own page is not called shared, a problem with no page names none, and a deploy says so",
+          "course" : "ICS3U",
+          "courseName" : "ICS3U",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "quizzesNotReady",
+              "page" : "section2/Class 4",
+              "prompt" : "“section2/Class 4”, question 2: no answer is marked as right"
+            },
+            {
+              "kind" : "sectionIndexMissing",
+              "page" : "",
+              "prompt" : "ICS3U Section 2 has no front page, so its website opens on a list of files."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “section2/Class 4”, question 2: no answer is marked as right (page: courses/ICS3U/section2/Class 4.md, skill: plantoir-quizzes) · 2) ICS3U Section 2 has no front page, so its website opens on a list of files (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "ten problems are all named",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 10,
+            "kind" : "figuresCouldNotBeDrawn",
+            "page" : "Unit {n}/Graphs",
+            "prompt" : "“Unit {n}/Graphs”, diagram 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 10,
+            "rowsNotNamed" : 0,
+            "atMostCharacters" : 6500
+          }
+        },
+        {
+          "name" : "an eleventh problem is counted, not named",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 11,
+            "kind" : "figuresCouldNotBeDrawn",
+            "page" : "Unit {n}/Graphs",
+            "prompt" : "“Unit {n}/Graphs”, diagram 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 10,
+            "rowsNotNamed" : 1,
+            "atMostCharacters" : 6500,
+            "textHas" : " · and 1 more on the Problems tab. "
+          }
+        },
+        {
+          "name" : "long page names stop the message at its length, and the rest are counted",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "manyRows" : {
+            "count" : 11,
+            "kind" : "geogebraSketchesNotReady",
+            "page" : "Unit {n}/A very long page name about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs about quadratic relations and their graphs",
+            "prompt" : "“Unit {n}”, sketch 1: ",
+            "promptCharacters" : 400
+          },
+          "expect" : {
+            "rowsNamed" : 7,
+            "rowsNotNamed" : 4,
+            "atMostCharacters" : 6500,
+            "textHas" : " · and 4 more on the Problems tab. "
+          }
+        },
+        {
+          "name" : "Cloudflare's refusal alone is cleared by a deploy, not a preview",
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "filesTooLargeForCloudflare",
+              "page" : "",
+              "prompt" : "Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. The last deploy of Section 2 found a problem on its website that I'd like your help to fix: 1) Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, deploy Section 2 to Cloudflare again so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a refusal beside a figure needs a preview and a deploy, said in one sentence",
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here"
+            },
+            {
+              "kind" : "filesTooLargeForCloudflare",
+              "page" : "",
+              "prompt" : "Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/ICS3U/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs) · 2) Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 and then deploy it to Cloudflare again so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a semicolon a row brings is written as a comma, and a very long course name is cut",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Mathematics with a name that goes on and on with a name that goes on and on with a name that goes on and on with a name that goes on and on ",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 2, line 9: Missing $ inserted; check the label"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Mathematics with a name that goes on and on with a name that …) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 2, line 9: Missing $ inserted, check the label (page: courses/MPM2D/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "nothing to hand over is no message",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Math",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [],
+          "expect" : null
+        },
+        {
+          "name" : "a row's own braces are handed over as written, and a double quote becomes an apostrophe",
+          "course" : "ICS4U",
+          "courseName" : "Grade 12 \"Computer\" Science",
+          "section" : 3,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "printPdfNotFound",
+              "page" : "Unit 2/Worksheet",
+              "prompt" : "“Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder"
+            },
+            {
+              "kind" : "runnableCodeShownAsPlainCode",
+              "page" : "section3/Class 9",
+              "prompt" : "“section3/Class 9”, a Python block: it is shown as plain code"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS4U (Grade 12 'Computer' Science) in Plantoir. The last preview of Section 3 found problems on its website that I'd like your help to fix: 1) “Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder (page: courses/ICS4U/Unit 2/Worksheet.md, a page shared by every section, skill: plantoir-printing) · 2) “section3/Class 9”, a Python block: it is shown as plain code (page: courses/ICS4U/section3/Class 9.md, skill: plantoir-runnable-code). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 3 so its Problems tab clears."
+          }
+        }
+      ],
+      "greetingCasesHow" : "rows are the handed rows in order (kind, page - empty for none - and prompt). manyRows makes count rows: page and prompt with {n} filled with the row's number from 1, and the prompt then followed by the letter x until it is promptCharacters long. expect null means no message; otherwise rowsNamed and rowsNotNamed, and text (the whole message, exactly), or atMostCharacters and textHas. No message in any case may hold a semicolon or a newline."
+    },
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",
@@ -2849,6 +3331,19 @@
       "measured" : "GitHub #235, on one real first preview (the mac, 2026-09-20 capture, ICS4U): the announcement is 6,055 characters in and about 11,000 more follow, so an 8,000-character tail had lost it by the time Quartz said its server started. Read a piece at a time with NOTHING carried over, cutting the line after ':8', ':81' or ':810' gives a valid address on the wrong port (3 of the line's cut points), and reading a raw piece of terminal output whole gives the right port with a garbage path ('http://127.0.0.1:8101/%0D%0A…') because the CRLF line ending is not split.",
       "whenTheLauncherCannotReadIt" : "preview.sh asks for this folder's published port twice; if both answers are empty it says it could not find out where the preview will be and stops before building (exit 1). It never announces the port inside the builder in its place. A build for publishing (--build-only) announces nothing and asks nothing, so it can never be stopped here.",
       "why" : "The port the builder uses inside is the same on every Mac, and the one this Mac opens is not: the first working folder publishes 8081 -> 8081, the next 8091 -> 8081, and so on. A guessed address is right by luck for the first folder only, and can open ANOTHER section's preview as though it were this one."
+    },
+    "bindsTo" : {
+      "address" : "127.0.0.1",
+      "how" : "Every published address of a folder's workspace - the four site addresses and their four live-reload websockets - is published as `-p 127.0.0.1:<base>-<base+3>:8081-8084 -p 127.0.0.1:<base+1000>-<base+1003>:9081-9084`, from create_the_workspace_on_free_ports in the PREVIEW PORT BLOCK, so setup.sh, preview.sh and deploy.sh make it the same way and cannot remake it away from each other. A workspace made before #684 (every HostIp empty, which Docker reads as every interface) is remade once by setup.sh and preview.sh (every_published_address_is_this_macs_only, then whenTheWorkspaceIsInUse.sentences.whenItNeedsSettingUpAgain.forThisMacOnly and remake_the_workspace, so #94's wait and refusals apply). The check reads each binding in brackets, `[{{.HostIp}}]`: an old workspace's host address is EMPTY, and a check that every listed word is 127.0.0.1 passes it by finding no words. deploy.sh never makes this check: it never serves, and a publish at six in the morning should not pay a two-minute remake for it; it makes new workspaces the shared way, and a later preview remakes the old one.",
+      "measured" : "GitHub #684, 2026-10-31 and 2026-11-01, Colima 0.10.3 with its ssh forwarder, Docker 29.5.2, macOS 26. Before: every teaching-quartz-* workspace had HostIp \"\", and `lsof -nP -iTCP -sTCP:LISTEN` showed `ssh ... *:8101` for each site and websocket address, so the preview answered from the Mac's address on the school network. With the prefix: lsof shows `127.0.0.1:<port>` only; `curl` to 127.0.0.1 and to localhost answers on the site and websocket addresses; `curl` to the Mac's network address and to [::1] is refused (exit 7) - and nothing listened on ::1 before either. `docker port` answers `127.0.0.1:<port>`, which preview.sh's announcement already reads (it keeps the text after the last colon). A block another workspace holds is still refused, in both directions (a loopback workspace onto an open one's block and the other way round), as `Bind for 127.0.0.1:<port> failed: port is already allocated`, which it_was_a_port_clash already reads. Nothing a teacher uses connects from anywhere else: the app's preview pane opens http://localhost:<port>/, Safari is handed 127.0.0.1, the reach check (#234) curls 127.0.0.1, and the live-reload client is ws://localhost:.",
+      "probe" : "hostBlockProbe is unchanged and still right: a port held by a program listening on 127.0.0.1 alone is in netstat's list as `127.0.0.1.<port>` and in lsof's as `127.0.0.1:<port>`, and both count it, so a localhost-only listener of somebody else's still makes a block taken. A same-account program on `*:<port>` can now sit beside this folder's `127.0.0.1:<port>` forward (127.0.0.1 still reaches the workspace, measured); the reach check's look for another account's listener counts sockets and remakes, which is conservative and correct.",
+      "rejected" : [
+        "Keeping the preview open on purpose, so it can be opened on an iPad or phone on the same Wi-Fi: nobody was found relying on it, and two of the preview-only packages (serve-handler, ws) carry denial-of-service advisories (#667's audit). If it is ever wanted it needs a setting a teacher turns on and a trail line, not a default.",
+        "Binding Colima's forwarder or Lima's hostIP instead: Colima is shared with other projects on this Mac (CLAUDE.md rule 7), and it would not cover Docker Desktop.",
+        "Serving Quartz on 127.0.0.1 INSIDE the workspace: Docker's forward connects to the workspace's own address, so the preview would stop answering at all (the reason Windows' loopback rewrite is native-only).",
+        "Remaking in deploy.sh too: it serves nothing, so an open address costs it nothing, and a scheduled publish keeps its warm builder. Measured (#684 review L2): a folder that only deploys keeps an old workspace's open forwards - lsof shows `ssh ... *:<port> (LISTEN)` - but with nothing serving, a request from the network gets an empty reply (curl exit 52) and no page; the next setup or preview makes it again on 127.0.0.1."
+      ],
+      "why" : "GitHub #684, found by #667's audit; Russell's decision 2026-10-31: localhost only. A preview is for the Mac that runs it; published on every interface, a running preview and its live-reload connection were open to anyone on the same network. Windows already binds its native preview to 127.0.0.1 (windows-app/Vendor/fetch-runtime.ps1, commit 2d32ca9e5, 2026-08-19, which rewrites both of Quartz's bind sites in handlers.js), so this key is what both platforms do."
     },
     "containerPorts" : [
       8081,
@@ -3625,6 +4120,7 @@
           "afterAnUpdate" : "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…",
           "forBuiltWebsitesOutside" : "♻️  Setting this folder up again so built websites can be kept outside your course folder…",
           "forSeveralPreviews" : "♻️  Setting this folder up again so several previews can run at once…",
+          "forThisMacOnly" : "♻️  Setting this folder up again so its previews can only be opened on this Mac…",
           "retiringTheOldSharedOne" : "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…",
           "why" : "The lines a launcher prints just before it sets a folder up again, for the reasons a teacher meets most (an update above all: that is how #378 was met). They replaced 'Your workspace was built from an older version; rebuilding it so the update takes effect…', 'Rebuilding your workspace so …' and 'Retiring the old shared workspace container…' — Russell, who wrote the product, did not know what 'workspace' meant (#378's decisions), and 'container' is a rule-1 word. Checked by scripts/test_port_blocks.py in every launcher that says them. The other lines about this folder's workspace (hostBlockClash.saysWhenAStartIsRefused, the second-spelling lines, and the rarer remake reasons that still say 'container') are GitHub #378's piece B / its follow-up issue, not these keys."
         },
@@ -5459,5 +5955,192 @@
         "why" : "A KNOWN, ACCEPTED false negative, written down so it is not discovered as a surprise. The fingerprint is of file metadata, never of file contents, which is what makes it cheap enough to run whenever a window comes to the front. `cp -p`, `rsync -a`, unzipping a backup and Time Machine all preserve modification dates, so restoring yesterday's version of a page can leave the marker off. The cure - hashing every byte of every page - costs more than the marker is worth. Publishing is never blocked by the marker, so the teacher can always publish anyway."
       }
     ]
+  },
+  "publishingDestinations" : {
+    "deployWithoutAnAccountID" : {
+      "cases" : [
+        {
+          "accountID" : "",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : true,
+          "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "expectTrailLine" : "deploy refused: no Cloudflare Account ID is saved in Settings",
+          "name" : "A new course on the default destination, made with no Account ID, is refused at its first deploy"
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "netlify",
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : true,
+          "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "expectTrailLine" : "deploy refused: no Cloudflare Account ID is saved in Settings",
+          "name" : "Cloudflare as an additional destination is refused the same way"
+        },
+        {
+          "accountID" : "abc",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : true,
+          "expectRefusalStartsWith" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "expectTrailLine" : "deploy refused: the Cloudflare Account ID in Settings is not a whole ID",
+          "name" : "An Account ID that cannot be one is refused, and the trail says which"
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "local_folder",
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : false,
+          "expectRefusalStartsWith" : "Choose the folder this course deploys into.",
+          "expectTrailLine" : null,
+          "name" : "A folder with no folder chosen is refused first, in the course's own settings",
+          "why" : "Destinations are checked in order and the first problem is the one said. The folder is put right in Course Settings, not in Plantoir ▸ Settings, so the alert offers no Open Settings…, and the line is not this event's."
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "netlify"
+          ],
+          "expectOpenSettings" : false,
+          "expectRefusalStartsWith" : null,
+          "expectTrailLine" : null,
+          "name" : "Netlify needs no Account ID"
+        },
+        {
+          "accountID" : "0123456789abcdef0123456789abcdef",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : false,
+          "expectRefusalStartsWith" : null,
+          "expectTrailLine" : null,
+          "name" : "With the ID in Settings, the deploy goes ahead"
+        }
+      ],
+      "why" : "The other half of wizardAccountID, and why the wizard can let Create go ahead. Nothing about WHEN the deploy-time refusal happens changed with #668: the deploy (the Deploy button, the assistant, an MCP client), scheduling a deploy, and saving Course Settings with a changed destination all still refuse a Cloudflare destination with no Account ID, before the launcher is started, and the refusal names Plantoir ▸ Settings ▸ Deploying (File ▸ Settings ▸ Deploying on Windows) — which is why the cases pin only the start of the sentence, the cloudflareAccountProblem half both apps share. What #668 added: the Deploy button's 'Cannot Deploy Yet' alert offers Open Settings… beside OK when its sentence is the Account ID's (expectOpenSettings), and the refusal is written on the trail by kind (expectTrailLine; shared-rules.json -> activityTrail.mustRecord, 'deploy refused for the Cloudflare Account ID'), because it is now the path every new teacher meets. The launcher's own prompt for the ID is never reached from the app: the app refuses first, and a launcher's answer would go to the Keychain rather than to the app's settings, so every app-side check would still fail after it. That is why the first deploy is the moment a teacher is asked, and why the measurement the plan proposed (does the launcher's dialog appear?) was not needed."
+    },
+    "netlifyNoteCases" : [
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify chosen as the destination",
+        "primary" : "netlify"
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "No destination saved at all, which reads as Netlify",
+        "primary" : "",
+        "why" : "Course Settings for a course made before #668, or made with setup.sh: it deploys to Netlify, so it gets the note, although nothing in its file says Netlify."
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : false,
+        "name" : "Cloudflare Pages chosen, the new-course default",
+        "primary" : "cloudflare_pages"
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : false,
+        "name" : "A folder on this computer alone",
+        "primary" : "local_folder"
+      },
+      {
+        "additional" : [
+          "netlify"
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify switched on as an additional destination",
+        "primary" : "cloudflare_pages",
+        "why" : "An additional Netlify destination is deployed every time the primary is, so it spends the allowance exactly as a primary one does."
+      },
+      {
+        "additional" : [
+          "netlify"
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify as an additional destination beside a folder",
+        "primary" : "local_folder"
+      },
+      {
+        "additional" : [
+          "cloudflare_pages"
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : false,
+        "name" : "Cloudflare Pages as an additional destination beside a folder",
+        "primary" : "local_folder"
+      }
+    ],
+    "newCourseDefault" : "cloudflare_pages",
+    "note" : "Where a NEW course deploys, and what a teacher is told while choosing (GitHub #668). Netlify moved new accounts to a fixed monthly allowance of credits shared by every site on the account, which deploys use up, and when it runs out every site on the account is paused until the next month; Cloudflare Pages' free plan has no limit on visitors. So every NEW course starts on Cloudflare Pages, at the app or the command line (Russell, 2026-11-01: \"Cloudflare everywhere\"): either app's new-course window, where it is listed first, and setup_course.py when it finds no saved file. A teacher can still choose Netlify, and is then shown netlifyNote. The sentences carry NO figures, because the hosts change them: the dated figures are in documentation/07-deployment.md and on plantoir.app's deploying page. They say DEPLOY, never publish, for what spends the allowance — in Plantoir, publishing marks a page, and costs nothing. They make no claim about Cloudflare's limits on deploys, which its documentation does not settle for an upload made from a computer (doc 07, read 2026-11-01). The trail's 'course created' line deliberately does not carry the destination (shared-rules.json -> activityTrail.mustRecord): course_config.json already answers 'where does this course deploy?'.",
+    "pickerOrder" : [
+      "cloudflare_pages",
+      "netlify",
+      "local_folder"
+    ],
+    "sentences" : {
+      "accountIDCanWait" : "You can create the course without it and preview it as usual. It is needed before the first deploy.",
+      "cloudflareCaption" : "Recommended. Free, with no limit on visitors.",
+      "netlifyNote" : "A note about Netlify’s free plan: Netlify accounts made since September 2025 get a fixed monthly allowance, and every deploy of every section uses part of it. When the allowance runs out, Netlify pauses every site on the account until the next month. Cloudflare Pages’ free plan has no limit on visitors, which is why Plantoir suggests it. If your Netlify account is older than that, or you deploy only now and then, Netlify works well.",
+      "netlifyScheduleNote" : "This course deploys to Netlify. On Netlify’s free plan every deploy uses part of a monthly allowance, and when it runs out Netlify pauses every site on the account until the next month.",
+      "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
+    },
+    "whenTheKeyIsAbsent" : "netlify",
+    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup_course.py writes newCourseDefault for a course it makes with no saved file (since Russell's ruling of 2026-11-01), keeps a saved deploy_target when it is run again, and writes NONE over a saved file that names none — that course predates the other destinations and keeps deploying to Netlify. And a deploy typed at the command line goes where the course's settings say (Russell, 2026-11-01): deploy.sh, given neither --target nor --to-folder, reads deploy_target — absent still meaning Netlify — and deploys each additional destination as a leg of its own; a typed --target still wins. Since then the app names every leg it runs (deployArguments: --target netlify included). deploy.ps1 matching it is Windows' obligation.",
+    "wizardAccountID" : {
+      "cases" : [
+        {
+          "accountID" : "",
+          "expectAccountIDCanWait" : true,
+          "expectCreateRefusal" : null,
+          "expectWarning" : "Paste your Cloudflare Account ID.",
+          "name" : "No Account ID yet: Create goes ahead, and the window says so"
+        },
+        {
+          "accountID" : "   ",
+          "expectAccountIDCanWait" : true,
+          "expectCreateRefusal" : null,
+          "expectWarning" : "Paste your Cloudflare Account ID.",
+          "name" : "Only spaces is no Account ID"
+        },
+        {
+          "accountID" : "abc",
+          "expectAccountIDCanWait" : false,
+          "expectCreateRefusal" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "expectWarning" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "name" : "An Account ID that cannot be one still refuses Create",
+          "why" : "Something is saved, and it is wrong: the teacher has tried and made a mistake, and Open Settings… beside the sentence is where it is put right. Only an EMPTY ID is the step that can wait."
+        },
+        {
+          "accountID" : "0123456789abcdef0123456789abcdef",
+          "expectAccountIDCanWait" : false,
+          "expectCreateRefusal" : null,
+          "expectWarning" : null,
+          "name" : "A good Account ID: nothing to say"
+        }
+      ],
+      "why" : "Each case holds whether Cloudflare Pages is the primary destination or an additional one; with Netlify or a folder alone the Account ID is not asked about at all. Before #668 the window refused Create with no Account ID; with Cloudflare the default that would stop every new teacher at their first course, before they had seen a page. The sentence stays on screen, orange, beside Open Settings…, with accountIDCanWait under it. Rejected: defaulting to Cloudflare only when Settings already has an ID — a first-time teacher has none, so that gives Netlify to exactly the teachers #668 is for, and it makes the default depend on the state of the machine the tests run on."
+    }
   }
 }

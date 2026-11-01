@@ -128,6 +128,18 @@ key "3. a) 7x - 2y  b) 7a - 11b".
   ticked them on their own computer, each tick drawn in ink - not as the
   page's `[ ]` and `[x]`. A worksheet meant to come back blank should use
   a numbered list or questions, not boxes.
+- **A blank students write on.** A page has one: a fill-in-the-blank
+  question's `` `____` `` inside a ` > [!quiz] ` callout, which prints as
+  a line (the `plantoir-quizzes` skill). Never make one by hand - no row of
+  underscores, no `\_\_\_`, and no empty lines or `<br>`s typed to leave
+  writing room, which print at whatever height the page happens to give
+  them. The house rule for paper is that a line carrying a blank is about
+  two lines tall, so a wrapped prompt still leaves a full line to write on,
+  and the site does that itself: a quiz blank prints as a line with the
+  room above it, from Print and from ⌘P alike. When a sheet needs more room
+  than that for written answers, make it a PDF handout instead
+  (`plantoir-handouts`, section 4) and hand it out from the page (section 4
+  below). If the room makes it a page longer, accept it and say so.
 
 ## 4. Handing out a PDF the teacher already has
 

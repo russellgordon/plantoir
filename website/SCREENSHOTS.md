@@ -294,8 +294,9 @@ python3 website/shots/capture.py --quizzes  # the Quizzes page's figures (v1.8.1
   have their 2× Windows pictures since 2026-10-31. `quiz-math` and
   `quiz-code-run` frame with 16 pt above and 24 below rather than the
   others' 40 and 56, so they fit the window on Windows, where Edge's title
-  bar is outside the page (Russell's ruling (a) on #590; the Mac's
-  two are to be retaken with them (mac #710)). `website/README.md` → "The Quizzes page" has the run.
+  bar is outside the page (Russell's ruling (a) on #590). The Mac's two
+  were retaken under the same margins on 2026-11-01 (#710) and sit 32 pt
+  lower than before, so each pair frames alike. `website/README.md` → "The Quizzes page" has the run.
 - **Mobile View**: Photographed in the iOS Simulator using RocketSim to render
   the authentic device bezel.
 - **Appearance Switching**: Machine appearance is toggled between Light and

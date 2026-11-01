@@ -139,10 +139,16 @@ struct SidebarView: View {
                                         sectionNumber: sectionNumber,
                                         generation: ScheduledPublishWatcher.shared.generation
                                     )
+                                // From memory: the store reads the records
+                                // at the moments listed on the list (#717).
+                                let hasProblems: Bool = sectionHasProblems(
+                                    courseCode: course.code, sectionNumber: sectionNumber
+                                )
                                 sectionRowLabel(
                                     sectionNumber: sectionNumber,
                                     scheduledFor: scheduledFor,
-                                    stoppedPublish: stoppedPublish
+                                    stoppedPublish: stoppedPublish,
+                                    hasProblems: hasProblems
                                 )
                                     .tag(SidebarSelection.section(course.code, sectionNumber))
                                     .accessibilityIdentifier("sidebar-\(course.code)-section\(sectionNumber)")
@@ -286,6 +292,27 @@ struct SidebarView: View {
             }
             .onDisappear {
                 returnKey.stop()
+            }
+            // Each section's record of its problems (#717), for the warning
+            // on its row: read when the folder and its courses are shown,
+            // when a run in this app prints that a record changed, when the
+            // scheduled-deploy watcher moves, and when Plantoir comes to the
+            // front (the MCP server's builds, a terminal's). Never from a
+            // row's render, which reads memory only.
+            .task(id: workspace.workspaceURL) {
+                reloadEveryProblemsRecord()
+            }
+            .onChange(of: workspace.courses.count) {
+                reloadEveryProblemsRecord()
+            }
+            .onChange(of: SectionProblems.shared.markersArrived) {
+                reloadEveryProblemsRecord()
+            }
+            .onChange(of: ScheduledPublishWatcher.shared.generation) {
+                reloadEveryProblemsRecord()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                reloadEveryProblemsRecord()
             }
             .onChange(of: workspace.expandedCourseCodes) {
                 WorkspaceModel.rememberOpenFolders()
@@ -588,36 +615,61 @@ struct SidebarView: View {
         return outcome
     }
 
+    /// Every section's record of its problems, read again (#717).
+    func reloadEveryProblemsRecord() {
+        guard let folder = workspace.workspaceURL else {
+            return
+        }
+        SectionProblems.shared.reloadAll(folder: folder, courses: workspace.courses)
+    }
+
+    /// Whether a section's last build found any problem — from memory.
+    func sectionHasProblems(courseCode: String, sectionNumber: Int) -> Bool {
+        guard let folder = workspace.workspaceURL else {
+            return false
+        }
+        return SectionProblems.shared.hasProblems(folder: folder, courseCode: courseCode, sectionNumber: sectionNumber)
+    }
+
     /// A section's row, wearing a clock when it is set to deploy on its own
     /// and a warning when a publish that was set to happen on its own did not
-    /// get through.
+    /// get through, or when its last build found problems (#717).
     ///
     /// The warning is here rather than only inside the section because a
     /// teacher who does not know which section failed cannot open the right
     /// one — and not knowing is the entire problem this feature exists for.
+    ///
+    /// ONE warning, whichever of the two applies (`sectionProblems.
+    /// sectionMarker`, plan review MED 7): two near-identical triangles side
+    /// by side would be two meanings a teacher cannot tell apart. Its help
+    /// says each that applies; its identifier is the stopped deploy's when
+    /// that applies, so the tests that find it keep finding it.
     @ViewBuilder
     func sectionRowLabel(
         sectionNumber: Int,
         scheduledFor: Date?,
-        stoppedPublish: ScheduledPublishOutcome.Stopped? = nil
+        stoppedPublish: ScheduledPublishOutcome.Stopped? = nil,
+        hasProblems: Bool = false
     ) -> some View {
-        if scheduledFor != nil || stoppedPublish != nil {
+        if scheduledFor != nil || stoppedPublish != nil || hasProblems {
             HStack {
                 Label("Section \(sectionNumber)", systemImage: "doc.richtext")
                 Spacer()
-                if stoppedPublish != nil {
+                if stoppedPublish != nil || hasProblems {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .accessibilityIdentifier(
-                            "stoppedPublishBadge-section\(sectionNumber)"
+                            stoppedPublish != nil
+                                ? "stoppedPublishBadge-section\(sectionNumber)"
+                                : "problemsBadge-section\(sectionNumber)"
                         )
                         // The same sentence twice, on purpose: hovering and
                         // hearing the row should tell a teacher the same thing.
                         // An orange triangle alone says "something", and a
                         // teacher who cannot find out what without clicking is
                         // being asked to guess.
-                        .help(SidebarView.stoppedPublishTooltip())
-                        .accessibilityLabel(Text(SidebarView.stoppedPublishTooltip()))
+                        .help(SidebarView.warningTooltip(stoppedPublish: stoppedPublish != nil, hasProblems: hasProblems))
+                        .accessibilityLabel(Text(SidebarView.warningTooltip(stoppedPublish: stoppedPublish != nil, hasProblems: hasProblems)))
                 }
                 if let scheduledFor {
                     Image(systemName: "clock")
@@ -924,6 +976,19 @@ struct SidebarView: View {
     static func stoppedPublishTooltip() -> String {
         return "A deploy that was set to happen on its own did not get through. "
              + "Open this section to see what happened."
+    }
+
+    /// The one warning's words: each sentence that applies, the stopped
+    /// deploy's first (#717, `sectionProblems.sectionMarker`).
+    static func warningTooltip(stoppedPublish: Bool, hasProblems: Bool) -> String {
+        var sentences: [String] = []
+        if stoppedPublish {
+            sentences.append(stoppedPublishTooltip())
+        }
+        if hasProblems {
+            sentences.append(SectionProblemsWording.markerHelp)
+        }
+        return sentences.joined(separator: " ")
     }
 
     /// What the clock beside a section means, said in full on hover.

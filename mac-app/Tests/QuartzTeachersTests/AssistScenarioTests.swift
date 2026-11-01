@@ -298,7 +298,8 @@ final class AssistScenarioTests: XCTestCase {
             try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
             try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
             try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
-            // Keep All and Deploy, answered earlier in the window (#475).
+            // The question answered earlier in the window with every class
+            // left ticked (#475; Return since #694).
             if scenario.given["laterClassesKeptAll"] as? Bool == true {
                 let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
                 ClassesDatedLater.keep(
@@ -425,6 +426,8 @@ final class AssistScenarioTests: XCTestCase {
             return .waitingForAnAnswer
         case "alreadyOpening":
             return .alreadyOpening
+        case "didNotOpen":
+            return .didNotOpen
         default:
             return .noWindow
         }
@@ -526,13 +529,30 @@ final class AssistScenarioTests: XCTestCase {
             if let scriptedReply {
                 // The scripted reply answers the FIRST request; any lap after
                 // it gets plain text, so a turn that should have ended in code
-                // and handed back instead fails on the count below rather
-                // than looping on the same call for ever (found proving #610's
-                // must-fails: the agent has no lap cap of its own).
-                started.serve([
-                    try AssistScenarioTests.engineReply(scriptedBy: scriptedReply),
-                    #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#,
-                ])
+                // and handed back instead fails on the count below. Kept even
+                // though the agent has had a lap cap since #689: this suite
+                // must not depend on the thing it is checking.
+                //
+                // `modelReplyAnswers: everyRequest` (#689) answers EVERY
+                // request with it instead — a model that keeps choosing the
+                // same call — but through a FUSE, well past the cap, and then
+                // plain text, so code without the cap fails on the count in
+                // seconds rather than hanging (`StubEngine` repeats its last
+                // entry for ever).
+                let scripted: String = try AssistScenarioTests.engineReply(scriptedBy: scriptedReply)
+                var served: [String] = [scripted]
+                if scenario.given["modelReplyAnswers"] as? String == "everyRequest" {
+                    let fuse: Int = AssistAgent.mostModelRequestsPerTurn * 3 + 2
+                    while served.count < fuse {
+                        served.append(scripted)
+                    }
+                } else if let answers = scenario.given["modelReplyAnswers"] {
+                    XCTFail("\(scenario.name): modelReplyAnswers \(answers) is not one this runner knows")
+                }
+                served.append(
+                    #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
+                )
+                started.serve(served)
             } else {
                 started.serve(
                     #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
@@ -718,6 +738,8 @@ final class AssistScenarioTests: XCTestCase {
         var filled: String = template
             .replacingOccurrences(of: AssistContract.coursePlaceholder, with: "ICS3U")
             .replacingOccurrences(of: AssistContract.sectionPlaceholder, with: "1")
+        // #698: a sentence naming the computer says this platform's word.
+        filled = MachineWord.filling(filled)
         // #610: a page an Open in Obsidian case says was opened.
         if let page {
             filled = filled.replacingOccurrences(of: AssistContract.pagePlaceholder, with: page)

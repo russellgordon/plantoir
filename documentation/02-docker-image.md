@@ -92,20 +92,7 @@ The image is layered as follows (in order):
    conversion, below), `fonts-noto-color-emoji` (the colour emoji
    drawn onto social sharing cards), and `rsync` (used for fast differential
    mirroring of the built `public/` directory back to the host mount).
-4. **`npm install -g wrangler@4.80.0`** — Cloudflare's own deploy CLI,
-   used by `deploy.py` when a course publishes to Cloudflare Pages (see
-   [deployment](07-deployment.md)). It is pinned, and pinned **below
-   4.87** deliberately: 4.87.0 is the first wrangler whose `engines.node` is
-   `>=22.0.0` (4.80.0 to 4.86.0 say `>=20.3.0`; this said 4.100 until #640,
-   which was never a boundary). The image runs Node 22 since #640 and
-   Windows' runtime since #675 (the pin is shared), so the ceiling no longer
-   protects either platform: it stays only until moving wrangler, its own
-   piece, retires it on both. If Node is ever raised, revalidate
-   Quartz *before* chasing a newer CLI. The pin also keeps the image reproducible and stops
-   an upstream CLI change from breaking a teacher's publishing mid-term.
-   Note this adds an npm-registry dependency to the image build, alongside
-   the Debian and GitHub sources.
-5. **Clone Quartz v4.5.0, at depth 1, & pre-bake dependencies → `/opt/quartz`** — a pinned checkout:
+4. **Clone Quartz v4.5.0, at depth 1, & pre-bake dependencies → `/opt/quartz`** — a pinned checkout:
    ```dockerfile
    RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
    RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
@@ -125,27 +112,50 @@ The image is layered as follows (in order):
    baked into the image layers, completely eliminating the need to run `npm install`
    across slow host filesystem mounts (9P on WSL2 or virtiofs on macOS) when
    setting up or building course sections.
-6. **The certificate store, at least `ca-certificates 20250419+deb13u1`
-   (#639, v1.9.0)** — its own layer, after the tikz engine and before the
-   patches, so a teacher who has built before re-runs only it (10.4 MB,
-   4 s, measured) rather than the apt line and everything below it:
+5. **Debian's security updates, with three floors (#714, v1.9.1; the
+   certificate store since #639)** — its own layer, after the tikz engine and
+   before GeoGebra, so a teacher who has built before re-runs only it
+   (seconds) rather than the apt line and everything below it:
    ```dockerfile
    RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+         $(apt-get -s upgrade | awk '/^Inst / && /Debian-Security/ {print $2}') \
+         libbrotli1 libssl3t64 openssl \
     && apt-get install -y --no-install-recommends ca-certificates \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419+deb13u1 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge 1.1.0-2+deb13u1 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libssl3t64)" ge 3.5.7-1~deb13u3 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
    ```
-   A floor, not an exact version, and the floor is in the line's text, so
-   raising it re-runs the layer. Why, what was measured and what was
-   rejected: [The certificate store](#the-certificate-store-639-v190).
-7. **GeoGebra Math Apps 5.4.933.1 → `/opt/vendor/geogebra` (#578)** — its own
-   layer straight after the certificate store it downloads through: the zip
+   Every package `trixie-security` has a newer version of, plus the three
+   floored packages by name; floors, not exact versions, and each floor is in
+   the line's text, so raising one re-runs the layer. Why, what was measured
+   and what was rejected: [Debian's security updates](#debians-security-updates-714-v191)
+   and [The certificate store](#the-certificate-store-639-v190).
+6. **GeoGebra Math Apps 5.4.933.1 → `/opt/vendor/geogebra` (#578)** — its own
+   layer straight after the security layer it downloads through (curl, on
+   libbrotli1 and libssl3t64 as that layer left them): the zip
    from download.geogebra.org, retried, then from plantoir.app's mirror of the
    same file, one `sha256sum -c` whichever answered, then
    `scripts/geogebra_engine.py adapt`. Only that script is copied in (to
    `/tmp`, never baked), so editing any other script never downloads the
    33.5 MB again. What it keeps, the six replacements and the mirror:
    [`/opt/vendor/geogebra`](#optvendorgeogebra-578).
+7. **`npm install -g wrangler@4.156.0`** (#699, v1.9.1) — Cloudflare's own
+   deploy CLI, used by `deploy.py` when a course publishes to Cloudflare
+   Pages (see [deployment](07-deployment.md)). Pinned exactly, at the newest
+   4.x on the day it moved, which keeps the image reproducible and stops an
+   upstream CLI change from breaking a teacher's publishing mid-term. It was
+   item 4, `wrangler@4.80.0` straight after the apt line, held below 4.87
+   (the first wrangler whose engines need Node 22) until both platforms ran
+   Node 22; #699 moved it here, to its own late layer, so the next bump
+   re-runs this layer and nothing above it, rather than the clone, Quartz's
+   `npm install` and every engine. Its engines say `>=22.0.0`, which the
+   `node` pin satisfies. If Node is ever raised, revalidate Quartz *before*
+   chasing a newer CLI. It adds an npm-registry dependency to the image
+   build, alongside the Debian and GitHub sources. What moved, what was
+   measured and the delegation to Workers to know about:
+   [Node 22](#node-22-640-v190) → "wrangler 4.156.0 (#699)".
 8. **Overwrite five Quartz source files with patched versions** from
    [`patches/`](../patches/) — three components and two filter files:
    - `patches/Explorer.tsx` → `quartz/components/Explorer.tsx`
@@ -601,7 +611,7 @@ Root TLS CA - G3" (not in Debian's store at all) and "emSign ECC Root CA -
 G3". Debian's answer, the same day, is `ca-certificates 20250419+deb13u1` in
 `trixie-security`, which stops trusting the two of those it carried
 (research on #636). It matters here because **Python's `urllib` trusts this store** —
-`_ssl` links Debian's OpenSSL 3.5.6, whose default paths lead to
+`_ssl` links Debian's OpenSSL (3.5.6 when this was written; 3.5.7 since #714), whose default paths lead to
 `/etc/ssl/certs/ca-certificates.crt` and the hashed folder `/usr/lib/ssl/certs`
 — and `urllib` is every Netlify publish and `deploy.py`'s own Cloudflare calls
 ([07](07-deployment.md)). OpenSSL checks no revocation, so a chain to a
@@ -665,7 +675,9 @@ the trust list the default context loads is the thing urllib actually uses.
 - bumping the base digest: not needed (deb13u1 is reachable from the live
   `trixie-security` the base already names), a full rebuild for every
   teacher, it moves Python's patch release, and the Swift image shares it;
-- `apt-get upgrade`: unbounded — the image would become that day's Debian;
+- `apt-get upgrade`: unbounded — the image would become that day's Debian
+  (#714 measured it, and took trixie-security's upgrades only:
+  [Debian's security updates](#debians-security-updates-714-v191));
 - snapshot.debian.org: a new, rate-limited dependency on a teacher's first
   build;
 - adding it to the main apt line: about 330 MB once for every teacher who
@@ -676,10 +688,11 @@ the trust list the default context loads is the thing urllib actually uses.
 - relying on NodeSource's script to keep installing it: third-party, and a
   cached layer never re-runs it.
 
-**Not in this piece:** the image has other Debian security updates waiting,
-among them OpenSSL itself (`libssl3t64` 3.5.6 → 3.5.7), which is the library
-`urllib` runs on — a follow-up issue decides between a digest bump and
-naming the package.
+**Since #714 (v1.9.1)** this is one of three floors in a layer that takes
+every security update Debian has published for the image, rather than a
+layer of its own. The paragraph that stood here promised a follow-up issue
+for OpenSSL; none was opened, and #714 is where it landed:
+[Debian's security updates](#debians-security-updates-714-v191).
 
 **On Windows (#652, #659).** There is no image: `deploy.py` runs on the
 bundled Python, whose `load_default_certs` reads the Windows store (Root and
@@ -709,6 +722,107 @@ Debian or Mozilla drop a root Microsoft keeps. To check a PC:
 D1EB23A46D17D68FD92564C2F1F1601764D8E349`, and the bundled Python's
 `ssl.create_default_context().get_ca_certs()`.
 
+### Debian's security updates (#714, v1.9.1)
+
+**Why.** The base is frozen at its digest, and the main apt line is cached on
+every Mac that has built before, so neither takes a fix Debian publishes
+later. #714 found the case that made it urgent: `libbrotli1` was still
+`1.1.0-2+b7`, while `trixie-security` carried `1.1.0-2+deb13u1`, the fix for
+CVE-2026-111497 ("Node2Shell", in CISA's KEV since 2026-10-27). `curl` links
+it (`libbrotlidec.so.1`). Node's own bundled Brotli is a separate copy, fixed
+in 22.23.4 (#640), so Debian's was the one unpatched decoder Plantoir
+shipped.
+
+**Measured 2026-10-31** in throwaway containers from
+`teaching-quartz:src-91f8833b` (Debian 13.6, arm64, Colima on an M4 Pro), by
+the plan and its review:
+
+- **#714 understated it.** `trixie-security` had newer versions of **15**
+  packages, not one. Among them is **`libssl3t64` 3.5.6-1~deb13u2 →
+  3.5.7-1~deb13u3** (about 14 CVEs by Debian's tracker). Python's `_ssl`
+  links it: `ssl.OPENSSL_VERSION` read 3.5.6 before the layer and 3.5.7
+  after, and that is the TLS under every Netlify publish and `deploy.py`'s
+  own Cloudflare calls. The others included `liblzma5`, `libpcre2-8-0` and
+  `util-linux`. #714's table said openssl matched; by the 31st it did not.
+- **The security-only layer:** 15 upgraded, **22.6 MB**, 7 s. `nodejs`
+  stayed `22.23.4-1nodesource1` (NodeSource's lines are labelled `nodistro`,
+  never `Debian-Security`, and Debian's own nodejs is 20.x), `libc6` was
+  untouched, and curl reports `OpenSSL/3.5.7`.
+- **A full `apt-get upgrade`** (with `apt-mark hold nodejs`): 25 upgraded,
+  **57.6 MB**, 9 s. The other ten come only from the 13.7 point release:
+  glibc `deb13u4` (2 CVEs), gzip (2), sqlite (2), tzdata, bash and
+  base-files. Without the hold it would move `nodejs` off its `=` pin the
+  day NodeSource ships 22.23.5, because `nodesource.sources` stays in the
+  image.
+- **An empty selector exits 0**, so the layer does not break on the day
+  `trixie-security` has nothing newer than the image.
+- **In the image verify.sh built from this recipe** (`quartz-teacher:dev-test`,
+  2026-10-31): the layer is **22.6 MB** (`docker history`), its floor check
+  reads `libbrotli1 1.1.0-2+deb13u1` and `libssl3t64 3.5.7-1~deb13u3`,
+  Python reports `OpenSSL 3.5.7 9 Jun 2026`, curl `OpenSSL/3.5.7 …
+  brotli/1.1.0`, and the whole image is 1.96 GB against the previous 1.89 GB
+  (wrangler's layer is 232 MB of that, 222 MB of it wrangler on disk).
+- **`-t trixie-security` would not limit an upgrade**: `apt-cache policy`
+  shows security as its own release (`n=trixie-security,l=Debian-Security`),
+  but the 13.7 packages stay at priority 500 against its 100.
+
+**The layer** (Dockerfile, after the tikz engine and before GeoGebra, whose
+curl runs on these libraries): `apt-get -s upgrade`, kept to the `Inst`
+lines whose candidate is labelled `Debian-Security`, then `--only-upgrade`
+of those AND of `libbrotli1 libssl3t64 openssl` by name; then
+`ca-certificates` as before (#639); then three `dpkg --compare-versions … ge`
+floors. **The floored packages are named because the selector can miss
+them** (the review's B2): it keeps a package only when its CANDIDATE is
+labelled Debian-Security, and `libssl3t64` 3.5.7 is in BOTH archives
+(`deb13u2` in 13.7, `deb13u3` in security). The day a point release ships a
+newer stable-only version, the Inst line would say `Debian:13.x/stable` only,
+the package would stay at the base's 3.5.6, and the floor would fail every
+uncached build — the failure #639's floor exists to avoid. Named, its
+candidate comes from whichever archive has it.
+
+**The pins.** `contracts/toolchain.json` → `pins` → `libbrotli1`
+(`1.1.0-2+deb13u1`) and `libssl3t64` (`3.5.7-1~deb13u3`), beside
+`caCertificates`. Each has a `dockerfileContains` of the form `<package>)" ge
+<value>`, so both apps' pin tests find the floor in the recipe with no code
+of their own, and a `debianPackage`, which `verify.sh` reads: for every pin
+that has one it runs `dpkg-query` and `dpkg --compare-versions … ge` in the
+fresh image, and a failure names the package, the version found and the
+floor. Neither has `windowsRuntimeContains`: Windows' Python and Node carry
+no separate libbrotli, and Windows' Python ships its own OpenSSL.
+
+**Rejected:**
+
+- **A full `apt-get upgrade`, with or without `nodejs` held** — 2.5 times the
+  bytes for six more fixes, and the image becomes that day's Debian. The 13.7
+  fixes arrive with the next base-digest bump instead.
+- **Exact pins** — Debian's security archive serves only its newest version,
+  so the build breaks the day the next one ships.
+- **A base-digest bump** — a full rebuild for every teacher, and it moves
+  Python's patch release; the security archive reaches the same fixes.
+- **The layer where wrangler used to be (straight after the apt line)** —
+  this piece busts the cache there anyway, because wrangler's old line left
+  (#699), so on a Mac that has built before the clone, Quartz's
+  `npm install` and the pagedjs, function-plot and Pyodide downloads re-run
+  once, and they run on the OLD libbrotli and libssl, since the security
+  layer comes after them. Putting the layer up there would have run them on
+  the new libraries for free THIS time, but every later floor raise would
+  then re-run everything below it (~330 MB) rather than seconds. Those
+  downloads are SHA-256-checked or tag-pinned, so running them on the old
+  libraries is a low risk; a new teacher's build has no libbrotli1 at all
+  before curl's apt line, and gets `deb13u1` there.
+- **Relying on `trixie-security` alone with no floors** — a cached layer
+  never re-runs, so a floor in the line's text is what makes a raise reach
+  every Mac.
+
+**The Swift image is left alone, and documented.** `support/swift/Dockerfile`
+is the same base, still has `libbrotli1 1.1.0-2+b7`, and takes none of this.
+It compiles with `--network none`, and every download its build makes is
+checked by SHA-256, so it decodes nothing anyone else chose; it moves with
+its next base bump.
+
+**Windows: nothing to do.** It has no image. Its Python and Node carry no
+separate libbrotli, and Node 22.23.4's bundled Brotli is the fixed one.
+
 ### Node 22 (#640, v1.9.0)
 
 The image moved from an unpinned `setup_20.x` to **Node 22.23.4, pinned
@@ -736,6 +850,8 @@ Node 20.18.1 and the pin is shared (Windows moved to 22.23.4 in #675, and
 wrangler 4.80.0 answers `--version` on it there too). The contract records wrangler's own
 engines as `nodeEngine` (`>=20.3.0`): verify.sh reads it out of the image's
 wrangler `package.json`, and the mac suite checks the `node` pin satisfies it.
+(That was #640. Since #699 wrangler is 4.156.0, `nodeEngine` is `>=22.0.0`
+and `mustStayBelow` is gone: "wrangler 4.156.0 (#699)" below.)
 
 **Measured, before (dev's recipe) and after, on an M4 Pro, Colima, arm64,
 in an isolated buildx builder:**
@@ -795,7 +911,56 @@ own prefix, not the word "DeprecationWarning", which a page could carry).
   break would print.
 - **Removing `mustStayBelow` now** — Windows' suite reads it, and the ceiling
   still held for Windows' Node 20 when #640 landed. Windows runs 22 since
-  #675; the removal belongs to the wrangler piece, on both platforms.
+  #675; the removal belonged to the wrangler piece, on both platforms, and
+  #699 made it.
+
+#### wrangler 4.156.0 (#699, v1.9.1)
+
+Both platforms run Node 22.23.4, so the ceiling had no reason left, and
+wrangler 4.80.0 carried the undici advisories the npm audit had accepted.
+The pin moved to **4.156.0**, the newest 4.x on 2026-10-31
+(`npm view wrangler dist-tags.latest`; published 2026-10-29), into a late
+layer of its own after GeoGebra. `mustStayBelow` is retired, and with it
+`testWranglerStaysBelowTheVersionWindowsNode20CannotRun` (mac) and
+`Wrangler_StaysBelowVersionThatNeedsNode22` (Windows). The `nodeEngine`
+check stays, now `>=22.0.0`. The pin carries `windowsRuntimeContains`
+(`$WranglerVersion = "4.156.0"`, fetch-runtime.ps1's own line), so the two
+platforms' wranglers cannot drift apart quietly again.
+
+**Measured** (the plan and its review, 2026-10-31, throwaway containers from
+`teaching-quartz:src-91f8833b` and `npm pack` in a scratch folder):
+
+- `wrangler-dist/cli.js` bundles **undici 7.30.1** (4.80.0 bundled 7.24.4).
+  An audit of its tree, made the way verify.sh makes it, finds **0
+  advisories**; 4.80.0's had 35, exactly the 35 accepted wrangler pairs, so
+  all four wrangler entries in `npmAudit.accepted` went stale and were
+  deleted.
+- `pages deploy`'s options are unchanged; new global flags are off by
+  default; `--version` is clean; the skills prompt returns early under `CI`.
+  The success line is still `Uploaded N files`, with `(M already uploaded)`
+  only when something was (#712's transcripts, below).
+- On disk wrangler goes from 194 MB to 222 MB.
+- **SIGINT:** 4.156.0's top-level `pages` handler that called
+  `process.exit()` is gone, but under Python's `Popen` against a stand-in API
+  that never answers, **4.80.0 and 4.156.0 both exit 0** in 0.01–0.02 s
+  (SIGINT at 2 s and at 6 s, SIG_DFL restored). Nothing a teacher sees
+  changes: [05](05-build-pipeline.md) → "The Cancel that arrives through
+  wrangler first".
+- **New since 4.108: Pages-to-Workers delegation.** When wrangler believes
+  an AI agent is driving it (`CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID`,
+  `GEMINI_CLI` and others in its environment, or an agent among its
+  ancestors), a deploy that would CREATE a new static project goes to
+  `*.workers.dev` instead. Our call is guarded three ways, and verify-deploy.sh
+  fails a leg that prints the delegation's notice:
+  [07](07-deployment.md) → "wrangler is never left a question to ask".
+
+**The before and after transcripts** of a first-ever upload are in
+`research/wrangler/2026-10-31-first-upload.md` (#712).
+
+**Rejected:** a version below 4.120, to keep a miniflare 5 pre-release out of
+the tree (`pages deploy` never starts miniflare, and the ruling was the
+newest 4.x on the day); a range instead of an exact pin; waiting for
+wrangler 5.
 
 **Windows** (#675, v1.9.0): the runtime (`windows-app/Vendor/fetch-runtime.ps1`)
 carries the same 22.23.4, and the `node` pin's `windowsRuntimeContains` holds
@@ -891,7 +1056,7 @@ Markdown it reads. The 15 xmldom advisories are in a package nothing runs:
 pixi.js's, for the Graph view build_site.py removes. A built site has no
 `pixi` or `xmldom` string. The undici advisories touch only a Cloudflare
 deploy, and are fixed in wrangler > 4.113.0, which waited on Windows' Node 22
-(landed in #675; the move itself is its own piece).
+(landed in #675; the move itself was #699, below).
 **Re-run 2026-10-28 on Windows' runtime** (`research/npm-audit/2026-10-28.md`,
 `windows-app\audit-runtime.ps1`, the same pins): 87 pairs, six new since the
 24th (five undici, one satori, published 2026-10-27), all accepted on
@@ -899,12 +1064,27 @@ evidence after reading wrangler's code. wrangler bundles undici 7.24.4 into
 its own `cli.js`, so the undici reasons are about wrangler's requests, not
 only miniflare's. The image's next online verify.sh run should see the same
 87.
+**Re-run 2026-10-31 for #699** (`research/npm-audit/2026-10-31.md`): the
+image on 4.80.0 saw **89**, not 87: two quartz moderates published since the
+28th, glob GHSA-3g3m-2fjr-6pw4 and minimatch GHSA-g3hv-75wg-m249, both
+accepted on their packages' existing entries after reading Quartz's one call
+of each. With wrangler at 4.156.0 its tree has **no advisory**, the 35
+wrangler pairs went stale and their four entries were deleted, and the gate
+reads 54 advisories, 54 accepted, 0 reported, 0 stale. **The mac audits the
+PIN's tree, not the installed one**: verify.sh builds wrangler's lockfile
+with `npm install --package-lock-only` from the pin's version (measured by
+the review: the copied 4.80.0 tree with spec `4.156.0` resolved 4.156.0 from
+the registry), so a recipe whose installed wrangler differs from the pin is
+caught by the Node block (`wrangler … does not run`, or its version), not by
+the audit. Windows audits its installed lockfile (`audit-runtime.ps1`).
 The audit takes about 22 s online. Offline it takes about 2.5 min (npm's
 retries), and only then. One more exposure fact, not this piece's to fix: the
 preview ports are published on every interface (`lsof` shows `TCP *:8133` and
 others held by Colima's forwarder), so the accepted ws and serve-handler
 denials of service are reachable from the school network while a preview
-runs.
+runs. *(Closed by GitHub #684 in v1.9.1: every address is published on
+127.0.0.1 now, so they are reachable from this Mac only —
+[03](03-launcher-scripts.md) → "Every preview address is this Mac's own".)*
 
 **Revisited at every cut** (RELEASING.md step 2). Read verify.sh's npm-audit
 line; a SKIP means it was not checked, so run it again online. Then run
@@ -914,8 +1094,9 @@ advisory. Either upgrade, in its own piece, or accept it with its reason.
 **REJECTED.**
 
 - **Upgrading now.** The ruling on #667 is no upgrades this release. Quartz's
-  tree moves with Quartz 5 (#512). wrangler moves in its own piece, which
-  waited for Windows to run Node 22 (its pin's `mustStayBelow`; #675 did).
+  tree moves with Quartz 5 (#512). wrangler moved in its own piece, #699,
+  which waited for Windows to run Node 22 (its pin's `mustStayBelow`; #675
+  did) and left wrangler with no accepted advisory.
 - **Auditing in the image build.** It would need the network on every build,
   and it would fail an unchanged recipe, and a teacher's first build, the day
   an advisory is published. verify.sh is the developer's gate, and that is
@@ -956,11 +1137,11 @@ measurement), on an M4 Pro with Colima at 6 CPUs / 12 GiB, 2026-09-26:
 | base `python:3.11-slim` | ~46 MB | a fresh VM only |
 | `pip install` (three pins) | 7.7 MB | |
 | `apt-get` (curl, git, lsof, dos2unix, emoji font, rsync, nodesource, nodejs) | 92.8 MB | `--no-install-recommends` would save 4.3 MB — rejected, below |
-| `npm install -g wrangler@4.80.0` | 65.1 MB | |
+| `npm install -g wrangler@4.80.0` | 65.1 MB | since #699 it is `wrangler@4.156.0`, in its own late layer after GeoGebra, not re-measured here |
 | `git clone` of Quartz | 42.0 MB → **2.3 MB** at depth 1 | |
 | Quartz's `npm install` | 128.0 MB | the largest |
 | GeoGebra (#578) | 33.5 MB | the zip (33,461,640 bytes); its own late layer, so a teacher who has built before downloads only this, once, at the first preview after updating; NOT in the total below |
-| certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded |
+| certificate store (#639, added 2026-10-23) | 10.4 MB | measured on its own, after #334, so NOT in the total below; mostly apt's lists, and an install that changes nothing for a no-cache build, which NodeSource's script already upgraded. Since #714 the same layer takes every trixie-security upgrade (15 packages, 22.6 MB, 2026-10-31) |
 | **Total** | **≈382 MB → ≈342 MB** | #334's stages only (≈352 MB with #639's layer); #312's VM counter read 389.8 MB in a fresh VM |
 
 **Since #640 (2026-10-23)** the apt line's text changed (`setup_22.x` and

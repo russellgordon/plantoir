@@ -2082,8 +2082,8 @@ final class AssistToolRunner {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
 
-        // Not when the change is the classes a teacher ticked to hide at
-        // Deploy (#475): the deploy builds the site itself, straight after.
+        // Not when the change is the classes a teacher unticked at
+        // Deploy (#475, #694): the deploy builds the site itself, straight after.
         var previewNote: String = ""
         if previewFollowsAChange {
             previewNote = await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber)
@@ -2204,7 +2204,7 @@ final class AssistToolRunner {
             )
         }
         if !obsidianOpening.isInstalled() {
-            return AssistToolOutcome.refused(AssistWording.obsidianIsNotOnThisMac)
+            return AssistToolOutcome.refused(AssistWording.obsidianIsNotOnThisMachine())
         }
         if sectionWindow(for: course, sectionNumber: located.sectionNumber) == nil {
             _ = await revealSectionOnScreen(course: course, sectionNumber: located.sectionNumber)
@@ -2216,7 +2216,7 @@ final class AssistToolRunner {
         }
         let press: OpenInObsidianPress = await window.openInObsidian()
         let said: String = AssistToolRunner.sentence(for: press, course: course.displayCode, section: section)
-        if press == .noWindow {
+        if press == .noWindow || press == .didNotOpen {
             return AssistToolOutcome.refused(said)
         }
         return AssistToolOutcome.answered(said, detail: said)
@@ -2243,6 +2243,8 @@ final class AssistToolRunner {
             return AssistWording.obsidianIsAlreadyOpening(course: course)
         case .noWindow:
             return AssistWording.openInObsidianFoundNoWindow(course: course, section: section)
+        case .didNotOpen:
+            return AssistWording.openInObsidianDidNotOpen(course: course, section: section)
         }
     }
 

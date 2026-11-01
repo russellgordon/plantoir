@@ -31,10 +31,20 @@ class CourseConfiguration {
         set { values["course_name"] = newValue }
     }
 
-    /// Where deploys go: "netlify" (the default), "cloudflare_pages", or
-    /// "local_folder" — a folder on this computer, for teachers who upload
-    /// to their own web host themselves (e.g. over SFTP). Course-level:
-    /// every section of the course deploys the same way.
+    /// Where deploys go: "cloudflare_pages", "netlify", or "local_folder" —
+    /// a folder on this computer, for teachers who upload to their own web
+    /// host themselves (e.g. over SFTP). Course-level: every section of the
+    /// course deploys the same way.
+    ///
+    /// A file with NO `deploy_target` reads as "netlify", and that is not
+    /// the new-course default (`PublishingDestinations.newCourseDefault`,
+    /// Cloudflare Pages since #668): every course written before the other
+    /// destinations existed has no key and deploys to Netlify, so reading an
+    /// absent key any other way would move a working class site to a host
+    /// the teacher has no account with. The new-course window writes the key
+    /// for every course it makes, so this fallback only reaches older files
+    /// and courses made with setup.sh — `publishingDestinations.whyTheyDiffer`
+    /// in contracts/app-rules.json.
     ///
     /// These spellings are shared with the Windows app, which reads and
     /// writes the same `course_config.json`, so they are not ours alone to
@@ -42,7 +52,7 @@ class CourseConfiguration {
     var deployTarget: String {
         get {
             let stored: String = stringValue(forKey: "deploy_target")
-            return stored.isEmpty ? "netlify" : stored
+            return stored.isEmpty ? PublishingDestinations.whenTheKeyIsAbsent : stored
         }
         set {
             values["deploy_target"] = newValue
@@ -80,11 +90,12 @@ class CourseConfiguration {
         var path: String
     }
 
-    /// The three destinations Plantoir knows how to publish to, in the
+    /// The three destinations Plantoir knows how to deploy to, in the
     /// order they are offered — shared by the primary picker and the
     /// additional-targets list, so "one of each type" has a single place
-    /// that defines what a "type" even is.
-    static let knownDeployTargetTypes: [String] = ["netlify", "cloudflare_pages", "local_folder"]
+    /// that defines what a "type" even is. Cloudflare Pages first since
+    /// #668, the recommended choice (`publishingDestinations.pickerOrder`).
+    static let knownDeployTargetTypes: [String] = ["cloudflare_pages", "netlify", "local_folder"]
 
     /// Extra places this course ALSO publishes to, beyond `deployTarget` —
     /// for redundancy against one host having a bad day, never a

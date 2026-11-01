@@ -94,6 +94,12 @@ nonisolated enum ActivityTrail {
         /// settings). Whether it is now set, cleared or not yet valid —
         /// NEVER the ID.
         case cloudflareAccountIDChangedInSettings = "Cloudflare account ID changed in Settings"
+        /// A deploy refused, before anything ran, because a Cloudflare
+        /// destination has no usable Account ID in Settings (#668): the first
+        /// thing every new course meets at its first deploy now that
+        /// Cloudflare Pages is the new-course default. Carries whether the
+        /// ID is missing or not a whole ID — never the ID.
+        case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
         case assistantOpened = "assistant opened"
         /// A Claude or Codex session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
@@ -181,6 +187,18 @@ nonisolated enum ActivityTrail {
         /// believed. Not `assistant could not answer` either: that is for an
         /// engine that FAILED, and here the engine answered perfectly badly.
         case assistantRepeatedTheRequestBack = "assistant repeated the request back"
+        /// One teacher action asked the model as many times as one may
+        /// (#689), so the turn was stopped, nothing more was run, and the
+        /// turn was taken back out of the conversation.
+        ///
+        /// Carries this window's course and section, how many times the
+        /// model was asked, and the tool it last chose, in words — "it kept
+        /// listing pages" and "it kept reading a page" are different reports
+        /// about the model. Never the sentence (`assistant asked` has it) and
+        /// never argument values. Its own event rather than `assistant answer
+        /// was cut off`, whose name would be false: every answer here
+        /// finished, and was simply never the last.
+        case assistantWentRoundWithoutFinishing = "assistant went round without finishing"
         /// The model named a tool that exists but was not among those it was
         /// OFFERED in this window, so the turn was refused and nothing ran
         /// (#327).
@@ -261,6 +279,20 @@ nonisolated enum ActivityTrail {
         /// (`ScheduledDeploy.recordFolderProblems`, #153) — dated to the run,
         /// not to whenever somebody next opens the section.
         case folderProblemFound = "folder problem found"
+        /// A section's record of its problems changed — counts and kinds,
+        /// never a page — once per record's alert key, when the app first
+        /// reads it; and, as a second line of the same event, the answer the
+        /// teacher gave the alert about it (#717, `SectionProblems`).
+        case problemsChanged = "problems changed"
+        /// Fix with Claude… or Fix with Codex… on a section's Problems tab
+        /// opened its door with the ticked problems in the opening message
+        /// (#717, part two, `FixWithAssistant`): which assistant, how many
+        /// problems went and of what kinds, how many the message named, and
+        /// how many were left out (unticked, or fixed in the source) — never
+        /// a page. Written once the door has opened, beside the door's own
+        /// "assistant opened" line, so a report of "it fixed the wrong thing"
+        /// can tell what it was asked to fix.
+        case askedAnAssistantToFixProblems = "asked an assistant to fix problems"
         /// A folder a feature depends on was put back, at the teacher's
         /// request — or, since #584, something the build put right in the
         /// teacher's own files by itself (`BuildRepairReport`: a front page's
@@ -295,7 +327,10 @@ nonisolated enum ActivityTrail {
         /// rewritten, so a build whose dates were already right adds nothing.
         /// Recorded because this is a change to the teacher's files nobody
         /// asked for in so many words, and "why did this page's date change?"
-        /// is asked long after the console that said so has gone.
+        /// is asked long after the console that said so has gone. When the
+        /// build shortened its line (`machineLineLength`, #666, #704) the
+        /// names are the first ones only, possibly none, and the number is
+        /// the line's own `count`, the true total.
         case pagesDatedByTheBuild = "pages dated by the build"
 
         /// The curriculum coverage maps a build wrote (#128): one per
@@ -303,8 +338,11 @@ nonisolated enum ActivityTrail {
         /// folder it came from and how many expectations it shows — or that it
         /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
         /// (`CoverageMapsBuilt`), printed on every build whose section wants
-        /// the map, so "my second map is missing" has an answer. Course
-        /// structure only, never anything written on a page.
+        /// the map, so "my second map is missing" has an answer. A shortened
+        /// line (`machineLineLength`, #666, #704) describes only its first
+        /// maps, possibly none, and the number is its `count`: an empty list
+        /// WITH a count is maps made, not none. Course structure only, never
+        /// anything written on a page.
         case coverageMapsBuilt = "curriculum maps built"
 
         /// What a build did about the My Progress page (#545): that it made
@@ -986,6 +1024,19 @@ nonisolated enum ActivityTrail {
         /// Mac only, permanently: Windows serves a preview on the PC itself,
         /// with no forward to lose.
         case previewAddressHeldByAnotherAccount = "preview address held by another account"
+        /// This working folder's workspace WAS made again (GitHub #684): where
+        /// the run was for, and why — one of the reasons the launchers' own
+        /// checks name (an update, previews open to the network, a missing
+        /// mount, the courses not saving, the addresses taken…), in the
+        /// contract's `whyWords`. A remake makes the next preview about two
+        /// minutes slower, and until #684 only a WAIT before one reached the
+        /// trail, so the commonest of all — after an update — left nothing.
+        ///
+        /// Written by the app, from the line every launcher prints once the
+        /// new workspace exists (`FolderSetUpAgainReport`), which
+        /// `ScriptRunner` reads from a run's console and `ScheduledDeploy` from
+        /// a publish's log. Mac only, permanently: Windows has no workspace.
+        case folderSetUpAgain = "folder set up again"
         /// Plantoir installed one or more of the website builder's helper
         /// programs into its tools folder (GitHub #312): which ones, at which
         /// pinned versions, whether from inside Plantoir or downloaded, why
@@ -1063,7 +1114,9 @@ nonisolated enum ActivityTrail {
         case howITeachPageWritten = "How I Teach page written"
         /// A build dropped a How I Teach page the course's settings had
         /// LISTED for the website (#209) — one earlier builds published.
-        /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
+        /// Read from the build's `PLANTOIR_KEPT_OFF:` line; a shortened one
+        /// (`machineLineLength`, #666, #704) names only its first pages,
+        /// possibly none, and the number is its `count`.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
         /// Course Settings made an EMPTY How I Teach page (#329) — or could
         /// not, and why: carries the course. A page the teacher did not
@@ -1204,9 +1257,10 @@ nonisolated enum ActivityTrail {
         /// had a chat for it to be "before".
         case sectionMenuBackedUpACourse = "section menu backed up a course"
         /// The teacher was asked about classes dated after the next class
-        /// (#475) — at Deploy, the in-app assistant's deploy, or Section ▸
-        /// Publish Pages… — and answered: how many were flagged, hidden (or
-        /// left hidden), kept published, or Cancel. Counts and places only.
+        /// (#475) — at Deploy or the in-app assistant's deploy, never at
+        /// Section ▸ Publish Pages… (#694) — and answered: how many were
+        /// flagged, unticked and hidden, kept published, or Cancel. Counts
+        /// and places only.
         /// "Why did my class disappear from the site?" is answered here.
         case laterClassesAsked = "asked about classes dated after the next class"
         /// A deploy went out with classes dated after the next class and
@@ -1328,6 +1382,35 @@ nonisolated enum ActivityTrail {
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
         ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+    }
+
+    /// The words for `deployRefusedForTheAccountID` (#668), or nil when the
+    /// deploy is not refused for the Account ID — refused for a folder
+    /// first, or not refused at all. Walks the destinations in the order
+    /// `MultiDestinationDeployRunner.refusalReason` does, so the line names
+    /// the refusal the teacher was shown.
+    @MainActor
+    static func deployRefusedForTheAccountIDLine(
+        destinations: [CourseConfiguration.DeployDestination],
+        cloudflareAccountID: String
+    ) -> String? {
+        for destination in destinations {
+            if destination.type == "local_folder" {
+                if CourseConfiguration.deployFolderProblem(forPath: destination.path) != nil {
+                    return nil
+                }
+            }
+            if destination.type == "cloudflare_pages" {
+                if CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) == nil {
+                    return nil
+                }
+                if PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
+                    return "deploy refused: no Cloudflare Account ID is saved in Settings"
+                }
+                return "deploy refused: the Cloudflare Account ID in Settings is not a whole ID"
+            }
+        }
+        return nil
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and

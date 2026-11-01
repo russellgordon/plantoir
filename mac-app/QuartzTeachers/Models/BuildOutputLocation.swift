@@ -382,9 +382,15 @@ nonisolated enum BuildOutputLocation {
     /// that does not exist is genuinely gone, while a path on `/Volumes` might
     /// be back tomorrow. Builds for those simply accumulate, which is the
     /// cheaper mistake.
+    ///
+    /// The folder's toolchain index goes with it (#683), found by the builds
+    /// folder's own NAME — the same eight characters — in the index folder
+    /// under `homeDirectory`, so a test that passes its own home never
+    /// reaches the real one.
     static func discardBuildsForMissingWorkingFolders(
         homeDirectory: URL = RealHome.forFiles
     ) {
+        let indexFolder: URL = ToolchainFingerprints.indexFolder(inHomeFolder: homeDirectory)
         let fileManager: FileManager = FileManager.default
         guard let entries = try? fileManager.contentsOfDirectory(
             at: buildsRoot, includingPropertiesForKeys: [.isDirectoryKey], options: []
@@ -407,6 +413,7 @@ nonisolated enum BuildOutputLocation {
                 continue
             }
             try? fileManager.removeItem(at: entry)
+            ToolchainFingerprints.removeIndex(named: entry.lastPathComponent, in: indexFolder)
         }
     }
 

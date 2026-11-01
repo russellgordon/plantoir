@@ -349,17 +349,17 @@ final class SectionVerbsFixesTests: XCTestCase {
 
     // MARK: - Tests
 
-    /// Finding 1: Keep All records every listed class as kept, so the next
-    /// question about the same section asks nothing.
-    func testKeepAllAsksOnce() async throws {
+    /// #694, Russell's ruling 1: a ticked box always means INCLUDED. Every
+    /// class starts ticked, the default button is Deploy Ticked, and Return
+    /// keeps every one at its date — so the next question about the same
+    /// section asks nothing (what Keep All did until #694). MUST FAIL on the
+    /// old polarity, where every class started ticked to HIDE.
+    func testEveryClassStartsTickedAndReturnDeploysThemAll() async throws {
         let made = try AssistFixture.makeRunner(surface: .menu)
         defer {
             try? FileManager.default.removeItem(at: made.root)
         }
-        try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
-        try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
-        try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
-        try AssistFixture.write(page: "Unit 2, Day 6", publish: "true", date: "2026-09-14", body: "Later still.", in: made.course)
+        try SectionVerbsFixesTests.writeTwoClassesDatedLater(in: made.course)
         let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
         let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today)
         XCTAssertEqual(flagged.count, 2)
@@ -367,23 +367,60 @@ final class SectionVerbsFixesTests: XCTestCase {
             kind: .laterClassesAtDeploy, course: made.course, sectionNumber: 1, title: "", item: nil
         )
         model.ask(about: flagged, nextDay: CalendarDay(year: 2026, month: 9, day: 9))
-        XCTAssertEqual(model.laterHidden.count, 2, "every class starts ticked to hide")
-        XCTAssertEqual(model.defaultButtonTitle, AssistWording.hideTickedAndDeployButton)
-        // What Keep All and Deploy does to the model, then records.
-        model.laterTicked = []
+        XCTAssertEqual(model.laterHidden, [], "Return hides nothing: every class starts ticked to go out")
+        XCTAssertEqual(model.laterKept.count, 2, "every class is kept, and deployed")
+        XCTAssertEqual(model.defaultButtonTitle, AssistWording.deployTickedButton)
+        // What Return records (answerAtDeploy keeps `laterKept`).
         ClassesDatedLater.keep(model.laterKept, forSection: 1, in: made.course)
-        XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today), [], "asked again after Keep All")
-
-        // The window's Keep All runs the same answer with nothing ticked.
-        let verbs: String = try DeployAsksAboutLaterClassesTests.body(
-            of: "    func keepAllAtDeploy(", in: try DeployAsksAboutLaterClassesTests.source(
-                "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
-            )
+        XCTAssertEqual(
+            ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today), [],
+            "asked again after Return kept them all"
         )
-        XCTAssertTrue(verbs.contains("model.laterTicked = []"))
-        XCTAssertTrue(verbs.contains("answerAtDeploy(model)"))
-        let sheet: String = try DeployAsksAboutLaterClassesTests.source("mac-app/QuartzTeachers/Views/Section/SectionVerbSheet.swift")
-        XCTAssertTrue(sheet.contains("Button(AssistWording.keepAllAndDeployButton)"), "Keep All is always beside the default")
+    }
+
+    /// #694, Russell's ruling 2: the class the teacher UNticks is the one
+    /// hidden (through `unpublish_pages`, in `answerAtDeploy`), and the
+    /// ticked one is kept. MUST FAIL on the old polarity.
+    func testAnUntickedClassIsHiddenAndTheTickedOnesKept() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try SectionVerbsFixesTests.writeTwoClassesDatedLater(in: made.course)
+        let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
+        let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today)
+        XCTAssertEqual(flagged.count, 2)
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .laterClassesAtDeploy, course: made.course, sectionNumber: 1, title: "", item: nil
+        )
+        model.ask(about: flagged, nextDay: CalendarDay(year: 2026, month: 9, day: 9))
+        let unticked: ClassesDatedLater.Flagged = flagged[0]
+        model.laterBinding(for: unticked).wrappedValue = false
+        var hiddenPlaces: [String] = []
+        for page in model.laterHidden {
+            hiddenPlaces.append(page.place)
+        }
+        var keptPlaces: [String] = []
+        for page in model.laterKept {
+            keptPlaces.append(page.place)
+        }
+        XCTAssertEqual(hiddenPlaces, [unticked.place], "the unticked class is the one hidden")
+        XCTAssertEqual(keptPlaces, [flagged[1].place], "the ticked class is the one kept and deployed")
+        XCTAssertEqual(model.defaultButtonTitle, AssistWording.deployTickedButton, "a fixed label, whatever is ticked")
+    }
+
+    /// #694: no second button. Keep All and Deploy would only repeat Return
+    /// now that every class starts ticked, so the sheet has Cancel and the
+    /// default alone. MUST FAIL with Keep All's closure or function back.
+    func testThereIsNoSecondButton() throws {
+        let sheet: String = try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionVerbSheet.swift"
+        )
+        XCTAssertFalse(sheet.contains("keepAll"), "the sheet carries no Keep All")
+        let verbs: String = try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
+        )
+        XCTAssertFalse(verbs.contains("func keepAllAtDeploy("), "the window has no Keep All answer")
     }
 
     /// Finding 2: a class published from the links checklist is kept at its
@@ -484,6 +521,17 @@ final class SectionVerbsFixesTests: XCTestCase {
         XCTAssertTrue(MenuVoiceTests.speaksAsAConversation(
             AssistWording.pagesAChangeCouldNotFinish("“Unit 1, Day 3”", count: 1)
         ))
+    }
+
+    // MARK: - Helpers
+
+    /// Today, the next class day, and two classes after it (the 11th and the
+    /// 14th) that are flagged.
+    static func writeTwoClassesDatedLater(in course: Course) throws {
+        try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: course)
+        try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: course)
+        try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: course)
+        try AssistFixture.write(page: "Unit 2, Day 6", publish: "true", date: "2026-09-14", body: "Later still.", in: course)
     }
 }
 

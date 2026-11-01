@@ -936,7 +936,8 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 #     --logout) or prints its help; --diagnose DOES deploy. Only one working
 #     in THIS folder counts: its working directory is asked of lsof, and one
 #     that cannot be asked counts (a deploy of this very section is proved;
-#     only its folder is not).
+#     only its folder is not) - unless `ps -p` finds it has ended since the
+#     table was read (#737).
 #   - a scheduled deploy of C/S: any process whose arguments name its script,
 #     `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
 #     (ScheduledDeploy.agentLabel; <CODE> as ScheduledDeploy.sanitizedCode
@@ -982,6 +983,15 @@ a_deploy_is_running_for() {
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        # Nothing from lsof, and the process has ENDED since the table was
+        # read: skipped (#737). A deploy.sh that exits between the two looks,
+        # in any folder, used to count. One still running whose folder lsof
+        # cannot answer for still counts, as #381 decided. `ps -p`, never
+        # `kill -0`, which also fails for another account's process that is
+        # running, and which this guard must still count.
+        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
+          continue
+        fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           return 0
         fi ;;
@@ -1045,7 +1055,9 @@ fi
 #     its leases as well, and its script is in the table.
 #   - "another": `deploy.sh C S` as the program, working in THIS folder (its
 #     working directory, asked of lsof; one that cannot be asked counts, as in
-#     #381), and not only clearing a token or printing its help.
+#     #381, while `ps -p` still finds it running - one that has ended since
+#     the table was read does not, #737), and not only clearing a token or
+#     printing its help.
 # This run, its ancestors and its descendants never count (the reader's
 # family rule), so a scheduled run's own legs are never refused by its own
 # wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
@@ -1081,6 +1093,15 @@ what_is_deploying_this_section() {
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        # Nothing from lsof, and the process has ENDED since the table was
+        # read: skipped (#737). A deploy.sh that exits between the two looks,
+        # in any folder, used to count. One still running whose folder lsof
+        # cannot answer for still counts, as #381 decided. `ps -p`, never
+        # `kill -0`, which also fails for another account's process that is
+        # running, and which this guard must still count.
+        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
+          continue
+        fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           seen="another"
         fi ;;
@@ -2363,6 +2384,15 @@ say_there_is_no_room_for_previews() {
 # of a refused attempt is removed with a plain `docker rm` — never -f: it was
 # never started, and -f is what would kill a workspace another launcher made
 # under this name a moment ago, mid-publish (#94's shape).
+#
+# Every address is published on 127.0.0.1, this Mac's own, and on nothing
+# else (GitHub #684): without the prefix Docker publishes on every
+# interface, and under Colima its forward listened on `*:<port>`, so anyone
+# on the school's network could open a running preview and its live-reload
+# connection. The app opens localhost and Safari 127.0.0.1, so nothing a
+# teacher uses changes. contracts/app-rules.json -> previewPorts.bindsTo
+# says what was measured and what was rejected (opening it for an iPad
+# needs a setting and a trail line, not a default).
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
   local next output running named_already=false
@@ -2377,8 +2407,8 @@ create_the_workspace_on_free_ports() {
         --name "$CONTAINER_NAME" \
         --mount "$(bind_mount_argument "$HOST_COURSES" /teaching/courses)" \
         --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
-        -p "${base}-$((base + 3)):8081-8084" \
-        -p "$((base + 1000))-$((base + 1003)):9081-9084" \
+        -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
+        -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
         "$IMAGE" \
         tail -f /dev/null 2>&1)"; then
       return 0
@@ -2450,6 +2480,7 @@ start_the_existing_workspace() {
       # is never printed for a rebuild that did not happen (a refused
       # remove, or another launcher's workspace used as it is).
       tell_the_app_the_address_was_held before-start "$taken"
+      note_that_this_folder_was_set_up_again addressTaken
       return 0
     fi
     # Refused: another launcher got here first and it is running again. Use it.
@@ -2471,6 +2502,7 @@ start_the_existing_workspace() {
   say_this_folder_is_set_up_again_on_free_addresses
   if docker rm "$CONTAINER_NAME" >/dev/null 2>&1; then
     run_container_with_mount
+    note_that_this_folder_was_set_up_again addressTaken
     return 0
   fi
   # Refused: another launcher got here first and it is running again. Use it.
@@ -3108,9 +3140,44 @@ tell_the_app_the_workspace_was_in_use() {
   echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${place// /+}${3:+ $3}"
 }
 
+# The line the app reads onto the activity trail when this folder's workspace
+# HAS been made again (GitHub #684, rule 5): contracts/shared-rules.json ->
+# activityTrail.mustRecord."folder set up again" -> marker. Printed after the
+# new workspace exists, so a remake #94 refused (it exits inside
+# remake_the_workspace with its own line) never claims one. A remake costs
+# the next preview about two minutes, and "why was the first preview after
+# the update so slow?" is asked days later; until #684 only a WAIT before a
+# remake reached the trail, and an ordinary one left nothing. The reason is
+# one word, a key of the contract's whyWords; the app holds the words, and a
+# word it does not know writes the line without a reason rather than a wrong
+# one. Machinery, so the console a teacher reads leaves it out; the line the
+# caller printed before the remake already said why in words.
+# "<reason> <where this run was for>".
+note_that_this_folder_was_set_up_again() {
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_FOLDER_SET_UP_AGAIN: ${1:-unknown} ${place// /+}"
+}
+
+# Whether every address this folder's workspace publishes is on 127.0.0.1,
+# this Mac's own (GitHub #684). Published addresses cannot be changed after
+# a workspace is made, so one made before #684 — every address open to the
+# network — is made again, once, through remake_the_workspace. Each binding
+# is read in brackets: a workspace made before #684 has an EMPTY host
+# address, and a check that every listed word is 127.0.0.1 would pass it by
+# finding no words at all. Nothing read (no workspace, no answer) counts as
+# not yet, the same way the 9084 check before it reads a missing answer.
+every_published_address_is_this_macs_only() {
+  local bindings
+  bindings="$(docker inspect -f '{{range $p, $b := .HostConfig.PortBindings}}{{range $b}}[{{.HostIp}}]{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)" || return 1
+  [ -n "$bindings" ] || return 1
+  [ -z "${bindings//\[127.0.0.1\]/}" ]
+}
+
 # Removes this folder's workspace and makes it again, once nothing whose
 # owner is running is at work in it. Every remake goes through here: the
-# launchers' own checks say WHY in one line, then call this.
+# launchers' own checks say WHY in one line, then call this with the reason
+# as one word (a key of the contract's "folder set up again".whyWords), which
+# the app records once the new workspace exists (GitHub #684).
 #
 # The workspace is stopped and removed by its ID, never by name and never
 # with -f. Two launchers started together after an update can both find the
@@ -3129,10 +3196,11 @@ tell_the_app_the_workspace_was_in_use() {
 # look-then-stop window of tens of milliseconds — is ended unnamed, which is
 # #94's own known limit (contracts: whatCountsAsRunning.knownLimits).
 remake_the_workspace() {
-  local id waited=0 said="" waited_for=""
+  local because="${1:-}" id waited=0 said="" waited_for=""
   id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME" 2>/dev/null)" || id=""
   if [ -z "$id" ]; then
     run_container_with_mount
+    note_that_this_folder_was_set_up_again "$because"
     return 0
   fi
   while true; do
@@ -3185,6 +3253,7 @@ remake_the_workspace() {
     fi
   fi
   run_container_with_mount
+  note_that_this_folder_was_set_up_again "$because"
 }
 
 # The one shared workspace from before working folders each had their own.
@@ -3270,27 +3339,34 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
     echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
-    remake_the_workspace
+    remake_the_workspace coursesNotFound
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
     echo "🔀 This folder's website builder was set up for a folder somewhere else:"
     echo "   • Set up for:  $CURRENT_MOUNT_SRC"
     echo "   • This folder: $HOST_COURSES"
     echo "♻️  Setting it up again for this folder…"
-    remake_the_workspace
+    remake_the_workspace otherFolder
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
     # mount this container was made without. A mount cannot be added to a
     # container that already exists.
     echo "♻️  Setting this folder up again so built websites can be kept outside your course folder…"
-    remake_the_workspace
+    remake_the_workspace buildsOutside
   elif [[ -n "$DESIRED_IMAGE_ID" && -n "$RUNNING_IMAGE_ID" && "$RUNNING_IMAGE_ID" != "$DESIRED_IMAGE_ID" ]]; then
     echo "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…"
-    remake_the_workspace
+    remake_the_workspace update
   elif ! docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>/dev/null | grep -q '9084/tcp'; then
     # An older container publishes only 8081, and published ports cannot
     # be changed after creation — recreating is the only way to add them.
     echo "♻️  Setting this folder up again so several previews can run at once…"
-    remake_the_workspace
+    remake_the_workspace severalPreviews
+  elif ! every_published_address_is_this_macs_only; then
+    # A workspace made before GitHub #684 publishes its addresses to the
+    # whole network; they cannot be changed after it was made. In v1.9.1
+    # the update's own remake above reaches every folder first, so this is
+    # the safety net for a workspace the image check passed.
+    echo "♻️  Setting this folder up again so its previews can only be opened on this Mac…"
+    remake_the_workspace thisMacOnly
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
@@ -3531,7 +3607,7 @@ announce_the_preview_address() {
     fi
     say_this_folder_is_set_up_again_on_free_addresses
     held_port="$host_port"
-    remake_the_workspace
+    remake_the_workspace addressTaken
     # After the remake RETURNS, so a remake #94 refused (it exits inside,
     # with its own line for the trail) never leaves a claim of a rebuild.
     tell_the_app_the_address_was_held remade "$held_port"

@@ -19,6 +19,7 @@
 \usepackage{array}
 \usepackage{needspace}
 \usepackage[most]{tcolorbox}
+\usepackage{nicematrix}   % tables: every rule drawn after the heading's shade (the skill's section 9)
 \pgfplotsset{compat=1.18}
 
 % ---------- Fill in ----------
@@ -32,6 +33,13 @@
 \newcommand{\qa}[2]{\ifanswers #2\else #1\fi}
 \newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
+
+% A blank students write on, in a question (the skill's section 4): an
+% invisible strut makes its line about two lines tall, so a wrapped prompt
+% still leaves a full line of writing room above the blank. \fillin{answer}
+% or \fillin[5cm]{answer}: the student copy shows the blank, the answer key
+% writes the answer on the same line, at the same height.
+\newcommand{\fillin}[2][3.2cm]{\ \qa{\rule[-0.2em]{#1}{0.4pt}}{\makebox[#1]{#2}\llap{\rule[-0.2em]{#1}{0.4pt}}}\rule[-0.2em]{0pt}{2.1em}}
 
 \ifanswers
   \newcommand{\doctitle}{\handouttitle\ --- Answers}
@@ -58,6 +66,26 @@
 \definecolor{peach}{RGB}{253,244,233}
 \definecolor{peachframe}{RGB}{226,160,96}
 \definecolor{exampletitle}{RGB}{176,38,30}
+\definecolor{tablehead}{RGB}{225,232,245}   % a table's heading row
+% One heading-row height for tables set side by side (the skill's section 9)
+\newcommand{\headstrut}{\rule[-1.1em]{0pt}{2.6em}}
+% Tables (the skill's section 9). Every value sits in a row \valuepitch tall,
+% centred in it, so the first value is half a row below the heading rule and
+% the last half a row above the bottom rule. The value columns of a table are
+% one width (\setvaluecol{the widest value in either column} sets \valuecol
+% to it plus 0.5cm). C is a centred value column; N{$18$} is for a column
+% holding a negative or whole numbers beside decimals: each value right-
+% aligned in a box as wide as the column's widest value WITHOUT its sign,
+% the box centred - \makebox[\widthof{$18$}][r]{$-6$} in every cell - so the
+% digits share one trailing edge and a minus sign juts out to the left.
+% \renewcommand{\valuepitch}{3em} for a table with room to write.
+\renewcommand{\arraystretch}{1.1}
+\newcommand{\valuepitch}{1.5em}
+\newcommand{\rowstrut}[1]{\rule[\dimexpr0.32em-0.5\dimexpr#1\relax\relax]{0pt}{#1}}
+\newlength{\valuecol}
+\newcommand{\setvaluecol}[1]{\settowidth{\valuecol}{#1}\addtolength{\valuecol}{0.5cm}}
+\newcolumntype{C}{>{\rowstrut{\valuepitch}}w{c}{\valuecol}}
+\newcolumntype{N}[1]{>{\rowstrut{\valuepitch}\settowidth{\dimen0}{#1}\hbox to\dimen0\bgroup\hss}w{c}{\valuecol}<{\egroup}}
 
 % Section heading for the answer key, where the worked examples are hidden
 \newcommand{\strand}[1]{\bigskip{\large\bfseries\sffamily #1}\par\smallskip}
@@ -133,13 +161,45 @@ Evaluate $3x + 2$ when $x = 4$.
 \end{tasks}
 
 \q[12]{2} \qa{Graph the line $y = 2x - 1$.}{$y = 2x - 1$:}
-\onlya{%
+% The answer key keeps the question's layout: ONE grid, the same axis ranges,
+% scale and size in both copies, and only what is plotted on it is switched.
+% y = 2x - 1 has no context, so the line runs past its plotted points to the
+% edge of the grid (it leaves through y = -6 at x = -2.5 and y = 6 at x = 3.5)
+% with an arrowhead at each end. A graph that models a situation stops at the
+% end points the situation gives it, with no arrowheads.
 \begin{center}
 \begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
     xmin=-5, xmax=5, ymin=-6, ymax=6, xtick={-4,-2,...,4}, ytick={-6,-4,...,6}]
-  \addplot[lineA, domain=-2.4:3.4]{2*x - 1};
+  \onlya{%
+  \addplot[lineA, <->, >=latex, domain=-2.5:3.5]{2*x - 1};
+  \addplot[only marks, mark=*, mark size=1.5pt] coordinates {(0,-1) (1,1) (2,3)};}
 \end{axis}\end{tikzpicture}
-\end{center}}
+\end{center}
+
+\q[9]{3} \onlyq{Complete the table of values for $y = x - 3$.}\onlya{$y = x - 3$:}
+
+% A table: full border, a shaded heading row, each column set by its own
+% values - x has no negative value, so it is a centred C column; y has
+% negatives, so it is N{$3$}: right-aligned in a box as wide as its widest
+% value without the sign, the box centred, its heading centred over it. The
+% x and y columns are ONE width; here 1.6cm, so students have room to write
+% in y (a table students do not write in takes \setvaluecol{widest value}).
+% It is written once: the key switches only the cells (\qa{}{...}), so it is
+% vertical in both copies, with the same alignment and row height.
+\begin{center}
+{\setlength{\valuecol}{1.6cm}%
+\begin{NiceTabular}{CN{$3$}}[hvlines]
+\CodeBefore \rowcolor{tablehead}{1} \Body
+$x$ & \multicolumn{1}{c}{$y$} \\
+$0$ & \qa{}{$-3$} \\
+$1$ & \qa{}{$-2$} \\
+$2$ & \qa{}{$-1$} \\
+$3$ & \qa{}{$0$} \\
+\end{NiceTabular}}
+\end{center}
+
+\q{4} The line $y = 2x - 1$ crosses the $y$-axis at the point where $x = 0$,
+so its $y$-intercept is \fillin[2cm]{$-1$}, and its slope is \fillin[2cm]{$2$}.
 \end{questions}
 
 \end{document}

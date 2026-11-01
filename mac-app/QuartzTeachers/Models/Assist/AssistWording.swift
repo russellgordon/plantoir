@@ -566,11 +566,19 @@ nonisolated enum AssistWording {
         return "Obsidian is already opening \(course). It will be on screen in a moment."
     }
 
-    /// Nothing on this Mac opens Obsidian's links; the button is greyed out
-    /// for the same reason.
-    static let obsidianIsNotOnThisMac: String =
-        "Obsidian is not on this Mac, so there is nothing to open the page in. Install it from "
-        + "obsidian.md, then ask again."
+    /// Nothing on this computer opens Obsidian's links; the button is greyed
+    /// out for the same reason.
+    ///
+    /// Names the computer through `MachineWord` (#698), as every sentence
+    /// both apps say does: the contract writes it once with the placeholder
+    /// and each app puts in its own word, so Windows says "this PC" from the
+    /// same key rather than from a Windows-only copy of the sentence. Renamed
+    /// from `obsidianIsNotOnThisMac` with it, because a key that says Mac
+    /// for a sentence Windows says too is the drift the placeholder removes.
+    static func obsidianIsNotOnThisMachine(machine: String = MachineWord.onThisPlatform) -> String {
+        return "Obsidian is not on this \(machine), so there is nothing to open the page in. Install it "
+             + "from obsidian.md, then ask again."
+    }
 
     /// An assistant working from another app has no window to read the page
     /// on screen from, or to ask the add-ons question in.
@@ -583,6 +591,20 @@ nonisolated enum AssistWording {
     static func openInObsidianFoundNoWindow(course: String, section: String) -> String {
         return "Open \(course) Section \(section) in Plantoir, then ask again. No window is showing "
              + "it, so nothing was opened in Obsidian."
+    }
+
+    /// The press went ahead but Obsidian was never handed anything (#698):
+    /// the add-ons scan, the add-ons pass or the open itself failed. Says
+    /// plainly that nothing opened, and where to try again — the window's
+    /// own button, which is what the assistant pressed.
+    ///
+    /// Windows answered this with `openInObsidianIsInTheSectionWindow`
+    /// until it had a sentence of its own: every clause of that one is true,
+    /// but it is written for an assistant in ANOTHER app, and reads oddly
+    /// from the window's own.
+    static func openInObsidianDidNotOpen(course: String, section: String) -> String {
+        return "Something went wrong before Obsidian could open \(course) Section \(section), so "
+             + "nothing was opened. Press Open in Obsidian in that section's window to try again."
     }
 
     // MARK: - Taking something back
@@ -1594,6 +1616,21 @@ nonisolated enum AssistWording {
         "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
         + "a shorter sentence, or fewer pages at a time."
 
+    /// One teacher action asked the model as many times as one may (#689),
+    /// so the turn was stopped and taken back out of the conversation.
+    ///
+    /// Windows' sentence as it had shipped there since its agent was written,
+    /// with the fact genuinely in doubt added in `answerWasCutOff`'s order:
+    /// **say it did not finish**, **say nothing was changed** — a teacher who
+    /// asked to publish needs to know it did not happen, and it is true on
+    /// every path that reaches the cap (`AssistAgent.sayItWentRoundWithoutFinishing`
+    /// says why) — and **give them something to do**. Names no number and no
+    /// limit: a teacher cannot act on a limit they cannot see, and naming it
+    /// is the machinery rule 1 keeps out of the interface.
+    static let wentRoundWithoutFinishing: String =
+        "I've gone round several times without finishing, so nothing was changed. Tell me what "
+        + "you'd like me to do next."
+
     /// A tool was asked for with no course at all — which reaches the runner
     /// only from outside the app, over MCP, where nothing binds a window's own
     /// course onto the call (issue #198).
@@ -2276,31 +2313,32 @@ nonisolated enum AssistWording {
 
     // MARK: - Classes dated after the next class (#475)
     //
-    // Asked at Deploy, and at Section ▸ Publish Pages…, when a class students
-    // can see — or are about to — is dated after the next class day
+    // Asked at Deploy, and only there (#694: Section ▸ Publish Pages… never
+    // asks, because publishing changes only the preview), when a class
+    // students can see is dated after the next class day
     // (`class-planning.json` → `futureDatedClasses`; where it is asked and
-    // where it never is: `shared-rules.json` → `classesDatedLater`).
+    // where it never is: `shared-rules.json` → `classesDatedLater`). Every row
+    // starts ticked, and a ticked class GOES OUT — a ticked box always means
+    // included (Russell, 2026-10-25).
 
     static func laterClassesTitle(noun: ClassNoun = .class) -> String {
-        return "Hide \(noun.plural) dated later?"
+        return "Deploy \(noun.plural) dated later?"
     }
 
     /// At Deploy. `nextDay` is the next class day, as the row writes a day.
     static func laterClassesAtDeploy(nextDay: String, noun: ClassNoun = .class) -> String {
         return "These \(noun.plural) are published but dated after \(nextDay), the next \(noun.singular). "
-             + "Students will see them once this section is deployed. Ticked ones are hidden first, "
-             + "with any page only they link to."
+             + "Ticked ones go to students when this section is deployed. Untick any \(noun.singular) "
+             + "that should not go yet: it is hidden first, with any page only it links to, so the "
+             + "preview shows what students will see."
     }
 
-    /// At Section ▸ Publish Pages…, before the plan.
-    static func laterClassesAtPublish(nextDay: String, noun: ClassNoun = .class) -> String {
-        return "These \(noun.plural) are dated after \(nextDay), the next \(noun.singular). Ticked ones "
-             + "are left hidden; the rest are published with the other pages."
-    }
-
-    /// Under the list, both times.
+    /// Under the list. Unticking unpublishes (#694, Russell's ruling 2), so
+    /// the teacher is told how to take it back — and, since Undo changes the
+    /// preview only, that it goes online at the next deploy.
     static func laterClassesKeptNote(noun: ClassNoun = .class) -> String {
-        return "A \(noun.singular) you untick stays published, and is not asked about again unless its date changes."
+        return "A \(noun.singular) left ticked is not asked about again unless its date changes. "
+             + "Section ▸ Undo Last Change publishes again any you untick; the next deploy sends them out."
     }
 
     /// One row's day: "Wednesday, 2026-10-14".
@@ -2308,22 +2346,13 @@ nonisolated enum AssistWording {
         return "\(weekday), \(date)"
     }
 
-    /// The question's default button at Deploy: the ticked classes are
-    /// hidden, the unticked kept, and the section deployed. With nothing
-    /// ticked it hides nothing.
-    static let hideTickedAndDeployButton: String = "Hide Ticked and Deploy"
-
-    /// Beside it, always (#475, the director's ruling on batch B's
-    /// implementation review, finding 1): every listed class is kept
-    /// published and remembered at its date, so a course that publishes the
-    /// whole term ahead — every pre-populated course does — is asked ONCE.
-    static let keepAllAndDeployButton: String = "Keep All and Deploy"
-
-    static func leaveOutAndContinueButton(count: Int) -> String {
-        return "Leave \(count) Hidden and Continue"
-    }
-
-    static let publishThemAllButton: String = "Publish Them All"
+    /// The question's default button (#694): the ticked classes are kept at
+    /// their dates, the unticked hidden, and the section deployed. Every row
+    /// starts ticked, so Return deploys them all. A fixed label rather than
+    /// one with a count, and no second button: Keep All would only repeat
+    /// Return. (It was "Hide Ticked and Deploy", under the key
+    /// `hideTickedAndDeployButton`, until #694 turned the ticks round.)
+    static let deployTickedButton: String = "Deploy Ticked"
 
     /// An assistant working from another app asked to deploy a section with
     /// a class dated later and no answer on file. Refused before anything is

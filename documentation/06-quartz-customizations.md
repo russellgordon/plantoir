@@ -1375,6 +1375,25 @@ from the site, whose engine is 0.5.2's (`obsidianAddOnsForFigures.knownLimits`).
 The skill `plantoir-math-graphs` (support/agent_guidance) carries the whole
 syntax for an assistant.
 
+**What the site's engine cannot draw, measured (#715, 2026-10-31,
+node-tikzjax 1.0.5 as the build drives it).** Four pgfplots figures on
+Russell's MPM2D pages had silently failed for some time. `groupplots` is not
+carried (TeX cannot find `pgflibrarypgfplots.groupplots.code.tex`). A dot
+written `\fill (axis cs:1,1) circle (2pt);` - a radius in PARENTHESES inside
+an `axis`, with or without `axis cs:` - fails (`Argument of \pgfmathfloatparse@@
+has an extra }`, reported at the `\end{axis}` line), while
+`circle[radius=2pt]` and `\addplot[only marks]` draw, and `circle (2pt)`
+outside an axis draws; the issue's "`\fill … circle`" was broader than the
+fault. Those three are `figureFences.texErrors` cases, run against the real
+engine by `scripts/check_figure_rules_against_the_site.py` in `verify.sh`.
+`\textdegree`, `\$` and `\textdollar` in a pgfplots label END the engine
+("Could not find font tcrm1000"), and in plain TikZ the drawing fails on
+the same font. Until #718 the build reported the first as `tookTooLong`,
+uncached and retried every build, and the second as TeX saying nothing;
+since #718 it names the problem in both (`fontMissing`), and #718's `figureFences.knownLimits` entry lists the nine
+text symbols measured. `$^{\circ}$` and `\char36` draw, and
+`plantoir-math-graphs` sections 3 and 8 tell an assistant to write those.
+
 **Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
 `<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB
 each — a site carries only the ones its drawings name, ~30 KB a face);
@@ -2708,6 +2727,55 @@ both quizzes' questions, the page's own folded answer in its key, and
 neither quiz's answer nor its explanation. The answer key for quizzes is
 #511's.
 
+**A blank on paper is about two lines tall, the room above it (#733,
+v1.9.1).** The house rule for anything printed (#715, 2026-11-01): a line
+carrying a blank students write on is about two lines tall, so a question
+that wraps still leaves a full line of writing room above the blank. The
+handouts do it with an invisible strut in `\fillin`
+(`\rule[-0.2em]{0pt}{2.1em}`); the site does it in `quiz.scss`:
+
+- **⌘P** (print media): the blank's `<input>` gets `padding-top: 1.6em` over
+  a `line-height: 1.2` line, `font-size: 1em` (the screen's 16 px floor is
+  for iPadOS zoom, which paper does not have), no bottom padding, and a
+  1 px BLACK line. Short answers (`.plantoir-quiz-response`) get the same,
+  overriding the screen's 44 px target.
+- **Print** (the handout): its copy draws each blank as a
+  `span.plantoir-quiz-paper-blank` (`print.inline.ts`), which gets the same
+  room from a rule OUTSIDE `@media print` — the span exists only on paper,
+  and the print layout reads the stylesheet itself whichever way it lays the
+  handout out.
+- **Why 1.6em.** 2.1em at LaTeX's 1.2em leading is 1.75 lines. This site's
+  leading is 1.6, so the same 1.75 lines is 2.8em: 1.6em of room over a
+  1.2em line. The room is on the blank, so only the line that carries it
+  grows; a question's other lines keep their pitch.
+- **Measured** (2026-11-01, Chrome for Testing 155 headless, letter, print
+  media, verify's `Quiz Wrapped Blank` — a 16 px question that wraps —
+  printed to PDF, rendered with `pdftoppm -r 80` and looked at; "before" is
+  the same built page with the previous `index.css`): before, the line
+  carrying the blank sat 29 CSS px (24 px at 80 dpi) below the line above,
+  against 25.6 (21) for any other line — about one line — and **its line was
+  not printed at all**: the print rule drew it in `currentColor` and made the
+  colour transparent to hide what was typed, so the line was transparent too,
+  from #563 until #733. A short answer printed as an empty 44 px box with no
+  line. The handout's span was 1.32em tall: one line. After: 48 CSS px
+  (40 px at 80 dpi) from the line above, 1.9 lines; each blank's box is
+  45.8 CSS px (2.86em) with a visible black line, the short answer's too.
+- **Verified**: `browser-checks/quiz_check.mjs` step 8c, on verify's `Quiz
+  Wrapped Blank`. Under print media each blank's line is drawn; the box is
+  at least 2.5em tall, with its room above, not below; what was typed is
+  not printed. The wrapped question's blank sits on a line after the first,
+  at least 1.75 lines below the one above. `checkHandout` asks the same of
+  every blank in `Quiz Printable`'s handout, at the moment it prints.
+- **Rejected:**
+  - a fixed height in px, which would not follow a teacher's font size;
+  - room below the blank, since the rule is the room above, where the
+    handwriting goes;
+  - leaving the screen alone was never in question: `@media print` only, and
+    the handout's span is not on any screen;
+  - typing empty lines into the page. The printing skill tells assistants
+    never to do that, and it now says the site gives the blank its room
+    itself.
+
 ### J6. Measured (2026-10-17, M4 Pro, macOS 26.6, Chrome for Testing 155)
 
 `browser-checks/quiz_check.mjs` on the verify fixture's `Quiz Playground`
@@ -2773,7 +2841,7 @@ build wiring, and owes only a measured look (its `windows` issue).
 | `plugins/transformers/taskRules.ts` | The rules, pure: `taskItemText`, `taskItemId`, `siteRootFrom`, `taskKey`, `readTicks`. Bundled by `scripts/check_task_rules_against_the_site.py` and run over every contract case. |
 | `plugins/transformers/plantoirTasks.ts` | Html stage, wired straight after `PlantoirQuizzes` (`build_site._wire_tasks_transformer`): takes `disabled` off every task box outside a `.plantoir-quiz`, stamps it, and wraps it in a label. The ONLY producer of item ids. |
 | `components/scripts/tasks.inline.ts` | Rides `PlantoirMetaLine.afterDOMLoaded` into every page's `postscript.js`: one delegated `change` listener, and the restore on every `nav`. |
-| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, the focus ring, unclickable previews, and the paper ink. |
+| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, where the box sits (K5b, #693), the focus ring, unclickable previews, and the paper ink. |
 
 ### K2. The id, the key and the read API
 
@@ -2870,6 +2938,98 @@ mode (desert-sandstone) and 12.19:1 in dark. `scripts/test_task_box_contrast.py`
 and 4.5:1 (words) in every scheme; the browser check reads the computed
 colours. This drops Quartz's coloured fill.
 
+### K5b. Where the box sits (#693)
+
+**What a teacher saw.** Russell, 2026-10-24, from Safari's inspector: the box
+sat high beside its words. His picture's red guides mark the label's 18px
+line box and ask for the box centred between them.
+
+**Why.** Quartz's `input[type="checkbox"]` rule (base.scss) sets no
+`margin-block`, so the browser's own 3px top and bottom margins lifted the box
+3px, and its `translateY(2px)` — written for Quartz's `li > input` shape, not
+the `li > label > input` the transformer makes — brought back 2. Measured: the
+box's bottom 1.00px above the baseline at every size, and its centre 3.37px
+high of the capitals' middle at 16px (0.55-5.03px across the sweep below);
+4.02px on a printable page under print media (`print.scss`'s 10.95pt) and in
+the handout's frame.
+
+**The rule** (`tasks.scss`, outside `@media print`, so paper gets it too;
+quizzes' boxes untouched):
+
+```scss
+input[type="checkbox"].plantoir-task {
+  font: inherit;
+  margin-block: 0;
+  transform: none;
+  vertical-align: baseline;
+  vertical-align: calc(0.5cap - 8px);
+}
+```
+
+The box's centre lands on the middle of the WORDS' capitals: `cap` is their
+cap height, so it holds for every font and size. `font: inherit` is what makes
+it the words' cap height and not the control's 13.33px default. 8px is half
+the box, which Quartz's base.scss makes 16px square at every font size (the
+UA's border-box; `font: inherit` does not change it) — so the 8px follows the
+pinned Quartz, and the browser check asserts 16px so a Quartz that changes it
+fails with that message rather than as a half-pixel drift.
+
+**Measured** (2026-10-31/11-01, M4 Pro, macOS 26, Chrome for Testing 155 and
+WebKit `WKWebView`; tight and loose lists planted in the verify site; 12, 14.4,
+16, 17.92, 20 and 24px in system-ui, Georgia, Verdana and Times New Roman;
+screen and print media; 49 boxes per run). The two engines agree to 0.02px.
+"Off" is the box's centre against the capitals' middle, from a zero-width
+probe of height `1cap` set on the baseline after the box — and canvas's
+`measureText("H").actualBoundingBoxAscent` equals `1cap` to 0.01px in every
+case, so the probe is not measuring the rule against itself.
+
+| CSS on the box | Bottom vs baseline at 16px | Centre vs capitals' middle | Verdict |
+|---|---|---|---|
+| A: Quartz's (before) | 1.00px above, every size | 0.55-5.03px high (3.37 at 16px) | the fault |
+| B: `margin-block:0; transform:none; vertical-align:baseline` | on it (0.00) everywhere | 4.03px high to 0.72px low | what the title asked; still 2.4px high at 16px, the fault in the picture |
+| C: `vertical-align: middle` | 3.8px below | 1.05-2.57px low | rejected |
+| D: `calc(0.375em - 8px)`, fitted to the system font | 2.0px below | 0.14-1.05px high; Times 1.0px off the label's centre | rejected: a constant fitted to one font |
+| **E: B plus `font:inherit; vertical-align:calc(0.5cap - 8px)`** | 2.36px below (0.73px above to 4.02px below across the sweep) | **within 0.02px, every font and size, both engines** | **shipped** (Russell's ruling) |
+
+**Where `cap` is not known** (Safari before 17.2; iPadOS likewise) the second
+declaration is dropped and the first stands: B, the box's bottom on the
+baseline. Measured with a `calc` naming an unknown unit, in both engines: the
+bottom 0.00px from the baseline everywhere, the centre up to 4.03px high of the
+capitals. Acceptable as a fallback — it is what the issue's title asked for,
+and better than Quartz's in every case. Quartz's own pipeline keeps the pair:
+compiled through its pinned sass 1.79.4 and lightningcss 1.29.2 with its
+Safari 15.6 target, the output is `vertical-align:baseline;vertical-align:calc(.5cap - 8px)`, in that order.
+
+**A side effect, accepted:** a task row is now as tall as an ordinary list
+line — 29.59 → 25.59px at 16px. The browser's 3px margins had been stretching
+it. Keeping the old height would mean adding the margin back on purpose.
+
+**Rejected also:** a `translateY` nudge (it drifts with font size, which is
+how Quartz's came to be wrong here); an `inline-flex` label with
+`align-items: center` (it centres on the whole block, so an item that wraps
+puts the box between its lines).
+
+**No build_site.py change.** `install_quartz_additions` runs in the ALWAYS
+section and copies any file whose bytes differ, so every existing course folder
+picks the new tasks.scss up on its next build.
+
+**Gated** by `browser-checks/task_boxes.mjs` (in verify.sh, Chrome only):
+step 1c reads every box on Task Fixture (tight, callouts included), Task Loose
+(a loose list, planted by verify.sh for this) and Task Printable, on screen and
+under print media, and fails a box that is not 16px tall or is more than 0.5px
+off the capitals' middle; step 10 does the same INSIDE Paged.js's handout
+frame, which re-parses the stylesheets. Against the old tasks.scss (copied in
+and restored) verify.sh failed only this check, on all seven places: −3.37px
+on screen and under print media, −4.02px on the printable page under print and
+in the handout's frame. With the rule: at most 0.01px on screen (29 boxes on
+Task Fixture, 2 on Task Loose, 3 on Task Printable), 0.02px on the printable
+page under print and in the handout's frame, every box 16px. WebKit has no gate; its numbers above were measured
+once. The paper step (K6) had to change with it: its box finder scanned each
+word's tall pdftotext box from the TOP, and with rows 4px shorter it found the
+previous item's box (the unticked box read the ticked one's 62 inked pixels
+though the PDF draws it empty, checked by rendering it); it now scans from the
+word's middle up.
+
 ### K6. On paper: the ink
 
 With the browser's "background graphics" off (its default), Quartz's ticked
@@ -2885,7 +3045,8 @@ grey, 8.5:1 on white). The browser check prints `Task Printable` and `Task
 Twin A` in both themes with `Page.printToPDF` (backgrounds off), renders the
 PDF with poppler's `pdftoppm`, finds each box by its inked sides, and counts
 the ink inside: 50-66 dark pixels inside a ticked box, 0 inside an unticked
-one; with the print block taken out, 0 inside the ticked box and the
+one (60-66 and 0 again after #693 moved the box; the finder now scans from
+each word's middle up - K5b); with the print block taken out, 0 inside the ticked box and the
 unticked box not found at all. Safari is not measured (no headless Safari
 here; recorded as owed).
 

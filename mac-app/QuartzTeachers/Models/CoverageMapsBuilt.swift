@@ -24,17 +24,36 @@ struct CoverageMapsBuilt: Equatable {
     let section: Int
     let maps: [Map]
 
+    /// The build's own count of the maps it made, when it SHORTENED its line
+    /// to stay under `contracts/shared-rules.json` → `machineLineLength`
+    /// (#666, #704): the line then describes only the first maps. `nil` for
+    /// a whole line, which describes every map.
+    let count: Int?
+
     /// The marker the build prints. Pinned by
     /// `contracts/shared-rules.json` → `coverageMapsBuilt.marker.prefix`.
     nonisolated static let markerPrefix: String = "PLANTOIR_MAPS:"
 
     // MARK: - Computed properties
 
+    /// How many maps the build made: the line's `count` when it carries one,
+    /// and never fewer than the maps it describes, as
+    /// `PagesDatedByTheBuild.total` reads its own.
+    nonisolated var total: Int {
+        let counted: Int = count ?? 0
+        if counted > maps.count {
+            return counted
+        }
+        return maps.count
+    }
+
     /// The trail line, in the shape `coverageMapsBuilt.trailLine` gives: the
     /// count first, then each map as a teacher would say it — its title, the
-    /// folder it came from, and how many expectations it shows.
+    /// folder it came from, and how many expectations it shows. An empty list
+    /// is "no curriculum map" only when the line carries no count: with one,
+    /// the build made maps and could name none of them (k = 0).
     nonisolated var trailSentence: String {
-        if maps.isEmpty {
+        if total == 0 {
             return "the build made no curriculum map: no curriculum folder holds an expectation page"
         }
         var described: [String] = []
@@ -42,8 +61,27 @@ struct CoverageMapsBuilt: Equatable {
             let noun: String = map.expectations == 1 ? "expectation" : "expectations"
             described.append("\(map.title) from \(map.folder) (\(map.expectations) \(noun))")
         }
-        let count: String = maps.count == 1 ? "1 curriculum map" : "\(maps.count) curriculum maps"
-        return "the build made \(count): " + described.joined(separator: ", ")
+        var names: String = described.joined(separator: ", ")
+        let notShown: Int = total - maps.count
+        if notShown > 0 {
+            if maps.isEmpty {
+                names = "\(notShown) not named"
+            } else {
+                names += " and \(notShown) more"
+            }
+        }
+        let mapsPhrase: String = total == 1 ? "1 curriculum map" : "\(total) curriculum maps"
+        return "the build made \(mapsPhrase): " + names
+    }
+
+    // MARK: - Initializer
+
+    /// `count` is left out for a whole line.
+    nonisolated init(course: String, section: Int, maps: [Map], count: Int? = nil) {
+        self.course = course
+        self.section = section
+        self.maps = maps
+        self.count = count
     }
 
     // MARK: - Functions
@@ -76,7 +114,10 @@ struct CoverageMapsBuilt: Equatable {
                 }
                 maps.append(Map(title: title, folder: folder, expectations: expectations))
             }
-            found.append(CoverageMapsBuilt(course: course, section: section, maps: maps))
+            // An empty list stays a report — of none when the line carries
+            // no count, of maps the line could not name when it does.
+            let count: Int? = object["count"] as? Int
+            found.append(CoverageMapsBuilt(course: course, section: section, maps: maps, count: count))
         }
         return found
     }
