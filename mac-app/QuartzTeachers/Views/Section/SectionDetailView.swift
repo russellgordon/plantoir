@@ -18,6 +18,13 @@ struct SectionDetailView: View {
     /// see `deployRun`.
     @State var deployRunWithNoFolder: SectionDeployRun = SectionDeployRun()
 
+    /// The section deploy's ending this view keeps off its console: set on
+    /// appearing when some view has already shown that ending (#706 review,
+    /// M1), so a finished deploy is shown on return only until one view has
+    /// displayed it. A later ending is a different number, so the next
+    /// deploy is shown as ever.
+    @State var deployEndingHiddenHere: Int? = nil
+
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
 
@@ -461,7 +468,7 @@ struct SectionDetailView: View {
                 // which is what dragged the progress header under the
                 // window's toolbar when a preview was restarted.
                 VStack(spacing: 0) {
-                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRun.isShown(hidingEnding: deployEndingHiddenHere) {
                         consoleArea
                     } else {
                         // Fills the height it is offered, which is what keeps
@@ -694,7 +701,10 @@ struct SectionDetailView: View {
             // these reads.
             loadStoppedScheduledPublish()
             // A deploy of this section that outlived the view before this one
-            // (#706): what it left for whoever shows the section next.
+            // (#706): what it left for whoever shows the section next. An
+            // ending some view has already shown is kept off this console
+            // first (#706 review, M1), before this view counts as showing it.
+            deployEndingHiddenHere = deployRun.endingToHideOnAppearing()
             takeWhatTheDeployLeft(onAppearing: true)
             guard let folder = workspace.workspaceURL else {
                 return
@@ -971,6 +981,11 @@ struct SectionDetailView: View {
         }
         if run.takeFindings() {
             showHealthFindings(from: run.runner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+        }
+        // This view is showing how it ended — live, or on appearing — so the
+        // next view to come to the section shows its ordinary state.
+        if !run.isBusy && run.endings > 0 {
+            run.noteEndingShown()
         }
     }
 
@@ -1754,7 +1769,7 @@ struct SectionDetailView: View {
         return SectionDetailView.showsDeployProgress(
             previewIsRunning: previewRunner.isRunning,
             deployIsRunning: deployRunner.isRunning,
-            previewStartedAt: previewRunner.startedAt,
+            previewStartedAt: previewRunner.startedAt ?? deployRun.previewLastStartedAt,
             deployStartedAt: deployRunner.startedAt
         )
     }
@@ -2075,6 +2090,14 @@ struct SectionDetailView: View {
                 arguments: [course.code, String(sectionNumber), "--port", String(lease.port)],
                 workingDirectory: workspaceURL
             )
+            // Said to the section's run, so a view that comes back later
+            // knows this preview is newer than the last deploy (#706 review,
+            // M1): its own preview runner will have no start time at all.
+            if let previewStartedAt = previewRunner.startedAt {
+                SectionRuns.shared.deploy(
+                    folder: workspaceURL, courseCode: course.code, sectionNumber: sectionNumber
+                ).notePreviewStarted(at: previewStartedAt)
+            }
             await waitForPreviewServer(port: lease.port, siteAsItWas: siteAsItWas, startRequest: request)
 
             // A second chance, for the ordinary case where the wait finished

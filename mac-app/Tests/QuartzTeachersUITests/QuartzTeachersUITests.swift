@@ -756,8 +756,9 @@ final class QuartzTeachersUITests: XCTestCase {
     /// deploy and starts nothing (GitHub #706): the progress is there, Deploy
     /// is unavailable, and neither selecting the section nor ⇧⌘D runs the
     /// launcher a second time. The stub counts its own starts in a file
-    /// beside it, which is the "launcherStarts" of
-    /// `shared-rules.json` → `returningToASectionMidDeploy`.
+    /// beside it, which is what `selectingStartsALauncher` and
+    /// `aPressStartsALauncher` in
+    /// `shared-rules.json` → `returningToASectionMidDeploy.cases` describe.
     func testReturningToASectionMidDeployShowsTheDeploy() throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
 

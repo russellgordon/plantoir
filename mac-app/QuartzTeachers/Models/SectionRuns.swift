@@ -20,9 +20,13 @@ import Foundation
 /// **Never replaced.** A section's `SectionDeployRun` is made once and kept
 /// for the life of the app: a running task holds a reference to it, and a
 /// view that found a NEW object would be watching something nothing writes
-/// to. A finished run keeps its legs, so its outcome is what a teacher sees
-/// on returning, until that section's next deploy starts over the same
-/// runner. Memory only: nothing here is written to disk.
+/// to. A finished run keeps its legs until that section's next deploy
+/// starts over the same runner, but its ending is SHOWN only until one view
+/// has displayed it (`isShown(hidingEnding:)`): the view that watched it end,
+/// or the first to show the section after it ended while the teacher was
+/// elsewhere. After that, and whenever a later preview of the section has
+/// started, the section shows its ordinary state. Memory only: nothing here
+/// is written to disk.
 @Observable
 final class SectionDeployRun {
 
@@ -55,6 +59,20 @@ final class SectionDeployRun {
     /// told with `.onChange` that it has something to take.
     var endings: Int = 0
 
+    /// The latest ending a view has put in front of the teacher (#706
+    /// review, M1). Equal to `endings` once the ending has been seen, and a
+    /// view appearing after that hides it (`endingToHideOnAppearing()`), so
+    /// a deploy watched to the end does not come back on every visit to the
+    /// section until quit.
+    var endingShown: Int = 0
+
+    /// When a preview of this section last started in this app, from any
+    /// view of it. A view that comes back has a fresh preview runner with no
+    /// start time of its own, so without this a finished deploy always won
+    /// the "which ran last" comparison and came back over a later preview
+    /// (#706 review, M1).
+    var previewLastStartedAt: Date?
+
     // MARK: - Computed properties
 
     /// True while this run is doing anything at all.
@@ -69,6 +87,50 @@ final class SectionDeployRun {
     func noteEnded() {
         findingsAreWaiting = true
         endings += 1
+    }
+
+    /// Says a view has put this run's ending in front of the teacher.
+    func noteEndingShown() {
+        endingShown = endings
+    }
+
+    /// Says a preview of this section has started, at `date`.
+    func notePreviewStarted(at date: Date) {
+        previewLastStartedAt = date
+    }
+
+    /// The ending a view appearing now should keep off the screen: the
+    /// current one, once some view has shown it — or nil, when there is
+    /// nothing to hide because the run is busy or its ending is still unseen.
+    func endingToHideOnAppearing() -> Int? {
+        if isBusy {
+            return nil
+        }
+        if endings > 0 && endingShown == endings {
+            return endings
+        }
+        return nil
+    }
+
+    /// Whether a view should give its console to this run: always while it
+    /// is busy; once it has finished, only while it has something to show,
+    /// the view did not hide its ending on appearing (`hidingEnding`, from
+    /// `endingToHideOnAppearing()`), and no preview of the section has
+    /// started since the deploy did.
+    func isShown(hidingEnding: Int?) -> Bool {
+        if isBusy {
+            return true
+        }
+        if !runner.hasAnyOutput {
+            return false
+        }
+        if let hidingEnding, hidingEnding == endings {
+            return false
+        }
+        if let previewStart = previewLastStartedAt, let deployStart = runner.startedAt, previewStart > deployStart {
+            return false
+        }
+        return true
     }
 
     /// Whether this caller should show the findings — true once per ending.

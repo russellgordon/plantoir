@@ -602,8 +602,8 @@ that finished while the teacher was on section 2 showed "Done" on return.
   its unsaved-settings sentence (#335), and `findingsAreWaiting` plus an
   `endings` counter. **It is never replaced**: a running task holds it, and a
   view that found a new object would watch something nothing writes. A
-  finished run keeps its legs, so its outcome is what a returning teacher
-  sees, until that section's next deploy starts over the same runner. It
+  finished run keeps its legs until that section's next deploy starts over
+  the same runner, but it is SHOWN only by the rule in the next bullet. It
   lives in memory only, until quit. It is not cleared on a change of working
   folder, because windows each have their own folder and the key already
   carries it (#706 plan review, M3).
@@ -626,8 +626,36 @@ that finished while the teacher was on section 2 showed "Done" on return.
   button, the Section menu, ⇧⌘D, `deployAndWait`'s first busy check and
   `deployWillBeRefused` all ask it. The last matters because #475's question
   must not be asked before a refusal (plan review, M2).
+- **A finished deploy is shown on return only until one view has displayed
+  its ending** (implementation review M1, ruled by the director 2026-11-01 in
+  Russell's absence and flagged for his review). The first build of this fix
+  showed the finished panel on every visit until quit — a red "Something went
+  wrong" included — and a view that came back had a fresh preview runner
+  with no start time (`?? .distantPast`), so an 8 am deploy won
+  `showsDeployProgress` over an 11 am preview of the same section. Now:
+  - `SectionDeployRun.endingShown` records the last ending a view put on
+    screen. `takeWhatTheDeployLeft` sets it, live (`.onChange` of `endings`)
+    or on appearing, whenever the run has ended and is not busy.
+  - On appearing, the view first stores `endingToHideOnAppearing()` in its
+    `@State deployEndingHiddenHere`: the current ending if some view has
+    already shown it. `body` gives the console to the deploy only when
+    `isShown(hidingEnding:)` says so — always while busy (preparing
+    included, so a first-ever deploy now shows "Preparing to deploy…"
+    rather than the placeholder), otherwise only with output, an ending this
+    view did not hide, and no later preview. A NEW ending is a new number, so
+    the next deploy in that same view is shown as ever.
+  - `startPreview` tells the section's run when a preview started
+    (`notePreviewStarted`), and `showsDeployProgress` is given
+    `previewRunner.startedAt ?? deployRun.previewLastStartedAt`, so the
+    preview wins the comparison when it is the more recent run.
+  - Rejected: keeping the panel until the next deploy (the first build, above);
+    forgetting it only when a preview starts (a deploy watched to the end would
+    still come back on every visit). The contract case
+    `watchedToTheEndThenPreviewed` holds it.
 - `TaskConsoleView` scrolls to its end on appearing, so a returned, finished
-  console opens where the outcome is.
+  console opens where the outcome is. That applies to every console, the
+  preview's included, which is harmless: a console that has just appeared has
+  nothing the teacher has scrolled back to.
 
 **What stays per window, and why.** A preview being built is still stopped
 when its section is left. Its port lease, its web view and #232's ⌘Q record
@@ -664,14 +692,21 @@ Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 - the store, and `===` across two spellings of one folder;
 - the `CourseActivity` clause;
 - a finished run, and findings taken once;
-- the eight contract cases;
+- an ending shown once is not shown again, and a later deploy's is;
+- a later preview of the section wins over a finished deploy, even in a view
+  with no preview start of its own;
+- the nine contract cases;
 - a source scan that the view holds no `@State` deploy runner, that nothing
   on appearing deploys, and that `deployAndWait` names only its captured run.
 
 Must-fail, by copy-and-restore:
 - the store always creating turns three tests red;
 - dropping the `CourseActivity` clause turns two red;
-- the scan over `origin/dev`'s view is red.
+- the scan over `origin/dev`'s view is red;
+- `isShown` reduced to the first build's rule (busy or any output) turns the
+  two M1 tests and the `watchedToTheEndThenPreviewed` case red; dropping only
+  the shown-once clause, or only the later-preview clause, turns its own test
+  red.
 
 `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
 a stub `deploy.sh` that counts its own starts. It is part of no gate.

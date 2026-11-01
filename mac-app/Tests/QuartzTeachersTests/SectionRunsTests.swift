@@ -130,6 +130,61 @@ final class SectionRunsTests: XCTestCase {
         )
     }
 
+    /// A finished deploy is shown on return only until one view has
+    /// displayed its ending (#706 review, M1): the view that came back and
+    /// showed it counts, and the next one to come shows the section's
+    /// ordinary state. A later deploy's ending is shown again.
+    func testAnEndingOnceShownIsNotShownAgain() throws {
+        let folder: URL = try makeFolder()
+        let run: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+        run.runner.startedAt = Date(timeIntervalSince1970: 1_790_000_000)
+        giveOutput(to: run)
+        run.noteEnded()
+
+        let firstToCome: Int? = run.endingToHideOnAppearing()
+        XCTAssertNil(firstToCome, "an ending nobody has seen is not hidden")
+        XCTAssertTrue(run.isShown(hidingEnding: firstToCome), "the first view back shows how it ended")
+        run.noteEndingShown()
+        XCTAssertTrue(run.isShown(hidingEnding: firstToCome), "and keeps showing it while it stays")
+
+        let nextToCome: Int? = run.endingToHideOnAppearing()
+        XCTAssertFalse(run.isShown(hidingEnding: nextToCome), "the next view back shows the section's ordinary state")
+
+        run.runner.isRunning = true
+        XCTAssertTrue(run.isShown(hidingEnding: nextToCome), "a new deploy is shown, live, in that same view")
+        run.runner.isRunning = false
+        run.noteEnded()
+        XCTAssertTrue(run.isShown(hidingEnding: nextToCome), "and so is how that new deploy ended")
+    }
+
+    /// A preview of the section that started after the deploy wins over the
+    /// deploy's finished panel, even in a view whose own preview runner has
+    /// no start time — a view that came back (#706 review, M1).
+    func testALaterPreviewOfTheSectionWinsOverAFinishedDeploy() throws {
+        let folder: URL = try makeFolder()
+        let run: SectionDeployRun = SectionRuns.shared.deploy(folder: folder, courseCode: "EXC2O", sectionNumber: 1)
+        let deployStart: Date = Date(timeIntervalSince1970: 1_790_000_000)
+        run.runner.startedAt = deployStart
+        giveOutput(to: run)
+        run.noteEnded()
+        XCTAssertTrue(run.isShown(hidingEnding: nil))
+
+        let previewStart: Date = deployStart.addingTimeInterval(3 * 60 * 60)
+        run.notePreviewStarted(at: previewStart)
+        XCTAssertFalse(run.isShown(hidingEnding: nil), "a later preview means the deploy's panel does not come back")
+        // What `showsDeployProgress` is given by a view that came back: its
+        // own preview runner has never started.
+        let thisViewsPreviewStart: Date? = nil
+        XCTAssertFalse(
+            SectionDetailView.showsDeployProgress(
+                previewIsRunning: false, deployIsRunning: false,
+                previewStartedAt: thisViewsPreviewStart ?? run.previewLastStartedAt,
+                deployStartedAt: run.runner.startedAt
+            ),
+            "with no preview start of its own, the view compares against the section's"
+        )
+    }
+
     // MARK: - The contract
 
     /// `shared-rules.json` → `returningToASectionMidDeploy.cases`, each set up
@@ -137,7 +192,7 @@ final class SectionRunsTests: XCTestCase {
     func testReturningToASectionMidDeployCases() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("returningToASectionMidDeploy")
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 8)
+        XCTAssertEqual(cases.count, 9)
         for testCase in cases {
             SectionRuns.shared.reset()
             CourseActivity.reset()
@@ -170,11 +225,28 @@ final class SectionRunsTests: XCTestCase {
             if startedWithTheRun {
                 started = SectionRuns.shared.deploy(folder: startedFolder, courseCode: "EXC2O", sectionNumber: startedSection)
             }
-            if then == "returned" {
+            let deployStart: Date = Date(timeIntervalSince1970: 1_790_000_000)
+            started?.runner.startedAt = deployStart
+            switch then {
+            case "returned":
                 started?.runner.isRunning = true
                 CourseActivity.beginPublish(folderPath: startedFolder.path, courseCode: "EXC2O", sectionNumber: startedSection)
-            } else {
-                started?.noteEnded()
+            case "finishedWhileAway":
+                if let started {
+                    giveOutput(to: started)
+                    started.noteEnded()
+                }
+            case "watchedToTheEndThenPreviewed":
+                // The view that started it watched it end, and a preview of
+                // the section started after it.
+                if let started {
+                    giveOutput(to: started)
+                    started.noteEnded()
+                    started.noteEndingShown()
+                    started.notePreviewStarted(at: deployStart.addingTimeInterval(60))
+                }
+            default:
+                XCTFail("\(label): a then this test does not know")
             }
 
             // The teacher comes back to section 1 of the first folder.
@@ -186,9 +258,12 @@ final class SectionRunsTests: XCTestCase {
             let underWay: Bool = SectionDetailView.deployIsUnderWay(
                 run: returning, folderPath: folder.path, courseCode: "EXC2O", sectionNumber: 1
             )
+            // What a view coming back shows: the run it binds to, given its
+            // console only when `isShown` says so, after hiding on appearing
+            // whatever ending another view has already shown.
             var showsTheRun: Bool = false
-            if let started {
-                showsTheRun = started === returning
+            if let started, started === returning {
+                showsTheRun = returning.isShown(hidingEnding: returning.endingToHideOnAppearing())
             }
 
             XCTAssertEqual(available, testCase["deployAvailable"] as? Bool, "\(label): deployAvailable")
@@ -241,6 +316,15 @@ final class SectionRunsTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// A finished leg with a line in its console, as a deploy that ran leaves.
+    private func giveOutput(to run: SectionDeployRun) {
+        let leg: MultiDestinationDeployRunner.Leg = MultiDestinationDeployRunner.Leg(
+            destination: CourseConfiguration.DeployDestination(type: "local_folder", path: "/tmp/site")
+        )
+        leg.runner.transcript.append(rawText: "Deployed.\n")
+        run.runner.legs = [leg]
+    }
 
     private func makeFolder() throws -> URL {
         let folder: URL = FileManager.default.temporaryDirectory
