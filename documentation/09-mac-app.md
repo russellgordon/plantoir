@@ -3611,7 +3611,13 @@ rejected:
   checks five right-aligned and five centred maths cells, a right-aligned
   heading, and that "2.0" and "0.0" are each a centred cell of their own
   (two and one), not merely somewhere on the page (the fixes round, review
-  L5).
+  L5). **Corrected 2026-11-01:** this merge missed the issue's 12:43
+  refinement - a column mixing whole numbers and decimals is right-aligned
+  too, so its points line up - and centred such a column in both skills,
+  the page example, `tables.tex`, the contract clause and 6n. The second
+  round (below) fixes all of them; 6n now counts ten right-aligned cells,
+  no centred one, two right-aligned headings, and "2.0" and "0.0" as
+  right-aligned cells of their own.
 - **The finite-difference scaffold** ships as a static example
   (`finite_differences.tex`, and pattern E in math-graphs for a page) beside
   a cleaned copy of the generator Russell's session wrote
@@ -3667,9 +3673,106 @@ rejected:
   four graphs per set, discussion pages mirror the cards word for word -
   carried as the issue wrote them.
 
-Russell's own `~/.claude/CLAUDE.md` "Tables of values" bullet still says to
-right-align every numeric column and use `\phantom{.5}`, which #715
-reverses; that file is his, not this repository's, and was left alone.
+**Graphs, the key's layout, and table widths and spacing (#715 reopened,
+2026-11-01).** Russell added rules and refinements after the merge (issue
+comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
+
+- **Abstract or in context, decided per graph.** A graph of a relation with
+  no context is drawn to the edge of the grid with an arrowhead at each end,
+  its plotted points kept; one that models a context stops at the end points
+  the situation gives it, with no arrowheads. `plantoir-handouts` section 12
+  and `plantoir-math-graphs` section 4 carry it; pattern B's static fence and
+  the handout starter's question 2 now follow it. MEASURED on the site's
+  engine (node-tikzjax 1.0.5, `support/figures` driven through
+  `figures.run_jobs` in the `quartz-teacher:dev-test` image, the SVG
+  rasterised with rsvg-convert): `<->, >=latex` on an `\addplot` inside an
+  `axis` draws both arrowheads, as do `>=stealth` and `arrows.meta`'s
+  `{Latex}-{Latex}` (each about 0.7 s). A `domain` that runs PAST the grid's
+  edge loses both arrowheads, because the axis clips the curve and its tips
+  with it - measured on the engine and in tectonic alike - so the skills
+  say to solve for where the curve leaves the grid. functionplot cannot end
+  a curve or draw an arrowhead (it draws every function across the window),
+  so it stays the tool for an abstract relation explored on screen and a
+  context graph is a `tikz` fence. REJECTED: adding arrowheads to functionplot
+  (it is the vendored function-plot's drawing, and a plain line on an
+  interactive graph a student drags past its edge says the same thing).
+- **The answer key keeps the question copy's layout** (`plantoir-handouts`
+  section 3): one table and one grid, authored once, with only the cells and
+  the plotted answer switched by `\qa`/`\onlya`. The starter's question 2
+  used to draw its grid only in the key; it now draws the same grid in
+  both. **Orientation** (section 9): a horizontal two-row table is fine where
+  no finite differences are asked; any table used for finite differences is
+  vertical; the key follows the question.
+- **One width for the value columns, and digits in a centred box**
+  (13:13, refined 14:19). x and y share a width, and the two difference
+  columns share one, from the widest value in either (`\setvaluecol`, width
+  plus 0.5 cm). A column holding a negative value or whole numbers beside
+  decimals sets each value right-aligned in a box as wide as the column's
+  widest value WITHOUT its sign, the box centred in the column
+  (`\makebox[\widthof{$18$}][r]{…}`; the starters' column type `N{$18$}` does
+  it with `\settowidth` and `\hbox to`, so no calc package is needed), so
+  the digits share one trailing edge, sit centred, and a minus sign juts out
+  left. This REPLACES the first version of that day - a fixed 0.25 cm of
+  trailing padding, which put the digits against the right side of a wide
+  column. Measured at 600 dpi on `tables.tex`: the digits' right edges in
+  every `N` column agree within 3 px (0.4 pt, the glyphs' side bearings).
+  `finite_differences.py` does the same in TikZ with
+  `\inbox{widest}{value}` (`\setbox0\hbox{…}\hbox to\wd0{\hss…}`, plain TeX,
+  which node-tikzjax 1.0.5 drew in 0.36 s); the static
+  `finite_differences.tex` and pattern E were regenerated from it.
+- **Every value centred in a row of one pitch** (13:14, refined 14:22). The
+  gap from the heading rule to the first value, and from the last value to
+  the bottom rule, is half the distance between neighbouring values. `C`
+  and `N` columns put `\rowstrut{\valuepitch}` (1.5em; a strut of equal
+  height and depth about 0.32em, the middle of a digit) in every cell;
+  `\arraystretch` drops to 1.1 so TeX's own strut never outgrows it; a
+  table with room to write takes `\renewcommand{\valuepitch}{3em}`.
+  Measured at 600 dpi (poppler, the ink of each value to the middle of each
+  rule): `tables.tex` pattern C, pitch 16.76 pt, first value 8.10-8.22 pt
+  below the heading rule and last 8.52-8.64 pt above the bottom rule
+  against a half pitch of 8.38; pattern D (3em) 16.44-16.50 and 16.80
+  against 16.53; the scaffold, pitch 17.58 pt, 8.94 and 8.64 against 8.79.
+  Before: `\arraystretch` 1.2 alone gave 7.98 and 8.70 against 8.32, and
+  2.0 gave 15.60 and 11.94 against 13.74 - TeX's strut puts the baseline
+  70% of the way down a row. REJECTED: a large `\arraystretch` for tall
+  rows, for that reason.
+- **Running text never pads decimals** (14:19): 0.8 m in a sentence beside
+  a table that reads 0.80. In both skills. On a page the column rule stays
+  `---:`, since a Markdown table has no box.
+- **A miss in the first merge, corrected: a column mixing whole numbers and
+  decimals is right-aligned** as a negative column is - now in the
+  centred box above (the issue's 12:43 refinement, which the first merge did not
+  carry): centring 9.0 beside 10.5 shifts the point by half a digit from
+  row to row. Fixed in `plantoir-handouts` section 9, `plantoir-page-authoring`
+  section 7 (its example's y column is `---:` now), `tables.tex` pattern
+  C's h column, `finite_differences.py` (`right_aligned`: any negative, or
+  whole beside decimal), the contract's `handoutsSkill.rule`, and 6n.
+
+- **A blank students write on is about two lines tall** (12:58). The
+  starters gain `\fillin[width]{answer}`: the blank on the student copy,
+  the answer written on the same line in the key, and an invisible
+  `\rule[-0.2em]{0pt}{2.1em}` strut either way, so a wrapped prompt keeps a
+  full line of room above the blank (Handout's new question 4, compiled and
+  looked at in both copies). The header's Name/Date/Class # `\fillblank`
+  keeps one line: a two-line strut there would push into `headheight`, and
+  those blanks are not prompts. On a page the only blank is a quiz's
+  `` `____` ``, which prints as a line at the site's own height;
+  `plantoir-printing` section 3 says never to fake blanks with underscores
+  or typed empty lines, and to make a PDF handout when written answers need
+  the room. NOT changed here: the printed quiz blank's height, which is the
+  site's `quiz.scss` print rule (a product change for both platforms, not
+  a skill's) - that half of the rule is
+  [#733](https://github.com/russellgordon/plantoir/issues/733) (v1.9.1).
+
+Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
+refinement) now carries these rules - the centred box for a column with a
+negative value, matched decimal places without `\phantom`, no padding in
+running text, equal x and y widths, fill-in blanks, graphs and the key's
+layout - except for two phrases left from the morning's wording: a mixed
+whole/decimal column is right-aligned "with the same trailing padding", and
+equal widths make aligned numbers "sit at one offset in both" columns. The
+skills follow the 14:19 refinement in both places. That file is his, not
+this repository's, and was left alone.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

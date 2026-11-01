@@ -196,22 +196,34 @@ line.
 `plantoir-handouts` section 9):
 
 - The row of dashes sets each column's alignment, and it is decided per
-  column, by that column's values. A column holding **any negative value**
-  is right-aligned, `---:`, so the units digits line up - that includes a
-  column of zeros and negatives (0, -3, -4) and an all-negative one. A
-  column of numbers with **no negative value** is centred, `:---:`; zero is
-  not negative. A column of words is left as `---`. The site pads every
+  column, by that column's values. A column holding **any negative value**,
+  or **mixing whole numbers and decimals**, is right-aligned, `---:`, so the
+  units digits and the decimal points line up - that includes a column of
+  zeros and negatives (0, -3, -4), an all-negative one, and one such as
+  9.0, 10.5, 12.0. Any other column of numbers - no negative value, and all
+  whole numbers or all decimals - is centred, `:---:`; zero is not
+  negative. A column of words is left as `---`. The site pads every
   cell, so a right-aligned number does not touch the edge; the heading
   follows its column's alignment.
 - Write negative numbers as maths (`$-3$`), so the minus sign is a real
   one.
 - In a column that mixes whole numbers and decimals, write every value to
-  the same places: 2.0 beside 0.5, 0.0 beside 4.5. A column of whole
-  numbers gets no decimals.
+  the same places: 2.0 beside 0.5, 0.0 beside 4.5 - and right-align it,
+  `---:`. A column of whole numbers gets no decimals. The padded zeros are
+  only for matching the column: **running text never pads** - the
+  sentence under a table that reads 0.80 says 0.8 m.
+- A printed handout centres such a column's digits in a box as wide as its
+  widest value (`plantoir-handouts` section 9). A page cannot: Markdown
+  tables have no box, so on a page the rule stays `---:` for a column with
+  a negative value or with whole numbers beside decimals, and nothing else
+  is needed.
+
+Here $x$ holds negatives and $y$ mixes whole numbers and decimals, so both
+are `---:`:
 
 ```markdown
 | $x$ | $y = 0.5x^2$ |
-| ---: | :---: |
+| ---: | ---: |
 | $-2$ | $2.0$ |
 | $-1$ | $0.5$ |
 | $0$ | $0.0$ |
