@@ -1841,7 +1841,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline in about 20 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740, the retry below) in about 25 s,
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -1855,6 +1855,45 @@ the script: with the wait returning at once, 4 of the 8 fail (the mac's
 figure; Windows' is in 12); comparing the
 front page only fails the static-files case; without the `\r` strip the two
 transcript cases fail.
+
+**A brand-new site's files, asked again (#740, 2026-11-01).** On a
+`--first-publish` run, every per-file fetch-back in `check_engine` (the
+Python engine's files, the worker's CSP, Swift's thread and program, the COEP
+on the engine folders, KaTeX's stylesheet and face) goes through
+`fetch_headers`: an answer that is not what its check wants (HTTP 200, plus
+COEP `require-corp` for the COEP checks) is asked again every 5 s for at most
+60 s (`VERIFY_DEPLOY_NS_POLL`, `VERIFY_DEPLOY_NS_WAIT`). Each retry prints a
+`↻` line naming the file, the count and the seconds, and the Result block
+carries one measured line per site ("N file(s) needed asking again, …", or "no
+file needed asking again"). An answer that never comes is still that check's
+failure, judged on the last answer. A plain run asks once, exactly as before.
+
+**Measured at the v1.9.1 gate** (2026-11-01, dev e7a73e082, M4 Pro, home
+network): two `--first-publish` runs in a row failed on the NEW Netlify site
+only. Run 1 failed 2 checks: a 404 for `static/pyodide/pyodide.mjs`, and no COEP
+on `static/swift/plantoir-swift-worker.js`. Run 2 failed 1: a 404 (`text/plain`)
+for the swift worker, while both of run 1's checks passed. So it was a
+different file each time, never on Cloudflare. A watcher fetching both files
+every 5 s from the moment the site answered got 24 of 24 HTTP 200, with the
+right type and COEP, in the same minute. The plain run against the long-lived
+sites was 174/0/0. That is a site seconds old whose edges do not yet agree,
+not the build. (The 2026-10-31 first-publish run's one failure, a 404 on a
+page link, was the same thing. `check_page_links` is not retried, because its
+fetches run inside the Python program that Windows reads out of this script.)
+
+Rejected: *a fixed sleep after the site is made*, which is a guessed duration
+for a race. Also, the edges disagree file by file, so "long enough" for one
+file says nothing about the next. Rejected too: *retrying on the plain run*,
+which would hide a real 404 from a site that has existed for weeks. That is
+what this harness exists to catch. *Retrying only Netlify* was considered,
+because only Netlify was seen doing it. It was rejected, because a
+first-publish Cloudflare project is just as new and the rule is about the
+site's age, not its host. `--self-test` gained five cases: 404 twice then the
+file; no COEP twice then COEP; never served (still a failure, at the cap);
+the Result block's count; and a plain run judging a 404 at once. Proved
+must-fail by copy-and-restore: with the retry taken out, 4 of the 5 fail, and
+the plain-run case passes either way. **Windows owes the same in
+`verify-deploy.ps1`** (`Check-Engine`, `-SelfTest`).
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the
