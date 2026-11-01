@@ -297,7 +297,10 @@ class RealContractTests(unittest.TestCase):
             self.assertNotEqual(pin["pin"], "npmAudit")
 
     def test_the_real_list_accepts_the_real_fixtures(self) -> None:
-        audits = {"quartz": load("quartz-trimmed.json"), "wrangler": load("wrangler-trimmed.json"),
+        # wrangler's tree is the real audit of the pinned 4.156.0 (#699), which
+        # has no advisory; wrangler-trimmed.json (4.80.0's, 35 pairs) stays for
+        # the synthetic tests, and against this list it is BLOCKING.
+        audits = {"quartz": load("quartz-trimmed.json"), "wrangler": load("wrangler-clean.json"),
                   "tikz-engine": load("tikz-engine-clean.json"), "pagedjs": load("tikz-engine-clean.json"),
                   "function-plot": load("tikz-engine-clean.json")}
         report = npm_audit.compare(audits, self.npm_audit)

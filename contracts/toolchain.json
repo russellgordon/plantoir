@@ -61,11 +61,11 @@
       "why": "#640 (v1.9.0): Node 22.23.4 from NodeSource (`setup_22.x`), PINNED EXACTLY. Node 20 has been end-of-life since 2026-04-30, and the unpinned `setup_20.x` let the image and Windows' runtime drift to different patch releases (#636). 22.23.4 is the 2026-10-20 security release (npm 10.9.9, OpenSSL 3.5.9). An `=` pin is safe here, unlike caCertificates' floor: NodeSource keeps its history (measured 2026-10-23: every 22.x from 22.5.0 on arm64, 22.23.4 and back past 22.22.0 on amd64), so the pin does not break a first build the day 22.23.5 ships. Quartz v4.5.0 is still what decides this, and was revalidated on 22: an identical `npm ls --all` tree for Quartz and the tikz engine (665 lines, no EBADENGINE), byte-identical figure-cache SVG, the same 336 files for the EXC2O example with 0 differences once timestamps and Explorer ids are set aside, and verify.sh and verify-deploy.sh green. The one new behaviour, a `punycode` DEP0040 deprecation line on every Quartz build, is silenced by build_site.py (`--disable-warning=DEP0040`, that one warning only). Node's own built-in store (`tls.rootCertificates`) holds 116 roots and neither caCertificates subject; verify.sh checks the version, wrangler's engines and that store. Node 22 is end-of-life on 2027-04-30, so Quartz 5 (#512) or Node 24 must land before then. Windows' runtime carries the same 22.23.4 since #675 (v1.9.0; fetch-runtime.ps1's `$NodeVersion`, held to this pin by windowsRuntimeContains, five spaces and all), so both platforms run one Node; there, global `WebSocket` exists without `--experimental-websocket` and Quartz's `npm ls --all` tree is the one it had on 20.18.1. REJECTED: Node 24 (the ruling on #636 is 22, and 24 is a second, unmeasured jump); a floating `setup_22.x` (#636's drift again); a late `nodejs` layer over Node 20 (saves existing teachers about 90 MB, estimated, but every npm layer below must rebuild anyway, Node 20's files stay as dead weight, and no no-cache build reproduces the image)."
     },
     {
-      "mustStayBelow": "4.87",
-      "nodeEngine": ">=20.3.0",
+      "nodeEngine": ">=22.0.0",
       "pin": "wrangler",
-      "value": "4.80.0",
-      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. `mustStayBelow` is 4.87 because 4.87.0 is the first wrangler whose `engines.node` is `>=22.0.0` (`npm view 'wrangler@>=4.80.0' engines.node`, 2026-10-23: 4.80.0 to 4.86.0 say `>=20.3.0`, 4.87.0 to 4.152.0 say `>=22.0.0`, none yet needs 24). It said 4.100 until #640, which was never a boundary. The image runs Node 22 since #640 and Windows' runtime since #675, so no platform needs the ceiling any more: it stays only until moving wrangler, its own piece now that both platforms run 22, retires `mustStayBelow` on both. `nodeEngine` is wrangler's own `engines.node` at this pin: verify.sh reads it from the image's wrangler package.json, and the mac suite checks the `node` pin satisfies it - the invariant that matters from now on. The exact pin also keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester."
+      "value": "4.156.0",
+      "windowsRuntimeContains": "$WranglerVersion = \"4.156.0\"",
+      "why": "Cloudflare's own deploy CLI, used by `deploy.py` for the Pages destination. PINNED EXACTLY at the newest 4.x on 2026-10-31 (#699, `npm view wrangler dist-tags.latest`, published 2026-10-29): the exact pin keeps the image reproducible and stops an upstream CLI change from breaking publishing for a teacher mid-semester. It was held at 4.80.0 by a `mustStayBelow` of 4.87, the first wrangler whose `engines.node` is `>=22.0.0`, until both platforms ran Node 22.23.4 (the image since #640, Windows' runtime since #675); this move RETIRED that ceiling on both platforms, and with it the mac's and Windows' tests of it. `nodeEngine` is wrangler's own `engines.node` at this pin: verify.sh reads it from the image's wrangler package.json, and the mac suite checks the `node` pin satisfies it - the invariant that matters from now on. `windowsRuntimeContains` is fetch-runtime.ps1's own line, so the two platforms' wranglers cannot drift apart quietly again. Why it moved (#699): 4.156.0's own wrangler-dist/cli.js BUNDLES undici 7.30.1 (4.80.0 bundled 7.24.4), and npm audit finds NO advisory in its tree, against 35 in 4.80.0's (the four wrangler entries in npmAudit.accepted went stale and were deleted). MEASURED for `pages deploy` (#712's transcripts, research/wrangler/): its options are unchanged, new global flags are off by default, and the success line is still `Uploaded N files`. NEW since 4.108, and the one behaviour to know: when wrangler believes an AI agent is driving it (CLAUDECODE, AI_AGENT and others in its environment, or an agent among its ancestors), a deploy that would CREATE a new static project goes to Cloudflare Workers instead of Pages. deploy.py is guarded three ways: it passes `--branch`, an argument that delegation refuses; `ensure_pages_project` makes the project through the API before wrangler runs; and on the mac `docker exec` hands the container six named variables only. verify-deploy.sh fails a Cloudflare leg that prints the delegation's notice. REJECTED: a version below 4.120, to keep a miniflare 5 pre-release out of the tree (`pages deploy` never starts miniflare, and the ruling was the newest 4.x on the day); a range instead of an exact pin; waiting for wrangler 5."
     },
     {
       "pin": "quartz",
@@ -173,7 +173,21 @@
         "AAA Certificate Services",
         "emSign ECC Root CA - G3"
       ],
-      "why": "#639 (v1.9.0): Debian's certificate store, at least this version - the one that stops trusting `mustNotTrust`, the Comodo and eMudhra roots above the intermediates compromised in October 2026. Python's urllib trusts this store (its default paths lead to /etc/ssl/certs/ca-certificates.crt), and urllib is every Netlify publish and deploy.py's own Cloudflare calls; OpenSSL checks no revocation, so distrusting the roots is the protection. A FLOOR (`dpkg --compare-versions ... ge`) in a late layer of its own, not an `=` pin: Debian's security archive serves only its newest version, so an exact pin breaks every first build the day deb13u2 ships, and a later version only distrusts more. verify.sh checks the version, that neither subject is in the bundle, in Python's default context or in the hashed certificate folder, and that the store still holds more than 100 certificates, so an empty store cannot pass. Debian removed exactly these two: emSign Root CA - G1, emSign Root CA - C1 and emSign ECC Root CA - C3 (also eMudhra) stay trusted, which is Debian's choice and not ours to curate. Measured 2026-10-23: 150 certificates at 20250419, 148 at this version. No windowsRuntimeContains: Windows' Python reads the Windows certificate stores, not this file. Node's own built-in store (`tls.rootCertificates`, which wrangler uses) is not this file either: measured by #640, Node 22.23.4's holds 116 roots and neither subject, and of the four emSign roots Node 20.20.2's held (144 roots) it keeps only emSign Root CA - G1, as Debian does; verify.sh checks it under the `node` pin. REJECTED: an exact pin; a base-digest bump (a full rebuild for every teacher, and it moves Python's patch release); `apt-get upgrade` (unbounded); snapshot.debian.org (a new dependency on a first build); the main apt line (~330 MB again for every teacher who has built); trusting NodeSource's setup script, which happens to install ca-certificates, to keep doing so - and a cached layer never re-runs it."
+      "why": "#639 (v1.9.0): Debian's certificate store, at least this version - the one that stops trusting `mustNotTrust`, the Comodo and eMudhra roots above the intermediates compromised in October 2026. Python's urllib trusts this store (its default paths lead to /etc/ssl/certs/ca-certificates.crt), and urllib is every Netlify publish and deploy.py's own Cloudflare calls; OpenSSL checks no revocation, so distrusting the roots is the protection. A FLOOR (`dpkg --compare-versions ... ge`) in a late layer (since #714 the layer that takes all of trixie-security's upgrades), not an `=` pin: Debian's security archive serves only its newest version, so an exact pin breaks every first build the day deb13u2 ships, and a later version only distrusts more. verify.sh checks the version, that neither subject is in the bundle, in Python's default context or in the hashed certificate folder, and that the store still holds more than 100 certificates, so an empty store cannot pass. Debian removed exactly these two: emSign Root CA - G1, emSign Root CA - C1 and emSign ECC Root CA - C3 (also eMudhra) stay trusted, which is Debian's choice and not ours to curate. Measured 2026-10-23: 150 certificates at 20250419, 148 at this version. No windowsRuntimeContains: Windows' Python reads the Windows certificate stores, not this file. Node's own built-in store (`tls.rootCertificates`, which wrangler uses) is not this file either: measured by #640, Node 22.23.4's holds 116 roots and neither subject, and of the four emSign roots Node 20.20.2's held (144 roots) it keeps only emSign Root CA - G1, as Debian does; verify.sh checks it under the `node` pin. REJECTED: an exact pin; a base-digest bump (a full rebuild for every teacher, and it moves Python's patch release); `apt-get upgrade` (unbounded: #714 measured it at 25 packages and found it would move nodejs off its exact pin; the security layer it shares with libbrotli1 and libssl3t64 takes trixie-security's upgrades only); snapshot.debian.org (a new dependency on a first build); the main apt line (~330 MB again for every teacher who has built); trusting NodeSource's setup script, which happens to install ca-certificates, to keep doing so - and a cached layer never re-runs it."
+    },
+    {
+      "pin": "libbrotli1",
+      "debianPackage": "libbrotli1",
+      "value": "1.1.0-2+deb13u1",
+      "dockerfileContains": "libbrotli1)\" ge 1.1.0-2+deb13u1",
+      "why": "#714 (v1.9.1): Debian's Brotli decoder, at least this version - the one that fixes CVE-2026-111497 (Node2Shell, in CISA's KEV since 2026-10-27). curl links it (`libbrotlidec.so.1`), and curl runs only at build time here (GeoGebra's download, after this layer) and never passes `--compressed`, so the exposure was small; but the image was the one place Plantoir shipped the decoder unpatched. The base (frozen by its digest) has no libbrotli1; it arrives with curl on the main apt line, so a cached Mac kept 1.1.0-2+b7. Node's own bundled Brotli is a separate copy and is fixed in Node 22.23.4 (the `node` pin). A FLOOR (`dpkg --compare-versions ... ge`) in the late security layer, not an `=` pin, for the certificate store's reason: Debian's security archive serves only its newest version. The Dockerfile names it explicitly beside the security selector, so its candidate is taken from whichever archive has it. `debianPackage` makes verify.sh check the installed version against `value`. No windowsRuntimeContains: Windows' Python and Node carry no separate libbrotli. REJECTED: a full `apt-get upgrade` (it would move nodejs off its exact pin the day NodeSource ships 22.23.5); an exact pin; a base-digest bump (a full rebuild for every teacher, and it moves Python's patch release)."
+    },
+    {
+      "pin": "libssl3t64",
+      "debianPackage": "libssl3t64",
+      "value": "3.5.7-1~deb13u3",
+      "dockerfileContains": "libssl3t64)\" ge 3.5.7-1~deb13u3",
+      "why": "#714 (v1.9.1): Debian's OpenSSL library, at least this version (3.5.7; the image carried 3.5.6-1~deb13u2, about 14 CVEs older per Debian's security tracker on 2026-10-31). Python's `_ssl` links it - `ssl.OPENSSL_VERSION` read 3.5.6 before this layer and 3.5.7 after - so it is the TLS under every Netlify publish and deploy.py's own Cloudflare calls, and curl links it too. Node's TLS is its own bundled OpenSSL, under the `node` pin. Found while fixing libbrotli1: #714 first said openssl matched trixie-security, which was not true by 2026-10-31. 3.5.7 is in BOTH trixie-security (deb13u3) and the 13.7 point release (deb13u2), which is why the Dockerfile names libssl3t64 and openssl explicitly beside the Debian-Security selector: a newer stable-only version would otherwise leave it at the base's copy and fail this floor on every first build. A FLOOR in the late security layer, as caCertificates and libbrotli1; `debianPackage` makes verify.sh check it. No windowsRuntimeContains: Windows' Python ships its own OpenSSL with python.org's build. REJECTED: as libbrotli1."
     },
     {
       "pin": "geogebra",
@@ -388,9 +402,9 @@
     "rejected": "Carrying Swift in the installer (0.9 GB for every teacher, most of whom never write Swift); `swift sdk install` (needs Visual Studio's link.exe); installer.exe /layout (copies only itself); HTTP Range for just the needed payloads (one solid LZX folder); the asserts toolchain (the bundle's default, larger, not measured); WiX's `wix burn extract` (a .NET tool to ship, where expand.exe is part of Windows); cabinet.dll FDI in-process to avoid carving the cabinet out (the next step if the 4.82 GB peak ever matters); a container or WSL2 (Windows has had neither since 2026-08-19)."
   },
   "npmAudit": {
-    "note": "#667 (v1.9.0): what `npm audit` reports against the image's JavaScript, and which findings are accepted and why. verify.sh audits every tree below inside the image, with the image's own npm, and FAILS on a high or critical advisory that is not accepted here for that tree, or that is accepted at a LOWER severity than the database gives it now (re-decide). Low and moderate advisories that are not accepted are reported, not failed; an accepted advisory no longer reported is stale, said and not failed. Offline it SKIPS, saying no tree counts as audited until every tree can be. A top-level key, deliberately NOT under `pins`: both apps' pin tests read every pin as a Dockerfile line. Every current advisory is listed, low and moderate included, with the severity it has today, so a later raise fails. `exposure` and `reason` are decided per tree, because one advisory can be harmless in one tree and not in another. Windows audits its runtime's copies of the same trees (`windowsRuntime`) against this same list. scripts/npm_audit.py is the comparator; research/npm-audit/<date>.md is the record of each run; RELEASING.md step 2 revisits it at every cut. REJECTED: upgrading now (the ruling on #667: no upgrades this release; Quartz's tree moves with Quartz 5, #512, and wrangler's with its own piece); `npm audit --audit-level=high` alone, which cannot say 'accepted', so every run would be red; auditing in the image build, which would need the network on every build and fail a teacher's first build the day an advisory is published.",
+    "note": "#667 (v1.9.0): what `npm audit` reports against the image's JavaScript, and which findings are accepted and why. verify.sh audits every tree below inside the image, with the image's own npm, and FAILS on a high or critical advisory that is not accepted here for that tree, or that is accepted at a LOWER severity than the database gives it now (re-decide). Low and moderate advisories that are not accepted are reported, not failed; an accepted advisory no longer reported is stale, said and not failed. Offline it SKIPS, saying no tree counts as audited until every tree can be. A top-level key, deliberately NOT under `pins`: both apps' pin tests read every pin as a Dockerfile line. Every current advisory is listed, low and moderate included, with the severity it has today, so a later raise fails. `exposure` and `reason` are decided per tree, because one advisory can be harmless in one tree and not in another. Windows audits its runtime's copies of the same trees (`windowsRuntime`) against this same list. scripts/npm_audit.py is the comparator; research/npm-audit/<date>.md is the record of each run; RELEASING.md step 2 revisits it at every cut. REJECTED: upgrading now (the ruling on #667: no upgrades this release; Quartz's tree moves with Quartz 5, #512, and wrangler's moved with its own piece, #699, whose 4.156.0 has no advisory, so wrangler has no accepted entry today); `npm audit --audit-level=high` alone, which cannot say 'accepted', so every run would be red; auditing in the image build, which would need the network on every build and fail a teacher's first build the day an advisory is published.",
     "failsOn": ["high", "critical"],
-    "reviewed": "2026-10-28",
+    "reviewed": "2026-10-31",
     "trees": [
       {"tree": "quartz", "image": "/opt/quartz", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\quartz", "exposure": "Quartz v4.5.0 and every dependency its lockfile installs, dev dependencies included. Runs in the container on the teacher's Mac: the build, and the preview server while a preview runs. A built site carries Quartz's own client scripts and stylesheets."},
       {"tree": "tikz-engine", "image": "/opt/vendor/tikz-engine", "lockfile": "package-lock.json", "windowsRuntime": "runtime\\vendor\\tikz-engine", "exposure": "node-tikzjax and its locked dependencies (support/figures/package-lock.json, npm ci --omit=dev). Build only: a site carries the SVG it draws, never the engine."},
@@ -451,9 +465,10 @@
         "tree": "quartz",
         "package": "glob",
         "exposure": "the teacher's build only",
-        "reason": "The advisory is the glob COMMAND LINE's -c/--cmd option. Quartz reaches glob as a library through rimraf and never runs its command line.",
+        "reason": "The advisory is the glob COMMAND LINE's -c/--cmd option. Quartz reaches glob as a library through rimraf and never runs its command line. GHSA-3g3m-2fjr-6pw4 (moderate, published after 2026-10-28) is glob 9 to 14.0.1 carrying on through the filesystem after an AbortSignal has cancelled it: Quartz's one call is `rimraf(path.join(output, \"*\"), { glob: true, ... })` in its build.ts, with no signal, so there is nothing to cancel (read 2026-10-31 in the image: rimraf 6.0.1 passes a signal to glob only when its caller gave one).",
         "advisories": [
-          {"id": "GHSA-5j98-mcp5-4vw2", "severity": "high"}
+          {"id": "GHSA-5j98-mcp5-4vw2", "severity": "high"},
+          {"id": "GHSA-3g3m-2fjr-6pw4", "severity": "moderate"}
         ]
       },
       {
@@ -502,11 +517,12 @@
         "tree": "quartz",
         "package": "minimatch",
         "exposure": "the teacher's build, and the preview server on the teacher's Mac",
-        "reason": "ReDoS on crafted glob patterns. The patterns are Quartz's and serve-handler's own, never a teacher's notes or a student's request.",
+        "reason": "ReDoS on crafted glob patterns. The patterns are Quartz's and serve-handler's own, never a teacher's notes or a student's request. GHSA-g3hv-75wg-m249 (moderate, published after 2026-10-28) is the same shape, a denial of service from a crafted pattern's expansion: the patterns are still Quartz's own ignorePatterns (build.ts) and serve-handler's own configuration, so it is accepted on the same reason.",
         "advisories": [
           {"id": "GHSA-3ppc-4f35-3m26", "severity": "high"},
           {"id": "GHSA-7r86-cg39-jmmj", "severity": "high"},
-          {"id": "GHSA-23c5-xmqv-rm74", "severity": "high"}
+          {"id": "GHSA-23c5-xmqv-rm74", "severity": "high"},
+          {"id": "GHSA-g3hv-75wg-m249", "severity": "moderate"}
         ]
       },
       {
@@ -566,73 +582,6 @@
         "package": "ws",
         "exposure": "the teacher's build, and the preview server on the teacher's Mac",
         "reason": "Quartz's live-reload server while a preview runs (--serve --wsPort): a memory-exhaustion denial of service, and memory disclosure, of the preview's own websocket. A built site carries no ws. The preview ports listen beyond localhost today, which is its own finding.",
-        "advisories": [
-          {"id": "GHSA-58qx-3vcg-4xpx", "severity": "moderate"},
-          {"id": "GHSA-96hv-2xvq-fx4p", "severity": "high"}
-        ]
-      },
-      {
-        "tree": "wrangler",
-        "package": "esbuild",
-        "exposure": "not run",
-        "reason": "The advisory is esbuild's development server on Windows. `wrangler pages deploy` uploads a folder and bundles nothing.",
-        "advisories": [
-          {"id": "GHSA-g7r4-m6w7-qqqr", "severity": "low"}
-        ]
-      },
-      {
-        "tree": "wrangler",
-        "package": "sharp",
-        "exposure": "not run",
-        "reason": "Under miniflare, wrangler's local development server (its images binding). `wrangler pages deploy` uploads a folder and never starts miniflare.",
-        "advisories": [
-          {"id": "GHSA-f88m-g3jw-g9cj", "severity": "high"},
-          {"id": "GHSA-rgj7-g3m4-5g8c", "severity": "high"},
-          {"id": "GHSA-wq5f-xc86-pv6w", "severity": "high"}
-        ]
-      },
-      {
-        "tree": "wrangler",
-        "package": "undici",
-        "exposure": "Cloudflare deploy only",
-        "reason": "wrangler's HTTP client, used only while a Cloudflare deploy talks to Cloudflare's API from the teacher's computer. Plantoir configures no proxy; one in the teacher's environment is honoured through EnvHttpProxyAgent. The SOCKS5 advisories need a `socks5://` proxy, and the dropped-requestTls one also needs a `requestTls` option wrangler never passes, so the pool-reuse one is reached only behind a SOCKS5 proxy. The cache and cookie advisories need a shared cache, and wrangler makes fixed API calls with none. The WebSocket, EventSource and decompression ones are client-side denials of service from Cloudflare's own responses. The five published 2026-10-27, checked 2026-10-28 in wrangler 4.80.0's own wrangler-dist/cli.js, which BUNDLES undici 7.24.4 (so these are wrangler's own requests, not only miniflare's): GHSA-4w7w-5xrc-9h26 and GHSA-55wc-3pg8-jfw6 need undici's cache or decompress interceptor composed onto a dispatcher, and wrangler composes none; GHSA-2m5v-pch6-74hx needs a function-valued `tls` option on an Agent, and wrangler's only dispatchers are undici's default Agent and, when a proxy variable is set, EnvHttpProxyAgent({ noProxy }), neither with a tls option; GHSA-qrxm-fqhp-jwvm needs a TLS 1.2 connection, and api.cloudflare.com, where every `wrangler pages deploy` request goes, negotiated TLS 1.3 from Windows' runtime's Node 22.23.4, the image's exact pin (MEASURED 2026-10-28 on Windows: only those TLS 1.3 handshakes, of this PC's route, and registry.npmjs.org negotiating TLS 1.2 there; that host is reached only by the update check, which goes through Node's https module, not undici. REASONED, NOT MEASURED: through an HTTPS_PROXY CONNECT tunnel TLS stays end to end, so the measurement carries over; a proxy that terminates TLS is the peer instead and may speak 1.2, but Node trusts it only if its CA was handed to Node, and a proxy in that position already sees the token, so the worst it can then do is crash that deploy, a client-side DoS); GHSA-9fm3-97px-rjf6 is the WebSocket client, which a deploy never opens. Fixed in wrangler > 4.113.0, whose engines need Node 22: both platforms run Node 22.23.4 since #675, and moving wrangler is its own piece, #699 (the wrangler pin).",
-        "advisories": [
-          {"id": "GHSA-vmh5-mc38-953g", "severity": "high"},
-          {"id": "GHSA-p88m-4jfj-68fv", "severity": "moderate"},
-          {"id": "GHSA-vxpw-j846-p89q", "severity": "high"},
-          {"id": "GHSA-hm92-r4w5-c3mj", "severity": "high"},
-          {"id": "GHSA-g8m3-5g58-fq7m", "severity": "low"},
-          {"id": "GHSA-pr7r-676h-xcf6", "severity": "moderate"},
-          {"id": "GHSA-8xcm-r25x-g524", "severity": "moderate"},
-          {"id": "GHSA-4cwx-7wf7-3272", "severity": "high"},
-          {"id": "GHSA-m8rv-5g2x-5cg5", "severity": "moderate"},
-          {"id": "GHSA-jr45-8vmc-qm54", "severity": "moderate"},
-          {"id": "GHSA-v3r7-h72x-cjcm", "severity": "moderate"},
-          {"id": "GHSA-35p6-xmwp-9g52", "severity": "low"},
-          {"id": "GHSA-pmjh-fq2x-6v4x", "severity": "moderate"},
-          {"id": "GHSA-r53p-7pc4-xj5r", "severity": "low"},
-          {"id": "GHSA-rfgv-xxqx-mfg5", "severity": "high"},
-          {"id": "GHSA-3xpg-4rpp-hhhm", "severity": "moderate"},
-          {"id": "GHSA-2jfj-6hjv-fm6j", "severity": "moderate"},
-          {"id": "GHSA-2gqq-gqf2-x968", "severity": "low"},
-          {"id": "GHSA-w293-vg96-wgc3", "severity": "high"},
-          {"id": "GHSA-8436-99hf-9mmv", "severity": "low"},
-          {"id": "GHSA-rx4f-c7p8-82vq", "severity": "moderate"},
-          {"id": "GHSA-4qv8-2p9j-2685", "severity": "moderate"},
-          {"id": "GHSA-f72v-6w45-q472", "severity": "moderate"},
-          {"id": "GHSA-xjj6-f33q-929c", "severity": "high"},
-          {"id": "GHSA-4w7w-5xrc-9h26", "severity": "high"},
-          {"id": "GHSA-2m5v-pch6-74hx", "severity": "high"},
-          {"id": "GHSA-qrxm-fqhp-jwvm", "severity": "high"},
-          {"id": "GHSA-9fm3-97px-rjf6", "severity": "moderate"},
-          {"id": "GHSA-55wc-3pg8-jfw6", "severity": "moderate"}
-        ]
-      },
-      {
-        "tree": "wrangler",
-        "package": "ws",
-        "exposure": "not run",
-        "reason": "Under miniflare, wrangler's local development server. `wrangler pages deploy` never starts it.",
         "advisories": [
           {"id": "GHSA-58qx-3vcg-4xpx", "severity": "moderate"},
           {"id": "GHSA-96hv-2xvq-fx4p", "severity": "high"}

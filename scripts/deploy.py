@@ -758,9 +758,9 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
         # The Cancel reaches wrangler and this program together; usually this
         # program hears it first, as a KeyboardInterrupt. When wrangler is
         # seen leaving first, the same Cancel must not read as a failed
-        # publish with a traceback (GitHub #259). wrangler 4.80.0 itself
-        # exits 0 on SIGINT (measured), so only this program's own
-        # interrupt covers that shape; this covers the rest.
+        # publish with a traceback (GitHub #259). wrangler itself exits 0 on
+        # SIGINT - 4.80.0 and 4.156.0 alike (measured for #699) - so only
+        # this program's own interrupt covers that shape; this covers the rest.
         sys.exit(130)
     if completed.returncode != 0:
         raise RuntimeError(f"Cloudflare's deploy tool exited with code {completed.returncode}")
