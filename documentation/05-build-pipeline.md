@@ -2000,8 +2000,9 @@ build's `plantoir: error:` line and `figuresCouldNotBeDrawn` word a reason
 with — they had two copies of the fill until then. `test_figures.py` renders
 every reason with an empty `said` in both places and refuses "()", a dangling
 colon and a `{said}` left in; its stand-in ends itself by SIGKILL and SIGTERM.
-Rejected: dropping the brackets alone (the sentence then reads "stopped
-part-way  - …" with nothing to say what), and filling the gap with a stock
+Rejected: stripping the empty brackets out in code (the sentence then
+reads "stopped part-way  - …" with a double space and nothing to say what,
+where the authored no-detail sentence is written to read whole), and filling the gap with a stock
 phrase such as "no reason given" inside the brackets (it still reads as a
 fault in the wording rather than a sentence).
 

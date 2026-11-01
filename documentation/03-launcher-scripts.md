@@ -1201,11 +1201,13 @@ addresses. Every one of them now passes its reason to `remake_the_workspace`
 as one word, and the launcher prints `PLANTOIR_FOLDER_SET_UP_AGAIN: <reason>
 <place>` once the new workspace exists, which the app writes onto the trail
 as `folder set up again` (#684, `contracts/shared-rules.json`). `deploy.sh`
-never checks the image, the live-reload ports or the bindings: a publish runs
+never checks the image or the live-reload ports: a publish runs
 in whatever workspace the last preview or build left, and the next preview
 remakes it. That is an inconsistency, not
 a decision — written down here rather than fixed by #94, which is about what
-a remake may END, not about when one is due. `preview.sh` has no writability
+a remake may END, not about when one is due. (Not checking the BINDINGS there
+is the one part that IS a decision, #684: see "Remaking in `deploy.sh` too"
+among the rejected options above.) `preview.sh` has no writability
 check and no comment in it says why.
 
 Otherwise the container is started if stopped (`start_the_existing_workspace`
