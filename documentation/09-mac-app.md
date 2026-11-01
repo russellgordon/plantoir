@@ -3510,13 +3510,20 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   `` `____` ``, which prints as a line at the site's own height;
   `plantoir-printing` section 3 says never to fake blanks with underscores
   or typed empty lines, and to make a PDF handout when written answers need
-  the room. NOT changed: the printed quiz blank's height, which is the
+  the room. NOT changed here: the printed quiz blank's height, which is the
   site's `quiz.scss` print rule (a product change for both platforms, not
-  a skill's).
+  a skill's) - that half of the rule is
+  [#733](https://github.com/russellgordon/plantoir/issues/733) (v1.9.1).
 
-Russell's own `~/.claude/CLAUDE.md` "Tables of values" bullet still says to
-right-align every numeric column and use `\phantom{.5}`, which #715
-reverses; that file is his, not this repository's, and was left alone.
+Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
+refinement) now carries these rules - the centred box for a column with a
+negative value, matched decimal places without `\phantom`, no padding in
+running text, equal x and y widths, fill-in blanks, graphs and the key's
+layout - except for two phrases left from the morning's wording: a mixed
+whole/decimal column is right-aligned "with the same trailing padding", and
+equal widths make aligned numbers "sit at one offset in both" columns. The
+skills follow the 14:19 refinement in both places. That file is his, not
+this repository's, and was left alone.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

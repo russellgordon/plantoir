@@ -459,18 +459,26 @@ context?**
   that were plotted, so the graph does too: it is drawn **to the edge of
   the grid, with an arrowhead at each end**. The plotted points stay on it.
   In `pgfplots`, `<->, >=latex` on the `\addplot` and a `domain` that ends
-  where the curve meets the edge of the grid:
+  where the curve meets the edge of the grid - here a grid from $x = -1$ to
+  7 and $y = -6$ to 5:
 
   ```latex
+  % \begin{axis}[..., xmin=-1, xmax=7, ymin=-6, ymax=5]
   \addplot[thick, <->, >=latex, domain=-0.16:6.16, samples=50] {-x^2 + 6*x - 5};
   \addplot[only marks, mark=*] coordinates {(1,0) (2,3) (3,4) (4,3) (5,0)};
   ```
 
-  Find each end by solving for where the curve leaves the grid: a line
-  leaves through whichever edge it reaches first (on a grid from -6 to 6,
-  $y = 2x - 1$ leaves at $x = -2.5$ and $x = 3.5$); this parabola meets
-  $y = -6$ at $x = 3 \pm \sqrt{10}$, so -0.16 and 6.16. **Do not let the
-  domain run past the edge**: the axis clips the curve there and the
+  Find each end by solving the relation against **every** edge of the
+  grid - left, right, top and bottom - and stop the domain, on each side,
+  at the FIRST edge the curve crosses, so both arrowheads stay inside. On
+  the grid above, this parabola meets the bottom edge $y = -6$ at
+  $x = 3 \pm \sqrt{10}$, about -0.16 and 6.16, both inside $-1$ to 7, so
+  the bottom edge comes first on both sides. On a grid from -6 to 6 both
+  ways it reaches the right edge $x = 6$ (at $y = -5$) before the bottom,
+  so the domain ends at 6 there: `-0.16:6.16` on that grid draws only the
+  left arrowhead (measured). A line likewise: on a grid from -6 to 6,
+  $y = 2x - 1$ leaves through the bottom and top at $x = -2.5$ and 3.5.
+  **Do not let the domain run past the edge**: the axis clips the curve there and the
   arrowheads are cut off with it (measured: `domain=-1:7` above draws no
   arrowheads at all). Stopping a little short of the edge is fine; past
   it is not.

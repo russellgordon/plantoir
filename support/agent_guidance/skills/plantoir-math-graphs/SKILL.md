@@ -161,20 +161,28 @@ relation has a context.**
   is drawn **to the edge of the grid with an arrowhead at each end**, and
   the plotted points stay on it. In a `tikz` fence with `pgfplots`, put
   `<->, >=latex` on the `\addplot` and give it a `domain` that ends where
-  the curve meets the edge of the grid (pattern B):
+  the curve meets the edge of the grid (pattern B) - here a grid from
+  $x = -1$ to 7 and $y = -6$ to 5:
 
   ```latex
+  \begin{axis}[axis lines=middle, xmin=-1, xmax=7, ymin=-6, ymax=5, grid=major, width=8cm]
   \addplot[<->, >=latex, domain=-0.16:6.16, samples=50, thick, red] {-x^2 + 6*x - 5};
   \addplot[only marks, mark=*] coordinates {(1,0) (2,3) (3,4) (4,3) (5,0)};
+  \end{axis}
   ```
 
   Measured on the site's own engine (node-tikzjax 1.0.5): `<->, >=latex`
   draws an arrowhead at both ends of an `\addplot` inside an `axis`, as do
-  `>=stealth` and `arrows.meta`'s `{Latex}-{Latex}`. Solve for where the
-  curve leaves the grid (this parabola meets $y = -6$ at
-  $x = 3 \pm \sqrt{10}$, so -0.16 and 6.16) and **never let the domain run
+  `>=stealth` and `arrows.meta`'s `{Latex}-{Latex}`. Solve the relation
+  against **every** edge of the grid - left, right, top and bottom - and
+  stop the domain, on each side, at the FIRST edge the curve crosses, so
+  both arrowheads stay inside. On this grid the parabola meets the bottom
+  edge $y = -6$ at $x = 3 \pm \sqrt{10}$, about -0.16 and 6.16, both inside
+  $-1$ to 7. On a grid from -6 to 6 both ways it reaches the right edge
+  $x = 6$ first, so the domain ends at 6 there: `-0.16:6.16` on that grid
+  draws only the left arrowhead (measured). **Never let the domain run
   past the edge**: the axis clips the curve there and the arrowheads are
-  cut off with it (`domain=-1:7` on the same grid draws none).
+  cut off with it (`domain=-1:7` on the grid above draws none).
 - **A relation that models a context** (a bridge arch, a ball in flight,
   supply and demand) stops at the end points the situation gives it - the
   arch's two feet, the moment the ball lands - with **no arrowheads**:

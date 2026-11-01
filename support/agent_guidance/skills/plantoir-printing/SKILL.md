@@ -138,7 +138,8 @@ key "3. a) 7x - 2y  b) 7a - 11b".
   when a sheet needs that room for written answers, make it a PDF handout
   instead (`plantoir-handouts`, section 4) and hand it out from the page
   (section 4 below). If the room makes it a page longer, accept it and say
-  so.
+  so. (Giving a printed quiz blank that room itself is Plantoir's to do, not
+  yours: issue #733.)
 
 ## 4. Handing out a PDF the teacher already has
 
