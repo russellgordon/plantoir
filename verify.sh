@@ -1754,6 +1754,7 @@ check_baked scripts/contracts.py          /opt/scripts/contracts.py
 check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
+check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.
@@ -5793,6 +5794,100 @@ if ! grep -q "Swift program.* ready to run…" /tmp/verify_figures_second.log \
 else
   fail "runnable Swift: a second build compiled again or changed the Swift page (#493)"
   grep -n "Swift" /tmp/verify_figures_second.log | head -5
+fi
+
+# ---- 6i-p. A section's record of its problems (#717) ----
+# The main build's record names the planted diagram TeX cannot draw (\foo, a
+# real TeX error) as one row on its page, with the site's own say included
+# (siteSaidComplete: the site's emitter called Python on a real build); the
+# second build found the same rows, nothing new, and kept when each was first
+# found. Then the shared page is built for Section 2 too, the fence is put
+# right, and Section 1 is built again: its row goes, and Section 2's record -
+# whose site still carries the broken page - is left exactly as it was.
+PROBLEMS_ONE="$HIT_COURSE/.merged_output/section1/.problems.json"
+PROBLEMS_TWO="$HIT_COURSE/.merged_output/section2/.problems.json"
+rm -f /tmp/verify_problems_*.log /tmp/verify_problems_*.json
+cp "$PROBLEMS_ONE" /tmp/verify_problems_after_second.json 2>/dev/null || true
+PROBLEMS_OK=true
+if ! ./preview.sh EXC2O 2 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_problems_section2.log 2>&1; then
+  PROBLEMS_OK=false
+  echo "   Section 2 did not build"
+fi
+cp "$PROBLEMS_TWO" /tmp/verify_problems_section2_before.json 2>/dev/null || true
+python3 - "$HIT_COURSE/Figures Fixture.md" <<'UNFOO'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+path.write_text("".join(line for line in lines if line.strip() != "\\foo"), encoding="utf-8")
+UNFOO
+if ! ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_problems_fixed.log 2>&1; then
+  PROBLEMS_OK=false
+  echo "   Section 1 did not build after the fence was put right"
+fi
+# Read now: the stages after this one build the section again.
+cp "$PROBLEMS_ONE" /tmp/verify_problems_section1_fixed.json 2>/dev/null || true
+cp "$PROBLEMS_TWO" /tmp/verify_problems_section2_after.json 2>/dev/null || true
+if $PROBLEMS_OK && python3 - /tmp/verify_main_build.log /tmp/verify_problems_after_second.json \
+     /tmp/verify_problems_section2_before.json /tmp/verify_problems_section1_fixed.json \
+     /tmp/verify_problems_section2_after.json /tmp/verify_problems_fixed.log <<'PROBLEMSPY'
+import json, re, sys
+from pathlib import Path
+main_log, second, two_before, one_now, two_now, fixed_log = [Path(arg) for arg in sys.argv[1:7]]
+problems = []
+def read(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+said = main_log.read_text(encoding="utf-8", errors="ignore")
+markers = re.findall(r"PLANTOIR_PROBLEMS: (\{[^\n]*\})", said)
+if len(markers) != 2:
+    problems.append(f"the main build printed {len(markers)} PLANTOIR_PROBLEMS: lines, not two (the build's, then the site's)")
+health_at = said.find("PLANTOIR_HEALTH:")
+problems_at = said.find("PLANTOIR_PROBLEMS:")
+links_at = said.find("PLANTOIR_LINKS_CHECKLIST:")
+if problems_at < 0 or health_at > problems_at or (links_at >= 0 and links_at < problems_at):
+    problems.append("the record's marker is not after the folder problems and before the links checklist's")
+after_second = read(second)
+if after_second is None:
+    problems.append("no record after the second build of Section 1")
+else:
+    # The page holds two figures that cannot be drawn (\\foo and a graph's
+    # "ln"): each is its own row, and the \\foo diagram is exactly one.
+    figures_here = [row for row in after_second["rows"] if row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture"]
+    figure = [row for row in figures_here if "\\foo" in row["item"]]
+    if len(figures_here) < 2 or len(figure) != 1 or "|tikz|" not in figure[0]["id"]:
+        problems.append(f"the record does not name the diagram TeX cannot draw as one row: {figure}")
+    if not after_second.get("siteSaidComplete"):
+        problems.append("the site did not say into the record (siteSaidComplete)")
+    if after_second["changed"] != {"new": [], "gone": []}:
+        problems.append(f"the second build changed the set: {after_second['changed']}")
+    if figure and figure[0]["firstSeen"] == figure[0]["lastSeen"]:
+        problems.append("the second build did not keep when the diagram's problem was first found")
+two = read(two_before)
+if two is None or not any(row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture" for row in two["rows"]):
+    problems.append("Section 2's record does not name the shared page's diagram")
+one = read(one_now)
+if one is None:
+    problems.append("no record after Section 1 was built with the fence put right")
+else:
+    if any(row["kind"] == "figuresCouldNotBeDrawn" and row["page"] == "Figures Fixture" and "\\foo" in row["item"] for row in one["rows"]):
+        problems.append("the diagram put right is still a row of Section 1's record")
+    if after_second is not None and figure and figure[0]["id"] not in one["changed"]["gone"]:
+        problems.append(f"the diagram put right is not among the gone: {one['changed']}")
+    if "Figures Fixture" not in one.get("pagesShown", []):
+        problems.append("Section 1's record does not list the shared page among the pages it shows")
+if two_now.read_bytes() != two_before.read_bytes() if two_now.is_file() and two_before.is_file() else True:
+    problems.append("Section 1's build changed Section 2's record")
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PROBLEMSPY
+then
+  pass "a section's record of its problems: the diagram TeX cannot draw is one row on its page, the site says into it, a second build finds nothing new and keeps when it was first found, and putting it right takes it out of Section 1's record while Section 2's is left as it was (#717)"
+else
+  fail "a section's record of its problems: one of the checks above failed (#717)"
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT

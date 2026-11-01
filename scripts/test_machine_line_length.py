@@ -122,6 +122,11 @@ class TheCapHolds(unittest.TestCase):
         limit = rule("maxCharacters")
         long_code = "A" * 40
         worst = [
+            # #717: counts only, never a row.
+            "PLANTOIR_PROBLEMS: " + json.dumps({"course": long_code, "section": 99,
+                                                "buildId": "20260929T233000Z-1a2b3c4d",
+                                                "alertKey": "20260929T233000Z-1a2b3c4d+1a2b3c4d",
+                                                "rows": 99999, "new": 99999, "gone": 99999}),
             "PLANTOIR_MY_PROGRESS: " + json.dumps({"course": long_code, "section": 99, "built": False,
                                                    "pages": 99999, "reason": "noSuccessCriteria"}),
             "PLANTOIR_REPAIRED: " + json.dumps({"course": long_code, "section": 99, "repair": "frontPageTitleQuoted",

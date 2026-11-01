@@ -490,12 +490,12 @@ def prepare(pages: list, output_dir, cache_root, swift_dir=None, windows=None, p
                 line = None
                 if file_line is not None:
                     line = file_line + dropped + (block_line if block_line is not None else 1)
-                problem = {"page": page["place"], "block": block["n"], "line": line,
+                problem = {"page": page["place"], "block": block["n"], "key": key, "line": line,
                            "blockLine": block_line, "reason": "compileError", "said": said}
                 manifest[key] = {"ok": False, "reason": "compileError"}
             else:
                 reason = missing_reason(state, windows)
-                problem = {"page": page["place"], "block": block["n"], "line": file_line,
+                problem = {"page": page["place"], "block": block["n"], "key": key, "line": file_line,
                            "blockLine": None, "reason": reason, "said": ""}
                 manifest[key] = {"ok": False, "reason": reason}
             problems.append(problem)

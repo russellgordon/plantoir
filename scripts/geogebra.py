@@ -702,7 +702,9 @@ def _located(sketch: dict, problem: dict) -> dict:
         line = sketch["fileLine"]
         if problem.get("blockLine") is not None:
             line += problem["blockLine"]
-    located = {"page": sketch["place"], "block": sketch["block"], "line": line,
+    # "key" is the fence's own key (#717): what identifies the sketch's row
+    # in the section's Problems record, whatever its place on the page.
+    located = {"page": sketch["place"], "block": sketch["block"], "key": sketch.get("key"), "line": line,
                "blockLine": problem.get("blockLine"), "reason": problem.get("reason")}
     for name in ("file", "name", "value", "id", "megabytes"):
         if problem.get(name) is not None:

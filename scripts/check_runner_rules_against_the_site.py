@@ -321,6 +321,10 @@ const siteSaidRuns = []
     { name: "nothing disagrees", carried: ["pyodide"], emits: 1 },
     { name: "quizzes on two pages, and a hidden page", carried: ["pyodide"], emits: 2, quizzes: true },
     { name: "blocks and quizzes together", carried: [], emits: 1, quizzes: true },
+    // #717 (plan review, HIGH 1): with nothing to say, a build that named its
+    // Problems record still calls Python, which takes the site's carried row
+    // out of it - or a block put right would keep its row for ever.
+    { name: "nothing disagrees, and the build named its record", carried: ["pyodide"], emits: 1, record: true },
   ]
   for (const run of runs) {
     count += 1
@@ -328,7 +332,18 @@ const siteSaidRuns = []
     mkdirSync(join(site, "quartz"))
     mkdirSync(join(site, "content", "Units"), { recursive: true })
     writeFileSync(join(site, "quartz", "plantoir_code_runner.json"), JSON.stringify({ words, carried: run.carried, limits: {} }))
-    writeFileSync(join(site, "quartz", "plantoir_site_said.json"), JSON.stringify({ ...said, content: join(site, "content") }))
+    let problems = undefined
+    if (run.record) {
+      problems = { file: join(site, ".problems.json"), buildId: "B717" }
+      writeFileSync(problems.file, JSON.stringify({
+        version: 1, course: "ICS3U", section: 1, buildId: "B717", builtAt: "2026-11-01T13:00:00Z",
+        occasion: "preview", pagesShown: ["Unit 1/Loops"], before: ["runnableCodeShownAsPlainCode|Unit 1/Loops|python|1"],
+        siteSaidComplete: false, alertKey: "B717", changed: { new: [], gone: [] },
+        rows: [{ id: "runnableCodeShownAsPlainCode|Unit 1/Loops|python|1", kind: "runnableCodeShownAsPlainCode",
+                 page: "Unit 1/Loops", from: "site", carried: true, firstSeen: "2026-10-31T13:00:00Z" }],
+      }))
+    }
+    writeFileSync(join(site, "quartz", "plantoir_site_said.json"), JSON.stringify({ ...said, content: join(site, "content"), problems }))
     for (const [path, text] of pages) writeFileSync(join(site, "content", path), text)
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25)
     process.chdir(site)
@@ -367,7 +382,8 @@ const siteSaidRuns = []
       if (!Array.isArray(emitted) || emitted.length !== 0) failures.push(`plantoirSiteSaid, ${run.name}: emitted ${JSON.stringify(emitted)}`)
     }
     process.chdir(home)
-    siteSaidRuns.push({ name: run.name, lines, printed, ms })
+    const record = run.record ? JSON.parse(readFileSync(problems.file, "utf-8")) : undefined
+    siteSaidRuns.push({ name: run.name, lines, printed, ms, record })
   }
 }
 // Text that wraps (#653): every case through the rule, then as a page
@@ -520,6 +536,37 @@ def check_what_the_site_said(runs: list) -> list:
         print(f"plantoirSiteSaid.ts: one finding for three blocks, said once, in {several['ms'][0]:.0f} ms "
               f"(a second emit {several['ms'][1]:.1f} ms; a site where nothing disagrees {quiet['ms'][0]:.1f} ms)")
     failures += check_the_quizzes_the_site_said(by_name, prefix)
+    failures += check_the_record_the_site_said(by_name)
+    return failures
+
+
+def check_the_record_the_site_said(by_name: dict) -> list:
+    """
+    #717 (plan review, HIGH 1): a site where nothing disagrees, whose build
+    named its Problems record, still calls Python - which prints no HEALTH
+    line, ONE PLANTOIR_PROBLEMS: line, and leaves the record with the site's
+    carried row gone and siteSaidComplete set.
+    """
+    failures = []
+    run = by_name.get("nothing disagrees, and the build named its record")
+    if run is None:
+        return ["plantoirSiteSaid: the Node half did not run the record case"]
+    prefix = contracts.section("shared-rules", "sectionProblems", "marker", "prefix")
+    health = contracts.section("shared-rules", "siteHealth", "marker", "prefix")
+    printed = run["printed"][0]
+    markers = [line for line in printed.splitlines() if prefix in line]
+    record = run.get("record") or {}
+    if health in printed or len(markers) != 1:
+        failures.append(f"plantoirSiteSaid: with nothing to say it printed {printed!r}")
+    else:
+        said = json.loads(markers[0][markers[0].index(prefix) + len(prefix):])
+        if said.get("rows") != 0 or said.get("gone") != 1:
+            failures.append(f"plantoirSiteSaid: the record's marker says {said}")
+    if record.get("rows") != [] or record.get("siteSaidComplete") is not True:
+        failures.append(f"plantoirSiteSaid: the record after the site said is {record}")
+    if not failures:
+        print(f"plantoirSiteSaid.ts: with nothing to say, the build's Problems record still loses the site's "
+              f"carried row ({run['ms'][0]:.0f} ms, #717)")
     return failures
 
 

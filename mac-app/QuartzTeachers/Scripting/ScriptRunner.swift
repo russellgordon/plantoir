@@ -734,6 +734,12 @@ class ScriptRunner {
     /// finding is announced before the offer can exist.
     private(set) var linksChecklistMarkers: [LinksChecklistMarker] = []
 
+    /// The build's word that a section's Problems record changed (#717),
+    /// collected as it arrives for the reason `healthFindings` is. The window
+    /// reloads the record and decides the alert from THIS, never from the
+    /// findings, which are said before the record is written.
+    private(set) var problemsMarkers: [SectionProblemsMarker] = []
+
     /// The address the launcher announced for this run's preview — the last
     /// one, when there is more than one — and nil until it has announced one.
     ///
@@ -796,6 +802,7 @@ class ScriptRunner {
         }
         healthFindings = []
         linksChecklistMarkers = []
+        problemsMarkers = []
         announcedPreviewAddress = nil
         pendingLine = ""
     }
@@ -853,6 +860,12 @@ class ScriptRunner {
         BuildRepairReport.noteOnTheTrail(from: text)
         for marker in LinksChecklistMarker.markers(in: text) {
             linksChecklistMarkers.append(marker)
+        }
+        for marker in SectionProblemsMarker.markers(in: text) {
+            problemsMarkers.append(marker)
+            // Whichever run printed it — a preview, a deploy that outlived
+            // its view, the assistant's — the sidebar reads the records again.
+            SectionProblems.shared.noteAMarkerArrived()
         }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
