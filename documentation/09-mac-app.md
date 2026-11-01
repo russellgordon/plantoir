@@ -9052,7 +9052,10 @@ years at up to 2 MB each, and the fix is small.
   with no default, and the app passes `indexFolder()`, which `RealHome`
   puts under the throwaway home in the unit suite and under the state folder
   with `--state-dir`; the suite never runs the launch task, and a test
-  (`testAPruneNeverReachesTheRealIndexFolder`) holds both.
+  (`testAPruneNeverReachesTheRealIndexFolder`) holds both — comparing the
+  folder with the REAL one, built from the real home and never opened (an
+  allowance in `RealHomeTripwireTests`), because a comparison with the
+  suite's own home could not fail.
 - **The builds sweep takes the index with the builds.** When
   `discardBuildsForMissingWorkingFolders` removes `builds/<id>` (a folder
   under the home that is gone), it removes `toolchain-index/<id>.hashes`,
@@ -9066,10 +9069,13 @@ years at up to 2 MB each, and the fix is small.
 **The race, and which side of it this is on.** The prune runs at launch
 while a reopened folder's first pass may be reading its index. Marking at
 READ time means a folder being opened has a fresh time before the prune can
-look at it in almost every interleaving; in the one that is left (pruned
-between the read and the mark), `utimes` does not recreate the file, the
-pass does not rewrite an index it thinks unchanged, and the next pass reads
-in full and writes it again. That costs one full read, and nothing else.
+look at it in almost every interleaving. Two are left, and they end the same
+way: the prune removes the index between the pass's read and its mark, or
+the prune reads the OLD time, the pass then reads and marks the index, and
+the prune removes it on the time it read. Either way `utimes` does not
+recreate the file, the pass does not rewrite an index it thinks unchanged,
+and the next pass reads in full and writes it again. That costs one full
+read, and nothing else.
 
 **Why 90 days.** A wrongly removed index costs one pass that hashes every
 copy once: **0.95 s for 12,928 files (40 MB) on an M4 Pro**, measured warm

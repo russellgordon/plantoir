@@ -108,6 +108,10 @@ final class RealHomeTripwireTests: XCTestCase {
         "QuartzTeachersTests/SuiteStaysOutOfRealFoldersTests.swift | homeDirectoryForCurrentUser": 1,
         "QuartzTeachersTests/BuildOutputLocationTests.swift | homeDirectoryForCurrentUser": 1,
         "QuartzTeachersTests/AssistScenarioTests.swift | homeDirectoryForCurrentUser": 1,
+        // The toolchain-index prune (#683): the folder the app would prune
+        // under the suite is compared with the REAL one, built from the
+        // real home and never opened, so the check can fail.
+        "QuartzTeachersTests/ToolchainFingerprintTests.swift | homeDirectoryForCurrentUser": 1,
         "QuartzTeachersTests/ActivityTrailWiringTests.swift | expandingTildeInPath": 1,
         "QuartzTeachersTests/ActivityTrailWiringTests.swift | \"~/": 1,
         "QuartzTeachersTests/ScheduledDeployCleanupTests.swift | expandingTildeInPath": 1,
