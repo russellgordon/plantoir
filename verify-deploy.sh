@@ -46,15 +46,38 @@
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
 #                                          # Cloudflare, offline, in ~20 s (#665)
+#   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
+#                                          # publishes as a NEW teacher would:
+#                                          # new sites, both questions asked (#712)
 #
 # It uses ONE course throughout, on purpose: a Netlify site and a Cloudflare
 # project are created once and reused, rather than littering the accounts with
 # one per case. The names are printed at the end so they can be deleted.
+#
+# --first-publish (#712, the mac's copy of Windows' -FirstPublish, #123/#623)
+# moves aside what makes a publish a REPEAT one - the saved surname (and its
+# pre-.internal location), the section's Netlify record (and its legacy
+# per-section one) and its Cloudflare record - and answers the surname
+# question with "Testing" plus six random letters, so deploy.py names, and
+# creates, a Netlify site and a Cloudflare project nobody has ever uploaded
+# to. A random surname alone changes nothing while the records are there:
+# deploy.py reuses a recorded site and never asks (#699's plan review, B1).
+# Everything moved aside is put back on every exit, and a run killed outright
+# is put right by the next run's preflight. The two sites it made are DELETED
+# at the end of the run, through the hosts' own APIs, and the Result block
+# names them either way, so nothing is left on the accounts unannounced.
 
 set -u
 
 SELF_TEST=false
-if [ "${1:-}" = "--self-test" ]; then SELF_TEST=true; shift; fi
+FIRST_PUBLISH=false
+while :; do
+  case "${1:-}" in
+    --self-test)     SELF_TEST=true; shift ;;
+    --first-publish) FIRST_PUBLISH=true; shift ;;
+    *) break ;;
+  esac
+done
 
 WORKING_FOLDER="${1:-$HOME/Desktop/plantoir-overnight}"
 COURSE="${2:-ADA1O}"
@@ -315,7 +338,137 @@ STASHED_INDEX="$WORK/index.md.stashed"
 # section so every destination carries the Python engine and the site's own
 # KaTeX; removed on any exit.
 RUNNER_PAGE="$WORKING_FOLDER/courses/$COURSE/section$SECTION/Runner Deploy Check.md"
+
+# ------------------------------------------------- a FIRST publish (#712)
+# What a first publish reads, moved aside so deploy.py asks for a surname and
+# names new sites - the same five paths as Windows' verify-deploy.ps1.
+#
+# THE ORIGINALS ARE NEVER DELETED, only renamed to <path>.verify-deploy-hidden,
+# and the sentinel records, path by path and AFTER each step, whether that
+# path's original was hidden or absent. Restoring deletes what is at a path
+# only when its original is safe beside it (hidden) or there never was one
+# (absent): then it is a record deploy.py wrote for the test's site. Anything
+# else - a move that failed, a kill between a move and the sentinel - is left
+# alone, and a hidden original is always moved back. So a run killed half way
+# is put right by the NEXT run's preflight, and no failure on the way can
+# cost the course its real records (Windows' Opus review of the same code).
+FIRST_PUBLISH_STATE=(
+  "$WORKING_FOLDER/courses/.internal/profile.json"
+  "$WORKING_FOLDER/courses/_secrets/profile.json"
+  "$WORKING_FOLDER/courses/$COURSE/.netlify_sites/section$SECTION.json"
+  "$WORKING_FOLDER/courses/$COURSE/.cloudflare_sites/section$SECTION.json"
+  "$WORKING_FOLDER/courses/$COURSE/section$SECTION/.netlify_site.json"
+)
+FIRST_PUBLISH_SENTINEL="$WORKING_FOLDER/courses/.verify-deploy-first-publish.txt"
+SITES_MADE=()      # "netlify<TAB>name<TAB>site id" / "cloudflare<TAB>name<TAB>account id"
+SITES_REPORT=()    # what the Result block says about each, deleted or not
+SURNAME="Testing"
+if [ "$FIRST_PUBLISH" = true ]; then
+  # Letters only, as deploy.py asks; lower case so the site name carries it
+  # verbatim, which is what the deletion below checks before it deletes.
+  SURNAME="Testing$(LC_ALL=C tr -dc 'a-z' </dev/urandom | head -c 6)"
+fi
+SURNAME_IN_NAMES=$(printf '%s' "$SURNAME" | tr 'A-Z' 'a-z')
+first_publish_anything_hidden() {
+  local path
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] && return 0
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do [ -e "$path.verify-deploy-hidden" ] && return 0; done
+  return 1
+}
+first_publish_recorded() {  # first_publish_recorded <path> -> hidden|absent|""
+  [ -f "$FIRST_PUBLISH_SENTINEL" ] || return 0
+  awk -F '\t' -v p="$1" '$2 == p { v = $1 } END { if (v != "") print v }' "$FIRST_PUBLISH_SENTINEL"
+}
+restore_first_publish_state() {
+  local path hidden safe recorded line
+  first_publish_anything_hidden || return 0
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do
+    hidden="$path.verify-deploy-hidden"
+    safe=false; [ -e "$hidden" ] && safe=true
+    recorded=$(first_publish_recorded "$path")
+    if [ -e "$path" ] && { [ "$safe" = true ] || [ "$recorded" = absent ]; }; then
+      # A record deploy.py wrote for the test's site: its name (and the id the
+      # host's API deletes it by) is kept for the Result block, then it goes.
+      line=$(python3 - "$path" <<'PY2'
+import json, sys
+path = sys.argv[1]
+try:
+    record = json.load(open(path))
+except Exception:
+    sys.exit(0)
+name = record.get("name") or ""
+if not name:
+    sys.exit(0)
+if "cloudflare_sites" in path:
+    print("cloudflare\t" + name + "\t" + (record.get("account_id") or ""))
+elif "netlify" in path:
+    print("netlify\t" + name + "\t" + (record.get("site_id") or record.get("id") or ""))
+PY2
+)
+      [ -n "$line" ] && SITES_MADE+=("$line")
+      rm -f "$path"
+    fi
+    if [ "$safe" = true ]; then
+      mv -f "$hidden" "$path" 2>/dev/null \
+        || { echo "  ⚠️  could not put $path back from $hidden - move it back by hand"; return 1; }
+    elif [ "$recorded" = hidden ]; then
+      echo "  ⚠️  $path was recorded as moved aside but $hidden is not there; left as it is"
+    fi
+  done
+  rm -f "$FIRST_PUBLISH_SENTINEL"
+  echo "  ↩︎  put the saved surname and the section's own site records back"
+}
+hide_first_publish_state() {
+  local path
+  : >"$FIRST_PUBLISH_SENTINEL" || { echo "could not write $FIRST_PUBLISH_SENTINEL"; return 1; }
+  for path in "${FIRST_PUBLISH_STATE[@]}"; do
+    if [ -e "$path" ]; then
+      mv "$path" "$path.verify-deploy-hidden" 2>/dev/null || { echo "could not move $path aside"; return 1; }
+      printf 'hidden\t%s\n' "$path" >>"$FIRST_PUBLISH_SENTINEL"
+    else
+      printf 'absent\t%s\n' "$path" >>"$FIRST_PUBLISH_SENTINEL"
+    fi
+  done
+  return 0
+}
+# Deletes the sites a first publish made, through each host's own API, so a
+# release's first-publish run leaves nothing on the accounts. Only a site whose
+# record deploy.py wrote during THIS run (collected by the restore above) and
+# whose name carries this run's random surname is ever touched - never the
+# section's own sites, whose records were hidden and are now back. The token
+# goes to curl on stdin (-H @-), never on a command line.
+delete_sites_made() {
+  local entry kind name id code token
+  for entry in ${SITES_MADE[@]+"${SITES_MADE[@]}"}; do
+    IFS=$'\t' read -r kind name id <<<"$entry"
+    case "$name" in
+      *"$SURNAME_IN_NAMES"*) ;;
+      *) SITES_REPORT+=("$kind $name: NOT deleted (its name does not carry this run's surname $SURNAME_IN_NAMES)"); continue ;;
+    esac
+    code=""
+    if [ "$kind" = netlify ] && [ -n "$id" ]; then
+      token=$(security find-generic-password -s "containerized-quartz-netlify" -w 2>/dev/null)
+      code=$(printf 'Authorization: Bearer %s\n' "$token" | curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+        -X DELETE -H @- "https://api.netlify.com/api/v1/sites/$id")
+    elif [ "$kind" = cloudflare ] && [ -n "$id" ]; then
+      token=$(security find-generic-password -s "containerized-quartz-cloudflare" -w 2>/dev/null)
+      code=$(printf 'Authorization: Bearer %s\n' "$token" | curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+        -X DELETE -H @- "https://api.cloudflare.com/client/v4/accounts/$id/pages/projects/$name")
+    fi
+    token=""
+    case "$code" in
+      2??) SITES_REPORT+=("$kind $name: created by this run, and DELETED at its end (HTTP $code)") ;;
+      *)   SITES_REPORT+=("$kind $name: created by this run, NOT deleted (HTTP ${code:-none}) - delete it by hand") ;;
+    esac
+  done
+  SITES_MADE=()
+}
+
 restore_what_was_borrowed() {
+  restore_first_publish_state
+  delete_sites_made
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "  ↩︎  $line"; done
+  SITES_REPORT=()
   if [ -f "$RUNNER_PAGE" ]; then
     rm -f "$RUNNER_PAGE" && echo "  ↩︎  took the borrowed page of runnable code away"
   fi
@@ -359,6 +512,21 @@ else
   skip "no Cloudflare credentials — Cloudflare cases will be skipped, not failed"
 fi
 CF_ACCOUNT=$(security find-generic-password -s "containerized-quartz-cloudflare-account" -w 2>/dev/null || echo "")
+
+if first_publish_anything_hidden; then
+  restore_first_publish_state
+  delete_sites_made
+  ok "a FIRST-publish run before this one was stopped half way: its surname and site records were put back first"
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "    $line"; done
+  SITES_REPORT=()
+fi
+if [ "$FIRST_PUBLISH" = true ]; then
+  HIDE_PROBLEM=$(hide_first_publish_state) || {
+    no "FIRST publish: ${HIDE_PROBLEM} - refusing to publish, and putting back what was moved"
+    exit 1
+  }
+  ok "FIRST publish: the surname and the section's site records are moved aside; deploy.py will be told '$SURNAME'"
+fi
 
 # ------------------------------------- the recipe the launchers run (#665)
 # The checks read THIS checkout's contracts/ (check_engine_folder), but the
@@ -449,7 +617,7 @@ run_deploy() {  # run_deploy <logfile> <args...>
     log_file -a {$log}
     spawn ./deploy.sh $*
     expect {
-      -re {last name.*: }        { send \"Testing\r\"; exp_continue }
+      -re {last name.*: }        { send \"$SURNAME\r\"; exp_continue }
       -re {Netlify site name.*]} { send \"\r\"; exp_continue }
       -re {Enter Netlify site name} { send \"\r\"; exp_continue }
       -re {different Netlify site name} { send \"\r\"; exp_continue }
@@ -522,6 +690,22 @@ check_folder() {  # check_folder <label> <dir>
     no "$1 CONTAINS THE LIVE-RELOAD CLIENT — a preview build was published"
   else
     ok "$1 carries no live-reload client"
+  fi
+}
+
+# wrangler 4.108 and later sends a NEW static project to Workers instead of
+# Pages when it believes an AI agent is driving it (CLAUDECODE, AI_AGENT, ...
+# in its environment, or an agent among its ancestors) - a different product
+# at a different address. deploy.py is guarded three ways (--branch is an
+# argument the delegation refuses, the project is made through the API before
+# wrangler runs, and docker exec hands the container six named variables
+# only), so a leg that prints the delegation's notice is a FAILURE: the site a
+# teacher was told about is not the one that was made (#699).
+check_no_delegation() {  # check_no_delegation <label> <logfile>
+  if grep -aq "now part of Cloudflare Workers" "$2" 2>/dev/null; then
+    no "$1 — wrangler delegated the upload to Cloudflare Workers instead of Pages"
+  else
+    ok "$1 — uploaded to Cloudflare Pages itself, with no delegation to Workers"
   fi
 }
 
@@ -804,7 +988,10 @@ measure_deploy() {  # measure_deploy <label> <logfile> <args...>
   before=$(obytes); start=$(date +%s)
   run_deploy "$log" "$@"; rc=$?
   finish=$(date +%s); after=$(obytes)
-  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files \([0-9]+ already uploaded\)" "$log" | tail -1)
+  # Pages' line is "Uploaded N files (M already uploaded)" in 4.80.0 and
+  # 4.156.0 alike, but a first-ever upload has nothing already uploaded, and
+  # the old pattern, which required the parenthesis, never matched one (#712).
+  files=$(grep -aoE "Netlify requires [0-9]+ file|Uploaded [0-9]+ files?( \([0-9]+ already uploaded\))?" "$log" | tail -1)
   MEASURED+=("$label: $((finish - start)) s, ${files:-no upload count}, $(( (${after:-0} - ${before:-0}) / 1024 )) KiB sent on ${NET_IFACE:-?}")
   return $rc
 }
@@ -949,6 +1136,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/deploy-cloudflare.log"
   measure_deploy "Cloudflare, first publish with the engine" "$WORK/deploy-cloudflare.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "publish to Cloudflare exited 0" || no "publish to Cloudflare failed"
+  check_no_delegation "Cloudflare Pages" "$WORK/deploy-cloudflare.log"
   snapshot_cloudflare_upload "Cloudflare Pages" "$WORK/deploy-cloudflare.log" "$WORK/cf-alone"; CF_SNAPPED=$?
   CF_URL=$(url_from_log "$WORK/deploy-cloudflare.log")
   [ -n "$CF_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare Pages" "$CF_URL" "$WORK/cf-alone"
@@ -972,6 +1160,7 @@ if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/pair-nc2.log"
   measure_deploy "Cloudflare, second publish" "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 2 (Cloudflare) exited 0" || no "leg 2 (Cloudflare) failed"
+  check_no_delegation "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log"
   snapshot_cloudflare_upload "Cloudflare (paired with Netlify)" "$WORK/pair-nc2.log" "$WORK/cf-with-netlify"; CF_SNAPPED=$?
   C_URL=$(url_from_log "$WORK/pair-nc2.log")
   [ -n "$C_URL" ] && [ "$CF_SNAPPED" -eq 0 ] && wait_for_cloudflare_production "Cloudflare (paired with Netlify)" "$C_URL" "$WORK/cf-with-netlify"
@@ -1011,6 +1200,7 @@ if [ "$HAVE_CLOUDFLARE" = true ]; then
   : >"$WORK/pair-cf.log"
   run_deploy "$WORK/pair-cf.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
     && ok "leg 1 (Cloudflare) exited 0" || no "leg 1 (Cloudflare) failed"
+  check_no_delegation "Cloudflare (paired with a folder)" "$WORK/pair-cf.log"
   # Kept NOW: the folder leg below can rebuild the section before production
   # is judged.
   snapshot_cloudflare_upload "Cloudflare (paired with a folder)" "$WORK/pair-cf.log" "$WORK/cf-with-folder"; CF_SNAPPED=$?
@@ -1108,6 +1298,12 @@ RECIPE_AT_END=$(recipe_differences)
   && ok "the folder still runs this checkout's recipe at the end of the run" \
   || no "the folder's recipe differs from this checkout's in $RECIPE_AT_END place(s) at the end - something re-mirrored it during the run"
 
+# A first publish's records are put back, and the sites it made deleted,
+# BEFORE the Result block, so the block can name them. The exit trap does it
+# again, harmlessly, on every other path.
+restore_first_publish_state
+delete_sites_made
+
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"
 echo "  recipe: this checkout at $RECIPE_COMMIT$( [ "$RECIPE_DIRTY" -gt 0 ] && echo " with $RECIPE_DIRTY uncommitted change(s)" || echo ", clean"); $RECIPE_CHANGED difference(s) mirrored into the folder"
@@ -1117,9 +1313,17 @@ if [ "${#MEASURED[@]}" -gt 0 ]; then
   for line in "${MEASURED[@]}"; do echo "    $line"; done
 fi
 echo
-echo "  Sites this created (delete them when you are done):"
-[ -n "${NETLIFY_URL:-}${N_URL:-}" ] && echo "    Netlify:    ${NETLIFY_URL:-$N_URL}"
-[ -n "${CF_URL:-}${C_URL:-}" ]      && echo "    Cloudflare: ${CF_URL:-$C_URL}"
-echo "    Folder:     $FOLDER_TARGET"
+if [ "$FIRST_PUBLISH" = true ]; then
+  echo "  A FIRST publish, as surname '$SURNAME'. The sites it made:"
+  [ "${#SITES_REPORT[@]}" -gt 0 ] || echo "    none recorded (no publish to Netlify or Cloudflare wrote a record)"
+  for line in ${SITES_REPORT[@]+"${SITES_REPORT[@]}"}; do echo "    $line"; done
+  SITES_REPORT=()
+  echo "    Folder:     $FOLDER_TARGET"
+else
+  echo "  Sites this published to (the section's own; delete them when you are done with the folder):"
+  [ -n "${NETLIFY_URL:-}${N_URL:-}" ] && echo "    Netlify:    ${NETLIFY_URL:-$N_URL}"
+  [ -n "${CF_URL:-}${C_URL:-}" ]      && echo "    Cloudflare: ${CF_URL:-$C_URL}"
+  echo "    Folder:     $FOLDER_TARGET"
+fi
 echo "  Logs: $WORK"
 [ "$FAIL" -eq 0 ] || exit 1
