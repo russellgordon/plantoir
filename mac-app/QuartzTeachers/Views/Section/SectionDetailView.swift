@@ -228,6 +228,9 @@ struct SectionDetailView: View {
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
+    /// For the deploy refusal's Open Settings… (#668).
+    @Environment(\.openSettings) var openSettings
+
     /// Whether this section's pages have changed since it last published
     /// — the " — Edited" marker in the title bar.
     ///
@@ -851,6 +854,19 @@ struct SectionDetailView: View {
             Text(previewAlertMessage)
         }
         .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
+            // The Account ID is put right in Settings, so the refusal that
+            // names it offers the way there (#668) — the refusal every new
+            // course meets at its first deploy now that Cloudflare Pages is
+            // the default. OK stays the default button.
+            if PublishingDestinations.deployRefusalOpensSettings(
+                refusal: deployRefusal ?? "", cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            ) {
+                Button("Open Settings…") {
+                    deployRefusal = nil
+                    SettingsPane.select(.deploying)
+                    openSettings()
+                }
+            }
             Button("OK") {
                 deployRefusal = nil
             }
@@ -2564,6 +2580,13 @@ struct SectionDetailView: View {
         // redundancy run would waste the teacher's time and let some
         // destinations quietly go out while others never got the chance.
         if let problem = uses.refusal {
+            // On the trail when it is the Account ID (#668): the refusal a
+            // new course meets at its first deploy, by kind, never the ID.
+            if let line = ActivityTrail.deployRefusedForTheAccountIDLine(
+                destinations: destinations, cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            ) {
+                ActivityTrail.note(.deployRefusedForTheAccountID, line, course: saved.code, section: sectionNumber)
+            }
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
             )

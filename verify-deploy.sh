@@ -32,8 +32,12 @@
 #
 # WHAT IT DOES NOT COVER, AND WHY THAT IS HONEST
 # ==============================================
-# `additional_deploy_targets` is not handled by `deploy.sh` at all — the APP
-# loops over the destinations and calls the launcher once per destination.
+# The APP loops over a course's destinations and calls the launcher once per
+# destination, naming each one — `--target netlify` included since #668,
+# because a `deploy.sh` given NO destination now reads the course's saved
+# destinations itself and runs every one of them (Russell, 2026-11-01). Every
+# call here names its destination for the same reason, so a Netlify leg of a
+# pairing never runs the pairing's other leg as well.
 # So this script exercises the pairings the way the app does, by running the
 # same sequence of launcher calls, which is a real test of the launcher half.
 # That the APP produces exactly those argument lists is a separate question,
@@ -1183,7 +1187,7 @@ hdr "Destination 2 of 3 — Netlify"
 if [ "$HAVE_NETLIFY" = true ]; then
   set_destination "netlify" "" ""
   : >"$WORK/deploy-netlify.log"
-  measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" \
+  measure_deploy "Netlify, first publish with the engine" "$WORK/deploy-netlify.log" "$COURSE" "$SECTION" --target netlify \
     && ok "publish to Netlify exited 0" || no "publish to Netlify failed"
   NETLIFY_URL=$(url_from_log "$WORK/deploy-netlify.log")
   [ -n "$NETLIFY_URL" ] && wait_for_new_address "Netlify" "$NETLIFY_URL"
@@ -1220,7 +1224,7 @@ hdr "Pairing 1 of 3 — Netlify primary, Cloudflare also"
 if [ "$HAVE_NETLIFY" = true ] && [ "$HAVE_CLOUDFLARE" = true ]; then
   set_destination "netlify" "" '[{"type":"cloudflare_pages"}]'
   : >"$WORK/pair-nc.log"
-  measure_deploy "Netlify, second publish" "$WORK/pair-nc.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
+  measure_deploy "Netlify, second publish" "$WORK/pair-nc.log" "$COURSE" "$SECTION" --target netlify && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
   N_URL=$(url_from_log "$WORK/pair-nc.log")
   : >"$WORK/pair-nc2.log"
   measure_deploy "Cloudflare, second publish" "$WORK/pair-nc2.log" "$COURSE" "$SECTION" --target cloudflare --account "$CF_ACCOUNT" \
@@ -1244,7 +1248,7 @@ if [ "$HAVE_NETLIFY" = true ]; then
   rm -rf "$FOLDER_TARGET"; mkdir -p "$FOLDER_TARGET"
   set_destination "netlify" "$FOLDER_TARGET" "[{\"type\":\"local_folder\",\"path\":\"$FOLDER_TARGET\"}]"
   : >"$WORK/pair-nf.log"
-  run_deploy "$WORK/pair-nf.log" "$COURSE" "$SECTION" && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
+  run_deploy "$WORK/pair-nf.log" "$COURSE" "$SECTION" --target netlify && ok "leg 1 (Netlify) exited 0" || no "leg 1 (Netlify) failed"
   N_URL=$(url_from_log "$WORK/pair-nf.log")
   : >"$WORK/pair-nf2.log"
   run_deploy "$WORK/pair-nf2.log" "$COURSE" "$SECTION" --to-folder "$FOLDER_TARGET" \

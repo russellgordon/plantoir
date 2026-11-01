@@ -157,6 +157,11 @@ final class CourseConfigurationTests: XCTestCase {
 
     // MARK: - Deploy target
 
+    /// The default for a file that names NO destination — every course
+    /// written before the other destinations existed. Not the new-course
+    /// default, which is Cloudflare Pages since #668 and is WRITTEN into
+    /// every new course (`PublishingDestinationsTests`); the two differ on
+    /// purpose, `publishingDestinations.whyTheyDiffer` in app-rules.json.
     @MainActor
     func testNetlifyIsTheDeployDefault() {
         let configuration: CourseConfiguration = CourseConfiguration(values: [:], lastSavedData: Data())

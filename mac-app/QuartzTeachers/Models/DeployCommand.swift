@@ -27,8 +27,13 @@ enum DeployCommand {
 
     /// The arguments for one section's deploy, to one destination.
     ///
-    /// Netlify passes no target flag at all: it is `deploy.sh`'s default,
-    /// and every course written before Cloudflare existed relies on that.
+    /// Every destination is NAMED, Netlify included (`--target netlify`)
+    /// since #668. Before that Netlify passed no flag, as `deploy.sh`'s own
+    /// default; but a `deploy.sh` given no destination now reads the
+    /// course's SAVED one and deploys every saved destination, one leg each
+    /// (Russell, 2026-11-01), so the Netlify leg of a course that also
+    /// deploys elsewhere would have run every leg again. Naming it keeps
+    /// one call, one destination.
     ///
     /// `unattended` is what a SCHEDULED deploy passes and nothing else
     /// does. It is the difference between the two kinds of caller, and it
@@ -65,19 +70,22 @@ enum DeployCommand {
             arguments.append(destination.path.trimmingCharacters(in: .whitespaces))
             return arguments
         }
-        if destination.type == "cloudflare_pages" {
+        if destination.type != "cloudflare_pages" {
             arguments.append("--target")
-            arguments.append("cloudflare")
-            // The launcher can discover the account from some tokens and
-            // remembers it afterwards, but a token scoped only to Pages
-            // cannot list its own account — so the app hands over what the
-            // teacher gave it rather than leaving a console prompt that
-            // nothing here can answer.
-            let identifier: String = cloudflareAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !identifier.isEmpty {
-                arguments.append("--account")
-                arguments.append(identifier)
-            }
+            arguments.append("netlify")
+            return arguments
+        }
+        arguments.append("--target")
+        arguments.append("cloudflare")
+        // The launcher can discover the account from some tokens and
+        // remembers it afterwards, but a token scoped only to Pages
+        // cannot list its own account — so the app hands over what the
+        // teacher gave it rather than leaving a console prompt that
+        // nothing here can answer.
+        let identifier: String = cloudflareAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !identifier.isEmpty {
+            arguments.append("--account")
+            arguments.append(identifier)
         }
         return arguments
     }

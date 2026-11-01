@@ -1,12 +1,17 @@
 # 7. Publishing a built section (`deploy.py`)
 
 > A course chooses **where** it publishes with the `deploy_target` key —
-> which the APP reads and turns into a `--target` argument. **No launcher
-> reads that key**: `deploy.sh`, `deploy.ps1` and `deploy.py` all default to
-> Netlify and change destination only on `--target`, so anything driving a
-> launcher directly — a script, a test harness, a scheduled wrapper — has to
-> pass the flag itself. Setting the key and calling the launcher publishes to
-> Netlify, silently; that is exactly how a deploy harness came to verify a
+> which the APP reads and turns into a `--target` argument, naming every
+> destination (`--target netlify` included, since #668). **`deploy.sh` reads
+> the key too, since #668, but only when it is given no destination**
+> (Russell, 2026-11-01): `./deploy.sh ICS3U 1` deploys where the course's
+> settings say, and every `additional_deploy_targets` entry as a leg of its
+> own; `--target` or `--to-folder` still decides when it is typed ("Choosing
+> a destination (#668)", below). **`deploy.ps1` and `deploy.py` still read
+> no key** and default to Netlify, so anything driving those directly — a
+> script, a test harness, a scheduled wrapper — has to pass the flag itself.
+> Setting the key and calling such a launcher publishes to Netlify,
+> silently; that is exactly how a deploy harness came to verify a
 > `netlify.app` address three times over and report three green Cloudflare
 > publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
@@ -14,8 +19,8 @@
 >
 > | `deploy_target` | Where it goes | Who does the work |
 > |---|---|---|
-> | `netlify` (default) | A Netlify site per section | `deploy.py`, Netlify REST API |
-> | `cloudflare_pages` | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
+> | `netlify` (what an ABSENT key means, and the launchers' default) | A Netlify site per section | `deploy.py`, Netlify REST API |
+> | `cloudflare_pages` (the new-course default in both apps since #668 — see "Choosing a destination (#668)" below) | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
 > | `local_folder` | A folder on the teacher's own machine, one `sectionN` subfolder per section | the **launcher**, host-side — the container is never involved |
 >
 > Whichever is chosen, the thing published is the same built
@@ -970,6 +975,148 @@ Cloudflare 429 is deliberately NOT explained yet — the sentence names Netlify 
 so it falls back to the raw output until Cloudflare has a sentence of its own;
 matching the nameless `API error 429` was rejected for exactly that case.
 `app-rules.json` → `failureExplanations.cases` pins all three.
+
+## Choosing a destination (#668)
+
+**Every NEW course deploys to Cloudflare Pages, made in the app or at the
+command line** (Russell, 2026-11-01: "Cloudflare everywhere"), unless the
+teacher picks something else. Either app's new-course window writes
+`cloudflare_pages` and lists it first; `setup_course.py` writes it for a
+course it makes with no saved file (`NEW_COURSE_DEPLOY_TARGET`). A course
+whose file has NO `deploy_target` — every course made before the other
+destinations existed — still deploys to Netlify, and nothing about that
+changed: a re-run of setup over such a file writes none.
+
+**A deploy typed at the command line goes where the course's settings
+say** (Russell, 2026-11-01). Until then the launchers read no key, so
+`./deploy.sh ICS3U 1` deployed a course written for Cloudflare to Netlify.
+Now `deploy.sh`, given neither `--target` nor `--to-folder`, reads
+`deploy_target` (absent or `netlify` → Netlify, `cloudflare_pages` →
+Cloudflare, `local_folder` → its `deploy_folder_path`) and says so ("Deploying
+to Cloudflare Pages, as ICS3U's settings say."); a course with
+`additional_deploy_targets` is deployed one leg per destination, by running
+the launcher again with that leg's flag — the app's own shape, so every leg
+meets every check, and a leg that fails does not stop the others. Settings
+that cannot be read REFUSE rather than fall back to Netlify, which is the
+silent wrong-host deploy this exists to stop. A typed `--target` still wins.
+Two things found by review and fixed the same day: the settings are read
+with **`plutil`** on a Mac — on every Mac, Command Line Tools or not —
+because this launcher keeps the rule that it needs no host `python3` (the
+reference-course check's comment; a Python reads them only where there is no
+`plutil`); and the list of legs is read on **descriptor 3**, never stdin,
+because every leg inherits stdin and READS it (`docker exec -i` forwards it,
+a token prompt waits on it), so a list on stdin was eaten by the first leg
+and the others never ran, the run ending at that leg's exit code.
+`scripts/test_deploy_sh_destination.py` pins all of it (eight cases, listed in
+`verify.sh`; two of them plant a stdin-reading line in every leg and hide
+every Python from PATH). **The app names every leg now** (`DeployCommand.arguments`,
+`--target netlify` included; `deployArguments` cases moved), because the
+Netlify leg of a course with a second destination, passed no flag, would
+otherwise have run both legs again; `verify-deploy.sh` names its Netlify
+legs for the same reason. **`deploy.ps1` has the same gap** and is Windows'
+obligation; `deploy.py` is unchanged (it does one destination per call). The rule, the
+sentences and every case are `contracts/app-rules.json` →
+`publishingDestinations`; the Swift is `PublishingDestinations`.
+
+**Why.** Netlify moved new accounts to a credit-based plan, and the free one
+is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
+(the issue's own table, read 2026-10-23, agrees):
+
+| What | Credits |
+|---|---|
+| Free plan allowance | 300 a month, a hard limit (no way to buy more on Free) |
+| A production deploy | 15 each (deploy previews are free) |
+| Bandwidth | 20 per GB |
+| Web requests | 2 per 10,000 |
+
+"Starting on September 4, 2025, all new Netlify accounts will use the new
+credit-based pricing plans"; an account made before then is on a Legacy plan
+and is unaffected unless it switches. When the balance is used up, "all of
+your web projects (sites/apps) are paused", each showing "Site not available"
+until the next cycle. **Each section is its own site, so one deploy of a
+three-section course is three production deploys, 45 credits** — twenty
+production deploys, fewer than seven deploys of that course, is the whole
+allowance before a single student has loaded a page. Traffic is a small part of it: about 90 students reading a few pages a
+day is roughly 1.6 GB, some 32 credits plus ~15 for requests.
+
+Cloudflare Pages, read the same day: static asset requests are "free and
+unlimited" on every plan; 20,000 files a site, 25 MiB a file (already said in
+the app, `cloudflareSizeNote`), and **100 projects an account**, "not
+routinely increased". The limits page also lists "500 builds per month" on
+Free, but describes builds only as pushes to a Git repository; neither it nor
+the Direct Upload page says whether an upload with `wrangler pages deploy`
+counts. **So the app makes no claim about Cloudflare's limits on deploys** —
+only that its free plan has no limit on visitors, which its pricing page says
+in so many words. The 100-project cap, which a teacher who rolls over many
+sections a year could reach in about seven years, is #723.
+
+**What the teacher is told.** No figures in the app — the hosts change them;
+the dated figures are here and on plantoir.app's deploying page. Every
+sentence says DEPLOY for what spends the allowance, because in Plantoir
+publishing marks a page and costs nothing. `netlifyNote` sits under Netlify
+wherever it is configured (primary or additional, the new-course window and
+Course Settings, and an absent key counts as Netlify); `cloudflareCaption`
+sits wherever Cloudflare is; `netlifyScheduleNote` is in Schedule a deploy
+when the SAVED settings deploy to Netlify; the window's section caption is
+`wizardCaption`.
+
+**The Account ID.** Before #668 the new-course window refused Create with no
+Cloudflare Account ID in Settings. With Cloudflare the default that stops
+every first-time teacher at their first course, before they have seen a
+page. Now a MISSING ID is a warning: the orange
+`cloudflareAccountProblem` sentence stays beside Open Settings…, with
+`accountIDCanWait` under it, and Create goes ahead; previews never need the
+ID. An ID that cannot be one (not 32 hexadecimal characters) still refuses
+Create, because something is saved and it is wrong. The refusal moves to the
+first DEPLOY, where it already was: `MultiDestinationDeployRunner.refusalReason`
+(the Deploy button, the assistant, an MCP client), scheduling, and saving
+Course Settings with a changed destination all refuse a Cloudflare
+destination with no ID and name Plantoir ▸ Settings ▸ Deploying. Since that
+refusal is now the path every new teacher meets, the Deploy button's "Cannot
+Deploy Yet" alert offers **Open Settings…** beside OK when its sentence is
+the Account ID's (`PublishingDestinations.deployRefusalOpensSettings`; a
+folder's refusal, put right in Course Settings, does not), and the refusal
+is **on the trail** by kind — "deploy refused: no Cloudflare Account ID is
+saved in Settings", or "…is not a whole ID", never the ID (event `deploy
+refused for the Cloudflare Account ID`, rule 5). Both halves are contract
+cases (`wizardAccountID`, `deployWithoutAnAccountID`, six cases with
+`expectOpenSettings` and `expectTrailLine`).
+
+**One orange block, not two.** With Cloudflare the default, a new teacher
+with no ID would have met two orange warnings on their first course: the
+ID's sentence and the fixed 25 MB fact. When both apply they are one block,
+the ID's sentence first, then "it can wait", then the 25 MB note, as one block (#668 second fixes round).
+
+**What was rejected, and why.**
+- *Letting the launcher ask for the ID at the first deploy.* The plan's first
+  idea. It cannot work: the app refuses before `deploy.sh` runs, and the
+  launcher keeps an answer in the Keychain
+  (`containerized-quartz-cloudflare-account`), not in the app's settings, so
+  every app-side check would go on failing after it.
+- *Defaulting to Cloudflare only when Settings already has an ID.* A
+  first-time teacher has none, so this gives Netlify to exactly the teachers
+  the change is for — and it makes the default depend on the machine the
+  tests run on (the suite's settings folder is empty).
+- *Changing the absent-key fallback.* It moves a working class site to a
+  host the teacher has no account with, at its next deploy, with nothing to
+  say so. `setup_course.py` therefore writes the new-course default only
+  where there is no saved file, keeps a saved `deploy_target`, and writes
+  none over a saved file that names none
+  (`scripts/test_setup_course_deploy_target.py`, four cases).
+- *A command-line course on Netlify.* What the first version of this piece
+  did, by leaving `setup_course.py` alone; Russell ruled it out on
+  2026-11-01 ("Cloudflare everywhere").
+- *Figures in the app's sentences.* The hosts change them, and a sentence
+  in the app cannot carry a date the way this page does.
+- *Recording the destination on the "course created" trail line.* That line's
+  `carries` says, deliberately, "not where it publishes", and
+  `course_config.json` already answers the question.
+
+**Windows** owes the same default, order, sentences, the warning in place of
+the refusal, Open Settings… on the refusal, the trail event, and a test that
+its new-course dialog WRITES `newCourseDefault`. Its goldens hold the
+setup answers rather than the written file, so none of them moves. The
+command-line half is shared Python and reaches it free.
 
 ## Cloudflare Pages (`--target cloudflare`)
 

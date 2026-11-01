@@ -433,6 +433,7 @@ recounted 2026-09-07.
 | A section's record of its problems: one row per problem the last build met, worded by the folder problem's own makers one item at a time, kept beside the built site with the site's and a deploy's rows carried until they are checked again; a Problems tab beside the Website, one warning on the section's sidebar row while its OWN last build found any, a row on a shared page shown "fixed in the source" when another section's later build shows the page clean, and an alert only when a build found something new, answered once per alert key and remembered across launches ([#717](https://github.com/russellgordon/plantoir/issues/717)) | `shared-rules.json` → `sectionProblems` (`rowCases` 10, `rowState.cases` 12, `sectionMarker.cases` 4, `alert.cases` 6; `kinds` 16, `words` 19), plus `activityTrail.mustRecord` → "problems changed" and `machineLineLength.bounded` → `PLANTOIR_PROBLEMS:` | `scripts/test_section_problems.py` (the `rowCases`, the site's merge, the deploy's refusal, two builds; on Windows through `PythonToolchainTests`), `SectionProblemsTests` on the mac (13: the three case lists, the wording and lists pinned, the store, the view's source scan), verify.sh's two-section end-to-end check. AUTHORED on the mac, 2026-11-01. **The Python is shared, so Windows writes the record already; no Windows reader of the app's half yet** — the `windows` issue asks for the tab, the table, the marker, the alert and the answers file. |
 | Which act turns a scheduled deploy off without being asked, which acts deliberately turn none off, and how late is too late for one to still run | `shared-rules.json` → `scheduledDeployCancellation` | ScheduledDeployCleanup (25 on the mac, of which four walk the file's own lists: fifteen cancellation cases (five of them from [#237](https://github.com/russellgordon/plantoir/issues/237), 2026-09-25 — one alarm per section PER WORKING FOLDER, `oneAlarmPerWorkingFolder`), ten lateness cases, seven stored-value cases and every sentence). Added from the mac 2026-09-20 ([#236](https://github.com/russellgordon/plantoir/issues/236)). **No Windows reader yet**, and the suite there stays GREEN rather than going red, because it deserialises `shared-rules.json` by NAMED key and a new top-level key nobody asks for is silently ignored — the same precedent as `gradedFolders.removingAFolder` and `workingFolderSelection`. What DOES go red there is the trail event `scheduled deploy turned off`, `scheduledPublishStopped.kinds.tooLateToRun`, and `file-formats.json`'s new `scheduled_deploy_may_run_late_days`. Half the rule is already theirs: `CourseArchiver.cs` cancels on removing a SECTION and not on removing a COURSE. Read `howToRunACase` before wiring the runner — twelve cases are played through a real scheduling, removal, rename, rollover or folder read and three are a scan of a file that must not have learned to cancel Since #323, `theDestination`: where a scheduled deploy goes is read when it RUNS, the refusals re-applied then (12 cases, `reasonClauses`, `wording`), run by `ScheduledDeployAsSetNowTests.testEveryTheDestinationCaseHolds`, which EXECUTES each wrapper that goes ahead. Case 12 is `appliesOn: ["mac"]`. |
 | Validation messages | `app-rules.json` → `configurationRules` | CourseConfiguration (10), CustomDomain (4) |
+| Where a NEW course deploys (Cloudflare Pages) and what an absent `deploy_target` means (Netlify), the picker's order, the sentences a teacher reads while choosing and when each is shown, and the Account ID: the new-course window lets a missing one wait, the first deploy refuses it ([#668](https://github.com/russellgordon/plantoir/issues/668)) | `app-rules.json` → `publishingDestinations` (`netlifyNoteCases` 7, `wizardAccountID.cases` 4, `deployWithoutAnAccountID.cases` 6, `sentences` 5) | PublishingDestinations (10), WizardStructure and ListTableGolden (the seven goldens), and `scripts/test_setup_course_deploy_target.py` (4: a course made at the command line gets the new-course default, a re-run keeps the destination the window wrote, and writes none over an older file that names none). AUTHORED 2026-11-01; no Windows reader yet |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (10) |
 | What a teacher reads when a pasted Cloudflare token is refused (#695), or a saved token could not be checked (#716) — the launchers' own lines, lifted and joined — and that a saved token is cleared only on a 400/401/403 that is the service's own answer | `app-rules.json` → `failureExplanations.cases` (the four whose output carries "did not accept that token" or "to check the saved token") | `scripts/test_deploy_token_refusal.py` (15): pins both launchers' printed lines to the cases' `expect`, and RUNS `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed. Discovered by Windows' `PythonToolchainTests`; the run half skips off a Mac. |
@@ -1677,6 +1678,35 @@ list grew, and it DOES turn Windows red: `app-rules.json` →
 token" (`deploy.sh` only until Windows' #705). Windows' `FailureExplainer.cs`
 stays red on all four until it lifts and joins them. No generated half moves.
 
+**Re-taken 2026-11-01 with [#668](https://github.com/russellgordon/plantoir/issues/668)**
+(Cloudflare Pages the default for a new course), on `issue/668-cloudflare-default`
+off `dev` 1da81707c, which read **434** with the walker below: **437**. One new
+AUTHORED top-level key, `app-rules.json` → `publishingDestinations`, holding three
+lists — `netlifyNoteCases` (7), `wizardAccountID.cases` (4) and
+`deployWithoutAnAccountID.cases` (4) — plus `newCourseDefault`, `whenTheKeyIsAbsent`,
+`pickerOrder` and five `sentences`. No Windows reader yet (owed, the #668 `windows`
+issue), so nothing goes red there: Windows' new-course window still defaults
+to Netlify, and only a reader written for this key will say so. `file-formats.json` → `deploy_target.values`
+gains `"netlify"`, which the wizard has always written and the list lacked. No
+generated half moves (`Plantoir --write-contracts contracts`, twice: the first run
+only rewrote the new block's empty arrays in the generator's form, the second
+changed nothing). `activityTrail.mustRecord` unchanged at **151** by that
+commit: the "course created" line still does not carry the destination,
+deliberately. **The fixes round** (same branch, same day) grew
+`deployWithoutAnAccountID.cases` 4 → **6** (a malformed ID, and a folder
+refused first) and gave each case `expectOpenSettings` and `expectTrailLine`;
+the census stays **437** (no list added). `activityTrail.mustRecord` gained
+one event, "deploy refused for the Cloudflare Account ID", for both platforms —
+it turns Windows red until it records it. **The launcher round** (same branch,
+same day) moved two `deployArguments` cases: a Netlify destination now
+expects `--target netlify`, because a `deploy.sh` given no destination reads
+the course's saved ones itself — that ALSO turns Windows red until its
+`DeployCommand` names Netlify. **Re-taken at the merge of `origin/dev`
+df80ae9c3 into the branch:** the walker reads **442** lists (437 + dev's
+five), and `activityTrail.mustRecord` is **153** (dev's 152 + this one). The
+open #717b branch adds one more event, so whichever lands second re-counts
+(154 expected) rather than adding in its head.
+
 **#717 part two (2026-11-01)**, on `issue/717-fix-with-assistant` off `dev`
 cd43d8cb1: three lists added, re-taken with the walker below — **439 → 442** —
 `app-rules.json` → `outsideAgents.fixWith.buttons` (2), `.buttonCases` (8) and
@@ -1684,6 +1714,8 @@ cd43d8cb1: three lists added, re-taken with the walker below — **439 → 442**
 counted. One list grew, and it DOES turn Windows red:
 `shared-rules.json` → `activityTrail.mustRecord` 152 → **153** ("asked an
 assistant to fix problems") until Windows records it. No generated half moves.
+
+**Re-taken at the merge of #668 into `dev` after #717 part two (2026-11-01, Fable):** the walker reads **445** lists (442 + #668's three) and `activityTrail.mustRecord` is **154** (#717b's event and #668's), the counts both branches said whichever landed second would take.
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

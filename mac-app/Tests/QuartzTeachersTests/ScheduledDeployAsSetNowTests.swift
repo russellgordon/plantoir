@@ -156,7 +156,8 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
     // MARK: - The reading
 
     /// The issue: scheduled to Netlify, then moved to a folder. Before #323
-    /// the wrapper still read `deploy.sh ICS3U 1 --non-interactive`.
+    /// the wrapper still read `deploy.sh ICS3U 1 --non-interactive` (a
+    /// Netlify call, which names itself with `--target netlify` since #668).
     func testTheRunDeploysWhereTheCourseDeploysNow() throws {
         try writeSettings([:])
         try markDeployedBefore()
@@ -207,7 +208,9 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         }
         XCTAssertEqual(destinations, ["Netlify"])
         XCTAssertEqual(scheduledTo, [folder.path])
-        XCTAssertEqual(try execute(command), ["ICS3U 1 --non-interactive"])
+        // Netlify is NAMED since #668: a deploy.sh given no destination
+        // reads the course's saved ones itself.
+        XCTAssertEqual(try execute(command), ["ICS3U 1 --non-interactive --target netlify"])
     }
 
     func testUnreadableSettingsStandDown() throws {

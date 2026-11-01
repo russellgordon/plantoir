@@ -86,9 +86,10 @@
         "values": [
           "",
           "cloudflare_pages",
-          "local_folder"
+          "local_folder",
+          "netlify"
         ],
-        "why": "EMPTY means Netlify, and that is not an oversight: every course written before the other destinations existed has no key at all, and must keep working."
+        "why": "EMPTY or ABSENT means Netlify, and that is not an oversight: every course written before the other destinations existed has no key at all, and must keep working. Both apps' new-course windows WRITE the key for every course they make — `netlify` when a teacher picks it, and `cloudflare_pages` unless they do, the new-course default since #668 (app-rules.json -> publishingDestinations, whose whyTheyDiffer says why the default and the fallback differ). setup_course.py writes `cloudflare_pages` for a course it makes with no saved file (Russell, 2026-11-01: \"Cloudflare everywhere\"), keeps a saved key when run again, and writes none over a saved file that names none."
       },
       {
         "default": 7,

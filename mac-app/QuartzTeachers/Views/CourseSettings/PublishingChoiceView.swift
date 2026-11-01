@@ -30,7 +30,29 @@ struct PublishingChoiceView: View {
     /// primary above — see `CourseConfiguration.additionalDeployTargets`.
     @Binding var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget]
 
+    /// True in the new-course window only: there a missing Account ID is a
+    /// warning rather than a refusal (#668), so the orange sentence gets
+    /// `PublishingDestinations.accountIDCanWait` under it. Course Settings
+    /// leaves it false, because saving a changed destination there still
+    /// needs the ID (`SaveEnablement`).
+    var accountIDMayWait: Bool = false
+
     // MARK: - Computed properties
+
+    /// The additional destinations' types, in the order they were added.
+    var additionalTypes: [String] {
+        var result: [String] = []
+        for target in additionalDeployTargets {
+            result.append(target.type)
+        }
+        return result
+    }
+
+    /// Whether Netlify's note is shown (#668) — wherever Netlify is
+    /// configured, primary or additional.
+    var showsNetlifyNote: Bool {
+        return PublishingDestinations.showsNetlifyNote(primary: deployTarget, additional: additionalTypes)
+    }
 
     /// What is wrong with the chosen folder, or nil when nothing is.
     /// Checks the PRIMARY folder only — an additional folder target's
@@ -147,8 +169,15 @@ struct PublishingChoiceView: View {
         if deployTarget == "cloudflare_pages" {
             CloudflareDetailFields(
                 cloudflareAccountID: cloudflareAccountID,
-                accountProblem: accountProblem
+                accountProblem: accountProblem,
+                accountIDMayWait: accountIDMayWait
             )
+        }
+
+        // Netlify as the primary: the note sits under the picker. As an
+        // additional destination it sits under that toggle instead.
+        if deployTarget == "netlify" && showsNetlifyNote {
+            NetlifyNote()
         }
 
         if deployTarget == "local_folder" {
@@ -189,9 +218,15 @@ struct PublishingChoiceView: View {
         if type == "cloudflare_pages" && hasAdditionalCloudflare {
             CloudflareDetailFields(
                 cloudflareAccountID: cloudflareAccountID,
-                accountProblem: accountProblem
+                accountProblem: accountProblem,
+                accountIDMayWait: accountIDMayWait
             )
             .padding(.leading, 20)
+        }
+
+        if type == "netlify" && deployTarget != "netlify" && showsNetlifyNote {
+            NetlifyNote()
+                .padding(.leading, 20)
         }
 
         if type == "local_folder" && hasAdditionalLocalFolder {
@@ -259,16 +294,27 @@ struct PublishingChoiceView: View {
 /// "Where do I find this?" and its instructions moved to Plantoir ▸ Settings
 /// ▸ Deploying (`DeployingSettingsView`), because the ID is the teacher's,
 /// not the course's: editing it here changed it for every course. With no
-/// ID the wizard still refuses Create with the same sentence as before
+/// ID the sentence is the same as before
 /// (`CourseConfiguration.cloudflareAccountProblem`, pinned in the contract),
-/// now beside the button that fixes it. `AppSettings` is observable, so a
-/// change made in the Settings window shows here, and re-validates, at once.
+/// beside the button that fixes it — but since #668 the new-course window no
+/// longer refuses Create over a MISSING ID (Cloudflare is the default, and a
+/// first-time teacher has none): it says `accountIDCanWait` under it, and the
+/// first deploy refuses instead. `AppSettings` is observable, so a change
+/// made in the Settings window shows here, and re-validates, at once.
 private struct CloudflareDetailFields: View {
 
     // MARK: - Stored properties
 
+    /// The fixed fact about this destination, shown whether or not
+    /// anything is wrong.
+    static let sizeNote: String =
+        "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely."
+
     let cloudflareAccountID: String
     let accountProblem: String?
+
+    /// See `PublishingChoiceView.accountIDMayWait`.
+    let accountIDMayWait: Bool
 
     @Environment(\.openSettings) var openSettings
 
@@ -283,8 +329,35 @@ private struct CloudflareDetailFields: View {
         return trimmed
     }
 
+    /// Whether the new-course window's "it can wait" sentence belongs under
+    /// the ID's problem: only there, and only for a MISSING ID (#668).
+    var saysTheIDCanWait: Bool {
+        return accountProblem != nil && accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)
+    }
+
+    /// ONE block of text (#668 review, L5 and L4): the ID's problem in
+    /// orange, then — in the new-course window, for a missing ID — the
+    /// sentence that says it can wait, in grey, right after the sentence it
+    /// qualifies, and then the 25 MB fact in orange.
+    var notice: Text {
+        var built: Text = Text("")
+        if let accountProblem {
+            built = Text(accountProblem + " ").foregroundStyle(.orange)
+            if saysTheIDCanWait {
+                built = built + Text(PublishingDestinations.accountIDCanWait + " ").foregroundStyle(.secondary)
+            }
+        }
+        return built + Text(CloudflareDetailFields.sizeNote).foregroundStyle(.orange)
+    }
+
+    // MARK: - Body
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Why it is offered first (#668), said plainly and without
+            // figures.
+            ExampleCaption(PublishingDestinations.cloudflareCaption)
+                .accessibilityIdentifier("cloudflareCaption")
             // Said FIRST, where the row is read from: the value below is
             // shown, not edited, and this is where it is edited.
             Text("Kept in Plantoir ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare Pages.")
@@ -307,25 +380,47 @@ private struct CloudflareDetailFields: View {
                 }
             }
 
-            // What is wrong with the ID this Mac has. Not commentary: this
-            // is why the course will not save, or the wizard will not create.
-            if let accountProblem {
-                Text(accountProblem)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .accessibilityIdentifier("cloudflareAccountProblem")
-            }
-
-            // Not a warning that comes and goes: a fact about this
-            // destination that never hides. It is the one real
-            // functional difference between the destinations, so a
-            // teacher should meet it while choosing rather than when
-            // a deploy fails halfway through an upload.
-            Text("One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely.")
+            // What is wrong with the ID this Mac has, and the 25 MB fact,
+            // in ONE block when both apply (#668 review, L5; `notice`): with
+            // Cloudflare the default, a new teacher with no ID would
+            // otherwise meet two orange warnings on their first course. Not
+            // commentary: in Course Settings the ID's sentence is why a
+            // changed destination will not save; in the new-course window a
+            // MISSING ID is a warning and says so right after it, while one that
+            // cannot be an ID still refuses Create
+            // (`PublishingDestinations.wizardCreateRefusal`).
+            //
+            // The 25 MB sentence is not a warning that comes and goes: a
+            // fact about this destination that never hides. It is the one
+            // real functional difference between the destinations, so a
+            // teacher should meet it while choosing rather than when a
+            // deploy fails halfway through an upload.
+            notice
                 .font(.caption)
-                .foregroundStyle(.orange)
-                .accessibilityIdentifier("cloudflareSizeNote")
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(accountProblem == nil ? "cloudflareSizeNote" : "cloudflareAccountProblem")
         }
+    }
+}
+
+/// What a teacher is told about Netlify's free plan wherever Netlify is
+/// chosen (#668): the allowance, that deploys use it up, and that running
+/// out pauses every site on the account. No figures — the hosts change them.
+private struct NetlifyNote: View {
+
+    // MARK: - Body
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text(PublishingDestinations.netlifyNote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("netlifyNote")
     }
 }
 

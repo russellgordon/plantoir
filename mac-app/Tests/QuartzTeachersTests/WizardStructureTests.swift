@@ -559,6 +559,12 @@ final class WizardStructureTests: XCTestCase {
     /// and the app had left out since 2026-08-24, so every such course read
     /// as never asked (`gradedFolders.newCourse`). Nothing else in them
     /// moved, and the AMU3M goldens did not move at all.
+    ///
+    /// All seven goldens (these six and `266-wizard-gestures`) moved a
+    /// second time, on purpose, for GitHub issue #668: `deploy_target` went
+    /// from `"netlify"` to `"cloudflare_pages"`, the new-course default
+    /// (`app-rules.json` → `publishingDestinations.newCourseDefault`). One
+    /// value in each, and nothing else.
     func testTheFileForEveryPathThatExistedBeforeIsUnchanged() throws {
         let takenFromTheExample: [String] = ["ADA1O", "MCV4U", "MCMPR11", "ICS4U"]
         for code in takenFromTheExample {
