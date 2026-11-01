@@ -181,7 +181,10 @@ and names a LOOK-ALIKE ("How I Teach 1") that WILL be published
 When a page the settings had listed is dropped, the build prints
 `PLANTOIR_KEPT_OFF: {json}`, which the app writes on the trail
 (`How I Teach page kept off the website`) — once, at the transition, not on every
-build. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
+build. A line the build had to shorten (below, "How long a machine line may be")
+can carry an EMPTY `pages` list with a `count`: that is a report of `count` pages
+kept off, none of them named, and both apps write it ("3 not named"); only an
+empty list with no count reports nothing. Gates: `scripts/test_how_i_teach.py` (Windows runs it too), and
 `verify.sh`'s real build, which plants pages with sentinel phrases and greps the
 whole of `public/` (pages, `contentIndex.json`, sitemap, RSS) — the reserved
 two absent, the look-alike present so the check cannot pass by building nothing.
@@ -906,7 +909,9 @@ never written back.
 When anything was rewritten, the build prints a plain sentence and one
 `PLANTOIR_DATED: {"course", "section", "pages"}` line naming each page by its
 place in the course folder (`shared-rules.json` → `pagesDatedByTheBuild`). The
-mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
+number on the trail is the line's `count` when it carries one — a line the build
+shortened to stay under 4,000 characters names only its first pages ("How long
+a machine line may be (#666)", below). The mac records it as "pages dated by the build" (`PagesDatedByTheBuild`,
 `ScriptRunner`), shows the teacher only the sentence, and prints nothing when
 nothing changed. A SCHEDULED publish records the same line from its own log:
 `ScheduledDeploy.recordFolderProblems` already reads that run's part of the log
@@ -1363,7 +1368,39 @@ what the line left out. Without that the trail would say "the build gave 206
 pages…" for a build that dated 300 (the count-first reasoning of
 `pagesDatedByTheBuild.trailLine.why`). Russell's ruling on the plan: the true
 count travels as its own field, and both apps' readers use it (Windows in
-#666, the mac by its own issue).
+#666, the mac in #704).
+
+**The mac's readers (#704, mac v1.9.1).** `PagesDatedByTheBuild`,
+`HowITeachKeptOffReport` and `CoverageMapsBuilt` each carry the line's `count`
+(`nil` for a whole line) and word the trail from `total`, the LARGER of
+`count` and the entries the line carries — the rule Windows' readers use
+(`PagesDatedByTheBuild.cs`, `HowITeachPage.cs`, `CoverageMapsBuilt.cs`), so a
+malformed line reads the same on both. The sentence ends "and M more" when
+some are not named and "M not named" when the line named none, with M =
+`total` minus the names shown, and the plural follows `total`. DATED and
+KEPT_OFF used to drop a line with an empty list; they now drop it only when
+it has no `count` either (an empty list with no count is still no report).
+MAPS checks `total == 0`, not an empty list, before its "no curriculum map"
+sentence, so an empty list with no count stays "none" and one with a count
+is maps made. The mac's own 40-name cap on the DATED trail line is
+unchanged and applies to what the line carries: 300 dated pages, of which a
+shortened line keeps 206, reach the trail as 40 names "and 260 more". Both
+of the mac's paths reach the same objects — the console of a run the app
+started (`ScriptRunner.rememberHealthFindings`), which the MCP door uses
+too, and a scheduled publish's log (`ScheduledDeploy.recordFolderProblems`)
+— and `MachineLineLengthReaderTests` runs all six `readerExamples` rows
+through each reader and both paths, and pins the count at 6, so a row added
+on Windows later turns the mac suite red as a request. Measured on the
+readers as they were before #704: 16 failures, every row wrong (the three
+shortened rows said 2, 1 and 1 for 300, 200 and 100; the DATED and KEPT_OFF
+k = 0 rows recorded nothing; the MAPS k = 0 row said "no curriculum map").
+On the mac the cap protects nothing a teacher would otherwise lose: the
+kernel pseudo terminal never splits a line, and `ScriptRunner` carries an
+unfinished line in `pendingLine` with no length limit
+(`collectCompleteLines`), so before the cap a long line arrived whole. What
+the cap costs the mac is names, and what the count gives back is the true
+number. Rejected: trusting `count` alone — a count smaller than the line's
+own list is not believed over the list, on either platform.
 
 **The numbers.** The mac's kernel pseudo terminal never splits a line.
 Windows' pseudo console does, when a line longer than the console wraps on the
@@ -1670,7 +1707,10 @@ names the colliding title through `{page}`.
 **The trail.** Every build whose section wants the map prints
 `PLANTOIR_MAPS: {"course", "section", "maps": [{title, folder, expectations}]}`
 — an empty list included, because "my College Board map is missing" is the
-question it answers (`coverageMapsBuilt`). The mac reads it from the console
+question it answers (`coverageMapsBuilt`). An empty list means none only when
+the line carries no `count`: a line the build shortened can keep no map at all
+and carry `count`, and that is a report of maps made, none of them named ("5
+not named"; "How long a machine line may be (#666)"). The mac reads it from the console
 (`ScriptRunner`) and from a scheduled publish's log
 (`ScheduledDeploy.recordFolderProblems`) and writes `curriculum maps built`.
 Nothing is printed when the map is switched off for the section. And since

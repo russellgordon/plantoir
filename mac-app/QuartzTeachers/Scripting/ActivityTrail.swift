@@ -295,7 +295,10 @@ nonisolated enum ActivityTrail {
         /// rewritten, so a build whose dates were already right adds nothing.
         /// Recorded because this is a change to the teacher's files nobody
         /// asked for in so many words, and "why did this page's date change?"
-        /// is asked long after the console that said so has gone.
+        /// is asked long after the console that said so has gone. When the
+        /// build shortened its line (`machineLineLength`, #666, #704) the
+        /// names are the first ones only, possibly none, and the number is
+        /// the line's own `count`, the true total.
         case pagesDatedByTheBuild = "pages dated by the build"
 
         /// The curriculum coverage maps a build wrote (#128): one per
@@ -303,8 +306,11 @@ nonisolated enum ActivityTrail {
         /// folder it came from and how many expectations it shows — or that it
         /// wrote none. Read from the build's `PLANTOIR_MAPS:` line
         /// (`CoverageMapsBuilt`), printed on every build whose section wants
-        /// the map, so "my second map is missing" has an answer. Course
-        /// structure only, never anything written on a page.
+        /// the map, so "my second map is missing" has an answer. A shortened
+        /// line (`machineLineLength`, #666, #704) describes only its first
+        /// maps, possibly none, and the number is its `count`: an empty list
+        /// WITH a count is maps made, not none. Course structure only, never
+        /// anything written on a page.
         case coverageMapsBuilt = "curriculum maps built"
 
         /// What a build did about the My Progress page (#545): that it made
@@ -1063,7 +1069,9 @@ nonisolated enum ActivityTrail {
         case howITeachPageWritten = "How I Teach page written"
         /// A build dropped a How I Teach page the course's settings had
         /// LISTED for the website (#209) — one earlier builds published.
-        /// Read from the build's `PLANTOIR_KEPT_OFF:` line.
+        /// Read from the build's `PLANTOIR_KEPT_OFF:` line; a shortened one
+        /// (`machineLineLength`, #666, #704) names only its first pages,
+        /// possibly none, and the number is its `count`.
         case howITeachPageKeptOff = "How I Teach page kept off the website"
         /// Course Settings made an EMPTY How I Teach page (#329) — or could
         /// not, and why: carries the course. A page the teacher did not

@@ -490,7 +490,7 @@
         "why": "Its own event rather than a failure: a teacher who presses Stop chose to, and a line calling that a failure is a line that misleads whoever reads it back. It is also what explains a folder that is NOT there - the course in hand is removed on the way out, so without this line the trail shows an import that started and nothing about how it ended."
       },
       {
-        "carries": "the course and section that was built, how many of the teacher's pages the build rewrote, and their NAMES - their place in the course folder, never anything written on them",
+        "carries": "the course and section that was built, how many of the teacher's pages the build rewrote, and their NAMES - their place in the course folder, never anything written on them. When the build shortened its line (machineLineLength, #666/#704) the names are the first ones only, possibly none, and the number is the line's own count, the true total",
         "event": "pages dated by the build",
         "why": "From 2026-09-25 every preview and every publish can REWRITE the teacher's own pages: the front page takes the date of the class it shows, and a page a class links to directly takes the date of the earliest visible class that links to it (class-planning.json -> sectionIndexPointer.dateCases and datingPagesAClassBrings.atBuildTime). A change to a teacher's files that nobody asked for in so many words is exactly what a trail exists to answer - 'why did the date on this page change?' - and the build's console, where it is also said, is gone by the time anyone asks. Recorded from the build's own PLANTOIR_DATED: line (pagesDatedByTheBuild), which says nothing when nothing was rewritten, so a build whose dates were already right leaves no line. A SCHEDULED publish records it too, from that run's own part of its log once the run is done: it is often the first build after a class goes visible, so the one likeliest to rewrite files, and nobody is watching a console then. On Windows also from a run plantoir-mcp started (#660: one dispatch, BuildMachineLines, for all three; the mac's MCP door runs through its ScriptRunner already)."
       },
@@ -764,7 +764,7 @@
         "line": "an outside assistant wrote a new How I Teach page ({after} words) / replaced the How I Teach page ({before} → {after} words), after backing up the course as {backup}"
       },
       {
-        "carries": "the course and section built, and the place in the course folder of each page with the reserved name that the build dropped from a copy list the course's settings had named it in. Never anything written on it.",
+        "carries": "the course and section built, and the place in the course folder of each page with the reserved name that the build dropped from a copy list the course's settings had named it in. Never anything written on it. When the build shortened its line (machineLineLength, #666/#704) the names are the first ones only, possibly none, with the true count.",
         "event": "How I Teach page kept off the website",
         "why": "#209's build rule can take a page OFF a site that used to publish it: a teacher who already had a page called How I Teach, meant for students, finds it gone after an update, and the build's console, which said why, is gone by the time they ask. Read from the build's own PLANTOIR_KEPT_OFF: line (howITeachPage.keptOffMarker) - by the app from the console of a run it started and from a scheduled publish's own log, as PLANTOIR_DATED: is (on Windows also from a run plantoir-mcp started, #660). Printed only when the build dropped a listed page, so a course whose page was never on the site leaves no line on every build.",
         "line": "howITeachPage.keptOffTrailLine"
@@ -776,7 +776,7 @@
         "line": "started an empty How I Teach page from Course Settings / could not start the How I Teach page from Course Settings: {reason}"
       },
       {
-        "carries": "the course and section, and for each coverage map the build wrote its title, the folder it was built from and how many expectations it shows - or that it wrote none. NEVER anything written on a page.",
+        "carries": "the course and section, and for each coverage map the build wrote its title, the folder it was built from and how many expectations it shows - or that it wrote none. When the build shortened its line (machineLineLength, #666/#704) only the first maps are described, possibly none, and the number is the line's own count, the true total: an empty list with a count is maps made, not none. NEVER anything written on a page.",
         "event": "curriculum maps built",
         "why": "#128: a course can have a map per curriculum folder, and 'my second map is missing' or 'the map shows the wrong folder' is answerable only if the trail says which maps each build made. Read from the build's PLANTOIR_MAPS: line - coverageMapsBuilt - by the console reader for a run the app starts and by the scheduled publish's log reader, so the build nobody watches leaves it too; on Windows also from a run plantoir-mcp started (#660: one dispatch, BuildMachineLines, for all three; the mac's MCP door runs through its ScriptRunner already)."
       },
@@ -32269,7 +32269,7 @@
         }
       }
     ],
-    "readerExamplesNote": "Shortened lines as a reader meets them, and what it must make of them: the course, the section, how many entries the line carries (shown), the count, and the trail line, whose \"and N more\" is count minus shown. Run by the Windows suite (MachineLineLengthContractTests, through each reader and through BuildMachineLines); owed by the mac's readers.",
+    "readerExamplesNote": "Shortened lines as a reader meets them, and what it must make of them: the course, the section, how many entries the line carries (shown), the count, and the trail line, whose \"and N more\" is count minus shown. Run by the Windows suite (MachineLineLengthContractTests, through each reader and through BuildMachineLines), and on the mac by MachineLineLengthReaderTests (#704), through each reader, the console reader and the scheduled-log reader.",
     "readerExamples": [
       {
         "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"Unit 1/Day 1\", \"Unit 1/Day 2\"], \"count\": 300, \"more\": 298}",

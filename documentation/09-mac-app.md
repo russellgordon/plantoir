@@ -2134,6 +2134,18 @@ scheduled log) into `curriculum maps built` on the trail, and since this piece
 `BuildMarkerLine` keeps ANY `PLANTOIR_…:` line out of the console, so a marker
 the app has no reader for yet never reaches a teacher as raw JSON.
 
+**A shortened machine line (#704, v1.9.1).** Since #666 the shared Python
+caps every machine line at 4,000 characters, so a `PLANTOIR_DATED:`,
+`PLANTOIR_KEPT_OFF:` or `PLANTOIR_MAPS:` line with a long list keeps its first
+entries and carries `count`, the true total. `PagesDatedByTheBuild`,
+`HowITeachKeptOffReport` and `CoverageMapsBuilt` read it into their `count`
+and word the trail from `total` (the larger of `count` and the entries shown),
+ending "and M more", or "M not named" when the line named none. An empty list
+with a count is a report, not none. `MachineLineLengthReaderTests` runs the
+contract's six `machineLineLength.readerExamples` through each reader, the
+console and a scheduled publish's log. Why, what was measured and what was
+rejected: `05-build-pipeline.md` → "How long a machine line may be (#666)".
+
 ## The wizard's Starting Content section, and what governs what
 
 Five toggles can appear there, and their ORDER is their dependency, read
