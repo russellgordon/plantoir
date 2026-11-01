@@ -1873,7 +1873,9 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    again for the rest; it is `tookTooLong` and NOT cached, so the next build
    tries again (review S5 — a slow moment must not become a permanent
    failure). `\def\x{\x}\x` loops for ever and says nothing, measured;
-   that is the case the clock exists for.
+   that is the case the clock exists for. A helper that ENDS rather than
+   runs out of time is told apart since #718 — see "A diagram that crashes
+   the engine" below.
 6. **What is answered.** TikZ: the SVG, or the reason from TeX's console —
    the first `! ` line, and `l.N`, which is the tidied fence's line N − 1
    (node-tikzjax puts a one-line preamble in front; measured), mapped back
@@ -1882,7 +1884,8 @@ cases: `contracts/shared-rules.json` → `figureFences`.
    their file. Reasons: `undefinedCommand`, `missingPackage`,
    `missingDocument`, `documentClassNotNeeded` (an Overleaf paste — the line
    is NOT removed, so Obsidian and the site still agree; review S6),
-   `texSaid`, `tookTooLong`, `engineMissing`. functionplot: the 1.2.1 parse,
+   `texSaid`, `tookTooLong`, `engineMissing`, and since #718 `fontMissing`,
+   `drawingStopped` and `drawingEnded` (below). functionplot: the 1.2.1 parse,
    then each function tried at three points with function-plot's own
    evaluator (a name it does not know is only found by evaluating) and
    sampled at 51 points across the bounds (`sin x` is NaN everywhere and
@@ -1925,6 +1928,102 @@ stopped at its 20-second clock and the next one drawn, both in 23.5 s. The
 first build is mostly the new section's Quartz scaffold, not TeX (18.6 s with
 one diagram). The rest, and what was checked in the browser:
 [12 → Diagrams and graphs](12-windows-app.md#diagrams-and-graphs-485-e1-v170-the-runtime-carries-the-engines-503).
+
+**A diagram that crashes the engine (GitHub #718).** Found by #715's planner:
+some symbols written as TEXT need a font the engine does not carry
+(`tcrm1000`), and node-tikzjax's DVI reader THROWS "Could not find font
+tcrm1000" rather than letting TeX stop. Measured 2026-11-01 (node-tikzjax
+1.0.5, the dev-test image, Colima on an M4 Pro): `\$`, `\textdollar`,
+`\textdegree`, `\S`, `\pounds`, `\copyright`, `\textbullet`, `\textmu` and
+`\textcent` all do it, in plain TikZ and in a pgfplots label. It has two
+shapes, and until #718 the build told the teacher the wrong thing for both:
+
+| Where the symbol is | What the engine did | What the build said before | Since #718 |
+|---|---|---|---|
+| a pgfplots label | the throw is outside drawTikz's `catch`; Node ended the helper (exit 1) after **0.53–0.57 s** | `tookTooLong` — not cached, tried again every build | `fontMissing`, cached; answered in 0.40–0.57 s |
+| plain TikZ `\node{…}` | the `catch` swallowed it; TeX printed no `! ` line (0.02 s) | `texSaid` with nothing said ("LaTeX stopped here: ") | `fontMissing`, cached |
+
+**It never cost 20 seconds**, which is what #715's review and the issue's
+title assumed: `read()` returned None at the end of the helper's output as
+well as on the clock, so a crash cost one helper restart (old code: 11.7 s for
+the 20-job measurement, new code 13.0 s — the new one restarts after a crash
+it answered too). The cost was the wrong reason and a retry on every build.
+
+What the helper does now (`plantoir-figures.mjs`): the message the `catch`
+used to drop is kept, and a `process.on("uncaughtException")` handler answers
+the job being drawn the same way. One classifier for both: "Could not find
+font X" is `fontMissing` with X as `name` — never a font NUMBER, which
+dvi2html's parser throws as a bare string ("Could not find font 7.") — and
+any other throw with no `! ` line from TeX is `drawingStopped` with one line
+of the message (at most 160 characters, never a path or a stack: it reaches a
+teacher's console and the folder-problem finding). After an uncaught throw
+the helper exits, in the answer's write callback rather than straight after
+the write, because how much of a pipe write lands before an exit differs by
+platform and Windows runs this natively. It also writes "Error: <message>"
+to stderr.
+
+What `figures.py` does now: `_Helper.read` says whether the output ENDED
+(`helper.ended`) as against the clock running out. A helper that ended without
+answering is waited for (5 s), its stderr drained to the end, and read:
+"Could not find font X" anywhere in it is `fontMissing` again — so an old
+helper, or an answer the pipe lost, still names the font; Node's own print of
+a throw quotes the source line (`throw new Error("Could not find font " +
+…`), so the name must be letters and digits, not the `"` that follows —
+anything else is `drawingEnded` with the first "Error: …" line. After any
+crash it answered (`fontMissing`, `drawingStopped`) the next job gets a fresh
+helper. **That guard is new to this design, not a bug that shipped**: before
+#718 a crash was never answered, and the end of the output already restarted
+the helper; a helper that answers and THEN exits would have handed the next
+job an ended pipe and blamed it.
+
+What is cached (`NOT_CACHED`, pinned to `figureFences.cache.notCached`):
+`fontMissing` and `drawingStopped` are cached — the same fence and engine
+crash the same way every time (3 of 3, measured by the planner), and `engineId` covers the
+helper, so this change cleared every cache once, the empty-`said` entries
+included. `drawingEnded` is NOT: a death with no answer can be a signal, the
+memory running out or the builder being stopped, and cached it would stick to
+a good figure until the fence changed. It is bounded the way `tookTooLong`
+is: each figure is tried once a build, so it costs at most one helper start a
+build. The reason strings are stable, for #717's record.
+
+**Nothing said is never "()".** The implementation review measured it on the
+real engine: a helper killed mid-diagram with SIGKILL or SIGTERM (6.6 s, the
+next diagram drawn) leaves stderr EMPTY, so `drawingEnded` — whose sentence
+was "drawing it stopped part-way ({said}) - …" — read "drawing it stopped
+part-way () - it will be tried again next time" in the console and in the
+folder problem. That is the ordinary shape of `drawingEnded`, not an edge.
+So `figureFences.words.reasonsWithoutDetail` gives every reason whose
+sentence carries `{said}` (`drawingEnded`, `drawingStopped`, `texSaid`,
+`expressionNotUnderstood`) a sentence for when nothing was said (blank after
+trimming), and `site_health.figure_reason_words` is the one function both the
+build's `plantoir: error:` line and `figuresCouldNotBeDrawn` word a reason
+with — they had two copies of the fill until then. `test_figures.py` renders
+every reason with an empty `said` in both places and refuses "()", a dangling
+colon and a `{said}` left in; its stand-in ends itself by SIGKILL and SIGTERM.
+Rejected: dropping the brackets alone (the sentence then reads "stopped
+part-way  - …" with nothing to say what), and filling the gap with a stock
+phrase such as "no reason given" inside the brackets (it still reads as a
+fault in the wording rather than a sentence).
+
+`$^\circ$` and `\char36` draw in both shapes (0.04–0.61 s), and rendered
+with the site's own faces they are a degree sign and a dollar sign (looked at,
+2026-11-01); the `fontMissing` sentence says so, and names the rule (a symbol
+written as text needs lettering diagrams don't have) rather than only the
+two it was found with. `\textsf`, `\texttt`, `\textsc`, `\mathbb` and bold
+italic draw (measured by the plan's review). `figureFences.knownLimits` lists the measured symbols;
+`check_figure_rules_against_the_site.py` (verify.sh) runs a dollar sign in
+plain TikZ and a degree sign in a pgfplots label on the real engine, placed
+before the graph cases so the run also proves the job after a crash is
+answered by a fresh helper — red on the old helper (`texSaid`; and
+`tookTooLong` with the old `figures.py`).
+
+**Rejected:** caching every ended helper (a signal or a stopped builder would
+stick to a good figure); reading stderr ALONE for the reason (the drain thread
+can lose the race with the exit, so the answer on stdout comes first and
+stderr is the fallback); shipping `tcrm1000` (it is not in the engine's
+BaKoMa set and no licensed source was found — a separate issue if wanted);
+keeping the helper after a caught crash (the engine's state after a throw
+mid-drawing is not known; a restart costs about 0.5 s).
 
 **The live-preview edge.** The preview's live reload re-reads `content/`,
 not the teacher's vault, so a fence edited in Obsidian reaches the site on
