@@ -101,15 +101,23 @@
   <p>Whichever you choose, what gets deployed is the same site — the exact pages you previewed. Only where it ends up differs, and you can change your mind later without rewriting anything.</p>
 
   <div class="note">
-    <h3>Netlify — the default</h3>
-    <p>A free hosting account, one site per section, at an address like <code>ics3u-s1-2025-gordon.netlify.app</code>. The address is suggested once and stays fixed after that, so a link handed out in September still works in June.</p>
-    <p>This is the right choice for most teachers starting out — the app does the account creation for you the first time you deploy. The one thing worth knowing: Netlify's free accounts can turn requests away for a few minutes if a whole staff room deploys at once, say at a workshop. It resolves itself in a few minutes; nothing is lost.</p>
+    <h3>Cloudflare Pages — the default for a new course</h3>
+    <p>Free, one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Cloudflare's free plan has no limit on visitors or on how much your students download, which is why a new course starts here unless you choose otherwise.</p>
+    <p>It needs your Cloudflare Account ID, kept once in Plantoir ▸ Settings ▸ Deploying for every course. You can create a course and preview it without one; the first deploy asks you to add it. Setup is two things — see below.</p>
   </div>
 
   <div class="note">
-    <h3>Cloudflare Pages — for unmetered bandwidth, or a free address per section</h3>
-    <p>Also free, also one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Worth choosing if a class page carries a lot of images or embedded documents and you'd rather not think about bandwidth limits — Cloudflare's free plan doesn't limit how much your students download.</p>
-    <p>Setup asks for two things instead of one — see below.</p>
+    <h3>Netlify — fine for an older account, or for occasional deploys</h3>
+    <p>Also free, one site per section, at an address like <code>ics3u-s1-2025-gordon.netlify.app</code>. The address is suggested once and stays fixed after that, so a link handed out in September still works in June. The app does the account creation for you the first time you deploy.</p>
+    <p>The thing to know before choosing it: Netlify accounts made since September 2025 are on a fixed monthly allowance of credits, shared by every site on the account, and deploys are what use it up. When it runs out, Netlify pauses <em>every</em> site on that account until the next month. As read from <a href="https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/">Netlify's own page</a> on 1 November 2026:</p>
+    <ul>
+      <li>The free plan's allowance: 300 credits a month, with no way to buy more.</li>
+      <li>One deploy of one section: 15 credits.</li>
+      <li>Bandwidth: 20 credits per GB.</li>
+      <li>Web requests: 2 credits per 10,000.</li>
+    </ul>
+    <p>Each section is its own site, so one deploy of all three sections of a class uses 45 credits: fewer than seven of those a month spends the whole allowance, before a single student has loaded a page. An account made before September 2025 keeps its older plan, and a teacher who deploys only now and then may never come near the limit. Courses made before Plantoir offered Cloudflare keep deploying to Netlify exactly as they always have.</p>
+    <p>Netlify's free accounts can also turn requests away for a few minutes if a whole staff room deploys at once, say at a workshop. It resolves itself; nothing is lost.</p>
   </div>
 
   <div class="note">
@@ -137,7 +145,7 @@
     <h3>An API token</h3>
     <p>Create one in the Cloudflare dashboard with exactly one permission: <strong>Account → Cloudflare Pages → Edit</strong>. Nothing broader is needed, and nothing broader is asked for.</p>
     <h3>An Account ID</h3>
-    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app asks for your Cloudflare Account ID once, up front, rather than mid-deploy. It's on the same dashboard page as the token.</p>
+    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app keeps your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying. It's on the same dashboard page as the token. A new course can be created and previewed before you add it; the first deploy asks for it.</p>
   </div>
   <p>Enter both once and every Cloudflare course you deploy afterward reuses them.</p>
 </section>
@@ -152,7 +160,7 @@
 <hr class="rule">
 
 <section>
-  <h2>The one real limit</h2>
+  <h2>Cloudflare's file-size limit</h2>
   <p>Cloudflare Pages won't accept a single file larger than <strong>25 MB</strong>. Netlify and a folder on your own web space don't share that limit.</p>
   <p>In practice it rarely matters. Documents, images and slide decks are comfortably under it. Long-form video is the exception — which is exactly why most teachers embed video from YouTube or Vimeo rather than uploading it. That sidesteps the limit for any destination, not just Cloudflare's.</p>
   <p>If a file is too large for Cloudflare, the app tells you which one before it uploads anything, rather than failing partway through.</p>

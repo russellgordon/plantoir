@@ -14,8 +14,8 @@
 >
 > | `deploy_target` | Where it goes | Who does the work |
 > |---|---|---|
-> | `netlify` (default) | A Netlify site per section | `deploy.py`, Netlify REST API |
-> | `cloudflare_pages` | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
+> | `netlify` (what an ABSENT key means, and the launchers' default) | A Netlify site per section | `deploy.py`, Netlify REST API |
+> | `cloudflare_pages` (the new-course default in both apps since #668 — see "Choosing a destination (#668)" below) | A Cloudflare Pages project per section, at `<project>.pages.dev` | `deploy.py`, via wrangler in the image |
 > | `local_folder` | A folder on the teacher's own machine, one `sectionN` subfolder per section | the **launcher**, host-side — the container is never involved |
 >
 > Whichever is chosen, the thing published is the same built
@@ -970,6 +970,96 @@ Cloudflare 429 is deliberately NOT explained yet — the sentence names Netlify 
 so it falls back to the raw output until Cloudflare has a sentence of its own;
 matching the nameless `API error 429` was rejected for exactly that case.
 `app-rules.json` → `failureExplanations.cases` pins all three.
+
+## Choosing a destination (#668)
+
+**A course made in either app's new-course window deploys to Cloudflare
+Pages** unless the teacher picks something else, and the picker lists it
+first. A course whose file has NO `deploy_target` — every course made before
+the other destinations existed, and every course made with `setup.sh` —
+still deploys to Netlify, and nothing about that changed. The rule, the
+sentences and every case are `contracts/app-rules.json` →
+`publishingDestinations`; the Swift is `PublishingDestinations`.
+
+**Why.** Netlify moved new accounts to a credit-based plan, and the free one
+is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
+(the issue's own table, read 2026-10-23, agrees):
+
+| What | Credits |
+|---|---|
+| Free plan allowance | 300 a month, a hard limit (no way to buy more on Free) |
+| A production deploy | 15 each (deploy previews are free) |
+| Bandwidth | 20 per GB |
+| Web requests | 2 per 10,000 |
+
+"Starting on September 4, 2025, all new Netlify accounts will use the new
+credit-based pricing plans"; an account made before then is on a Legacy plan
+and is unaffected unless it switches. When the balance is used up, "all of
+your web projects (sites/apps) are paused", each showing "Site not available"
+until the next cycle. **Each section is its own site, so one deploy of a
+three-section course is three production deploys, 45 credits** — twenty
+production deploys, fewer than seven deploys of that course, is the whole
+allowance before a single student has loaded a page. Traffic is a small part of it: about 90 students reading a few pages a
+day is roughly 1.6 GB, some 32 credits plus ~15 for requests.
+
+Cloudflare Pages, read the same day: static asset requests are "free and
+unlimited" on every plan; 20,000 files a site, 25 MiB a file (already said in
+the app, `cloudflareSizeNote`), and **100 projects an account**, "not
+routinely increased". The limits page also lists "500 builds per month" on
+Free, but describes builds only as pushes to a Git repository; neither it nor
+the Direct Upload page says whether an upload with `wrangler pages deploy`
+counts. **So the app makes no claim about Cloudflare's limits on deploys** —
+only that its free plan has no limit on visitors, which its pricing page says
+in so many words. The 100-project cap, which a teacher who rolls over many
+sections a year could reach in about seven years, is #723.
+
+**What the teacher is told.** No figures in the app — the hosts change them;
+the dated figures are here and on plantoir.app's deploying page. Every
+sentence says DEPLOY for what spends the allowance, because in Plantoir
+publishing marks a page and costs nothing. `netlifyNote` sits under Netlify
+wherever it is configured (primary or additional, the new-course window and
+Course Settings, and an absent key counts as Netlify); `cloudflareCaption`
+sits wherever Cloudflare is; `netlifyScheduleNote` is in Schedule a deploy
+when the SAVED settings deploy to Netlify; the window's section caption is
+`wizardCaption`.
+
+**The Account ID.** Before #668 the new-course window refused Create with no
+Cloudflare Account ID in Settings. With Cloudflare the default that stops
+every first-time teacher at their first course, before they have seen a
+page. Now a MISSING ID is a warning: the orange
+`cloudflareAccountProblem` sentence stays beside Open Settings…, with
+`accountIDCanWait` under it, and Create goes ahead; previews never need the
+ID. An ID that cannot be one (not 32 hexadecimal characters) still refuses
+Create, because something is saved and it is wrong. The refusal moves to the
+first DEPLOY, where it already was: `MultiDestinationDeployRunner.refusalReason`
+(the Deploy button, the assistant, an MCP client), scheduling, and saving
+Course Settings with a changed destination all refuse a Cloudflare
+destination with no ID and name Plantoir ▸ Settings ▸ Deploying. Both halves
+are contract cases (`wizardAccountID`, `deployWithoutAnAccountID`).
+
+**What was rejected, and why.**
+- *Letting the launcher ask for the ID at the first deploy.* The plan's first
+  idea. It cannot work: the app refuses before `deploy.sh` runs, and the
+  launcher keeps an answer in the Keychain
+  (`containerized-quartz-cloudflare-account`), not in the app's settings, so
+  every app-side check would go on failing after it.
+- *Defaulting to Cloudflare only when Settings already has an ID.* A
+  first-time teacher has none, so this gives Netlify to exactly the teachers
+  the change is for — and it makes the default depend on the machine the
+  tests run on (the suite's settings folder is empty).
+- *Changing the absent-key fallback, or the launchers' default.* Either moves
+  a working class site to a host the teacher has no account with, at its next
+  deploy, with nothing to say so. `setup.sh` writes no `deploy_target` and
+  keeps a saved one (`scripts/test_setup_course_deploy_target.py`), so a
+  command-line course stays on Netlify.
+- *Figures in the app's sentences.* The hosts change them, and a sentence
+  in the app cannot carry a date the way this page does.
+- *Recording the destination on the "course created" trail line.* That line's
+  `carries` says, deliberately, "not where it publishes", and
+  `course_config.json` already answers the question.
+
+**Windows** owes the same default, order, sentences, the warning in place of
+the refusal, and its own copies of the seven wizard goldens.
 
 ## Cloudflare Pages (`--target cloudflare`)
 

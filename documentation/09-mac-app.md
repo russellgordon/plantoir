@@ -4259,7 +4259,12 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   Deploying section and the wizard SHOW it read-only with **Open Settings…**,
   which selects the Deploying pane first (`SettingsPane`). With no ID the
   wizard still refuses Create with the contract's existing sentence (unchanged,
-  so nothing goes red on Windows), now beside that button. Driven: typing an ID
+  so nothing goes red on Windows), now beside that button. **Since #668 it does
+  not:** Cloudflare Pages is the new-course default, so a MISSING ID is a
+  warning (the same sentence, with `PublishingDestinations.accountIDCanWait`
+  under it) and the first deploy refuses instead; an ID that cannot be one
+  still refuses Create — [07](07-deployment.md) → "Choosing a destination
+  (#668)". Driven: typing an ID
   in Settings updated an open course's Deploying section at once. No data
   moved — the value was always app-wide (`AppSettings.cloudflareAccountID`) —
   so nothing was migrated. The one-tab objection recorded in
