@@ -14,7 +14,7 @@ oversight; changing the launchers' default was rejected with the fallback.
 
 The run is the real one, `setup_course.setup_course`, driven exactly as
 test_graded_folders_rerun.py drives it (Return at every prompt), whose
-harness it borrows.
+harness it borrows. Listed in verify.sh; Windows' PythonToolchainTests discovers it.
 """
 
 import sys
