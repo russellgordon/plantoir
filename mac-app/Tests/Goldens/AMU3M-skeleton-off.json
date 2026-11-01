@@ -7,7 +7,7 @@
   "course_name" : "Golden Course",
   "custom_short_name" : "",
   "deploy_folder_path" : "",
-  "deploy_target" : "netlify",
+  "deploy_target" : "cloudflare_pages",
   "emojis" : {
     "sections" : {
       "section1" : "📚"

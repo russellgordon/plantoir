@@ -30,7 +30,29 @@ struct PublishingChoiceView: View {
     /// primary above — see `CourseConfiguration.additionalDeployTargets`.
     @Binding var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget]
 
+    /// True in the new-course window only: there a missing Account ID is a
+    /// warning rather than a refusal (#668), so the orange sentence gets
+    /// `PublishingDestinations.accountIDCanWait` under it. Course Settings
+    /// leaves it false, because saving a changed destination there still
+    /// needs the ID (`SaveEnablement`).
+    var accountIDMayWait: Bool = false
+
     // MARK: - Computed properties
+
+    /// The additional destinations' types, in the order they were added.
+    var additionalTypes: [String] {
+        var result: [String] = []
+        for target in additionalDeployTargets {
+            result.append(target.type)
+        }
+        return result
+    }
+
+    /// Whether Netlify's note is shown (#668) — wherever Netlify is
+    /// configured, primary or additional.
+    var showsNetlifyNote: Bool {
+        return PublishingDestinations.showsNetlifyNote(primary: deployTarget, additional: additionalTypes)
+    }
 
     /// What is wrong with the chosen folder, or nil when nothing is.
     /// Checks the PRIMARY folder only — an additional folder target's
@@ -147,8 +169,15 @@ struct PublishingChoiceView: View {
         if deployTarget == "cloudflare_pages" {
             CloudflareDetailFields(
                 cloudflareAccountID: cloudflareAccountID,
-                accountProblem: accountProblem
+                accountProblem: accountProblem,
+                accountIDMayWait: accountIDMayWait
             )
+        }
+
+        // Netlify as the primary: the note sits under the picker. As an
+        // additional destination it sits under that toggle instead.
+        if deployTarget == "netlify" && showsNetlifyNote {
+            NetlifyNote()
         }
 
         if deployTarget == "local_folder" {
@@ -189,9 +218,15 @@ struct PublishingChoiceView: View {
         if type == "cloudflare_pages" && hasAdditionalCloudflare {
             CloudflareDetailFields(
                 cloudflareAccountID: cloudflareAccountID,
-                accountProblem: accountProblem
+                accountProblem: accountProblem,
+                accountIDMayWait: accountIDMayWait
             )
             .padding(.leading, 20)
+        }
+
+        if type == "netlify" && deployTarget != "netlify" && showsNetlifyNote {
+            NetlifyNote()
+                .padding(.leading, 20)
         }
 
         if type == "local_folder" && hasAdditionalLocalFolder {
@@ -259,16 +294,22 @@ struct PublishingChoiceView: View {
 /// "Where do I find this?" and its instructions moved to Plantoir ▸ Settings
 /// ▸ Deploying (`DeployingSettingsView`), because the ID is the teacher's,
 /// not the course's: editing it here changed it for every course. With no
-/// ID the wizard still refuses Create with the same sentence as before
+/// ID the sentence is the same as before
 /// (`CourseConfiguration.cloudflareAccountProblem`, pinned in the contract),
-/// now beside the button that fixes it. `AppSettings` is observable, so a
-/// change made in the Settings window shows here, and re-validates, at once.
+/// beside the button that fixes it — but since #668 the new-course window no
+/// longer refuses Create over a MISSING ID (Cloudflare is the default, and a
+/// first-time teacher has none): it says `accountIDCanWait` under it, and the
+/// first deploy refuses instead. `AppSettings` is observable, so a change
+/// made in the Settings window shows here, and re-validates, at once.
 private struct CloudflareDetailFields: View {
 
     // MARK: - Stored properties
 
     let cloudflareAccountID: String
     let accountProblem: String?
+
+    /// See `PublishingChoiceView.accountIDMayWait`.
+    let accountIDMayWait: Bool
 
     @Environment(\.openSettings) var openSettings
 
@@ -285,6 +326,10 @@ private struct CloudflareDetailFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Why it is offered first (#668), said plainly and without
+            // figures.
+            ExampleCaption(PublishingDestinations.cloudflareCaption)
+                .accessibilityIdentifier("cloudflareCaption")
             // Said FIRST, where the row is read from: the value below is
             // shown, not edited, and this is where it is edited.
             Text("Kept in Plantoir ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare Pages.")
@@ -307,13 +352,22 @@ private struct CloudflareDetailFields: View {
                 }
             }
 
-            // What is wrong with the ID this Mac has. Not commentary: this
-            // is why the course will not save, or the wizard will not create.
+            // What is wrong with the ID this Mac has. Not commentary: in
+            // Course Settings this is why a changed destination will not
+            // save; in the new-course window a MISSING ID is a warning (#668)
+            // and says so, while one that cannot be an ID still refuses
+            // Create (`PublishingDestinations.wizardCreateRefusal`).
             if let accountProblem {
                 Text(accountProblem)
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("cloudflareAccountProblem")
+                if accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
+                    Text(PublishingDestinations.accountIDCanWait)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("cloudflareAccountCanWait")
+                }
             }
 
             // Not a warning that comes and goes: a fact about this
@@ -326,6 +380,27 @@ private struct CloudflareDetailFields: View {
                 .foregroundStyle(.orange)
                 .accessibilityIdentifier("cloudflareSizeNote")
         }
+    }
+}
+
+/// What a teacher is told about Netlify's free plan wherever Netlify is
+/// chosen (#668): the allowance, that deploys use it up, and that running
+/// out pauses every site on the account. No figures — the hosts change them.
+private struct NetlifyNote: View {
+
+    // MARK: - Body
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text(PublishingDestinations.netlifyNote)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("netlifyNote")
     }
 }
 

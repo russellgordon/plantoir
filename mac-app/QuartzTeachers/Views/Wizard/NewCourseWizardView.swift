@@ -125,10 +125,12 @@ struct NewCourseWizardView: View {
     @State var usesLCSTerminology: Bool = false
     @State var fontChoice: FontChoice = FontChoice.systemDefault
 
-    /// Where this course's sections deploy: Netlify (the default),
-    /// Cloudflare Pages, or a folder on this Mac for teachers who upload to
-    /// their own web host.
-    @State var deployTarget: String = "netlify"
+    /// Where this course's sections deploy: Cloudflare Pages (the default
+    /// for a new course since #668), Netlify, or a folder on this Mac for
+    /// teachers who upload to their own web host. Always WRITTEN to the new
+    /// course's file, so the absent-key fallback (Netlify) only ever reaches
+    /// courses made before — `PublishingDestinations.whyTheyDiffer`.
+    @State var deployTarget: String = PublishingDestinations.newCourseDefault
     @State var deployFolderPath: String = ""
 
     /// Extra destinations this course ALSO publishes to, beyond
@@ -1245,10 +1247,12 @@ struct NewCourseWizardView: View {
                     // Settings and shown read-only, with Open Settings…
                     // beside it (#457, the HIG sweep).
                     cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
-                    additionalDeployTargets: $additionalDeployTargets
+                    additionalDeployTargets: $additionalDeployTargets,
+                    // A missing ID is a warning here, not a refusal (#668).
+                    accountIDMayWait: true
                 )
             } header: {
-                FormSectionHeader("Deploying", caption: "Netlify is the usual choice — change any time in Settings")
+                FormSectionHeader("Deploying", caption: PublishingDestinations.wizardCaption)
             }
             .disabled(!hasChosenCourse)
 
@@ -1711,8 +1715,15 @@ struct NewCourseWizardView: View {
                 return
             }
         }
+        // A MISSING Account ID no longer refuses Create (#668): Cloudflare
+        // is the default, a first-time teacher has none, and the first
+        // deploy refuses with the same sentence and the way to fix it
+        // (`MultiDestinationDeployRunner.refusalReason`). An ID that cannot
+        // be one still refuses here. The rule and both halves are contract
+        // cases: app-rules.json → publishingDestinations.wizardAccountID and
+        // .deployWithoutAnAccountID.
         if deployTarget == "cloudflare_pages" {
-            if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+            if let problem = PublishingDestinations.wizardCreateRefusal(forAccountID: AppSettings.shared.cloudflareAccountID) {
                 validationProblem = problem
                 return
             }
@@ -1730,7 +1741,7 @@ struct NewCourseWizardView: View {
                 }
             }
             if target.type == "cloudflare_pages" {
-                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
+                if let problem = PublishingDestinations.wizardCreateRefusal(forAccountID: AppSettings.shared.cloudflareAccountID) {
                     validationProblem = problem
                     return
                 }

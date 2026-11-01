@@ -5493,5 +5493,162 @@
         "why" : "A KNOWN, ACCEPTED false negative, written down so it is not discovered as a surprise. The fingerprint is of file metadata, never of file contents, which is what makes it cheap enough to run whenever a window comes to the front. `cp -p`, `rsync -a`, unzipping a backup and Time Machine all preserve modification dates, so restoring yesterday's version of a page can leave the marker off. The cure - hashing every byte of every page - costs more than the marker is worth. Publishing is never blocked by the marker, so the teacher can always publish anyway."
       }
     ]
+  },
+  "publishingDestinations" : {
+    "deployWithoutAnAccountID" : {
+      "cases" : [
+        {
+          "accountID" : "",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "name" : "A new course on the default destination, made with no Account ID, is refused at its first deploy"
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "netlify",
+            "cloudflare_pages"
+          ],
+          "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "name" : "Cloudflare as an additional destination is refused the same way"
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "netlify"
+          ],
+          "expectRefusalStartsWith" : null,
+          "name" : "Netlify needs no Account ID"
+        },
+        {
+          "accountID" : "0123456789abcdef0123456789abcdef",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectRefusalStartsWith" : null,
+          "name" : "With the ID in Settings, the deploy goes ahead"
+        }
+      ],
+      "why" : "The other half of wizardAccountID, and why the wizard can let Create go ahead. Nothing about the deploy-time refusal changed with #668: the deploy (the Deploy button, the assistant, an MCP client), scheduling a deploy, and saving Course Settings with a changed destination all still refuse a Cloudflare destination with no Account ID, before the launcher is started, and the refusal names Plantoir ▸ Settings ▸ Deploying (File ▸ Settings ▸ Deploying on Windows) — which is why the cases pin only the start of the sentence, the cloudflareAccountProblem half both apps share. The launcher's own prompt for the ID is never reached from the app: the app refuses first, and a launcher's answer would go to the Keychain rather than to the app's settings, so every app-side check would still fail after it. That is the reason the first deploy is the moment a teacher is asked, and why the measurement the plan proposed (does the launcher's dialog appear?) was not needed."
+    },
+    "netlifyNoteCases" : [
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify chosen as the destination",
+        "primary" : "netlify"
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "No destination saved at all, which reads as Netlify",
+        "primary" : "",
+        "why" : "Course Settings for a course made before #668, or made with setup.sh: it deploys to Netlify, so it gets the note, although nothing in its file says Netlify."
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : false,
+        "name" : "Cloudflare Pages chosen, the new-course default",
+        "primary" : "cloudflare_pages"
+      },
+      {
+        "additional" : [
+
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : false,
+        "name" : "A folder on this computer alone",
+        "primary" : "local_folder"
+      },
+      {
+        "additional" : [
+          "netlify"
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify switched on as an additional destination",
+        "primary" : "cloudflare_pages",
+        "why" : "An additional Netlify destination is deployed every time the primary is, so it spends the allowance exactly as a primary one does."
+      },
+      {
+        "additional" : [
+          "netlify"
+        ],
+        "expectCloudflareCaption" : false,
+        "expectNetlifyNote" : true,
+        "name" : "Netlify as an additional destination beside a folder",
+        "primary" : "local_folder"
+      },
+      {
+        "additional" : [
+          "cloudflare_pages"
+        ],
+        "expectCloudflareCaption" : true,
+        "expectNetlifyNote" : false,
+        "name" : "Cloudflare Pages as an additional destination beside a folder",
+        "primary" : "local_folder"
+      }
+    ],
+    "newCourseDefault" : "cloudflare_pages",
+    "note" : "Where a NEW course deploys, and what a teacher is told while choosing (GitHub #668). Netlify moved new accounts to a fixed monthly allowance of credits shared by every site on the account, which deploys use up, and when it runs out every site on the account is paused until the next month; Cloudflare Pages' free plan has no limit on visitors. So a course made in either app's new-course window starts on Cloudflare Pages, listed first; a teacher can still choose Netlify, and is then shown netlifyNote. The sentences carry NO figures, because the hosts change them: the dated figures are in documentation/07-deployment.md and on plantoir.app's deploying page. They say DEPLOY, never publish, for what spends the allowance — in Plantoir, publishing marks a page, and costs nothing. They make no claim about Cloudflare's limits on deploys, which its documentation does not settle for an upload made from a computer (doc 07, read 2026-11-01). The trail's 'course created' line deliberately does not carry the destination (shared-rules.json -> activityTrail.mustRecord): course_config.json already answers 'where does this course deploy?'.",
+    "pickerOrder" : [
+      "cloudflare_pages",
+      "netlify",
+      "local_folder"
+    ],
+    "sentences" : {
+      "accountIDCanWait" : "You can create the course without it and preview it as usual. It is needed before the first deploy.",
+      "cloudflareCaption" : "Recommended. Free, with no limit on visitors.",
+      "netlifyNote" : "A note about Netlify’s free plan: Netlify accounts made since September 2025 get a fixed monthly allowance, and every deploy of every section uses part of it. When the allowance runs out, Netlify pauses every site on the account until the next month. Cloudflare Pages’ free plan has no limit on visitors, which is why Plantoir suggests it. If your Netlify account is older than that, or you deploy only now and then, Netlify works well.",
+      "netlifyScheduleNote" : "This course deploys to Netlify. On Netlify’s free plan every deploy uses part of a monthly allowance, and when it runs out Netlify pauses every site on the account until the next month.",
+      "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
+    },
+    "whenTheKeyIsAbsent" : "netlify",
+    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup.sh writes no deploy_target and keeps a saved one when it is run again, so a course made at the command line deploys to Netlify, like deploy.sh's own default; that was left alone (rejected: changing the launchers' default, which is the same move as changing the fallback).",
+    "wizardAccountID" : {
+      "cases" : [
+        {
+          "accountID" : "",
+          "expectAccountIDCanWait" : true,
+          "expectCreateRefusal" : null,
+          "expectWarning" : "Paste your Cloudflare Account ID.",
+          "name" : "No Account ID yet: Create goes ahead, and the window says so"
+        },
+        {
+          "accountID" : "   ",
+          "expectAccountIDCanWait" : true,
+          "expectCreateRefusal" : null,
+          "expectWarning" : "Paste your Cloudflare Account ID.",
+          "name" : "Only spaces is no Account ID"
+        },
+        {
+          "accountID" : "abc",
+          "expectAccountIDCanWait" : false,
+          "expectCreateRefusal" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "expectWarning" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "name" : "An Account ID that cannot be one still refuses Create",
+          "why" : "Something is saved, and it is wrong: the teacher has tried and made a mistake, and Open Settings… beside the sentence is where it is put right. Only an EMPTY ID is the step that can wait."
+        },
+        {
+          "accountID" : "0123456789abcdef0123456789abcdef",
+          "expectAccountIDCanWait" : false,
+          "expectCreateRefusal" : null,
+          "expectWarning" : null,
+          "name" : "A good Account ID: nothing to say"
+        }
+      ],
+      "why" : "Each case holds whether Cloudflare Pages is the primary destination or an additional one; with Netlify or a folder alone the Account ID is not asked about at all. Before #668 the window refused Create with no Account ID; with Cloudflare the default that would stop every new teacher at their first course, before they had seen a page. The sentence stays on screen, orange, beside Open Settings…, with accountIDCanWait under it. Rejected: defaulting to Cloudflare only when Settings already has an ID — a first-time teacher has none, so that gives Netlify to exactly the teachers #668 is for, and it makes the default depend on the state of the machine the tests run on."
+    }
   }
 }
