@@ -638,9 +638,10 @@ class PreviewPageSceneTests(unittest.TestCase):
             found.append((shot["id"], shot["capture"]["workspace"], shot["capture"]["course"]))
             with self.subTest(shot=shot["id"]):
                 self.assertTrue((capture.PREPARE_DIR / shot["capture"]["prepare"]).is_file())
-                # No windows: false assertion any more: every quiz shot has its
-                # Windows twin since #590, and WINDOWS_PICTURE_OWED is where a
-                # shot still owed one is pinned (#686; the Mac retake is #710).
+                # No windows: false assertion any more (dropped in 020a51c57,
+                # #686): every quiz shot has its Windows twin since #590, and
+                # a shot still owed one is pinned in WINDOWS_PICTURE_OWED and
+                # checked by test_every_shot_has_its_windows_picture.
         self.assertEqual(found, [("quiz-math", "demo", "MCV4U"), ("quiz-chemistry", "demo", "SCH3U"),
                                  ("quiz-english", "demo", "ENG2D"), ("quiz-code-run", "marketing", "ICS3U")])
 
