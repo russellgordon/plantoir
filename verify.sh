@@ -2486,7 +2486,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Quiz One Blank.md" "$HIT_COURSE/Quiz Read Differently.md" \
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
-        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Progress Fixture.md" \
+        "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Task Loose.md" "$HIT_COURSE/Progress Fixture.md" \
         "$HIT_COURSE/Wrap Fixture.md" "$HIT_COURSE/Wrap Plain Twin.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
@@ -3645,7 +3645,9 @@ QUIZPLANTS
 # browser check proves the reuse happened before it trusts what it reads);
 # Task Printable: a printable page with a task list (what paper shows); Task
 # Raw Box: a checkbox the page writes in HTML, which is no task item and is
-# left alone (6l must not count it - review F5).
+# left alone (6l must not count it - review F5); Task Loose: a LOOSE list
+# (li > p > label > input), where the browser check measures where the box
+# sits as it does on the tight ones (#693).
 # Removed by restore_hit_fixture.
 python3 - "$HIT_COURSE" <<'TASKPLANTS'
 import json, sys
@@ -3677,6 +3679,9 @@ for twin in ("A", "B"):
     "---\ntitle: Task Printable\nprintable: true\n---\nA printable checklist (plantoir-task-printable-7f3a).\n\n"
     "## Before the lab\n\n- [ ] Printable first item\n- [x] Printable second item\n- [ ] Printable third item\n",
     encoding="utf-8")
+(course / "Task Loose.md").write_text(
+    "---\ntitle: Task Loose\n---\nA loose task list (plantoir-task-loose-7f3a).\n\n"
+    "- [ ] Loose first item\n\n- [ ] Loose second item\n", encoding="utf-8")
 TASKPLANTS
 # ---- #653: text blocks that wrap, planted for the same build ----
 # Wrap Fixture: a ```text wrap {2,101} block of 120 lines (a three-digit

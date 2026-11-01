@@ -2773,7 +2773,7 @@ build wiring, and owes only a measured look (its `windows` issue).
 | `plugins/transformers/taskRules.ts` | The rules, pure: `taskItemText`, `taskItemId`, `siteRootFrom`, `taskKey`, `readTicks`. Bundled by `scripts/check_task_rules_against_the_site.py` and run over every contract case. |
 | `plugins/transformers/plantoirTasks.ts` | Html stage, wired straight after `PlantoirQuizzes` (`build_site._wire_tasks_transformer`): takes `disabled` off every task box outside a `.plantoir-quiz`, stamps it, and wraps it in a label. The ONLY producer of item ids. |
 | `components/scripts/tasks.inline.ts` | Rides `PlantoirMetaLine.afterDOMLoaded` into every page's `postscript.js`: one delegated `change` listener, and the restore on every `nav`. |
-| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, the focus ring, unclickable previews, and the paper ink. |
+| `components/styles/tasks.scss` | Rides `PlantoirMetaLine.css` into `index.css`: Quartz's task-item rules said again for the label shape, the look, where the box sits (K5b, #693), the focus ring, unclickable previews, and the paper ink. |
 
 ### K2. The id, the key and the read API
 
@@ -2870,6 +2870,98 @@ mode (desert-sandstone) and 12.19:1 in dark. `scripts/test_task_box_contrast.py`
 and 4.5:1 (words) in every scheme; the browser check reads the computed
 colours. This drops Quartz's coloured fill.
 
+### K5b. Where the box sits (#693)
+
+**What a teacher saw.** Russell, 2026-10-24, from Safari's inspector: the box
+sat high beside its words. His picture's red guides mark the label's 18px
+line box and ask for the box centred between them.
+
+**Why.** Quartz's `input[type="checkbox"]` rule (base.scss) sets no
+`margin-block`, so the browser's own 3px top and bottom margins lifted the box
+3px, and its `translateY(2px)` — written for Quartz's `li > input` shape, not
+the `li > label > input` the transformer makes — brought back 2. Measured: the
+box's bottom 1.00px above the baseline at every size, and its centre 3.37px
+high of the capitals' middle at 16px (0.55-5.03px across the sweep below);
+4.02px on a printable page under print media (`print.scss`'s 10.95pt) and in
+the handout's frame.
+
+**The rule** (`tasks.scss`, outside `@media print`, so paper gets it too;
+quizzes' boxes untouched):
+
+```scss
+input[type="checkbox"].plantoir-task {
+  font: inherit;
+  margin-block: 0;
+  transform: none;
+  vertical-align: baseline;
+  vertical-align: calc(0.5cap - 8px);
+}
+```
+
+The box's centre lands on the middle of the WORDS' capitals: `cap` is their
+cap height, so it holds for every font and size. `font: inherit` is what makes
+it the words' cap height and not the control's 13.33px default. 8px is half
+the box, which Quartz's base.scss makes 16px square at every font size (the
+UA's border-box; `font: inherit` does not change it) — so the 8px follows the
+pinned Quartz, and the browser check asserts 16px so a Quartz that changes it
+fails with that message rather than as a half-pixel drift.
+
+**Measured** (2026-10-31/11-01, M4 Pro, macOS 26, Chrome for Testing 155 and
+WebKit `WKWebView`; tight and loose lists planted in the verify site; 12, 14.4,
+16, 17.92, 20 and 24px in system-ui, Georgia, Verdana and Times New Roman;
+screen and print media; 49 boxes per run). The two engines agree to 0.02px.
+"Off" is the box's centre against the capitals' middle, from a zero-width
+probe of height `1cap` set on the baseline after the box — and canvas's
+`measureText("H").actualBoundingBoxAscent` equals `1cap` to 0.01px in every
+case, so the probe is not measuring the rule against itself.
+
+| CSS on the box | Bottom vs baseline at 16px | Centre vs capitals' middle | Verdict |
+|---|---|---|---|
+| A: Quartz's (before) | 1.00px above, every size | 0.55-5.03px high (3.37 at 16px) | the fault |
+| B: `margin-block:0; transform:none; vertical-align:baseline` | on it (0.00) everywhere | 4.03px high to 0.72px low | what the title asked; still 2.4px high at 16px, the fault in the picture |
+| C: `vertical-align: middle` | 3.8px below | 1.05-2.57px low | rejected |
+| D: `calc(0.375em - 8px)`, fitted to the system font | 2.0px below | 0.14-1.05px high; Times 1.0px off the label's centre | rejected: a constant fitted to one font |
+| **E: B plus `font:inherit; vertical-align:calc(0.5cap - 8px)`** | 2.36px below (0.73px above to 4.02px below across the sweep) | **within 0.02px, every font and size, both engines** | **shipped** (Russell's ruling) |
+
+**Where `cap` is not known** (Safari before 17.2; iPadOS likewise) the second
+declaration is dropped and the first stands: B, the box's bottom on the
+baseline. Measured with a `calc` naming an unknown unit, in both engines: the
+bottom 0.00px from the baseline everywhere, the centre up to 4.03px high of the
+capitals. Acceptable as a fallback — it is what the issue's title asked for,
+and better than Quartz's in every case. Quartz's own pipeline keeps the pair:
+compiled through its pinned sass 1.79.4 and lightningcss 1.29.2 with its
+Safari 15.6 target, the output is `vertical-align:baseline;vertical-align:calc(.5cap - 8px)`, in that order.
+
+**A side effect, accepted:** a task row is now as tall as an ordinary list
+line — 29.59 → 25.59px at 16px. The browser's 3px margins had been stretching
+it. Keeping the old height would mean adding the margin back on purpose.
+
+**Rejected also:** a `translateY` nudge (it drifts with font size, which is
+how Quartz's came to be wrong here); an `inline-flex` label with
+`align-items: center` (it centres on the whole block, so an item that wraps
+puts the box between its lines).
+
+**No build_site.py change.** `install_quartz_additions` runs in the ALWAYS
+section and copies any file whose bytes differ, so every existing course folder
+picks the new tasks.scss up on its next build.
+
+**Gated** by `browser-checks/task_boxes.mjs` (in verify.sh, Chrome only):
+step 1c reads every box on Task Fixture (tight, callouts included), Task Loose
+(a loose list, planted by verify.sh for this) and Task Printable, on screen and
+under print media, and fails a box that is not 16px tall or is more than 0.5px
+off the capitals' middle; step 10 does the same INSIDE Paged.js's handout
+frame, which re-parses the stylesheets. Against the old tasks.scss (copied in
+and restored) verify.sh failed only this check, on all seven places: −3.37px
+on screen and under print media, −4.02px on the printable page under print and
+in the handout's frame. With the rule: at most 0.01px on screen (29 boxes on
+Task Fixture, 2 on Task Loose, 3 on Task Printable), 0.02px on the printable
+page under print and in the handout's frame, every box 16px. WebKit has no gate; its numbers above were measured
+once. The paper step (K6) had to change with it: its box finder scanned each
+word's tall pdftotext box from the TOP, and with rows 4px shorter it found the
+previous item's box (the unticked box read the ticked one's 62 inked pixels
+though the PDF draws it empty, checked by rendering it); it now scans from the
+word's middle up.
+
 ### K6. On paper: the ink
 
 With the browser's "background graphics" off (its default), Quartz's ticked
@@ -2885,7 +2977,8 @@ grey, 8.5:1 on white). The browser check prints `Task Printable` and `Task
 Twin A` in both themes with `Page.printToPDF` (backgrounds off), renders the
 PDF with poppler's `pdftoppm`, finds each box by its inked sides, and counts
 the ink inside: 50-66 dark pixels inside a ticked box, 0 inside an unticked
-one; with the print block taken out, 0 inside the ticked box and the
+one (60-66 and 0 again after #693 moved the box; the finder now scans from
+each word's middle up - K5b); with the print block taken out, 0 inside the ticked box and the
 unticked box not found at all. Safari is not measured (no headless Safari
 here; recorded as owed).
 
