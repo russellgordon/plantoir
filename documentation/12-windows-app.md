@@ -7730,7 +7730,9 @@ parent + `vendor`; `figures.helper_command` runs `node` from PATH.
   the answer's write CALLBACK, not straight after it, precisely because pipe
   semantics differ on Windows. Adding a crash case to `NativeFiguresTests`
   is optional; [05 → "A diagram that crashes the engine"](05-build-pipeline.md)
-  has the reasons and the measurements.
+  has the reasons and the measurements. A helper ended with nothing said
+  (a signal, the memory running out) is worded from
+  `words.reasonsWithoutDetail`, never "()" — the same Python prints it there.
 - **Path length.** The longest path under `tikz-engine\` is 134 characters
   (`…\@jsonjoy.com\json-pack\lib\nfs\v4\server\operations\node\Nfsv4OperationsNode.js.map`;
   the longest code file is 130). Installed at

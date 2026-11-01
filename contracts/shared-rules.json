@@ -24850,7 +24850,14 @@
         "graphEngineMissing": "this copy of Plantoir can't check graphs",
         "unknownSetting": "{name} isn't a graph setting, so it was left out",
         "missingAlt": "it has no “% alt:” first line, so a screen reader only says “A diagram.”"
-      }
+      },
+      "reasonsWithoutDetail": {
+        "texSaid": "LaTeX stopped here without saying why",
+        "drawingStopped": "drawing it stopped part-way, so it won't be tried again until the diagram changes",
+        "drawingEnded": "drawing it stopped part-way - it will be tried again next time",
+        "expressionNotUnderstood": "the graph can't read this function"
+      },
+      "reasonsWithoutDetailWhy": "#718's implementation review (M1, measured): a drawing engine ended by a signal - SIGKILL or SIGTERM mid-diagram, the memory running out, the builder being stopped - leaves nothing on stderr, so drawingEnded has nothing in `said`, and the teacher read 'drawing it stopped part-way () - it will be tried again next time' in the console and in the folder-problem finding. So a reason whose sentence holds {said} is said with THIS sentence when `said` is empty (blank after trimming), wherever it is said: figures.reason_sentence and site_health's figuresCouldNotBeDrawn share one function (site_health.figure_reason_words) for it. texSaid had the same hole ('LaTeX stopped here: ' with nothing after it, which a plain-TikZ crash said until #718), and expressionNotUnderstood would have it for an evaluator that threw an empty message. test_figures.py renders every reason with an empty `said` and refuses '()', a dangling colon or a {said} left in."
     },
     "agentGuidance": {
       "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, a GeoGebra sketch three ways with `version:`, Obsidian's hidden .ggb and what Copy a Page and a rename do not follow (#578, section 10), the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",

@@ -1986,6 +1986,25 @@ a good figure until the fence changed. It is bounded the way `tookTooLong`
 is: each figure is tried once a build, so it costs at most one helper start a
 build. The reason strings are stable, for #717's record.
 
+**Nothing said is never "()".** The implementation review measured it on the
+real engine: a helper killed mid-diagram with SIGKILL or SIGTERM (6.6 s, the
+next diagram drawn) leaves stderr EMPTY, so `drawingEnded` — whose sentence
+was "drawing it stopped part-way ({said}) - …" — read "drawing it stopped
+part-way () - it will be tried again next time" in the console and in the
+folder problem. That is the ordinary shape of `drawingEnded`, not an edge.
+So `figureFences.words.reasonsWithoutDetail` gives every reason whose
+sentence carries `{said}` (`drawingEnded`, `drawingStopped`, `texSaid`,
+`expressionNotUnderstood`) a sentence for when nothing was said (blank after
+trimming), and `site_health.figure_reason_words` is the one function both the
+build's `plantoir: error:` line and `figuresCouldNotBeDrawn` word a reason
+with — they had two copies of the fill until then. `test_figures.py` renders
+every reason with an empty `said` in both places and refuses "()", a dangling
+colon and a `{said}` left in; its stand-in ends itself by SIGKILL and SIGTERM.
+Rejected: dropping the brackets alone (the sentence then reads "stopped
+part-way  - …" with nothing to say what), and filling the gap with a stock
+phrase such as "no reason given" inside the brackets (it still reads as a
+fault in the wording rather than a sentence).
+
 `$^\circ$` and `\char36` draw in both shapes (0.04–0.61 s), and rendered
 with the site's own faces they are a degree sign and a dollar sign (looked at,
 2026-11-01); the `fontMissing` sentence says so, and names the rule (a symbol

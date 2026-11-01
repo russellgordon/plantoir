@@ -675,14 +675,10 @@ def pages_students_see(content_root, is_hidden, place_of, source_of, skip=None, 
 # ---- The words a teacher reads -------------------------------------------------
 
 def reason_sentence(problem: dict, said: dict) -> str:
-    reasons = said["reasons"]
-    reason = problem.get("reason") or "texSaid"
-    text = reasons.get(reason) or reasons["texSaid"]
-    return site_health.filled(text, {
-        "name": problem.get("name") or "",
-        "said": problem.get("said") or "",
-        "seconds": JOB_SECONDS,
-    })
+    # With nothing said, a reason never reads "()" (#718 review M1): the
+    # one function the folder problem uses too.
+    return site_health.figure_reason_words(problem, said["reasons"], said.get("reasonsWithoutDetail"),
+                                           JOB_SECONDS)
 
 
 def error_line(problem: dict, said: dict, kind="error") -> str:

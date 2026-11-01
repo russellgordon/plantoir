@@ -59,7 +59,7 @@ def rules(*keys):
 # on stderr; STOPPED answers drawingStopped and carries on.
 # Every start is counted in the file named by its first argument.
 STAND_IN = textwrap.dedent('''
-    import json, sys, time
+    import json, os, signal, sys, time
     with open(sys.argv[1], "a") as starts:
         starts.write("started\\n")
     if len(sys.argv) > 2 and sys.argv[2] == "never-ready":
@@ -83,6 +83,16 @@ STAND_IN = textwrap.dedent('''
             send({"id": message["id"], "ok": False, "reason": "fontMissing", "texLine": None,
                   "name": "tcrm1000", "said": ""})
             sys.exit(1)
+        if "SELFKILL" in body or "SELFTERM" in body:
+            # Ended by a signal mid-diagram, saying nothing at all (#718
+            # review M1). Windows has no SIGKILL; SIGTERM ends it there.
+            ending = getattr(signal, "SIGKILL", signal.SIGTERM) if "SELFKILL" in body else signal.SIGTERM
+            os.kill(os.getpid(), ending)
+            time.sleep(60)
+        if "STOPPEDQUIET" in body:
+            send({"id": message["id"], "ok": False, "reason": "drawingStopped", "texLine": None,
+                  "name": None, "said": ""})
+            continue
         if "NODEPRINT" in body:
             # Node's own print of a throw nothing caught: the source line
             # first, quoting the message's start, then the message.
@@ -403,6 +413,41 @@ class PrepareTests(unittest.TestCase):
         line = [line for line in self.space.said if line.startswith("plantoir: error:")][0]
         self.assertIn("(something was not ready)", line)
 
+    def test_a_helper_ended_by_a_signal_says_so_without_empty_brackets(self):
+        """#718 review M1, measured on the real engine: SIGKILL or SIGTERM
+        mid-diagram leaves nothing on stderr, and the teacher read
+        "drawing it stopped part-way () - …". Now the sentence without detail."""
+        bare = rules("words", "reasonsWithoutDetail")["drawingEnded"]
+        for word in ("SELFKILL", "SELFTERM"):
+            with self.subTest(signal=word):
+                space = Workspace()
+                try:
+                    crashed, quick, pages = self.two_diagrams(word)
+                    started = time.monotonic()
+                    outcome = space.prepare(pages)
+                    self.assertLess(time.monotonic() - started, 10)
+                    self.assertEqual([(problem["reason"], problem["said"]) for problem in outcome["problems"]],
+                                     [("drawingEnded", "")])
+                    self.assertEqual(outcome["drawn"], 1)
+                    said = [line for line in space.said if line.startswith("plantoir: error:")]
+                    self.assertEqual(said, ["plantoir: error: P.md: tikz block 1: " + bare])
+                    facts = {"media_target_exists": True, "section_index_exists": True,
+                             "figure_problems": outcome["problems"]}
+                    found = [item for item in site_health.findings(facts, "MPM2D", 1)
+                             if item.name == "figuresCouldNotBeDrawn"]
+                    self.assertIn(bare, found[0].detail)
+                    self.assertNotIn("()", found[0].detail)
+                finally:
+                    space.close()
+
+    def test_a_drawing_that_stopped_with_nothing_said_has_no_empty_brackets(self):
+        crashed, quick, pages = self.two_diagrams("STOPPEDQUIET")
+        outcome = self.space.prepare(pages)
+        self.assertEqual([problem["reason"] for problem in outcome["problems"]], ["drawingStopped"])
+        line = [line for line in self.space.said if line.startswith("plantoir: error:")][0]
+        self.assertEqual(line, "plantoir: error: P.md: tikz block 1: "
+                         + rules("words", "reasonsWithoutDetail")["drawingStopped"])
+
     def test_what_is_never_cached_is_the_contracts_list(self):
         self.assertEqual(sorted(figures.NOT_CACHED), sorted(rules("cache", "notCached")))
 
@@ -598,9 +643,31 @@ class WordsTests(unittest.TestCase):
                       "fontMissing", "drawingStopped", "drawingEnded"])
         self.assertEqual(sorted(named - set(reasons)), [])
 
+    def test_no_reason_ever_reads_empty_when_nothing_was_said(self):
+        """#718 review M1: every reason, said with an empty `said`, in both
+        places a reason is worded - never "()", a dangling colon or a blank."""
+        reasons = rules("words", "reasons")
+        bare = rules("words", "reasonsWithoutDetail")
+        said = figures.words()
+        holding = [reason for reason, text in reasons.items() if "{said}" in text]
+        self.assertEqual(sorted(holding), sorted(bare), "every reason that carries {said} has words without it")
+        for reason in list(reasons) + ["somethingNew"]:
+            for nothing in ("", "   ", None):
+                problem = {"reason": reason, "said": nothing, "name": "\\foo"}
+                for sentence in (figures.reason_sentence(problem, said),
+                                 site_health.figure_reason_words(problem, reasons, bare, 20)):
+                    with self.subTest(reason=reason, said=nothing):
+                        self.assertNotIn("()", sentence)
+                        self.assertNotIn("{said}", sentence)
+                        self.assertFalse(sentence.rstrip().endswith(":"), sentence)
+                        self.assertTrue(sentence.strip(), reason)
+        # Something said is still said.
+        self.assertIn("(it broke)", figures.reason_sentence({"reason": "drawingEnded", "said": "it broke"}, said))
+
     def test_no_word_names_the_machinery(self):
         forbidden = contracts.section("shared-rules", "userFacingLabelWords", "forbidden")
-        said = list(rules("words", "site").values()) + list(rules("words", "reasons").values())
+        said = list(rules("words", "site").values()) + list(rules("words", "reasons").values()) \
+            + list(rules("words", "reasonsWithoutDetail").values())
         for check in contracts.section("shared-rules", "siteHealth", "checks"):
             if check["name"] == "figuresCouldNotBeDrawn":
                 said += [check["sentence"], check["sentenceForSeveral"], check["detail"]]
