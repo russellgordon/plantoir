@@ -49,7 +49,8 @@
 #   ./verify-deploy.sh                     # uses the defaults below
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
-#                                          # Cloudflare, offline, in ~20 s (#665)
+#                                          # Cloudflare (#665) and its retry of a
+#                                          # new site's files (#740), offline, ~25 s
 #   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
 #                                          # publishes as a NEW teacher would:
 #                                          # new sites, both questions asked (#712)
@@ -212,6 +213,74 @@ wait_for_new_address() {  # wait_for_new_address <label> <url>
   return 1
 }
 
+# ------------------------------- a brand-new site's files, retried (#740)
+# On a site this run has just CREATED, Netlify's edges are not yet of one
+# mind. Measured at the v1.9.1 gate (2026-11-01, dev e7a73e082, M4 Pro, home
+# network): two consecutive --first-publish runs went red on the NEW Netlify
+# site only - run 1 a 404 for static/pyodide/pyodide.mjs and no COEP on
+# static/swift/plantoir-swift-worker.js, run 2 a 404 ('text/plain') for the
+# swift worker while pyodide.mjs and its COEP passed - a different file each
+# time, never on Cloudflare, and a watcher fetching both files every 5 s from
+# the moment the site was live got 24 of 24 HTTP 200 with the right type and
+# COEP in the same minute. The plain run against the long-lived sites was
+# 174/0/0. So on a FIRST publish (and only there: a plain run's sites are old,
+# and a wrong answer from them is a fault) a per-file fetch-back that does not
+# get the answer its check wants is asked again every NS_POLL s for at most
+# NS_WAIT s, each retry is written down and counted in the Result block, and
+# an answer that never comes is still the check's failure, judged on the last
+# answer. Rejected: a fixed sleep after creating the site (a guessed duration
+# for a race, and the edges disagree file by file, so "long enough" for one
+# file says nothing about the next); retrying on a plain run too (it would
+# hide a real 404 on a site that has existed for weeks).
+NS_POLL="${VERIFY_DEPLOY_NS_POLL:-5}"
+NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
+
+# fetch_headers <want: 200|coep> <url> [-o <file>]
+# Prints the response headers (\r stripped), as `curl -s -D -` did. "200"
+# wants HTTP 200; "coep" wants HTTP 200 and COEP require-corp.
+fetch_headers() {
+  local want="$1" url="$2" out="/dev/null" headers code start deadline waited tries=0 good
+  [ "${3:-}" = "-o" ] && out="$4"
+  # A deadline fixed once, not a count of polls: how many retries fit before
+  # it depends on how long each answer takes, so nothing may pin that number
+  # (the self-test asserts a range).
+  start=$(date +%s)
+  deadline=$(( start + NS_WAIT ))
+  while :; do
+    headers=$(curl -s -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    good=false
+    if [ "$code" = "200" ]; then
+      if [ "$want" != "coep" ] || printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+        good=true
+      fi
+    fi
+    waited=$(( $(date +%s) - start ))
+    [ "$good" = true ] && break
+    [ "$FIRST_PUBLISH" = true ] || break
+    case "$url" in http://localhost:*) break ;; esac  # the preview is no new site
+    [ "$(date +%s)" -ge "$deadline" ] && break
+    tries=$((tries+1))
+    sleep "$NS_POLL"
+  done
+  if [ "$tries" -gt 0 ]; then
+    echo "  ↻ a brand-new site: $url needed $tries retr$([ "$tries" -eq 1 ] && echo y || echo ies) over $waited s ($([ "$good" = true ] && echo "then answered" || echo "never answered as wanted"))" >&2
+    printf '%s\t%s\t%s\t%s\n' "$url" "$tries" "$waited" "$good" >>"${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}"
+  fi
+  printf '%s\n' "$headers"
+}
+
+# One line per site for the Result block: how many of its files a brand-new
+# site needed asking again, and the most it took.
+measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in />
+  local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
+  [ "$FIRST_PUBLISH" = true ] || return 0
+  case "$2" in http://localhost:*) return 0 ;; esac
+  line=$(awk -F '\t' -v b="$2" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
+    END { if (n == 0) print "no file needed asking again"; else printf "%d file(s) needed asking again, %d retries in all, at most %d for one file, the longest %d s", n, t, m, w }' "$log" 2>/dev/null)
+  MEASURED+=("$1, a brand-new site's files (#740): ${line:-no file needed asking again}")
+}
+
 # ----------------------------------------------------------------- self-test
 # The wait above, proved against a stub server on 127.0.0.1 that serves the
 # OLD bytes for the first K requests to a path and the NEW after: no
@@ -350,6 +419,100 @@ STUB
   [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q "does not carry this run's mark" \
     && ok "an upload whose page of runnable code lacks this run's mark is a failure, since the wait could not tell it from the last" \
     || no "an upload without this run's mark: rc $rc, said: ${out:-nothing}"
+
+  hdr "Self-test — a brand-new site's files, asked again (#740)"
+  cat >"$ST_DIR/files.py" <<'STUB'
+import http.server, os, pathlib, sys
+portfile, mode = sys.argv[1:3]
+kind, _, limit = mode.partition(":")
+seen = {"n": 0}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.do_GET()
+    def do_GET(self):
+        n = seen["n"]; seen["n"] = n + 1
+        early = limit == "inf" or n < int(limit)
+        if kind == "404" and early:
+            body = b"Not Found - Request ID: stub\n"
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+        else:
+            body = b"self.onmessage = () => {};\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=UTF-8")
+            if not (kind == "nocoep" and early):
+                self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+STUB
+  fs_start() {  # fs_start <mode>: 404:K, 404:inf or nocoep:K
+    rm -f "$ST_DIR/fport"
+    python3 -I "$ST_DIR/files.py" "$ST_DIR/fport" "$1" &
+    STUB_PID=$!
+    for _ in $(seq 1 100); do [ -s "$ST_DIR/fport" ] && break; sleep 0.1; done
+    FS_URL="http://127.0.0.1:$(cat "$ST_DIR/fport" 2>/dev/null)/static/swift/plantoir-swift-worker.js"
+  }
+  code_of() { printf '%s\n' "$1" | awk 'NR==1{print $2}'; }
+  NS_POLL=1; NS_WAIT=4
+  NS_RETRY_LOG="$ST_DIR/retries.tsv"; : >"$NS_RETRY_LOG"
+
+  FIRST_PUBLISH=true
+  fs_start 404:2
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  if [ "$(code_of "$out")" = "200" ] && printf '%s' "$out" | grep -qi '^content-type: application/javascript' \
+     && grep -q 'needed 2 retries' "$ST_DIR/said.txt" && grep -q $'\t2\t[0-9]*\ttrue$' "$NS_RETRY_LOG"; then
+    ok "a brand-new site answers 404 twice, then the file: asked again, it passes, and the log says it took 2 retries"
+  else
+    no "a brand-new site answers 404 twice, then the file: got HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  fs_start nocoep:2
+  out=$(fetch_headers coep "$FS_URL" 2>"$ST_DIR/said.txt")
+  printf '%s\n' "$out" | grep -qi '^cross-origin-embedder-policy: require-corp' \
+    && ok "a brand-new site sends the file without COEP twice, then with it: asked again, the COEP check passes" \
+    || no "a brand-new site sends the file without COEP twice: said: $(cat "$ST_DIR/said.txt")"
+  st_stop
+
+  fs_start 404:inf
+  started=$(date +%s)
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  elapsed=$(( $(date +%s) - started ))
+  n=$(sed -n 's/.*needed \([0-9][0-9]*\) retr.*/\1/p' "$ST_DIR/said.txt" | head -1)
+  if [ "$(code_of "$out")" = "404" ] && grep -q 'never answered as wanted' "$ST_DIR/said.txt" \
+     && [ -n "$n" ] && [ "$n" -ge 2 ] && [ "$n" -le 5 ] \
+     && [ "$elapsed" -ge 4 ] && [ "$elapsed" -le 10 ]; then
+    ok "a brand-new site that never serves the file: still the check's failure, judged on the last answer, at the cap (${elapsed} s, ${n} retries)"
+  else
+    no "a brand-new site that never serves the file: HTTP $(code_of "$out"), ${elapsed} s, said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  MEASURED=()
+  measure_new_site_retries "Netlify" "http://127.0.0.1:"
+  total=$(awk -F '\t' '{ t += $2 } END { print t + 0 }' "$NS_RETRY_LOG")
+  printf '%s\n' "${MEASURED[@]}" | grep -q "3 file(s) needed asking again, $total retries in all" \
+    && [ "$(awk -F '\t' '$4 == "true" && $2 == 2' "$NS_RETRY_LOG" | wc -l | tr -d ' ')" -eq 2 ] \
+    && ok "the Result block counts them: ${MEASURED[0]#*: }" \
+    || no "the Result block's count: ${MEASURED[*]:-nothing}"
+
+  FIRST_PUBLISH=false
+  : >"$NS_RETRY_LOG"
+  fs_start 404:2
+  out=$(fetch_headers 200 "$FS_URL" 2>"$ST_DIR/said.txt")
+  if [ "$(code_of "$out")" = "404" ] && [ ! -s "$ST_DIR/said.txt" ] && [ ! -s "$NS_RETRY_LOG" ]; then
+    ok "a plain run's long-lived site answers 404: judged at once, never asked again"
+  else
+    no "a plain run's 404: HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
 
   hdr "Result"
   echo "  $PASS passed, $FAIL failed, $SKIP skipped"
@@ -786,9 +949,14 @@ url_from_log() {  # url_from_log <logfile>
 # face must come back from the site itself, and Netlify's CSP must no longer
 # name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
 check_engine() {  # check_engine <label> <site base url ending in />
+  # Each call keeps its own retry log, so a pairing leg that checks a site
+  # an earlier leg already checked counts only its own retries (#740 review).
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
   local base="$2" name type code headers csp
   for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}static/pyodide/$name")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     case "$name" in
@@ -804,7 +972,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
       ok "$1 sends static/pyodide/$name (HTTP 200${type:+, $type})"
     fi
   done
-  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/pyodide/plantoir-worker.js" 2>/dev/null | tr -d '\r')
+  headers=$(fetch_headers 200 "${base}static/pyodide/plantoir-worker.js")
   csp=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-security-policy:"{ $1=""; print }' | tail -1)
   if [ -z "$csp" ] || printf '%s' "$csp" | grep -Eq "'(unsafe-eval|wasm-unsafe-eval)'"; then
     ok "$1's worker may compile WebAssembly (${csp:+CSP allows it}${csp:-no CSP})"
@@ -824,7 +992,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   # program is compiled from its bytes, so its type does not decide whether
   # it runs; it is said, not required (review N4).
   for name in plantoir-swift-worker.js plantoir-wasi.mjs; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/swift/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}static/swift/$name")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     if [ "$code" = "200" ] && printf '%s' "$type" | grep -q javascript; then
@@ -838,7 +1006,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   if [ -z "$program" ]; then
     no "$1's page of runnable code carries no Swift program"
   else
-    headers=$(curl -s -D - -o "$WORK/program.wasm" --max-time 30 "${base}$program" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers 200 "${base}$program" -o "$WORK/program.wasm")
     code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
     type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
     if [ "$code" = "200" ] && [ "$(head -c 4 "$WORK/program.wasm" | od -An -tx1 | tr -d ' \n')" = "0061736d" ]; then
@@ -861,7 +1029,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
     no "$1 does not send COOP and COEP on the page of runnable code, so it keeps the input box"
   fi
   for name in pyodide/pyodide.mjs pyodide/plantoir-worker.js swift/plantoir-wasi.mjs swift/plantoir-swift-worker.js; do
-    headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/$name" 2>/dev/null | tr -d '\r')
+    headers=$(fetch_headers coep "${base}static/$name")
     if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
       ok "$1 sends COEP on static/$name"
     else
@@ -874,13 +1042,13 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     ok "$1 sends no COEP on the front page, which has no runnable code"
   fi
-  headers=$(curl -s -D - -o /dev/null --max-time 30 "${base}static/katex/katex.min.css" 2>/dev/null | tr -d '\r')
+  headers=$(fetch_headers 200 "${base}static/katex/katex.min.css")
   if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
     ok "$1 serves KaTeX's stylesheet itself (text/css)"
   else
     no "$1 does not serve static/katex/katex.min.css as text/css"
   fi
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" 2>/dev/null)
+  code=$(fetch_headers 200 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" | awk 'NR==1{print $2}')
   [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
   headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r')
   if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
@@ -888,6 +1056,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   else
     ok "$1's CSP names no CDN for the maths"
   fi
+  measure_new_site_retries "$1" "$base"
 }
 
 # The pinned engine files, byte for byte, in a folder publish.
