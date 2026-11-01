@@ -1375,6 +1375,25 @@ from the site, whose engine is 0.5.2's (`obsidianAddOnsForFigures.knownLimits`).
 The skill `plantoir-math-graphs` (support/agent_guidance) carries the whole
 syntax for an assistant.
 
+**What the site's engine cannot draw, measured (#715, 2026-10-31,
+node-tikzjax 1.0.5 as the build drives it).** Four pgfplots figures on
+Russell's MPM2D pages had silently failed for some time. `groupplots` is not
+carried (TeX cannot find `pgflibrarypgfplots.groupplots.code.tex`). A dot
+written `\fill (axis cs:1,1) circle (2pt);` - a radius in PARENTHESES inside
+an `axis`, with or without `axis cs:` - fails (`Argument of \pgfmathfloatparse@@
+has an extra }`, reported at the `\end{axis}` line), while
+`circle[radius=2pt]` and `\addplot[only marks]` draw, and `circle (2pt)`
+outside an axis draws; the issue's "`\fill … circle`" was broader than the
+fault. Those three are `figureFences.texErrors` cases, run against the real
+engine by `scripts/check_figure_rules_against_the_site.py` in `verify.sh`.
+`\textdegree`, `\$` and `\textdollar` in a pgfplots label END the engine
+("Could not find font tcrm1000"), and in plain TikZ they fail with TeX
+saying nothing. Until #718 the build reported the first as `tookTooLong`,
+uncached and retried every build; since #718 it names the problem
+(`fontMissing`), and #718's `figureFences.knownLimits` entry lists the nine
+text symbols measured. `$^{\circ}$` and `\char36` draw, and
+`plantoir-math-graphs` sections 3 and 8 tell an assistant to write those.
+
 **Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
 `<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB
 each — a site carries only the ones its drawings name, ~30 KB a face);

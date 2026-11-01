@@ -192,6 +192,39 @@ The row of dashes under the headings is what makes it a table. Maths works
 in a cell; a `|` inside a cell must be written `\|`. Keep each row on one
 line.
 
+**Numbers in a table** (the same rules as a printed handout,
+`plantoir-handouts` section 9):
+
+- The row of dashes sets each column's alignment, and it is decided per
+  column, by that column's values. A column holding **any negative value**
+  is right-aligned, `---:`, so the units digits line up - that includes a
+  column of zeros and negatives (0, -3, -4) and an all-negative one. A
+  column of numbers with **no negative value** is centred, `:---:`; zero is
+  not negative. A column of words is left as `---`. The site pads every
+  cell, so a right-aligned number does not touch the edge; the heading
+  follows its column's alignment.
+- Write negative numbers as maths (`$-3$`), so the minus sign is a real
+  one.
+- In a column that mixes whole numbers and decimals, write every value to
+  the same places: 2.0 beside 0.5, 0.0 beside 4.5. A column of whole
+  numbers gets no decimals.
+
+```markdown
+| $x$ | $y = 0.5x^2$ |
+| ---: | :---: |
+| $-2$ | $2.0$ |
+| $-1$ | $0.5$ |
+| $0$ | $0.0$ |
+| $1$ | $0.5$ |
+| $2$ | $2.0$ |
+```
+
+**First and second differences.** The first table of a day that meets
+first or second differences carries the finite-difference scaffold: a
+` ```tikz ` fence with arrows from each value up to the one above it,
+labelled with the subtraction. Copy it from `plantoir-math-graphs` section
+4E rather than drawing it as a Markdown table.
+
 ## 8. Mathematics
 
 Single dollar signs keep maths in the sentence; double dollar signs, **each
@@ -636,7 +669,9 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   pages share the name.
 - Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
   Course Settings write it), or anything in a folder whose name starts with
-  a dot.
+  a dot. (The one exception is `plantoir-handouts`' own
+  `.internal/handouts/handouts.json`, the folder where a course's handouts
+  are kept.)
 
 ## 23. Check it
 

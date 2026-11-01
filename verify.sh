@@ -5228,6 +5228,13 @@ def geogebra_specs(html_text):
     import html as html_module, json
     return [json.loads(html_module.unescape(spec)) for spec in
             re.findall(r'<figure class="pl-figure pl-geogebra"[^>]*data-geogebra="([^"]*)"', html_text or "")]
+def centred_cells_holding(html, number):
+    """How many centred table cells are the one KaTeX number `number` - the
+    cell itself, so a "0.0" elsewhere on the page does not count (#715 L5)."""
+    cell = r'<td style="text-align:center;"><span class="katex">(?:(?!</td>).)*?<span class="mord">' + re.escape(number) + r'</span>(?:(?!</td>).)*?</td>'
+    return len(re.findall(cell, html, re.S))
+
+
 # (a text only that example holds, what it must build as, the check)
 claims = [
     ("title: Slope as a Rate of Change", "settings: the title, tags and maths",
@@ -5244,6 +5251,11 @@ claims = [
      lambda a, p: '<code class="mermaid"' in a and "pie title" in a),
     ("| Representation | Shows best | Hides |", "a table with maths in a cell",
      lambda a, p: "<table>" in a and re.search(r"<td>Equation <span class=\"katex\"", a)),
+    ("| $x$ | $y = 0.5x^2$ |", "a table of values: the column with negatives right-aligned under its heading, the one without centred, 2.0 beside 0.5 (#715)",
+     lambda a, p: len(re.findall(r'<td style="text-align:right;"><span class="katex"', a)) == 5
+     and len(re.findall(r'<td style="text-align:center;"><span class="katex"', a)) == 5
+     and '<th style="text-align:right;"><span class="katex"' in a
+     and centred_cells_holding(a, "2.0") == 2 and centred_cells_holding(a, "0.0") == 1),
     ("Chemistry works too", "inline, display and chemistry maths",
      lambda a, p: 'class="katex-display"' in a and "\\ce" not in re.sub(r"<annotation.*?</annotation>", "", a, flags=re.S) and "katex-error" not in a),
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
@@ -5329,7 +5341,7 @@ print(f"   {len(examples)} examples, {len(claims)} claims")
 sys.exit(1 if problems else 0)
 AUTHORPY
 then
-  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
+  pass "page-authoring skill: every example builds as the feature it claims - settings, text, callouts and folding, Mermaid, tables, a table of values aligned by column (#715), maths, code, a text block that wraps (#653), checklists, success criteria, links, embedded pages, footnotes, tags, Media pictures and PDFs, YouTube/Vimeo/PhET, GeoGebra sketches from a file and from commands (#578), comments, publish: false, a folder's front page, a class page, Key Links - and what its prose says about prices, spaced maths, Markdown links and callout kinds holds (#596)"
 else
   fail "page-authoring skill: an example did not build as the feature it claims, or an example has no claim (#596)"
 fi
