@@ -318,6 +318,127 @@ final class ToolchainFingerprintTests: XCTestCase {
         XCTAssertNil(ToolchainFingerprints.read(root.appendingPathComponent("absent.hashes")))
     }
 
+    // MARK: - Pruning the index (#683)
+
+    func modificationDate(of url: URL) throws -> Date {
+        let attributes: [FileAttributeKey: Any] = try FileManager.default.attributesOfItem(atPath: url.path)
+        return try XCTUnwrap(attributes[.modificationDate] as? Date)
+    }
+
+    func makeFile(named name: String, in folder: URL, aged age: TimeInterval, now: Date) throws -> URL {
+        let url: URL = folder.appendingPathComponent(name)
+        try write("index\n", to: url)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-age)], ofItemAtPath: url.path)
+        return url
+    }
+
+    /// MUST-FAIL without `markUsed` in `copyToolchainFiles`: a pass that
+    /// changes nothing does not rewrite the index, so before #683 its time
+    /// stayed whatever the last CHANGE left, and a folder opened every day
+    /// would look unused after ninety.
+    func testAPassMarksAnUnchangedIndexUsed() throws {
+        try writeManifest()
+        _ = mirror()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path), "the first pass wrote no index")
+        let longAgo: Date = Date().addingTimeInterval(-100 * 24 * 60 * 60)
+        try FileManager.default.setAttributes([.modificationDate: longAgo], ofItemAtPath: indexURL.path)
+        let before: String = try String(contentsOf: indexURL, encoding: .utf8)
+
+        let outcome: WorkspaceModel.MirrorOutcome = mirror()
+
+        XCTAssertEqual(outcome.changed, 0, "the state being tested: a pass with nothing to change")
+        XCTAssertEqual(try String(contentsOf: indexURL, encoding: .utf8), before, "the index was rewritten, so the test proves nothing")
+        XCTAssertLessThan(abs(try modificationDate(of: indexURL).timeIntervalSinceNow), 60,
+                          "a folder opened today must read as used today")
+    }
+
+    func testAnIndexUnusedForNinetyDaysIsRemovedAndOneUsedWithinThemIsKept() throws {
+        let now: Date = Date()
+        let day: TimeInterval = 24 * 60 * 60
+        let old: URL = try makeFile(named: "aaaaaaaa.hashes", in: indexFolder, aged: 91 * day, now: now)
+        let recent: URL = try makeFile(named: "bbbbbbbb.hashes", in: indexFolder, aged: 89 * day, now: now)
+
+        let removed: [String] = ToolchainFingerprints.pruneIndexes(in: indexFolder, now: now)
+
+        XCTAssertEqual(removed, ["aaaaaaaa.hashes"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recent.path), "used within the summer, so kept")
+        XCTAssertEqual(ToolchainFingerprints.unusedIndexLifetime, 90 * day)
+    }
+
+    func testALeftoverTemporaryIndexIsRemovedAfterADay() throws {
+        let now: Date = Date()
+        let old: URL = try makeFile(named: "aaaaaaaa.hashes.4242.tmp", in: indexFolder, aged: 2 * 24 * 60 * 60, now: now)
+        let writing: URL = try makeFile(named: "bbbbbbbb.hashes.4243.tmp", in: indexFolder, aged: 60, now: now)
+
+        ToolchainFingerprints.pruneIndexes(in: indexFolder, now: now)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path), "an interrupted write's leftover stays forever otherwise")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: writing.path), "a pass may be writing it now")
+    }
+
+    func testNothingButIndexesIsTouched() throws {
+        let now: Date = Date()
+        let ages: TimeInterval = 400 * 24 * 60 * 60
+        let stray: URL = try makeFile(named: "notes.txt", in: indexFolder, aged: ages, now: now)
+        let alike: URL = try makeFile(named: "aaaaaaaa.hashes.bak", in: indexFolder, aged: ages, now: now)
+        let folder: URL = indexFolder.appendingPathComponent("cccccccc.hashes")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-ages)], ofItemAtPath: folder.path)
+        let target: URL = try makeFile(named: "elsewhere.txt", in: root, aged: ages, now: now)
+        let link: URL = indexFolder.appendingPathComponent("dddddddd.hashes")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        XCTAssertEqual(ToolchainFingerprints.pruneIndexes(in: indexFolder, now: now), [])
+        for kept in [stray, alike, folder, target] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: kept.path), "\(kept.lastPathComponent) was removed")
+        }
+        XCTAssertNotNil(try? FileManager.default.destinationOfSymbolicLink(atPath: link.path), "a link is not one of ours")
+    }
+
+    func testAFolderWithNoIndexesIsLeftAlone() {
+        let missing: URL = root.appendingPathComponent("never-made")
+        XCTAssertEqual(ToolchainFingerprints.pruneIndexes(in: missing, now: Date()), [])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
+    }
+
+    /// The suite never reaches the real index folder: the default folder the
+    /// app prunes is under the suite's throwaway home, and the one caller in
+    /// the product is the launch task the suite never runs.
+    func testAPruneNeverReachesTheRealIndexFolder() throws {
+        let realHome: URL = FileManager.default.homeDirectoryForCurrentUser
+        let realIndexFolder: URL = ToolchainFingerprints.indexFolder(inHomeFolder: realHome)
+        XCTAssertNotEqual(ToolchainFingerprints.indexFolder().standardizedFileURL.path,
+                          realIndexFolder.standardizedFileURL.path,
+                          "under the suite the app's index folder must be the throwaway home's")
+
+        let repository: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        var callers: [String] = []
+        let sources: URL = repository.appendingPathComponent("QuartzTeachers")
+        let walker = FileManager.default.enumerator(atPath: sources.path)
+        while let relative = walker?.nextObject() as? String {
+            if !relative.hasSuffix(".swift") {
+                continue
+            }
+            let text: String = try String(contentsOf: sources.appendingPathComponent(relative), encoding: .utf8)
+            if text.contains("ToolchainFingerprints.pruneIndexes(") {
+                callers.append(relative)
+            }
+        }
+        XCTAssertEqual(callers, ["App/AppDelegate.swift"], "a new caller of the prune; check it cannot run under the suite")
+        let delegate: String = try String(contentsOf: sources.appendingPathComponent("App/AppDelegate.swift"), encoding: .utf8)
+        let callRange = try XCTUnwrap(delegate.range(of: "ToolchainFingerprints.pruneIndexes("))
+        // The NEAREST guard above the call.
+        let guardRange = try XCTUnwrap(delegate.range(
+            of: "if !WorkspaceModel.isRunningTests {", options: .backwards,
+            range: delegate.startIndex..<callRange.lowerBound
+        ))
+        XCTAssertLessThan(guardRange.lowerBound, callRange.lowerBound)
+        XCTAssertLessThan(delegate.distance(from: guardRange.lowerBound, to: callRange.lowerBound), 800,
+                          "the prune has moved away from the launch task the suite never runs")
+    }
+
     // MARK: - The trail line
 
     func prepareTrail() throws -> URL {

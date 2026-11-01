@@ -91,6 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !WorkspaceModel.isRunningTests {
             Task.detached(priority: .utility) {
                 BuildOutputLocation.discardBuildsForMissingWorkingFolders()
+                // And the toolchain indexes nobody has used in ninety days
+                // (#683): a folder's pass marks its index used as it reads
+                // it, so one being opened now is never among them.
+                ToolchainFingerprints.pruneIndexes(in: ToolchainFingerprints.indexFolder(), now: Date())
             }
             // Ask the helper programs which versions they are, off the main
             // thread, and only THEN write the trail's helpers line — about a

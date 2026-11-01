@@ -516,6 +516,50 @@ final class BuildOutputLocationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: unmarked.path), "no marker is no evidence")
     }
 
+    /// A gone folder's toolchain index goes with its builds (#683), found by
+    /// the builds folder's NAME — the recorded path is not hashed again, and
+    /// here it could not be: it names a folder that never existed, so its
+    /// hash is not "eeeeeeee". A folder outside the home keeps its index,
+    /// for the same reason it keeps its builds. And the index folder is the
+    /// one under the home the sweep was given, never the real one.
+    func testAGoneFoldersIndexGoesWithItsBuilds() throws {
+        let home: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cq4t-home-\(UUID().uuidString)")
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: home)
+        }
+        let indexFolder: URL = ToolchainFingerprints.indexFolder(inHomeFolder: home)
+        try FileManager.default.createDirectory(at: indexFolder, withIntermediateDirectories: true)
+        let gone: URL = buildsRoot.appendingPathComponent("eeeeeeee")
+        let onAnotherDisk: URL = buildsRoot.appendingPathComponent("ffffffff")
+        for folder in [gone, onAnotherDisk] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try "index\n".write(to: indexFolder.appendingPathComponent(folder.lastPathComponent + ".hashes"),
+                                atomically: true, encoding: .utf8)
+        }
+        let unrelated: URL = indexFolder.appendingPathComponent("12345678.hashes")
+        try "index\n".write(to: unrelated, atomically: true, encoding: .utf8)
+        let recorded: String = "\(home.path)/Course Notes"
+        XCTAssertNotEqual(BuildOutputLocation.folderIdentifier(forWorkingFolder: recorded), "eeeeeeee")
+        try "\(recorded)\n".write(
+            to: gone.appendingPathComponent(BuildOutputLocation.workingFolderMarkerName),
+            atomically: true, encoding: .utf8
+        )
+        try "/Volumes/Teaching/Course Notes\n".write(
+            to: onAnotherDisk.appendingPathComponent(BuildOutputLocation.workingFolderMarkerName),
+            atomically: true, encoding: .utf8
+        )
+
+        BuildOutputLocation.discardBuildsForMissingWorkingFolders(homeDirectory: home)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: gone.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: indexFolder.appendingPathComponent("eeeeeeee.hashes").path),
+                       "the gone folder's index was left behind")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: indexFolder.appendingPathComponent("ffffffff.hashes").path),
+                      "the disk may be back tomorrow, and its index with it")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path), "an index with no builds folder is the age rule's")
+    }
+
     /// "The folder is not there" and "Plantoir is not allowed to look at it"
     /// are different answers, and only the first is deletion.
     ///
