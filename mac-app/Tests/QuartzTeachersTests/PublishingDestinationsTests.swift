@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import QuartzTeachers
 
@@ -151,6 +152,59 @@ final class PublishingDestinationsTests: XCTestCase {
                        "the primary and the additional Cloudflare destination are both asked")
         XCTAssertTrue(source.contains("accountIDMayWait: true"),
                       "the window no longer says the ID can wait")
+    }
+
+    /// What the view itself decides, with the wizard's own starting state
+    /// and with Netlify picked or added — the on-screen check of the
+    /// new-course window was not driven in the #668 run, so the view's
+    /// computed answers and the placement of each sentence are pinned here.
+    func testTheChoiceViewShowsEachSentenceWhereTheRuleSays() throws {
+        var additional: [CourseConfiguration.AdditionalDeployTarget] = []
+        let additionalBinding: Binding<[CourseConfiguration.AdditionalDeployTarget]> = Binding(
+            get: { return additional },
+            set: { newValue in additional = newValue }
+        )
+        let wizardStart: PublishingChoiceView = PublishingChoiceView(
+            deployTarget: .constant(PublishingDestinations.newCourseDefault),
+            deployFolderPath: .constant(""),
+            cloudflareAccountID: "",
+            additionalDeployTargets: additionalBinding,
+            accountIDMayWait: true
+        )
+        XCTAssertFalse(wizardStart.showsNetlifyNote, "a new course on Cloudflare is shown Netlify's note")
+        XCTAssertEqual(wizardStart.accountProblem, CourseConfiguration.cloudflareAccountProblem(forID: ""),
+                       "the orange sentence must stay on screen with no Account ID")
+        XCTAssertNil(PublishingDestinations.wizardCreateRefusal(forAccountID: wizardStart.cloudflareAccountID),
+                     "Create would be refused for the window's missing ID")
+
+        additional = [CourseConfiguration.AdditionalDeployTarget(type: "netlify", path: "")]
+        XCTAssertTrue(wizardStart.showsNetlifyNote, "Netlify switched on as an additional destination shows no note")
+
+        let netlifyPicked: PublishingChoiceView = PublishingChoiceView(
+            deployTarget: .constant("netlify"),
+            deployFolderPath: .constant(""),
+            cloudflareAccountID: "",
+            additionalDeployTargets: .constant([])
+        )
+        XCTAssertTrue(netlifyPicked.showsNetlifyNote)
+        XCTAssertNil(netlifyPicked.accountProblem, "Netlify alone asks nothing about Cloudflare")
+        XCTAssertFalse(netlifyPicked.accountIDMayWait, "Course Settings must not say the ID can wait")
+
+        let source: String = try String(
+            contentsOf: PublishingDestinationsTests.repositoryRoot()
+                .appendingPathComponent("mac-app/QuartzTeachers/Views/CourseSettings/PublishingChoiceView.swift"),
+            encoding: .utf8
+        )
+        for needle in [
+            "Text(PublishingDestinations.netlifyNote)",
+            "ExampleCaption(PublishingDestinations.cloudflareCaption)",
+            "Text(PublishingDestinations.accountIDCanWait)",
+            "accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)",
+        ] {
+            XCTAssertTrue(source.contains(needle), "PublishingChoiceView no longer shows: \(needle)")
+        }
+        XCTAssertEqual(source.components(separatedBy: "NetlifyNote()").count - 1, 2,
+                       "the note is placed under the picker AND under the additional Netlify toggle")
     }
 
     func testTheFirstDeployRefusesAMissingAccountID() throws {
