@@ -5502,7 +5502,9 @@
           "destinations" : [
             "cloudflare_pages"
           ],
+          "expectOpenSettings" : true,
           "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "expectTrailLine" : "deploy refused: no Cloudflare Account ID is saved in Settings",
           "name" : "A new course on the default destination, made with no Account ID, is refused at its first deploy"
         },
         {
@@ -5511,15 +5513,41 @@
             "netlify",
             "cloudflare_pages"
           ],
+          "expectOpenSettings" : true,
           "expectRefusalStartsWith" : "Paste your Cloudflare Account ID.",
+          "expectTrailLine" : "deploy refused: no Cloudflare Account ID is saved in Settings",
           "name" : "Cloudflare as an additional destination is refused the same way"
+        },
+        {
+          "accountID" : "abc",
+          "destinations" : [
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : true,
+          "expectRefusalStartsWith" : "That doesn’t look like an Account ID — it’s 32 letters and digits.",
+          "expectTrailLine" : "deploy refused: the Cloudflare Account ID in Settings is not a whole ID",
+          "name" : "An Account ID that cannot be one is refused, and the trail says which"
+        },
+        {
+          "accountID" : "",
+          "destinations" : [
+            "local_folder",
+            "cloudflare_pages"
+          ],
+          "expectOpenSettings" : false,
+          "expectRefusalStartsWith" : "Choose the folder this course deploys into.",
+          "expectTrailLine" : null,
+          "name" : "A folder with no folder chosen is refused first, in the course's own settings",
+          "why" : "Destinations are checked in order and the first problem is the one said. The folder is put right in Course Settings, not in Plantoir ▸ Settings, so the alert offers no Open Settings…, and the line is not this event's."
         },
         {
           "accountID" : "",
           "destinations" : [
             "netlify"
           ],
+          "expectOpenSettings" : false,
           "expectRefusalStartsWith" : null,
+          "expectTrailLine" : null,
           "name" : "Netlify needs no Account ID"
         },
         {
@@ -5527,11 +5555,13 @@
           "destinations" : [
             "cloudflare_pages"
           ],
+          "expectOpenSettings" : false,
           "expectRefusalStartsWith" : null,
+          "expectTrailLine" : null,
           "name" : "With the ID in Settings, the deploy goes ahead"
         }
       ],
-      "why" : "The other half of wizardAccountID, and why the wizard can let Create go ahead. Nothing about the deploy-time refusal changed with #668: the deploy (the Deploy button, the assistant, an MCP client), scheduling a deploy, and saving Course Settings with a changed destination all still refuse a Cloudflare destination with no Account ID, before the launcher is started, and the refusal names Plantoir ▸ Settings ▸ Deploying (File ▸ Settings ▸ Deploying on Windows) — which is why the cases pin only the start of the sentence, the cloudflareAccountProblem half both apps share. The launcher's own prompt for the ID is never reached from the app: the app refuses first, and a launcher's answer would go to the Keychain rather than to the app's settings, so every app-side check would still fail after it. That is the reason the first deploy is the moment a teacher is asked, and why the measurement the plan proposed (does the launcher's dialog appear?) was not needed."
+      "why" : "The other half of wizardAccountID, and why the wizard can let Create go ahead. Nothing about WHEN the deploy-time refusal happens changed with #668: the deploy (the Deploy button, the assistant, an MCP client), scheduling a deploy, and saving Course Settings with a changed destination all still refuse a Cloudflare destination with no Account ID, before the launcher is started, and the refusal names Plantoir ▸ Settings ▸ Deploying (File ▸ Settings ▸ Deploying on Windows) — which is why the cases pin only the start of the sentence, the cloudflareAccountProblem half both apps share. What #668 added: the Deploy button's 'Cannot Deploy Yet' alert offers Open Settings… beside OK when its sentence is the Account ID's (expectOpenSettings), and the refusal is written on the trail by kind (expectTrailLine; shared-rules.json -> activityTrail.mustRecord, 'deploy refused for the Cloudflare Account ID'), because it is now the path every new teacher meets. The launcher's own prompt for the ID is never reached from the app: the app refuses first, and a launcher's answer would go to the Keychain rather than to the app's settings, so every app-side check would still fail after it. That is why the first deploy is the moment a teacher is asked, and why the measurement the plan proposed (does the launcher's dialog appear?) was not needed."
     },
     "netlifyNoteCases" : [
       {
@@ -5601,7 +5631,7 @@
       }
     ],
     "newCourseDefault" : "cloudflare_pages",
-    "note" : "Where a NEW course deploys, and what a teacher is told while choosing (GitHub #668). Netlify moved new accounts to a fixed monthly allowance of credits shared by every site on the account, which deploys use up, and when it runs out every site on the account is paused until the next month; Cloudflare Pages' free plan has no limit on visitors. So a course made in either app's new-course window starts on Cloudflare Pages, listed first; a teacher can still choose Netlify, and is then shown netlifyNote. The sentences carry NO figures, because the hosts change them: the dated figures are in documentation/07-deployment.md and on plantoir.app's deploying page. They say DEPLOY, never publish, for what spends the allowance — in Plantoir, publishing marks a page, and costs nothing. They make no claim about Cloudflare's limits on deploys, which its documentation does not settle for an upload made from a computer (doc 07, read 2026-11-01). The trail's 'course created' line deliberately does not carry the destination (shared-rules.json -> activityTrail.mustRecord): course_config.json already answers 'where does this course deploy?'.",
+    "note" : "Where a NEW course deploys, and what a teacher is told while choosing (GitHub #668). Netlify moved new accounts to a fixed monthly allowance of credits shared by every site on the account, which deploys use up, and when it runs out every site on the account is paused until the next month; Cloudflare Pages' free plan has no limit on visitors. So every NEW course starts on Cloudflare Pages, at the app or the command line (Russell, 2026-11-01: \"Cloudflare everywhere\"): either app's new-course window, where it is listed first, and setup_course.py when it finds no saved file. A teacher can still choose Netlify, and is then shown netlifyNote. The sentences carry NO figures, because the hosts change them: the dated figures are in documentation/07-deployment.md and on plantoir.app's deploying page. They say DEPLOY, never publish, for what spends the allowance — in Plantoir, publishing marks a page, and costs nothing. They make no claim about Cloudflare's limits on deploys, which its documentation does not settle for an upload made from a computer (doc 07, read 2026-11-01). The trail's 'course created' line deliberately does not carry the destination (shared-rules.json -> activityTrail.mustRecord): course_config.json already answers 'where does this course deploy?'.",
     "pickerOrder" : [
       "cloudflare_pages",
       "netlify",
@@ -5615,7 +5645,7 @@
       "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
     },
     "whenTheKeyIsAbsent" : "netlify",
-    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup.sh writes no deploy_target and keeps a saved one when it is run again, so a course made at the command line deploys to Netlify, like deploy.sh's own default; that was left alone (rejected: changing the launchers' default, which is the same move as changing the fallback).",
+    "whyTheyDiffer" : "The new-course default and the meaning of a MISSING deploy_target are different on purpose. Every course written before the other destinations existed has no deploy_target and deploys to Netlify today; reading an absent key as Cloudflare would move a working class site to a host the teacher has no account with, at its next deploy, with nothing to say so. So the fallback stays Netlify everywhere it is read (CourseConfiguration.deployTarget, deploy.py --target, deploy.sh and deploy.ps1, build_site's domain resolution), and both apps' new-course windows WRITE deploy_target for every course they make, so the fallback only ever applies to a file that predates them. setup_course.py writes newCourseDefault for a course it makes with no saved file (since Russell's ruling of 2026-11-01), keeps a saved deploy_target when it is run again, and writes NONE over a saved file that names none — that course predates the other destinations and keeps deploying to Netlify. The launchers themselves still read no key: ./deploy.sh at the command line deploys to Netlify unless it is given --target cloudflare, as documentation/07-deployment.md has always said (rejected for this piece: changing the launchers' default, which is the same move as changing the fallback for every older course).",
     "wizardAccountID" : {
       "cases" : [
         {

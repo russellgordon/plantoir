@@ -200,6 +200,8 @@ final class PublishingDestinationsTests: XCTestCase {
             "ExampleCaption(PublishingDestinations.cloudflareCaption)",
             "Text(PublishingDestinations.accountIDCanWait)",
             "accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)",
+            // One orange block for the ID's problem and the 25 MB fact (L5).
+            "Text(CloudflareDetailFields.orangeBlock(accountProblem: accountProblem))",
         ] {
             XCTAssertTrue(source.contains(needle), "PublishingChoiceView no longer shows: \(needle)")
         }
@@ -211,7 +213,7 @@ final class PublishingDestinationsTests: XCTestCase {
         let block: [String: Any] = try PublishingDestinationsTests.block()
         let section: [String: Any] = try XCTUnwrap(block["deployWithoutAnAccountID"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 4, "the contract lost deploy cases")
+        XCTAssertGreaterThanOrEqual(cases.count, 6, "the contract lost deploy cases")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             var destinations: [CourseConfiguration.DeployDestination] = []
@@ -222,14 +224,63 @@ final class PublishingDestinationsTests: XCTestCase {
                 destinations: destinations,
                 cloudflareAccountID: try XCTUnwrap(testCase["accountID"] as? String)
             )
+            let accountID: String = try XCTUnwrap(testCase["accountID"] as? String)
+            let opensSettings: Bool = try XCTUnwrap(testCase["expectOpenSettings"] as? Bool)
             if let expected = testCase["expectRefusalStartsWith"] as? String {
                 let said: String = try XCTUnwrap(refusal, "\(name): the deploy went ahead")
                 XCTAssertTrue(said.hasPrefix(expected), "\(name): \(said)")
-                XCTAssertTrue(said.contains("Settings ▸ Deploying"), "\(name): the refusal no longer says where to fix it")
+                if opensSettings {
+                    XCTAssertTrue(said.contains("Settings ▸ Deploying"), "\(name): the refusal no longer says where to fix it")
+                }
+                XCTAssertEqual(
+                    PublishingDestinations.deployRefusalOpensSettings(refusal: said, cloudflareAccountID: accountID),
+                    opensSettings, "\(name): Open Settings…"
+                )
             } else {
                 XCTAssertNil(refusal, name)
+                XCTAssertFalse(opensSettings, name)
             }
+            XCTAssertEqual(
+                ActivityTrail.deployRefusedForTheAccountIDLine(destinations: destinations, cloudflareAccountID: accountID),
+                testCase["expectTrailLine"] as? String, "\(name): the trail line"
+            )
         }
+    }
+
+    /// The refusal's trail event is named on both sides of the contract
+    /// (rule 5), and its example line is the one the app writes.
+    func testTheRefusalIsOnTheTrail() throws {
+        let url: URL = PublishingDestinationsTests.repositoryRoot()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let rules: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let trail: [String: Any] = try XCTUnwrap(rules["activityTrail"] as? [String: Any])
+        let mustRecord: [[String: Any]] = try XCTUnwrap(trail["mustRecord"] as? [[String: Any]])
+        var entry: [String: Any]? = nil
+        for candidate in mustRecord where candidate["event"] as? String == ActivityTrail.Event.deployRefusedForTheAccountID.rawValue {
+            entry = candidate
+        }
+        let found: [String: Any] = try XCTUnwrap(entry, "mustRecord does not name the refusal's event")
+        let line: String = try XCTUnwrap(ActivityTrail.deployRefusedForTheAccountIDLine(
+            destinations: [CourseConfiguration.DeployDestination(type: "cloudflare_pages", path: "")],
+            cloudflareAccountID: ""
+        ))
+        XCTAssertEqual(found["line"] as? String, "ICS3U/1 · " + line)
+
+        // And the window writes it, and offers Open Settings… — read from the
+        // source, because both sit in a view's own deploy path and alert.
+        let window: String = try String(
+            contentsOf: PublishingDestinationsTests.repositoryRoot()
+                .appendingPathComponent("mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(window.contains("ActivityTrail.note(.deployRefusedForTheAccountID"),
+                      "the Deploy button's refusal no longer reaches the trail")
+        XCTAssertTrue(window.contains("PublishingDestinations.deployRefusalOpensSettings("),
+                      "the Cannot Deploy Yet alert no longer offers Open Settings…")
+        XCTAssertTrue(window.contains("SettingsPane.select(.deploying)"),
+                      "Open Settings… no longer opens the Deploying pane")
     }
 
     // MARK: - Private

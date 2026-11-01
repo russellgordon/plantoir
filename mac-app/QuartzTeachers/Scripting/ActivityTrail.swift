@@ -94,6 +94,12 @@ nonisolated enum ActivityTrail {
         /// settings). Whether it is now set, cleared or not yet valid —
         /// NEVER the ID.
         case cloudflareAccountIDChangedInSettings = "Cloudflare account ID changed in Settings"
+        /// A deploy refused, before anything ran, because a Cloudflare
+        /// destination has no usable Account ID in Settings (#668): the first
+        /// thing every new course meets at its first deploy now that
+        /// Cloudflare Pages is the new-course default. Carries whether the
+        /// ID is missing or not a whole ID — never the ID.
+        case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
         case assistantOpened = "assistant opened"
         /// A Claude or Codex session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
@@ -1362,6 +1368,35 @@ nonisolated enum ActivityTrail {
     /// section a line belongs to without every caller remembering to.
     static func note(_ event: Event, _ what: String, course: String, section: Int, at moment: Date = Date()) {
         ActivityTrail.note(event, "\(course)/\(section) · " + what, at: moment)
+    }
+
+    /// The words for `deployRefusedForTheAccountID` (#668), or nil when the
+    /// deploy is not refused for the Account ID — refused for a folder
+    /// first, or not refused at all. Walks the destinations in the order
+    /// `MultiDestinationDeployRunner.refusalReason` does, so the line names
+    /// the refusal the teacher was shown.
+    @MainActor
+    static func deployRefusedForTheAccountIDLine(
+        destinations: [CourseConfiguration.DeployDestination],
+        cloudflareAccountID: String
+    ) -> String? {
+        for destination in destinations {
+            if destination.type == "local_folder" {
+                if CourseConfiguration.deployFolderProblem(forPath: destination.path) != nil {
+                    return nil
+                }
+            }
+            if destination.type == "cloudflare_pages" {
+                if CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) == nil {
+                    return nil
+                }
+                if PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
+                    return "deploy refused: no Cloudflare Account ID is saved in Settings"
+                }
+                return "deploy refused: the Cloudflare Account ID in Settings is not a whole ID"
+            }
+        }
+        return nil
     }
 
     /// The words for `pageSettingsLeftAsTheyWere`: what was being done, and

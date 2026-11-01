@@ -973,11 +973,22 @@ matching the nameless `API error 429` was rejected for exactly that case.
 
 ## Choosing a destination (#668)
 
-**A course made in either app's new-course window deploys to Cloudflare
-Pages** unless the teacher picks something else, and the picker lists it
-first. A course whose file has NO `deploy_target` — every course made before
-the other destinations existed, and every course made with `setup.sh` —
-still deploys to Netlify, and nothing about that changed. The rule, the
+**Every NEW course deploys to Cloudflare Pages, made in the app or at the
+command line** (Russell, 2026-11-01: "Cloudflare everywhere"), unless the
+teacher picks something else. Either app's new-course window writes
+`cloudflare_pages` and lists it first; `setup_course.py` writes it for a
+course it makes with no saved file (`NEW_COURSE_DEPLOY_TARGET`). A course
+whose file has NO `deploy_target` — every course made before the other
+destinations existed — still deploys to Netlify, and nothing about that
+changed: a re-run of setup over such a file writes none.
+
+**One thing that did not move, and a command-line teacher should know it:**
+the launchers still read no key (see the top of this page). `./deploy.sh
+ICS3U 1` deploys to Netlify unless it is given `--target cloudflare`, even
+for a course whose file says `cloudflare_pages`; the app passes the flag
+for them. Changing the launchers' default was not part of the ruling — it
+is the publishing path and would move every older course's command-line
+deploy too — and is left for its own decision. The rule, the
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.
 
@@ -1034,8 +1045,21 @@ Create, because something is saved and it is wrong. The refusal moves to the
 first DEPLOY, where it already was: `MultiDestinationDeployRunner.refusalReason`
 (the Deploy button, the assistant, an MCP client), scheduling, and saving
 Course Settings with a changed destination all refuse a Cloudflare
-destination with no ID and name Plantoir ▸ Settings ▸ Deploying. Both halves
-are contract cases (`wizardAccountID`, `deployWithoutAnAccountID`).
+destination with no ID and name Plantoir ▸ Settings ▸ Deploying. Since that
+refusal is now the path every new teacher meets, the Deploy button's "Cannot
+Deploy Yet" alert offers **Open Settings…** beside OK when its sentence is
+the Account ID's (`PublishingDestinations.deployRefusalOpensSettings`; a
+folder's refusal, put right in Course Settings, does not), and the refusal
+is **on the trail** by kind — "deploy refused: no Cloudflare Account ID is
+saved in Settings", or "…is not a whole ID", never the ID (event `deploy
+refused for the Cloudflare Account ID`, rule 5). Both halves are contract
+cases (`wizardAccountID`, `deployWithoutAnAccountID`, six cases with
+`expectOpenSettings` and `expectTrailLine`).
+
+**One orange block, not two.** With Cloudflare the default, a new teacher
+with no ID would have met two orange warnings on their first course: the
+ID's sentence and the fixed 25 MB fact. When both apply they are one block,
+the ID's sentence first (`CloudflareDetailFields.orangeBlock`).
 
 **What was rejected, and why.**
 - *Letting the launcher ask for the ID at the first deploy.* The plan's first
@@ -1047,11 +1071,15 @@ are contract cases (`wizardAccountID`, `deployWithoutAnAccountID`).
   first-time teacher has none, so this gives Netlify to exactly the teachers
   the change is for — and it makes the default depend on the machine the
   tests run on (the suite's settings folder is empty).
-- *Changing the absent-key fallback, or the launchers' default.* Either moves
-  a working class site to a host the teacher has no account with, at its next
-  deploy, with nothing to say so. `setup.sh` writes no `deploy_target` and
-  keeps a saved one (`scripts/test_setup_course_deploy_target.py`), so a
-  command-line course stays on Netlify.
+- *Changing the absent-key fallback.* It moves a working class site to a
+  host the teacher has no account with, at its next deploy, with nothing to
+  say so. `setup_course.py` therefore writes the new-course default only
+  where there is no saved file, keeps a saved `deploy_target`, and writes
+  none over a saved file that names none
+  (`scripts/test_setup_course_deploy_target.py`, four cases).
+- *A command-line course on Netlify.* What the first version of this piece
+  did, by leaving `setup_course.py` alone; Russell ruled it out on
+  2026-11-01 ("Cloudflare everywhere").
 - *Figures in the app's sentences.* The hosts change them, and a sentence
   in the app cannot carry a date the way this page does.
 - *Recording the destination on the "course created" trail line.* That line's
@@ -1059,7 +1087,10 @@ are contract cases (`wizardAccountID`, `deployWithoutAnAccountID`).
   `course_config.json` already answers the question.
 
 **Windows** owes the same default, order, sentences, the warning in place of
-the refusal, and its own copies of the seven wizard goldens.
+the refusal, Open Settings… on the refusal, the trail event, and a test that
+its new-course dialog WRITES `newCourseDefault`. Its goldens hold the
+setup answers rather than the written file, so none of them moves. The
+command-line half is shared Python and reaches it free.
 
 ## Cloudflare Pages (`--target cloudflare`)
 

@@ -305,6 +305,11 @@ private struct CloudflareDetailFields: View {
 
     // MARK: - Stored properties
 
+    /// The fixed fact about this destination, shown whether or not
+    /// anything is wrong.
+    static let sizeNote: String =
+        "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely."
+
     let cloudflareAccountID: String
     let accountProblem: String?
 
@@ -323,6 +328,19 @@ private struct CloudflareDetailFields: View {
         }
         return trimmed
     }
+
+    // MARK: - Functions
+
+    /// The one orange block: the Account ID's problem, when there is one,
+    /// then the 25 MB fact.
+    static func orangeBlock(accountProblem: String?) -> String {
+        if let accountProblem {
+            return accountProblem + " " + sizeNote
+        }
+        return sizeNote
+    }
+
+    // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -352,33 +370,32 @@ private struct CloudflareDetailFields: View {
                 }
             }
 
-            // What is wrong with the ID this Mac has. Not commentary: in
-            // Course Settings this is why a changed destination will not
-            // save; in the new-course window a MISSING ID is a warning (#668)
-            // and says so, while one that cannot be an ID still refuses
-            // Create (`PublishingDestinations.wizardCreateRefusal`).
-            if let accountProblem {
-                Text(accountProblem)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .accessibilityIdentifier("cloudflareAccountProblem")
-                if accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
-                    Text(PublishingDestinations.accountIDCanWait)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("cloudflareAccountCanWait")
-                }
-            }
-
-            // Not a warning that comes and goes: a fact about this
-            // destination that never hides. It is the one real
-            // functional difference between the destinations, so a
-            // teacher should meet it while choosing rather than when
-            // a deploy fails halfway through an upload.
-            Text("One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely.")
+            // What is wrong with the ID this Mac has, and the 25 MB fact,
+            // in ONE orange block when both apply (#668 review, L5): with
+            // Cloudflare the default, a new teacher with no ID would
+            // otherwise meet two orange warnings on their first course. Not
+            // commentary: in Course Settings the ID's sentence is why a
+            // changed destination will not save; in the new-course window a
+            // MISSING ID is a warning and says so underneath, while one that
+            // cannot be an ID still refuses Create
+            // (`PublishingDestinations.wizardCreateRefusal`).
+            //
+            // The 25 MB sentence is not a warning that comes and goes: a
+            // fact about this destination that never hides. It is the one
+            // real functional difference between the destinations, so a
+            // teacher should meet it while choosing rather than when a
+            // deploy fails halfway through an upload.
+            Text(CloudflareDetailFields.orangeBlock(accountProblem: accountProblem))
                 .font(.caption)
                 .foregroundStyle(.orange)
-                .accessibilityIdentifier("cloudflareSizeNote")
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(accountProblem == nil ? "cloudflareSizeNote" : "cloudflareAccountProblem")
+            if accountProblem != nil && accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID) {
+                Text(PublishingDestinations.accountIDCanWait)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("cloudflareAccountCanWait")
+            }
         }
     }
 }

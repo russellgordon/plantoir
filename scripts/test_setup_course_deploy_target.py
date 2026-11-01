@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Course setup keeps the destination the desktop apps chose (GitHub #668).
+"""Course setup and the destination a course deploys to (GitHub #668).
 
-Both apps' new-course windows write `deploy_target` into course_config.json
-and then run course setup over it. Since #668 a new course is written as
-`cloudflare_pages`, so a setup run that dropped the key would quietly send
-that course's first deploy to Netlify instead, which is what an absent key
-means (contracts/app-rules.json -> publishingDestinations.whyTheyDiffer).
+A NEW course deploys to Cloudflare Pages wherever it is made (Russell,
+2026-11-01: "Cloudflare everywhere"): both apps' new-course windows write
+`deploy_target: cloudflare_pages`, and course setup at the command line
+writes the same when there is no saved file at all.
 
-The other half is pinned too: setup run at the command line on a course
-with NO saved destination writes none, so a course made with setup.sh deploys
-to Netlify, like deploy.sh's own default. That was a decision, not an
-oversight; changing the launchers' default was rejected with the fallback.
+Two other halves are pinned with it:
+- a re-run keeps the destination a saved file names (the apps write the
+  file, then run setup over it), and
+- a re-run over a saved file that names NO destination writes none - that
+  course was made before the other destinations existed and deploys to
+  Netlify, and must keep doing so (publishingDestinations.whyTheyDiffer).
 
-The run is the real one, `setup_course.setup_course`, driven exactly as
-test_graded_folders_rerun.py drives it (Return at every prompt), whose
-harness it borrows. Listed in verify.sh; Windows' PythonToolchainTests discovers it.
+The runs are the real one, `setup_course.setup_course`, driven exactly as
+test_graded_folders_rerun.py and test_graded_folders_new_course.py drive it,
+whose harnesses it borrows. Listed in verify.sh; Windows' PythonToolchainTests
+discovers it.
 """
 
 import sys
@@ -24,6 +26,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import contracts  # noqa: E402
+import setup_course  # noqa: E402
+import test_graded_folders_new_course as new_course_harness  # noqa: E402
 import test_graded_folders_rerun as rerun_harness  # noqa: E402
 import toolchain_paths  # noqa: E402
 
@@ -59,11 +63,21 @@ class SetupKeepsTheDestination(unittest.TestCase):
         written = self.rerun_setup({"deploy_target": default})
         self.assertEqual(written.get("deploy_target"), default)
 
-    def test_a_course_with_no_destination_is_given_none(self):
+    def test_a_saved_course_that_names_no_destination_is_given_none(self):
         written = self.rerun_setup({})
         self.assertNotIn("deploy_target", written,
-                         "setup wrote a destination of its own; a command-line course "
-                         "is meant to deploy to Netlify by the absent-key fallback")
+                         "a re-run gave an older course a destination; it deploys to "
+                         "Netlify by the absent-key fallback and must keep doing so")
+
+    def test_a_new_course_made_at_the_command_line_deploys_to_the_default(self):
+        default = contracts.section("app-rules", "publishingDestinations", "newCourseDefault")
+        self.assertEqual(setup_course.NEW_COURSE_DEPLOY_TARGET, default,
+                         "setup_course.py and the contract disagree about the new-course default")
+        written = new_course_harness.NewCourseGetsItsMarksPool.create_course(
+            self, "ADA1O", takes_example=False, keeps_skeleton=True
+        )
+        self.assertEqual(written.get("deploy_target"), default,
+                         "a course made with setup.sh did not get the new-course default")
 
 
 if __name__ == "__main__":

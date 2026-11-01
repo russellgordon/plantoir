@@ -2855,6 +2855,14 @@ class ClubStart:
             f.write(self.first_page_text(now_str))
 
 
+# Where a course made here deploys, unless its saved file says otherwise.
+# The same value as contracts/app-rules.json -> publishingDestinations.
+# newCourseDefault, which scripts/test_setup_course_deploy_target.py holds it
+# to; a constant rather than a read of the contract so that setting up a
+# course never depends on finding the contract file.
+NEW_COURSE_DEPLOY_TARGET = "cloudflare_pages"
+
+
 def setup_course(no_backup: bool = False):
     print("📚 Welcome to the Course Setup Script!\n")
 
@@ -3360,6 +3368,17 @@ def setup_course(no_backup: bool = False):
     for saved_key, saved_value in saved_config.items():
         if saved_key not in config:
             config[saved_key] = saved_value
+
+    # A NEW course deploys to Cloudflare Pages, made here or in either app's
+    # new-course window (#668; Russell, 2026-11-01: "Cloudflare everywhere").
+    # Only when there was no saved file at all: a course that already has
+    # one and names no destination was made before the other destinations
+    # existed, deploys to Netlify, and must keep doing so — reading its
+    # silence as Cloudflare would move a working class site to a host the
+    # teacher has no account with. contracts/app-rules.json ->
+    # publishingDestinations (newCourseDefault, whyTheyDiffer).
+    if not saved_config:
+        config["deploy_target"] = NEW_COURSE_DEPLOY_TARGET
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)

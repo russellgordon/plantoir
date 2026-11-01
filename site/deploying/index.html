@@ -103,7 +103,7 @@
   <div class="note">
     <h3>Cloudflare Pages — the default for a new course</h3>
     <p>Free, one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Cloudflare's free plan has no limit on visitors or on how much your students download, which is why a new course starts here unless you choose otherwise.</p>
-    <p>It needs your Cloudflare Account ID, kept once in Plantoir ▸ Settings ▸ Deploying for every course. You can create a course and preview it without one; the first deploy asks you to add it. Setup is two things — see below.</p>
+    <p>It needs your Cloudflare Account ID, kept once in Plantoir ▸ Settings ▸ Deploying for every course. You can create a course and preview it without one; the first deploy stops and offers to open Settings so you can add it. Setup is two things — see below.</p>
   </div>
 
   <div class="note">
@@ -116,7 +116,7 @@
       <li>Bandwidth: 20 credits per GB.</li>
       <li>Web requests: 2 credits per 10,000.</li>
     </ul>
-    <p>Each section is its own site, so one deploy of all three sections of a class uses 45 credits: fewer than seven of those a month spends the whole allowance, before a single student has loaded a page. An account made before September 2025 keeps its older plan, and a teacher who deploys only now and then may never come near the limit. Courses made before Plantoir offered Cloudflare keep deploying to Netlify exactly as they always have.</p>
+    <p>Each section is its own site, so one deploy of all three sections of a class uses 45 credits: fewer than seven of those a month spends the whole allowance, before a single student has loaded a page. An account made before September 2025 keeps its older plan, and a teacher who deploys only now and then may never come near the limit. A course made before this version keeps deploying wherever it deployed before, Netlify included.</p>
     <p>Netlify's free accounts can also turn requests away for a few minutes if a whole staff room deploys at once, say at a workshop. It resolves itself; nothing is lost.</p>
   </div>
 
@@ -145,7 +145,7 @@
     <h3>An API token</h3>
     <p>Create one in the Cloudflare dashboard with exactly one permission: <strong>Account → Cloudflare Pages → Edit</strong>. Nothing broader is needed, and nothing broader is asked for.</p>
     <h3>An Account ID</h3>
-    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app keeps your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying. It's on the same dashboard page as the token. A new course can be created and previewed before you add it; the first deploy asks for it.</p>
+    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app keeps your Cloudflare Account ID in Plantoir ▸ Settings ▸ Deploying. It's on the same dashboard page as the token. A new course can be created and previewed before you add it; the first deploy stops until it is there.</p>
   </div>
   <p>Enter both once and every Cloudflare course you deploy afterward reuses them.</p>
 </section>

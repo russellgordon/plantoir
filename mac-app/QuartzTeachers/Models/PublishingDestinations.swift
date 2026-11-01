@@ -93,6 +93,17 @@ enum PublishingDestinations {
         return CourseConfiguration.cloudflareAccountProblem(forID: rawID)
     }
 
+    /// Whether the "Cannot Deploy Yet" alert offers Open Settings… beside
+    /// OK (#668): when what it says is the Account ID's problem, which is
+    /// put right in Plantoir ▸ Settings ▸ Deploying. A folder's refusal is
+    /// put right in the course's own settings, so it does not.
+    static func deployRefusalOpensSettings(refusal: String, cloudflareAccountID: String) -> Bool {
+        guard let problem = CourseConfiguration.cloudflareAccountProblem(forID: cloudflareAccountID) else {
+            return false
+        }
+        return refusal.hasPrefix(problem)
+    }
+
     /// True when the ID is empty once trimmed — the case the new-course
     /// window lets wait, and says so with `accountIDCanWait`.
     static func accountIDIsMissing(_ rawID: String) -> Bool {
