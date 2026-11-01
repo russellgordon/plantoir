@@ -1387,10 +1387,10 @@ outside an axis draws; the issue's "`\fill … circle`" was broader than the
 fault. Those three are `figureFences.texErrors` cases, run against the real
 engine by `scripts/check_figure_rules_against_the_site.py` in `verify.sh`.
 `\textdegree`, `\$` and `\textdollar` in a pgfplots label END the engine
-("Could not find font tcrm1000"), and in plain TikZ they fail with TeX
-saying nothing. Until #718 the build reported the first as `tookTooLong`,
-uncached and retried every build; since #718 it names the problem
-(`fontMissing`), and #718's `figureFences.knownLimits` entry lists the nine
+("Could not find font tcrm1000"), and in plain TikZ the drawing fails on
+the same font. Until #718 the build reported the first as `tookTooLong`,
+uncached and retried every build, and the second as TeX saying nothing;
+since #718 it names the problem in both (`fontMissing`), and #718's `figureFences.knownLimits` entry lists the nine
 text symbols measured. `$^{\circ}$` and `\char36` draw, and
 `plantoir-math-graphs` sections 3 and 8 tell an assistant to write those.
 

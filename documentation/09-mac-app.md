@@ -3317,7 +3317,10 @@ rejected:
   "54/0/0/0" and found the loss followed where the table sat. Top-rule
   pixels lost at 80 dpi, positions 1-12:
   - pattern A: 0 at all 12;
-  - pattern B: 0, 0, 56, 55, 55, 0, 0, 54, 55, 56, 0, 0 - side rules 0;
+  - pattern B: 0, 0, 56, 55, 55, 0, 0, 54, 55, 56, 0, 0 - and its right rule
+    loses 3-4 single pixels at the corners and row joins at 5-6 of the 12
+    (re-measured by the fixes review, within 1 px), near-invisible and
+    changing no advice;
   - a bare `\rowcolor`: 0, 0, 56, 57, 58, 0, 0, 57, 56, 56, 0, 0 - the same
     six positions - and 18-19 px of the left rule at 7 of 12;
   - B and the bare `\rowcolor` with Russell's templates' "Outer border, drawn
