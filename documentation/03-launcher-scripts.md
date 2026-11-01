@@ -2327,7 +2327,11 @@ all XNU compares).
     OS credential store, then delete the legacy entry.
   - On first run the script opens the Netlify token-creation page, validates
     the pasted token against `GET /api/v1/user`, and saves it.
-    `--reset-token` (or `--logout`) clears it.
+    `--reset-token` (or `--logout`) clears it. A SAVED token (Netlify's or
+    Cloudflare's) is cleared on its own only when the service answers 400,
+    401 or 403; with no answer the mac launcher keeps it and stops (#716,
+    `token_check_answer`; `deploy.ps1`'s half is #705) —
+    `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
     into the `NETLIFY_AUTH_TOKEN` environment variable — it never appears in
