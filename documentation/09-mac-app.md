@@ -905,30 +905,52 @@ made here in its own words, and nothing opens.
 
 **The message** (`fixWith.fixGreeting`, one line): the course and its name,
 which build of which section found the problems, then each handed row numbered
-`1) …; 2) …` — its `prompt` verbatim (the record's one bounded line,
-`sectionProblems.prompt`), then `(page: courses/<COURSE>/<page>.md; this page
-is shared by every section; skill: <skill>)`, the middle clause only when the
-page is not under `section<N>/` — then the plantoir tools, the How I Teach
-sentence verbatim, plan-first-and-agree, and "When you are done, preview
-Section N so its Problems tab clears." The skill per kind is
+`1) … · 2) …` — its `prompt` verbatim (the record's one bounded line,
+`sectionProblems.prompt`, less its own closing full stop so it never reads
+". ("), then `(page: courses/<COURSE>/<page>.md, a page shared by every
+section, skill: <skill>)`, the middle clause only when the page is not under
+`section<N>/` — then the plantoir tools, the How I Teach sentence verbatim,
+plan-first-and-agree, and a closing that names what clears the rows
+(`closingWhy`): "preview Section N" for almost every kind, "deploy Section N
+to Cloudflare again" when every row is Cloudflare's refusal (a preview never
+runs that check, so it carries the row unchanged — `deployOnlyKinds`), and
+both in one sentence for a mix (review M1). The skill per kind is
 `fixWith.skillForKind` (figures and GeoGebra `plantoir-math-graphs`, Swift and
 runnable code `plantoir-runnable-code`, self-check questions
 `plantoir-quizzes`, a handout `plantoir-printing`, anything else
 `plantoir-page-authoring`); a test holds that every one is a skill the app
 carries and every key a `sectionProblems` kind. The message is filled in ONE
 pass over its template (`FixWithAssistant.fill`), so a row whose words carry
-`{section}` — TeX is braces everywhere — goes over as written; double quotes
-become apostrophes (`greetingCarriesNoDoubleQuotes`).
+`{section}` — TeX is braces everywhere — goes over as written.
+
+**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). On
+Windows the door runs `wt.exe -d <folder> cmd /k …` when Windows Terminal is
+there, and `wt` splits its command line at EVERY `;`, inside quotes too,
+because it reads the arguments after the quotes are removed
+(microsoft/terminal #13264; the documented escape is `\;`). A message with a
+semicolon opens cut short, with its tail as a second tab. The first draft used
+`; ` between rows and inside every row, so a ten-row message carried about
+thirty. No piece of `fixGreeting` has one now, and any a row, a page or a
+course name brings (a TeX error often does) is written as a comma. A double
+quote becomes an apostrophe (`greetingCarriesNoDoubleQuotes`). Both
+replacements keep the length. **Rejected:** escaping `;` as `\;` on Windows
+only. It would hold only while every future piece of the message remembered
+it, and the mac would send a different message.
 
 **Bounds.** At most `mostRowsInThePrompt` (10) rows are named, in the record's
 order, and no row is added that would take the whole message past
 `greetingMaxCharacters` (6,500); the first is always named and the rest are
-"and N more on the Problems tab". A page's place is cut at 300 characters. Why
+"and N more on the Problems tab". A page's place is cut at 300 characters and
+the course's name at 80 (`courseNameMaxCharacters`, review L2 — before it, a
+7,000-character name gave an 8,042-character message), so the bound is
+absolute. Characters are Swift's (grapheme clusters, `fixWith.charactersAre`);
+Windows counts UTF-16 units, which can be more, and keeps the whole command
+line under 8,191 of those, with the rest of 6,500's room as the margin. Why
 6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
 characters, and the rest of that line (the terminal, the assistant's path, the
 configuration's) needs room. Measured with the contract's cases: ten 400-character
-rows on ordinary pages make 5,710 characters; long page names (286
-characters each) stop at seven rows and 6,118.
+rows on ordinary pages make 5,650 characters; long page names (286
+characters each) stop at seven rows and 6,077.
 
 **The trail.** "asked an assistant to fix problems"
 (`ActivityTrail.Event.askedAnAssistantToFixProblems`, `activityTrail.
@@ -950,19 +972,23 @@ command").
 **Measured.** The contract's expectations were computed by an implementation
 written from the rule text (Python), and the Swift, compiled on its own with
 the real `FixWithAssistant.swift`, `SectionProblemsRecord.swift` and
-`SectionProblemsRules.swift`, gives the same answer for all 7 `greetingCases`
+`SectionProblemsRules.swift`, gives the same answer for all 10 `greetingCases`
 and 8 `buttonCases`. The tool-surface digests did not move (local 13
 `46b96562…`, MCP 38 `89641d12…`): the message is a launch argument, not a tool
 description.
 
 **What Windows owes** (its `windows` issue): the two buttons under its list,
 the same `buttonCases` and `greetingCases`, the trail event, and the message
-through `cmd /k` — a `%` the record's prompts already drop, but a page's name
-can carry one, and `^` and `!` need checking in its quoting — measured against
-8,191.
+through `wt.exe`/`cmd /k`. The message has no `;` for `wt` to split at. A `%`
+the record's prompts already drop, but a page's name can carry one. `^` and
+`!` need checking in its quoting. Measure the whole command line in UTF-16
+units against 8,191.
 
-**Tests.** `FixWithAssistantTests` (11): the words and bounds pinned, every
-skill real and every key a kind, both case lists, rule 1 over the message, the
+**Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
+with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
+kinds a deploy writes, both case lists (no message with a semicolon, a newline
+or ". ("), no semicolon and no unbounded name with every input carrying them,
+the closing per kind, rule 1 over the message, the
 real `rowState` leaving a row out, which pages are shared, both doors sending
 the message they are given (and the plain greeting without one), the message
 surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an

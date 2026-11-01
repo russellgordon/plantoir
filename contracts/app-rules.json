@@ -2847,16 +2847,18 @@
       "fixGreeting" : {
         "openingOne" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found a problem on its website that I'd like your help to fix: ",
         "openingSeveral" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found problems on its website that I'd like your help to fix: ",
-        "rowWithAPage" : "{number}) {prompt} (page: {file}{shared}; skill: {skill})",
+        "rowWithAPage" : "{number}) {prompt} (page: {file}{shared}, skill: {skill})",
         "rowWithoutAPage" : "{number}) {prompt} (skill: {skill})",
-        "sharedPage" : "; this page is shared by every section",
-        "rowSeparator" : "; ",
-        "more" : "; and {count} more on the Problems tab",
+        "sharedPage" : ", a page shared by every section",
+        "rowSeparator" : " · ",
+        "more" : " · and {count} more on the Problems tab",
         "afterTheRows" : ". Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. ",
         "planFirst" : " Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. ",
-        "closing" : "When you are done, preview Section {section} so its Problems tab clears."
+        "closingPreview" : "When you are done, preview Section {section} so its Problems tab clears.",
+        "closingDeploy" : "When you are done, deploy Section {section} to Cloudflare again so its Problems tab clears.",
+        "closingBoth" : "When you are done, preview Section {section} and then deploy it to Cloudflare again so its Problems tab clears."
       },
-      "fixGreetingIsOneLine" : "Windows hands the message to cmd /k, which cannot carry a newline, so rows are numbered on one line (1) …; 2) …) rather than set one per line (plan review, MED 9).",
+      "fixGreetingIsOneLine" : "Windows hands the message to cmd /k, which cannot carry a newline, so rows are numbered on one line (1) … · 2) …) rather than set one per line (plan review, MED 9), and with no semicolon anywhere (replaceInTheMessageWhy).",
       "fixGreetingMustSay" : [
         "the course, by code, and its name when that differs, and whether a preview or a deploy found the problems, and of which section",
         "each handed row's prompt, verbatim, numbered",
@@ -2865,8 +2867,23 @@
         "that the plantoir tools are the way to do anything to do with this course",
         "greetingHowITeachSentence, verbatim",
         "that before anything is changed the teacher is shown what will change, in plain words, and agrees",
-        "that when it is done this section is previewed, so its Problems tab clears"
+        "that when it is done this section is previewed - or deployed to Cloudflare again, for a refusal only a deploy clears - so its Problems tab clears (closingWhy)"
       ],
+      "deployOnlyKinds" : [
+        "filesTooLargeForCloudflare"
+      ],
+      "closingWhy" : "A preview clears every problem but Cloudflare's refusal: a preview never runs that check and carries the row unchanged (shared-rules.json -> sectionProblems.deployRefusals.filesTooLargeForCloudflare.carryOver), so only a deploy clears it. closingPreview when every handed row is cleared by a preview, closingDeploy when every one is a deployOnlyKinds row, closingBoth otherwise (717b review M1).",
+      "replaceInTheMessage" : [
+        [
+          "\"",
+          "'"
+        ],
+        [
+          ";",
+          ","
+        ]
+      ],
+      "replaceInTheMessageWhy" : "A double quote would end the argument's quoting (greetingCarriesNoDoubleQuotes). A semicolon would split it: Windows Terminal reads its command line after the quotes are removed and treats EVERY ; as the start of a new tab's command, inside quotes too (microsoft/terminal #13264; the documented escape is \\;), so the message would open cut short and its tail as a second tab (717b review H1). No piece of fixGreeting has a semicolon, and any a row brings - a TeX error, a sentence - is written as a comma. Each replacement keeps the length.",
       "skillForKind" : {
         "figuresCouldNotBeDrawn" : "plantoir-math-graphs",
         "geogebraSketchesNotReady" : "plantoir-math-graphs",
@@ -2881,7 +2898,9 @@
       "mostRowsInThePrompt" : 10,
       "greetingMaxCharacters" : 6500,
       "pagePlaceMaxCharacters" : 300,
-      "boundsWhy" : "Rows are named in the record's order until mostRowsInThePrompt are, or until the next would take the WHOLE message past greetingMaxCharacters; the first is always named, and the rest are 'and N more on the Problems tab'. A row's prompt is at most 400 characters (sectionProblems.prompt) and its page place at most pagePlaceMaxCharacters (cut with …), so ten ordinary rows fit, and 6,500 leaves room under cmd's 8,191-character command line for the terminal, the assistant's path and the configuration's.",
+      "courseNameMaxCharacters" : 80,
+      "charactersAre" : "Every count here is in characters as the mac's Swift counts them (String.count: grapheme clusters - one emoji, one accented letter, is one). Windows counts UTF-16 units (String.Length), which can be more for the same text (an emoji is two, and a family emoji is many), and cmd's 8,191-character limit is in UTF-16 units: so Windows applies the same bounds in Swift's characters where it can (StringInfo text elements), and must ALSO keep the whole command line's UTF-16 length under 8,191 - the 1,691 left over by 6,500 is the margin for that, measured with the longest greetingCases case (717b review L1).",
+      "boundsWhy" : "The course name is cut at courseNameMaxCharacters (with …), so the bound holds whatever the course is called (717b review L2). Rows are named in the record's order until mostRowsInThePrompt are, or until the next would take the WHOLE message past greetingMaxCharacters; the first is always named, and the rest are 'and N more on the Problems tab'. A row's prompt is at most 400 characters (sectionProblems.prompt) and its page place at most pagePlaceMaxCharacters (cut with …), so ten ordinary rows fit, and 6,500 leaves room under cmd's 8,191-character command line for the terminal, the assistant's path and the configuration's.",
       "rejected" : [
         "Handing the rows over in a file the message names (plan review, MED 9's other option): it is a file written where the assistant can read it - the working folder, which Obsidian is watching - and nobody cleans it up; the one-line message fits.",
         "One session per problem: a shared page's problems are one fix, and ten terminals are not triage.",
@@ -3080,7 +3099,7 @@
           "expect" : {
             "rowsNamed" : 1,
             "rowsNotNamed" : 0,
-            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Math) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/MPM2D/Unit 1/Graphs.md; this page is shared by every section; skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
+            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Math) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/MPM2D/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
           }
         },
         {
@@ -3104,7 +3123,7 @@
           "expect" : {
             "rowsNamed" : 2,
             "rowsNotNamed" : 0,
-            "text" : "I'm a teacher working on ICS3U in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “section2/Class 4”, question 2: no answer is marked as right (page: courses/ICS3U/section2/Class 4.md; skill: plantoir-quizzes); 2) ICS3U Section 2 has no front page, so its website opens on a list of files. (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 so its Problems tab clears."
+            "text" : "I'm a teacher working on ICS3U in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “section2/Class 4”, question 2: no answer is marked as right (page: courses/ICS3U/section2/Class 4.md, skill: plantoir-quizzes) · 2) ICS3U Section 2 has no front page, so its website opens on a list of files (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 so its Problems tab clears."
           }
         },
         {
@@ -3143,7 +3162,7 @@
             "rowsNamed" : 10,
             "rowsNotNamed" : 1,
             "atMostCharacters" : 6500,
-            "textHas" : "; and 1 more on the Problems tab. "
+            "textHas" : " · and 1 more on the Problems tab. "
           }
         },
         {
@@ -3163,7 +3182,69 @@
             "rowsNamed" : 7,
             "rowsNotNamed" : 4,
             "atMostCharacters" : 6500,
-            "textHas" : "; and 4 more on the Problems tab. "
+            "textHas" : " · and 4 more on the Problems tab. "
+          }
+        },
+        {
+          "name" : "Cloudflare's refusal alone is cleared by a deploy, not a preview",
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "filesTooLargeForCloudflare",
+              "page" : "",
+              "prompt" : "Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. The last deploy of Section 2 found a problem on its website that I'd like your help to fix: 1) Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, deploy Section 2 to Cloudflare again so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a refusal beside a figure needs a preview and a deploy, said in one sentence",
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "section" : 2,
+          "occasion" : "deploy",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here"
+            },
+            {
+              "kind" : "filesTooLargeForCloudflare",
+              "page" : "",
+              "prompt" : "Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be."
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 2,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on ICS3U (Grade 11 Computer Science) in Plantoir. The last deploy of Section 2 found problems on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 1, line 13: \\foo isn't a command LaTeX knows here (page: courses/ICS3U/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs) · 2) Cloudflare refused Media/lecture.mp4, which is larger than the 25 MB a file may be (skill: plantoir-page-authoring). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 2 and then deploy it to Cloudflare again so its Problems tab clears."
+          }
+        },
+        {
+          "name" : "a semicolon a row brings is written as a comma, and a very long course name is cut",
+          "course" : "MPM2D",
+          "courseName" : "Grade 10 Academic Mathematics with a name that goes on and on with a name that goes on and on with a name that goes on and on with a name that goes on and on ",
+          "section" : 1,
+          "occasion" : "preview",
+          "rows" : [
+            {
+              "kind" : "figuresCouldNotBeDrawn",
+              "page" : "Unit 1/Graphs",
+              "prompt" : "“Unit 1/Graphs”, diagram 2, line 9: Missing $ inserted; check the label"
+            }
+          ],
+          "expect" : {
+            "rowsNamed" : 1,
+            "rowsNotNamed" : 0,
+            "text" : "I'm a teacher working on MPM2D (Grade 10 Academic Mathematics with a name that goes on and on with a name that …) in Plantoir. The last preview of Section 1 found a problem on its website that I'd like your help to fix: 1) “Unit 1/Graphs”, diagram 2, line 9: Missing $ inserted, check the label (page: courses/MPM2D/Unit 1/Graphs.md, a page shared by every section, skill: plantoir-math-graphs). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 1 so its Problems tab clears."
           }
         },
         {
@@ -3196,11 +3277,11 @@
           "expect" : {
             "rowsNamed" : 2,
             "rowsNotNamed" : 0,
-            "text" : "I'm a teacher working on ICS4U (Grade 12 'Computer' Science) in Plantoir. The last preview of Section 3 found problems on its website that I'd like your help to fix: 1) “Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder (page: courses/ICS4U/Unit 2/Worksheet.md; this page is shared by every section; skill: plantoir-printing); 2) “section3/Class 9”, a Python block: it is shown as plain code (page: courses/ICS4U/section3/Class 9.md; skill: plantoir-runnable-code). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 3 so its Problems tab clears."
+            "text" : "I'm a teacher working on ICS4U (Grade 12 'Computer' Science) in Plantoir. The last preview of Section 3 found problems on its website that I'd like your help to fix: 1) “Unit 2/Worksheet” names {section}.pdf, which is not in the Media folder (page: courses/ICS4U/Unit 2/Worksheet.md, a page shared by every section, skill: plantoir-printing) · 2) “section3/Class 9”, a Python block: it is shown as plain code (page: courses/ICS4U/section3/Class 9.md, skill: plantoir-runnable-code). Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. Then read my How I Teach page for this course, and keep to it in anything you write for me. Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. When you are done, preview Section 3 so its Problems tab clears."
           }
         }
       ],
-      "greetingCasesHow" : "rows are the handed rows in order (kind, page - empty for none - and prompt). manyRows makes count rows: page and prompt with {n} filled with the row's number from 1, and the prompt then followed by the letter x until it is promptCharacters long. expect null means no message; otherwise rowsNamed and rowsNotNamed, and text (the whole message, exactly), or atMostCharacters and textHas."
+      "greetingCasesHow" : "rows are the handed rows in order (kind, page - empty for none - and prompt). manyRows makes count rows: page and prompt with {n} filled with the row's number from 1, and the prompt then followed by the letter x until it is promptCharacters long. expect null means no message; otherwise rowsNamed and rowsNotNamed, and text (the whole message, exactly), or atMostCharacters and textHas. No message in any case may hold a semicolon or a newline."
     },
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",

@@ -42,7 +42,9 @@ final class FixWithAssistantTests: XCTestCase {
             "more": FixWithAssistant.more,
             "afterTheRows": FixWithAssistant.afterTheRows,
             "planFirst": FixWithAssistant.planFirst,
-            "closing": FixWithAssistant.closing,
+            "closingPreview": FixWithAssistant.closingPreview,
+            "closingDeploy": FixWithAssistant.closingDeploy,
+            "closingBoth": FixWithAssistant.closingBoth,
         ]
         XCTAssertEqual(swiftPieces, pieces)
 
@@ -51,6 +53,12 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertEqual(fixWith["mostRowsInThePrompt"] as? Int, FixWithAssistant.mostRowsInThePrompt)
         XCTAssertEqual(fixWith["greetingMaxCharacters"] as? Int, FixWithAssistant.greetingMaxCharacters)
         XCTAssertEqual(fixWith["pagePlaceMaxCharacters"] as? Int, FixWithAssistant.pagePlaceMaxCharacters)
+        XCTAssertEqual(fixWith["courseNameMaxCharacters"] as? Int, FixWithAssistant.courseNameMaxCharacters)
+        XCTAssertEqual(fixWith["replaceInTheMessage"] as? [[String]], FixWithAssistant.replaceInTheMessage)
+        XCTAssertEqual(Set((fixWith["deployOnlyKinds"] as? [String]) ?? []), FixWithAssistant.deployOnlyKinds)
+        for (_, piece) in swiftPieces {
+            XCTAssertFalse(piece.contains(";"), "Windows Terminal splits at a semicolon: \(piece)")
+        }
         XCTAssertEqual(FixWithAssistant.mostRowsInThePrompt, 10, "the ruling's number")
     }
 
@@ -76,9 +84,14 @@ final class FixWithAssistantTests: XCTestCase {
             kinds.insert(try XCTUnwrap(kind["kind"] as? String))
         }
         XCTAssertEqual(kinds.count, 16)
+        var deployKinds: Set<String> = []
+        for kind in try XCTUnwrap(problems["kinds"] as? [[String: Any]]) where (kind["from"] as? String) == "deploy" {
+            deployKinds.insert(try XCTUnwrap(kind["kind"] as? String))
+        }
         for (kind, _) in FixWithAssistant.skillForKind {
             XCTAssertTrue(kinds.contains(kind), "\(kind) is not a sectionProblems kind")
         }
+        XCTAssertEqual(FixWithAssistant.deployOnlyKinds, deployKinds, "the kinds only a deploy writes, and so clears")
         XCTAssertEqual(FixWithAssistant.skill(forKind: "figuresCouldNotBeDrawn"), "plantoir-math-graphs")
         XCTAssertEqual(FixWithAssistant.skill(forKind: "linksIntoHiddenPages"), FixWithAssistant.otherwiseSkill)
     }
@@ -183,6 +196,8 @@ final class FixWithAssistantTests: XCTestCase {
             }
             XCTAssertFalse(made.text.contains("\n"), "\(name): one line")
             XCTAssertFalse(made.text.contains("\""), "\(name): greetingCarriesNoDoubleQuotes")
+            XCTAssertFalse(made.text.contains(";"), "\(name): Windows Terminal splits at a semicolon")
+            XCTAssertFalse(made.text.contains(". ("), "\(name): a row's own full stop is dropped")
             XCTAssertTrue(made.text.contains(ClaudeCodeLauncher.howITeachGreetingSentence), name)
             if rows.count == 10 && made.rowsNamed == 10 {
                 sawTen = true
@@ -218,6 +233,41 @@ final class FixWithAssistantTests: XCTestCase {
                 XCTAssertFalse(title.contains(word), title)
             }
         }
+    }
+
+    /// No semicolon reaches the message, whatever the course, the page or
+    /// the row brings, and the course's name cannot take it past its bound.
+    /// MUST FAIL if `replaceInTheMessage` loses its semicolon pair, or the
+    /// name is not cut.
+    func testNoSemicolonAndNoUnboundedName() throws {
+        var rows: [SectionProblemRow] = []
+        for index in 1...11 {
+            var prompt: String = "problem \(index); see line 3; "
+            while prompt.count < 400 {
+                prompt.append("x")
+            }
+            rows.append(try XCTUnwrap(SectionProblemRow([
+                "id": "r\(index)", "kind": "figuresCouldNotBeDrawn",
+                "page": "Unit 1; Part \(index)/" + String(repeating: "long; name ", count: 40), "prompt": prompt,
+            ])))
+        }
+        let name: String = String(repeating: "A course; with a long name ", count: 300)
+        let greeting: FixWithAssistant.Greeting = try XCTUnwrap(FixWithAssistant.greeting(
+            rows: rows, courseCode: "MPM2D", courseName: name, sectionNumber: 1, occasion: "preview"
+        ))
+        XCTAssertFalse(greeting.text.contains(";"), greeting.text)
+        XCTAssertLessThanOrEqual(greeting.text.count, FixWithAssistant.greetingMaxCharacters)
+        XCTAssertGreaterThanOrEqual(greeting.rowsNamed, 1)
+    }
+
+    /// The closing names what clears the rows: a preview, a deploy for
+    /// Cloudflare's refusal alone, both for a mix.
+    func testTheClosingFollowsWhatClearsTheRows() {
+        let figure: SectionProblemRow = SectionProblemRow(id: "f", kind: "figuresCouldNotBeDrawn", page: "Unit 1/Graphs")
+        let refusal: SectionProblemRow = SectionProblemRow(id: "c", kind: "filesTooLargeForCloudflare", page: "")
+        XCTAssertEqual(FixWithAssistant.closing(for: [figure]), FixWithAssistant.closingPreview)
+        XCTAssertEqual(FixWithAssistant.closing(for: [refusal]), FixWithAssistant.closingDeploy)
+        XCTAssertEqual(FixWithAssistant.closing(for: [refusal, figure]), FixWithAssistant.closingBoth)
     }
 
     // MARK: - The real rule

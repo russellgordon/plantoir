@@ -18,10 +18,15 @@ import Foundation
 /// active, never while a view draws), and opening it is the door's own
 /// `open(…, greeting:)`.
 ///
-/// **The message is ONE line.** Windows hands it to `cmd /k`, which cannot
-/// carry a newline, so the rows are numbered `1) …; 2) …` rather than set one
-/// per line (plan review, MED 9); each row's `prompt` is already one bounded
-/// line (`shared-rules.json` → `sectionProblems.prompt`).
+/// **The message is ONE line, with no semicolon in it.** Windows hands it to
+/// `cmd /k`, which cannot carry a newline, so the rows are numbered
+/// `1) … · 2) …` rather than set one per line (plan review, MED 9); each
+/// row's `prompt` is already one bounded line (`shared-rules.json` →
+/// `sectionProblems.prompt`). And when Windows Terminal is there, `wt.exe`
+/// splits its command line at EVERY `;`, inside quotes too
+/// (microsoft/terminal #13264; 717b review H1), so a semicolon would end the
+/// message early and open the rest as a second tab: none of the pieces has
+/// one, and any the rows bring are written as commas.
 nonisolated enum FixWithAssistant {
 
     /// Which door a button opens.
@@ -110,6 +115,27 @@ nonisolated enum FixWithAssistant {
     /// The longest a page's place may be in a row (`fixWith.pagePlaceMaxCharacters`).
     static let pagePlaceMaxCharacters: Int = 300
 
+    /// The longest a course's name may be in the message
+    /// (`fixWith.courseNameMaxCharacters`), so `greetingMaxCharacters` holds
+    /// whatever the teacher called the course (717b review L2).
+    static let courseNameMaxCharacters: Int = 80
+
+    /// What is written in place of what, in the whole message
+    /// (`fixWith.replaceInTheMessage`): a double quote would end the
+    /// argument's quoting, and a semicolon splits Windows Terminal's
+    /// command line.
+    static let replaceInTheMessage: [[String]] = [
+        ["\"", "'"],
+        [";", ","],
+    ]
+
+    /// The kinds only a deploy clears (`fixWith.deployOnlyKinds`): a preview
+    /// never runs Cloudflare's check, so it carries the row unchanged
+    /// (`sectionProblems.deployRefusals`; 717b review M1).
+    static let deployOnlyKinds: Set<String> = [
+        "filesTooLargeForCloudflare",
+    ]
+
     /// The skill that knows each kind (`fixWith.skillForKind`); every other
     /// kind gets `otherwiseSkill`.
     static let skillForKind: [String: String] = [
@@ -133,15 +159,15 @@ nonisolated enum FixWithAssistant {
     static let openingSeveral: String =
         "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found problems on its website that I'd like your help to fix: "
 
-    static let rowWithAPage: String = "{number}) {prompt} (page: {file}{shared}; skill: {skill})"
+    static let rowWithAPage: String = "{number}) {prompt} (page: {file}{shared}, skill: {skill})"
 
     static let rowWithoutAPage: String = "{number}) {prompt} (skill: {skill})"
 
-    static let sharedPage: String = "; this page is shared by every section"
+    static let sharedPage: String = ", a page shared by every section"
 
-    static let rowSeparator: String = "; "
+    static let rowSeparator: String = " · "
 
-    static let more: String = "; and {count} more on the Problems tab"
+    static let more: String = " · and {count} more on the Problems tab"
 
     static let afterTheRows: String =
         ". Use the plantoir tools for anything to do with this course, and the skill named for each problem, which knows what this site can show. "
@@ -149,7 +175,14 @@ nonisolated enum FixWithAssistant {
     static let planFirst: String =
         " Before changing anything, show me in plain words what you will change, using the matching plan tool where there is one, and wait for me to agree. "
 
-    static let closing: String = "When you are done, preview Section {section} so its Problems tab clears."
+    /// The closing, by what the handed rows need to clear (717b review M1).
+    static let closingPreview: String = "When you are done, preview Section {section} so its Problems tab clears."
+
+    static let closingDeploy: String =
+        "When you are done, deploy Section {section} to Cloudflare again so its Problems tab clears."
+
+    static let closingBoth: String =
+        "When you are done, preview Section {section} and then deploy it to Cloudflare again so its Problems tab clears."
 
     // MARK: - Functions
 
@@ -237,11 +270,37 @@ nonisolated enum FixWithAssistant {
         return "courses/\(courseCode)/\(place).md"
     }
 
-    /// One numbered row.
+    /// The closing for `rows`: a preview clears most problems, but only a
+    /// deploy clears Cloudflare's refusal, and a message holding both says
+    /// both.
+    static func closing(for rows: [SectionProblemRow]) -> String {
+        var needsAPreview: Bool = false
+        var needsADeploy: Bool = false
+        for row in rows {
+            if deployOnlyKinds.contains(row.kind) {
+                needsADeploy = true
+            } else {
+                needsAPreview = true
+            }
+        }
+        if needsADeploy && needsAPreview {
+            return closingBoth
+        }
+        if needsADeploy {
+            return closingDeploy
+        }
+        return closingPreview
+    }
+
+    /// One numbered row. A prompt's own closing full stop is dropped, so the
+    /// row never reads ". (" (717b review L3).
     static func rowText(_ row: SectionProblemRow, number: Int, courseCode: String) -> String {
         var prompt: String = row.prompt
         if prompt.isEmpty {
             prompt = row.item.isEmpty ? row.sentence : row.item
+        }
+        if prompt.hasSuffix(".") {
+            prompt = String(prompt.dropLast())
         }
         if row.page.isEmpty {
             return fill(rowWithoutAPage, [
@@ -276,7 +335,10 @@ nonisolated enum FixWithAssistant {
             return nil
         }
         var courseNamed: String = courseCode
-        let trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.count > courseNameMaxCharacters {
+            trimmedName = String(trimmedName.prefix(courseNameMaxCharacters - 1)) + "…"
+        }
         if !trimmedName.isEmpty && trimmedName != courseCode {
             courseNamed.append(" (\(trimmedName))")
         }
@@ -290,7 +352,7 @@ nonisolated enum FixWithAssistant {
         let ending: String = afterTheRows
             + ClaudeCodeLauncher.howITeachGreetingSentence
             + planFirst
-            + fill(closing, ["{section}": section])
+            + fill(closing(for: rows), ["{section}": section])
 
         var named: [String] = []
         var length: Int = opening.count + ending.count
@@ -320,9 +382,12 @@ nonisolated enum FixWithAssistant {
             message.append(fill(more, ["{count}": String(notNamed)]))
         }
         message.append(ending)
-        // `outsideAgents.greetingCarriesNoDoubleQuotes`: the message is one
-        // shell argument on the mac and one quoted `cmd` argument on Windows.
-        message = message.replacingOccurrences(of: "\"", with: "'")
+        // `fixWith.replaceInTheMessage`: the message is one shell argument on
+        // the mac and one quoted `cmd` argument on Windows, which Windows
+        // Terminal splits at a semicolon. Same length either way.
+        for pair in replaceInTheMessage {
+            message = message.replacingOccurrences(of: pair[0], with: pair[1])
+        }
         return Greeting(text: message, rowsNamed: named.count, rowsNotNamed: notNamed)
     }
 
