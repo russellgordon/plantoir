@@ -837,6 +837,8 @@ class ScriptRunner {
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // A folder whose workspace was made again, and why (#684).
+        FolderSetUpAgainReport.noteOnTheTrail(from: text)
         // The helper programs installed and the website builder created on
         // a first run, and where each came from (#312).
         HelperBootstrapReport.noteOnTheTrail(from: text)

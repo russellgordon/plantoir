@@ -654,6 +654,39 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows' preview.ps1 serves on the PC itself, with no workspace and no forward to lose (app-rules.json -> previewPorts.whenAnotherAccountHasTheAddress.appliesOnWhy). Whether the Windows WALK sees another account's listeners is a separate question, asked in the windows issue from #310."
       },
       {
+        "carries": "where the run was for (course and section, or the word setup) and WHY the folder's workspace had to be made again, as one of the reasons in whyWords: Plantoir had been updated, its previews could be opened from other computers on the network (GitHub #684), it could show only one preview at a time, built websites are now kept outside the course folder, the courses could not be found or saved into, it had been set up for a folder somewhere else, 'courses/' had just been created, the connection to it was lost, or something else was using its preview addresses. Never a path, a command or a process number.",
+        "event": "folder set up again",
+        "marker": {
+          "prefix": "PLANTOIR_FOLDER_SET_UP_AGAIN:",
+          "shape": "PLANTOIR_FOLDER_SET_UP_AGAIN: <reason> <course>/<section or the word setup>, the course's one permitted space written +; <reason> is one word, a key of whyWords",
+          "examples": [
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: update ICS4U/1",
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: thisMacOnly setup",
+            "PLANTOIR_FOLDER_SET_UP_AGAIN: buildsOutside AP+CALC/2"
+          ],
+          "why": "Printed by setup.sh, preview.sh and deploy.sh alike, from the function they share in the PREVIEW PORT BLOCK (note_that_this_folder_was_set_up_again), on EVERY remake of a folder's workspace and only once the new one EXISTS - so a remake #94's wait refused (it exits inside remake_the_workspace with its own 'workspace was in use' line) never claims one. Read by the APP, which writes the line, in the same two places as PLANTOIR_WORKSPACE_IN_USE and for the same reason: ScriptRunner from the console of a run it started, ScheduledDeploy from the log of a publish launchd ran - one writer for the event's words, and a real call site (ActivityTrailWiringTests). A preview typed in Terminal is not recorded, as with every launcher marker. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says the reason in words on the line before (previewPorts.whenTheWorkspaceIsInUse.sentences.whenItNeedsSettingUpAgain and the launchers' other remake lines). A marker that is not this shape records nothing; a reason the app has no words for writes lineWithoutAReason, never a wrong reason."
+        },
+        "line": "{place} · set this folder up again — {why}",
+        "lineWithoutAReason": "{place} · set this folder up again",
+        "whyWords": {
+          "update": "Plantoir had been updated",
+          "thisMacOnly": "its previews could be opened from other computers on the network",
+          "severalPreviews": "it could show only one preview at a time",
+          "buildsOutside": "built websites are now kept outside the course folder",
+          "coursesNotFound": "the website builder could not find the courses",
+          "otherFolder": "it had been set up for a folder somewhere else",
+          "coursesJustMade": "'courses/' had just been created",
+          "couldNotSave": "the website builder could not save into 'courses/'",
+          "lostConnection": "Plantoir had lost its connection to the website builder",
+          "addressTaken": "something else was using its preview addresses"
+        },
+        "why": "GitHub #684 (the director's ruling on its plan review). A remake throws away the warm website builder, so the next preview takes about two minutes instead of seconds (109 s measured on a teacher's Mac, #225), and 'why was my first preview this morning so slow?' is asked days later. Until #684 only a WAIT before a remake reached the trail ('workspace was in use'), so the commonest remake of all - after an update - left nothing. One event with the reason carried, rather than one per reason: to a teacher they are the same thing, the folder being got ready again. Not filed under 'workspace was in use' (rejected for #310 too, documentation/03-launcher-scripts.md): that event's lines are written from its own marker and say a remake with nothing running writes nothing. In v1.9.1 the image changed, so every folder is remade for 'update' first and 'thisMacOnly' fires on its own only for a workspace the image check passed. Where #310 already records a remake ('preview address held by another account', outcomes before-start and remade) this line is written too, on purpose (#684 review L1): that one says WHY and names the address, this one says WHAT was done to the folder in the same words as every other remake, so every remake is found under one event; the plain port-clash remake writes only this one.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows builds natively and has no workspace to remake (app-rules.json -> previewPorts.whenTheWorkspaceIsInUse.appliesOnWhy)."
+      },
+      {
         "carries": "which of the four helper programs were installed into Plantoir's tools folder (Colima, Lima, the Docker CLI, Buildx) and at which pinned versions; whether they were set up from inside Plantoir or downloaded; why they were installed (not yet on this Mac, other versions were there, a copy there was damaged, or the copies there were set up before Plantoir kept a record of them); and for a download, why Plantoir's own copy was not used (this Plantoir does not carry one, it is for another kind of Mac, or it did not pass its check)",
         "event": "helper programs installed",
         "marker": {
