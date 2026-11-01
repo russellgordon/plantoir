@@ -2951,8 +2951,9 @@ reaches `main()`, so no node server is left behind. Pinned by
     `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL`, which the rebuild's guard
     reads too — instead of raising "Cloudflare's deploy tool exited with
     code …" with a traceback. Measured inside the image with a stand-in API
-    that never answers: **wrangler 4.80.0 exits 0 on SIGINT** (its `pages`
-    commands install a handler that calls `process.exit()`), so the guard
+    that never answers: **wrangler 4.80.0 and 4.156.0 both exit 0 on SIGINT**
+    (re-measured for #699, 2026-10-31, under Python's `Popen` with SIG_DFL
+    restored, SIGINT at 2 s and at 6 s: 0.01–0.02 s each), so the guard
     cannot see that shape — `deploy.py`'s own interrupt is what covers it, and
     with the whole group signalled, as the app's `^C` does, the real wrangler
     run exits 130 with nothing on stderr and no wrangler left running. (A
@@ -2982,7 +2983,9 @@ reaches `main()`, so no node server is left behind. Pinned by
       the app ends the launcher two seconds after its `^C`.)
     - wrangler uploads every asset first and creates the Pages deployment —
       the step that changes the site — only after (`pages deploy` in
-      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`).
+      wrangler 4.80.0's `cli.js`: `upload(…)`, then `POST …/deployments`;
+      the same order in 4.156.0's, read for #699: the upload, then the
+      upsert of hashes, then the deployment).
       A Cancel before that step publishes nothing; `subprocess.run` kills
       wrangler 0.25 s after the interrupt if it has not left on its own.
 

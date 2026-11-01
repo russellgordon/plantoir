@@ -763,12 +763,14 @@ The image carries **wrangler**, Cloudflare's own deploy CLI, used by
 `scripts/deploy.py` for the Cloudflare Pages destination (their upload protocol
 — BLAKE3 hashing, short-lived JWT, batched uploads — is undocumented enough that
 reimplementing it would break teachers' publishing whenever Cloudflare changed
-it). It is pinned at 4.80.0, *below* 4.87 deliberately: 4.87.0 is the first
-wrangler whose engines need Node 22 (this said 4.100 until #640, which was
-never a boundary). The image ships Node 22.23.4, pinned exactly, since #640,
-with Quartz v4.5.0 revalidated on it, and Windows' runtime carries the same
-22.23.4 since #675 — so the CLI may now move, as its own piece, which also
-retires the `mustStayBelow` ceiling on both platforms. **If you raise Node, revalidate Quartz before chasing a
+it). It is pinned exactly at 4.156.0 since #699, in a late layer of its own;
+it was held at 4.80.0, below 4.87 (the first wrangler whose engines need
+Node 22), until the image (#640) and Windows' runtime (#675) both ran Node
+22.23.4, and that move retired the `mustStayBelow` ceiling on both platforms.
+Since 4.108 wrangler sends an AI agent's deploy of a NEW static project to
+Workers instead of Pages; `deploy.py`'s `--branch=main` and its API-made
+project are what keep it on Pages, so do not drop either
+(`documentation/07-deployment.md`). **If you raise Node, revalidate Quartz before chasing a
 newer CLI.**
 
 First-run bootstrap: if Docker isn't available, the launchers install pinned

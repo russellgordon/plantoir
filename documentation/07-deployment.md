@@ -1199,6 +1199,52 @@ which is exactly what #92 and #378 exist to prevent.
 `scripts/test_deploy_cloudflare_project.py` pins both halves, and
 `CloudflareProjectRemadeReportTests` the app's reader.
 
+**wrangler 4.108 and later can send a NEW project to Workers (#699).** Since
+4.108, when wrangler believes an AI agent is driving it — `CLAUDECODE`,
+`AI_AGENT`, `CODEX_THREAD_ID`, `GEMINI_CLI` and others in its environment,
+or an agent among its ancestors (`maybeDelegatePagesToWorkers` in 4.156.0's
+`cli.js`) — a deploy that would create a new static project is delegated to
+"the latest version of Cloudflare Pages, now part of Cloudflare Workers": a
+Worker at `*.workers.dev`, not the Pages project at the `*.pages.dev`
+address `deploy.py` prints and the app records. `deploy.py`'s call cannot be
+delegated, for three reasons, any one of which is enough:
+
+- **`--branch=main`** is in wrangler's own list of arguments the delegation
+  does not support (`getUnsupportedDeployDelegateArgs`), so it declines
+  before looking at anything else (read in 4.156.0's `cli.js` by the review: `--branch`
+  alone blocks it). `--commit-dirty` is in the same list. So `--branch` is
+  load-bearing twice now: it answers the production-branch question, and it
+  keeps the deploy on Pages.
+- **The project exists before wrangler runs**: `ensure_pages_project` makes
+  it through the API on a first publish, and `remake_pages_project_if_gone`
+  on a deleted one, so wrangler never sees a project to create.
+- **On the mac, `docker exec` hands wrangler six named variables only**
+  (`deploy.sh`), so a teacher's `CLAUDECODE` never reaches it. On Windows
+  `deploy.py` runs natively and the teacher's environment does reach wrangler
+  — under Claude Code, `CLAUDECODE=1` — so the first two guards are the ones
+  that hold there.
+
+`verify-deploy.sh` fails a Cloudflare leg whose log carries the delegation's
+notice ("now part of Cloudflare Workers"), and was run with `CLAUDECODE` and
+`AI_AGENT` set in its own environment on 2026-10-31: every leg stayed on
+Pages. **Do not drop `--branch`** to "simplify" the call, and do not pass
+`--force`: wrangler documents `--force` as the opt-out, but it also prints a
+"Notice to agents" line, and the guards above already make it unnecessary.
+
+**A brand-new project's address can be unknown to a resolver for up to 30
+minutes (#712).** Measured 2026-10-31 on the mac's first `--first-publish`
+run: the moment the first upload returned, this Mac's resolver asked for
+the new `<project>.pages.dev`, got NODATA under the project's own zone, and
+kept that answer for the zone's negative TTL of **1800 s**, while 1.1.1.1,
+8.8.8.8 and the router already answered with Cloudflare's addresses.
+`*.netlify.app` answers for any name, so Netlify never shows it. A teacher
+who opens a new Cloudflare site the instant it is published can meet the
+same wait in a browser; it ends on its own. `verify-deploy.sh
+--first-publish` therefore waits for 1.1.1.1 to answer for a new site before
+anything on the Mac looks it up, and reports how long that took; on the
+first run, which did not, 43 Cloudflare checks failed (HTTP 000, or no answer) against a site that
+was serving.
+
 ## A folder on this PC (`--to-folder`)
 
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This
