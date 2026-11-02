@@ -7,7 +7,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Plantoir</title>
         <item>
             <title>1.9.1</title>
-            <pubDate>Sun, 01 Nov 2026 17:54:37 -0500</pubDate>
+            <pubDate>Sun, 01 Nov 2026 18:58:23 -0500</pubDate>
             <link>https://plantoir.app/</link>
             <sparkle:criticalUpdate sparkle:version="3943"/>
             <sparkle:version>4497</sparkle:version>
@@ -17,7 +17,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 <div data-sparkle-version="4497">
 <h2>Plantoir 1.9.1</h2>
 <p>Plantoir 1.9.1 is for the Mac. Plantoir 1.4.0 or later on the Mac will offer this update by itself. The changes to your class websites reach each site the next time you deploy it, and the first preview after updating takes a few minutes longer while Plantoir rebuilds its website builder.</p>
-<p><strong>Security.</strong> The part of the website builder that deploys to Cloudflare is brought up to date, past known weaknesses in the older version. The website builder now also takes the latest security fixes for the system libraries it runs on each time it is built, and refuses to build with the older compression and encryption libraries that had known weaknesses. And a preview can now be opened only on the Mac that runs it: before, anyone on your school&#x27;s network who knew your Mac&#x27;s address could open a preview while it was running. If you used to look at a preview from another device, deploy the section and look at the site instead.</p>
+<p><strong>Security.</strong> The part of the website builder that deploys to Cloudflare is brought up to date, past known weaknesses in the older version, and the builder now takes the latest fixes for the system libraries it runs on each time it is built. A preview now opens only on the Mac that is running Plantoir, where before it could also be reached from other computers on the same network.</p>
 <h3>New</h3>
 <ul>
 <li><strong>A Problems tab for each section.</strong> Every problem a preview or a deploy finds, such as a problem in the course folder or a diagram that could not be drawn, is listed in one table on the section&#x27;s Problems tab. The section shows a warning in the sidebar, and after a build one message offers to Show the list. A problem fixed in a page that every section shares clears from every section.</li>
@@ -6110,6 +6110,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: htYsNwa+JuqAbHevU3655SbU6s88gV6VULN9wFlvDS0MPKlxHgh/oTKRH0j3+ITk5dBvBWFeGZslwxKqObPdBg==
-length: 649405
+edSignature: 9m/rAvw4ojJAfvz00lp5p2r+NjMNTGMJ7NL+2+cMoASeRsHkVbvYba3ffm1vzm5f50reajz/YzLcd7x17W9MDw==
+length: 649143
 -->
