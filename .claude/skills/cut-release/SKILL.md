@@ -391,3 +391,38 @@ card and the release ship together.
 Stage by path — never `git add -A`. Other work may be in the tree.
 
 See "Brand images" in `RELEASING.md`.
+
+## Correcting the notes AFTER a mac release is public
+
+Learned 2026-11-01 (v1.9.1): Russell reworded a paragraph of the notes
+after the cut, and editing the GitHub release and `website/updates/
+macos-notes.html` was NOT enough — the Mac's update window kept showing the
+old text. **The feed `website/updates/macos.xml` embeds this release's
+notes inside each item's `<description>` CDATA, and the feed is signed**, so
+the only honest way to change what a Mac shows is to regenerate and re-sign
+it from the SAME DMG. Three places carry the notes; change all three:
+
+1. **The GitHub release body:** `gh release view v<v> --json body --jq .body
+   > /tmp/body.md`, edit the paragraph, `gh release edit v<v> --notes-file
+   /tmp/body.md` (the owner-account `GH_TOKEN` form).
+2. **The feed, on `main`:** put the feed and its notes page back to the state
+   BEFORE this release's feed run (`git checkout <website-commit>~1 --
+   website/updates/macos.xml website/updates/macos-notes.html`, where
+   `<website-commit>` is the "Update website for v<v>" commit), fix the
+   paragraph in the approved notes file, and run step 1a again:
+   `python3 website/update_feed.py macos --version <v> --dmg
+   mac-app/dist/Plantoir-macOS.dmg --notes <notes.md>` — the DMG must be the
+   exact uploaded one (hash it first). It rewrites both files, prepends the
+   corrected section to the notes page, and remakes the deltas: **re-upload
+   every `.delta` with `gh release upload v<v> mac-app/dist/*.delta
+   --clobber`**, because the feed now names the regenerated files.
+3. **plantoir.app:** `python3 website/build.py && python3 website/build.py
+   --check`, commit `website/updates/macos.xml`,
+   `website/updates/macos-notes.html` and `site/` by path on `main`, push,
+   `python3 website/build.py --deploy`, then `--verify-deploy` ✅; merge
+   `main` back into `dev`.
+
+Check with a sentence from the OLD text, not a word count: `grep -c "<old
+phrase>" website/updates/macos.xml` must be 0 and the new phrase 1 (an
+earlier release's notes may share ordinary words). An open update window
+keeps the old text until the app checks again; Check for Updates… refetches.
