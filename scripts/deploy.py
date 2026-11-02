@@ -240,21 +240,31 @@ def build_was_stopped_by_the_teacher(error) -> bool:
         return False
     return error.returncode in STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL
 
+# What a deploy says when it builds a site again because an earlier version
+# of Plantoir built it (#746). Plain words, rule 1; deploy.sh says the same.
+SAY_BUILT_BY_AN_EARLIER_VERSION = (
+    " Plantoir has been updated since this site was built, so it is building it "
+    "again before it is deployed…"
+)
+
+
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
     If quartz.config.ts in internal build dir has a baseUrl that does not match target_domain,
     rebuild for production using build_site.py so OpenGraph and Twitter meta tags reflect
-    the deployed site domain.
+    the deployed site domain. Otherwise rebuild if an earlier version of Plantoir built
+    the site (#746, its `.built-with-toolchain` stamp) - at most one rebuild either way.
     """
     clean_target = clean_base_url(target_domain)
-    if not clean_target:
-        return
 
     internal_dir = Path(f"/tmp/quartz-builds/{course_code}/section{section}")
     config_paths = [p / "quartz.config.ts" for p in [section_dir, internal_dir] if (p / "quartz.config.ts").is_file()]
 
     needs_rebuild = False
-    if not config_paths:
+    if not clean_target:
+        # No address to compare with: only the toolchain question below.
+        pass
+    elif not config_paths:
         needs_rebuild = True
     else:
         for config_path in config_paths:
@@ -271,6 +281,14 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
 
     if needs_rebuild:
         print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
+        rebuild_for_production(course_code, section, host_os)
+    elif not toolchain_paths.site_was_built_by_this_toolchain(section_dir):
+        # #746: the pages had not changed, so nothing else asked for a build,
+        # and the site was the one an older Plantoir built - 1.9.1's
+        # stylesheet never reached a site redeployed under it. Here, at the
+        # one place both destinations decide whether to rebuild, so a deploy
+        # builds at most once.
+        print(SAY_BUILT_BY_AN_EARLIER_VERSION)
         rebuild_for_production(course_code, section, host_os)
 
 # ---------- Teacher profile (unchanged) ----------
@@ -1549,8 +1567,10 @@ def main():
         sys.exit(1)
 
     target_domain = clean_base_url(site_url)
-    if target_domain:
-        ensure_base_url_and_rebuild(section_dir, target_domain, args.course, str(args.section), _HOST_OS)
+    # Called with no address too (#746): it is also where a site an earlier
+    # version of Plantoir built is built again, and that must not depend on
+    # Netlify having said where the site lives.
+    ensure_base_url_and_rebuild(section_dir, target_domain, args.course, str(args.section), _HOST_OS)
 
     # Netlify can add its own "Powered by Netlify" badge to a free-tier
     # site — this rule keeps it off without touching anything students see.

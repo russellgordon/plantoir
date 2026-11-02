@@ -1282,6 +1282,58 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   exit 1
 fi
 
+# -------------------- Did THIS version build the site? (#746) ----------
+# A site is deployed as it was built, and nothing a teacher wrote had to
+# change for the toolchain to change: 1.9.1's tick-box rule (#693) and quiz
+# print rule (#733) were in the app, in .toolchain and in a freshly tagged
+# image, and a section redeployed under 1.9.1 still served 1.9.0's
+# stylesheet. The app went straight here (its pages had not changed since
+# the last build), this script started the folder's EXISTING workspace —
+# made from the 1.9.0 image, since only preview.sh and setup.sh remake a
+# workspace whose image is out of date — and the one rebuild deploy.py made
+# ran in it. Measured 2026-11-01: documentation/05-build-pipeline.md ->
+# "Which toolchain built a site (#746)".
+#
+# Every build stamps the folder that holds public/ with the name of the
+# image its workspace was made from (PLANTOIR_TOOLCHAIN_ID, set when the
+# workspace is created). A stamp that is not this run's $IMAGE — or no stamp,
+# which is every site built before 1.9.2 — means preview.sh --build-only
+# first, which builds the image if it is missing, remakes the workspace from
+# it (waiting for, or refusing over, work in it exactly as #94 says) and
+# builds the site. Delegated rather than copied here, so the rules for
+# remaking a workspace stay in the launchers that already own them.
+# Plain string compare and no JSON: scripts/test_deploy_toolchain_stamp.py
+# cuts this definition out of the launcher and runs it.
+# BEGIN site_was_built_by_this_toolchain
+site_was_built_by_this_toolchain() {
+  local stamp_file="$1/.built-with-toolchain" stamp
+  [[ -f "$stamp_file" ]] || return 1
+  stamp="$(tr -d '[:space:]' < "$stamp_file" 2>/dev/null)" || return 1
+  [[ -n "$stamp" && "$stamp" == "$2" ]]
+}
+# END site_was_built_by_this_toolchain
+
+# Not for --reset-token, which deploys nothing and exits further down.
+if [[ "$RESET_TOKEN" != "true" ]] && ! site_was_built_by_this_toolchain "${SECTION_DIR_HOST}" "$IMAGE"; then
+  echo "🔁 Plantoir has been updated since this site was built, so it is"
+  echo "   building it again before it is deployed…"
+  _TOOLCHAIN_EXTRA=()
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then _TOOLCHAIN_EXTRA+=(--non-interactive); fi
+  # The same image this run compares with, or the build would stamp another.
+  if [[ -n "$OVERRIDE_IMAGE" ]]; then _TOOLCHAIN_EXTRA+=(--image "$OVERRIDE_IMAGE"); fi
+  # `|| _rc=$?` for the reasons written at the preview rebuild below.
+  _rc=0
+  "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_TOOLCHAIN_EXTRA[@]+"${_TOOLCHAIN_EXTRA[@]}"}" || _rc=$?
+  if [[ $_rc -ne 0 ]]; then
+    if [[ $_rc -eq 3 ]]; then
+      echo "❌ Could not rebuild this site before deploying it: it needed an answer."
+      exit 3
+    fi
+    echo "❌ Could not rebuild this site before deploying it."
+    exit 1
+  fi
+fi
+
 # -------------------- Is this site a preview's? ------------------------
 # Serve mode bakes a live-reload client into every page it builds, and a site
 # that carries it must never be published (the reasons are where it is used,
@@ -3235,6 +3287,12 @@ say_there_is_no_room_for_previews() {
 # teacher uses changes. contracts/app-rules.json -> previewPorts.bindsTo
 # says what was measured and what was rejected (opening it for an iPad
 # needs a setting and a trail line, not a default).
+#
+# The workspace carries the name of the image it was made from, as
+# PLANTOIR_TOOLCHAIN_ID (#746): every build in it stamps its site with that
+# name, and deploy.sh builds a site again when the stamp is not the image it
+# would use now - so a changed recipe reaches a site whose pages have not
+# changed. scripts/toolchain_paths.py -> BUILT_WITH_TOOLCHAIN_MARKER.
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
   local next output running named_already=false
@@ -3251,6 +3309,7 @@ create_the_workspace_on_free_ports() {
         --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
         -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
         -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
+        -e "PLANTOIR_TOOLCHAIN_ID=$IMAGE" \
         "$IMAGE" \
         tail -f /dev/null 2>&1)"; then
       return 0

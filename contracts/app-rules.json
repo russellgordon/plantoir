@@ -207,6 +207,12 @@
       "pending" : ".build-started.pending",
       "where" : "Beside the section's built site: .merged_output/section<N>/, the folder that holds public/."
     },
+    "builtWithToolchain" : {
+      "file" : ".built-with-toolchain",
+      "issue" : "#746",
+      "note" : "Which toolchain built the site, so a change to the toolchain reaches a site whose pages have not changed. build_site.py reads the toolchain's name when a build STARTS and writes it here only when the site is that build's (beside renaming .build-started; a preview or a failed build leaves it alone). The name is PLANTOIR_TOOLCHAIN_ID when the launcher sets it - the mac's launchers make every workspace with its image's tag, teaching-quartz:src-<hash of the recipe> - and otherwise toolchain_paths' hash of the scripts, support, contracts and the Quartz scaffold's sources (Windows, native). A deploy builds first when the file is missing, empty, or names another toolchain: deploy.sh compares it with its own $IMAGE and runs preview.sh --build-only (which remakes an out-of-date workspace); deploy.py compares it with its own toolchain in ensure_base_url_and_rebuild, the one place both destinations decide to rebuild, so a deploy builds at most once. BuildFreshness in the apps does NOT read it: the deploy itself decides, so every caller - the window, the assistant, a scheduled deploy, the command line - is covered by one check. Measured 2026-11-01: a site redeployed under 1.9.1 served 1.9.0's stylesheet without it. Every site built before 1.9.2 has no file, and is built once on its next deploy.",
+      "where" : "Beside .build-started: .merged_output/section<N>/, the folder that holds public/. One line, the toolchain's name."
+    },
     "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site.",
     "previewBuild" : {
       "cases" : [

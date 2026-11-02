@@ -52,6 +52,11 @@ support files ──────┘                        │                  
    rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
    the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
 
+   **Beside it, the build notes WHICH TOOLCHAIN built the site** (#746,
+   v1.9.2): `section<N>/.built-with-toolchain`, one line. See "Which toolchain
+   built a site (#746)" below; the rule is `contracts/app-rules.json` →
+   `buildFreshness.builtWithToolchain`.
+
 **One known extra rebuild, written down so it is not re-found.** Preflight rewrites `course_config.json` after the marker whenever it discovers a new item (a folder or file that arrived in Obsidian since the last build), so the config is then newer than the marker and the next Publish rebuilds once for nothing (measured 2026-09-24: `needsRebuild` true after a build that discovered `Extra Notes.md`). It errs toward rebuilding and settles after one build; not worth a special case.
 
    **That path is a link, and the built site is not inside the working
@@ -1933,6 +1938,114 @@ framework's text is the teacher's to bring. A teacher makes the folder
 folders", and asks Revise With ▸ Claude… to draft one page per code from the
 framework they have; the next build draws its map.
 
+
+## Which toolchain built a site (#746)
+
+**A change to the toolchain reaches a site at its next DEPLOY, even when no
+page changed.** Until v1.9.2 it did not: 1.9.1's tick-box rule (#693,
+`vertical-align: calc(0.5cap - 8px)` in `support/quartz/components/styles/
+tasks.scss`) and its quiz print rule (#733) were in the installed app, in the
+working folder's `.toolchain` and in a freshly tagged image, and a section
+redeployed under 1.9.1 still served 1.9.0's stylesheet.
+
+### What was measured (2026-11-01, before any fix)
+
+On Russell's folder, read only: the deployed `index.css` was 81,885 bytes with
+no `cap` — and so was the section's built `public/index.css`, written by a real
+build at 19:57:17, a minute after the 1.9.1 app rewrote `.toolchain`. The
+folder's workspace was `teaching-quartz:src-91f8833b`, built 2026-10-24,
+**Created** 2026-10-24 and **Started** at 19:57:00: started, never recreated.
+Its `/opt/support/…/tasks.scss` had no `cap`, and the workspace's copy was
+byte-identical to it. The image the new `.toolchain` hashed to existed and
+carried the rule. So `install_quartz_additions` worked (it compares bytes) —
+against the OLD `/opt/support`.
+
+Reproduced in a scratch folder (ADA1O section 1): built with `git archive
+v1.9.0` as `.toolchain` (index.css 81,885 bytes, no `cap`), stopped the
+workspace as quitting the app does, put dev in `.toolchain`, then:
+
+| What ran | What happened | index.css |
+|---|---|---|
+| `deploy.sh … --to-folder` | no build at all; the 1.9.0 site copied | 81,885, no `cap` |
+| `docker start` + `build_site.py --build-only` in it (what deploy.sh then deploy.py's own rebuild do) | built, in the 1.9.0 workspace | 81,885, no `cap` |
+| `preview.sh --build-only`, no `--full-rebuild` | "Plantoir has been updated, so it is setting this folder up again…", 15 s | 82,253, `vertical-align:calc(.5cap - 8px)` |
+
+### The cause
+
+Two holes with one outcome. **(1)** `preview.sh` and `setup.sh` remake a
+workspace whose image is out of date; `deploy.sh` does not — it `docker
+start`s whatever exists, and builds no image. **(2)** Nothing recorded which
+toolchain built a site. The app runs `preview.sh --build-only` before a deploy
+only when `BuildFreshness` says the pages changed, so a deploy after an update
+went straight to `deploy.sh`, into the old workspace, and either uploaded the
+old site or rebuilt it there (deploy.py rebuilds a preview's build, or when
+the workspace's `baseUrl` is not the site's). A preview or an edit closed both
+holes by accident, which is why every check of #693 and #733 passed: each
+built through `preview.sh`. Quartz itself was never stale — it re-bundles the
+SCSS on every build, and no `.quartz-cache` was involved.
+
+### The fix
+
+- **Every build stamps its site.** `build_site.py` reads
+  `toolchain_paths.current_toolchain_id()` when the build STARTS (beside
+  `.build-started.pending`) and writes it to `.built-with-toolchain` only when
+  the site on the host is that build's (in `_mark_build_finished`, beside the
+  rename). A preview, a failed or a stopped build leaves the old stamp. A
+  stamp that cannot be written is removed rather than left wrong.
+- **The name.** `PLANTOIR_TOOLCHAIN_ID` when set: all three launchers make a
+  workspace with `-e PLANTOIR_TOOLCHAIN_ID=$IMAGE`, the image's tag
+  (`teaching-quartz:src-<hash of the recipe>`), so every build in it — from
+  `preview.sh`, or deploy.py's own — stamps the name of the image it really
+  ran. Otherwise (Windows, native) a hash of `SCRIPTS_DIR`, `SUPPORT_DIR`,
+  `CONTRACTS_DIR` and `QUARTZ_DIR/quartz`, skipping `__pycache__`,
+  `node_modules`, `.pyc` and dot-files: 12,911 files in 0.3 s in the
+  container.
+- **`deploy.sh`** compares the stamp with its own `$IMAGE` (plain string, no
+  Python on the host) right after it finds the built site, for every
+  destination; a missing, empty or different stamp runs `preview.sh
+  --build-only` first — with `--non-interactive` and `--image` forwarded — so
+  the image is built if missing and the workspace is remade with the waits
+  and refusals #94 gives it. Not for `--reset-token`, which deploys nothing.
+- **`deploy.py`** asks the same question in `ensure_base_url_and_rebuild`,
+  the one place Netlify and Cloudflare decide to rebuild, so a deploy builds
+  at most once; it is now asked with no site address too.
+
+Measured with the fix, same scratch folder and sequence: the folder deploy
+said "Plantoir has been updated since this site was built…", remade the
+workspace, built, and published 82,253 bytes carrying the rule, in 13 s
+(image layers cached); the next deploy built nothing ("0 file(s) updated",
+2 s). Every site built before 1.9.2 has no stamp, so it is built once on its
+next deploy — which is what puts 1.9.1's rules on Russell's sites.
+
+### Rejected
+
+- **`--full-rebuild` on every toolchain change.** It would not have fixed
+  this: it re-copies the scaffold from `/opt/quartz` of the workspace it runs
+  in, and that was the old image. Measured on ADA1O: a plain build and a
+  full rebuild each 4 s, so the cost was never the objection.
+- **An image check copied into `deploy.sh`.** It would need
+  `build_image_if_missing` and the remake's #94 waits copied too, and it
+  would still leave hole (2): a current workspace uploading a site an older
+  one built. Delegating to `preview.sh --build-only` reuses both.
+- **Teaching `BuildFreshness` about the toolchain.** Two apps and the
+  scheduled deploy's shell would each need it; the deploy itself is the one
+  place every caller passes through.
+- **A cache to clear.** There was none: no `.quartz-cache` in the workspace,
+  and a build in the current image picked the change up without
+  `--full-rebuild`.
+
+### Windows
+
+The same Python runs natively, so hole (1) does not exist there: `build_site`
+reads the app's current `.toolchain` directly and `install_quartz_additions`
+refreshes the persistent workspace by content. Hole (2) does: a deploy that
+does not build uploads the old site. Read from the code, not measured on
+Windows: `ensure_base_url_and_rebuild` looks for the workspace's
+`quartz.config.ts` at the hard-coded `/tmp/quartz-builds/…`, which Windows
+never has, so its Netlify and Cloudflare deploys already rebuild every time;
+the stamp check now says why a rebuild is due rather than relying on that. A
+folder publish from `deploy.ps1` publishes without entering `deploy.py`, and
+must ask the same question.
 
 ## Printable pages: what the build does (#454, v1.6.0)
 

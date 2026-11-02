@@ -63,6 +63,9 @@ def _a_working_folder(tmp: str, folder_name: str, values: dict, section: int = 1
     built = course / ".merged_output" / f"section{section}" / "public"
     built.mkdir(parents=True)
     (built / "index.html").write_text("<html>a built site</html>", encoding="utf-8")
+    # Built by the image the runs here name (#746), so a deploy publishes it
+    # as it is rather than building it again first.
+    (built.parent / ".built-with-toolchain").write_text("no-such-image\n", encoding="utf-8")
     return folder
 
 

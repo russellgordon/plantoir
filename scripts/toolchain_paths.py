@@ -299,3 +299,124 @@ def link_directory(target: Path, link: Path) -> str:
     import shutil
     shutil.copytree(str(target), str(link), symlinks=True)
     return "copy"
+
+
+# ---------------------------------------------------------------------------
+# Which toolchain built a site (#746)
+#
+# A built site is stamped with the toolchain that built it, and a deploy
+# rebuilds a site whose stamp is not the current toolchain's. Without it a
+# change to the toolchain - a stylesheet, a script, a patch - reached a site
+# only when something ELSE forced a build: 1.9.1's tick-box rule (#693) and
+# quiz print rule (#733) were in the app, in the working folder's .toolchain
+# and in a freshly tagged image, and a site redeployed under 1.9.1 still
+# served 1.9.0's stylesheet, because the deploy found the site up to date
+# (nothing the teacher wrote had changed) and the one rebuild it made ran in
+# the folder's old workspace. documentation/05-build-pipeline.md ->
+# "Which toolchain built a site (#746)" has the measurement.
+#
+# The identity is PLANTOIR_TOOLCHAIN_ID when a launcher sets it - the mac's
+# launchers create each workspace with its image's tag, `teaching-quartz:src-
+# <hash of the recipe>`, so the shell can compare a stamp without Python -
+# and otherwise a hash of the toolchain files these scripts read (Windows,
+# which runs them natively). Either way a stamp the current toolchain did not
+# write, or no stamp at all, means "build again": the safe direction, since
+# a wrong answer that way costs one build and the other way publishes a stale
+# site and says it succeeded.
+# ---------------------------------------------------------------------------
+TOOLCHAIN_ID_VARIABLE = "PLANTOIR_TOOLCHAIN_ID"
+
+# Beside `.build-started`, in the folder that holds `public/`. Hidden, like
+# it, so the freshness checks never count it as content and it is never
+# published. contracts/app-rules.json -> buildFreshness.builtWithToolchain.
+BUILT_WITH_TOOLCHAIN_MARKER = ".built-with-toolchain"
+
+# Names never part of the toolchain's identity: Python's own caches, which
+# appear beside the scripts the first time they are imported, and Node's
+# packages, which are pinned by the recipe rather than read from it.
+_NOT_THE_TOOLCHAIN = {"__pycache__", "node_modules"}
+
+
+def _hash_of_the_toolchain_files() -> str:
+    """A hash of every file under the scripts, support, contracts and the
+    Quartz scaffold's own sources, by relative path and content. Measured in
+    the container on 2026-11-01: 12,911 files in 0.3 s."""
+    import hashlib
+    digest = hashlib.sha256()
+    roots = (
+        ("scripts", SCRIPTS_DIR),
+        ("support", SUPPORT_DIR),
+        ("contracts", CONTRACTS_DIR),
+        ("quartz", QUARTZ_DIR / "quartz"),
+    )
+    for label, root in roots:
+        if not root.is_dir():
+            continue
+        for folder, subfolders, files in os.walk(root):
+            kept_subfolders = []
+            for name in sorted(subfolders):
+                if name in _NOT_THE_TOOLCHAIN or name.startswith("."):
+                    continue
+                kept_subfolders.append(name)
+            subfolders[:] = kept_subfolders
+            for name in sorted(files):
+                if name.startswith(".") or name.endswith(".pyc"):
+                    continue
+                path = Path(folder) / name
+                relative = path.relative_to(root).as_posix()
+                try:
+                    content = path.read_bytes()
+                except OSError:
+                    continue
+                digest.update(f"{label}/{relative}\0".encode("utf-8"))
+                digest.update(hashlib.sha256(content).digest())
+    return "files-" + digest.hexdigest()[:16]
+
+
+def current_toolchain_id() -> str:
+    """The identity of the toolchain this process is running."""
+    named = os.environ.get(TOOLCHAIN_ID_VARIABLE, "").strip()
+    if named:
+        return named
+    return _hash_of_the_toolchain_files()
+
+
+def built_with_toolchain_marker(section_dir: Path) -> Path:
+    return Path(section_dir) / BUILT_WITH_TOOLCHAIN_MARKER
+
+
+def toolchain_that_built(section_dir: Path):
+    """The identity a section's built site was stamped with, or None."""
+    try:
+        text = built_with_toolchain_marker(section_dir).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    text = text.strip()
+    if not text:
+        return None
+    return text
+
+
+def site_was_built_by_this_toolchain(section_dir: Path, toolchain_id=None) -> bool:
+    """True only when the section's built site carries THIS toolchain's stamp."""
+    if toolchain_id is None:
+        toolchain_id = current_toolchain_id()
+    return toolchain_that_built(section_dir) == toolchain_id
+
+
+def note_the_toolchain_that_built(section_dir: Path, toolchain_id: str) -> None:
+    """Stamp a section's built site. Written whole and moved into place; if
+    that fails, the old stamp is removed instead, so a site this toolchain
+    did not finish stamping is rebuilt rather than taken as current."""
+    marker = built_with_toolchain_marker(section_dir)
+    temporary = marker.with_name(marker.name + ".writing")
+    try:
+        temporary.write_text(toolchain_id + "\n", encoding="utf-8")
+        os.replace(temporary, marker)
+    except OSError as error:
+        print(f"⚠️  Could not note which version of Plantoir built this site: {error}")
+        for leftover in (temporary, marker):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass

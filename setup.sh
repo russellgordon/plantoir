@@ -1966,6 +1966,12 @@ say_there_is_no_room_for_previews() {
 # teacher uses changes. contracts/app-rules.json -> previewPorts.bindsTo
 # says what was measured and what was rejected (opening it for an iPad
 # needs a setting and a trail line, not a default).
+#
+# The workspace carries the name of the image it was made from, as
+# PLANTOIR_TOOLCHAIN_ID (#746): every build in it stamps its site with that
+# name, and deploy.sh builds a site again when the stamp is not the image it
+# would use now - so a changed recipe reaches a site whose pages have not
+# changed. scripts/toolchain_paths.py -> BUILT_WITH_TOOLCHAIN_MARKER.
 create_the_workspace_on_free_ports() {
   local base="$FIRST_HOST_BLOCK"
   local next output running named_already=false
@@ -1982,6 +1988,7 @@ create_the_workspace_on_free_ports() {
         --mount "$(bind_mount_argument "$BUILD_ROOT" "$BUILD_ROOT")" \
         -p "127.0.0.1:${base}-$((base + 3)):8081-8084" \
         -p "127.0.0.1:$((base + 1000))-$((base + 1003)):9081-9084" \
+        -e "PLANTOIR_TOOLCHAIN_ID=$IMAGE" \
         "$IMAGE" \
         tail -f /dev/null 2>&1)"; then
       return 0

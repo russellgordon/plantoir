@@ -152,6 +152,19 @@ Netlify supports a
 Deploys always go to **production** (no draft deploys), matching the
 "publish what I previewed" mental model.
 
+### Automatic production rebuilds (a site an earlier version built, #746)
+
+Since v1.9.2 a deploy also builds first when the site was built by an earlier
+version of Plantoir: every build stamps `section<N>/.built-with-toolchain`,
+`deploy.sh` compares it with its own `$IMAGE` for EVERY destination (folder
+included) and runs `preview.sh --build-only` when they differ — which also
+remakes a workspace still running an older image, something `deploy.sh` never
+did on its own — and `deploy.py` asks the same in `ensure_base_url_and_rebuild`.
+Without it 1.9.1's stylesheet changes never reached a redeployed site. What was
+measured, the fix and what was rejected:
+[05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
+`deploy.ps1`'s folder publish owes the same check (the `windows` issue for #746).
+
 ### Automatic production rebuilds (live-reload detection)
 
 A preview build embeds a live-reload WebSocket client (`ws://localhost:<port>`)
@@ -2853,7 +2866,7 @@ fails there.
   destinations with different addresses** (Netlify AND Cloudflare Pages, say):
   the site is built for one address, and the next destination finds the other
   one baked in and rebuilds for its own. So that one stays reachable whatever
-  happens to #136, and for such a course it is not a first-publish corner. And both `deploy.py` and `deploy.sh` rebuild a site they
+  happens to #136, and for such a course it is not a first-publish corner. Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run
   only while the wrapper's is-the-site-stale check is narrower than the
   launchers' (the gap described under "How it is tested" below,

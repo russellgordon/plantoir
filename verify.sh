@@ -721,6 +721,16 @@ else
   cat /tmp/verify_deploy_folder_target_test.log
 fi
 
+# A site an earlier version of Plantoir built is built again before it is
+# deployed (GitHub #746): deploy.sh's stamp comparison, the real launcher
+# publishing to a folder, build_site.py's stamp and deploy.py's one rebuild.
+if (cd scripts && python3 test_deploy_toolchain_stamp.py) >/tmp/verify_deploy_toolchain_stamp_test.log 2>&1; then
+  pass "a site an earlier version of Plantoir built is built again before it is deployed, once (scripts/test_deploy_toolchain_stamp.py, #746)"
+else
+  fail "a site an earlier version of Plantoir built is built again before it is deployed, once (scripts/test_deploy_toolchain_stamp.py, #746)"
+  cat /tmp/verify_deploy_toolchain_stamp_test.log
+fi
+
 # A refused publishing token is explained in the launchers' own words, and a
 # SAVED token is cleared only when the service says no (GitHub #695, #716):
 # pins both launchers' lines to app-rules.json -> failureExplanations, and
@@ -6524,6 +6534,66 @@ fi
 docker rm -f "$VERIFY_LOCK_CONTAINER" >/dev/null 2>&1 || true
 chflags -R nouchg "$VERIFY_LOCK_DIR" 2>/dev/null || true
 rm -rf "$VERIFY_LOCK_DIR" "$VERIFY_LOCK_BUILDS"
+
+# -------------------- A changed recipe reaches a site whose pages did not change (#746)
+# 1.9.1's tick-box rule (#693) was in the app, in .toolchain and in a freshly
+# tagged image, and a section redeployed under 1.9.1 still served 1.9.0's
+# stylesheet: nothing a teacher wrote had changed, so the deploy found the
+# site up to date, and the one rebuild it made ran in the folder's OLD
+# workspace. Here an earlier version's site is planted - its stamp, its
+# stylesheet, and the workspace's copy of the recipe's tasks.scss without the
+# rule - and a plain folder deploy, with no --full-rebuild anywhere, must
+# publish the rule the recipe carries now. Measured failing on the old
+# deploy.sh in a scratch folder (documentation/05-build-pipeline.md ->
+# "Which toolchain built a site (#746)").
+echo ""
+echo "🔁 A site an earlier version built is built again before it is deployed (#746)…"
+TC_SECTION="courses/EXC2O/.merged_output/section1"
+TC_WORKSPACE_STYLE="/tmp/quartz-builds/EXC2O/section1/quartz/components/styles/tasks.scss"
+TC_RECIPE_RULE='vertical-align: calc(0.5cap - 8px)'
+TC_BUILT_RULE='vertical-align:calc(.5cap - 8px)'
+TC_OUT="$(mktemp -d -t plantoir-verify-746)"
+if grep -Fq "$TC_RECIPE_RULE" support/quartz/components/styles/tasks.scss; then
+  pass "the recipe's tasks.scss carries the rule this check looks for (#746)"
+else
+  fail "support/quartz/components/styles/tasks.scss no longer carries '$TC_RECIPE_RULE' - point this check at a rule it does carry (#746)"
+fi
+TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
+if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
+  pass "the last build stamped its site with the image its workspace was made from (#746)"
+else
+  fail "the built site is stamped '${TC_STAMP:-nothing}', not $DEV_TEST_IMAGE (#746)"
+fi
+docker exec "$CONTAINER_NAME" sh -c "sed -i 's/vertical-align: calc(0.5cap - 8px);//' '$TC_WORKSPACE_STYLE'" 2>/dev/null || true
+printf '/* built by an earlier version */\n' > "$TC_SECTION/public/index.css"
+printf 'teaching-quartz:src-00000000\n' > "$TC_SECTION/.built-with-toolchain"
+if docker exec "$CONTAINER_NAME" grep -Fq "$TC_RECIPE_RULE" "$TC_WORKSPACE_STYLE" 2>/dev/null; then
+  fail "could not plant the earlier version's tasks.scss in the workspace (#746)"
+fi
+if ./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+     >/tmp/verify_toolchain_stamp_deploy.log 2>&1; then
+  pass "a folder deploy of a site an earlier version built finished (#746)"
+else
+  fail "a folder deploy of a site an earlier version built did not finish (#746)"
+  tail -20 /tmp/verify_toolchain_stamp_deploy.log
+fi
+if grep -q "Plantoir has been updated since this site was built" /tmp/verify_toolchain_stamp_deploy.log; then
+  pass "and it said it was building the site again first (#746)"
+else
+  fail "the deploy did not build the site again first (#746)"
+fi
+if grep -Fq "$TC_BUILT_RULE" "$TC_OUT/section1/index.css" 2>/dev/null; then
+  pass "and the deployed stylesheet carries the recipe's rule ($TC_BUILT_RULE), without --full-rebuild (#746)"
+else
+  fail "the deployed stylesheet does not carry '$TC_BUILT_RULE' (#746)"
+fi
+TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
+if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
+  pass "and the rebuilt site is stamped with this image again, so the next deploy does not build (#746)"
+else
+  fail "the rebuilt site is stamped '${TC_STAMP:-nothing}', not $DEV_TEST_IMAGE (#746)"
+fi
+rm -rf "$TC_OUT"
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then
