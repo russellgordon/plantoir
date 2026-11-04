@@ -1305,10 +1305,16 @@ fi
 # Plain string compare and no JSON: scripts/test_deploy_toolchain_stamp.py
 # cuts this definition out of the launcher and runs it.
 # BEGIN site_was_built_by_this_toolchain
+# The stamp is trimmed at both ends and nowhere else, as Python's strip()
+# reads it (toolchain_paths.toolchain_that_built). A stamp that cannot be read
+# is a quiet rebuild: the redirection sits inside the braces so a refusal to
+# open it never reaches the console.
 site_was_built_by_this_toolchain() {
   local stamp_file="$1/.built-with-toolchain" stamp
-  [[ -f "$stamp_file" ]] || return 1
-  stamp="$(tr -d '[:space:]' < "$stamp_file" 2>/dev/null)" || return 1
+  [[ -f "$stamp_file" && -r "$stamp_file" ]] || return 1
+  stamp="$( { cat -- "$stamp_file"; } 2>/dev/null )" || return 1
+  stamp="${stamp#"${stamp%%[![:space:]]*}"}"
+  stamp="${stamp%"${stamp##*[![:space:]]}"}"
   [[ -n "$stamp" && "$stamp" == "$2" ]]
 }
 # END site_was_built_by_this_toolchain

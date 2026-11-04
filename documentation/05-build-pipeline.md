@@ -2017,6 +2017,23 @@ workspace, built, and published 82,253 bytes carrying the rule, in 13 s
 2 s). Every site built before 1.9.2 has no stamp, so it is built once on its
 next deploy — which is what puts 1.9.1's rules on Russell's sites.
 
+### The first scheduled deploy after an update (a known limit)
+
+A scheduled deploy's wrapper builds first only when `BuildFreshness`'s shell
+twin says so, and that check does not read the stamp — by design. So on the
+first scheduled run after an update the rebuild happens inside the
+DESTINATION leg, through `deploy.sh`: a build that stops for a question is
+recorded as `neededAnAnswer` and a build that fails as `didNotFinish`, naming
+the destination, rather than as `buildNeededAnAnswer` / `buildDidNotFinish`.
+The advice those outcomes carry (deploy it yourself) still recovers.
+Changing the wrapper would not reach the runs that meet this: wrappers are
+written when a deploy is SCHEDULED, so every one set before 1.9.2 keeps its
+old text, and #136 already rejected a launcher exit code of its own for the
+rerun. Also: the scheduled runner does not refresh a folder's launchers, so a
+run before Plantoir 1.9.2 has opened the folder once still uses 1.9.1's
+`deploy.sh`, which has no stamp check. (`ScheduledDeploy.swift`'s comments
+say the same.)
+
 ### Rejected
 
 - **`--full-rebuild` on every toolchain change.** It would not have fixed

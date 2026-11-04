@@ -113,6 +113,31 @@ class TheLaunchersComparison(unittest.TestCase):
     def test_an_empty_image_never_matches_an_empty_stamp(self):
         self.assertFalse(self._matches("", image=""))
 
+    def test_the_ends_are_trimmed_as_python_trims_them(self):
+        self.assertTrue(self._matches("  " + IMAGE + "\r\n\n"))
+        stamp = "teaching-quartz:src 1a2b"
+        self.assertFalse(self._matches(stamp + "\n", image="teaching-quartz:src1a2b"))
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, MARKER).write_text(stamp + "\n", encoding="utf-8")
+            self.assertEqual(toolchain_paths.toolchain_that_built(Path(tmp)), stamp)
+        self.assertTrue(self._matches(stamp + "\n", image=stamp))
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root reads everything")
+    def test_an_unreadable_stamp_is_a_quiet_rebuild(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp, MARKER)
+            marker.write_text(IMAGE + "\n", encoding="utf-8")
+            marker.chmod(0)
+            try:
+                script = _the_launchers_comparison() + '\nsite_was_built_by_this_toolchain "$1" "$2"\n'
+                result = subprocess.run(["bash", "-c", script, "_", tmp, IMAGE],
+                                        capture_output=True, timeout=60)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout + result.stderr, b"", "printed something")
+                self.assertIsNone(toolchain_paths.toolchain_that_built(Path(tmp)))
+            finally:
+                marker.chmod(0o644)
+
 
 class EveryWorkspaceCarriesItsImagesName(unittest.TestCase):
     """The name every build in a workspace stamps its site with is the image
