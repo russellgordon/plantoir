@@ -3011,7 +3011,10 @@ puts the box between its lines).
 
 **No build_site.py change.** `install_quartz_additions` runs in the ALWAYS
 section and copies any file whose bytes differ, so every existing course folder
-picks the new tasks.scss up on its next build.
+picks the new tasks.scss up on its next build — a build in the CURRENT image.
+Until #746 (v1.9.2) a deploy whose pages had not changed did not build at all,
+or built in the folder's old workspace, so this reached no redeployed site in
+1.9.1: [05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
 
 **Gated** by `browser-checks/task_boxes.mjs` (in verify.sh, Chrome only):
 step 1c reads every box on Task Fixture (tight, callouts included), Task Loose

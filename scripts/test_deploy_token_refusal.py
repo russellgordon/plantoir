@@ -189,6 +189,8 @@ def _a_stubbed_working_folder(tmp: str) -> Path:
     built = folder / "courses" / "ICS3U" / ".merged_output" / "section1" / "public"
     built.mkdir(parents=True)
     (built / "index.html").write_text("<html>a built site</html>", encoding="utf-8")
+    # Built by the image the runs here name (#746), so no deploy builds again.
+    (built.parent / ".built-with-toolchain").write_text("unused:tag\n", encoding="utf-8")
 
     text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
     credentials = "# -------------------- Cloudflare token and account ---------------------\n"

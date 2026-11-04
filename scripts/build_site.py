@@ -7052,12 +7052,31 @@ def _mark_build_starting(host_output_dir: Path) -> None:
         print(f"⚠️  Could not note when this build started: {error}")
 
 
+# Which toolchain this build is running (#746), read when the build STARTS -
+# the same moment `.build-started.pending` is made - and written beside the
+# site only once the site is this build's, in `_mark_build_finished`. A
+# deploy compares it with the toolchain it runs (deploy.sh in the shell,
+# deploy.py in Python) and builds again when they differ, so a change to the
+# toolchain reaches a site whose pages have not changed.
+# toolchain_paths.BUILT_WITH_TOOLCHAIN_MARKER says why.
+_this_build_toolchain = None
+
+
 def _mark_build_finished(host_output_dir: Path) -> None:
     """The site on the host is now this build's: its start time becomes the
-    site's. A rename keeps the pending file's time."""
+    site's, and so does the toolchain that built it (#746). A rename keeps the
+    pending file's time."""
     pending = host_output_dir / BUILD_STARTED_PENDING
     if not pending.exists():
         return
+    if _this_build_toolchain:
+        toolchain_paths.note_the_toolchain_that_built(host_output_dir, _this_build_toolchain)
+    else:
+        # Never an older build's stamp on this build's site.
+        try:
+            toolchain_paths.built_with_toolchain_marker(host_output_dir).unlink()
+        except OSError:
+            pass
     try:
         os.replace(pending, host_output_dir / BUILD_STARTED_MARKER)
     except OSError as error:
@@ -9063,6 +9082,8 @@ def build_section_site(
     # this line, so a change made from here on is one this build cannot have
     # seen. See BUILD_STARTED_MARKER.
     _mark_build_starting(host_output_dir)
+    global _this_build_toolchain
+    _this_build_toolchain = toolchain_paths.current_toolchain_id()
     # This build's id (#379): printed with the links-checklist offer and
     # carried by the visible-pages list, so the app and deploy.py can tell
     # this build's files from an earlier one's.

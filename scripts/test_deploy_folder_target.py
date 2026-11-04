@@ -94,6 +94,9 @@ def _a_working_folder(tmp: str) -> Path:
     built.mkdir(parents=True)
     for name, text in BUILT_PAGES.items():
         (built / name).write_text(text, encoding="utf-8")
+    # Built by the image this test names (#746), so the deploy publishes it
+    # as it is rather than building it again first.
+    (built.parent / ".built-with-toolchain").write_text("no-such-image\n", encoding="utf-8")
     return folder
 
 
