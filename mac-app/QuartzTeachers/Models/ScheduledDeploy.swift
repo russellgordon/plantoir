@@ -858,9 +858,12 @@ enum ScheduledDeploy {
 
         // BUILD IF STALE, THEN DEPLOY — exactly what the Deploy button does.
         //
-        // `deploy.sh` never builds; it refuses outright when there is no
-        // built site. So an agent that ran it alone would either fail at
-        // half six or send whatever was last previewed.
+        // `deploy.sh` refuses outright when there is no built site, and builds
+        // only in two cases this check does not cover for it: a folder publish
+        // of a preview's site, and (since #746) a site an earlier version of
+        // Plantoir built — see the destination leg below. So an agent that ran
+        // it alone would either fail at half six or send whatever was last
+        // previewed.
         //
         // The staleness test is `BuildFreshness.needsRebuild` written out in
         // shell, because the app is closed when this runs and cannot be
@@ -1105,13 +1108,27 @@ enum ScheduledDeploy {
         // through deploy.py, whose rebuild runs build_site.py directly, asks
         // nothing and fails with 1, so they land in `didNotFinish` honestly.)
         // It needs NEEDS_BUILD=0 above, and the check above now reads the same
-        // tree deploy.sh greps, so whenever deploy.sh would rebuild, this
-        // script has already built — and a build question is `buildNeeded-
-        // AnAnswer`, from the build leg. The rerun in deploy.sh stays: it is
+        // tree deploy.sh greps, so whenever deploy.sh would rebuild FOR THAT
+        // REASON, this script has already built — and a build question is
+        // `buildNeededAnAnswer`, from the build leg. The rerun in deploy.sh stays: it is
         // what protects `./preview.sh` then `./deploy.sh --to-folder` typed at
         // a command line. Rejected: giving that rerun its own exit code, a
         // launcher contract change Windows shares for a fault that was this
         // check being narrower than the launcher's.
+        //
+        // A SECOND path does escape, deliberately (#746, v1.9.2). deploy.sh
+        // runs preview.sh --build-only before ANY destination when the site's
+        // `.built-with-toolchain` stamp is not its own image, and this check
+        // does not read the stamp (the deploy decides, so every caller is
+        // covered by one check). So on the first scheduled deploy after an
+        // update the rebuild happens inside the DESTINATION leg: a build
+        // question there is recorded as `neededAnAnswer` and a failed build as
+        // `didNotFinish`, against the destination, not as the build's own
+        // kinds. Changing this wrapper would not help the runs that meet it:
+        // a wrapper is written when the deploy is SCHEDULED, so every one set
+        // before 1.9.2 keeps its old text. The advice those outcomes give
+        // (deploy it yourself) still recovers. documentation/05-build-pipeline.md
+        // → "Which toolchain built a site (#746)".
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting

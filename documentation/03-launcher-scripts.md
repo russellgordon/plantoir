@@ -1205,7 +1205,15 @@ never checks the image or the live-reload ports: a publish runs
 in whatever workspace the last preview or build left, and the next preview
 remakes it. That is an inconsistency, not
 a decision — written down here rather than fixed by #94, which is about what
-a remake may END, not about when one is due. (Not checking the BINDINGS there
+a remake may END, not about when one is due. **It cost 1.9.1 its stylesheet
+changes (#746):** a deploy after the update ran in the 1.9.0 workspace. Since
+v1.9.2 `deploy.sh` still has no image check of its own, but before it deploys
+it compares the site's `.built-with-toolchain` stamp with its `$IMAGE` and runs
+`preview.sh --build-only` when they differ, which remakes the workspace for the
+`update` reason above; every workspace is made with `-e
+PLANTOIR_TOOLCHAIN_ID=$IMAGE` (the PREVIEW PORT BLOCK) so the stamp names the
+image a build really ran in. [05 → "Which toolchain built a site
+(#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746). (Not checking the BINDINGS there
 is the one part that IS a decision, #684: see "Remaking in `deploy.sh` too"
 among the rejected options above.) `preview.sh` has no writability
 check and no comment in it says why.

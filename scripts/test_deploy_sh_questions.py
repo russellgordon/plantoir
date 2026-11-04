@@ -133,6 +133,9 @@ def a_working_folder(tmp: str, course: str = "ICS3U", section: int = 1) -> Path:
     built = folder / "courses" / course / ".merged_output" / f"section{section}" / "public"
     built.mkdir(parents=True)
     (built / "index.html").write_text("<html>a built site</html>", encoding="utf-8")
+    # Built by the image every run here names (#746), so no deploy builds
+    # again before it reaches the questions.
+    (built.parent / ".built-with-toolchain").write_text("unused:tag\n", encoding="utf-8")
     return folder
 
 
