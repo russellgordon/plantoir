@@ -10285,7 +10285,10 @@ Differently plants, built through `plantoir-mcp.exe --state-dir …`
   Fixture: OK. 120 lines, 132 rows at 1,512 px (light and dark) and 152 at
   390 px; digits 3; every row at x 372.75 px (63.75 at 390); line 101's
   first row full, 5 rows at 1,512 px and 12 at 390; about 95 characters a
-  row; the copy button gave 120 lines and 2,174 characters.
+  row; the copy button gave 120 lines and 2,174 characters. (That copy
+  came from a scripted `.click()` with `writeText` stubbed, which cannot see
+  a button a real pointer cannot reach - the fault #759 found and fixed;
+  #760 owes a real press in Edge.)
 
 Still owed: a tap in Edge on a site published to Netlify, Narrator by ear,
 and the dialog's order behind a runnable-code finding. No new trail line:

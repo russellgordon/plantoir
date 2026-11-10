@@ -5452,12 +5452,16 @@ else:
         problems.append(f"index.css's ellipsis string has {plain.group(1).count('…')} rows, expected 80")
 if "@media screen{:root .plantoir-text-wrap pre:not(.plantoir-flowing)>code{white-space:pre-wrap;overflow-wrap:anywhere}" not in css:
     problems.append("index.css lacks the screen-only pre-wrap rule")
+# #759: the copy button raised over the lines, inside an isolated block. How
+# a pointer reaches it is browser-checks/text_wrap.mjs step 8; this is the rule.
+if not re.search(r"@media screen\{[^@]*:root \.plantoir-text-wrap pre:not\(\.plantoir-flowing\)\{isolation:isolate\}:root \.plantoir-text-wrap pre:not\(\.plantoir-flowing\)>\.clipboard-button\{z-index:1\}", css):
+    problems.append("index.css lacks the screen-only rule that raises the copy button over a wrapped block's lines (#759)")
 for problem in problems:
     print("   " + problem)
 sys.exit(1 if problems else 0)
 WRAPPY
 then
-  pass "text that wraps, as built: Wrap Fixture's four flagged text blocks (the page's own, a folded callout's, a list item's, a quiz explanation's) each in div.plantoir-text-wrap and its text and python wrap blocks in none, its first three blocks byte for byte the unflagged twin's, the class on no other page but the skill's example, and index.css's screen-only rule with 80 rows of ellipses and alt text (#653)"
+  pass "text that wraps, as built: Wrap Fixture's four flagged text blocks (the page's own, a folded callout's, a list item's, a quiz explanation's) each in div.plantoir-text-wrap and its text and python wrap blocks in none, its first three blocks byte for byte the unflagged twin's, the class on no other page but the skill's example, and index.css's screen-only rule with 80 rows of ellipses and alt text, and the one that raises the copy button over the lines inside an isolated block (#653, #759)"
 else
   fail "text that wraps: a flagged text block was not wrapped, an unflagged block was, the word changed the block itself, or index.css lacks the rule (#653)"
 fi
@@ -5697,9 +5701,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   # #653: a ```text wrap block as a reader sees it.
   if node browser-checks/text_wrap.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Wrap-Fixture.html" \
        >/tmp/verify_text_wrap.log 2>&1; then
-    pass "text that wraps, in a browser: Wrap Fixture's text wrap block does not scroll while its text and python wrap blocks do, every line's rows hold its text, every row starts at one x, the URL line's first row is full, each line's number sits on its first row and its ellipses run its full height on one hairline, highlighted lines keep their tint, the folded callout's, the list item's and the quiz explanation's blocks wrap too, in light, dark and at 390 px; on paper and in the handout it is laid out as a plain block, and the copy button copies it as written - $(head -1 /tmp/verify_text_wrap.log | sed 's/^OK: //') (#653, browser-checks/text_wrap.mjs)"
+    pass "text that wraps, in a browser: Wrap Fixture's text wrap block does not scroll while its text and python wrap blocks do, every line's rows hold its text, every row starts at one x, the URL line's first row is full, each line's number sits on its first row and its ellipses run its full height on one hairline, highlighted lines keep their tint, the folded callout's, the list item's and the quiz explanation's blocks wrap too, in light, dark and at 390 px; on paper and in the handout it is laid out as a plain block; its copy button, pressed by a real pointer at 1512 and 390 px, is what the pointer hits, its write succeeds and the headless browser's own clipboard reads back the block as written, the plain block's button the same, and the must-fail, the button stacked as before #759, is missed - $(head -1 /tmp/verify_text_wrap.log | sed 's/^OK: //') (#653, #759, browser-checks/text_wrap.mjs)"
   else
-    fail "a text wrap block did not wrap as the contract says, or an unflagged block did, or print, the handout or the copy button changed (browser-checks/text_wrap.mjs, #653)"
+    fail "a text wrap block did not wrap as the contract says, or an unflagged block did, or print or the handout changed, or a real pointer could not press a block's copy button or it did not copy the block as written, or the must-fail was not missed (browser-checks/text_wrap.mjs, #653, #759)"
     cat /tmp/verify_text_wrap.log
   fi
   # #494: maths offline from the site's own KaTeX, and (#455 review S1)
