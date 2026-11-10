@@ -193,7 +193,13 @@ function closeDialog(dialog: Element) {
 // way: turning dialogs off does not stop one already queued (measured,
 // #755). So the watcher stays until the last marker run has arrived,
 // closing what comes, and only then lets go - never left open over the
-// sketch, and still no clock.
+// sketch, and still no clock. Should that marker never come, the watcher
+// would close every dialog a student opens with a tool (Slider, Text...)
+// the moment it opens; so it also lets go at the student's first
+// pointerdown or keydown inside the sketch, since any dialog a student
+// opens follows their own input. The accepted cost: a queued line's
+// dialog that arrives after that first touch is drawn, and the student
+// closes it by hand, which is GeoGebra's ordinary behaviour.
 async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Array<{ line: number; said: string }>> {
   const refused: Array<{ line: number; said: string }> = []
   if (spec.commands.length === 0) {
@@ -219,7 +225,7 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
       closeDialog(dialog)
     }
     if (finished && markersSeen >= markersRun) {
-      watcher.disconnect()
+      letGo()
     }
     if (arrived !== null) {
       arrived()
@@ -227,6 +233,13 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
   }
   const watcher = new MutationObserver(take)
   watcher.observe(box, { childList: true, subtree: true })
+  // The student's first touch inside the sketch, once lines are over.
+  const touched = () => letGo()
+  const letGo = () => {
+    watcher.disconnect()
+    box.removeEventListener("pointerdown", touched, true)
+    box.removeEventListener("keydown", touched, true)
+  }
   const giveUpAt = performance.now() + LINES_GIVE_UP_MS
   try {
     try {
@@ -275,8 +288,13 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
       api.setErrorDialogsActive(false)
     } catch {}
     // Lets go now if every marker has come (the ordinary end), otherwise
-    // when the last one does (the last resort above).
+    // when the last one does or at the student's first touch, whichever
+    // is first (the last resort above).
     finished = true
+    if (markersSeen < markersRun) {
+      box.addEventListener("pointerdown", touched, { capture: true, once: true })
+      box.addEventListener("keydown", touched, { capture: true, once: true })
+    }
     take()
   }
 }

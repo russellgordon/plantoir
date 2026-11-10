@@ -4249,10 +4249,21 @@ drew both dialogs a few milliseconds later (measured, both engines). On the
 dialog still on its way would have been drawn, modal, and left over the
 sketch. It now counts markers run and markers seen, and lets go only when the
 last marker run has arrived — the ordinary end at once, the last resort when
-the engine catches up — closing whatever comes meanwhile. No clock. **Known
-limit:** if a marker never arrives at all, the watcher stays on that applet
-and would also close a dialog a toolbar tool opens in it; that has not been
-seen to happen.
+the engine catches up — closing whatever comes meanwhile. No clock. A marker
+that never arrives would leave the watcher on the applet for good, closing
+every dialog a student opens with a tool (Slider, Text, Rotate…) in a
+`toolbar: true` sketch the moment it opens. So on the last resort it also
+lets go at the student's first `pointerdown` or `keydown` inside the sketch
+(capture phase, once; both listeners are removed when it lets go the
+ordinary way), since any dialog a student opens follows their own input.
+Measured 2026-11-10, headless Chromium 1243 and WebKit 2359 over HTTP, the
+last resort forced by a marker that brings no dialog (it took 10.3–10.4 s):
+a dialog queued before any touch was closed (0 left open, 0 shades); after a
+pointerdown on the sketch, the next dialog stayed open (1 open, 1 shade); on
+the ordinary end the watcher had already gone and a later dialog stayed
+open. **Known limit, accepted:** on the last resort, a refused line's dialog
+that arrives after the student's first touch is drawn over the sketch, and
+the student closes it by hand — GeoGebra's ordinary behaviour.
 
 **Rejected for #755:** removing the shades as well as the dialogs (the
 issue's first proposal — the picture comes back, the sketch still ignores
