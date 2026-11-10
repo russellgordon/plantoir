@@ -3314,7 +3314,7 @@ A sketch from commands:
 alt: A parabola and a line (plantoir-alt-commands).
 f(x) = x^2
 g(x) = 2x + 1
-a = 2
+a = Slider(-5, 5, 1)
 PLANTOIR-COMMANDS-FROM-THE-CONTRACT
 ```
 
@@ -4375,7 +4375,7 @@ named = sorted({spec["sketch"] for spec in specs if spec.get("sketch")})
 if named != ["Investigations/GeoGebra-Fixture-Lines.ggb"]:
     problems.append(f"the cards name {named}, not the one published file")
 command_cases = json.load(open("contracts/shared-rules.json", encoding="utf-8"))["geogebraFences"]["commands"]["cases"]
-wanted_commands = [{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "g(x) = 2x + 1"}, {"line": 4, "text": "a = 2"}]
+wanted_commands = [{"line": 2, "text": "f(x) = x^2"}, {"line": 3, "text": "g(x) = 2x + 1"}, {"line": 4, "text": "a = Slider(-5, 5, 1)"}]
 for number, case in enumerate(command_cases, start=5):
     wanted_commands.append({"line": number, "text": case["text"]})
 if [spec["commands"] for spec in specs][1:3] != [wanted_commands, [{"line": 2, "text": "h(x) = -x + 3"}]]:
@@ -5679,9 +5679,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
        /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
        /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
-    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, browser-checks/geogebra_applet.mjs)"
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, browser-checks/geogebra_applet.mjs)"
   else
-    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, or were published twice (browser-checks/geogebra_applet.mjs, #578)"
+    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, were published twice, or once their lines had run were shaded over or would not take a drag (browser-checks/geogebra_applet.mjs, #578, #755)"
     cat /tmp/verify_geogebra_applet.log
   fi
   rm -rf "$GEOGEBRA_SITE"
