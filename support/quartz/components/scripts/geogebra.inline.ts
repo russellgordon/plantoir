@@ -234,12 +234,12 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
   const watcher = new MutationObserver(take)
   watcher.observe(box, { childList: true, subtree: true })
   // The student's first touch inside the sketch, once lines are over.
-  const touched = () => letGo()
   const letGo = () => {
     watcher.disconnect()
     box.removeEventListener("pointerdown", touched, true)
     box.removeEventListener("keydown", touched, true)
   }
+  const touched = () => letGo()
   const giveUpAt = performance.now() + LINES_GIVE_UP_MS
   try {
     try {
@@ -373,7 +373,7 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
       enableShiftDragZoom: true,
       showResetIcon: true,
       // On while the fence's lines run, so GeoGebra says what it refused;
-      // off after (runCommands), so nothing a student does opens one.
+      // off after (runCommands), so nothing a student does opens an error dialog.
       errorDialogsActive: true,
       borderColor: null,
       useBrowserForJS: false,

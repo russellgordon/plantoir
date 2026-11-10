@@ -4177,7 +4177,7 @@ CLOSES it through its own button as it is added, before it is drawn (#755,
 below); the wait ends when the marker's
 dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
 lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
-turned off after, so nothing a student does opens one. The refused lines do
+turned off after, so nothing a student does opens an error dialog. The refused lines do
 not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
 the fixture's commands sketch and reads exactly the refused ones, in
 GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
@@ -4264,6 +4264,9 @@ the ordinary end the watcher had already gone and a later dialog stayed
 open. **Known limit, accepted:** on the last resort, a refused line's dialog
 that arrives after the student's first touch is drawn over the sketch, and
 the student closes it by hand — GeoGebra's ordinary behaviour.
+The forced give-up measurement above (the touch let-go) was a one-off in
+headless Chromium and WebKit and is in no gate: `verify.sh`'s browser check
+does not force the last resort.
 
 **Rejected for #755:** removing the shades as well as the dialogs (the
 issue's first proposal — the picture comes back, the sketch still ignores

@@ -792,6 +792,19 @@ class DialogClosingTextPinTests(unittest.TestCase):
         # arrive: the watcher disconnects only once every marker has come.
         self.assertNotIn("watcher.disconnect()", finally_block)
         self.assertIn("markersSeen >= markersRun", run)
+        # Nor may it let go unconditionally there: on the last resort it lets
+        # go only when the last marker comes or at the student's first touch,
+        # and the touch listeners are added only while markers are owed.
+        guard = "if (markersSeen < markersRun) {"
+        self.assertIn(guard, finally_block)
+        guarded = finally_block[finally_block.index(guard):]
+        guarded = guarded[:guarded.index("\n    }") + 6]
+        unguarded = finally_block.replace(guarded, "")
+        self.assertNotIn("letGo()", unguarded,
+                         "runCommands lets go unconditionally when it ends, so a dialog still queued is drawn, modal (#755)")
+        for kind in ("pointerdown", "keydown"):
+            self.assertIn(f'box.addEventListener("{kind}", touched', guarded)
+            self.assertNotIn(f'box.addEventListener("{kind}"', unguarded)
 
 
 if __name__ == "__main__":
