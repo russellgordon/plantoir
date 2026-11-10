@@ -85,8 +85,20 @@
 //   125 ellipses on the test page without it, 0 with it). The plain
 //   declaration comes first, so a browser without the alt-text form (Safari
 //   before 17.4) keeps the ellipses and reads them.
-// * The copy button is untouched: generated content is not in innerText, and
-//   a soft wrap is no line break, so a wrapped block copies as written.
+// * The copy button is RAISED over the lines (#759). Each line above is
+//   `position: relative` (its number's and ellipses' containing block), and
+//   Quartz's button is absolute at z-index auto and PREPENDED to the <pre>,
+//   so the positioned lines after it paint and hit-test on top of it: on
+//   hover the button showed through the line's transparent box, but a real
+//   pointer at its centre hit the line's span, the button's handler never
+//   ran and nothing reached the clipboard (measured 2026-11-10 in WebKit and
+//   Chromium alike; a scripted .click() on the button cannot see it). So the
+//   button takes z-index 1, and the <pre> isolates, so that 1 is counted
+//   inside the block and can never rise over a popover, the search or a
+//   sticky header. Only a wrapped block's: no other block has the fault.
+//   What it copies is Quartz's own `innerText` of the code, read at "nav":
+//   generated content is not in it and a soft wrap is no line break, so a
+//   wrapped block copies as written.
 $plantoir-wrap-ellipses: "";
 @for $row from 1 through 80 {
   $plantoir-wrap-ellipses: $plantoir-wrap-ellipses + "\a …";
@@ -119,6 +131,15 @@ $plantoir-wrap-ellipses: "";
     overflow: hidden;
     white-space: pre;
     pointer-events: none;
+  }
+
+  // The copy button raised over the lines, inside the block (#759; above).
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) {
+    isolation: isolate;
+  }
+
+  :root .plantoir-text-wrap pre:not(.plantoir-flowing) > .clipboard-button {
+    z-index: 1;
   }
 }
 
