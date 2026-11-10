@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 4 November 2026. The current release is **1.9.2** on the Mac and **1.9.0** on Windows.*
+*Last updated: 10 November 2026. The current release is **1.9.3** on the Mac and **1.9.0** on Windows.*
 
 A few things to know before you read on:
 
@@ -26,7 +26,7 @@ need to read those to use Plantoir.
 
 ---
 
-## Version 1.9.3
+## Version 1.9.4
 
 Mac first. The Windows app follows in its own update.
 
@@ -45,6 +45,9 @@ Mac first. The Windows app follows in its own update.
   arrange the shelf in groups you make yourself, and replace a reference
   course with a newer version (with a backup kept first).
   ([#572](https://github.com/russellgordon/plantoir/issues/572))
+- **GeoGebra sketches show that they are loading.** While GeoGebra itself
+  is still arriving, the sketch's box says so, inside the box, instead of
+  standing empty. ([#756](https://github.com/russellgordon/plantoir/issues/756))
 
 ## Version 2.0
 
