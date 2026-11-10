@@ -497,11 +497,13 @@ Neither app contains toolchain logic of its own: they write the same
       **Implementation is done by Opus agents, and adversarial review by
       other Opus agents**, never the one that implemented. Spawn each with
       the model passed explicitly and never as a fork, which ignores the
-      model override and would run on Fable. **The release gets one final
-      Fable sweep before the cut**, of everything the release contains;
-      under a director this takes the place of the per-piece Fable sweep
-      described below, because the director has already read each piece on
-      Fable before merging it. **The director is terse**: a line or two as
+      model override and would run on Fable. **There are two kinds of Fable sweep, and
+      both are kept**: the per-piece sweep described below, on each piece
+      before it merges, and one more of the whole release before the cut.
+      The second does not replace the first (Russell, 2026-11-10): a cut
+      can hold ten issues, and that is too much to sweep effectively all
+      at once, so the release sweep looks for what only shows across
+      pieces and relies on each piece having had its own. **The director is terse**: a line or two as
       each item completes, with the detail in the issue's closing comment,
       not the chat. The bullets below still say what each implementation
       and each review owes.
