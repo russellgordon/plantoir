@@ -4172,11 +4172,12 @@ guess. What the loader does instead: after each line it also runs
 dialog always comes, and always after the line's own (every contract case,
 in order, in both engines), so any dialog that arrives before the marker's is
 the line's. A MutationObserver on the applet reads each dialog's message
-lines (`.dialogContent .gwt-Label`, without the title or buttons) and removes
-it as it is added, before it is drawn; the wait ends when the marker's
+lines (`.dialogContent .gwt-Label`, without the title or buttons) and then
+CLOSES it through its own button as it is added, before it is drawn (#755,
+below); the wait ends when the marker's
 dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
 lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
-turned off after, so nothing a student does opens one. The refused lines do
+turned off after, so nothing a student does opens an error dialog. The refused lines do
 not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
 the fixture's commands sketch and reads exactly the refused ones, in
 GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
@@ -4189,6 +4190,96 @@ Unmeasured, and so said here rather than relied on: a dialog GeoGebra
 opened while the SKETCH was loading, still open when the lines start, would
 arrive before the first line's marker and be blamed on line 1 (stage 3+4
 review item 4).
+
+**Each dialog is closed, never removed (#755, v1.9.3).** Until #755 the
+loader took each dialog off the page (`dialog.remove()`). Every one of
+GeoGebra's dialogs is modal: it lays a translucent shade
+(`.gwt-PopupPanelGlass`) over the sketch, inside the applet's own frame, and
+the app ignores pointer input while it is open; only the dialog's own close
+takes the shade away and lets go. Removing it did neither. A 14-line sketch
+(three `Slider` lines, `SetValue`, `SetColor`, `SetLineStyle`,
+`SetLineThickness`, a point, `ZoomIn`) left 14 shades, one per marker,
+which together read as a black box, and its slider could not be dragged.
+Measured 2026-11-10 over HTTP on `[::1]`, headless Chromium 1243 and WebKit
+2359 (Playwright 1.63), slider `a` dragged with real pointer events and read
+back with `getValue`:
+
+| Loader | Shades left | On top at the sketch's centre | `a` before → after the drag |
+|---|---:|---|---|
+| Before #755: dialogs removed | 14 | a shade | 1 → 1 |
+| The issue's first proposal: dialogs AND shades removed | 0 | the canvas | 1 → 1 |
+| Dialogs closed through their own button (shipped) | 0 | the canvas | 1 → 3 |
+| No error dialogs at all (`setErrorDialogsActive(false)`, no marker; a control) | 0 | the canvas | 1 → 3 |
+
+The same in both engines; two such sketches on one page left 30 shades
+(14 + 16) before and none after, both sliders moving; the fixture's commands
+sketch left 17 (13 markers and 4 refused lines) before and none after, its
+four refused lines word for word as before. A `.ggb` file sketch runs no
+lines and was never affected. GeoGebra 5.4.933.1's dialogs for a refused
+line or the marker have "Close" beside "Show Online Help", or "OK" alone;
+the loader presses a lone button, otherwise the plain text button
+(`materialTextButton`), never the help button, which opens geogebra.org.
+`click()` closes the dialog at once, before it is drawn — it is off the page
+when the call returns, in both engines — so no dialog is ever seen. A dialog
+a later engine does not close that way is still taken off the page, so it
+is never drawn either; `browser-checks/geogebra_applet.mjs` would then fail
+on the drag. The loader calls no internal name of the engine's: they are
+scrambled and hold for one pin only.
+
+Why #578's own measurements did not show it: its browser check read the
+page's DOM — the refused lines, `a` set to 3, no `.dialogComponent` left —
+and never looked at what was drawn over the sketch or tried to move
+anything, and its fixture's `a` was a plain number rather than a slider.
+The deployed-site check at v1.9.1 (#711) opened a `.ggb` FILE sketch, which
+runs no lines. The check now counts shades (zero, document-wide), asks
+`elementFromPoint` what lies at the sketch's centre (its canvas), and drags
+the fixture's slider `a` with `Input.dispatchMouseEvent`, requiring its value
+to change; its MUST-FAIL removes one dialog the old way (and its shade) from
+the same applet and requires the same drag to leave `a` where it was. Against
+the old loader it fails on all three; against the fix it passes, three runs
+out of three. `scripts/test_geogebra.py` → `DialogClosingTextPinTests` is a
+text pin on the loader's source, nothing more — the one guard the Windows
+suite can run.
+
+**The last resort keeps watching until the last marker comes (#755).**
+Turning dialogs off does not stop one already queued: a refused line and a
+marker run with dialogs on, then dialogs turned off in the same task, still
+drew both dialogs a few milliseconds later (measured, both engines). On the
+10-second last resort the loader used to disconnect its watcher at once, so a
+dialog still on its way would have been drawn, modal, and left over the
+sketch. It now counts markers run and markers seen, and lets go only when the
+last marker run has arrived — the ordinary end at once, the last resort when
+the engine catches up — closing whatever comes meanwhile. No clock. A marker
+that never arrives would leave the watcher on the applet for good, closing
+every dialog a student opens with a tool (Slider, Text, Rotate…) in a
+`toolbar: true` sketch the moment it opens. So on the last resort it also
+lets go at the student's first `pointerdown` or `keydown` inside the sketch
+(capture phase, once; both listeners are removed when it lets go the
+ordinary way), since any dialog a student opens follows their own input.
+Measured 2026-11-10, headless Chromium 1243 and WebKit 2359 over HTTP, the
+last resort forced by a marker that brings no dialog (it took 10.3–10.4 s):
+a dialog queued before any touch was closed (0 left open, 0 shades); after a
+pointerdown on the sketch, the next dialog stayed open (1 open, 1 shade); on
+the ordinary end the watcher had already gone and a later dialog stayed
+open. **Known limit, accepted:** on the last resort, a refused line's dialog
+that arrives after the student's first touch is drawn over the sketch, and
+the student closes it by hand — GeoGebra's ordinary behaviour.
+The forced give-up measurement above (the touch let-go) was a one-off in
+headless Chromium and WebKit and is in no gate: `verify.sh`'s browser check
+does not force the last resort.
+
+**Rejected for #755:** removing the shades as well as the dialogs (the
+issue's first proposal — the picture comes back, the sketch still ignores
+every drag, measured above); removing every shade in the document (would
+take the shade from a dialog a student has open in ANOTHER sketch, and
+still leaves this one modal); opening no error dialogs at all and finding
+refused lines another way (the control row above: it moves, but it loses
+GeoGebra's own words for a refused line and cannot see a failed `SetValue`
+or `SetColor`, which evalCommand's answer already showed it cannot tell from
+a working one — a change to `geogebraFences.commands` and to what a teacher
+reads, for Russell to decide, not a hotfix); calling the engine's internal
+close (scrambled names, one pin only). **Not measured:** why the issue saw
+the sketch look fine from `file://`; a class site is always served over HTTP.
 
 **A failed fetch is not remembered** (stage 3+4 review item 4). With no
 saved copy, every build asks geogebra.org again, and a build while it does
