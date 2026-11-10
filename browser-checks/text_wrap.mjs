@@ -30,8 +30,14 @@
 //    block's are (padding, white-space, no ellipses: print.scss governs); and
 //    on screen, a <pre> marked plantoir-flowing (what the handout does to
 //    each block) gets none of it;
-// 8. the page's copy button copies the long block as written: 120 lines, no
-//    ellipsis, no line break where a line wrapped (plan review finding 5).
+// 8. the page's copy button, pressed by a REAL pointer (CDP Input events:
+//    moved onto the block, then moved, pressed and released at the button's
+//    centre), copies the long block as written: 120 lines, no ellipsis, no
+//    line break where a line wrapped (plan review finding 5); the button is
+//    what a pointer at its centre hits, the write resolves and the clipboard
+//    reads it back; the plain block beside it is pressed the same way; and
+//    the must-fail: the button stacked as before #759 must be missed (#759).
+//    Pressed again at 390 px.
 //
 // Kept OUT of scripts/ for the reason print_handout.mjs is: it needs a
 // browser on the Mac, not the image. No packages: Node 22's own WebSocket.
@@ -56,6 +62,8 @@ const LINES = 120
 const WRAPPING_LINES = [2, 100, 101, 102, 103]
 const HIGHLIGHTED_LINES = [2, 101]
 const URL_LINE = 101
+// Written to the clipboard before each press of a copy button (step 8).
+const SENTINEL = "plantoir-text-wrap-check: nothing copied yet"
 
 const work = mkdtempSync(join(tmpdir(), "plantoir-text-wrap-check-"))
 const chrome = spawn(chromePath, [
@@ -203,6 +211,22 @@ async function connect(chunk) {
 
   await new Promise((resolve) => { socket.onopen = resolve })
 
+  // The clipboard, for step 8: granted to the page's origin through the
+  // browser's own endpoint, and the page given focus, which a clipboard
+  // call needs and a headless page does not otherwise have.
+  const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()
+  const browserSocket = new WebSocket(version.webSocketDebuggerUrl)
+  await new Promise((resolve) => { browserSocket.onopen = resolve })
+  const granted = await new Promise((resolve) => {
+    browserSocket.onmessage = (event) => resolve(JSON.parse(event.data))
+    browserSocket.send(JSON.stringify({ id: 1, method: "Browser.grantPermissions",
+      params: { origin: new URL(pageUrl).origin, permissions: ["clipboardReadWrite", "clipboardSanitizedWrite"] } }))
+  })
+  // Left open to the end: Chrome drops a session's permission overrides when
+  // that session closes (measured: closed here, readText was refused).
+  if (granted.error) return finish(1, "FAIL: the clipboard could not be granted to the page: " + JSON.stringify(granted.error))
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true })
+
   const problems = []
   const report = {}
 
@@ -318,6 +342,136 @@ async function connect(chunk) {
     report[where] = { rows: rowsInAll, lineHeight: block.lh, x: x === null ? null : +x.toFixed(2), urlRows: url.rows }
   }
 
+  // 8. A press of a block's copy button the way a person makes it: the
+  // pointer moves onto the block (Quartz shows the button on pre:hover),
+  // then moves, presses and releases at the button's centre, with CDP's
+  // Input events, which the browser hit-tests as it does a mouse's. What
+  // the press writes is taken from the argument of a PASS-THROUGH
+  // writeText (it still calls the real one, and its promise must resolve),
+  // never a stub, which would hide a refused write. Before each press a
+  // sentinel is written to the clipboard (through the real writeText, so it
+  // is not counted as the press's); after it the clipboard is read back and
+  // must hold what the press wrote, not the sentinel - so a failure says
+  // which half broke: the press (no write), the write (refused), or the
+  // clipboard (not what was written). Measured 2026-11-10 with Chrome for
+  // Testing 155 --headless=new on macOS 26: that clipboard is the headless
+  // browser's own, not the Mac's pasteboard (pbpaste unchanged by a run).
+  const pressCopy = async (figureIndex) => {
+    const placed = await evaluate(`(async () => {
+      if (!window.__copies) {
+        window.__copies = []
+        const real = navigator.clipboard.writeText.bind(navigator.clipboard)
+        window.__realWriteText = real
+        navigator.clipboard.writeText = (value) => {
+          const entry = { text: value, state: "pending" }
+          window.__copies.push(entry)
+          return real(value).then((result) => { entry.state = "resolved"; return result },
+                                  (error) => { entry.state = "rejected: " + error; throw error })
+        }
+      }
+      await window.__realWriteText(${JSON.stringify(SENTINEL)})
+      const pre = window.__wrap.figures()[${figureIndex}].querySelector("pre")
+      // The button sits at the block's top right: bring that top into view.
+      window.scrollBy({ top: pre.getBoundingClientRect().top - innerHeight / 3, behavior: "instant" })
+      const box = pre.getBoundingClientRect()
+      return { x: box.left + box.width / 2, y: box.top + 8, copies: window.__copies.length }
+    })()`)
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: placed.x, y: placed.y })
+    const shown = await until(`getComputedStyle(window.__wrap.figures()[${figureIndex}].querySelector("pre > .clipboard-button")).opacity === "1"`, 30)
+    const aim = await evaluate(`(() => {
+      const figure = window.__wrap.figures()[${figureIndex}]
+      const button = figure.querySelector("pre > .clipboard-button")
+      const box = button.getBoundingClientRect()
+      const x = box.left + box.width / 2, y = box.top + box.height / 2
+      const hit = document.elementFromPoint(x, y)
+      // The rows whose LETTERS the button lies over, line by line (for
+      // knownLimits): measured 2026-11-10, a 30.8 px button over 25.6 px
+      // rows reaches 2 px into the second row's box, above its letters.
+      const under = []
+      for (const [index, line] of window.__wrap.linesOf(figure).entries()) {
+        const rect = line.getBoundingClientRect()
+        if (rect.top >= box.bottom) break
+        if (rect.bottom > box.top) {
+          const rows = window.__wrap.rowsOf(line).tops
+          let count = 0
+          for (const top of rows) if (top < box.bottom && top + window.__wrap.lineHeight(figure) > box.top) count += 1
+          under.push({ line: index + 1, rows: count })
+        }
+      }
+      return { x, y, height: +box.height.toFixed(2), inside: !!hit && button.contains(hit),
+               hit: hit ? hit.tagName.toLowerCase() + (hit.hasAttribute("data-line") ? "[data-line]" : "") + " in " + (hit.parentElement ? hit.parentElement.tagName.toLowerCase() : "nothing") : "nothing",
+               under }
+    })()`)
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: aim.x, y: aim.y })
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: aim.x, y: aim.y, button: "left", buttons: 1, clickCount: 1 })
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: aim.x, y: aim.y, button: "left", buttons: 0, clickCount: 1 })
+    const settled = await until(`window.__copies.length > ${placed.copies} && window.__copies[window.__copies.length - 1].state !== "pending"`, 20)
+    const copy = settled ? await evaluate(`window.__copies[window.__copies.length - 1]`) : null
+    const readBack = await evaluate(`navigator.clipboard.readText().then((text) => text, (error) => "READ FAILED: " + error)`)
+    // Move off, so the button hides again before the next press.
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 })
+    return { shown: !!shown, ...aim, copy, readBack }
+  }
+  const asWritten = (copied) => {
+    const lines = copied.replace(/\n$/, "").split("\n")
+    const url = "https://example.com/" + "a".repeat(400)
+    const wrong = []
+    if (copied.includes("…")) wrong.push("it holds an ellipsis")
+    if (lines.length !== LINES) wrong.push(`${lines.length} lines, not ${LINES}`)
+    if (lines[URL_LINE - 1] !== url) wrong.push(`line ${URL_LINE} is ${JSON.stringify((lines[URL_LINE - 1] || "").slice(0, 40))}…`)
+    if (lines[0] !== "line 1" || lines[LINES - 1] !== `line ${LINES}`) wrong.push("its first or last line is not as written")
+    if (lines[1] !== lines[99] || lines[1].length < 200 || lines[101] !== "    " + lines[1] || lines[102] !== "\t" + lines[1]) wrong.push("a long line is not whole")
+    return wrong
+  }
+  const checkTheCopyButton = async (where, withTheMustFail) => {
+    const said = (text) => problems.push(`${where}: ${text}`)
+    const pressed = []
+    // The long wrapped block, then the plain one beside it as the comparison.
+    for (const [index, name] of [[0, "the long text wrap block"], [1, "the plain text block"]]) {
+      const press = await pressCopy(index)
+      pressed.push(press)
+      if (!press.shown) said(`${name}'s copy button did not appear when the pointer moved onto the block`)
+      if (!press.inside) {
+        said(`a pointer at the centre of ${name}'s copy button hits ${press.hit}, not the button, so pressing it copies nothing`)
+        continue
+      }
+      if (!press.copy) {
+        said(`${name}'s copy button, pressed, wrote nothing to the clipboard`)
+        continue
+      }
+      if (press.copy.state !== "resolved") said(`${name}'s clipboard write did not succeed: ${press.copy.state}`)
+      if (press.readBack !== press.copy.text) said(`the clipboard read back after ${name}'s press is not what it wrote (${press.readBack === SENTINEL ? "it still holds the sentinel" : String(press.readBack).slice(0, 200)})`)
+      if (index === 0) {
+        const wrong = asWritten(press.copy.text)
+        if (wrong.length) said(`the copy button's text is not the block as written: ${wrong.join("; ")}`)
+      } else {
+        const lines = press.copy.text.replace(/\n$/, "").split("\n")
+        if (lines.length !== 2 || lines[1] !== "short" || lines[0].length < 200) said(`the plain block's copy is not its two lines as written`)
+      }
+    }
+    const wrapped = pressed[0]
+    report[`copy, ${where}`] = { button: wrapped.height, under: wrapped.under, characters: wrapped.copy ? wrapped.copy.text.length : null }
+    if (!withTheMustFail) return
+    // The must-fail: the same press with the button stacked as it was before
+    // #759 (z-index auto, the pre not isolated) must MISS - hit a line, and
+    // write nothing - or the press above proves nothing.
+    await evaluate(`(() => {
+      const pre = window.__wrap.figures()[0].querySelector("pre")
+      pre.style.isolation = "auto"
+      pre.querySelector(":scope > .clipboard-button").style.zIndex = "auto"
+      return true
+    })()`)
+    const old = await pressCopy(0)
+    await evaluate(`(() => {
+      const pre = window.__wrap.figures()[0].querySelector("pre")
+      pre.style.isolation = ""
+      pre.querySelector(":scope > .clipboard-button").style.zIndex = ""
+      return true
+    })()`)
+    if (old.inside || old.copy || old.readBack !== SENTINEL) said(`must-fail did not fail: with the copy button stacked as before #759 a real press ${old.inside ? "still reached the button" : "hit " + old.hit}${old.copy ? " and copied" : ""}${old.readBack !== SENTINEL ? " and the clipboard lost the sentinel" : ""}, so the press check proves nothing`)
+    report.mustFail = { hit: old.hit, copied: !!old.copy, sentinelKept: old.readBack === SENTINEL }
+  }
+
   try {
     await send("Page.enable")
     await send("DOM.enable")
@@ -371,29 +525,11 @@ async function connect(chunk) {
     })()`)
     if (JSON.stringify(flowing.marked) !== JSON.stringify(flowing.plain) || !flowing.back) problems.push(`a pre marked plantoir-flowing (the handout's) is laid out as ${JSON.stringify(flowing.marked)}, the plain one as ${JSON.stringify(flowing.plain)}`)
 
-    // 8. The copy button copies the block as written.
-    const copied = await evaluate(`(async () => {
-      let text = null
-      const writeText = navigator.clipboard.writeText.bind(navigator.clipboard)
-      navigator.clipboard.writeText = (value) => { text = value; return Promise.resolve() }
-      window.__wrap.figures()[0].querySelector("pre > .clipboard-button").click()
-      for (let tries = 0; tries < 50 && text === null; tries += 1) await new Promise((done) => setTimeout(done, 20))
-      navigator.clipboard.writeText = writeText
-      return text
-    })()`)
-    if (typeof copied !== "string") problems.push("the copy button copied nothing")
-    else {
-      const lines = copied.replace(/\n$/, "").split("\n")
-      const url = "https://example.com/" + "a".repeat(400)
-      const wrong = []
-      if (copied.includes("…")) wrong.push("it holds an ellipsis")
-      if (lines.length !== LINES) wrong.push(`${lines.length} lines, not ${LINES}`)
-      if (lines[URL_LINE - 1] !== url) wrong.push(`line ${URL_LINE} is ${JSON.stringify((lines[URL_LINE - 1] || "").slice(0, 40))}…`)
-      if (lines[0] !== "line 1" || lines[LINES - 1] !== `line ${LINES}`) wrong.push("its first or last line is not as written")
-      if (lines[1] !== lines[99] || lines[1].length < 200 || lines[101] !== "    " + lines[1] || lines[102] !== "\t" + lines[1]) wrong.push("a long line is not whole")
-      if (wrong.length) problems.push(`the copy button's text is not the block as written: ${wrong.join("; ")}`)
-      report.copied = { lines: lines.length, characters: copied.length }
-    }
+    // 8. The copy button, pressed by a real pointer, copies the block as
+    //    written (#759). A scripted .click() dispatches ON the button
+    //    whatever lies over it, so it passed while a real pointer at the
+    //    button's centre hit the first line's span and nothing was copied.
+    await checkTheCopyButton("light, 1512 px", true)
 
     // Dark, then a phone's width.
     await send("Emulation.setEmulatedMedia", { media: "", features: [{ name: "prefers-color-scheme", value: "dark" }] })
@@ -403,6 +539,7 @@ async function connect(chunk) {
     await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 900, deviceScaleFactor: 2, mobile: true })
     if (!(await open())) return finish(1, "FAIL: Wrap Fixture did not load at 390 px")
     await checkTheBlocks("light, 390 px")
+    await checkTheCopyButton("light, 390 px", false)
   } catch (error) {
     return finish(1, "FAIL: " + (error && error.stack || error))
   }
@@ -411,7 +548,7 @@ async function connect(chunk) {
   const light = report["light, 1512 px"]
   const phone = report["light, 390 px"]
   const summary = light && phone
-    ? `${LINES} lines, ${light.rows} rows at 1512 px and ${phone.rows} at 390 px, digits 3, every row at x ${light.x} px, line ${URL_LINE}'s ${light.urlRows} rows full from the first, about ${report.charactersPerRow} characters a row at 1512 px`
+    ? `${LINES} lines, ${light.rows} rows at 1512 px and ${phone.rows} at 390 px, digits 3, every row at x ${light.x} px, line ${URL_LINE}'s ${light.urlRows} rows full from the first, about ${report.charactersPerRow} characters a row at 1512 px; the copy button pressed by a real pointer copied ${report["copy, light, 1512 px"]?.characters} characters as written at 1512 px and at 390 px, and stacked as before #759 it was missed (${report.mustFail?.hit})`
     : "incomplete"
   finish(problems.length === 0 ? 0 : 1, (problems.length === 0 ? `OK: ${summary}\n` : "FAIL: " + problems.join("\n  ") + "\n") + JSON.stringify(report))
 }

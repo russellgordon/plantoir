@@ -46,7 +46,17 @@
 //    applet, in the same place, outside the choices, still running
 //    commands; and Start again hides the explanation's open sketch, and a
 //    second answer shows the same applet again, not zero-sized, still
-//    running commands.
+//    running commands;
+// 10. once the commands sketch's lines have run (#755): no GeoGebra shade
+//    (.gwt-PopupPanelGlass) is left anywhere on the page, the sketch's own
+//    canvas is what lies at its centre, and its slider a, dragged with real
+//    pointer events (Input.dispatchMouseEvent), changes value - read through
+//    the applet before and after. Then the MUST-FAIL: one of GeoGebra's
+//    dialogs taken off the page the way the loader did before #755 (dialog
+//    and shade removed, never closed) leaves GeoGebra modal, and the same
+//    drag must NOT move the slider; if it does, the drag proves nothing.
+//    A DOM count alone passed on the broken loader: each dialog that is
+//    removed rather than closed leaves the app ignoring pointer input.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
@@ -274,6 +284,32 @@ async function connect(chunk) {
   // replaces - measured without it, Chromium opened no sketch after a page
   // change until a reload.
   const frameUnderHtml = async () => await evaluate(`(() => { const frame = document.getElementById("web3d"); return !!frame && frame.parentElement === document.documentElement })()`)
+  // Drags the knob of slider `name` in the sketch at `index` with real
+  // pointer events (Input.dispatchMouseEvent: press, ten moves with the
+  // button held, release) toward the middle of its range, and reads its
+  // value through the applet before and after (#755). The knob is found
+  // from the slider's own XML: its place on the graphics view in pixels, its
+  // width, and its range.
+  const dragSlider = async (index, name) => {
+    // The page may still be scrolling (the tap's own focus, smoothly): the
+    // knob is found once the page has stood still for three frames.
+    await evaluate(`new Promise((resolve) => { let last = -1, still = 0, frames = 0; const look = () => { frames += 1; still = scrollY === last ? still + 1 : 0; last = scrollY; if (still >= 3 || frames > 300) resolve(true); else requestAnimationFrame(look) }; requestAnimationFrame(look) })`)
+    const knob = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; if (!api) return { why: "no applet" }; const slider = /<slider ([^>]*)>/.exec(api.getXML(${JSON.stringify(name)}) || ""); if (!slider) return { why: "it is not a slider" }; const read = (key) => Number((new RegExp("\\\\b" + key + '="([^"]*)"').exec(slider[1]) || [])[1]); if (!/absoluteScreenLocation="true"/.test(slider[1])) return { why: "its place is not given in pixels" }; let canvas = null; for (const each of Array.from(box.querySelectorAll("canvas"))) { if (canvas === null || each.width * each.height > canvas.width * canvas.height) canvas = each } if (canvas === null) return { why: "no canvas" }; const r = canvas.getBoundingClientRect(); const scale = r.width / canvas.offsetWidth; const value = api.getValue(${JSON.stringify(name)}); const min = read("min"), max = read("max"), width = read("width"); const at = (v) => r.left + (read("x") + ((v - min) / (max - min)) * width) * scale; const middle = (min + max) / 2; return { before: value, x: at(value), y: r.top + read("y") * scale, toX: at(value === middle ? min : middle) } })()`)
+    if (!knob || knob.why || knob.thrown) return { why: knob?.why ?? knob?.thrown ?? "no answer" }
+    const mouse = (type, x, buttons) => send("Input.dispatchMouseEvent", { type, x, y: knob.y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 })
+    await mouse("mouseMoved", knob.x, 0)
+    await pause(50)
+    await mouse("mousePressed", knob.x, 1)
+    await pause(50)
+    for (let step = 1; step <= 10; step += 1) {
+      await mouse("mouseMoved", knob.x + ((knob.toX - knob.x) * step) / 10, 1)
+      await pause(30)
+    }
+    await mouse("mouseReleased", knob.toX, 0)
+    await pause(100)
+    const after = await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); return window[box.id.replace(/-box$/, "")].getValue(${JSON.stringify(name)}) })()`)
+    return { before: knob.before, after }
+  }
   const change = async (page) => {
     const target = urlOf(page)
     const changed = await evaluate(`(() => { if (typeof window.spaNavigate !== "function") return false; window.spaNavigate(new URL(${JSON.stringify(target)})); return true })()`)
@@ -290,6 +326,7 @@ async function connect(chunk) {
     await send("Network.setCacheDisabled", { cacheDisabled: true })
     await send("Page.addScriptToEvaluateOnNewDocument", { source: WATCH })
     const said = []
+    let dragSaid = ""
     if (copies.length !== 1) problems.push(`the site holds ${copies.length} files with the sketch's SHA-256 (${copies.join(", ")}), not exactly one`)
     for (const phase of ["policy", "isolated"]) {
       isolated = phase === "isolated"
@@ -320,6 +357,22 @@ async function connect(chunk) {
       else if (JSON.stringify(lines.shown) !== JSON.stringify(wanted)) problems.push(`${phase}: under the commands sketch: ${JSON.stringify(lines.shown)}, not the contract's ${JSON.stringify(wanted)}`)
       if (lines?.a !== 3) problems.push(`${phase}: SetValue(a, 3) did not set a to 3 (a is ${lines?.a})`)
       if (lines?.dialogs) problems.push(`${phase}: ${lines.dialogs} of GeoGebra's dialogs were left on the page`)
+      // 10 (#755): the sketch a student can actually use once its lines have
+      // run - no shade left, the sketch itself on top, and its slider moved
+      // by a real drag - and the must-fail: the same drag after a dialog is
+      // taken off the page the way the loader did before #755 (and its
+      // shade with it) does NOT move the slider, so the drag can tell.
+      const usable = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; f.scrollIntoView({ block: "center", behavior: "instant" }); const box = f.querySelector(".pl-geogebra-applet"); const r = box.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { shades: document.querySelectorAll(".gwt-PopupPanelGlass").length, onTop: !!top && top.tagName === "CANVAS" && box.contains(top), top: top ? top.tagName + "." + top.className : null } })()`)
+      if (usable?.shades !== 0) problems.push(`${phase}: ${usable?.shades} of GeoGebra's shades (.gwt-PopupPanelGlass) were left on the page once the commands sketch's lines had run - the sketch reads as a black box`)
+      if (!usable?.onTop) problems.push(`${phase}: at the commands sketch's centre the page shows ${usable?.top}, not the sketch's canvas`)
+      const drag = await dragSlider(1, "a")
+      if (drag.why) problems.push(`${phase}: the commands sketch's slider a could not be dragged: ${drag.why}`)
+      else if (drag.after === drag.before) problems.push(`${phase}: a real drag on the commands sketch's slider a left it at ${drag.before} - GeoGebra is not taking pointer input`)
+      const removedTheOldWay = await evaluate(`(async () => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; const came = new Promise((resolve) => { const watcher = new MutationObserver(() => { const dialog = box.querySelector(".dialogComponent"); if (dialog === null) return; dialog.remove(); for (const shade of Array.from(document.querySelectorAll(".gwt-PopupPanelGlass"))) shade.remove(); watcher.disconnect(); resolve(true) }); watcher.observe(box, { childList: true, subtree: true }); setTimeout(() => { watcher.disconnect(); resolve(false) }, 10000) }); api.setErrorDialogsActive(true); api.evalCommand(${JSON.stringify(contract.commands.endOfLine)}); api.setErrorDialogsActive(false); return await came })()`)
+      const mustFail = removedTheOldWay === true ? await dragSlider(1, "a") : { why: "no dialog came to remove" }
+      if (mustFail.why) problems.push(`${phase}: the must-fail could not run: ${mustFail.why}`)
+      else if (mustFail.after !== mustFail.before) problems.push(`${phase}: must-fail did not fail: with a dialog removed from the page the way the loader did before #755, the drag still moved a from ${mustFail.before} to ${mustFail.after}, so the drag check proves nothing`)
+      dragSaid = `slider a dragged ${drag.before} to ${drag.after} (${usable?.shades} shades left), and ${mustFail.before} to ${mustFail.after} after a dialog removed the old way`
       if (isolated) {
         const crossOriginIsolated = await evaluate("window.crossOriginIsolated")
         if (crossOriginIsolated !== true) problems.push("isolated: the page was not cross-origin isolated - the phase would prove nothing")
@@ -415,7 +468,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))

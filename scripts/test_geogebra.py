@@ -746,6 +746,67 @@ class WiringTests(unittest.TestCase):
                          ["PlantoirFigures", "PlantoirGeoGebra", "PlantoirQuizzes", "PlantoirTasks"])
 
 
+class DialogClosingTextPinTests(unittest.TestCase):
+    """#755: the site's loader CLOSES each of GeoGebra's error dialogs
+    through the dialog's own button rather than taking it off the page.
+
+    This is only a TEXT PIN on the TypeScript source, not a test of what it
+    does: nothing here runs a browser or GeoGebra. What the loader does is
+    proved in a real browser by browser-checks/geogebra_applet.mjs, from
+    verify.sh (no shade left, the sketch on top, a slider moved by a real
+    drag, and a must-fail against the old way). This pin exists because it
+    is the only guard the Windows suite can run: removing a dialog instead of
+    closing it left one shade per line over the sketch (a black box) and
+    GeoGebra modal, ignoring every drag."""
+
+    LOADER = (Path(__file__).resolve().parent.parent / "support" / "quartz" / "components"
+              / "scripts" / "geogebra.inline.ts")
+
+    def source(self):
+        if not self.LOADER.is_file():
+            self.skipTest(f"{self.LOADER} is not in this copy")
+        return self.LOADER.read_text(encoding="utf-8")
+
+    def function(self, name):
+        """One top-level function of the loader, up to its closing brace."""
+        text = self.source()
+        start = text.index(f"function {name}(")
+        return text[start:text.index("\n}\n", start) + 2]
+
+    def test_each_dialog_is_closed_through_its_own_button(self):
+        close = self.function("closeDialog")
+        self.assertIn(".click()", close)
+        self.assertIn(".dialogBtnPanel button", close)
+        # Never the help button, which opens geogebra.org: a lone button, or
+        # the plain text button beside it.
+        self.assertIn("materialTextButton", close)
+        run = self.function("runCommands")
+        self.assertIn("closeDialog(dialog)", run)
+        self.assertNotIn("dialog.remove()", run,
+                         "runCommands takes a dialog off the page instead of closing it, which leaves GeoGebra modal (#755)")
+
+    def test_the_watcher_waits_for_the_last_marker(self):
+        run = self.function("runCommands")
+        finally_block = run[run.index("} finally {"):]
+        # The give-up paths must not let go while a queued dialog can still
+        # arrive: the watcher disconnects only once every marker has come.
+        self.assertNotIn("watcher.disconnect()", finally_block)
+        self.assertIn("markersSeen >= markersRun", run)
+        # Nor may it let go unconditionally there: on the last resort it lets
+        # go only when the last marker comes or at the student's first touch,
+        # and the touch listeners are added only while markers are owed.
+        guard = "if (markersSeen < markersRun) {"
+        self.assertIn(guard, finally_block)
+        guarded = finally_block[finally_block.index(guard):]
+        guarded = guarded[:guarded.index("\n    }") + 6]
+        unguarded = finally_block.replace(guarded, "")
+        self.assertNotIn("letGo()", unguarded,
+                         "runCommands lets go unconditionally when it ends, so a dialog still queued is drawn, modal (#755)")
+        for kind in ("pointerdown", "keydown"):
+            self.assertIn(f'box.addEventListener("{kind}", touched', guarded)
+            self.assertNotIn(f'box.addEventListener("{kind}"', unguarded)
+
+
 if __name__ == "__main__":
     use_the_repository_contract()
     unittest.main()

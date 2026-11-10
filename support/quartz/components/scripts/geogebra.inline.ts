@@ -140,6 +140,40 @@ function dialogSays(dialog: Element): string {
   return lines.join(" ")
 }
 
+// Closes one of GeoGebra's error dialogs the way a student's tap on it would
+// (#755): through its own button, never by taking it off the page. Each
+// dialog GeoGebra opens is modal - it lays a shade (.gwt-PopupPanelGlass)
+// over the sketch and the app ignores pointer input while it is open - and
+// only its own close puts both right. Removing the dialog from the page,
+// which this loader did until #755, left one shade per line (14 lines, 14
+// shades, a black box) and the app still modal: with the shades removed
+// as well, a slider dragged with real pointer events did not move
+// (measured in headless Chromium 1243 and WebKit 2359 over HTTP: a stayed
+// at 1; closed through its button, 1 to 3, no shade left).
+//
+// The dialogs GeoGebra 5.4.933.1 opens for a refused line or the marker
+// have "Close" beside "Show Online Help", or "OK" alone (measured, every
+// contract case). The help button opens geogebra.org, so it is never the
+// one pressed: a lone button is pressed, otherwise the plain text button.
+// click() closes the dialog at once, before it is drawn (measured: off the
+// page when click returns, in both engines). Should a later engine not
+// close it, it is taken off the page as before, so it is still never drawn.
+function closeDialog(dialog: Element) {
+  const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>(".dialogBtnPanel button"))
+  let close: HTMLButtonElement | null = null
+  if (buttons.length === 1) {
+    close = buttons[0]
+  } else {
+    close = dialog.querySelector<HTMLButtonElement>(".dialogBtnPanel button.materialTextButton")
+  }
+  if (close !== null) {
+    close.click()
+  }
+  if (dialog.isConnected) {
+    dialog.remove()
+  }
+}
+
 // Runs the fence's commands, one line at a time, and answers the lines
 // GeoGebra refused, with its own words (geogebraFences.commands).
 //
@@ -150,9 +184,22 @@ function dialogSays(dialog: Element): string {
 // line a command GeoGebra does not know (endOfLine) is run as well: its
 // dialog always comes, and comes after the line's own, so whatever dialog
 // arrives before it is the line's (measured in Chromium and WebKit: in
-// order, every time). Each dialog is read and removed as it is added, before
-// it is drawn. No waiting on a clock: the wait ends when the marker's dialog
-// arrives, and LINES_GIVE_UP_MS is only a last resort.
+// order, every time). Each dialog is read and then closed through its own
+// button (closeDialog) as it is added, before it is drawn. No waiting on a
+// clock: the wait ends when the marker's dialog arrives, and
+// LINES_GIVE_UP_MS is only a last resort.
+//
+// On that last resort, dialogs for lines already run are still on their
+// way: turning dialogs off does not stop one already queued (measured,
+// #755). So the watcher stays until the last marker run has arrived,
+// closing what comes, and only then lets go - never left open over the
+// sketch, and still no clock. Should that marker never come, the watcher
+// would close every dialog a student opens with a tool (Slider, Text...)
+// the moment it opens; so it also lets go at the student's first
+// pointerdown or keydown inside the sketch, since any dialog a student
+// opens follows their own input. The accepted cost: a queued line's
+// dialog that arrives after that first touch is drawn, and the student
+// closes it by hand, which is GeoGebra's ordinary behaviour.
 async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Array<{ line: number; said: string }>> {
   const refused: Array<{ line: number; said: string }> = []
   if (spec.commands.length === 0) {
@@ -162,20 +209,37 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
     return refused
   }
   const seen: string[] = []
+  const marker = spec.endOfLine.replace(/\(.*$/, "")
+  const isMarker = (said: string) => said.includes(marker)
+  let markersRun = 0
+  let markersSeen = 0
+  let finished = false
   let arrived: (() => void) | null = null
   const take = () => {
     for (const dialog of Array.from(box.querySelectorAll(".dialogComponent"))) {
-      seen.push(dialogSays(dialog))
-      dialog.remove()
+      const said = dialogSays(dialog)
+      seen.push(said)
+      if (isMarker(said)) {
+        markersSeen += 1
+      }
+      closeDialog(dialog)
+    }
+    if (finished && markersSeen >= markersRun) {
+      letGo()
     }
     if (arrived !== null) {
       arrived()
     }
   }
-  const marker = spec.endOfLine.replace(/\(.*$/, "")
-  const isMarker = (said: string) => said.includes(marker)
   const watcher = new MutationObserver(take)
   watcher.observe(box, { childList: true, subtree: true })
+  // The student's first touch inside the sketch, once lines are over.
+  const letGo = () => {
+    watcher.disconnect()
+    box.removeEventListener("pointerdown", touched, true)
+    box.removeEventListener("keydown", touched, true)
+  }
+  const touched = () => letGo()
   const giveUpAt = performance.now() + LINES_GIVE_UP_MS
   try {
     try {
@@ -186,6 +250,7 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
       try {
         api.evalCommand(command.text)
       } catch {}
+      markersRun += 1
       try {
         api.evalCommand(spec.endOfLine)
       } catch {}
@@ -219,10 +284,18 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
     }
     return refused
   } finally {
-    watcher.disconnect()
     try {
       api.setErrorDialogsActive(false)
     } catch {}
+    // Lets go now if every marker has come (the ordinary end), otherwise
+    // when the last one does or at the student's first touch, whichever
+    // is first (the last resort above).
+    finished = true
+    if (markersSeen < markersRun) {
+      box.addEventListener("pointerdown", touched, { capture: true, once: true })
+      box.addEventListener("keydown", touched, { capture: true, once: true })
+    }
+    take()
   }
 }
 
@@ -300,7 +373,7 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
       enableShiftDragZoom: true,
       showResetIcon: true,
       // On while the fence's lines run, so GeoGebra says what it refused;
-      // off after (runCommands), so nothing a student does opens one.
+      // off after (runCommands), so nothing a student does opens an error dialog.
       errorDialogsActive: true,
       borderColor: null,
       useBrowserForJS: false,

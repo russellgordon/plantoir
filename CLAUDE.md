@@ -204,6 +204,9 @@ Neither app contains toolchain logic of its own: they write the same
      Russell saying so.** Start sessions from `dev` and branch off it. The
      merge back is HIS call, every time: see "Autonomy moves with the
      model" below, which was narrowed on 2026-08-22 for exactly this.
+     (One standing exception since 2026-11-10: a Fable director running
+     release work does the merges itself. It is set out at the end of that
+     same bullet.)
      A piece is ready to merge only with its tests green, its write-ups
      done (rules 2–5) and its documentation pass made (rule 11) — say it is
      ready and stop there.
@@ -280,6 +283,33 @@ Neither app contains toolchain logic of its own: they write the same
      Merging `dev` into `main` is PUBLISHING and was already his: do it
      during a requested release cut, or when he asks, never on your own
      initiative.
+
+     **Widened 2026-11-10, for release work run by a Fable director (rule
+     11).** Standing order from Russell: the director has authority to do
+     all necessary Git operations. That is committing, pushing, merging an
+     issue branch into `dev` with `--no-ff`, merging `dev` into `main`
+     during a cut, tagging, merging `main` back into `dev`, and deleting
+     merged branches, without asking per piece. Three limits:
+
+     - **The authority is the DIRECTOR's.** The Opus agents it spawns commit
+       and push on their own issue branch and nothing else; they never
+       merge, tag, or touch `dev` or `main`.
+     - **It does not cover anything that discards work**: a force-push, a
+       history rewrite, `git branch -D`. Those are still asked first.
+     - **Working toward a release, and cutting one, still start with him
+       asking.** The order removes the per-piece question, not the request.
+
+     A piece still merges only with its tests green, its write-ups done and
+     its documentation pass made; what changed is who performs the merge,
+     not what a piece owes before it. A session that is not directing
+     release work this way is bound by the paragraphs above, unchanged.
+
+     The reason for the widening: under a director the pieces of a release
+     are implemented and reviewed by agents in sequence, each building on
+     the last, and a merge that waits for a person stops the whole run at
+     every piece. The check the 2026-08-22 rule bought (somebody looks
+     before `dev` hands work to everybody) is now the director's
+     verification plus the Opus reviews plus the Fable sweep before the cut.
 
    End every commit message with the `Co-Authored-By` trailer naming the
    agent that did the work. Claude sessions use the trailer their harness
@@ -460,6 +490,23 @@ Neither app contains toolchain logic of its own: they write the same
     from Russell, 2026-09-05, after a session where every one of these paid for
     itself and the last one had to be asked for.
 
+    - **Release work has a Fable director and Opus agents.** Standing order
+      from Russell, 2026-11-10. The main session runs on Fable and DIRECTS:
+      it plans, writes the briefs, verifies what agents report, decides, and
+      does the Git operations (rule 6). It does not write the piece itself.
+      **Implementation is done by Opus agents, and adversarial review by
+      other Opus agents**, never the one that implemented. Spawn each with
+      the model passed explicitly and never as a fork, which ignores the
+      model override and would run on Fable. **There are two kinds of Fable sweep, and
+      both are kept**: the per-piece sweep described below, on each piece
+      before it merges, and one more of the whole release before the cut.
+      The second does not replace the first (Russell, 2026-11-10): a cut
+      can hold ten issues, and that is too much to sweep effectively all
+      at once, so the release sweep looks for what only shows across
+      pieces and relies on each piece having had its own. **The director is terse**: a line or two as
+      each item completes, with the detail in the issue's closing comment,
+      not the chat. The bullets below still say what each implementation
+      and each review owes.
     - **Implement with the strongest model available.** In Claude Code that
       means Opus; on another harness, the most capable model you have. This is
       not a preference about style: the work in this repository is mostly
@@ -545,7 +592,9 @@ Neither app contains toolchain logic of its own: they write the same
       day.
 
     Then say it is ready, say what it contains, and stop — rule 6 still
-    decides what happens next, and the merge is his.
+    decides what happens next, and the merge is his. (A Fable director on
+    release work merges the piece itself and moves to the next one: rule
+    6, "Widened 2026-11-10".)
 
 ## Setting up on a new machine
 

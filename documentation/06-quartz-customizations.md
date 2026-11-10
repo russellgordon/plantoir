@@ -3956,9 +3956,12 @@ keeps print.scss's wrapping. The rule, every fence case and the limits are
   is a Paged.js iframe in SCREEN media, but `print.inline.ts` marks every
   non-diagram `pre` in its clone `plantoir-flowing`, and the selector's
   `pre:not(.plantoir-flowing)` keeps print.scss in charge there.
-- **The copy button copies the block as written.** Quartz's
-  `clipboard.inline.ts` copies `code.innerText`; generated content is not in
-  it and a soft wrap is no line break.
+- **The copy button copies the block as written, and can be pressed.**
+  Quartz's `clipboard.inline.ts` copies `code.innerText`, read at "nav";
+  generated content is not in it and a soft wrap is no line break. The
+  button is raised over the lines (`z-index: 1`, the `<pre>` isolated),
+  because the lines' `position: relative` otherwise puts them on top of it:
+  until #759 a real pointer could not press it at all (P7).
 
 ### P3. Measured (2026-10-23, M4 Pro, macOS 26.6)
 
@@ -4023,7 +4026,8 @@ WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
   and **Wrap Plain Twin** (the first three without the word). **6o** reads
   the build: four wrappers and the right four, the first three blocks byte
   for byte the twin's, the class on no other page but the skill's example,
-  and `index.css`'s screen-only rule with 80 rows and alt text. **6n** builds
+  and `index.css`'s screen-only rule with 80 rows and alt text, and (#759)
+  the rule that raises the copy button inside an isolated block. **6n** builds
   the page-authoring skill's ```text wrap example.
 - `browser-checks/text_wrap.mjs` (Chrome for Testing, beside the sidebar
   check): at 1512 px light, dark and 390 px - FIRST that the block is
@@ -4033,7 +4037,8 @@ WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
   box (full height, one right edge) by CDP; highlighted lines tinted; the
   callout's (opened), list item's and quiz explanation's (answered) blocks
   wrap; then print media and a `plantoir-flowing` pre laid out as a plain
-  block, and the copy button's text the block as written.
+  block; and (step 8, since #759) the copy button pressed by a REAL pointer,
+  at 1512 and 390 px, with a must-fail (P7).
 - **Must-fail, proven by copy-and-restore** (the closing comment has the
   output): `wrapsText` returning false fails every wrapping case of the check script (19 lines when measured, before the twentieth case was added);
   on a copy of the built site, the CSS rule deleted, the wrapper divs
@@ -4071,8 +4076,98 @@ does not know `content: … / ""`, keeps the plain declaration, shows the
 ellipses and lets a screen reader read each one (accepted: the other order
 would lose the ellipses there altogether); Obsidian shows the block
 unwrapped (not measured); the copy button sits over the first row's right
-end on hover, as over any block. Windows inherits all of it with
+end on hover, as over any block (30.8 px tall over 25.6 px rows, it reaches
+2 px into the second row's box, above its letters: measured 2026-11-10 at
+1512 and 390 px in WebKit and Chromium). Windows inherits all of it with
 `support/quartz`; its `windows` issue owes a look in Edge and Narrator.
+
+### P7. The copy button could not be pressed (#759, v1.9.3)
+
+**What happened.** On a class site the copy button of a ```text wrap block
+showed on hover and did nothing when pressed; on a block that does not wrap
+it worked. Russell met it in Safari.
+
+**Measured (2026-11-10, playwright-core 1.63, WebKit and Chromium headless,
+the Wrap Fixture built in the image and served over HTTP).** The pointer
+moved onto the block, then moved, pressed and released at the button's
+centre. On hover the button's opacity went 0 → 1 on both blocks, visible,
+`pointer-events: auto`. On the wrapped block `document.elementFromPoint` at
+the button's centre was the first line's `span[data-line]` in both engines;
+the click went to the span, the button's handler never ran,
+`navigator.clipboard.writeText` was never called, and Chromium's clipboard
+read back empty. On the plain block the hit was the button's `svg`, the
+write was called once and RESOLVED in both - WebKit included, so the write
+is inside the user gesture (Quartz reads the text at "nav" and writes
+synchronously in the click handler) and Safari's rule against a write after
+an `await` or a timer is not involved.
+
+**Why.** P2's lines are `position: relative`, the containing block of each
+line's absolute number and ellipses. Quartz's button is `position:
+absolute`, `z-index: auto`, and is PREPENDED to the `<pre>`. Positioned
+boxes at `z-index: auto` paint and hit-test in tree order, so every line
+after the button lies over it: it is seen through the line's transparent
+box, but the pointer lands on the line.
+
+**The fix**, in codeLines.scss's screen-only block, scoped as the rest of
+P: `isolation: isolate` on `.plantoir-text-wrap pre:not(.plantoir-flowing)`
+and `z-index: 1` on its `> .clipboard-button`. The isolation keeps that 1
+inside the block's own stacking context, so it can never rise over a
+popover, the search or a sticky header. Measured with it: the button is the
+hit on every block in both engines, the wrapped block's write resolves, and
+the copy is 2,174 characters, 120 lines, no `…`, line 101's 420-character
+URL whole.
+
+**Why the gate passed.** `text_wrap.mjs` pressed the button with
+`button.click()` and replaced `writeText` with a stub. A scripted `.click()`
+is dispatched ON the element whatever lies over it, so it cannot see a
+hit-test fault; and a stub resolves whatever the browser would have done
+with the real write. It is the kind of blind spot #755 had (Q: a shade
+over the sketch that only a real pointer's drag could find). Step 8 now
+writes a sentinel to the clipboard, moves the pointer onto the block with
+CDP `Input.dispatchMouseEvent`, waits for the button to show, reads what
+`elementFromPoint` finds at the button's centre, and presses and releases
+there whatever it found; a hit outside the button is reported afterwards
+as the failure. The text is taken from the argument of a PASS-THROUGH
+`writeText` (it still calls the real one, and its promise must resolve),
+and the clipboard is then read back and must hold that text rather than
+the sentinel - so a failure says which half broke, the press, the write or
+the clipboard. Nothing in it waits a fixed time. The plain block is
+pressed the same way, and both are pressed again at 390 px; and at 1512 px
+the must-fail sets the button back to the pre-#759 stacking (`z-index:
+auto`, the pre not isolated) and requires the same press to MISS, nothing
+written and the sentinel still on the clipboard. verify.sh 6o also
+requires the raising rule in the built `index.css`, and fails without it.
+Against the site built without the fix, from verify.sh's own Chrome for
+Testing 155 over CDP: "FAIL: light, 1512 px: a pointer at the centre of
+the long text wrap block's copy button hits span[data-line] in code, not
+the button, so pressing it copies nothing" (and the same at 390 px); with
+it, OK, 2,174 characters copied at both widths and the must-fail missed on
+`span[data-line]`.
+
+**The clipboard the check uses is the headless browser's own.** Measured
+2026-11-10, Chrome for Testing 155 `--headless=new` on macOS 26: a
+21-character sentinel written there read back, while `pbpaste` gave the
+same 50 characters, the same hash, before and after; and the changed check
+run against both sites left the Mac's pasteboard as it was. So a verify.sh
+run neither overwrites what the person at the Mac copied nor fails because
+they copied something meanwhile. Two traps met on the way: the clipboard is
+granted with `Browser.grantPermissions` on the BROWSER's endpoint, and that
+session must stay open - Chrome drops a session's permission overrides when
+it closes, and `readText` was then refused ("Read permission denied");
+and the page is given `Emulation.setFocusEmulationEnabled`, since a
+headless page is otherwise not focused. The read needs no user gesture
+(measured: the same run passed without one).
+
+**Rejected.** A `z-index` on every block's button: only a wrapped block's
+lines are positioned, and nothing else is to change. Dropping `position:
+relative` from the lines: the number and ellipses need a box per line (P2
+measured the inline alternative). `pointer-events: none` on the lines: a
+student could no longer select part of a block. Moving the button after
+`<code>` in Quartz's clipboard script: a Quartz file and every block
+changed, for what two declarations answer. Writing the clipboard another
+way: the write was never the fault. In the check, reading the Mac's
+pasteboard (`pbpaste`): it would make the gate depend on, and overwrite,
+whatever the person at the Mac copied.
 
 ## Q. GeoGebra sketches (#578, v1.9.0)
 
@@ -4172,11 +4267,12 @@ guess. What the loader does instead: after each line it also runs
 dialog always comes, and always after the line's own (every contract case,
 in order, in both engines), so any dialog that arrives before the marker's is
 the line's. A MutationObserver on the applet reads each dialog's message
-lines (`.dialogContent .gwt-Label`, without the title or buttons) and removes
-it as it is added, before it is drawn; the wait ends when the marker's
+lines (`.dialogContent .gwt-Label`, without the title or buttons) and then
+CLOSES it through its own button as it is added, before it is drawn (#755,
+below); the wait ends when the marker's
 dialog arrives — 1 to 9 ms a line — with a 10-second last resort for all the
 lines together. Dialogs are on while the lines run (`errorDialogsActive`) and
-turned off after, so nothing a student does opens one. The refused lines do
+turned off after, so nothing a student does opens an error dialog. The refused lines do
 not print. `browser-checks/geogebra_applet.mjs` plants every contract case in
 the fixture's commands sketch and reads exactly the refused ones, in
 GeoGebra's words, and that `SetValue(a, 3)` set `a` to 3; its must-fail (the
@@ -4189,6 +4285,96 @@ Unmeasured, and so said here rather than relied on: a dialog GeoGebra
 opened while the SKETCH was loading, still open when the lines start, would
 arrive before the first line's marker and be blamed on line 1 (stage 3+4
 review item 4).
+
+**Each dialog is closed, never removed (#755, v1.9.3).** Until #755 the
+loader took each dialog off the page (`dialog.remove()`). Every one of
+GeoGebra's dialogs is modal: it lays a translucent shade
+(`.gwt-PopupPanelGlass`) over the sketch, inside the applet's own frame, and
+the app ignores pointer input while it is open; only the dialog's own close
+takes the shade away and lets go. Removing it did neither. A 14-line sketch
+(three `Slider` lines, `SetValue`, `SetColor`, `SetLineStyle`,
+`SetLineThickness`, a point, `ZoomIn`) left 14 shades, one per marker,
+which together read as a black box, and its slider could not be dragged.
+Measured 2026-11-10 over HTTP on `[::1]`, headless Chromium 1243 and WebKit
+2359 (Playwright 1.63), slider `a` dragged with real pointer events and read
+back with `getValue`:
+
+| Loader | Shades left | On top at the sketch's centre | `a` before → after the drag |
+|---|---:|---|---|
+| Before #755: dialogs removed | 14 | a shade | 1 → 1 |
+| The issue's first proposal: dialogs AND shades removed | 0 | the canvas | 1 → 1 |
+| Dialogs closed through their own button (shipped) | 0 | the canvas | 1 → 3 |
+| No error dialogs at all (`setErrorDialogsActive(false)`, no marker; a control) | 0 | the canvas | 1 → 3 |
+
+The same in both engines; two such sketches on one page left 30 shades
+(14 + 16) before and none after, both sliders moving; the fixture's commands
+sketch left 17 (13 markers and 4 refused lines) before and none after, its
+four refused lines word for word as before. A `.ggb` file sketch runs no
+lines and was never affected. GeoGebra 5.4.933.1's dialogs for a refused
+line or the marker have "Close" beside "Show Online Help", or "OK" alone;
+the loader presses a lone button, otherwise the plain text button
+(`materialTextButton`), never the help button, which opens geogebra.org.
+`click()` closes the dialog at once, before it is drawn — it is off the page
+when the call returns, in both engines — so no dialog is ever seen. A dialog
+a later engine does not close that way is still taken off the page, so it
+is never drawn either; `browser-checks/geogebra_applet.mjs` would then fail
+on the drag. The loader calls no internal name of the engine's: they are
+scrambled and hold for one pin only.
+
+Why #578's own measurements did not show it: its browser check read the
+page's DOM — the refused lines, `a` set to 3, no `.dialogComponent` left —
+and never looked at what was drawn over the sketch or tried to move
+anything, and its fixture's `a` was a plain number rather than a slider.
+The deployed-site check at v1.9.1 (#711) opened a `.ggb` FILE sketch, which
+runs no lines. The check now counts shades (zero, document-wide), asks
+`elementFromPoint` what lies at the sketch's centre (its canvas), and drags
+the fixture's slider `a` with `Input.dispatchMouseEvent`, requiring its value
+to change; its MUST-FAIL removes one dialog the old way (and its shade) from
+the same applet and requires the same drag to leave `a` where it was. Against
+the old loader it fails on all three; against the fix it passes, three runs
+out of three. `scripts/test_geogebra.py` → `DialogClosingTextPinTests` is a
+text pin on the loader's source, nothing more — the one guard the Windows
+suite can run.
+
+**The last resort keeps watching until the last marker comes (#755).**
+Turning dialogs off does not stop one already queued: a refused line and a
+marker run with dialogs on, then dialogs turned off in the same task, still
+drew both dialogs a few milliseconds later (measured, both engines). On the
+10-second last resort the loader used to disconnect its watcher at once, so a
+dialog still on its way would have been drawn, modal, and left over the
+sketch. It now counts markers run and markers seen, and lets go only when the
+last marker run has arrived — the ordinary end at once, the last resort when
+the engine catches up — closing whatever comes meanwhile. No clock. A marker
+that never arrives would leave the watcher on the applet for good, closing
+every dialog a student opens with a tool (Slider, Text, Rotate…) in a
+`toolbar: true` sketch the moment it opens. So on the last resort it also
+lets go at the student's first `pointerdown` or `keydown` inside the sketch
+(capture phase, once; both listeners are removed when it lets go the
+ordinary way), since any dialog a student opens follows their own input.
+Measured 2026-11-10, headless Chromium 1243 and WebKit 2359 over HTTP, the
+last resort forced by a marker that brings no dialog (it took 10.3–10.4 s):
+a dialog queued before any touch was closed (0 left open, 0 shades); after a
+pointerdown on the sketch, the next dialog stayed open (1 open, 1 shade); on
+the ordinary end the watcher had already gone and a later dialog stayed
+open. **Known limit, accepted:** on the last resort, a refused line's dialog
+that arrives after the student's first touch is drawn over the sketch, and
+the student closes it by hand — GeoGebra's ordinary behaviour.
+The forced give-up measurement above (the touch let-go) was a one-off in
+headless Chromium and WebKit and is in no gate: `verify.sh`'s browser check
+does not force the last resort.
+
+**Rejected for #755:** removing the shades as well as the dialogs (the
+issue's first proposal — the picture comes back, the sketch still ignores
+every drag, measured above); removing every shade in the document (would
+take the shade from a dialog a student has open in ANOTHER sketch, and
+still leaves this one modal); opening no error dialogs at all and finding
+refused lines another way (the control row above: it moves, but it loses
+GeoGebra's own words for a refused line and cannot see a failed `SetValue`
+or `SetColor`, which evalCommand's answer already showed it cannot tell from
+a working one — a change to `geogebraFences.commands` and to what a teacher
+reads, for Russell to decide, not a hotfix); calling the engine's internal
+close (scrambled names, one pin only). **Not measured:** why the issue saw
+the sketch look fine from `file://`; a class site is always served over HTTP.
 
 **A failed fetch is not remembered** (stage 3+4 review item 4). With no
 saved copy, every build asks geogebra.org again, and a build while it does
