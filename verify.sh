@@ -691,7 +691,7 @@ fi
 # the gate - the pass that writes the manifest and the thumbnails, the folder
 # problem, and where the transformer stands. Stdlib only.
 if (cd scripts && python3 test_geogebra.py) >/tmp/verify_geogebra_test.log 2>&1; then
-  pass "GeoGebra sketches: the fences, settings, commands, files (published once), keys, the gate, the manifest, the folder problem and the transformer's place (scripts/test_geogebra.py, #578)"
+  pass "GeoGebra sketches: the fences, settings, commands, files (published once), keys, the gate, the manifest, the folder problem, the transformer's place, and a text pin that the site's loader closes GeoGebra's dialogs rather than removing them (scripts/test_geogebra.py, #578, #755)"
 else
   fail "GeoGebra sketches: the fences, settings, commands, files, keys, gate or folder problem (scripts/test_geogebra.py, #578)"
   cat /tmp/verify_geogebra_test.log
