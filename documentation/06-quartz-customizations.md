@@ -4122,24 +4122,26 @@ URL whole.
 is dispatched ON the element whatever lies over it, so it cannot see a
 hit-test fault; and a stub resolves whatever the browser would have done
 with the real write. It is the kind of blind spot #755 had (Q: a shade
-over the sketch that only a real pointer's drag could find). Step 8 now moves the pointer onto the
-block with CDP `Input.dispatchMouseEvent`, waits for the button to show,
-requires `elementFromPoint` at its centre to be inside the button, writes a
-sentinel to the clipboard, presses and releases there, takes the text from
-the argument of a PASS-THROUGH `writeText` (it still calls the real one,
-and its promise must resolve), then reads the clipboard back and requires
-it to hold that text rather than the sentinel - so a failure says which
-half broke, the press, the write or the clipboard. Nothing in it waits a
-fixed time. The plain block is pressed the same way; and at 1512 px the
-must-fail sets the button back to the pre-#759 stacking (`z-index: auto`,
-the pre not isolated) and requires the same press to MISS, nothing
+over the sketch that only a real pointer's drag could find). Step 8 now
+writes a sentinel to the clipboard, moves the pointer onto the block with
+CDP `Input.dispatchMouseEvent`, waits for the button to show, reads what
+`elementFromPoint` finds at the button's centre, and presses and releases
+there whatever it found; a hit outside the button is reported afterwards
+as the failure. The text is taken from the argument of a PASS-THROUGH
+`writeText` (it still calls the real one, and its promise must resolve),
+and the clipboard is then read back and must hold that text rather than
+the sentinel - so a failure says which half broke, the press, the write or
+the clipboard. Nothing in it waits a fixed time. The plain block is
+pressed the same way, and both are pressed again at 390 px; and at 1512 px
+the must-fail sets the button back to the pre-#759 stacking (`z-index:
+auto`, the pre not isolated) and requires the same press to MISS, nothing
 written and the sentinel still on the clipboard. verify.sh 6o also
-requires the raising rule in the built `index.css`, and fails without it. Pressed again at 390 px. Against the site built
-without the fix, from verify.sh's own Chrome for Testing 155 over CDP:
-"FAIL: light, 1512 px: a pointer at the centre of the long text wrap
-block's copy button hits span[data-line] in code, not the button, so
-pressing it copies nothing" (and the same at 390 px); with it, OK, 2,174
-characters copied at both widths and the must-fail missed on
+requires the raising rule in the built `index.css`, and fails without it.
+Against the site built without the fix, from verify.sh's own Chrome for
+Testing 155 over CDP: "FAIL: light, 1512 px: a pointer at the centre of
+the long text wrap block's copy button hits span[data-line] in code, not
+the button, so pressing it copies nothing" (and the same at 390 px); with
+it, OK, 2,174 characters copied at both widths and the must-fail missed on
 `span[data-line]`.
 
 **The clipboard the check uses is the headless browser's own.** Measured
