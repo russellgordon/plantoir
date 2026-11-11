@@ -18,6 +18,15 @@ namespace Plantoir.Tests;
 /// runs them on any more. <c>documentation/12-windows-app.md</c> → "Python
 /// 3.14.10 in the runtime".
 /// </summary>
+/// <remarks>
+/// The recipe, project and installer checks read SOURCE TEXT. They catch a
+/// guard deleted, commented out or moved, and nothing that leaves the text in
+/// place but stops it running: a <c>Condition</c> set false, a statement
+/// inside <c>if ($false)</c> or a <c>&lt;# #&gt;</c> block, a later
+/// reassignment of <c>$PythonOpensslAtLeast</c>. Running things catches
+/// those: the fetch itself (its floor refuses a low OpenSSL), the build's
+/// <c>CheckNativeRuntimeManifest</c>, and the fetched-runtime facts below.
+/// </remarks>
 public sealed class RuntimePythonTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
@@ -92,6 +101,8 @@ public sealed class RuntimePythonTests : IDisposable
         string project = ProjectOutsideComments();
         string version = WindowsPython["version"]!.ToString();
         Assert.Contains($"<_PlantoirRuntimePython>{version}</_PlantoirRuntimePython>", project);
+        // And the pattern looks for the PYTHON key, not another one's.
+        Assert.Contains("<_PlantoirRuntimePythonPattern>&quot;python&quot;", project);
         Assert.Contains("<Error Condition=\"!$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimePythonPattern)))\"", project);
     }
 
@@ -101,9 +112,13 @@ public sealed class RuntimePythonTests : IDisposable
         string installer = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "installer.iss"));
         // Section headers at the start of a line: the comments above
         // [InstallDelete] name "[Files]" too.
-        var section = Regex.Match(installer, @"(?m)^\[InstallDelete\]\r?$").Index;
-        var next = Regex.Match(installer, @"(?m)^\[Files\]\r?$").Index;
-        Assert.True(section > 0 && next > section, "installer.iss has no [InstallDelete] section before its [Files] section.");
+        var header = Regex.Match(installer, @"(?m)^\[InstallDelete\]\r?$");
+        Assert.True(header.Success, "installer.iss has no [InstallDelete] section.");
+        int section = header.Index + header.Length;
+        // The section ends at the NEXT header, whichever it is: an
+        // [UninstallDelete] between it and [Files] is another section.
+        var after = Regex.Match(installer[section..], @"(?m)^\[");
+        int next = after.Success ? section + after.Index : installer.Length;
         // The whole line, anchored: the same entry behind ';' is a comment.
         Assert.Matches(new Regex(@"(?m)^Type: filesandordirs; Name: ""\{app\}\\runtime\\python""\r?$"), installer[section..next]);
     }
