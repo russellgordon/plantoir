@@ -63,10 +63,27 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; would otherwise stay inside it, for Node to resolve. And
 ; runtime\vendor\geogebra (#687): scripts\geogebra_engine.py makes the folder
 ; whole, so the next GeoGebra version must not inherit this one's files.
+; runtime\wrangler (#719): wrangler 4.80.0 -> 4.156.0 is an npm prefix
+; install whose dependencies are hoisted into runtime\wrangler\node_modules,
+; and the move changes most of them in place (89 -> 91 packages; sharp
+; 0.34.5 -> 0.35.5, ws 8.18.0 -> 8.21.0, undici 7.24.4 -> 7.30.1, miniflare
+; 4 -> 5), so every file an old version had and its new one does not would
+; stay beside the new tree, for Node to resolve and for the audit to find.
+; runtime\python (#764): Python 3.11.9 -> 3.14.10 renames the interpreter's
+; own files (python311.dll, python311.zip, python311._pth -> python314.*), and
+; 3.11's get-pip installed setuptools, wheel and packaging, which 3.14's does
+; not; Pillow's and PyYAML's cp311 .pyd files and the old pip's dist-info
+; would stay in Lib\site-packages too. Python 3.14 loads none of them (it
+; reads python314._pth only, and a cp311 extension is not a cp314 one), but a
+; tree holding two Pythons is what the next reader and the next audit find.
+; The same running-process exposure as runtime\node (#700): a preview build
+; or a scheduled deploy running runtime\python\python.exe at install time.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\runtime\vendor\tikz-engine\node_modules"
 Type: filesandordirs; Name: "{app}\runtime\node"
 Type: filesandordirs; Name: "{app}\runtime\vendor\geogebra"
+Type: filesandordirs; Name: "{app}\runtime\wrangler"
+Type: filesandordirs; Name: "{app}\runtime\python"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

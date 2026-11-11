@@ -20,6 +20,15 @@ Branch `issue/726-deploy-flow-later-classes-and-mid-deploy`. Measured on the Len
 - **#728:** `SectionDeployRun` / `SectionRuns` (Core) own a section's deploy; the view binds to it, Deploy is unavailable while this app has the section's deploy on its way, the ending is shown once, and the deploy's leases are the run's — they used to ride on the view's preview build claim, given back on Unloaded mid-deploy. `SectionKey` is meant for #734 too. `documentation/12-windows-app.md` → "A section's deploy outlives its view (#728, the mac's #706)".
 - Gates: `dotnet test` Failed 7, Passed 3183, Total 3190 (10 m 10 s) — the seven reds `dev` already carried, same messages (baseline on `dev` a8b7a65d6: Failed 8, Passed 3140, Total 3156). UI: `LaterClassesAtDeployUiTests` (4), `SectionVerbsUiTests` (2) and `ReturningToASectionMidDeployUiTests` (1) — 6 of 7 on the first run (the new test counted a deploy leg that had not started yet; corrected), then the new test alone, 1 of 1.
 
+## 2026-11-11 — wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)
+
+Branch `issue/719-wrangler-runtime-harness`. Measured on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200, wired Ethernet), with another worktree's test suites running at times.
+
+- **#743:** `verify-deploy.ps1 -FirstPublish` asks a brand-new site again, every 5 s for up to 60 s, for a file that does not yet answer as its check wants, and counts the retries per site; a plain run and the preview ask once. `-SelfTest` gained the mac's five #740 cases: 13 passed, 0 failed, ten runs in a row (about 30 s each); with the retry taken out, 4 of the 5 fail.
+- **#719:** wrangler 4.80.0 → 4.156.0 in `fetch-runtime.ps1`; the `mustStayBelow` test is deleted; `installer.iss` empties `{app}\runtime\wrangler` so an install over 1.9.0 keeps none of 4.80.0's files (to be proved by #700's upgrade). `audit-runtime.ps1`: 54 advisories, 54 accepted, 0 blocking (4.80.0: 14 blocking). `verify-deploy.ps1` fails a Cloudflare leg wrangler delegated to Workers (none did, with `CLAUDECODE` and `AI_AGENT` reaching wrangler): `-FirstPublish` 170 passed, 0 failed, 0 skipped; plain 168 passed, 0 failed, 0 skipped. Transcript: `research/wrangler/2026-11-10-windows-first-upload.md`.
+- **#730:** the loopback rewrite requires both of Quartz's bind sites, each exactly once, and keeps `handlers.js`'s bytes (it had been rewritten with a BOM and mojibake bullets in every runtime); `FetchRuntimeLoopbackGuardTests` (5).
+- **Gates:** `dotnet test` Failed 11, Passed 3142, Total 3153: the baseline on `dev` (17c126331 with the dev runtime) was Failed 13 of 3149, the same eleven (other pieces' contract-ahead-of-app cases) plus `TheWindowsRuntimeRecipeCarriesTheSamePins` and the deleted ceiling test; none added. Details: documentation/12, "wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)".
+
 ## 2026-10-28 — the console keeps lines apart, the Cloudflare wait needs this run's mark, and two decisions written down (#661, #680, #671, #659)
 
 Branch `issue/661-console-preview-verify`. Measured on the Lenovo 20QES70500 (i5-8365U, Windows 11 Pro 26200).
@@ -855,7 +864,7 @@ kind of session can do, measured on the day and written for the next one:
   website builder. Reinstall Plantoir, then try again." (`setup.ps1`,
   `preview.ps1`, `deploy.ps1`); there is no fallback path left to take. Run
   `windows-app/Vendor/fetch-runtime.ps1` once before building — it fetches
-  Node (22.23.4 since #675; 20 before), Python 3.11 embeddable, patched Quartz with win-x64 node_modules,
+  Node (22.23.4 since #675; 20 before), Python 3.14.10 embeddable (3.11.9 until #764), patched Quartz with win-x64 node_modules,
   wrangler and the emoji font into `windows-app/Vendor/runtime/` (~600 MB,
   gitignored), which the build robocopy-mirrors beside the app. The
   launchers run natively whenever `PLANTOIR_RUNTIME` (set by `ScriptRunner`)

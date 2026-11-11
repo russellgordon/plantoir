@@ -2301,7 +2301,7 @@ as work happens:
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
 fetches pinned, portable pieces — Node 22.23.4 (zip, no installer; Node 20
-until #675), Python 3.11
+until #675), Python 3.14.10 (3.11.9 until #764, below)
 (the embeddable distribution plus `python-frontmatter==1.3.0`,
 `PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
 against `contracts/toolchain.json` → `pins` by
@@ -2701,7 +2701,7 @@ Windows figures are the v1.1.0 release assets.
 | | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
 |---|---|---|---|
 | Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
-| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.14.10 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |
@@ -2722,7 +2722,9 @@ the same day.)
    file) on a mismatch. The pins were measured on the build PC (i5-8365U,
    Windows 11 26200), not copied: Node's equals nodejs.org's own
    `SHASUMS256.txt` for v20.18.1 (and, since #675, for v22.23.4); the Python zip's `python.exe` and
-   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   `python311.dll` were byte-identical to the runtime that had shipped (3.11.9;
+   since #764 the pin is python.org's published SHA-256 for the 3.14.10 zip,
+   and the wheels are hashed too); the font
    equals the shipped font. Proven by running the script's own `Fetch` (lifted
    out of the file by its syntax tree, against a `file://` copy): the right pin
    keeps the file, one wrong hex digit refuses it and leaves nothing behind.
@@ -8179,7 +8181,10 @@ be the "nothing skipped" run `RELEASING.md` asks for (the #568
 implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
-never moved beside the wired adapter).
+never moved beside the wired adapter). Since #743 and #719 a `-FirstPublish`
+run asks a brand-new site again for a file before failing it, and every
+Cloudflare leg fails if wrangler handed it to Workers: "wrangler 4.156.0, a
+brand-new site's files asked again, and the loopback guard", below.
 
 Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
 with a YouTube frame, and the borrowed page). The FIRST, from a fresh state
@@ -8192,7 +8197,9 @@ run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight
 were the Swift program, once per host and folder, then reported as skips;
 these totals are from BEFORE the change above, which turns those eight into
 asserted passes, so a clean run should now read 148 passed, 0 failed,
-0 skipped — the next release run re-measures it); publishes of 10–12 s to
+0 skipped — the next release run re-measures it; the checks have grown
+since, and on 2026-11-10 (#719) the `-FirstPublish` run read 170 passed,
+0 failed, 0 skipped and the plain run 168 passed, 0 failed, 0 skipped); publishes of 10–12 s to
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 
@@ -8344,7 +8351,10 @@ On scratch copies, not committed: a wait that returns `$true` at once
 failed **4 of the 8**, the mac's figure (07 → "`./verify-deploy.sh
 --self-test`"); comparing the front page only failed "only the static files moved (same front page)", the
 case that must fail without the mark; dropping the `\s*` failed the `\r\n`
-case and the unmarked-page case.
+case and the unmarked-page case. (That was the whole self-test until #743,
+which added the mac's five #740 cases against a second stub: it now reads
+13 passed, 0 failed in about 30 s — "wrangler 4.156.0, a brand-new site's
+files asked again, and the loopback guard", below.)
 
 The must-fail count was 3, not the mac's 4, until review found why:
 `Measure-Case` hid the call's Ok lines and returned only its result and its
@@ -10332,7 +10342,8 @@ is no longer needed for the browser checks). Quartz's `npm ls --all` is
 EBADENGINE), and so is the TikZ engine's (251 lines). The contract's
 triangle through `plantoir-figures.mjs` is the same 1,540 bytes, SHA-256
 `8c68b085…6827b37`, as on 20.18.1. wrangler 4.80.0 answers `--version` on
-it. `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
+it (4.156.0 since #719: "wrangler 4.156.0, a brand-new site's files asked
+again, and the loopback guard", below). `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
 which warns without it.
 
 **A Node bump is a full re-fetch, and the script now says so.** Until #675
@@ -10352,7 +10363,14 @@ and matches it with a regex, because Windows PowerShell 5.1's `ConvertTo-Json`
 writes `"node":  "20.18.1"` with two spaces and a BOM, so a `Contains` of the
 spaced text would be wrong either way. Proven against four hand-made
 manifests: Node 20 refused, 22.23.4 accepted, 22.23.45 refused, no
-`geogebra` key refused.
+`geogebra` key refused. Since #719 it names `_PlantoirRuntimeWrangler` the
+same way (regex, held to `pins` → `wrangler` by the same test), so a runtime
+still on wrangler 4.80.0 stops the build: "windows-app\Vendor\runtime does
+not carry wrangler 4.156.0 (its manifest.json names another). Delete
+windows-app\Vendor\runtime, re-run windows-app\Vendor\fetch-runtime.ps1 (a
+full fetch, about 600 MB) and build again." Proven 2026-11-11: the 4.80.0
+runtime's own manifest refused with that line, the 4.156.0 one built, and
+the test failed with the project file's value changed to 4.80.0.
 
 A second fix the re-fetch found: the scaffold bake (`setup_course`'s two
 `ensure_…` calls) prints a check mark, and with the script's output sent to a
@@ -10513,6 +10531,12 @@ GitHub published all six on 2026-10-27, after the list's `reviewed`
 undici and satori in the image, so verify.sh's next online run should see the
 same six.
 
+(The wrangler half of what follows is history since #699 and #719: wrangler
+4.156.0 bundles undici 7.30.1, its tree has no advisory, and the wrangler
+entries in `npmAudit.accepted` were deleted as stale. Windows' audit on
+4.156.0 is in "wrangler 4.156.0, a brand-new site's files asked again, and
+the loopback guard", below.)
+
 **All six were then accepted, on evidence** (`research/npm-audit/2026-10-28.md`
 has what was read and measured; `npmAudit.accepted` carries each reason, and
 `reviewed` is 2026-10-28). The fact that decides the undici five:
@@ -10542,6 +10566,325 @@ it is in this piece (the implementation review raised it; widening what a
 hand-run install closes is its own change, #700, not a side effect of a Node bump).
 Until then: stop any preview and let a scheduled deploy finish before
 installing by hand.
+
+## wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)
+
+Three pieces of the runtime and its publishing harness, done together
+because the credentialed run that judges the first needs the second. The
+mac's reasoning is not repeated: [02 → wrangler 4.156.0
+(#699)](02-docker-image.md), [07 → "A brand-new site's files, asked again
+(#740)"](07-deployment.md) and [03 → "Every preview address is this Mac's
+own (#684)"](03-launcher-scripts.md). This is what Windows does
+differently, and what it measured (2026-11-10/11, Lenovo 20QES70500, Intel
+Core i5-8365U, 16 GB, Windows 11 Pro 26200, wired Ethernet, Ontario; another
+agent's test suites were running in a second worktree for part of it).
+
+**wrangler 4.80.0 → 4.156.0** (#719). `fetch-runtime.ps1`'s
+`$WranglerVersion = "4.156.0"` is the contract's `windowsRuntimeContains`
+(one space), so `TheWindowsRuntimeRecipeCarriesTheSamePins` turned green;
+`Wrangler_StaysBelowVersionThatNeedsNode22` was deleted with the contract's
+`mustStayBelow`, and `TheRuntimesNodeSatisfiesWranglersEngines` stays. A
+base pin changed, so the fetch refuses an existing runtime (delete it and
+re-run): a fresh fetch took **223 s** (the 4.80.0 one the same evening 322 s).
+`wrangler --version` 4.156.0, `engines.node` `>=22.0.0`. `runtime\wrangler`
+is 177 MB on disk (158 MB on 4.80.0); its installed lockfile holds 91
+packages (89), none dropped, most moved (sharp 0.34.5 → 0.35.5, ws 8.18.0 →
+8.21.0, undici 7.24.4 → 7.30.1, miniflare 4.20260401.0 → 5.20261023.3-beta).
+
+**The installer now empties `{app}\runtime\wrangler`** (`installer.iss` →
+`[InstallDelete]`, the plan review's H1). The prefix install hoists every
+dependency into `runtime\wrangler\node_modules`, and Inno never removes a
+file the new version does not carry, so an install over 1.9.0 would have
+kept 4.80.0's files beside 4.156.0's in the same package folders, for Node
+to resolve and for the audit to find. NOT yet proved on a real upgrade: that
+is #700's measured install over 1.9.0, which must then run
+`windows-app\audit-runtime.ps1 -Runtime "<{app}>\runtime"` (expect exit 0,
+`blocking=0`, `stale=0`) and `"<{app}>\runtime\node\node.exe"
+"<{app}>\runtime\wrangler\node_modules\wrangler\bin\wrangler.js" --version`
+(expect 4.156.0), and look for files under `runtime\wrangler\node_modules`
+dated before the install.
+
+**The audit** (`windows-app\audit-runtime.ps1`): on 4.156.0 exit 0, `COUNTS
+audited=5 advisories=54 accepted=54 blocking=0 reported=0 stale=0` — the
+mac's numbers for the image exactly, so the installed tree adds no advisory
+the image's does not. On the 4.80.0 runtime kept aside, the same script with
+the new accepted list: exit 1, **14 blocking** (sharp, undici, ws) and 21
+reported, every one in the wrangler tree — the must-fail #719 predicted.
+
+**The Workers delegation, tested for real.** wrangler 4.108+ hands a NEW
+static project to Workers when it believes an agent drives it. On Windows
+`deploy.py` runs natively, so the harness's own `CLAUDECODE` and `AI_AGENT`
+(it ran under Claude Code) reached wrangler while it made a first upload
+to a project `ensure_pages_project` had just created. `verify-deploy.ps1` →
+`Check-NoDelegation` (the mac's `check_no_delegation`) fails a Cloudflare
+leg whose log says "now part of Cloudflare Workers", and the run records
+which of `CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID` and `GEMINI_CLI` it
+carried (names only). Every leg stayed on Pages: `--branch=main` and the
+API-made project hold here too. `Measure-Deploy`'s count no longer needs
+"(N already uploaded)", which a first-ever upload does not print (the mac's
+#712). The transcript is `research/wrangler/2026-11-10-windows-first-upload.md`.
+
+**A brand-new site's files, asked again** (#743). `Get-CheckedResponse` is
+`fetch_headers`, `Measure-NewSiteRetries` is `measure_new_site_retries`,
+and `Check-Engine` calls the first for exactly the fetches the mac
+switched (the engine's files, the worker's CSP, Swift's thread and program,
+COEP on the engine folders, KaTeX's stylesheet and face) and the second at
+its end, with its own retry log per call. On a `-FirstPublish` run only, an
+answer that is not HTTP 200 (plus COEP `require-corp` for the COEP checks)
+is asked again every 5 s until a 60 s deadline fixed at the first ask
+(`VERIFY_DEPLOY_NS_POLL`, `VERIFY_DEPLOY_NS_WAIT`); each retry prints an
+`[again]` line (ASCII, not the mac's arrow: the file is BOM-less UTF-8 that
+Windows PowerShell 5.1 reads as ANSI), and the Result block carries one line
+per site. A plain run, and the `http://localhost:` preview on any run, ask
+once. `Check-PageLinks` is not retried, as on the mac. `Get-Response` moved
+up beside `Get-CheckedResponse`, unchanged, because `-SelfTest` runs before
+the helpers.
+
+`-SelfTest` gained the mac's five cases against its second stub, `files.py`,
+copied byte for byte: **13 passed, 0 failed, 0 skipped**, ten runs in a row,
+29–31 s each. The never-served case asserts 2–5 retries and the count case
+the total the log holds (it read "3 file(s) needed asking again, 8 retries
+in all, at most 4 for one file, the longest 4 s"). Must-fail on a scratch
+copy with the retry taken out (`break` in place of the first-publish test):
+**9 passed, 4 failed**, the plain-run case passing either way — the mac's
+figure. The credentialed `-FirstPublish` run said "no file needed asking
+again" for both new sites on every leg, so, as on the mac, the retry has yet
+to be seen firing live.
+
+**How a red `-FirstPublish` check is read.** A per-file check that is red
+after its 60 s is a failure. A page-link 404 on a brand-new site
+(`Check-PageLinks`, not retried — the mac's 2026-10-31 run had one, doc 07)
+is checked once by hand a few minutes later and recorded as such, red in
+the run and "200 by hand at <time>" beside it; a run is never re-run until
+it is green.
+
+**The loopback guard** (#730). The rewrite is now `Set-QuartzLoopbackBinds`,
+between BEGIN/END markers above the fetch's `try`: it requires
+`server.listen(argv.port)` and `new WebSocketServer({ port: argv.wsPort })`
+each EXACTLY once and refuses, naming "the preview server" or "the
+live-reload websocket", when either is not; the guard it replaced passed on
+any `127.0.0.1` in the file. It also reads and writes `handlers.js` as UTF-8
+with no BOM. The old `Get-Content -Raw` read it as ANSI and `Set-Content
+-Encoding utf8` wrote a BOM, so the "Get started" bullets at lines 217-219
+were mojibake (`â€¢`) in every runtime made until now; the new fetch's file
+differs from upstream Quartz v4.5.0's in lines 442-443 only (`diff`), with
+no BOM. `FetchRuntimeLoopbackGuardTests` (5) lift the function and run it
+through powershell.exe on a fixture of Quartz's own two lines and a bullet
+line: both rewritten with every other byte kept, one site missing either
+way, neither, and a site twice. Must-fail with the old guard between the
+markers: all 5 red (the one-site and twice cases because the old guard
+passes them, the both-sites case on the bytes, neither-site because the old
+message names no site). REJECTED: "at least once" (a second bind site in a
+new Quartz is a change to look at, not to rewrite blind), and a regex over
+the whole file for `127.0.0.1` (what failed).
+
+**Measured on a real preview** (2026-11-11, `preview.bat ICS3U 1` in
+`C:\Users\lenov\Desktop\plantoir-deploy-verify`, with `PLANTOIR_RUNTIME` set
+by hand to the new runtime — unset, the launcher would have used the
+INSTALLED 1.9.0 runtime): `Get-NetTCPConnection -State Listen -LocalPort
+8081,9081` listed `127.0.0.1:8081` and `127.0.0.1:9081`, both owned by the
+one `node`, and nothing on `0.0.0.0` or `::`. `curl.exe` got 200 from
+`127.0.0.1:8081` and `localhost:8081`; from the PC's LAN address
+(192.168.2.21) on 8081 and 9081, and from `[::1]:8081`, it was refused
+(exit 7). `preview.bat ICS3U 1 --stop` stopped 3 processes and left no
+listener and no `node` naming the folder.
+
+**Cancel during a Cloudflare upload, on 4.156.0** (2026-11-11). The app's
+Cancel is `ScriptRunner.CancelByUser`: a `\x03` written into the pseudo
+console, then a kill two seconds later if anything is still running. That
+was reproduced with a scratch copy of PtyDriver whose only change is a reply
+that writes `\x03`, running the launcher the way the app does
+(`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File
+deploy.ps1 ICS3U 1 --target cloudflare`, `PLANTOIR_RUNTIME` the new
+runtime), and firing on the line under wrangler's banner, the moment
+`pages deploy` began. Node's exit codes were logged by a `--require`
+preload in `NODE_OPTIONS`. **wrangler 4.156.0 exited 0**, as both versions
+did on the mac (#699), and so did the launcher, 42 s after it started and
+with nothing printed after the banner: no "Deploy complete", no traceback.
+So nothing moves `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL` (130, -2,
+0xC000013A) or the Cancel wording, which the app chooses from its own
+`WasCancelled`, set before the `\x03`, not from the exit code. The window's
+sentence itself was not looked at in this piece. Through `deploy.bat`
+instead (how `verify-deploy.ps1` and a teacher at a command line run it),
+wrangler also exited 0 but `cmd.exe` then stopped at "Terminate batch job
+(Y/N)?" and waited until it was killed; the app never goes through `cmd`.
+
+**#714 on Windows** (Debian's Brotli in the image): the runtime's Node
+reports `process.versions.brotli` 1.1.0 and `process.versions.openssl`
+3.5.9 (Node 22.23.4). But Pillow 12.3.0's FreeType DOES carry a Brotli
+decoder of its own: `ImageFont.truetype` loads a WOFF2 font
+(`KaTeX_AMS-Regular.woff2`), which FreeType can only do when built with
+Brotli, although no `*brotli*` file and no Brotli string is in any Pillow
+`.pyd` (it is linked in statically). Its version cannot be read from the
+binary. And the runtime's Python 3.11.9 reported `ssl.OPENSSL_VERSION`
+"OpenSSL 3.0.13 30 Jan 2024", the TLS under every Netlify publish and
+`deploy.py`'s Cloudflare API calls on Windows. Nothing was changed
+here: the OpenSSL half was #764 (v1.9.3), which moved the runtime to Python
+3.14.10 and OpenSSL 3.5.9 (next section), and Pillow's Brotli is #766,
+which asks for its version on both platforms.
+
+## Python 3.14.10 in the runtime: a supported OpenSSL (#764, Windows 1.9.3)
+
+Written 2026-11-11 for [#764](https://github.com/russellgordon/plantoir/issues/764).
+Measured on the Windows test PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11
+Pro 26200, wired Ethernet). The contract half is `contracts/toolchain.json` →
+`windowsPython` (version, `windowsRuntimeContains`, `opensslAtLeast`, why,
+measured, rejected). The mac owes nothing; what it must KNOW is in
+[02 → "The shared scripts run on two Pythons"](02-docker-image.md).
+
+**Why.** Python's own OpenSSL is the TLS under every Netlify publish and every
+Cloudflare API call `deploy.py` makes here (wrangler uses Node's, 3.5.9). The
+runtime carried Python 3.11.9, the last 3.11 with Windows binaries, whose
+OpenSSL is 3.0.13 (30 Jan 2024). OpenSSL says "Versions 3.0, 1.1.1 and 1.0.2
+are no longer supported" (openssl-library.org → release strategy). Its last
+public 3.0 is 3.0.22 (25 Aug 2026), and about 44 CVEs were fixed in 3.0.x
+after 3.0.13. No 3.11 patch release can move it: 3.11.10 to 3.11.18 are
+source only. The exposure was outbound only, to Netlify and Cloudflare, at
+deploy: Python serves nothing.
+
+**The candidates.** Each python.org embeddable amd64 zip was checked against
+its published hash and run with `-I`. `ssl.OPENSSL_VERSION`, and each tag's
+`PCbuild/get_externals.bat` agrees:
+
+| Python | OpenSSL | Windows binaries still coming? | win_amd64 wheels for all three pins |
+|---|---|---|---|
+| 3.11.9 (was) | 3.0.13 | no | yes |
+| 3.12.10 | 3.0.16 | no (3.12.11 on are source only) | yes |
+| 3.13.17 | 3.5.9 | no: 3.13.18 (25 Oct 2026) is source only | yes |
+| **3.14.10** | **3.5.9** | **yes, while 3.14 is in bugfix (to about 2027-10)** | **yes (cp314)** |
+| 3.15.2 | 3.5.9 | yes | **no**: PyYAML 6.0.3 has no cp315 wheel (`pip --only-binary` refuses) |
+
+3.14.10 is the only line with all three, so the next OpenSSL fix arrives as a
+3.14.x. Its zip is 12,619,664 bytes (3.11.9's: 11,249,023), and `python.exe`,
+`python314.dll` and `libssl-3.dll` are Authenticode-signed by the Python
+Software Foundation. **Before 3.14 goes source-only (about 2027-10) the
+runtime must move again**, to a line that still has Windows binaries, or this
+returns. That needs a PyYAML wheel for that line, and PyYAML is the pin that
+decides what `publish: no` means (08 → "Whether students see a page").
+
+**What landed.**
+- `fetch-runtime.ps1`: `$PythonVersion   = "3.14.10"`. The zip is checked by
+  hash AND size. The three wheels are pinned by version AND SHA-256 (PyPI's
+  own, for the cp314 win_amd64 files) and installed with `--only-binary :all:
+  --require-hashes --no-deps`: a missing wheel refuses instead of building
+  from source. Until #764 they were exact versions with no hash. 3.14's
+  `get-pip.py` installs pip only; 3.11's also installed setuptools, wheel and
+  packaging, which nothing here imports.
+- `Assert-PythonOpenssl` refuses a Python whose OpenSSL is below
+  `opensslAtLeast` (3.5.9). It reads the number in `ssl.OPENSSL_VERSION`. Its
+  first version read `ssl.OPENSSL_VERSION_INFO[:3]` instead, and refused
+  3.14.10 on its first run. For OpenSSL 3 that tuple is (major, minor, 0,
+  patch, status), so 3.5.9 is `(3, 5, 0, 9, 0)` and its first three read 3.5.0.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest`: `_PlantoirRuntimePython`
+  stops the build on a runtime whose manifest names another Python. The
+  fetch already refuses to replace a base pin in place. Measured: a manifest
+  edited to 3.11.9 gives "does not carry Python 3.14.10".
+- `installer.iss` → `[InstallDelete]` empties `{app}\runtime\python`. Python
+  3.14 loads only `python314._pth`, and a cp311 `.pyd` is not a cp314 one.
+  But an upgrade would otherwise keep `python311.*`, setuptools, wheel,
+  packaging, the cp311 `.pyd`s and a second pip `dist-info` beside the new
+  tree. A preview build or scheduled deploy running `python.exe` at install
+  time is #700's exposure, the same as `runtime\node`'s.
+- `PythonToolchainTests` runs the shared `scripts/test_*.py` on the
+  RUNTIME's Python whenever a runtime is fetched (this checkout's, or
+  `PLANTOIR_RUNTIME`'s), and on PATH's `python` only when none is.
+  `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which, with
+  its version and OpenSSL. Until #764 they ran on PATH's interpreter (3.14.7
+  on this PC) while teachers ran 3.11.9. The runtime's `._pth` replaces
+  `sys.path`: the script's own folder is not on it and `PYTHONPATH` is
+  ignored. So, run plainly, 50 of 93 files failed with
+  `ModuleNotFoundError`. (`PYTHONIOENCODING`, `PYTHONDONTWRITEBYTECODE` and
+  `PYTHONUTF8` ARE honoured there, measured on 3.14.10, although
+  `sys.flags.ignore_environment` reads 1.) That happened on 3.11.9 and 3.14.10
+  alike. A shim (`runpy.run_path` with the working directory, `scripts\`,
+  first on `sys.path`, plus `-B -X utf8`) does what the product's entry
+  scripts do for themselves. With it, 93/93 pass on both (273 s and 293 s).
+- `RuntimePythonTests`. It holds the recipe, the build, the installer and a
+  fetched runtime to the contract. A runtime that is fetched and differs
+  FAILS; only no runtime skips, because the build's guard never runs for
+  `dotnet test`. It runs the OpenSSL floor as written against stand-ins
+  (3.0.13, 3.0.22 and 3.5.8 refused; 3.5.9, 3.5.10 and 3.10.0 accepted) and
+  against the real runtime. It also parses every `scripts/` and `support/` file
+  as Python 3.11, the image's. That parse rejects `type X = …`, `def f[T]`,
+  `class C[T]` and `except A, B:`, each a test case. It does NOT see PEP 701
+  quote reuse in an f-string, or a stdlib function added after 3.11.
+- `verify-deploy.ps1` records the runtime's Python and OpenSSL in its
+  Measured block.
+
+**Revalidated, against 3.11.9.**
+- Identical: libyaml (`CSafeLoader`), the YAML 1.1 readings of
+  no/off/yes/on, Pillow's freetype, webp, jpeg and zlib (raqm absent on both),
+  37 certificates in the default context (Windows store), TLS to
+  api.netlify.com and api.cloudflare.com, and `zoneinfo` absent on both.
+  Build_site's fallback to local time is the path both take.
+- 140 `.py` files compile with no `SyntaxWarning`.
+- One MPM2D folder (made by `setup.ps1` through PtyDriver) was built with
+  `preview.ps1 --build-only` on each runtime in turn: 429 files each, the
+  same names. 370 are byte-identical, `og-image.png` (Pillow) among them. The
+  other 59 differ only in the build's own `<time datetime>` and the
+  sitemap's dates. Built from two different folders, every page also differs
+  in base64 of the build path (the builds id). That is not Python.
+- A preview through `preview.ps1 --non-interactive` serves 200 on both. A
+  file count taken the moment the preview says "Started a Quartz server" is
+  NOT a finished site (276 of 429 on one run), so compare `--build-only`
+  output.
+- **Coloured tracebacks.** Python 3.13+ colours a traceback on a console, and
+  under ConPTY that console is the app's.
+  - A forced `RuntimeError` in `build_site.py`'s `main` was run through
+    PtyDriver (`--bytes-log`, as the app runs launchers). ConPTY sent 36 SGR
+    colour codes on 3.14.10, against 1 (its own reset) on 3.11.9.
+  - Fed back through `TranscriptBuilder`, the transcript carried no escape
+    character on either, and the same lines, plus 3.13's caret lines
+    (`~~~~^^`).
+  - `FailureExplainer` explained neither, as before. The app needs no change.
+  - PtyDriver's `--raw-log` strips control sequences itself, so it cannot
+    show this. Read `--bytes-log`.
+- **Backups.** The one Python deflate in `scripts/` is the setup wizard's
+  automatic course zip (`setup_course.backup_existing_course_dir`), and
+  3.14's Windows build links zlib-ng, so its compressed bytes differ. It is
+  left out of every byte comparison. A backup made on 3.14.10 (244 files,
+  1,855,118 bytes) passes `testzip` on 3.11.9 and on 3.14. Extracted by .NET's
+  `ZipFile`, all 244 files equal the course. `CourseRestorer.RestoreBackup`
+  does not read these zips at all: the app lists `<timestamp>.zip` wizard
+  zips as neither backups nor archives (`BackupItem`), and its own backups
+  are made by .NET.
+- Sizes: `runtime\python` 61 MB -> 56 MB; the whole runtime about 775 MB ->
+  764 MB (du). A full fetch took 248 s.
+
+**Publishing, on 3.14.10** (2026-11-11). Each run records the runtime's
+Python and OpenSSL in its Measured block: "3.14.10, OpenSSL 3.5.9 29 Sep 2026".
+- `verify-deploy.ps1 -SelfTest`: 13 passed, 0 failed, 0 skipped, 39 s.
+- Plain `verify-deploy.ps1`: 169 passed, 0 failed, 0 skipped, 1,082 s.
+- `-FirstPublish`: 169 passed, 0 failed, 0 skipped, 816 s. It created
+  `ics3u-s1-2026-vdywiqvtbm` on Netlify and on Cloudflare Pages, and no file
+  needed asking again.
+- `audit-runtime.ps1`: 5 trees, 55 advisories, 54 accepted, and 1 blocking:
+  GHSA-h895-cgqg-jf52 (toml, in Quartz's tree, high). It was new in the
+  advisory database that day and is identical on the 3.11.9 runtime, so it
+  is not this piece's. Python's part of the audit, the comparator, ran on
+  3.14.10. [#767](https://github.com/russellgordon/plantoir/issues/767)
+  accepted it on the existing `toml` entry (`npmAudit.accepted`, whose
+  reason already names prototype pollution from the teacher's own TOML).
+  After that the audit reads `COUNTS audited=5 advisories=55 accepted=55
+  blocking=0 reported=0 stale=0` (exit 0). The 54s in the #719 section above
+  and in 02 are that day's count.
+
+**Rejected.** 3.13.17, 3.12.10 and 3.15.2, for the reasons in the table.
+python-build-standalone 3.11.18 (OpenSSL 3.5.9 and the image's minor, but a
+third-party builder in the chain that holds teachers' tokens, unsigned
+binaries, 49 MB to download and 156 MB unpacked, and a different layout).
+Sending `deploy.py`'s HTTP through Node, which rewrites the shared publishing
+path on both platforms for one platform's packaging, and Python would still
+carry 3.0.13 for its other TLS. Moving the image too: its OpenSSL is current,
+and a base bump rebuilds every Mac. Staying, which the owner ruled out on
+2026-11-10.
+
+**The fallback, measured and kept.** If a 3.14.x ever cannot be taken, 3.14.10's
+`libssl-3.dll` and `libcrypto-3.dll` copied into 3.11.9 report "OpenSSL
+3.5.9 29 Sep 2026" and complete TLS to Netlify. OpenSSL 3.x keeps its ABI,
+which makes this the lowest-risk splice. It was not chosen: python.org never
+built or tested that pairing, and 3.11.9 stays nine releases behind on
+CPython's own security fixes.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

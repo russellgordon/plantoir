@@ -447,7 +447,8 @@ public class PageVisibilityWritingTests
     /// <para>Rewriting only the key's line orphans the indented lines below it
     /// onto the new value. <b>Measured by hand on 2026-09-19</b> through the
     /// vendored runtime — python-frontmatter 1.3.0 / PyYAML 6.0.3 / CPython
-    /// 3.11.9, the runtime that really builds a Windows teacher's site — then
+    /// 3.11.9, the runtime that really built a Windows teacher's site that day
+    /// (3.14.10 since #764, with the same PyYAML 6.0.3) — then
     /// <c>patches/publish.ts</c>'s own rule (hidden iff the boolean false or
     /// the exact string "false"). Measured rather than asserted in a test,
     /// because <c>Vendor/runtime/</c> is fetched and not committed, so a test

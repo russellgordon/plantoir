@@ -56,6 +56,9 @@
     course points at its own sites again. The sites it made are listed in the
     Result block; nothing deletes them. Without it, the run publishes to the
     sites the section already has and asks nothing.
+    On a first publish only, a file a brand-new site does not yet serve as
+    its check wants is asked for again every 5 s for up to 60 s, and the
+    Result block counts the retries per site (#743, the mac's #740).
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 `
@@ -63,10 +66,11 @@
 
 .PARAMETER SelfTest
     Prove the wait for Cloudflare's production address (#680, the mac's
-    #665) against a stub server on 127.0.0.1, in about 20 seconds: no
-    credentials, no network, no working folder. The same eight cases as
+    #665) against a stub server on 127.0.0.1, and since #743 the retry of a
+    brand-new site's files, against a second stub: no credentials, no
+    network, no working folder. The same thirteen cases as
     `./verify-deploy.sh --self-test`, by the same names. Run it before a
-    real run whenever the wait changes.
+    real run whenever the wait or the retry changes.
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass -File verify-deploy.ps1 -FirstPublish
@@ -215,6 +219,116 @@ function Wait-CloudflareProduction([string]$What, [string]$Url, [string]$Snapsho
     return $false
 }
 
+# The LAST response's status and headers (after any redirects when -Follow),
+# names lower-cased. Defined here, not beside Check-Engine, because
+# -SelfTest runs Get-CheckedResponse before the preflight.
+function Get-Response([string]$Url, [switch]$Follow, [string]$SaveTo = "NUL") {
+    $arguments = @('-s', '-D', '-', '-o', $SaveTo, '--max-time', '30')
+    if ($Follow) { $arguments += '-L' }
+    $raw = (& $script:Curl @arguments $Url 2>$null) -join "`n"
+    $blocks = @(($raw -replace "`r", "") -split "`n`n" | Where-Object { $_ -match '^HTTP/' })
+    $result = @{ Code = 0; Headers = @{} }
+    if ($blocks.Count -eq 0) { return $result }
+    $lines = $blocks[-1] -split "`n"
+    if ($lines[0] -match '^HTTP/\S+\s+(\d{3})') { $result.Code = [int]$Matches[1] }
+    foreach ($line in $lines | Select-Object -Skip 1) {
+        if ($line -match '^([^:]+):\s*(.*)$') { $result.Headers[$Matches[1].ToLowerInvariant()] = $Matches[2] }
+    }
+    return $result
+}
+
+# ------------------------------- a brand-new site's files, asked again (#743)
+# The mac's #740, ported. On a site this run has just CREATED, Netlify's
+# edges are not yet of one mind. Measured on the mac at the v1.9.1 gate
+# (2026-11-01, M4 Pro): two consecutive --first-publish runs went red on the
+# NEW Netlify site only, a different file each time (a 404 for
+# static/pyodide/pyodide.mjs, no COEP on the swift worker, then a 404 for the
+# swift worker), while a watcher fetching both files every 5 s got 24 of 24
+# HTTP 200 with the right type and COEP in the same minute. So on a
+# -FirstPublish run ONLY, a per-file fetch-back in Check-Engine that does not
+# get the answer its check wants (HTTP 200, plus COEP require-corp for the
+# COEP checks) is asked again every $NsPoll s until a deadline $NsWait s
+# after the first ask. Each retry is written down and counted in the Result
+# block, and an answer that never comes is still the check's failure, judged
+# on the last answer. A plain run's sites are old, and a wrong answer from
+# them is a fault, so a plain run asks once; so does the local preview on
+# any run (it is no new site). Rejected: a fixed sleep after making the site
+# (a guessed duration for a race that differs file by file); retrying on a
+# plain run (it would hide a real 404 on a site that has existed for
+# weeks). documentation/07-deployment.md -> "A brand-new site's files, asked
+# again (#740)". The environment overrides exist for -SelfTest, as the
+# Cloudflare wait's do, and are the mac's names.
+$script:NsPoll = 5
+if ($env:VERIFY_DEPLOY_NS_POLL) { $script:NsPoll = [int]$env:VERIFY_DEPLOY_NS_POLL }
+$script:NsWait = 60
+if ($env:VERIFY_DEPLOY_NS_WAIT) { $script:NsWait = [int]$env:VERIFY_DEPLOY_NS_WAIT }
+# A variable, not the parameter itself, so -SelfTest can judge both kinds of
+# run in one process.
+$script:NsFirstPublish = [bool]$FirstPublish
+$script:RetryLog = @()
+$script:NsSaid = @()
+
+# The twin of verify-deploy.sh's fetch_headers. $Want is '200' or 'coep'.
+# Returns what Get-Response returns, for the LAST answer, so every caller
+# judges exactly as it did before. The deadline is fixed once, at the first
+# ask, not a count of polls: how many retries fit depends on how long each
+# answer takes, so nothing may pin that number (the self-test asserts a
+# range - the mac's fixed "8 retries" failed 3 runs in 9).
+function Get-CheckedResponse([string]$Want, [string]$Url, [string]$SaveTo = "NUL") {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $tries = 0
+    while ($true) {
+        $r = Get-Response $Url -SaveTo $SaveTo
+        $good = ($r.Code -eq 200) -and ($Want -ne 'coep' -or ([string]$r.Headers['cross-origin-embedder-policy']) -match '^require-corp')
+        $waited = [int][Math]::Floor($clock.Elapsed.TotalSeconds)
+        if ($good) { break }
+        if (-not $script:NsFirstPublish) { break }
+        if ($Url.StartsWith('http://localhost:', [StringComparison]::OrdinalIgnoreCase)) { break }  # the preview is no new site
+        if ($clock.Elapsed.TotalSeconds -ge $script:NsWait) { break }
+        $tries++
+        Start-Sleep -Seconds $script:NsPoll
+    }
+    if ($tries -gt 0) {
+        $line = "  [again] a brand-new site: $Url needed $tries $(if ($tries -eq 1) { 'retry' } else { 'retries' }) over $waited s ($(if ($good) { 'then answered' } else { 'never answered as wanted' }))"
+        $script:NsSaid += $line
+        if (-not $script:Quiet) { Write-Host $line -ForegroundColor Yellow }
+        $script:RetryLog += [pscustomobject]@{ Url = $Url; Tries = $tries; Waited = $waited; Good = $good }
+    }
+    return $r
+}
+
+# One line per site for the Result block: how many of its files a brand-new
+# site needed asking again, and the most it took. Nothing on a plain run or
+# for the preview.
+function Measure-NewSiteRetries([string]$What, [string]$Base) {
+    if (-not $script:NsFirstPublish) { return }
+    if ($Base.StartsWith('http://localhost:', [StringComparison]::OrdinalIgnoreCase)) { return }
+    $mine = @($script:RetryLog | Where-Object { $_.Url.StartsWith($Base, [StringComparison]::Ordinal) })
+    if ($mine.Count -eq 0) { $line = 'no file needed asking again' }
+    else {
+        $total = ($mine | Measure-Object -Property Tries -Sum).Sum
+        $most = ($mine | Measure-Object -Property Tries -Maximum).Maximum
+        $longest = ($mine | Measure-Object -Property Waited -Maximum).Maximum
+        $line = "$($mine.Count) file(s) needed asking again, $total retries in all, at most $most for one file, the longest $longest s"
+    }
+    $script:Measured += "$What, a brand-new site's files (#740): $line"
+}
+
+# wrangler 4.108 and later sends a NEW static project to Cloudflare Workers
+# instead of Pages when it believes an AI agent is driving it (CLAUDECODE,
+# AI_AGENT, CODEX_THREAD_ID, GEMINI_CLI and others in its environment, or an
+# agent among its ancestors) - a different product at a different address.
+# On the mac docker exec hands wrangler six named variables only; HERE
+# deploy.py runs natively and the environment reaches wrangler, so the only
+# guards are deploy.py's --branch=main (an argument the delegation refuses)
+# and the project being made through the API before wrangler runs. A leg
+# that prints the delegation's notice is therefore a FAILURE (#719; the
+# mac's check_no_delegation, #699).
+function Check-NoDelegation([string]$What, [string]$Log) {
+    if ([string]$Log -match 'now part of Cloudflare Workers') { No "$What - wrangler delegated the upload to Cloudflare Workers instead of Pages" }
+    else { Ok "$What - uploaded to Cloudflare Pages itself, with no delegation to Workers" }
+}
+
 # ----------------------------------------------------------------- self-test
 # The wait above, proved against a stub server on 127.0.0.1 that serves the
 # OLD bytes for the first K requests to a path and the NEW after: no
@@ -222,7 +336,9 @@ function Wait-CloudflareProduction([string]$What, [string]$Url, [string]$Snapsho
 # preflight, so it touches nothing a real run uses. The stub is a COPY of
 # verify-deploy.sh's (its run_self_test, lines 178-211 on 2026-10-28), kept
 # byte for byte so the two harnesses are proved by the same server; change
-# both or neither. The eight cases are the mac's, by the same names.
+# both or neither. The eight cases are the mac's, by the same names. Since
+# #743 a second stub (the mac's files.py, also copied byte for byte) proves
+# Get-CheckedResponse with the mac's five #740 cases: 13 in all.
 function Invoke-SelfTest {
     $st = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-deploy-selftest-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
     $script:CfPoll = 1
@@ -300,6 +416,53 @@ server.serve_forever()
             try { $script:StubProcess.WaitForExit(5000) | Out-Null } catch { }
         }
         $script:StubProcess = $null
+    }
+    # The second stub (#743), for a brand-new site's files: a COPY of
+    # verify-deploy.sh's files.py (its run_self_test), kept byte for byte like
+    # the first. One path, the swift worker, served as 404:K (a 404 for the
+    # first K requests), 404:inf, or nocoep:K (200 without COEP at first).
+    $filesStub = @'
+import http.server, os, pathlib, sys
+portfile, mode = sys.argv[1:3]
+kind, _, limit = mode.partition(":")
+seen = {"n": 0}
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.do_GET()
+    def do_GET(self):
+        n = seen["n"]; seen["n"] = n + 1
+        early = limit == "inf" or n < int(limit)
+        if kind == "404" and early:
+            body = b"Not Found - Request ID: stub\n"
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+        else:
+            body = b"self.onmessage = () => {};\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=UTF-8")
+            if not (kind == "nocoep" and early):
+                self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+'@
+    $filesFile = Join-Path $st 'files.py'
+    [IO.File]::WriteAllText($filesFile, ($filesStub -replace "`r`n", "`n"), $noBom)
+    $fportFile = Join-Path $st 'fport'
+    $script:FileStubUrl = ''
+    function Start-FileStub([string]$Mode) {
+        Remove-Item -LiteralPath $fportFile -ErrorAction SilentlyContinue
+        $script:StubProcess = Start-Process -FilePath $python -PassThru -WindowStyle Hidden `
+            -ArgumentList ('-I "' + $filesFile + '" "' + $fportFile + '" ' + $Mode)
+        foreach ($i in 1..100) { if ((Test-Path -LiteralPath $fportFile) -and (Get-Item -LiteralPath $fportFile).Length -gt 0) { break }; Start-Sleep -Milliseconds 100 }
+        $port = if (Test-Path -LiteralPath $fportFile) { ([IO.File]::ReadAllText($fportFile)).Trim() } else { '' }
+        $script:FileStubUrl = "http://127.0.0.1:$port/static/swift/plantoir-swift-worker.js"
     }
     # Does the stub serve that file now?
     function Test-Serves([string]$Path, [string]$Expected) {
@@ -380,6 +543,65 @@ server.serve_forever()
         $case = Measure-Case { Save-CloudflareUpload "case" $crlf (Join-Path $st 'snap-unmarked') }
         if ($case.Result -eq $false -and ($case.Failures -join ' ') -like "*does not carry this run's mark*") { Ok "an upload whose page of runnable code lacks this run's mark is a failure, since the wait could not tell it from the last" }
         else { No "an upload without this run's mark: result $($case.Result), said: $($case.Failures -join ' | ')" }
+
+        # ---- #743, the mac's #740: the same five cases, by the same names.
+        Hdr "Self-test - a brand-new site's files, asked again (#743, the mac's #740)"
+        $script:NsPoll = 1; $script:NsWait = 4
+        $script:RetryLog = @()
+        $script:NsFirstPublish = $true
+
+        Start-FileStub '404:2'
+        $script:NsSaid = @()
+        $case = Measure-Case { Get-CheckedResponse '200' $script:FileStubUrl }
+        $said = $script:NsSaid -join ' | '
+        $entry = @($script:RetryLog | Select-Object -Last 1)
+        if ($case.Result.Code -eq 200 -and ([string]$case.Result.Headers['content-type']) -match '^application/javascript' -and
+            $said -like '*needed 2 retries*' -and $entry.Count -eq 1 -and $entry[0].Tries -eq 2 -and $entry[0].Good -eq $true) {
+            Ok "a brand-new site answers 404 twice, then the file: asked again, it passes, and the log says it took 2 retries"
+        } else { No "a brand-new site answers 404 twice, then the file: got HTTP $($case.Result.Code), said: $said" }
+        Stop-Stub
+
+        Start-FileStub 'nocoep:2'
+        $script:NsSaid = @()
+        $case = Measure-Case { Get-CheckedResponse 'coep' $script:FileStubUrl }
+        if (([string]$case.Result.Headers['cross-origin-embedder-policy']) -match '^require-corp') {
+            Ok "a brand-new site sends the file without COEP twice, then with it: asked again, the COEP check passes"
+        } else { No "a brand-new site sends the file without COEP twice: said: $($script:NsSaid -join ' | ')" }
+        Stop-Stub
+
+        Start-FileStub '404:inf'
+        $script:NsSaid = @()
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        $case = Measure-Case { Get-CheckedResponse '200' $script:FileStubUrl }
+        $elapsed = [int][Math]::Floor($clock.Elapsed.TotalSeconds)
+        $said = $script:NsSaid -join ' | '
+        $n = if ($said -match 'needed (\d+) retr') { [int]$Matches[1] } else { -1 }
+        if ($case.Result.Code -eq 404 -and $said -like '*never answered as wanted*' -and
+            $n -ge 2 -and $n -le 5 -and $elapsed -ge 4 -and $elapsed -le 10) {
+            Ok "a brand-new site that never serves the file: still the check's failure, judged on the last answer, at the cap ($elapsed s, $n retries)"
+        } else { No "a brand-new site that never serves the file: HTTP $($case.Result.Code), $elapsed s, said: $said" }
+        Stop-Stub
+
+        # The count, against the log the three cases above wrote: summed from
+        # the log, never a fixed number.
+        $script:Measured = @()
+        Measure-NewSiteRetries "Netlify" "http://127.0.0.1:"
+        $total = (@($script:RetryLog) | Measure-Object -Property Tries -Sum).Sum
+        $twice = @($script:RetryLog | Where-Object { $_.Good -eq $true -and $_.Tries -eq 2 }).Count
+        if ($script:Measured.Count -eq 1 -and $script:Measured[0] -like "*3 file(s) needed asking again, $total retries in all*" -and $twice -eq 2) {
+            Ok "the Result block counts them: $($script:Measured[0] -replace '^[^:]*: ', '')"
+        } else { No "the Result block's count: $($script:Measured -join ' | ')" }
+        $script:Measured = @()
+
+        $script:NsFirstPublish = $false
+        $script:RetryLog = @()
+        $script:NsSaid = @()
+        Start-FileStub '404:2'
+        $case = Measure-Case { Get-CheckedResponse '200' $script:FileStubUrl }
+        if ($case.Result.Code -eq 404 -and $script:NsSaid.Count -eq 0 -and @($script:RetryLog).Count -eq 0) {
+            Ok "a plain run's long-lived site answers 404: judged at once, never asked again"
+        } else { No "a plain run's 404: HTTP $($case.Result.Code), said: $($script:NsSaid -join ' | ')" }
+        Stop-Stub
     } finally {
         Stop-Stub
         Remove-Item -LiteralPath $st -Recurse -Force -ErrorAction SilentlyContinue
@@ -433,6 +655,16 @@ if (-not (Test-Path (Join-Path $script:Runtime 'manifest.json')) -or -not (Test-
 }
 $script:RuntimePython = Join-Path $script:Runtime 'python\python.exe'
 Ok "runtime ($runtimeSaid): $($script:Runtime)"
+# The Python every Netlify publish and deploy.py's Cloudflare calls run on,
+# and the OpenSSL under them (#764: 3.11.9 carried 3.0.13 unnoticed). Recorded,
+# not judged: fetch-runtime.ps1 and the app's build refuse the wrong one.
+$pythonSaid = (& $script:RuntimePython -I -c "import ssl, sys; print(sys.version.split()[0] + ', ' + ssl.OPENSSL_VERSION)" 2>&1 | Out-String).Trim()
+$script:Measured += "the runtime's Python and the OpenSSL its deploy requests use: $pythonSaid"
+# Which of the variables that make wrangler 4.108+ delegate a NEW project to
+# Workers this run hands it (names only): the evidence that Check-NoDelegation
+# was asked under the trigger, not around it (#719).
+$agentVariables = @(@('CLAUDECODE', 'AI_AGENT', 'CODEX_THREAD_ID', 'GEMINI_CLI') | Where-Object { [Environment]::GetEnvironmentVariable($_) })
+$script:Measured += "the agent variables wrangler's Workers delegation looks for, set in this run's environment: $(if ($agentVariables.Count -gt 0) { $agentVariables -join ', ' } else { 'none' })"
 
 # Anything else that might rewrite this folder's .toolchain while the run is
 # using it. A WARNING, not a refusal: a running Plantoir or plantoir-mcp
@@ -1116,33 +1348,24 @@ function Url-FromLog([string]$log) {
 # ($script:Curl and $script:Measured are set near the top, for -SelfTest.)
 $script:ContractsDir = Join-Path $PSScriptRoot "contracts"
 
-# The LAST response's status and headers (after any redirects when -Follow),
-# names lower-cased.
-function Get-Response([string]$Url, [switch]$Follow, [string]$SaveTo = "NUL") {
-    $arguments = @('-s', '-D', '-', '-o', $SaveTo, '--max-time', '30')
-    if ($Follow) { $arguments += '-L' }
-    $raw = (& $script:Curl @arguments $Url 2>$null) -join "`n"
-    $blocks = @(($raw -replace "`r", "") -split "`n`n" | Where-Object { $_ -match '^HTTP/' })
-    $result = @{ Code = 0; Headers = @{} }
-    if ($blocks.Count -eq 0) { return $result }
-    $lines = $blocks[-1] -split "`n"
-    if ($lines[0] -match '^HTTP/\S+\s+(\d{3})') { $result.Code = [int]$Matches[1] }
-    foreach ($line in $lines | Select-Object -Skip 1) {
-        if ($line -match '^([^:]+):\s*(.*)$') { $result.Headers[$Matches[1].ToLowerInvariant()] = $Matches[2] }
-    }
-    return $result
-}
+# Get-Response, and Get-CheckedResponse, which asks a brand-new site again
+# (#743), are defined near the top, because -SelfTest runs them before the
+# preflight.
 
 function Check-Engine([string]$What, [string]$Base) {
+    # Each call keeps its own retry log, so a pairing leg that checks a site an
+    # earlier leg already checked counts only its own retries (the mac's #740
+    # review).
+    $script:RetryLog = @()
     foreach ($name in @('pyodide.asm.wasm', 'pyodide.asm.mjs', 'pyodide.mjs', 'plantoir-worker.js', 'python_stdlib.zip', 'pyodide-lock.json')) {
-        $r = Get-Response "${Base}static/pyodide/$name"
+        $r = Get-CheckedResponse '200' "${Base}static/pyodide/$name"
         $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
         $want = if ($name -like '*.wasm') { 'application/wasm' } elseif ($name -like '*.mjs' -or $name -like '*.js') { 'javascript' } else { '' }
         if ($r.Code -ne 200) { No "$What answered HTTP $($r.Code) for static/pyodide/$name" }
         elseif ($want -and -not $type.Contains($want)) { No "$What sends static/pyodide/$name as '$type', which a browser will not run as $want" }
         else { Ok "$What sends static/pyodide/$name (HTTP 200, $type)" }
     }
-    $csp = [string](Get-Response "${Base}static/pyodide/plantoir-worker.js").Headers['content-security-policy']
+    $csp = [string](Get-CheckedResponse '200' "${Base}static/pyodide/plantoir-worker.js").Headers['content-security-policy']
     if (-not $csp -or $csp -match "'(unsafe-eval|wasm-unsafe-eval)'") { Ok "$What's worker may compile WebAssembly ($(if ($csp) { 'CSP allows it' } else { 'no CSP' }))" }
     else { No "$What's worker CSP allows no wasm: $csp" }
 
@@ -1157,7 +1380,7 @@ function Check-Engine([string]$What, [string]$Base) {
     # Runnable Swift (#493, #570): the thread and its WASI shim, and the
     # page's compiled program, checked as verify-deploy.sh checks them.
     foreach ($name in @('plantoir-swift-worker.js', 'plantoir-wasi.mjs')) {
-        $r = Get-Response "${Base}static/swift/$name"
+        $r = Get-CheckedResponse '200' "${Base}static/swift/$name"
         $type = ([string]$r.Headers['content-type']).ToLowerInvariant()
         if ($r.Code -eq 200 -and $type.Contains('javascript')) { Ok "$What sends static/swift/$name (HTTP 200, $type)" }
         else { No "$What answered HTTP $($r.Code), '$type' for static/swift/$name (a module worker needs JavaScript)" }
@@ -1166,7 +1389,7 @@ function Check-Engine([string]$What, [string]$Base) {
     if (-not $program.Success) { No "$What's page of runnable code carries no Swift program" }
     else {
         $programFile = Join-Path $work "program.wasm"
-        $r = Get-Response "${Base}$($program.Groups[1].Value)" -SaveTo $programFile
+        $r = Get-CheckedResponse '200' "${Base}$($program.Groups[1].Value)" -SaveTo $programFile
         $head = if (Test-Path -LiteralPath $programFile) { [IO.File]::ReadAllBytes($programFile) | Select-Object -First 4 } else { @() }
         if ($r.Code -eq 200 -and (($head | ForEach-Object { $_.ToString('x2') }) -join '') -eq '0061736d') {
             Ok "$What sends the page's Swift program (HTTP 200, $([string]$r.Headers['content-type']), $((Get-Item -LiteralPath $programFile).Length) bytes)"
@@ -1182,7 +1405,7 @@ function Check-Engine([string]$What, [string]$Base) {
     if ($r.Headers['content-security-policy'] -match 'jsdelivr') { No "$What's CSP still names cdn.jsdelivr.net" }
     else { Ok "$What's CSP names no CDN for the maths" }
     foreach ($name in @('pyodide/pyodide.mjs', 'pyodide/plantoir-worker.js', 'swift/plantoir-wasi.mjs', 'swift/plantoir-swift-worker.js')) {
-        $r = Get-Response "${Base}static/$name"
+        $r = Get-CheckedResponse 'coep' "${Base}static/$name"
         if ($r.Headers['cross-origin-embedder-policy'] -match '^require-corp') { Ok "$What sends COEP on static/$name" }
         else { No "$What sends no COEP on static/$name, which an isolated page's worker needs" }
     }
@@ -1190,11 +1413,12 @@ function Check-Engine([string]$What, [string]$Base) {
     if ($r.Headers.ContainsKey('cross-origin-embedder-policy')) { No "$What sends COEP on the front page, which has no runnable code - its frames would break" }
     else { Ok "$What sends no COEP on the front page, which has no runnable code" }
 
-    $r = Get-Response "${Base}static/katex/katex.min.css"
+    $r = Get-CheckedResponse '200' "${Base}static/katex/katex.min.css"
     if ($r.Code -eq 200 -and ([string]$r.Headers['content-type']) -match '^text/css') { Ok "$What serves KaTeX's stylesheet itself (text/css)" }
     else { No "$What does not serve static/katex/katex.min.css as text/css" }
-    $r = Get-Response "${Base}static/katex/fonts/KaTeX_Main-Regular.woff2"
+    $r = Get-CheckedResponse '200' "${Base}static/katex/fonts/KaTeX_Main-Regular.woff2"
     if ($r.Code -eq 200) { Ok "$What serves KaTeX's faces itself" } else { No "$What answered HTTP $($r.Code) for a KaTeX face" }
+    Measure-NewSiteRetries $What $Base
 }
 
 # The pinned engine files, byte for byte, in a folder publish.
@@ -1257,7 +1481,9 @@ function Measure-Deploy([string]$Label, [string]$Script, [string[]]$LauncherArgs
     $run = Run-Launcher -Script $Script -LauncherArgs $LauncherArgs -LogFile $LogFile
     $seconds = [int]$clock.Elapsed.TotalSeconds
     $after = Get-SentBytes
-    $files = [regex]::Matches([string]$run.Log, 'Netlify requires \d+ file|Uploaded \d+ files \(\d+ already uploaded\)') | Select-Object -Last 1
+    # A FIRST-ever Cloudflare upload prints "Uploaded N files (T sec)" with
+    # no "(N already uploaded)" part (the mac's #712), so that part is optional.
+    $files = [regex]::Matches([string]$run.Log, 'Netlify requires \d+ file|Uploaded \d+ files(?: \(\d+ already uploaded\))?') | Select-Object -Last 1
     $count = if ($files) { $files.Value } else { "no upload count" }
     $script:Measured += "${Label}: $seconds s, $count, $([int](($after.Bytes - $before.Bytes) / 1024)) KiB sent on $($after.Alias)"
     return $run
@@ -1412,6 +1638,7 @@ if ($haveCloudflare) {
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
     if ($cloudflareRun.Log -match '(?i)cloudflare|wrangler|pages\.dev') { Ok "the launcher really went to Cloudflare" }
     else { No "the Cloudflare leg's output never mentions Cloudflare - it published somewhere else" }
+    Check-NoDelegation "Cloudflare Pages" $cloudflareRun.Log
     $cloudflareUrl = Url-FromLog $cloudflareRun.Log
     if ($cloudflareUrl) {
         Note-Site $cloudflareUrl
@@ -1458,6 +1685,7 @@ if ($haveCloudflare) {
     # Kept NOW: the folder leg below rebuilds the section before production
     # is judged, and the wait used to read the index.html it had rewritten.
     $cfSnapped = Save-CloudflareUpload "Cloudflare (paired with a folder)" $legOne.Log (Join-Path $work "cf-with-folder")
+    Check-NoDelegation "Cloudflare (paired with a folder)" $legOne.Log
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair2-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (cloudflare $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
@@ -1482,6 +1710,7 @@ if ($haveNetlify -and $haveCloudflare) {
     Set-Destination -Primary "cloudflare_pages"
     $legTwo = Measure-Deploy "Cloudflare, second publish" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "pair3-cf.log")
     $cfSnapped = Save-CloudflareUpload "Cloudflare (paired with Netlify)" $legTwo.Log (Join-Path $work "cf-with-netlify")
+    Check-NoDelegation "Cloudflare (paired with Netlify)" $legTwo.Log
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), cloudflare $($legTwo.ExitCode))" }
     $u1 = Url-FromLog $legOne.Log

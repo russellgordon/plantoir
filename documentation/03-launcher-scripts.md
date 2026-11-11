@@ -576,9 +576,14 @@ that question incomplete exactly when an address was taken (#684 review L1).
 
 **Windows** already binds its native preview to `127.0.0.1`
 (`windows-app/Vendor/fetch-runtime.ps1`, commit 2d32ca9e5, 2026-08-19, which
-rewrites both of Quartz's bind sites in `handlers.js`). Its guard passes when
-only ONE of the two was rewritten, so a drifted websocket line would stay open
-without anyone noticing; that is a `windows` issue (#684's).
+rewrites both of Quartz's bind sites in `handlers.js`). Since #730 the rewrite
+(`Set-QuartzLoopbackBinds`) requires BOTH sites, each exactly once, and the
+runtime fetch refuses, naming the site, when either is missing; until then a
+guard that passed on any `127.0.0.1` in the file would have let a respelled
+websocket line stay open on every interface unnoticed.
+`FetchRuntimeLoopbackGuardTests` pins it, and the listening addresses were
+measured on a real preview (`documentation/12-windows-app.md` → "wrangler
+4.156.0, a brand-new site's files asked again, and the loopback guard").
 
 ### Staying up to date
 

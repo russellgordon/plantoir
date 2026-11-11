@@ -8,10 +8,11 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
 
     runtime\node\       Node.js 22.23.4 (win-x64 zip distribution - no
                         installer)
-    runtime\python\     Python 3.11 embeddable + python-frontmatter 1.3.0,
-                        PyYAML 6.0.3, Pillow 12.3.0
+    runtime\python\     Python 3.14.10 embeddable (OpenSSL 3.5.9, #764) +
+                        python-frontmatter 1.3.0, PyYAML 6.0.3, Pillow 12.3.0
+                        (wheels by version AND SHA-256)
     runtime\quartz\     Quartz v4.5.0 + this repo's patches + node_modules
-    runtime\wrangler\   wrangler 4.80.0 (npm prefix; Cloudflare deploys)
+    runtime\wrangler\   wrangler 4.156.0 (npm prefix; Cloudflare deploys)
     runtime\fonts\      Noto Color Emoji (social sharing cards)
     runtime\vendor\     the page features a site carries only when a page
                         asks for them (#496, #503, #568): pagedjs\ (Paged.js
@@ -26,10 +27,19 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
 
 Pins mirror the Dockerfile deliberately: Node 22.23.4 because that is the
 image's exact pin and Quartz v4.5.0 was revalidated on it (#640, #675);
-wrangler 4.80.0, below 4.87 because 4.87.0 is the first wrangler whose
-engines need Node 22 (the boundary was never 4.100, which this comment said
-until #675) - the pin is shared, and moving it is its own piece now that
-both platforms run 22; Python 3.11 to match the python:3.11-slim base.
+wrangler 4.156.0, the newest 4.x on 2026-10-31, the image's exact pin since
+#699 and this runtime's since #719 (it was held at 4.80.0, below 4.87, the
+first wrangler whose engines need Node 22, until both platforms ran Node
+22.23.4; that ceiling, mustStayBelow, is retired, and 4.156.0's own undici
+is 7.30.1 where 4.80.0's was 7.24.4). Python is the one base pin that
+does NOT mirror the image (python:3.11-slim, 3.11.15), since #764: 3.11.9 was
+the last 3.11 with Windows binaries and its own OpenSSL is 3.0.13 (30 Jan
+2024), a line out of support since 2026-09; 3.14.10 is the newest line that
+has a supported OpenSSL (3.5 LTS), Windows binaries still coming (3.14 is in
+bugfix until about 2027-10) and a win_amd64 wheel for every pin below.
+contracts/toolchain.json -> windowsPython holds the version, the OpenSSL
+floor and what was rejected. The shared scripts\ must still run on the
+image's 3.11 (RuntimePythonTests.TheSharedScriptsParseAsPython311).
 Change a pin here and the Dockerfile's reasoning applies to you.
 
 NOT committed (~600 MB of fetched output) - this repository ships recipes,
@@ -66,8 +76,14 @@ $ProgressPreference = 'SilentlyContinue'
 # contracts/toolchain.json -> pins -> node -> windowsRuntimeContains holds this
 # line, spacing included, against the contract.
 $NodeVersion     = "22.23.4"
-$PythonVersion   = "3.11.9"
-$WranglerVersion = "4.80.0"
+# Python 3.14.10 (#764): contracts/toolchain.json -> windowsPython ->
+# windowsRuntimeContains is the next line, three spaces and all.
+$PythonVersion   = "3.14.10"
+# The OpenSSL the runtime's Python must report at least, or the run refuses
+# (windowsPython -> opensslAtLeast): a Python bump that went back to a 3.0
+# OpenSSL would otherwise be noticed by nobody.
+$PythonOpensslAtLeast = "3.5.9"
+$WranglerVersion = "4.156.0"
 $QuartzTag       = "v4.5.0"
 $EmojiFontTag    = "v2.047"
 
@@ -122,15 +138,33 @@ foreach ($pair in @(
 # Windows 11 26200): the Node hash equalled nodejs.org's own SHASUMS256.txt for
 # v20.18.1, and the v22.23.4 hash below is that file's line for
 # node-v22.23.4-win-x64.zip (#675, re-checked 2026-10-23); the Python zip's
-# python.exe and python311.dll are byte-identical
-# to the runtime that has shipped; the font equals the shipped font. Change a
+# hash is the SHA-256 python.org publishes for python-3.14.10-embed-amd64.zip
+# (12,619,664 bytes; checked 2026-11-11, #764 - until then 3.11.9's, whose
+# python.exe and python311.dll were byte-identical to the runtime that had
+# shipped); the font equals the shipped font. Change a
 # version above and its hash must change with it, or the fetch refuses.
 # get-pip.py is NOT hashed, deliberately: bootstrap.pypa.io serves one moving
 # file with no versioned URL, so a hash would break the build on pip's next
 # release while protecting nothing the package pins below do not - those are
 # exact versions, fetched by pip from PyPI over TLS.
 $NodeZipSha256   = "cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20"
-$PythonZipSha256 = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
+$PythonZipSha256 = "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159"
+$PythonZipLength = 12619664
+# The three wheels, by version AND hash (#764; until then by version only,
+# from PyPI over TLS). Each is PyPI's own SHA-256 for the cp314 win_amd64
+# file (py3-none-any for python-frontmatter), read from
+# https://pypi.org/pypi/<name>/<version>/json and equal to what pip resolved
+# with --only-binary on 2026-11-11. The versions are the image's
+# (ToolchainContractTests holds each line's `name==version` against pins ->
+# pythonFrontmatter, pyyaml, pillow). A Python bump changes the cp tag, and
+# with it every binary wheel's hash: pip --require-hashes then refuses, which
+# is the point. python-frontmatter's one dependency is PyYAML, so --no-deps
+# with all three named is complete.
+$PythonWheels = @(
+    "python-frontmatter==1.3.0 --hash=sha256:9f7dd9260bec99044219159a329f64f039087f9d1a2124c9442556f2fe6f82ec",
+    "PyYAML==6.0.3 --hash=sha256:4a2e8cebe2ff6ab7d1050ecd59c25d4c8bd7e6f400f5f82b96557ac0abafd0ac",
+    "Pillow==12.3.0 --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d"
+)
 $EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
 # The vendor tarballs' hashes are the contract's own (toolchain.json ->
 # pins -> sha256, and fileSha256 for the one file kept), checked here as the
@@ -294,6 +328,61 @@ function Fetch([string]$Url, [string]$To, [string]$Sha256 = "", [string[]]$CurlO
     }
 }
 
+# NATIVE-ONLY: bind the preview server and its live-reload websocket to
+# loopback (see the call site in the Quartz phase for why). BOTH sites, each
+# found exactly once, or the run refuses naming the one that was not (#730,
+# the mac's #684): the guard this replaced passed when the file held
+# "127.0.0.1" anywhere, so a Quartz bump that respelled the websocket line
+# would have put live reload back on every interface, and the firewall dialog
+# would have been the only sign. Exactly once rather than at least once: a
+# second bind site in a new Quartz is a change somebody must look at, not one
+# to rewrite blind. Read and written as UTF-8 with no BOM, byte for byte
+# outside the two sites: until #730 Get-Content -Raw read the file as ANSI
+# and Set-Content wrote it back with a BOM, which turned the "Get started"
+# lines' bullets (handlers.js:217-219) into mojibake in every runtime.
+# Lifted between these markers and run by FetchRuntimeLoopbackGuardTests.
+# BEGIN Set-QuartzLoopbackBinds
+function Set-QuartzLoopbackBinds([string]$Path) {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $text = [IO.File]::ReadAllText($Path, $utf8)
+    foreach ($site in @(
+            @('the preview server', 'server.listen(argv.port)', 'server.listen(argv.port, "127.0.0.1")'),
+            @('the live-reload websocket', 'new WebSocketServer({ port: argv.wsPort })', 'new WebSocketServer({ host: "127.0.0.1", port: argv.wsPort })'))) {
+        $found = [regex]::Matches($text, [regex]::Escape($site[1])).Count
+        if ($found -ne 1) {
+            throw "The loopback patch could not rewrite $($site[0]) in quartz/cli/handlers.js: it found $found of '$($site[1])', not exactly 1. Quartz's bind line has changed; look at it before binding it."
+        }
+        $text = $text.Replace($site[1], $site[2])
+        if ([regex]::Matches($text, [regex]::Escape($site[2])).Count -ne 1) {
+            throw "The loopback patch rewrote $($site[0]) in quartz/cli/handlers.js but does not find '$($site[2])' exactly once afterwards."
+        }
+    }
+    [IO.File]::WriteAllText($Path, $text, $utf8)
+}
+# END Set-QuartzLoopbackBinds
+
+# The runtime's Python must carry an OpenSSL at least $AtLeast (#764): it is
+# the TLS under every Netlify publish and deploy.py's Cloudflare calls, and
+# 3.11.9 shipped 3.0.13 for two years with nothing saying so. Returns the
+# OPENSSL_VERSION line it read. Compared as [version] on the number in that
+# line ("OpenSSL 3.5.9 29 Sep 2026" -> 3.5.9), NOT on OPENSSL_VERSION_INFO's
+# first three fields: for OpenSSL 3 that tuple is (major, minor, 0, patch,
+# status) - 3.5.9 is (3, 5, 0, 9, 0) - so its first three read 3.5.0, which
+# refused 3.5.9 on this script's first run (2026-11-11). Lifted between these
+# markers and run by RuntimePythonTests.TheFetchRefusesAPythonBelowTheOpensslFloor
+# against stand-in pythons
+# and against the real runtime.
+# BEGIN Assert-PythonOpenssl
+function Assert-PythonOpenssl([string]$Python, [string]$AtLeast) {
+    $said = @(& $Python -I -c "import re, ssl; m = re.match(r'OpenSSL (\d+\.\d+\.\d+)', ssl.OPENSSL_VERSION); print(m.group(1) if m else '0.0.0'); print(ssl.OPENSSL_VERSION)")
+    if ($LASTEXITCODE -ne 0 -or $said.Count -lt 2) { throw "$Python could not say which OpenSSL it carries." }
+    if ([version]$said[0] -lt [version]$AtLeast) {
+        throw "$Python carries $($said[1]), and the runtime needs OpenSSL $AtLeast or newer (contracts/toolchain.json -> windowsPython -> opensslAtLeast)."
+    }
+    return $said[1]
+}
+# END Assert-PythonOpenssl
+
 try {
   $env:PATH = "$nodeDir;$env:PATH"
   if ($runBase) {
@@ -307,6 +396,7 @@ try {
     # ---- Python (embeddable package + pip bootstrap) -------------------------
     $pyZip = Join-Path $Temp "python.zip"
     Fetch "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-embed-amd64.zip" $pyZip $PythonZipSha256
+    Assert-Sha256 $pyZip $PythonZipSha256 $PythonZipLength
     Expand-Archive $pyZip -DestinationPath $pyDir -Force
     # The embeddable package ships with `import site` disabled; pip and
     # site-packages need it on.
@@ -328,11 +418,17 @@ try {
     # and this snapshot already carry, so the pins change nothing about what
     # is installed and everything about what can change underneath it.
     # `ToolchainContractTests` holds these against contracts/toolchain.json.
+    # Binary wheels only, each checked against $PythonWheels' hash (#764): a
+    # missing wheel for this Python refuses rather than building from source.
+    $pyReq = Join-Path $Temp "python-wheels.txt"
+    $PythonWheels | Set-Content $pyReq -Encoding ascii
     & "$pyDir\python.exe" -m pip install --no-warn-script-location `
-        python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0 | Out-Null
+        --only-binary :all: --require-hashes --no-deps -r $pyReq | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "pip refused or failed to install the pinned wheels ($pyReq)" }
     & "$pyDir\python.exe" -c "import frontmatter, PIL; print('frontmatter + Pillow OK')"
     if ($LASTEXITCODE -ne 0) { throw "Python package verification failed" }
-    Write-Host "Python $PythonVersion embeddable in place." -ForegroundColor Green
+    $pyOpenssl = Assert-PythonOpenssl "$pyDir\python.exe" $PythonOpensslAtLeast
+    Write-Host "Python $PythonVersion embeddable in place ($pyOpenssl)." -ForegroundColor Green
 
     # ---- Quartz, patched exactly as the Dockerfile patches it ----------------
     $quartzDir = Join-Path $Runtime "quartz"
@@ -356,13 +452,9 @@ try {
     # first preview. A preview is only ever browsed at localhost. This must
     # NOT be made a shared patch: inside the container, loopback binding
     # would break Docker's port forwarding, which connects to the
-    # container's own address.
-    $handlers = Join-Path $quartzDir "quartz\cli\handlers.js"
-    $handlersText = Get-Content $handlers -Raw
-    $handlersText = $handlersText.Replace('server.listen(argv.port)', 'server.listen(argv.port, "127.0.0.1")')
-    $handlersText = $handlersText.Replace('new WebSocketServer({ port: argv.wsPort })', 'new WebSocketServer({ host: "127.0.0.1", port: argv.wsPort })')
-    if ($handlersText -notmatch '127\.0\.0\.1') { throw "The loopback patch found neither bind site in quartz/cli/handlers.js" }
-    Set-Content $handlers $handlersText -Encoding utf8 -NoNewline
+    # container's own address. Set-QuartzLoopbackBinds (above) requires both
+    # sites (#730).
+    Set-QuartzLoopbackBinds (Join-Path $quartzDir "quartz\cli\handlers.js")
 
     Write-Host "Installing Quartz dependencies (a few minutes)..." -ForegroundColor Cyan
     Push-Location $quartzDir
@@ -403,7 +495,7 @@ try {
     Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
-    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.80.0, below 4.87) -----
+    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.156.0, #699/#719) ------
     $wranglerDir = Join-Path $Runtime "wrangler"
     New-Item -ItemType Directory -Force $wranglerDir | Out-Null
     & "$nodeDir\npm.cmd" install --prefix $wranglerDir --no-audit --no-fund --silent "wrangler@$WranglerVersion"
