@@ -20,8 +20,9 @@ namespace Plantoir.UiTests;
 /// course is padded with plain pages so the deploy runs long enough to leave
 /// and come back while it is still building; the build's length is printed.</para>
 ///
-/// <para>"Starts nothing" is read off the trail: exactly one "started
-/// deploy.ps1" line for the section, and no "already being deployed". A
+/// <para>"Starts nothing" is read off the trail: at most one build leg and
+/// exactly one "started deploy.ps1" line for the section, and no "already
+/// being deployed". A
 /// press on a greyed control cannot be made through UI Automation (Invoke on a
 /// disabled button throws), so the Deploy button is asserted unavailable, and
 /// the press is tried through Section ▸ Deploy… and its key, Ctrl+Shift+D.</para>
@@ -42,6 +43,19 @@ public class ReturningToASectionMidDeployUiTests
         app.Window.FindFirstDescendant(cf => cf.ByName(name)) is { IsOffscreen: false };
 
     private static string[] TrailLines(DrivenApp app) => MenuBar.Trail(app).Split('\n');
+
+    /// <summary>
+    /// The deploy's launcher starts for section 1 so far: its build leg
+    /// ("started preview.ps1 UIBACK 1 --build-only") and its deploy leg
+    /// ("started deploy.ps1 UIBACK 1 …"). A second press that got through
+    /// would add a second of either.
+    /// </summary>
+    private static (int Builds, int Deploys) LauncherStarts(DrivenApp app)
+    {
+        var lines = TrailLines(app);
+        return (lines.Count(line => line.Contains($"started preview.ps1 {Code} 1 --build-only")),
+                lines.Count(line => line.Contains($"started deploy.ps1 {Code} 1")));
+    }
 
     [UiFact]
     public void ReturningShowsTheDeploy_AndStartsNothing_ThenItsEndingOnce()
@@ -97,7 +111,12 @@ public class ReturningToASectionMidDeployUiTests
         CopyAPageEscapeUiTests.Front(app);
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_D);
         Thread.Sleep(1500);
-        Assert.Single(TrailLines(app), line => line.Contains($"started deploy.ps1 {Code} 1"));
+        // Mid-deploy: one build leg at most, one deploy leg at most, and at
+        // least one of them — neither press started a second.
+        var midway = LauncherStarts(app);
+        _output.WriteLine($"launcher starts after the presses: {midway.Builds} build, {midway.Deploys} deploy");
+        Assert.True(midway.Builds <= 1 && midway.Deploys <= 1 && midway.Builds + midway.Deploys >= 1,
+                    $"a press on return started a launcher: {midway.Builds} builds, {midway.Deploys} deploys");
 
         // ---- Away again while it ends; it ended while the teacher was away.
         app.SelectSection(Code, 2);
@@ -123,7 +142,9 @@ public class ReturningToASectionMidDeployUiTests
         Assert.True(app.Find("deployButton", "the Deploy button").IsEnabled, "Deploy was unavailable in the ordinary state");
 
         string[] trail = TrailLines(app);
-        Assert.Single(trail, line => line.Contains($"started deploy.ps1 {Code} 1"));
+        var total = LauncherStarts(app);
+        Assert.True(total.Builds <= 1 && total.Deploys == 1,
+                    $"one deploy started {total.Builds} builds and {total.Deploys} deploys");
         Assert.DoesNotContain(trail, line => line.Contains("already being deployed"));
         _output.WriteLine(string.Join("\n", trail.Where(line => line.Contains("deploy.ps1") || line.Contains("preview.ps1"))));
     }
