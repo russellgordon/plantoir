@@ -39,7 +39,8 @@ public sealed class SectionProblemsSourceTests
         Assert.Contains("SectionProblems.ReleaseTheAlert(folder, _course.Code, _sectionNumber);", raise);
         Assert.Contains("if (_healthDialogIsUp || _todaysClassQuestionUp || _linksChecklistUp) return;", raise);
         Assert.Contains("SectionProblems.Answer(due, answer, folder, _course.Code, _sectionNumber);", raise);
-        Assert.Contains("if (choice is { } answered && !_isTornDown)", raise);
+        Assert.Contains("if (choice is { } answered && !_windowIsClosing)", raise);
+        Assert.Contains("_windowIsClosing = true;", Body(View, "    internal void LetGoAsTheWindowCloses("));
         Assert.Contains("ShowTab(SectionProblems.Tab.Problems, focusTheTable: true);", raise);
     }
 

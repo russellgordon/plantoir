@@ -120,6 +120,25 @@ public sealed class SectionProblemsStoreTests : IDisposable
         Assert.Contains("MPM2D/1 · answered the alert about new problems: Show", TrailText());
     }
 
+    /// <summary>
+    /// An answer the file could not keep (a replace refused by a scanner, seen
+    /// once in the full UI run) still holds while the app is open; only a
+    /// relaunch reads the file alone.
+    /// </summary>
+    [Fact]
+    public void AnAnswerHoldsForTheSessionEvenWhenTheFileLostIt()
+    {
+        WriteRecord(1, SectionProblemsContractTests.RecordJson);
+        SectionProblems.Reload(_folder, Course());
+        var due = SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1)!;
+        SectionProblems.Answer(due, SectionProblemsRules.AnsweredNotNow, _folder, "MPM2D", 1);
+        File.Delete(ProblemsAcknowledgements.PathFor(_folder));
+        Assert.Null(SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1));
+        SectionProblems.Reset();
+        SectionProblems.Reload(_folder, Course());
+        Assert.NotNull(SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1));
+    }
+
     [Fact]
     public void TheTrailLineIsWrittenOncePerAlertKey_NotAgainAfterARelaunch()
     {

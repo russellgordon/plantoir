@@ -370,8 +370,12 @@ public sealed partial class SectionDetailView : UserControl
     /// without relying on WinUI to raise it (#728 implementation review).
     /// Safe twice — every step is an unsubscribe or a stop of nothing.
     /// </summary>
+    /// <summary>Set as the window closes: a dialog it takes down was not answered by anybody.</summary>
+    private bool _windowIsClosing;
+
     internal void LetGoAsTheWindowCloses()
     {
+        _windowIsClosing = true;
         // The panel first: it is what hands a question on and lets go of the
         // shared runners, and the Unloaded work below redraws a window that is
         // closing, which must not be able to skip it by throwing.
@@ -964,9 +968,14 @@ public sealed partial class SectionDetailView : UserControl
             choice = await ShowHealthDialogAsync(FolderProblemsDialog.NewProblems(
                 due, ReferenceCourse.ShownCode(_course), _sectionNumber, repairTitle));
             // Never answered on behalf of a teacher who did not answer: a
-            // dialog that never got on screen, or one closed because this view
-            // went away, leaves the alert due.
-            if (choice is { } answered && !_isTornDown)
+            // dialog that never got on screen, or one closed because the
+            // WINDOW is closing, leaves the alert due. A dialog that outlived
+            // this VIEW is still the teacher's answer, and is recorded:
+            // the view is rebuilt under an open dialog whenever the courses
+            // reload (ShowDetailForSelection), and the dialog stays on the
+            // window — measured in the full UI run of 2026-11-11, where an
+            // answer dropped that way had the next view raise the alert again.
+            if (choice is { } answered && !_windowIsClosing)
             {
                 string answer = answered switch
                 {
@@ -975,7 +984,13 @@ public sealed partial class SectionDetailView : UserControl
                     _ => SectionProblemsRules.AnsweredNotNow,
                 };
                 SectionProblems.Answer(due, answer, folder, _course.Code, _sectionNumber);
-                if (answered == ContentDialogResult.Primary)
+                if (answered == ContentDialogResult.Primary && _isTornDown)
+                {
+                    // The section's current view reads the tab from the store.
+                    SectionProblems.Show(SectionProblems.Tab.Problems, folder, _course.Code, _sectionNumber);
+                    SectionProblems.SayChanged(folder, _course.Code);
+                }
+                else if (answered == ContentDialogResult.Primary)
                     ShowTab(SectionProblems.Tab.Problems, focusTheTable: true);
                 else if (answered == ContentDialogResult.Secondary)
                 {
@@ -993,6 +1008,10 @@ public sealed partial class SectionDetailView : UserControl
             SectionProblems.ReleaseTheAlert(folder, _course.Code, _sectionNumber);
         }
 
+        // A view taken away under its dialog shows nothing more: the repair
+        // was made, the answer kept, and the section's view now showing reads
+        // the record again on its own.
+        if (_isTornDown) return;
         if (choice is null)
         {
             // Another dialog held the one slot WinUI allows: asked again once it

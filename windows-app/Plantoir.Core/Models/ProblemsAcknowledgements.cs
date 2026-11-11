@@ -55,7 +55,7 @@ public sealed class ProblemsAcknowledgements
         {
             string path = PathFor(workingFolder);
             if (!File.Exists(path)) return read;
-            if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root) return read;
+            if (JsonNode.Parse(Patiently(() => File.ReadAllText(path))) is not JsonObject root) return read;
             if (root["sections"] is not JsonObject sections) return read;
             foreach (var (name, value) in sections)
             {
@@ -114,8 +114,23 @@ public sealed class ProblemsAcknowledgements
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             string temporary = path + "." + Environment.ProcessId + ".tmp";
             File.WriteAllText(temporary, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporary, path, overwrite: true);
+            Patiently(() => { File.Move(temporary, path, overwrite: true); return ""; });
         }
         catch (Exception) { }
+    }
+
+    /// <summary>
+    /// Tried again a few times on a sharing violation: a virus scanner or a
+    /// sync client can hold a file just written for a moment, and a replace or
+    /// a read refused then would lose an answer (seen once in the full UI run,
+    /// 2026-11-11: an alert answered Not Now was raised again on returning).
+    /// </summary>
+    private static string Patiently(Func<string> act)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try { return act(); }
+            catch (IOException) when (attempt < 6) { System.Threading.Thread.Sleep(40 * attempt); }
+        }
     }
 }

@@ -58,6 +58,13 @@ public static class SectionProblems
     private static readonly Dictionary<SectionKey, string> AlertsUp = new();
 
     /// <summary>
+    /// The alert keys answered in THIS run, beside the file: an answer the file
+    /// could not keep (a replace refused by a scanner) still holds until the
+    /// app closes. The file is what a relaunch reads.
+    /// </summary>
+    private static readonly HashSet<(SectionKey, string)> AnsweredHere = new();
+
+    /// <summary>
     /// Where a working folder's records are: where the LAUNCHERS built
     /// (<see cref="BuildOutputLocation.WhereTheLaunchersBuild"/>), which under
     /// <c>--state-dir</c> is not <see cref="BuildOutputLocation.BuildsRootFor"/>
@@ -74,6 +81,12 @@ public static class SectionProblems
     /// assistant's build. Raised on the runner's interface thread.
     /// </summary>
     public static event Action<SectionProblemsMarker>? MarkerArrived;
+
+    /// <summary>
+    /// Says <see cref="Changed"/> without a read: a view taken away under its
+    /// alert hands Show to the section's view now showing.
+    /// </summary>
+    public static void SayChanged(string folder, string courseCode) => Changed?.Invoke(folder, courseCode);
 
     /// <summary>Called by <see cref="ScriptRunner"/> when a run prints a marker.</summary>
     public static void NoteMarker(SectionProblemsMarker marker) => MarkerArrived?.Invoke(marker);
@@ -187,6 +200,8 @@ public static class SectionProblems
     public static SectionProblemsRecord? RecordWithAnAlertDue(string? folder, string courseCode, int section)
     {
         if (folder is null || Record(folder, courseCode, section) is not { } found) return null;
+        lock (Gate)
+            if (AnsweredHere.Contains((SectionKey.For(folder, courseCode, section), found.AlertKey))) return null;
         IReadOnlySet<string> answered;
         lock (ProblemsAcknowledgements.Gate)
             answered = ProblemsAcknowledgements.Read(folder).Answered(courseCode, section);
@@ -200,6 +215,7 @@ public static class SectionProblems
     /// </summary>
     public static void Answer(SectionProblemsRecord record, string answer, string folder, string courseCode, int section)
     {
+        lock (Gate) AnsweredHere.Add((SectionKey.For(folder, courseCode, section), record.AlertKey));
         lock (ProblemsAcknowledgements.Gate)
         {
             var kept = ProblemsAcknowledgements.Read(folder);
@@ -291,6 +307,7 @@ public static class SectionProblems
             Tabs.Clear();
             Unticked.Clear();
             AlertsUp.Clear();
+            AnsweredHere.Clear();
         }
     }
 }

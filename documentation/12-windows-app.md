@@ -861,8 +861,17 @@ this view's is up (today's-class question, the links checklist, a health
 dialog) — it stays due in the store, so `ShowDialogSafelyAsync`, the outcome
 dialog, today's-class question and the checklist each ask again as they close;
 one that could not get on screen asks again two seconds later. An answer is
-written only when the teacher gave one: a dialog closed because the view went
-away leaves the alert due. The links checklist now FOLLOWS it: it reads the
+written only when the teacher gave one — but **a dialog that outlives its VIEW is
+still the teacher's answer**: the view is rebuilt under an open dialog whenever
+the courses reload (`ShowDetailForSelection` on `Courses`), the `ContentDialog`
+stays on the window, and the first version dropped the answer as "the view went
+away", so the next view raised the same alert again (found by the full UI run,
+2026-11-11, `ProblemsTabUiTests.OpeningOntoAnUnansweredRecordRaisesTheAlert_AndAnAnsweredOneDoesNot`).
+Only a dialog the WINDOW took down as it closed (`LetGoAsTheWindowCloses`)
+leaves it due. Answers are also kept in memory for the session
+(`SectionProblems`), so one the file could not keep — a replace a scanner
+refused — still holds until the app closes; the file's reads and replaces are
+tried again on a sharing violation. The links checklist now FOLLOWS it: it reads the
 record first (the marker came before the checklist's, but the read is
 asynchronous) and waits while the alert is due or up. `NoteHealthFindings`,
 `FolderProblemQueue` and the held #333 finding are gone: on Windows the

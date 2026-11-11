@@ -513,7 +513,8 @@ public class ProblemsTabUiTests
         string built = Status(table);
         Measured($"Problems shown {shown:0} ms after the click; the view said \"{built}\".");
         Assert.StartsWith("built 300 rows in", built);
-        var items = table.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem));
+        var items = Retry.WhileEmpty(() => table.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)),
+                                     TimeSpan.FromSeconds(5)).Result ?? Array.Empty<AutomationElement>();
         Measured($"UI Automation lists {items.Length} of the 300 rows before scrolling (a ListView realises the rows it shows).");
         Assert.NotEmpty(items);
         // The last row can be reached: scrolled to the bottom, it is there.
