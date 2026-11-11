@@ -408,14 +408,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > on each run.
    >
    > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
-   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline,
-   > about 20 s, no credentials: it proves the wait for Cloudflare's
-   > production address against a stub, so a real run's Cloudflare lines can
-   > be trusted. Since #740 on the mac and #743 on Windows, it also proves
-   > that a first-publish run retries a brand-new site's files for up to 60 s
-   > before failing one (about 25 s in all on the mac, about 30 s on
-   > Windows). The run's Result block counts the retries. It reads 13 passed,
-   > 0 failed on both.
+   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline, no
+   > credentials, about 25 s on the mac and about 30 s on Windows: it proves
+   > the wait for Cloudflare's production address against a stub, so a real
+   > run's Cloudflare lines can be trusted, and (since #740 on the mac, #743
+   > on Windows) that a first-publish run retries a brand-new site's files
+   > for up to 60 s before failing one. The run's Result block counts the
+   > retries. It reads 13 passed, 0 failed on both.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,

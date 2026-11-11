@@ -10177,7 +10177,14 @@ and matches it with a regex, because Windows PowerShell 5.1's `ConvertTo-Json`
 writes `"node":  "20.18.1"` with two spaces and a BOM, so a `Contains` of the
 spaced text would be wrong either way. Proven against four hand-made
 manifests: Node 20 refused, 22.23.4 accepted, 22.23.45 refused, no
-`geogebra` key refused.
+`geogebra` key refused. Since #719 it names `_PlantoirRuntimeWrangler` the
+same way (regex, held to `pins` → `wrangler` by the same test), so a runtime
+still on wrangler 4.80.0 stops the build: "windows-app\Vendor\runtime does
+not carry wrangler 4.156.0 (its manifest.json names another). Delete
+windows-app\Vendor\runtime, re-run windows-app\Vendor\fetch-runtime.ps1 (a
+full fetch, about 600 MB) and build again." Proven 2026-11-11: the 4.80.0
+runtime's own manifest refused with that line, the 4.156.0 one built, and
+the test failed with the project file's value changed to 4.80.0.
 
 A second fix the re-fetch found: the scaffold bake (`setup_course`'s two
 `ensure_…` calls) prints a check mark, and with the script's output sent to a

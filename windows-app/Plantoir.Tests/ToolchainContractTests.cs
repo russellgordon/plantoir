@@ -342,6 +342,11 @@ public class ToolchainContractTests
         string node = pins.First(p => p?["pin"]?.ToString() == "node")!["value"]!.ToString();
         Assert.Contains($"<_PlantoirRuntimeNode>{node}</_PlantoirRuntimeNode>", project);
         Assert.Contains("_PlantoirRuntimeManifest.Contains('&quot;geogebra&quot;')", project);
+        // #719: and the wrangler the runtime must carry, so a build PC that
+        // never re-fetched cannot ship 4.80.0's tree under a 4.156.0 pin.
+        string wrangler = pins.First(p => p?["pin"]?.ToString() == "wrangler")!["value"]!.ToString();
+        Assert.Contains($"<_PlantoirRuntimeWrangler>{wrangler}</_PlantoirRuntimeWrangler>", project);
+        Assert.Contains("$(_PlantoirRuntimeWranglerPattern)", project);
     }
 
     /// <summary>
