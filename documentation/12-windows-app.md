@@ -2152,7 +2152,7 @@ as work happens:
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
 fetches pinned, portable pieces — Node 22.23.4 (zip, no installer; Node 20
-until #675), Python 3.11
+until #675), Python 3.14.10 (3.11.9 until #764, below)
 (the embeddable distribution plus `python-frontmatter==1.3.0`,
 `PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
 against `contracts/toolchain.json` → `pins` by
@@ -2552,7 +2552,7 @@ Windows figures are the v1.1.0 release assets.
 | | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
 |---|---|---|---|
 | Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
-| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.14.10 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |
@@ -2573,7 +2573,9 @@ the same day.)
    file) on a mismatch. The pins were measured on the build PC (i5-8365U,
    Windows 11 26200), not copied: Node's equals nodejs.org's own
    `SHASUMS256.txt` for v20.18.1 (and, since #675, for v22.23.4); the Python zip's `python.exe` and
-   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   `python311.dll` were byte-identical to the runtime that had shipped (3.11.9;
+   since #764 the pin is python.org's published SHA-256 for the 3.14.10 zip,
+   and the wheels are hashed too); the font
    equals the shipped font. Proven by running the script's own `Fetch` (lifted
    out of the file by its syntax tree, against a `file://` copy): the right pin
    keeps the file, one wrong hex digit refuses it and leaves nothing behind.
@@ -10532,11 +10534,12 @@ decoder of its own: `ImageFont.truetype` loads a WOFF2 font
 (`KaTeX_AMS-Regular.woff2`), which FreeType can only do when built with
 Brotli, although no `*brotli*` file and no Brotli string is in any Pillow
 `.pyd` (it is linked in statically). Its version cannot be read from the
-binary. And the runtime's Python 3.11.9 reports `ssl.OPENSSL_VERSION`
+binary. And the runtime's Python 3.11.9 reported `ssl.OPENSSL_VERSION`
 "OpenSSL 3.0.13 30 Jan 2024", the TLS under every Netlify publish and
-`deploy.py`'s Cloudflare API calls on Windows. Nothing is changed
-here: the OpenSSL half is #764 (v1.9.3, moving the runtime's Python), and
-Pillow's Brotli is #766, which asks for its version on both platforms.
+`deploy.py`'s Cloudflare API calls on Windows. Nothing was changed
+here: the OpenSSL half was #764 (v1.9.3), which moved the runtime to Python
+3.14.10 and OpenSSL 3.5.9 (next section), and Pillow's Brotli is #766,
+which asks for its version on both platforms.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

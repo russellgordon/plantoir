@@ -329,6 +329,15 @@ Split it in two:
   2026-09-07, eighteen later the same week) — the same files `verify.sh` runs on the
   mac, in about eight seconds with no Docker, network or credentials. Until then this side ran none of them, so a shared
   file could be broken from this machine with every gate on it green.
+  **Since #764 (2026-11-11) they run on the RUNTIME's Python** —
+  `windows-app\Vendor\runtime\python\python.exe`, or `PLANTOIR_RUNTIME`'s,
+  3.14.10 — whenever a runtime is fetched, and on PATH's `python` only when
+  none is; `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which,
+  with its version and OpenSSL. (Before, they ran on PATH's interpreter while
+  teachers ran 3.11.9, so the gate had never run them on what ships.) With 93
+  files the run takes about five minutes, not eight seconds. The image's 3.11
+  is held only by `RuntimePythonTests.TheSharedScriptsParseAsPython311` (a
+  grammar check with known limits — `documentation/02-docker-image.md`).
 - **The IMAGE is not, because Windows has no image at all.** It carries its
   own runtime and builds natively, so a publish driven through the app here
   exercises the bundled runtime, not the image. A change to the Dockerfile or
