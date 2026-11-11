@@ -10541,6 +10541,161 @@ here: the OpenSSL half was #764 (v1.9.3), which moved the runtime to Python
 3.14.10 and OpenSSL 3.5.9 (next section), and Pillow's Brotli is #766,
 which asks for its version on both platforms.
 
+## Python 3.14.10 in the runtime: a supported OpenSSL (#764, Windows 1.9.3)
+
+Written 2026-11-11 for [#764](https://github.com/russellgordon/plantoir/issues/764).
+Measured on the Windows test PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11
+Pro 26200, wired Ethernet). The contract half is `contracts/toolchain.json` →
+`windowsPython` (version, `windowsRuntimeContains`, `opensslAtLeast`, why,
+measured, rejected). The mac owes nothing; what it must KNOW is in
+[02 → "The shared scripts run on two Pythons"](02-docker-image.md).
+
+**Why.** Python's own OpenSSL is the TLS under every Netlify publish and every
+Cloudflare API call `deploy.py` makes here (wrangler uses Node's, 3.5.9). The
+runtime carried Python 3.11.9, the last 3.11 with Windows binaries, whose
+OpenSSL is 3.0.13 (30 Jan 2024). OpenSSL says "Versions 3.0, 1.1.1 and 1.0.2
+are no longer supported" (openssl-library.org → release strategy). Its last
+public 3.0 is 3.0.22 (25 Aug 2026), and about 44 CVEs were fixed in 3.0.x
+after 3.0.13. No 3.11 patch release can move it: 3.11.10 to 3.11.18 are
+source only. The exposure was outbound only, to Netlify and Cloudflare, at
+deploy: Python serves nothing.
+
+**The candidates.** Each python.org embeddable amd64 zip was checked against
+its published hash and run with `-I`. `ssl.OPENSSL_VERSION`, and each tag's
+`PCbuild/get_externals.bat` agrees:
+
+| Python | OpenSSL | Windows binaries still coming? | win_amd64 wheels for all three pins |
+|---|---|---|---|
+| 3.11.9 (was) | 3.0.13 | no | yes |
+| 3.12.10 | 3.0.16 | no (3.12.11 on are source only) | yes |
+| 3.13.17 | 3.5.9 | no: 3.13.18 (25 Oct 2026) is source only | yes |
+| **3.14.10** | **3.5.9** | **yes, while 3.14 is in bugfix (to about 2027-10)** | **yes (cp314)** |
+| 3.15.2 | 3.5.9 | yes | **no**: PyYAML 6.0.3 has no cp315 wheel (`pip --only-binary` refuses) |
+
+3.14.10 is the only line with all three, so the next OpenSSL fix arrives as a
+3.14.x. Its zip is 12,619,664 bytes (3.11.9's: 11,249,023), and `python.exe`,
+`python314.dll` and `libssl-3.dll` are Authenticode-signed by the Python
+Software Foundation. **Before 3.14 goes source-only (about 2027-10) the
+runtime must move again**, to a line that still has Windows binaries, or this
+returns. That needs a PyYAML wheel for that line, and PyYAML is the pin that
+decides what `publish: no` means (08 → "Whether students see a page").
+
+**What landed.**
+- `fetch-runtime.ps1`: `$PythonVersion   = "3.14.10"`. The zip is checked by
+  hash AND size. The three wheels are pinned by version AND SHA-256 (PyPI's
+  own, for the cp314 win_amd64 files) and installed with `--only-binary :all:
+  --require-hashes --no-deps`: a missing wheel refuses instead of building
+  from source. Until #764 they were exact versions with no hash. 3.14's
+  `get-pip.py` installs pip only; 3.11's also installed setuptools, wheel and
+  packaging, which nothing here imports.
+- `Assert-PythonOpenssl` refuses a Python whose OpenSSL is below
+  `opensslAtLeast` (3.5.9). It reads the number in `ssl.OPENSSL_VERSION`. Its
+  first version read `ssl.OPENSSL_VERSION_INFO[:3]` instead, and refused
+  3.14.10 on its first run. For OpenSSL 3 that tuple is (major, minor, 0,
+  patch, status), so 3.5.9 is `(3, 5, 0, 9, 0)` and its first three read 3.5.0.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest`: `_PlantoirRuntimePython`
+  stops the build on a runtime whose manifest names another Python. The
+  fetch already refuses to replace a base pin in place. Measured: a manifest
+  edited to 3.11.9 gives "does not carry Python 3.14.10".
+- `installer.iss` → `[InstallDelete]` empties `{app}\runtime\python`. Python
+  3.14 loads only `python314._pth`, and a cp311 `.pyd` is not a cp314 one.
+  But an upgrade would otherwise keep `python311.*`, setuptools, wheel,
+  packaging, the cp311 `.pyd`s and a second pip `dist-info` beside the new
+  tree. A preview build or scheduled deploy running `python.exe` at install
+  time is #700's exposure, the same as `runtime\node`'s.
+- `PythonToolchainTests` runs the shared `scripts/test_*.py` on the
+  RUNTIME's Python whenever a runtime is fetched (this checkout's, or
+  `PLANTOIR_RUNTIME`'s), and on PATH's `python` only when none is.
+  `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which, with
+  its version and OpenSSL. Until #764 they ran on PATH's interpreter (3.14.7
+  on this PC) while teachers ran 3.11.9. The runtime's `._pth` replaces
+  `sys.path` and ignores `PYTHON*` variables, so run plainly 50 of 93 files
+  failed with `ModuleNotFoundError`. That happened on 3.11.9 and 3.14.10
+  alike. A shim (`runpy.run_path` with the working directory, `scripts\`,
+  first on `sys.path`, plus `-B -X utf8`) does what the product's entry
+  scripts do for themselves. With it, 93/93 pass on both (273 s and 293 s).
+- `RuntimePythonTests`. It holds the recipe, the build, the installer and a
+  fetched runtime to the contract. A runtime that is fetched and differs
+  FAILS; only no runtime skips, because the build's guard never runs for
+  `dotnet test`. It runs the OpenSSL floor as written against stand-ins
+  (3.0.13, 3.0.22 and 3.5.8 refused; 3.5.9, 3.5.10 and 3.10.0 accepted) and
+  against the real runtime. It also parses every `scripts/` and `support/` file
+  as Python 3.11, the image's. That parse rejects `type X = …`, `def f[T]`,
+  `class C[T]` and `except A, B:`, each a test case. It does NOT see PEP 701
+  quote reuse in an f-string, or a stdlib function added after 3.11.
+- `verify-deploy.ps1` records the runtime's Python and OpenSSL in its
+  Measured block.
+
+**Revalidated, against 3.11.9.**
+- Identical: libyaml (`CSafeLoader`), the YAML 1.1 readings of
+  no/off/yes/on, Pillow's freetype, webp, jpeg and zlib (raqm absent on both),
+  37 certificates in the default context (Windows store), TLS to
+  api.netlify.com and api.cloudflare.com, and `zoneinfo` absent on both.
+  Build_site's fallback to local time is the path both take.
+- 140 `.py` files compile with no `SyntaxWarning`.
+- One MPM2D folder (made by `setup.ps1` through PtyDriver) was built with
+  `preview.ps1 --build-only` on each runtime in turn: 429 files each, the
+  same names. 370 are byte-identical, `og-image.png` (Pillow) among them. The
+  other 59 differ only in the build's own `<time datetime>` and the
+  sitemap's dates. Built from two different folders, every page also differs
+  in base64 of the build path (the builds id). That is not Python.
+- A preview through `preview.ps1 --non-interactive` serves 200 on both. A
+  file count taken the moment the preview says "Started a Quartz server" is
+  NOT a finished site (276 of 429 on one run), so compare `--build-only`
+  output.
+- **Coloured tracebacks.** Python 3.13+ colours a traceback on a console, and
+  under ConPTY that console is the app's.
+  - A forced `RuntimeError` in `build_site.py`'s `main` was run through
+    PtyDriver (`--bytes-log`, as the app runs launchers). ConPTY sent 36 SGR
+    colour codes on 3.14.10, against 1 (its own reset) on 3.11.9.
+  - Fed back through `TranscriptBuilder`, the transcript carried no escape
+    character on either, and the same lines, plus 3.13's caret lines
+    (`~~~~^^`).
+  - `FailureExplainer` explained neither, as before. The app needs no change.
+  - PtyDriver's `--raw-log` strips control sequences itself, so it cannot
+    show this. Read `--bytes-log`.
+- **Backups.** The one Python deflate in `scripts/` is the setup wizard's
+  automatic course zip (`setup_course.backup_existing_course_dir`), and
+  3.14's Windows build links zlib-ng, so its compressed bytes differ. It is
+  left out of every byte comparison. A backup made on 3.14.10 (244 files,
+  1,855,118 bytes) passes `testzip` on 3.11.9 and on 3.14. Extracted by .NET's
+  `ZipFile`, all 244 files equal the course. `CourseRestorer.RestoreBackup`
+  does not read these zips at all: the app lists `<timestamp>.zip` wizard
+  zips as neither backups nor archives (`BackupItem`), and its own backups
+  are made by .NET.
+- Sizes: `runtime\python` 61 MB -> 56 MB; the whole runtime about 775 MB ->
+  764 MB (du). A full fetch took 248 s.
+
+**Publishing, on 3.14.10** (2026-11-11). Each run records the runtime's
+Python and OpenSSL in its Measured block: "3.14.10, OpenSSL 3.5.9 29 Sep 2026".
+- `verify-deploy.ps1 -SelfTest`: 13 passed, 0 failed, 0 skipped, 39 s.
+- Plain `verify-deploy.ps1`: 169 passed, 0 failed, 0 skipped, 1,082 s.
+- `-FirstPublish`: 169 passed, 0 failed, 0 skipped, 816 s. It created
+  `ics3u-s1-2026-vdywiqvtbm` on Netlify and on Cloudflare Pages, and no file
+  needed asking again.
+- `audit-runtime.ps1`: 5 trees, 55 advisories, 54 accepted, and 1 blocking:
+  GHSA-h895-cgqg-jf52 (toml, in Quartz's tree, high). It was new in the
+  advisory database that day and is identical on the 3.11.9 runtime, so it
+  is not this piece's. Python's part of the audit, the comparator, ran on
+  3.14.10.
+
+**Rejected.** 3.13.17, 3.12.10 and 3.15.2, for the reasons in the table.
+python-build-standalone 3.11.18 (OpenSSL 3.5.9 and the image's minor, but a
+third-party builder in the chain that holds teachers' tokens, unsigned
+binaries, 49 MB to download and 156 MB unpacked, and a different layout).
+Sending `deploy.py`'s HTTP through Node, which rewrites the shared publishing
+path on both platforms for one platform's packaging, and Python would still
+carry 3.0.13 for its other TLS. Moving the image too: its OpenSSL is current,
+and a base bump rebuilds every Mac. Staying, which the owner ruled out on
+2026-11-10.
+
+**The fallback, measured and kept.** If a 3.14.x ever cannot be taken, 3.14.10's
+`libssl-3.dll` and `libcrypto-3.dll` copied into 3.11.9 report "OpenSSL
+3.5.9 29 Sep 2026" and complete TLS to Netlify. OpenSSL 3.x keeps its ABI,
+which makes this the lowest-risk splice. It was not chosen: python.org never
+built or tested that pairing, and 3.11.9 stays nine releases behind on
+CPython's own security fixes.
+
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
 Written 2026-10-28 for [#681](https://github.com/russellgordon/plantoir/issues/681).

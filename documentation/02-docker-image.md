@@ -849,8 +849,11 @@ its next base bump.
 which measured two things this paragraph used to deny: Pillow 12.3.0's
 FreeType has a Brotli decoder linked in statically, with no version readable,
 and the image carries the same Pillow pin, unmeasured here (#766); and
-Windows' Python 3.11.9 carries OpenSSL 3.0.13 (#764).
-`documentation/12-windows-app.md` → "#714 on Windows".
+Windows' Python 3.11.9 carried OpenSSL 3.0.13, which #764 (Windows 1.9.3)
+ended by moving that runtime to Python 3.14.10 with OpenSSL 3.5.9 (see "The
+shared scripts run on two Pythons" under the base layer above).
+`documentation/12-windows-app.md` → "#714 on Windows" and "Python 3.14.10 in
+the runtime".
 
 ### Node 22 (#640, v1.9.0)
 
