@@ -80,23 +80,37 @@ public static class ClassesDatedLater
     }
 
     /// <summary>
-    /// The same question asked of pages a teacher is about to PUBLISH
-    /// (Section ▸ Publish Pages…): which of <paramref name="places"/> would be
-    /// flagged once visible. The next class day is the section's own, counted
-    /// over every class page as it is.
+    /// The answer to the question at Deploy (#694 / #726, <c>shared-rules.json</c>
+    /// → <c>classesDatedLater.answers</c>): a TICKED class goes out and is kept
+    /// at its date; an UNTICKED one is hidden first. A ticked box always means
+    /// included, in this sheet and every checklist in the app (Russell's ruling
+    /// 1 on #694). <paramref name="ticked"/> is read row for row against
+    /// <paramref name="flagged"/>; each list keeps the question's order.
     /// </summary>
-    public static IReadOnlyList<Page> FlaggedIfPublishing(Course course, int section, DateOnly today,
-                                                          IEnumerable<string> places)
+    /// <remarks>
+    /// Section ▸ Publish Pages… never asks (<c>classesDatedLater.neverAskedFrom</c>):
+    /// publishing changes only the preview, where a teacher publishes next
+    /// week's classes on purpose to check them. The reader it used,
+    /// <c>FlaggedIfPublishing</c>, went with that question.
+    /// </remarks>
+    public static (IReadOnlyList<Page> Kept, IReadOnlyList<Page> Hidden) AnswerAtDeploy(
+        IReadOnlyList<Page> flagged, IReadOnlyList<bool> ticked)
     {
-        if (ReferenceCourse.IsKeptForReference(course)) return Array.Empty<Page>();
-        var picked = places.Select(PlaceKey).ToHashSet(StringComparer.Ordinal);
-        var pages = ClassPages(course, section)
-            .Select(page => picked.Contains(page.Place) ? page with { Visible = true } : page)
-            .ToList();
-        return Flagged(pages, today, LaterClassesKept.Read(course.DirectoryPath, section))
-            .Where(page => picked.Contains(page.Place))
-            .ToList();
+        if (ticked.Count != flagged.Count)
+            throw new ArgumentException("one tick per flagged class", nameof(ticked));
+        var kept = new List<Page>();
+        var hidden = new List<Page>();
+        for (int index = 0; index < flagged.Count; index++)
+            (ticked[index] ? kept : hidden).Add(flagged[index]);
+        return (kept, hidden);
     }
+
+    /// <summary>
+    /// The counts the "ran from a menu" line of the hide at Deploy carries —
+    /// the mac's words (<c>SectionDetailVerbs.swift</c>), not the contract's.
+    /// </summary>
+    public static string UntickedAtDeployCounts(int count) =>
+        count == 1 ? "1 class dated later, unticked at Deploy" : $"{count} classes dated later, unticked at Deploy";
 
     /// <summary>
     /// The section's class pages, read from disk: the folders the shared

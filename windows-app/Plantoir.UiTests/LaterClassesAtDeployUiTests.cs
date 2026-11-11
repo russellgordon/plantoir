@@ -9,10 +9,12 @@ namespace Plantoir.UiTests;
 /// <summary>
 /// #475 through the real window (the rest of #489): a section that publishes
 /// to a folder on this PC, with classes published and dated after the next
-/// class. Deploy asks first; Cancel deploys nothing and leaves the preview
-/// serving; Hide Ticked and Deploy hides the ticked class, keeps the unticked
-/// one and deploys; Keep All and Deploy keeps every class, and the next Deploy
-/// asks nothing.
+/// class. Deploy asks first, every class ticked to GO OUT (#726, the mac's
+/// #694); Cancel deploys nothing and leaves the preview serving; Deploy Ticked
+/// with one class unticked hides that class, keeps the ticked one and deploys;
+/// Return with every class ticked keeps them all, and the next Deploy asks
+/// nothing; Section ▸ Publish Pages… on a class dated later asks nothing, and
+/// Deploy still does.
 /// </summary>
 /// <remarks>
 /// <para>Runs the real build and the real <c>deploy.ps1 --to-folder</c>, as
@@ -59,6 +61,9 @@ public class LaterClassesAtDeployUiTests
             Class("Unit 1, Day 2", 1, EndToEnd.Marker("Next"));
             Class("Unit 1, Day 3", 3, fixture.LaterA);
             Class("Unit 1, Day 4", 4, fixture.LaterB);
+            // Hidden, for Publish Pages… (#726): not flagged until published.
+            EndToEnd.WritePage(Path.Combine(classes, "Unit 1, Day 5.md"),
+                $"title: Unit 1, Day 5\npublish: false\ncreated: {Day(5)}T07:00:00.000-0400", "Lesson: hidden for now");
         });
         return (app, fixture with { Published = published! });
     }
@@ -78,6 +83,11 @@ public class LaterClassesAtDeployUiTests
         Assert.NotNull(first);
         var dialog = MenuBar.Dialog(app, "the question about classes dated later");
         Assert.Equal(Title, dialog.Name);
+        // One button beside Cancel (#726): Deploy Ticked, and no Keep All.
+        var secondary = dialog.FindFirstDescendant(cf => cf.ByAutomationId("SecondaryButton"));
+        Assert.True(secondary is null || secondary.IsOffscreen || string.IsNullOrEmpty(secondary.Name),
+                    $"the question has a second button: {secondary?.Name}");
+        Assert.Equal(AssistWording.DeployTickedButton, dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Name);
         return dialog.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.CheckBox)).ToList();
     }
 
@@ -97,7 +107,7 @@ public class LaterClassesAtDeployUiTests
     }
 
     [UiFact]
-    public void CancelDeploysNothingAndKeepsThePreview_ThenHideTickedHidesAndDeploys()
+    public void CancelDeploysNothingAndKeepsThePreview_ThenDeployTickedHidesTheUnticked()
     {
         var (app, fixture) = Launch();
         using var running = app;
@@ -112,7 +122,7 @@ public class LaterClassesAtDeployUiTests
         // ---- Cancel: nothing deployed, the preview still serving.
         var rows = DeployAndMeetTheQuestion(app);
         Assert.Equal(2, rows.Count);
-        Assert.All(rows, row => Assert.True(row.AsCheckBox().IsChecked, $"{row.Name} was not ticked to hide"));
+        Assert.All(rows, row => Assert.True(row.AsCheckBox().IsChecked, $"{row.Name} was not ticked to go out"));
         Assert.Contains("Unit 1, Day 3", rows[0].Name);
         Assert.Contains("Unit 1, Day 4", rows[1].Name);
         Press(app, "CloseButton");
@@ -123,9 +133,9 @@ public class LaterClassesAtDeployUiTests
                         MenuBar.Trail(app));
         Assert.Contains("publish: true", File.ReadAllText(Page(app, "Unit 1, Day 3")));
 
-        // ---- Hide Ticked and Deploy, with Day 4 unticked: Day 3 hidden, Day 4 kept, deployed.
+        // ---- Deploy Ticked, with Day 3 unticked: Day 3 hidden, Day 4 kept, deployed.
         rows = DeployAndMeetTheQuestion(app);
-        rows[1].AsCheckBox().IsChecked = false;
+        rows[0].AsCheckBox().IsChecked = false;
         Press(app, "PrimaryButton");
         var pressed = DateTime.Now;
         WaitForTheDeploy(app, fixture);
@@ -144,6 +154,8 @@ public class LaterClassesAtDeployUiTests
         string kept = File.ReadAllText(Path.Combine(app.WorkspacePath, "courses", Code, ".publish_state", "section1.later-classes-kept.json"));
         Assert.Contains("section1/All Classes/Unit 1, Day 4", kept);
         Assert.DoesNotContain("Unit 1, Day 3", kept);
+        // The hide's own line names Hide Pages…, counting the class as unticked.
+        Assert.Contains("1 class dated later, unticked at Deploy", MenuBar.Trail(app));
     }
 
     /// <summary>
@@ -178,15 +190,22 @@ public class LaterClassesAtDeployUiTests
         Assert.False(File.Exists(SiteIndex(fixture)), "Cancel deployed the section");
     }
 
+    /// <summary>Return, with every class left ticked: all of them go out and are kept, and the next Deploy asks nothing.</summary>
     [UiFact]
-    public void KeepAllDeploys_AndTheNextDeployAsksNothing()
+    public void ReturnWithEverythingTicked_KeepsThemAll_AndTheNextDeployAsksNothing()
     {
         var (app, fixture) = Launch();
         using var running = app;
         app.SelectSection(Code, 1);
 
         DeployAndMeetTheQuestion(app);
-        Press(app, "SecondaryButton");
+        var row = app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("laterClassRow0"))
+                  ?? throw new Xunit.Sdk.XunitException("the question's first row has no laterClassRow0");
+        row.Patterns.SelectionItem.Pattern.Select();
+        row.Focus();
+        Thread.Sleep(300);
+        CopyAPageEscapeUiTests.Front(app);
+        Keyboard.Type(FlaUI.Core.WindowsAPI.VirtualKeyShort.RETURN);
         WaitForTheDeploy(app, fixture);
         string site = Path.Combine(fixture.Published, "section1");
         Assert.NotEmpty(EndToEnd.FilesContaining(site, fixture.LaterA));
@@ -202,5 +221,61 @@ public class LaterClassesAtDeployUiTests
         Assert.Single(MenuBar.Trail(app).Split('\n'), line => line.Contains("asked about classes dated after the next class"));
         Assert.Contains($"{Code}/1 · asked about classes dated after the next class at Deploy — 2 flagged, 0 hidden, 2 kept published",
                         MenuBar.Trail(app));
+    }
+
+    /// <summary>
+    /// Section ▸ Publish Pages… on a class dated later goes straight from the
+    /// choice to its plan and publishes it, asking nothing and writing no kept
+    /// record (#726, <c>classesDatedLater.neverAskedFrom</c>); the next Deploy
+    /// still asks about it (the mac's testAClassPublishedFromTheMenuIsStillAskedAboutAtDeploy).
+    /// </summary>
+    [UiFact]
+    public void PublishPagesNeverAsks_AndDeployStillDoes()
+    {
+        var (app, fixture) = Launch();
+        using var running = app;
+        app.SelectSection(Code, 1);
+
+        EndToEnd.PressMenuBarItem(app, "Section", "sectionPublishPages");
+        var box = Retry.WhileNull(() => app.Desktop.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.CheckBox)
+                                                                              .And(cf.ByName("Unit 1, Day 5"))),
+                                  TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result
+                  ?? throw new Xunit.Sdk.XunitException("Publish Pages… did not list Unit 1, Day 5." + app.AnsweredSoFar);
+        box.AsCheckBox().Toggle();
+        PressWhenAvailable(app, "Publish Pages… (Continue)");
+        // Straight to the plan: no question in between.
+        var plan = Retry.WhileNull(() => app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("sectionVerbPlan")),
+                                   TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result
+                   ?? throw new Xunit.Sdk.XunitException("Publish Pages… never showed its plan." + app.AnsweredSoFar);
+        Assert.Null(app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("laterClass0")));
+        _output.WriteLine("plan: " + plan.Name);
+        PressWhenAvailable(app, "Publish Pages… (Publish)");
+        Assert.NotNull(Retry.WhileNull(() => app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId("sectionVerbResult")),
+                                       TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result);
+        MenuBar.CloseDialog(app);
+
+        Assert.Contains("publish: true", File.ReadAllText(Page(app, "Unit 1, Day 5")));
+        Assert.False(File.Exists(Path.Combine(app.WorkspacePath, "courses", Code, ".publish_state", "section1.later-classes-kept.json")),
+                     "Publish Pages… recorded a class dated later as kept");
+        Assert.DoesNotContain("asked about classes dated after the next class", MenuBar.Trail(app));
+
+        // Deploy asks about all three now, Day 5 among them; Cancel sends nothing.
+        var rows = DeployAndMeetTheQuestion(app);
+        Assert.Equal(3, rows.Count);
+        Assert.Contains("Unit 1, Day 5", rows[2].Name);
+        Press(app, "CloseButton");
+        Thread.Sleep(2000);
+        Assert.False(File.Exists(SiteIndex(fixture)), "Cancel deployed the section");
+    }
+
+    private static void PressWhenAvailable(DrivenApp app, string what)
+    {
+        var dialog = MenuBar.Dialog(app, what);
+        var button = Retry.WhileNull(() => dialog.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")),
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result
+                     ?? throw new Xunit.Sdk.XunitException($"{what} has no PrimaryButton");
+        Assert.True(Retry.WhileFalse(() => button.IsEnabled, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"{what}: PrimaryButton never became available");
+        button.AsButton().Invoke();
     }
 }

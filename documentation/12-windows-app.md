@@ -550,6 +550,158 @@ follow edits](05-build-pipeline.md#a-running-preview-does-not-follow-edits-671).
 
 ---
 
+## A section's deploy outlives its view (#728, the mac's #706)
+
+**The fault, found by reading rather than driven.** `MainWindow.ShowDetailForSelection`
+builds a fresh `SectionDetailView` for every selection, and the deploy runner and
+"preparing" were that view's fields. Clicking another section and back left the
+deploy running unseen in the old object while the new one showed a blank console
+with Deploy enabled — the button never asked `CourseActivity.IsPublishingSection`,
+and `IsSectionBusy` read only the view on screen. A press then reached
+`deploy.ps1`'s "already being deployed" refusal, or, during the build leg, started a
+second build (the mac measured that killing the first, "failed (exit 1) after
+17.5s", on an Apple M4 Pro, #706). The rule both apps now follow is
+`shared-rules.json` → `returningToASectionMidDeploy`.
+
+**A second fault that is Windows' own.** The deploy handed its BUILD lease to the
+view's preview build claim (`_buildWork = deployBuild`), and `Unloaded` →
+`StopPreview` → `ReleaseLease` → `ReleaseBuildClaim` gives that claim back. So
+leaving a section mid-deploy deleted the deploy's on-disk `building` lease while
+the build still ran: an outside assistant's `deploy_section`, or a scheduled run,
+was then told the course was free to build. The mac never had it — its claims are
+held by `claimAPublish` with a `defer` inside `deployAndWait`, so they live as long
+as the function. Observed by reading `SectionDetailView.xaml.cs` on `dev`
+a8b7a65d6 (the handover at the deploy, the release in the teardown region); not
+driven. Now the deploy's claims are the RUN's (`SectionDeployRun.Hold` /
+`EndPublish`), and `StopPreview` lets go of the preview's alone. The
+`ReleaseBuildClaim()` just before the handover stays: it lets go of the PREVIOUS
+build claim — a preview's, or the assistant's rebuild — not the deploy's.
+
+**The shape** (Core, so the rule is unit-tested):
+
+- `SectionKey` (`Models/SectionKey.cs`): folder through `WorkingFolder.Resolved`
+  and compared case-insensitively, course case-insensitive, section. Built
+  canonical, so `C:\Work\` and `c:\work` are one key. `PerSectionStore<T>` beside
+  it creates an entry on first ask and never replaces or removes one. Both are
+  meant for #734's per-section Problems store too.
+- `SectionDeployRun` (`Scripting/SectionDeployRun.cs`): the runner, `IsPreparing`,
+  `IsAsking` (the question about classes dated later is up in SOME window), the
+  `Folder` Cancel aims at, the deploy's claims, and the ending: `Endings`,
+  `EndingShown`, `PreviewLastStartedAt`, a waiting `Ending` (findings and the links
+  checklist's marker) taken read-and-clear by exactly one view. `SectionRuns.Deploy`
+  makes one, from a view, on the interface thread; `SectionRuns.Find` never does.
+- `SectionDeployRun.UnderWay(run, folder, course, section)` is preparing ∨ running ∨
+  asking ∨ the in-process publish record. The Deploy button (and so Section ▸
+  Deploy… and its key, which read the button), `DeployAsync`'s first check,
+  `DeployWillBeRefused`, `MainWindow.IsSectionBusy` (now given the caller's folder,
+  so a section not on screen still answers) and the Preview button, the links
+  checklist offered on appearing, today's-class re-check and the folder-repair
+  check all read it.
+
+**Why `IsAsking` is on the run** (the plan review's finding, Opus 5.5). With it on
+the view, a second window on the same section (File ▸ New Window) could put the
+question again while the first was up, back the course up and hide classes, and
+only then be refused by the "another deploy began while the question was up"
+check — a refusal after a change, which `classesDatedLater.order` forbids. Now the
+second window's Deploy is greyed and its press returns before anything.
+`SectionRunsTests.AQuestionUpInOneWindow_MakesTheSectionUnderWayInEveryWindow`.
+
+**Threading and lifetime.** Every Plantoir window is created on the one interface
+thread (`App.OpenWindow`), so the run's notifications are raised synchronously and
+reach every view on the thread it lives on. The deploy task — `DeployAsync` of the
+view that was pressed — keeps that view object alive until it ends, exactly as
+before; what changed is that every other view of the section binds to the same run.
+`DeployAsync` takes the run ONCE, from the folder it has just checked, and uses only
+that object (the mac's plan review H1: a window re-pointed at another folder
+mid-await must not split one deploy across two runs). `IsPreparing` is cleared in
+the `finally`. The view hooks the run and its runner on `Loaded` and lets go on
+`Unloaded`; so does `TaskProgressView` for every runner it registered — otherwise a
+view taken off screen stays subscribed to a shared runner for good. A window closed
+mid-deploy: `MainWindow.Closed` calls the section view's `LetGoAsTheWindowCloses()`
+(its `Unloaded` work, and the progress panel's `LetGo()`), so it lets go
+explicitly, not on whether WinUI raises `Unloaded` when a Window closes (nothing
+here measured that; the implementation review's finding). Called on the view
+rather than by setting `DetailHost.Content = null`, so the closing window's tree
+is not changed under it; both are idempotent. The deploy runs on; another window
+on the folder shows it. The last window, or quitting: unchanged — the quit question counts the
+`CourseActivity` record the run still writes. The in-app assistant's deploy goes
+through `MainWindow.DeployForAsync` → the view's `DeployAsync`, so it is the
+section's run and the assistant still awaits its outcome. A scheduled run, an
+outside assistant or a command line is another PROCESS and is not in the run: not
+greyed (`knownLimits`), refused in words by the work leases or the launcher.
+
+**The ending, shown once.** After the deploy: `run.EndPublish()`, THEN
+`run.NoteEnded(...)`, because the runner's own `IsRunning=false` arrives before the
+publish record ends — a view redrawing on it would leave Deploy greyed. Live views
+handle `Endings` by taking what the deploy left (links checklist, then folder
+problems) and calling `RefreshChrome`; the view that started a deploy and was left
+only deposits. A view appearing first notes `EndingToHideOnAppearing()` (an ending
+another view has shown), then takes. The console goes to the deploy when
+`IsShown(hidden, the view's own preview start)` says so: always while under way;
+afterwards only for an ending this view did not hide, and never over a preview of
+the section that started after the deploy did — a returning view has no preview
+start of its own, so the section's `PreviewLastStartedAt`, which both preview starts
+record, decides (the mac's M1 and L3).
+
+**One asker per question.** A deploy's credential question on a shared runner would
+otherwise be raised in every window showing the section, each sending its own answer
+to one prompt. `QuestionAskers` (Core) holds which view is asking each runner's
+question; the first view asks. A view taken off screen with the dialog up — a window
+closing, or the assistant changing the selection under a credential dialog
+(`MainWindow.DeployForAsync`, `AskAboutClassesDatedLaterFor`) — closes its own dialog
+(`_openQuestion.Hide()`: the dialog sits on the window, not in the view) and hands
+the question on rather than cancelling it — but only once that dialog has CLOSED:
+`QuestionAskers.HandOnWhenDone` marks it, and the dialog's own `finally`, after its
+`ShowAsync` has returned, calls `QuestionAskers.Done`, which lets the claim go and
+tells the next live view to ask. Handed on at once (the first build of this fix),
+the next view was usually in the SAME window, met WinUI's one-ContentDialog rule
+while the first was still closing, threw, and nobody asked again, so the deploy
+waited for ever (#728's third review, found by reading). NOT driven through the
+window, and why: the only question a deploy asks is a publishing credential, which
+needs a Netlify or Cloudflare destination with no saved credential, and answering it
+would reach that service; and in the same window only the in-app assistant changes
+the selection under an open dialog (a click on the sidebar is held by the modal
+dialog), which needs the local model. `QuestionAskersTests` pins the order instead. A view asking also waits
+while any other dialog is up in its window (`DialogGate.IsOpen`), asks again
+shortly if `ShowAsync` throws all the same, and a dialog whose question went away —
+the deploy cancelled from another window, or ended — is closed. A dialog
+that closes after its view left sends nothing, whichever button it reports
+(`QuestionAskers.WhatToDo`), so the left view and the new asker can never both reach
+the one prompt (`QuestionAskersTests`; the hide itself is pinned by a source scan and
+was not driven through a window). A question that
+arrived while nobody showed the section is asked when a view registers the runner.
+For the mac: its `TaskProgressView` binds the alert and the credential sheet to
+`runner.isAwaitingInput` (`awaitingInputBinding`, `awaitingCredentialBinding`), so
+two windows on one section both present it; answering one clears `isAwaitingInput`
+and the other is dismissed by its binding (reported to the director, who files it).
+
+**`theAssistantWithNoWindow`.** The contract's case is a deploy recorded with no
+run (the mac's `AssistSiteWork`). Windows never reaches it: `AssistWindow.MainWindowForBuilds`
+opens a section window, so the in-app assistant's deploy IS the section's run and is
+shown on return. `SectionRunsTests.ReturningToASectionMidDeploy` simulates the
+state — a publish record with no run — to pin the rule only.
+
+**Kept, deliberately.** A preview being built still stops when its section is left
+(its port lease, its web view and the quit record belong to the window). No trail
+line for navigation (`rejected`): the fix REMOVES lines — the second "started
+deploy.ps1" and the launcher's refusal no longer happen.
+
+**Rejected on this side.** Leaving the deploy's claim in `_buildWork` and skipping
+its release on `Unloaded`: a view would still own a claim that outlives it.
+Removing finished runs, or making the store observable: a reader would watch an
+object nothing writes (the mac's reason). Making a run from `IsSectionBusy`: a
+caller off the interface thread would bind the runner to the wrong context — `Find`
+never creates.
+
+**Tests.** `SectionRunsTests` (the key, the store, `UnderWay`, `IsAsking`, the
+ending's order, take-and-clear, shown once, a later preview, and the eleven contract
+cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing never
+deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
+the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
+test `ReturningToASectionMidDeployUiTests`.
+
+---
+
 ## Scheduled deploys
 
 There is no `launchd`. `TaskScheduling` registers a task with **Task Scheduler**
@@ -1385,8 +1537,9 @@ the 2026-10-23 full run and passed alone).
 Until bundle 11 the suite drove no Preview and no Deploy, so course import,
 courses kept for reference, Copy a Page, preview and publishing had never been
 proven through the window. Russell lifted the rule against it — "I don't care
-if you have real build folders. We need to test this. End to end." — and five
-classes now run the real launchers:
+if you have real build folders. We need to test this. End to end." — and these
+classes run the real launchers (five at the time; more have joined since,
+`LaterClassesAtDeployUiTests` among them):
 
 | Class | What it drives | What it reads back |
 |---|---|---|
@@ -1395,6 +1548,7 @@ classes now run the real launchers:
 | `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
 | `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
 | `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+| `ReturningToASectionMidDeployUiTests` (#728) | Deploy of a two-section course to a folder, padded with 1,200 plain pages so the deploy outlasts leaving and coming back; section 2 and back mid-deploy; Section ▸ Deploy… and Ctrl+Shift+D tried while greyed; away while it ends, back twice | the "Deploying …-S1" progress and Cancel on return, Deploy and the menu item unavailable (asserted, since Invoke on a greyed button throws), "Done" once and then the ordinary state, and the trail: ONE "started deploy.ps1 UIBACK 1", no "already being deployed" |
 
 **What a test that runs a launcher owes, and where it is done.** The launchers
 build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
@@ -4115,8 +4269,11 @@ that is why the two are separate commits in that order.
 The fix is structural, and two notes rather than one:
 
 - `_folderThisSectionWorksIn` — written where a folder is DECIDED: the two
-  preview starts, and the deploy only AFTER its own preview stop, so that stop
-  still names the preview's folder. Read by every stop.
+  preview starts. Read by every stop. (The deploy wrote it too, only AFTER its
+  own preview stop, until #728 moved the deploy's folder to its run —
+  `SectionDeployRun.Folder`, noted at the same point — because a deploy
+  outlives the view and Cancel from a view that came back must still aim at
+  it; "A section's deploy outlives its view" above.)
 - `_folderThisSectionRegisteredIn` — written once, `readonly`, at
   construction, and read only by `ReleaseLease`'s folder-keyed sweep. Kept
   apart from the work folder because a deploy starting in the one render pass
@@ -6741,8 +6898,9 @@ a change; a question after the stop would make Cancel cost the teacher the
 preview they were reading. The saved-settings notice and its "deployed using
 the saved settings" line moved AFTER the question (the plan review's M4): a
 Cancel must not leave either behind. A second Deploy press while the question
-is up returns at once (`_isAskingAboutLaterClasses`; `_isPreparingDeploy` is
-still false at that point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
+is up returns at once (`SectionDeployRun.IsAsking` since #728, on the run so
+a second window's press returns too; `IsPreparing` is still false at that
+point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
 reads that order from the source, as `ReferenceRefusalTests` already did for the
 reference refusal — the window cannot be built in a unit test.
 
@@ -6757,8 +6915,9 @@ record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
 stop: stopping the preview for a deploy that never starts would cost the
 teacher the page they were reading (2C's implementation review, L-1;
 `ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
-`IsSectionBusy` counts a deploy being prepared (`_isPreparingDeploy`) as well
-as one running. One check comes BEFORE that reading: a window already asking
+`IsSectionBusy` counts a deploy being prepared as well as one running — since
+#728 by asking the section's run, by the caller's folder
+(`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
 this question, or with any dialog up, answers `CannotAsk`, refused with
 `deployWaitsForAnOpenQuestion` and nothing stopped
 (`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
@@ -6772,10 +6931,22 @@ sentence from the seam — was rejected: the window's dialog would never be
 shown, and the window and the assistant would word the same refusal from two
 places.
 
-**The answer, in the window.** Every flagged class is listed ticked, and two
-buttons always sit beside Cancel: Hide Ticked and Deploy (the default) and
-Keep All and Deploy. Hide Ticked records the unticked as kept, then hides the
-ticked with Hide Pages…'s OWN call through this window's `plantoir-mcp`
+**The answer, in the window — a tick means it GOES OUT (#726, the mac's
+#694).** Every flagged class is listed ticked, and ONE button sits beside
+Cancel: Deploy Ticked (`AssistWording.DeployTickedButton`, the default,
+Return). Russell's two rulings on #694 (2026-10-25): a ticked box always means
+included, in this sheet and every checklist in the app; and unticking a class
+means it is not deployed AND it is unpublished, so the preview is left in the
+state the deployed site will be in (a deploy-time-only exclusion was rejected
+for letting the two drift apart). Until #726 this sheet said the opposite —
+"Hide classes dated later?", ticked meant HIDE, with Hide Ticked and Deploy
+and Keep All and Deploy beside Cancel; Keep All went because, with every row
+ticked to go out, it only repeated Return. The split is
+`ClassesDatedLater.AnswerAtDeploy` (ticked → kept at its date, unticked →
+hidden), so the direction is unit-tested rather than read off the view
+(`ClassesDatedLaterAtDeployTests.TickedIsKept_UntickedIsHidden`). Deploy
+Ticked records the ticked as kept, then hides the unticked with Hide Pages…'s
+OWN call through this window's `plantoir-mcp`
 (`MainWindow.HideClassesForTheDeploy` → `SectionVerbs.Perform`) — so it is
 backed up as `_menu-section<N>`, Section ▸ Undo Last Change takes it back, and
 pages only those classes link to go with them — with NO preview either side:
@@ -6783,7 +6954,8 @@ pages only those classes link to go with them — with NO preview either side:
 restart (the plan review's M1; a hide that failed would otherwise leave the
 teacher with no preview for a deploy that never happened). Its "ran from a
 menu" line names Hide Pages…, whose call it is, with "N classes dated later,
-at Deploy" as its counts — the mac's own line. A ticked class still visible
+unticked at Deploy" as its counts (`ClassesDatedLater.UntickedAtDeployCounts`)
+— the mac's own words since #694. An unticked class still visible
 afterwards stops the deploy, and the teacher is shown what the hide said. The
 "asked about…" line is written AFTER the hide, so a hide that left a class
 visible is recorded as cancelled rather than as hidden (the mac writes it
@@ -6827,21 +6999,34 @@ tests pin to a morning — with a second's slack; both are local time.
 `ScheduledRunTests` runs it both ways, and with an earlier night's success
 record that must not count.
 
-**Section ▸ Publish Pages…** asks about the ticked classes after the choice
-and before the plan, in the same dialog (a `LaterClasses` stage): the ticked
-are left out and stay hidden ("Leave N Hidden and Continue", or "Publish Them
-All" with none ticked), the unticked are kept, and with nothing left nothing is
-published and the dialog closes.
+**Section ▸ Publish Pages… never asks (#726, the mac's #694).** It goes
+straight from the choice to its plan, publishes what is ticked, and writes
+nothing to `LaterClassesKept` or the trail about classes dated later. Publishing
+changes only the local preview, and a teacher publishes next week's classes
+precisely to check them there; the old `LaterClasses` stage took the teacher's
+tick and turned it into "leave hidden", so Return undid the publish they had
+asked for. Recording a class as kept from there would also let it skip the
+Deploy question. The stage, `ClassesDatedLater.FlaggedIfPublishing` and the
+sentences `laterClassesAtPublish`, `leaveOutAndContinueButton` and
+`publishThemAllButton` went with it. **What that costs, knowingly:** a class
+published there for a preview check goes online at the next SCHEDULED deploy
+unasked, because no launcher reads this rule (`classesDatedLater.neverAskedFrom`,
+measured on the mac on 2026-11-01). The scheduled deploy is unchanged here;
+whether it should hold such a class back is #727, Russell's decision.
 
 **Testing it**: unit — `FutureDatedClassesContractTests` (24 cases, the
 record's shape, the rollover undo), the four `assist-cases.json` scenarios
 (green; the three ledgered ones left the ledger), `ClassesDatedLaterAtDeployTests`
 (an open dialog not waited on, no window, the hide with no preview, the server's
-hold, what is kept, the window's order), `ScheduledRunTests` (both ways), the
-wording walk (17 keys declared). Through the window: `LaterClassesAtDeployUiTests`
-— Cancel deploys nothing and leaves the preview serving; Hide Ticked hides one
-class, keeps the unticked one and deploys to a folder; Keep All and Deploy, then
-a second Deploy that asks nothing.
+hold, what is kept, the window's order; since #726 also the tick's direction,
+the one button, Publish Pages… asking nothing, the contract asking at Deploy
+only, and the hide's counts), `ScheduledRunTests` (both ways), the
+wording walk. Through the window: `LaterClassesAtDeployUiTests`
+— Cancel deploys nothing and leaves the preview serving; Deploy Ticked with one
+class unticked hides it, keeps the ticked one and deploys to a folder; Return
+with every class ticked keeps them all, then a second Deploy that asks nothing;
+and Publish Pages… on a hidden class dated later publishes it with no question
+and no kept record, after which Deploy asks about it.
 
 REJECTED, with the reason:
 - **Asking before the window's refusals, or after the assistant's stop**: see
@@ -8922,9 +9107,9 @@ dispatcher, with the generator's samples. No ledger entry, no contract edit.
 
 ### 1. The picker and the later-classes question are tables
 
-`Views/TickTable` draws all three: Publish Pages… and Hide Pages…'s first stage
-(Page, Folder, Date) and #475's question at Publish Pages… and at Deploy (Page,
-Date). One builder, so the three cannot drift. A `ListView` with
+`Views/TickTable` draws them all: Publish Pages… and Hide Pages…'s first stage
+(Page, Folder, Date) and #475's question at Deploy (Page, Date; it was also
+asked at Publish Pages… until #726). One builder, so they cannot drift. A `ListView` with
 `SelectionMode = Single` — there has to BE a selected row for Space to tick —
 1-epx border, a plain header (the mac's picker does not sort, so neither does
 this), each row a `CheckBox` whose content IS the title (trimmed, the whole
@@ -8964,8 +9149,9 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
 - Return with a row selected reaches Continue — when Continue is live —
   because a `ListView` keeps Return for itself (measured for #548), so the
   table catches it. At Deploy, a plain `ContentDialog`, Return records "the
-  main button" and hides the dialog, and the answer is read as Hide Ticked and
-  Deploy. Escape needs nothing: it reaches the dialog.
+  main button" and hides the dialog, and the answer is read as the main
+  button — Deploy Ticked since #726 (Hide Ticked and Deploy before it).
+  Escape needs nothing: it reaches the dialog.
 - **Narrator** hears each row's state: `AutomationProperties.ItemStatus`
   "ticked" / "not ticked", set on every change (the plan review's amendment 1).
   A box is named by its title — "title — folder" for two pages of one title —
@@ -9161,8 +9347,9 @@ before the button texts are cleared): Working clears both buttons,
 ContentDialog's "NoneVisible" state collapses that row, and holding the host
 alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
 clears the hold for every other stage, so the plan and the answer fit their
-own content. It applies after Choose and after the question about classes
-dated later too (grow-only Working, as the mac; the test asserts the picker's
+own content. It applies after Choose (and applied after Publish Pages…'s
+question about classes dated later, until #726 removed that question)
+(grow-only Working, as the mac; the test asserts the picker's
 417 held at Working as well as the plan's), and to the three page items only
 (gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
 is CLAMPED to what the window leaves room for — the window's height less what

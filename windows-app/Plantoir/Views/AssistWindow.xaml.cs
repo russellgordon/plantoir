@@ -565,7 +565,7 @@ public sealed partial class AssistWindow : Window
             // Asked of a window showing this section's folder — the busy
             // answer is read off a detail pane, and another folder's pane
             // answers about another folder's section.
-            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_course.Code, _section) == true,
+            SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_folder, _course.Code, _section) == true,
             // Same process as every window's Deploy, so the in-memory publish
             // record is the truth about this section being deployed (#386).
             SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(_folder, _course.Code, _section),

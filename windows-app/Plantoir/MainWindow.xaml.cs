@@ -242,6 +242,16 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             IsClosed = true;
+            // Let go EXPLICITLY (#728 implementation review): the section
+            // view's Unloaded is what lets go of the section's shared deploy
+            // run and hands on a question it has up, and nothing measured that
+            // WinUI raises it when a Window closes. Called on the view rather
+            // than by emptying the pane (`DetailHost.Content = null`), so the
+            // closing window's visual tree is not changed under it. A deploy
+            // started here runs on regardless — it is its run's, held by its
+            // own task — and the quit question was asked before Closed.
+            try { (DetailHost.Content as SectionDetailView)?.LetGoAsTheWindowCloses(); }
+            catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: the section view could not let go: {ex.Message}"); }
             SectionMenuActivity.Changed -= ActivityChanged;
             AssistActivity.Changed -= ActivityChanged;
             DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
@@ -1011,22 +1021,23 @@ public sealed partial class MainWindow : Window
     private bool ThisWindowIsShowing(string folderPath) =>
         WorkingFolder.IsTheSame(Workspace.WorkspacePath, folderPath);
 
-    public bool IsSectionBusy(string courseCode, int section)
+    public bool IsSectionBusy(string folder, string courseCode, int section)
     {
         // Busy, to the caller asking before a DEPLOY, means "a deploy is
-        // already running" — not "a preview is up". The Deploy path stops a
+        // already on its way" — not "a preview is up". The Deploy path stops a
         // running preview itself and waits for it (deploy-during-preview
         // port, mac commit "Allow Deploy button to stop active preview
         // before publishing"), so reporting a preview as busy here made the
         // assistant refuse — and say so — while the deploy went ahead.
-        // _isPreparingDeploy counts too (2C's implementation review, L-1): a
-        // deploy between its press and its runner starting is already on its
-        // way, and a second one would only be refused by the window.
-        if (DetailHost.Content is SectionDetailView detail)
-        {
-            return detail.IsDeployingOrPreparing;
-        }
-        return false;
+        // Preparing counts too (2C's implementation review, L-1): a deploy
+        // between its press and its runner starting is already on its way,
+        // and a second one would only be refused by the window.
+        //
+        // Asked of the SECTION's run, by the caller's folder (#728), never of
+        // the view on screen: until #728 this read whatever section the pane
+        // showed and ignored its arguments, so a section deploying while the
+        // teacher looked at another read as idle.
+        return SectionDeployRun.UnderWay(SectionRuns.Find(folder, courseCode, section), folder, courseCode, section);
     }
 
     /// <summary>

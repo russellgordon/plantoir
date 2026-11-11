@@ -5,8 +5,8 @@ namespace Plantoir.Core.Assist;
 /// <summary>
 /// The question about classes dated after the next class (#475, the mac's
 /// <c>AssistWording.laterClasses*</c>): what the section window asks at Deploy
-/// and at Section ▸ Publish Pages…, and what an assistant is told when its
-/// deploy is held back for it. Every sentence is the contract's
+/// (never at Section ▸ Publish Pages…, since #694 / #726), and what an
+/// assistant is told when its deploy is held back for it. Every sentence is the contract's
 /// (<c>contracts/assist-wording.json</c>) word for word, rendered by
 /// <c>ContractTests.AssistWording_MatchesContract</c> with the generator's
 /// own examples; where and in what order they are said is
@@ -15,49 +15,36 @@ namespace Plantoir.Core.Assist;
 public static partial class AssistWording
 {
     /// <summary>The question's title.</summary>
-    public const string LaterClassesTitle = "Hide classes dated later?";
+    public const string LaterClassesTitle = "Deploy classes dated later?";
 
     /// <summary>The question's title, for a club's meetings.</summary>
-    public const string LaterClassesTitleForAMeeting = "Hide meetings dated later?";
+    public const string LaterClassesTitleForAMeeting = "Deploy meetings dated later?";
 
     /// <summary>At Deploy: <paramref name="nextDay"/> is the next class day.</summary>
     public static string LaterClassesAtDeploy(DateOnly nextDay) =>
-        $"These classes are published but dated after {MenuDay(nextDay)}, the next class. Students will see them once this section is deployed. Ticked ones are hidden first, with any page only they link to.";
+        $"These classes are published but dated after {MenuDay(nextDay)}, the next class. Ticked ones go to students when this section is deployed. Untick any class that should not go yet: it is hidden first, with any page only it links to, so the preview shows what students will see.";
 
     /// <summary>At Deploy, for a club's meetings.</summary>
     public static string LaterClassesAtDeployForAMeeting(DateOnly nextDay) =>
-        $"These meetings are published but dated after {MenuDay(nextDay)}, the next meeting. Students will see them once this section is deployed. Ticked ones are hidden first, with any page only they link to.";
+        $"These meetings are published but dated after {MenuDay(nextDay)}, the next meeting. Ticked ones go to students when this section is deployed. Untick any meeting that should not go yet: it is hidden first, with any page only it links to, so the preview shows what students will see.";
 
-    /// <summary>At Section ▸ Publish Pages…, before the plan.</summary>
-    public static string LaterClassesAtPublish(DateOnly nextDay) =>
-        $"These classes are dated after {MenuDay(nextDay)}, the next class. Ticked ones are left hidden; the rest are published with the other pages.";
-
-    /// <summary>At Section ▸ Publish Pages…, for a club's meetings.</summary>
-    public static string LaterClassesAtPublishForAMeeting(DateOnly nextDay) =>
-        $"These meetings are dated after {MenuDay(nextDay)}, the next meeting. Ticked ones are left hidden; the rest are published with the other pages.";
-
-    /// <summary>Under the list, both times.</summary>
+    /// <summary>Under the list.</summary>
     public const string LaterClassesKeptNote =
-        "A class you untick stays published, and is not asked about again unless its date changes.";
+        "A class left ticked is not asked about again unless its date changes. Section ▸ Undo Last Change publishes again any you untick; the next deploy sends them out.";
 
     /// <summary>Under the list, for a club's meetings.</summary>
     public const string LaterClassesKeptNoteForAMeeting =
-        "A meeting you untick stays published, and is not asked about again unless its date changes.";
+        "A meeting left ticked is not asked about again unless its date changes. Section ▸ Undo Last Change publishes again any you untick; the next deploy sends them out.";
 
     /// <summary>One row's day: "Wednesday, 2026-10-14" — invariant and Gregorian (#144).</summary>
     public static string LaterClassesDay(DateOnly day) => MenuDay(day);
 
-    /// <summary>The default button at Deploy: hide the ticked, keep the rest, deploy.</summary>
-    public const string HideTickedAndDeployButton = "Hide Ticked and Deploy";
-
-    /// <summary>Beside it, always: every listed class is kept at its date, and the deploy goes.</summary>
-    public const string KeepAllAndDeployButton = "Keep All and Deploy";
-
-    /// <summary>At Publish Pages…, with <paramref name="count"/> classes ticked to stay hidden.</summary>
-    public static string LeaveOutAndContinueButton(int count) => $"Leave {count} Hidden and Continue";
-
-    /// <summary>At Publish Pages…, with none ticked.</summary>
-    public const string PublishThemAllButton = "Publish Them All";
+    /// <summary>
+    /// The one button beside Cancel at Deploy, the default (Return): the
+    /// ticked classes go out and are kept at their dates, the unticked are
+    /// hidden first (#694 / #726). Keep All is gone: it only repeated Return.
+    /// </summary>
+    public const string DeployTickedButton = "Deploy Ticked";
 
     /// <summary>
     /// An assistant working from another program asked to deploy with a class
