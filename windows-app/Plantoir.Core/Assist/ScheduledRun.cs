@@ -550,15 +550,30 @@ public static class ScheduledRun
     }
 
     /// <summary>
-    /// How the wrapper is started. It is handed this run's trail folder
-    /// (#682), and its own children - <c>preview.ps1 --build-only</c> and each
-    /// <c>deploy.ps1</c> leg, started with <c>Start-Process</c> - inherit it,
-    /// so the launchers' lines land in the same trail as this run's. ONLY the
-    /// trail: handing <c>PLANTOIR_RUNTIME</c> here too would change which
-    /// runtime a task uses (the wrapper falls back to the installed one),
-    /// which is its own question (#702).
+    /// How the wrapper is started: handed <see cref="LauncherEnvironment"/>,
+    /// the same two variables every other launcher start gets. Its own
+    /// children - <c>preview.ps1 --build-only</c> and each <c>deploy.ps1</c>
+    /// leg, started with <c>Start-Process</c> - inherit both, so the launchers'
+    /// lines land in this run's trail (#682) AND they build and deploy with the
+    /// runtime of the app that is running this task (#702).
+    ///
+    /// <para>Before #702 only the trail was handed, so the wrapper fell back to
+    /// <c>%LOCALAPPDATA%\Programs\Plantoir\runtime</c>, and a task registered
+    /// from a Debug build ("PT - Dev") ran that build's code with the INSTALLED
+    /// copy's Python and wrangler. For an installed copy the two folders are
+    /// the same one, so nothing changes for a teacher. A task registered by an
+    /// older app still names the installed <c>Plantoir.exe</c>, which writes
+    /// the wrapper afresh at run time (step 5b above) and starts it here, so it
+    /// gets this without being registered again. The pre-v1.2.0 tasks that run
+    /// a <c>.ps1</c> straight from Task Scheduler never come through here and
+    /// are left alone.</para>
     /// </summary>
-    internal static ProcessStartInfo WrapperStartInfo(string script)
+    internal static ProcessStartInfo WrapperStartInfo(string script) =>
+        WrapperStartInfo(script, LauncherEnvironment.Current);
+
+    /// <summary>The seam under <see cref="WrapperStartInfo(string)"/>, so the
+    /// suite can hand a runtime the test host does not carry.</summary>
+    internal static ProcessStartInfo WrapperStartInfo(string script, IReadOnlyDictionary<string, string> environment)
     {
         var info = new ProcessStartInfo
         {
@@ -567,7 +582,7 @@ public static class ScheduledRun
             UseShellExecute = false,
             WorkingDirectory = Path.GetDirectoryName(script) ?? Environment.CurrentDirectory,
         };
-        info.EnvironmentVariables[LauncherEnvironment.TrailVariable] = ActivityTrail.CurrentLogDirectory;
+        foreach (var (name, value) in environment) info.EnvironmentVariables[name] = value;
         foreach (string argument in TaskScheduling.WrapperRunArguments(script)) info.ArgumentList.Add(argument);
         return info;
     }

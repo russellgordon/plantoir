@@ -145,7 +145,9 @@ container branch left to fall back to.
 **The runtime travels beside the executable.** `NativeRuntime` resolves
 `<the folder Plantoir.exe is in>\runtime` — so a Debug build uses the copy
 under `bin\`, not an installed one — and `ScriptRunner` passes it to every
-launcher child as `PLANTOIR_RUNTIME`. A launcher run by hand honours that
+launcher child as `PLANTOIR_RUNTIME` (through `LauncherEnvironment`, which
+the scheduled deploy's wrapper also takes since #702, so a task registered
+from a Debug build no longer runs the installed copy's runtime). A launcher run by hand honours that
 variable first and only then falls back to
 `%LOCALAPPDATA%\Programs\Plantoir\runtime`, which is where the installer puts
 it. Either way the folder is recognised by a `manifest.json` INSIDE it, and it
@@ -1008,6 +1010,10 @@ the evening before by UI-suite runs that had all been started with
   `--state-dir`, so it hands over the redirected folder) and a scheduled
   publish's wrapper and legs. It moves the trail ONLY: the launchers still
   build into the real builds root. No current UI test triggers a refusal.
+  (The wrapper was handed only this variable until #702; since Windows
+  1.9.3 it is handed `PLANTOIR_RUNTIME` as well, which changes which runtime
+  a task builds with, not where anything is written. Doc 03 → "Where a
+  launcher's own trail lines go" has the reasoning and what older tasks do.)
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and
