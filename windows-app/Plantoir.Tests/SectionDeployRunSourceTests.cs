@@ -11,8 +11,14 @@ namespace Plantoir.Tests;
 /// </summary>
 public sealed class SectionDeployRunSourceTests
 {
+    /// <summary>
+    /// The file with its whole-line comments taken out, so a comment that
+    /// names a member cannot satisfy a scan for the code (#728 review).
+    /// </summary>
     private static string Source(params string[] parts) =>
-        File.ReadAllText(Path.Combine(new[] { ContractLoader.RepositoryRoot, "windows-app", "Plantoir" }.Concat(parts).ToArray())).Replace("\r\n", "\n");
+        string.Join("\n", File.ReadAllText(Path.Combine(new[] { ContractLoader.RepositoryRoot, "windows-app", "Plantoir" }.Concat(parts).ToArray()))
+            .Replace("\r\n", "\n").Split('\n')
+            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
 
     private static string View => Source("Views", "SectionDetailView.xaml.cs");
 
@@ -100,7 +106,19 @@ public sealed class SectionDeployRunSourceTests
     {
         string view = View;
         Assert.Contains("_deployRun.IsShown(_endingHiddenHere, _previewRunner.StartedAt)", view);
-        Assert.Equal(2, CountOf(view, "_deployRun.NotePreviewStarted("));
+        // Every preview start records it, however many starts there are: each
+        // `_previewRunner.Run("preview.ps1"` is followed, before the next
+        // statement block ends, by the note.
+        const string start = "_previewRunner.Run(\"preview.ps1\"";
+        int found = 0;
+        for (int at = view.IndexOf(start, StringComparison.Ordinal); at >= 0; at = view.IndexOf(start, at + 1, StringComparison.Ordinal))
+        {
+            found++;
+            int next = view.IndexOf("\n        }", at, StringComparison.Ordinal);
+            Assert.True(next > at && view[at..next].Contains("_deployRun.NotePreviewStarted("),
+                        "a preview start does not tell the section's run when it started");
+        }
+        Assert.True(found >= 1, "no preview start found");
     }
 
     /// <summary>The readers that used the view's own runner now ask the run (#728 plan review, finding 2).</summary>
@@ -134,8 +152,15 @@ public sealed class SectionDeployRunSourceTests
     {
         string panel = Source("Views", "TaskProgressView.xaml.cs");
         Assert.Contains("runner.PropertyChanged -= handler", panel);
-        Assert.Contains("s_asking", panel);
         Assert.Contains("if (runner.IsAwaitingInput) _ = AskQuestion(runner);", panel);
+        // The rule is QuestionAskers' (QuestionAskersTests); the panel must use it.
+        Assert.Contains("QuestionAskers.TryClaim(runner, this)", panel);
+        Assert.Contains("QuestionAskers.HandOn(asked, this)", panel);
+        Assert.Contains("_openQuestion?.Hide()", panel);
+        Assert.True(panel.IndexOf("_openQuestion?.Hide()", StringComparison.Ordinal) < panel.IndexOf("QuestionAskers.HandOn(asked, this)", StringComparison.Ordinal),
+                    "the leaving view must close its dialog before handing the question on");
+        Assert.Contains("QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput)", panel);
+        Assert.DoesNotContain("ContentDialogResult.Primary) runner.SendLine", panel);
     }
 
     private static int CountOf(string text, string what)

@@ -29,18 +29,14 @@ public sealed partial class TaskProgressView : UserControl
     /// </summary>
     private readonly System.Collections.Generic.Dictionary<ScriptRunner, System.ComponentModel.PropertyChangedEventHandler> _hooked = new();
 
-    /// <summary>
-    /// The runners whose question is on screen in SOME view right now — one
-    /// asker per question. Two windows on one section show the same deploy, and
-    /// both would otherwise put up the same credential question, each sending
-    /// its own answer to the one prompt (#728). Interface thread only.
-    /// </summary>
-    private static readonly System.Collections.Generic.HashSet<ScriptRunner> s_asking = new();
-
-    /// <summary>A view asking a question was taken off screen before it was answered: another may ask it.</summary>
-    private static event Action<ScriptRunner>? QuestionLeftUnanswered;
+    // One asker per question (#728): QuestionAskers in Core holds who is
+    // asking, hands a question on when its asker leaves, and decides what a
+    // closing dialog does — so the rule is tested without a window.
 
     private ScriptRunner? _askingFor;
+
+    /// <summary>The question dialog this view has up, so leaving can close it before handing the question on.</summary>
+    private ContentDialog? _openQuestion;
     private bool _leaving;
     private ScriptRunner? _runner;
     private MultiDestinationDeployRunner? _multiRunner;
@@ -61,8 +57,8 @@ public sealed partial class TaskProgressView : UserControl
         {
             _leaving = false;
             foreach (var runner in _registered) Hook(runner);
-            QuestionLeftUnanswered -= AskIfStillWaiting;
-            QuestionLeftUnanswered += AskIfStillWaiting;
+            QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
+            QuestionAskers.LeftUnanswered += AskIfStillWaiting;
             // A question asked while no view showed the section is asked now.
             foreach (var runner in _registered)
                 if (runner.IsAwaitingInput) _ = AskQuestion(runner);
@@ -71,15 +67,19 @@ public sealed partial class TaskProgressView : UserControl
         {
             _tick.Stop();
             _leaving = true;
-            QuestionLeftUnanswered -= AskIfStillWaiting;
+            QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
             foreach (var (runner, handler) in _hooked) runner.PropertyChanged -= handler;
             _hooked.Clear();
-            // Leaving with a question up: hand it on rather than cancel it.
+            // Leaving with a question up — a window closing, or the assistant
+            // changing the selection under a credential dialog: close this
+            // view's dialog (it sits on the window, not in the view, so it
+            // would otherwise stay up) and hand the question on rather than
+            // cancel it. The dialog's own ending then sends nothing (_leaving).
             if (_askingFor is { } asked)
             {
-                s_asking.Remove(asked);
                 _askingFor = null;
-                QuestionLeftUnanswered?.Invoke(asked);
+                try { _openQuestion?.Hide(); } catch { }
+                QuestionAskers.HandOn(asked, this);
             }
         };
     }
@@ -459,7 +459,7 @@ public sealed partial class TaskProgressView : UserControl
     private async System.Threading.Tasks.Task AskQuestion(ScriptRunner runner)
     {
         if (_questionDialogShowing || XamlRoot is null || _leaving) return;
-        if (!s_asking.Add(runner)) return;   // another view is asking it
+        if (!QuestionAskers.TryClaim(runner, this)) return;   // another view is asking it
         _questionDialogShowing = true;
         _askingFor = runner;
         try
@@ -517,9 +517,13 @@ public sealed partial class TaskProgressView : UserControl
                     };
                     inputControl.Loaded += (_, _) => inputControl.Focus(FocusState.Programmatic);
                     richDialogShown = true;
+                    _openQuestion = dialog;
                     var result = await dialog.ShowAsync();
-                    if (result == ContentDialogResult.Primary) runner.SendLine(getAnswer());
-                    else if (!_leaving) runner.CancelPendingQuestion();   // closed with its window: handed on
+                    switch (QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput))
+                    {
+                        case QuestionAskers.Answer.Send: runner.SendLine(getAnswer()); break;
+                        case QuestionAskers.Answer.Cancel: runner.CancelPendingQuestion(); break;
+                    }
                 }
                 catch (Exception ex) when (!richDialogShown)
                 {
@@ -553,19 +557,24 @@ public sealed partial class TaskProgressView : UserControl
                     XamlRoot = XamlRoot,
                 };
                 answerBox.Loaded += (_, _) => { answerBox.Focus(FocusState.Programmatic); answerBox.SelectAll(); };
+                _openQuestion = dialog;
                 var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary) runner.SendLine(answerBox.Text);
-                else if (!_leaving) runner.CancelPendingQuestion();   // the script's own clean-up runs; closed with its window: handed on
+                // Cancel lets the script's own clean-up run; a dialog closed
+                // because this view left sends nothing — the question was
+                // handed on.
+                switch (QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput))
+                {
+                    case QuestionAskers.Answer.Send: runner.SendLine(answerBox.Text); break;
+                    case QuestionAskers.Answer.Cancel: runner.CancelPendingQuestion(); break;
+                }
             }
         }
         finally
         {
             _questionDialogShowing = false;
-            if (ReferenceEquals(_askingFor, runner))
-            {
-                s_asking.Remove(runner);
-                _askingFor = null;
-            }
+            _openQuestion = null;
+            QuestionAskers.Release(runner, this);
+            if (ReferenceEquals(_askingFor, runner)) _askingFor = null;
         }
     }
 

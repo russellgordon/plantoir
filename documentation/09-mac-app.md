@@ -668,6 +668,14 @@ that finished while the teacher was on section 2 showed "Done" on return.
   console opens where the outcome is. That applies to every console, the
   preview's included, which is harmless: a console that has just appeared has
   nothing the teacher has scrolled back to.
+- A deploy's question (the alert, and the credential sheet) on a run shared
+  across windows is shown in EVERY window showing the section:
+  `TaskProgressView.swift` binds both to `runner.isAwaitingInput`
+  (`awaitingInputBinding`, `awaitingCredentialBinding`, the `.sheet` at
+  ~:370). Answering one clears `isAwaitingInput`, which closes the other, so
+  nothing is sent twice. Know-only, read on Windows for #728 (2026-11-11):
+  Windows lets one view ask and hands the question on if that view leaves
+  (`documentation/12-windows-app.md` → "A section's deploy outlives its view").
 
 **What stays per window, and why.** A preview being built is still stopped
 when its section is left. Its port lease, its web view and #232's ⌘Q record

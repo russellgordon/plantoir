@@ -31,7 +31,16 @@ namespace Plantoir.UiTests;
 public class ReturningToASectionMidDeployUiTests
 {
     private const string Code = "UIBACK";
-    private const int PaddingPages = 1200;
+    /// <summary>
+    /// Enough plain pages that the deploy outlasts leaving and coming back on
+    /// the i5-8365U this was written on (the whole test ran 8 m 23 s there).
+    /// A faster machine can raise it with PLANTOIR_UI_PADDING_PAGES. xunit
+    /// 2.9.2 has no skip decided while a test runs, so a deploy that finishes
+    /// before the return fails saying so and how long it took, rather than
+    /// passing on a scenario it never drove.
+    /// </summary>
+    private static readonly int PaddingPages =
+        int.TryParse(Environment.GetEnvironmentVariable("PLANTOIR_UI_PADDING_PAGES"), out int pages) && pages > 0 ? pages : 1200;
     private static readonly TimeSpan LongEnough = TimeSpan.FromMinutes(15);
 
     private readonly ITestOutputHelper _output;
@@ -94,7 +103,7 @@ public class ReturningToASectionMidDeployUiTests
                                      TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result,
                     "another section's deploy greyed section 2's Deploy");
         app.SelectSection(Code, 1);
-        Assert.False(File.Exists(siteIndex), $"the deploy finished in {pressed.Elapsed.TotalSeconds:0} s, before the test came back: raise PaddingPages");
+        Assert.False(File.Exists(siteIndex), $"the deploy finished in {pressed.Elapsed.TotalSeconds:0} s, before the test came back, so the scenario was not driven: this machine is faster than the padding allows — set PLANTOIR_UI_PADDING_PAGES above {PaddingPages}");
         Assert.True(Shows(app, Deploying(1)), "coming back showed a blank console, not the deploy still running");
         Assert.False(app.Find("deployButton", "the Deploy button").IsEnabled, "Deploy was available mid-deploy on return");
         var cancel = app.FindOrNull("taskCancelButton", TimeSpan.FromSeconds(5));

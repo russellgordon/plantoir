@@ -617,8 +617,10 @@ mid-await must not split one deploy across two runs). `IsPreparing` is cleared i
 the `finally`. The view hooks the run and its runner on `Loaded` and lets go on
 `Unloaded`; so does `TaskProgressView` for every runner it registered — otherwise a
 view taken off screen stays subscribed to a shared runner for good. A window closed
-mid-deploy: its views let go; the deploy runs on; another window on the folder shows
-it. The last window, or quitting: unchanged — the quit question counts the
+mid-deploy: `MainWindow.Closed` sets `DetailHost.Content = null`, so the section
+view's `Unloaded` runs and it lets go explicitly, not on whether WinUI raises
+`Unloaded` when a Window closes (nothing here measured that; the implementation
+review's finding); the deploy runs on; another window on the folder shows it. The last window, or quitting: unchanged — the quit question counts the
 `CourseActivity` record the run still writes. The in-app assistant's deploy goes
 through `MainWindow.DeployForAsync` → the view's `DeployAsync`, so it is the
 section's run and the assistant still awaits its outcome. A scheduled run, an
@@ -640,9 +642,16 @@ record, decides (the mac's M1 and L3).
 
 **One asker per question.** A deploy's credential question on a shared runner would
 otherwise be raised in every window showing the section, each sending its own answer
-to one prompt. `TaskProgressView` keeps a process-wide set of runners whose question
-is up; the first view asks, and a view taken off screen with the dialog up hands the
-question on (the next live view asks it) rather than cancelling it. A question that
+to one prompt. `QuestionAskers` (Core) holds which view is asking each runner's
+question; the first view asks. A view taken off screen with the dialog up — a window
+closing, or the assistant changing the selection under a credential dialog
+(`MainWindow.DeployForAsync`, `AskAboutClassesDatedLaterFor`) — closes its own dialog
+(`_openQuestion.Hide()`: the dialog sits on the window, not in the view) and hands
+the question on, the next live view asking it, rather than cancelling it. A dialog
+that closes after its view left sends nothing, whichever button it reports
+(`QuestionAskers.WhatToDo`), so the left view and the new asker can never both reach
+the one prompt (`QuestionAskersTests`; the hide itself is pinned by a source scan and
+was not driven through a window). A question that
 arrived while nobody showed the section is asked when a view registers the runner.
 For the mac: its `TaskProgressView` binds the alert and the credential sheet to
 `runner.isAwaitingInput` (`awaitingInputBinding`, `awaitingCredentialBinding`), so
