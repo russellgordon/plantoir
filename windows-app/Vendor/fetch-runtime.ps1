@@ -294,6 +294,39 @@ function Fetch([string]$Url, [string]$To, [string]$Sha256 = "", [string[]]$CurlO
     }
 }
 
+# NATIVE-ONLY: bind the preview server and its live-reload websocket to
+# loopback (see the call site in the Quartz phase for why). BOTH sites, each
+# found exactly once, or the run refuses naming the one that was not (#730,
+# the mac's #684): the guard this replaced passed when the file held
+# "127.0.0.1" anywhere, so a Quartz bump that respelled the websocket line
+# would have put live reload back on every interface, and the firewall dialog
+# would have been the only sign. Exactly once rather than at least once: a
+# second bind site in a new Quartz is a change somebody must look at, not one
+# to rewrite blind. Read and written as UTF-8 with no BOM, byte for byte
+# outside the two sites: until #730 Get-Content -Raw read the file as ANSI
+# and Set-Content wrote it back with a BOM, which turned the "Get started"
+# lines' bullets (handlers.js:217-219) into mojibake in every runtime.
+# Lifted between these markers and run by FetchRuntimeLoopbackGuardTests.
+# BEGIN Set-QuartzLoopbackBinds
+function Set-QuartzLoopbackBinds([string]$Path) {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $text = [IO.File]::ReadAllText($Path, $utf8)
+    foreach ($site in @(
+            @('the preview server', 'server.listen(argv.port)', 'server.listen(argv.port, "127.0.0.1")'),
+            @('the live-reload websocket', 'new WebSocketServer({ port: argv.wsPort })', 'new WebSocketServer({ host: "127.0.0.1", port: argv.wsPort })'))) {
+        $found = [regex]::Matches($text, [regex]::Escape($site[1])).Count
+        if ($found -ne 1) {
+            throw "The loopback patch could not rewrite $($site[0]) in quartz/cli/handlers.js: it found $found of '$($site[1])', not exactly 1. Quartz's bind line has changed; look at it before binding it."
+        }
+        $text = $text.Replace($site[1], $site[2])
+        if ([regex]::Matches($text, [regex]::Escape($site[2])).Count -ne 1) {
+            throw "The loopback patch rewrote $($site[0]) in quartz/cli/handlers.js but does not find '$($site[2])' exactly once afterwards."
+        }
+    }
+    [IO.File]::WriteAllText($Path, $text, $utf8)
+}
+# END Set-QuartzLoopbackBinds
+
 try {
   $env:PATH = "$nodeDir;$env:PATH"
   if ($runBase) {
@@ -356,13 +389,9 @@ try {
     # first preview. A preview is only ever browsed at localhost. This must
     # NOT be made a shared patch: inside the container, loopback binding
     # would break Docker's port forwarding, which connects to the
-    # container's own address.
-    $handlers = Join-Path $quartzDir "quartz\cli\handlers.js"
-    $handlersText = Get-Content $handlers -Raw
-    $handlersText = $handlersText.Replace('server.listen(argv.port)', 'server.listen(argv.port, "127.0.0.1")')
-    $handlersText = $handlersText.Replace('new WebSocketServer({ port: argv.wsPort })', 'new WebSocketServer({ host: "127.0.0.1", port: argv.wsPort })')
-    if ($handlersText -notmatch '127\.0\.0\.1') { throw "The loopback patch found neither bind site in quartz/cli/handlers.js" }
-    Set-Content $handlers $handlersText -Encoding utf8 -NoNewline
+    # container's own address. Set-QuartzLoopbackBinds (above) requires both
+    # sites (#730).
+    Set-QuartzLoopbackBinds (Join-Path $quartzDir "quartz\cli\handlers.js")
 
     Write-Host "Installing Quartz dependencies (a few minutes)..." -ForegroundColor Cyan
     Push-Location $quartzDir
