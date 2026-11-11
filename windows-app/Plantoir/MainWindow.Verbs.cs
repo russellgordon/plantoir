@@ -94,7 +94,8 @@ public sealed partial class MainWindow
 
     /// <summary>
     /// The hide the question about classes dated after the next class makes at
-    /// Deploy (#475): Hide Pages…'s OWN call, through this window's runner —
+    /// Deploy (#475) of the classes the teacher UNTICKED (#726): Hide Pages…'s
+    /// OWN call, through this window's runner —
     /// a copy of the course first, Section ▸ Undo Last Change takes it back,
     /// and pages only those classes link to are hidden with them — with no
     /// preview stopped or started either side, since the deploy builds the
@@ -107,7 +108,7 @@ public sealed partial class MainWindow
         // says where it came from, as the mac's does.
         var answer = await verbs.Perform(SectionVerbs.HidePages(code, section, places, plan: false),
                                          SectionVerbDialog.MenuPath(Item.HidePages), code, section,
-                                         places.Count == 1 ? "1 class dated later, at Deploy" : $"{places.Count} classes dated later, at Deploy",
+                                         ClassesDatedLater.UntickedAtDeployCounts(places.Count),
                                          previewFollows: false);
         ApplyMenuEnablement();
         return answer;

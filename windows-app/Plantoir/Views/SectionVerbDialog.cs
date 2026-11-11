@@ -35,14 +35,13 @@ namespace Plantoir.Views;
 /// </remarks>
 internal sealed class SectionVerbDialog
 {
-    private enum Stage { Choose, LaterClasses, Plan, Working, Result }
+    private enum Stage { Choose, Plan, Working, Result }
 
     private readonly ContentDialog _dialog;
     private readonly SectionVerbs _verbs;
     private readonly Course _course;
     private readonly int _section;
     private readonly Item _item;
-    private readonly bool _meeting;
     private Stage _stage = Stage.Choose;
     private Func<JsonObject>? _planCall;
     private JsonObject? _pendingCall;
@@ -52,7 +51,6 @@ internal sealed class SectionVerbDialog
     // Choose: Publish Pages… / Hide Pages…
     private readonly List<(AssistWorkspace.MenuPage Page, CheckBox Box)> _rows = new();
     // Publish Pages…: the question about classes dated after the next class (#475)
-    private readonly List<(ClassesDatedLater.Page Page, CheckBox Box)> _laterRows = new();
 
     // Choose: Publish Class for a Date…
     private CalendarDatePicker? _day;
@@ -67,7 +65,6 @@ internal sealed class SectionVerbDialog
         _course = course;
         _section = section;
         _item = item;
-        _meeting = course.Configuration.ClassNoun == ClassNoun.Meeting;
         _dialog = new ContentDialog
         {
             Title = title,
@@ -124,9 +121,9 @@ internal sealed class SectionVerbDialog
                 args.Cancel = true;
                 return;
             }
-            // Closed at the plan, or at the question about classes dated
-            // later, by Cancel or by Escape: nothing ran, and the trail says so.
-            if (_stage is Stage.Plan or Stage.LaterClasses)
+            // Closed at the plan, by Cancel or by Escape: nothing ran, and
+            // the trail says so.
+            if (_stage is Stage.Plan)
                 SectionVerbs.NoteCancelled(MenuPath(_item), _course.Code, _section, Counts());
         };
     }
@@ -813,9 +810,10 @@ internal sealed class SectionVerbDialog
     /// </summary>
     private async Task Advance()
     {
-        if (_stage == Stage.Choose && _item == Item.PublishPages && AskAboutClassesDatedLater()) return;
+        // Publish Pages… asks nothing about classes dated after the next class
+        // (#726, the mac's #694; classesDatedLater.neverAskedFrom): publishing
+        // changes only the preview, and the question is put at Deploy.
         if (_stage == Stage.Choose && _planCall is not null) await RunPlan(_planCall());
-        else if (_stage == Stage.LaterClasses) await AnswerAboutClassesDatedLater();
         else if (_stage == Stage.Plan && _pendingCall is not null) await RunChange(_pendingCall);
     }
 
@@ -853,99 +851,6 @@ internal sealed class SectionVerbDialog
                     _workingWords.Text = note == savingACopy ? savingACopy : AssistWording.MenuWorking;
             }));
         ShowResult(answer.Summary);
-    }
-
-    // ---- Publish Pages…: classes dated after the next class (#475) ---------------------
-
-    /// <summary>
-    /// After the choice and before the plan (<c>shared-rules.json</c> →
-    /// <c>classesDatedLater.askedFrom</c>): the ticked pages that would be
-    /// classes dated after the next class once published, each ticked to be
-    /// LEFT OUT. True when the question is now up.
-    /// </summary>
-    private bool AskAboutClassesDatedLater()
-    {
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        IReadOnlyList<ClassesDatedLater.Page> flagged;
-        DateOnly? next;
-        try
-        {
-            flagged = ClassesDatedLater.FlaggedIfPublishing(_course, _section, today, Ticked());
-            next = ClassesDatedLater.NextClassDay(today, ClassesDatedLater.ClassPages(_course, _section));
-        }
-        catch (Exception ex)
-        {
-            App.LogDiagnostic($"Section menu could not read the classes dated later: {ex.Message}");
-            return false;
-        }
-        if (flagged.Count == 0 || next is not { } nextDay) return false;
-
-        _stage = Stage.LaterClasses;
-        _laterRows.Clear();
-        // A table, the picker's shape (#634, the mac's #608): Page with its
-        // box, and Date. Return is the main button; Space ticks the row.
-        var table = TickTable.ForLaterClasses(flagged, _meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle);
-        foreach (var row in table.Rows) _laterRows.Add((flagged[row.Index], row.Box));
-        table.Changed += NameTheLaterClassesButton;
-        table.Enter = () => { if (_stage == Stage.LaterClasses) _ = Advance(); };
-        var panel = new StackPanel { Spacing = 12, MinWidth = 460 };
-        panel.Children.Add(Words(_meeting ? AssistWording.LaterClassesAtPublishForAMeeting(nextDay)
-                                          : AssistWording.LaterClassesAtPublish(nextDay)));
-        panel.Children.Add(table.Panel);
-        var note = Words(_meeting ? AssistWording.LaterClassesKeptNoteForAMeeting : AssistWording.LaterClassesKeptNote);
-        note.Opacity = 0.8;
-        panel.Children.Add(note);
-        _dialog.Title = _meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
-        void Rows()
-        {
-            int rows = PageTableLayout.PickerRows(WindowHeight, flagged.Count);
-            if (!table.SetRows(rows)) return;   // unchanged: a window move, say
-            App.LogDiagnostic($"Later classes at Publish Pages: window {WindowHeight:0} epx tall, {rows} rows tall of {flagged.Count}");
-        }
-        Rows();
-        SetContent(panel, Rows);
-        _dialog.CloseButtonText = AssistWording.MenuCancelButton;
-        DialogButtons.EnablePrimary(_dialog, true);
-        NameTheLaterClassesButton();
-        return true;
-    }
-
-    /// <summary>"Leave 2 Hidden and Continue", or "Publish Them All" with none ticked.</summary>
-    private void NameTheLaterClassesButton()
-    {
-        int leftOut = _laterRows.Count(row => row.Box.IsChecked == true);
-        _dialog.PrimaryButtonText = leftOut == 0
-            ? AssistWording.PublishThemAllButton
-            : AssistWording.LeaveOutAndContinueButton(leftOut);
-    }
-
-    /// <summary>
-    /// The ticked are LEFT OUT and stay hidden; the unticked are published with
-    /// the rest and remembered as kept at their dates. With nothing left, nothing
-    /// is published and the dialog closes.
-    /// </summary>
-    private async Task AnswerAboutClassesDatedLater()
-    {
-        var leftOut = _laterRows.Where(row => row.Box.IsChecked == true).Select(row => row.Page).ToList();
-        var kept = _laterRows.Where(row => row.Box.IsChecked != true).Select(row => row.Page).ToList();
-        LaterClassesKept.Keep(_course.DirectoryPath, _section, kept);
-        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.LaterClassesAsked,
-            ClassesDatedLater.AskedLine(MenuPath(_item), _laterRows.Count, leftOut.Count, kept.Count), _course.Code, _section);
-
-        var leaving = leftOut.Select(page => page.Place).ToHashSet(StringComparer.Ordinal);
-        foreach (var (page, box) in _rows)
-            if (leaving.Contains(ClassesDatedLater.PlaceKey(page.Name))) box.IsChecked = false;
-
-        _dialog.Title = AssistWording.MenuPublishPagesTitle(_course.Code, _section.ToString());
-        if (Ticked().Count == 0)
-        {
-            SectionVerbs.NoteCancelled(MenuPath(_item), _course.Code, _section,
-                                       "every page ticked was a class dated later, left hidden");
-            _stage = Stage.Result;
-            _dialog.Hide();
-            return;
-        }
-        if (_planCall is not null) await RunPlan(_planCall());
     }
 
     // ---- Publish Pages… / Hide Pages…: the checklist ----------------------------------

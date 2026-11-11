@@ -212,7 +212,8 @@ public class AssistScenarioTests : IDisposable
             Class("Unit 2, Day 4", Iso(PinnedToday.AddDays(1)), published: true);
             Class("Unit 2, Day 5", Iso(PinnedToday.AddDays(3)), published: true);
         }
-        // `given.laterClassesKeptAll`: Keep All and Deploy, answered before.
+        // `given.laterClassesKeptAll`: the question answered in the window
+        // before, with every class left ticked (Deploy Ticked keeps them all).
         if (given?["laterClassesKeptAll"]?.GetValue<bool>() == true)
         {
             var course = Workspace.DiscoverCourses(_folder).Single(found => found.Code == Course);

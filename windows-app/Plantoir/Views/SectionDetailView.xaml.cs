@@ -2042,9 +2042,10 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>
     /// The question about classes dated after the next class (#475;
     /// <c>shared-rules.json</c> → <c>classesDatedLater</c>), put in this
-    /// window. Every flagged class is listed, ticked to hide, with two buttons
-    /// beside Cancel, always: Hide Ticked and Deploy (the default) and Keep All
-    /// and Deploy.
+    /// window. Every flagged class is listed TICKED TO GO OUT, with one button
+    /// beside Cancel: Deploy Ticked, the default (#726, the mac's #694: a
+    /// ticked box always means included). Keep All and Deploy went — with
+    /// every row ticked it only repeated Return.
     /// </summary>
     /// <param name="route">Where it was asked, as the trail line names it: "Deploy", or the in-app assistant's deploy.</param>
     /// <returns>
@@ -2058,13 +2059,15 @@ public sealed partial class SectionDetailView : UserControl
     /// <para>The list is decided ONCE, when the question is put, on this
     /// computer's day: an answer given after midnight acts on the classes it
     /// listed, never on a list worked out afresh.</para>
-    /// <para>Hide Ticked and Deploy records the unticked as kept at their dates
-    /// (<see cref="LaterClassesKept"/>) and hides the ticked with Hide
+    /// <para>Deploy Ticked records the TICKED as kept at their dates
+    /// (<see cref="LaterClassesKept"/>) and hides the UNTICKED with Hide
     /// Pages…'s OWN call through this window's runner
     /// (<see cref="MainWindow.HideClassesForTheDeploy"/>) — backed up,
-    /// undoable — with no preview either side. A ticked class still visible
-    /// afterwards stops the deploy, and the teacher is shown what the hide
-    /// said. Keep All and Deploy keeps every listed class and hides nothing.</para>
+    /// undoable — with no preview either side, so the preview is left as the
+    /// deployed site will be (Russell's ruling 2 on #694). An unticked class
+    /// still visible afterwards stops the deploy, and the teacher is shown what
+    /// the hide said. Return with every row ticked keeps them all and hides
+    /// nothing. The split is <see cref="ClassesDatedLater.AnswerAtDeploy"/>.</para>
     /// </remarks>
     internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterAsync(string route)
     {
@@ -2080,7 +2083,7 @@ public sealed partial class SectionDetailView : UserControl
         bool meeting = _course.Configuration.ClassNoun == ClassNoun.Meeting;
         string title = meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
         // A table, the picker's shape (#634, the mac's #608): Page with its
-        // box, and Date; Space ticks the row, Return is Hide Ticked and Deploy.
+        // box, and Date; Space ticks the row, Return is Deploy Ticked.
         var table = TickTable.ForLaterClasses(flagged, title);
         var boxes = table.Rows.Select(row => (Page: flagged[row.Index], row.Box)).ToList();
         var content = new StackPanel { Spacing = 12, MinWidth = 460 };
@@ -2101,8 +2104,7 @@ public sealed partial class SectionDetailView : UserControl
         {
             Title = title,
             Content = content,
-            PrimaryButtonText = AssistWording.HideTickedAndDeployButton,
-            SecondaryButtonText = AssistWording.KeepAllAndDeployButton,
+            PrimaryButtonText = AssistWording.DeployTickedButton,
             CloseButtonText = AssistWording.MenuCancelButton,
             DefaultButton = ContentDialogButton.Primary,
         };
@@ -2126,7 +2128,7 @@ public sealed partial class SectionDetailView : UserControl
         dialog.Closed += (_, _) => { if (dialog.XamlRoot is { } root) root.Changed -= refit; };
         // Return with a row selected is the main button: the list keeps Return
         // for itself (measured for #548), so the table catches it and the
-        // dialog closes as if Hide Ticked and Deploy had been pressed.
+        // dialog closes as if Deploy Ticked had been pressed.
         bool returnPressed = false;
         table.Enter = () =>
         {
@@ -2141,25 +2143,23 @@ public sealed partial class SectionDetailView : UserControl
         {
             var chosen = await ShowDialogSafelyAsync(dialog);
             if (returnPressed) chosen = ContentDialogResult.Primary;
-            if (chosen is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
+            if (chosen != ContentDialogResult.Primary)
             {
                 ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
                     ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
                 return LaterClassesAnswer.Cancelled;
             }
 
-            var ticked = chosen == ContentDialogResult.Secondary
-                ? new List<ClassesDatedLater.Page>()
-                : boxes.Where(row => row.Box.IsChecked == true).Select(row => row.Page).ToList();
-            var keeping = flagged.Where(page => !ticked.Contains(page)).ToList();
+            // Ticked goes out and is kept; unticked is hidden first (#726).
+            var (keeping, hiding) = ClassesDatedLater.AnswerAtDeploy(flagged, boxes.Select(row => row.Box.IsChecked == true).ToList());
             LaterClassesKept.Keep(_course.DirectoryPath, _sectionNumber, keeping);
 
-            if (ticked.Count > 0)
+            if (hiding.Count > 0)
             {
                 var hid = await _window.HideClassesForTheDeploy(_course.Code, _sectionNumber,
-                                                                 ticked.Select(page => page.Place).ToList());
+                                                                 hiding.Select(page => page.Place).ToList());
                 bool stillVisible = ClassesDatedLater.ClassPages(_course, _sectionNumber)
-                    .Any(page => page.Visible && ticked.Any(asked => asked.Place == page.Place));
+                    .Any(page => page.Visible && hiding.Any(asked => asked.Place == page.Place));
                 if (hid is null || stillVisible)
                 {
                     ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
@@ -2179,7 +2179,7 @@ public sealed partial class SectionDetailView : UserControl
             }
 
             ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
-                ClassesDatedLater.AskedLine(route, flagged.Count, ticked.Count, keeping.Count), _course.Code, _sectionNumber);
+                ClassesDatedLater.AskedLine(route, flagged.Count, hiding.Count, keeping.Count), _course.Code, _sectionNumber);
             return LaterClassesAnswer.GoAhead;
         }
         finally
