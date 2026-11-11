@@ -304,15 +304,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > second half is still yours: open the file and check each entry's issue is
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
-   > a deliberate decision. Never cut over one. **For this cut the ledger is
-   > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
-   > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
-   > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
-   > with them in it. Mac #698 landed on 2026-10-31 (the key renamed
-   > `obsidianIsNotOnThisMachine`, with `{machine}`), so a Windows v1.9.1 cut
-   > needs both entries DELETED, with the regenerated contract taken, before
-   > it — at 1.9.1 the rule above turns them red. The boundary and the reasoning
-   > are in `contracts/README.md` → "Named gaps".
+   > a deliberate decision. Never cut over one. **The ledger is empty again
+   > since #720 (2026-11-10)**: the two entries #690 held against mac #698
+   > (v1.9.1, `obsidianIsNotOnThisMac` and its scenario) went with the commit
+   > that took the regenerated contract (`obsidianIsNotOnThisMachine`, with
+   > `{machine}`), so they cannot turn the catch-up cut red. The boundary and
+   > the reasoning are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,

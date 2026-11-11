@@ -153,17 +153,16 @@ internal static class NamedGapLedger
         keys.Select(key => new Entry(area, key, issue, milestone, reason));
 
     // Reasons, one per owning issue, as `private const string` beside the
-    // milestones above. TWO ENTRIES since 2026-10-28, both against mac #698
-    // (v1.9.1): #690's obsidianIsNotOnThisMac and its scenario, below.
-    // Empty before that from 2026-10-22, when #581 landed its four Obsidian
+    // milestones above. EMPTY since 2026-11-10, when #720 took mac #698's
+    // regenerated contract (obsidianIsNotOnThisMachine, said with {machine}
+    // filled) and deleted the two entries #690 had held against #698 (v1.9.1)
+    // from 2026-10-28: obsidianIsNotOnThisMac and the scenario "open in
+    // Obsidian on a Mac without Obsidian presses nothing (#610)". Empty
+    // before that from 2026-10-22, when #581 landed its four Obsidian
     // add-on events (held open earlier that day); empty from 2026-10-16, when
     // #548 closed the sixteen plan-table sentences (mac #524) that #551's
     // piece held open that morning; and empty from 2026-10-15, when the
     // catch-up to mac 1.7.1, #481, closed its last two.
-
-    private const string ObsidianNotOnThisMachine =
-        "the contract's sentence says \"this Mac\" without {machine}; Windows cannot say it as written and " +
-        "cannot regenerate assist-wording.json (the mac does), so it says \"this PC\" until mac #698 lands";
 
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
@@ -188,22 +187,15 @@ internal static class NamedGapLedger
 
         // ---- app-rules.json → modelTiers.requirements
 
-        // ---- assist-wording.json → wording, and assist-cases.json →
-        // scenarios.cases: #690's one sentence that names the computer
-        // "this Mac" without {machine} (specialNames.platformWording.machine.rule),
-        // and the scenario that expects it. Windows says "this PC"
-        // (AssistWording.ObsidianIsNotOnThisPc) until the mac writes the
-        // sentence with {machine}: mac issue #698.
-        Owed(AssistWordingKeys, 698, V191, ObsidianNotOnThisMachine, "obsidianIsNotOnThisMac"),
-        Owed(AssistScenarios, 698, V191, ObsidianNotOnThisMachine, "open in Obsidian on a Mac without Obsidian presses nothing (#610)"),
-
-        // ---- assist-wording.json → wording: before #690, none held open. The Section
+        // ---- assist-wording.json → wording: none held open. The Section
         // menu's sentences landed with #489's 2B, the Deploy question's
-        // seventeen (mac #475) with 2C, and mac #524's sixteen plan-table
-        // sentences (plan*, menuPlan*) with #548's plan table.
+        // seventeen (mac #475) with 2C, mac #524's sixteen plan-table
+        // sentences (plan*, menuPlan*) with #548's plan table, and #690's
+        // obsidianIsNotOnThisMac (held 2026-10-28) went with #720.
 
         // ---- assist-cases.json → scenarios.cases: none held open. #475's
-        // three landed with #489's 2C.
+        // three landed with #489's 2C; #690's "on a Mac without Obsidian"
+        // went with #720.
     }.SelectMany(group => group).ToArray();
 
     /// <summary>Every entry, for <c>NamedGapLedgerTests</c>.</summary>

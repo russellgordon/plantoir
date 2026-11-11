@@ -1948,13 +1948,23 @@ laps.
   turns do.
 - **Ten or more.** No turn needs it, and every lap past six is a wait the
   teacher sits through for an answer that is not coming.
-- **Not winding back** (what Windows did until it adopts this): it leaves the
-  six repeats in the history, the #215 fault.
+- **Not winding back** (what Windows did until #720, 2026-11-10): it leaves
+  the six repeats in the history, the #215 fault.
 
-**Windows** has capped its loop at 6 (`MostStepsPerTurn`) since its agent was
-written, with a literal sentence, no trail line and no wind-back; the issue
-opened with this piece asks it to read the number from the contract, say the
-contract's sentence, wind back, write the event, and run the scenario.
+**Windows** capped its loop at 6 (`MostStepsPerTurn`) from the day its agent
+was written, with a literal sentence, no trail line and no wind-back. Since
+[#720](https://github.com/russellgordon/plantoir/issues/720) (2026-11-10) it
+matches: the number is pinned to this contract key
+(`AssistLapCapTests.TheCapIsTheContractsNumber`), the teacher reads
+`AssistWording.WentRoundWithoutFinishing`, the turn is wound back, the trail
+records the event, and the scenario runs through a fuse read from the
+contract. Two things differ by construction, and the mac need only know them:
+the count lives in `AssistAgent.Run`'s loop (its one `_model.Ask`, entered from
+`Say` and `Approve`), and "nothing was changed" rests on Windows' per-NAME rule
+— a write ends the turn because it is in `AssistToolRunner.WriteTools` — so a
+test now pins that every write a lap can run is in that list. How, and the
+must-fails, are in `12-windows-app.md` → "The lap cap on Windows (#720, the
+mac's #689)".
 
 ### Step 4 — The app presses its own buttons
 
@@ -7907,14 +7917,19 @@ served through a fuse.
 by the APP pressing the section window's own Open in Obsidian
 (`MainWindow.PressOpenInObsidianFor`, the shape of its `deploy_section`
 hand-back), the eight fixed shapes are in `AssistCardCommand.FixedShapes`, and
-nine of the ten scenarios run; the tenth, "on a Mac without Obsidian", is held
+nine of the ten scenarios ran; the tenth, "on a Mac without Obsidian", was held
 in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` named "this Mac"
 without `{machine}` (mac #698), so Windows says "this PC". #698 (2026-10-31)
 renamed the key `obsidianIsNotOnThisMachine`, gave it the placeholder and
 renamed the scenario "open in Obsidian where Obsidian is not installed
 presses nothing (#610)", and added `openInObsidianDidNotOpen` with a scenario
-for Windows' `DidNotOpen`; the `windows` issue opened with it lists the ledger
-entries and the Windows-only member to delete. How the press
+for Windows' `DidNotOpen`. **Windows took both with #720 (2026-11-10)**: the
+two ledger entries and `AssistWording.ObsidianIsNotOnThisPc` are deleted,
+`ObsidianIsNotOnThisMachine()` fills `{machine}` with "PC" through
+`MachineWord`, `DidNotOpen` answers `openInObsidianDidNotOpen` (in place of
+`openInObsidianIsInTheSectionWindow`), and all eleven scenarios run. Unlike
+the mac's, Windows' route really does produce `DidNotOpen` (a scan or open
+that throws, and the runner's own `catch`). How the press
 reports early on Windows, where a question is an awaited dialog, is in
 `12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
