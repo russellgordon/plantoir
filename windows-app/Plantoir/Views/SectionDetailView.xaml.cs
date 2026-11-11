@@ -135,16 +135,26 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     private int _publishMarkerGeneration;
 
-    // ---- Folder problems --------------------------------------------------
+    // ---- The section's problems (#734, the mac's #717) ---------------------
     //
-    // Held in view state rather than read off the runner when a dialog is
-    // built, so a teacher who dismisses it and carries on editing does not
-    // meet it again on the next redraw. A healthy course must see nothing at
-    // all: the failure mode for this whole feature is nagging, and a warning
-    // dismissed by habit is one that gets dismissed when it matters.
+    // The section's Problems RECORD is the one list (SectionProblems, read
+    // from disk at the moments it can have changed): its tab, its sidebar
+    // marker, and ONE alert raised only when a build found something NEW and
+    // nobody has answered it. The per-build folder-problem dialog and its
+    // queue (FolderProblemQueue) are gone: an alert that is due stays due in
+    // the store until answered, so nothing has to be held or put back here.
 
-    /// <summary>True while a folder-problem dialog is on screen.</summary>
+    /// <summary>True while the alert about new problems, or what a repair did, is on screen.</summary>
     private bool _healthDialogIsUp;
+
+    /// <summary>The Problems tab, over the site and the console (never instead of them).</summary>
+    private readonly SectionProblemsView _problemsView;
+
+    /// <summary>True between the alert being asked for and its being raised (posted, so a burst of reads raises one).</summary>
+    private bool _problemsAlertQueued;
+
+    /// <summary>Set while this view moves the tab bar itself, so its SelectionChanged is not read as the teacher's.</summary>
+    private bool _settingTheTab;
 
     /// <summary>
     /// Set the moment this view is taken off screen, so an operation that was
@@ -163,31 +173,6 @@ public sealed partial class SectionDetailView : UserControl
     /// visual-tree walk.</para>
     /// </summary>
     private bool _isTornDown;
-
-    /// <summary>
-    /// What is waiting to be shown and what has been shown already.
-    ///
-    /// <para>Findings are HELD, not dropped, while a dialog is up: never swap
-    /// the contents of one that is already on screen — the title and the
-    /// message would change under the teacher's cursor and what they were
-    /// reading would vanish unacknowledged — but discarding them is not the
-    /// alternative either, since a failed deploy can report while an earlier
-    /// batch is still up.</para>
-    /// </summary>
-    private readonly FolderProblemQueue _healthQueue = new();
-
-    /// <summary>
-    /// True between a finding arriving and the dialog for it being built.
-    ///
-    /// <para>Presentation is posted to the dispatcher rather than run inside
-    /// the notification, and that is load-bearing: <c>site_health.py</c> prints
-    /// every finding in one burst, so they arrive in ONE pseudo-console flush
-    /// and the runner announces them one after another on the same stack.
-    /// Showing on the first announcement would put up a dialog naming one
-    /// problem and then a second naming both. By the time a posted
-    /// presentation runs, the whole flush has been collected.</para>
-    /// </summary>
-    private bool _healthPresentationQueued;
 
     public string CourseCode => _course.Code;
     public int SectionNumber => _sectionNumber;
@@ -241,6 +226,16 @@ public sealed partial class SectionDetailView : UserControl
         SectionTitle.Text = TitleText;
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
 
+        // #734: Website | Problems, and the Problems tab over the content.
+        WebsiteTab.Text = SectionProblemsWording.TabWebsite;
+        ProblemsTab.Text = SectionProblemsWording.TabProblems;
+        _problemsView = new SectionProblemsView(course, sectionNumber, () => _window.Workspace.WorkspacePath,
+                                                row => _ = RepairFromTheProblemsTabAsync(row))
+        {
+            Visibility = Visibility.Collapsed,
+        };
+        ContentArea.Children.Add(_problemsView);
+
         // The empty-state invitation follows the course's destination —
         // "to Netlify" would be wrong twice over for a folder-publishing course.
         // A course kept for reference (#241): the Deploy button is WITHHELD,
@@ -276,20 +271,16 @@ public sealed partial class SectionDetailView : UserControl
                 _previewWork = WorkLease.LetGoWhenAServingPreviewEnds(_previewWork, _previewRunner.IsRunning,
                     _previewRunner.HasBeenServing, _previewRunner.WasClosedForADeploy, _course.Code, _sectionNumber);
             }
-            // A new build asks the question again, so a problem it still finds
-            // is told again — "show it once" means once per BUILD, not once
-            // for the life of this view.
+            // A new build decides the links checklist again.
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && _previewRunner.IsRunning)
-            {
-                _healthQueue.ForgetShown();
                 _linksChecklistDecided = null;
-                _heldLinksFinding = null;
-            }
-            // As the build reports them. preview.ps1 does not exit while it is
-            // serving, so waiting for this runner to FINISH would hold the
-            // dialog until the teacher pressed Stop.
-            if (args.PropertyName == nameof(_previewRunner.HealthFindings))
-                NoteHealthFindings(_previewRunner);
+            // #734: the build wrote the section's Problems record — mid-build,
+            // before Quartz, the moment the folder-problem dialog had (#153: a
+            // missing front page stops the preview ever finishing, so waiting
+            // for the runner to END would hold the alert for ever). Read again,
+            // and the alert raised if the record found something new.
+            if (args.PropertyName == nameof(_previewRunner.ProblemsMarker) && _previewRunner.ProblemsMarker is not null)
+                ReadTheProblems();
             // The links checklist (#392): read when the build's marker
             // ARRIVES, mid-build — a preview never ends.
             if (args.PropertyName == nameof(_previewRunner.LinksChecklistMarker) &&
@@ -361,6 +352,14 @@ public sealed partial class SectionDetailView : UserControl
         // BEFORE this view takes anything, or it would hide its own (#706, M1).
         _endingHiddenHere = _deployRun.EndingToHideOnAppearing();
         TakeWhatTheDeployLeft();
+        // #734: the section's Problems record, whoever built it — a scheduled
+        // deploy, the assistant, the MCP server, a terminal — and the alert
+        // when it found something new that nobody has answered. Subscribed
+        // here and let go on Unloaded: the event is static.
+        SectionProblems.Changed -= OnProblemsChanged;
+        SectionProblems.Changed += OnProblemsChanged;
+        ShowTheProblems();
+        ReadTheProblems();
         RefreshChrome();
         TakeAnythingTheScheduledDeployFound();
         OfferTheLinksChecklistIfWaiting();
@@ -387,6 +386,7 @@ public sealed partial class SectionDetailView : UserControl
         AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
         _deployRun.PropertyChanged -= OnDeployRunChanged;
         _deployRun.Runner.PropertyChanged -= OnDeployRunnerChanged;
+        SectionProblems.Changed -= OnProblemsChanged;
         // A preview being built still stops when its section is left
         // (#706 kept it so: its port, its web view and the quit record are the
         // window's). The DEPLOY goes on — it is the run's, claims and all.
@@ -430,10 +430,12 @@ public sealed partial class SectionDetailView : UserControl
         _ = RefreshPublishedMarker();
         // A publish this app ran: its build's marker, if it printed one.
         if (ending.LinksMarker is { } marker) DecideTheLinksChecklist(marker);
-        else ReleaseTheHeldLinksFinding();
-        // What the build said about this course's folders: from a PUBLISH, so
-        // a repair made now is not on the students' site until the next one.
-        NoteHealthFindings(ending.Findings, cameFromPublishing: true);
+        // What the build found is the section's Problems record, read again
+        // here, and its alert raised when it found something new (#734): the
+        // ONE alert, never a second beside it (#717 plan review, MED 8). A
+        // deploy's record says students still see the old site, so a repair
+        // made from it says so.
+        ReadTheProblems();
         _deployRun.NoteEndingShown();
     }
 
@@ -450,6 +452,10 @@ public sealed partial class SectionDetailView : UserControl
         // wait until they clicked away and back. It is a File.Exists when
         // nothing is waiting.
         TakeAnythingTheScheduledDeployFound();
+        // #734: the window reads every record on activation (MainWindow,
+        // throttled); an alert that was due but could not be shown is asked
+        // for again here, whether or not anything moved.
+        QueueTheProblemsAlert();
         OfferTheLinksChecklistIfWaiting();
     }
 
@@ -619,7 +625,17 @@ public sealed partial class SectionDetailView : UserControl
         bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
-        Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
+        // #734: while the Problems tab shows, what is under it is COLLAPSED as
+        // well as covered — the console, the empty state and the web view —
+        // so none of it is in the Tab order or the UI Automation tree. The web
+        // view is collapsed, never removed or re-sourced: measured to keep its
+        // page, its scroll and its history (documentation/12-windows-app.md →
+        // "A section's Problems tab").
+        bool problemsShown = SectionProblems.TabFor(_window.Workspace.WorkspacePath, _course.Code, _sectionNumber)
+                             == SectionProblems.Tab.Problems;
+        BaseLayer.Visibility = problemsShown ? Visibility.Collapsed : Visibility.Visible;
+        Preview.Visibility = previewShown && !problemsShown ? Visibility.Visible : Visibility.Collapsed;
+        _problemsView.Visibility = problemsShown ? Visibility.Visible : Visibility.Collapsed;
 
         PreviewChromeChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -640,6 +656,12 @@ public sealed partial class SectionDetailView : UserControl
                 App.LogDiagnostic($"ShowDialogSafelyAsync for '{dialog.Title}' exception: {ex.Message}");
                 return null;
             }
+            finally
+            {
+                // #734: an alert about new problems that was due while this
+                // dialog held the one slot is asked for again now.
+                QueueTheProblemsAlert();
+            }
         }
         else
         {
@@ -648,37 +670,14 @@ public sealed partial class SectionDetailView : UserControl
         }
     }
 
-    // ---- Folder problems -------------------------------------------------
+    // ---- What last night's scheduled deploy left ---------------------------
 
     /// <summary>
-    /// Put a run's folder problems in front of the teacher.
-    ///
-    /// <para>Called when the build REPORTS them, never when a preview finishes
-    /// — and that distinction is the whole reason this feature reaches anybody.
-    /// <c>preview.ps1</c> does not exit while it is serving, so a runner on the
-    /// preview path stays running until the teacher presses Stop; and a section
-    /// missing its <c>index.md</c> makes every request 404, so the server wait
-    /// never succeeds either. Gating on either one would hide the dialog behind
-    /// a preview that the very problem it reports prevents from completing: the
-    /// worse the course, the less likely the teacher was to be told.</para>
-    ///
-    /// <para>A healthy course reports nothing and sees nothing.</para>
-    /// </summary>
-    /// <summary>
-    /// Read out whatever last night's scheduled deploy left for this section.
-    ///
-    /// <para>Marked as having come from a PUBLISH, because it did: the overnight
-    /// run went out to students, so a repair made now is not on their site
-    /// until the teacher publishes again, and that is the sentence they need.</para>
-    ///
-    /// <para><b>Guarded BEFORE consuming</b>, which is the mac's lesson and was
-    /// nearly not taken. The record is DELETED as it is read, and the queue
-    /// holding what it cannot show yet is ALMOST enough — but that queue is a
-    /// field of this view, and the view is discarded when the teacher selects
-    /// another section. So a batch consumed while a dialog was up, whose own
-    /// dialog then never got on screen, would live only in an object about to
-    /// be thrown away. Not consuming at all in that state costs one morning;
-    /// consuming and losing it costs the record for ever.</para>
+    /// Read out whatever last night's scheduled deploy left for this section:
+    /// how it turned out (an InfoBar, below), and its copy of the folder
+    /// problems, which is TAKEN so it does not pile up. Since #734 those
+    /// problems have no dialog of their own — the run's build wrote the
+    /// section's Problems record, and its alert is raised from that.
     /// </summary>
     private void TakeAnythingTheScheduledDeployFound()
     {
@@ -686,13 +685,16 @@ public sealed partial class SectionDetailView : UserControl
         // WinUI allows: the scheduled publish's outcome is an InfoBar in this
         // view now, so the two can both be on screen and neither can lose.
         ShowHowTheScheduledPublishTurnedOut();
-        if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
         try
         {
-            var waiting = _window.Workspace.WorkspacePath is { } folder
-                ? ScheduledHealthFindings.Take(_course.Code, _sectionNumber, folder)
-                : Array.Empty<SiteHealthFinding>();
-            if (waiting.Count > 0) NoteHealthFindings(waiting, cameFromPublishing: true);
+            // #734: the overnight run's copy of its findings is still TAKEN, so
+            // it does not pile up, and its trail lines are written as it is
+            // read (ScheduledHealthFindings). It has no dialog of its own any
+            // more: the run's build wrote the section's Problems record, which
+            // holds the same problems one row each, and its alert is raised
+            // from that record — from OnLoaded and the window's activation.
+            if (_window.Workspace.WorkspacePath is { } folder)
+                _ = ScheduledHealthFindings.Take(_course.Code, _sectionNumber, folder);
         }
         catch (Exception ex)
         {
@@ -831,65 +833,216 @@ public sealed partial class SectionDetailView : UserControl
     /// </remarks>
     public static event Action<string, int>? SectionOutcomeDismissed;
 
-    private void NoteHealthFindings(ScriptRunner? runner, bool cameFromPublishing = false)
+    // ---- The section's problems: the tab and the alert (#734) -------------
+
+    /// <summary>The store read a record again: this course's, on any window's thread.</summary>
+    private void OnProblemsChanged(string folder, string courseCode)
     {
-        if (runner is null) return;
-        NoteHealthFindings(runner.HealthFindings, cameFromPublishing);
+        if (!courseCode.Equals(_course.Code, StringComparison.OrdinalIgnoreCase)) return;
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (_isTornDown || !WorkingFolder.IsTheSame(folder, _window.Workspace.WorkspacePath)) return;
+            ShowTheProblems();
+            QueueTheProblemsAlert();
+        });
     }
 
-    private void NoteHealthFindings(IReadOnlyList<SiteHealthFinding> findings, bool cameFromPublishing)
+    /// <summary>
+    /// Reads this course's records again, off the interface thread — every
+    /// section's, because one section's build decides what another's rows say
+    /// — then shows them and raises the alert if one is due. The store raises
+    /// <see cref="SectionProblems.Changed"/> only when something moved, so the
+    /// alert is asked for here as well.
+    /// </summary>
+    private async void ReadTheProblems()
     {
-        // The #333 finding is announced BEFORE the links checklist exists, so
-        // it is HELD until the build's marker decides (#392): dropped when the
-        // checklist will really be shown, put back otherwise. Other findings
-        // go first as before, and the checklist follows when they have gone.
-        var held = findings.Where(f => f.Name == LinksIntoHiddenPagesCheck).ToList();
-        if (held.Count > 0 && !cameFromPublishing && _previewRunner.IsRunning)
+        try { await ReadTheProblemsNowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"ReadTheProblems: {ex.Message}"); }
+        if (_isTornDown) return;
+        ShowTheProblems();
+        QueueTheProblemsAlert();
+    }
+
+    private Task ReadTheProblemsNowAsync() =>
+        _window.Workspace.WorkspacePath is { } folder
+            ? SectionProblems.ReloadAsync(folder, _course.Code, _course.SectionNumbers.ToList())
+            : Task.CompletedTask;
+
+    /// <summary>
+    /// Website | Problems, from the store: the bar only while this section's
+    /// OWN record has rows, the tab it shows, and the table's rows. When the
+    /// last row clears with the keyboard inside the table, focus goes to
+    /// Preview — the act that shows what the teacher was working on — rather
+    /// than to nowhere (review change 3).
+    /// </summary>
+    private void ShowTheProblems()
+    {
+        string? folder = _window.Workspace.WorkspacePath;
+        var record = SectionProblems.Record(folder, _course.Code, _sectionNumber);
+        bool has = SectionProblemsRules.HasMarker(record);
+        bool focusWasInTheTable = _problemsView.ContainsFocus();
+        SectionTabs.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        if (record is not null && has)
+            _problemsView.Show(record, SectionProblems.OtherRecords(folder, _course, _sectionNumber));
+        var tab = SectionProblems.TabFor(folder, _course.Code, _sectionNumber);
+        _settingTheTab = true;
+        try { (tab == SectionProblems.Tab.Problems ? ProblemsTab : WebsiteTab).IsSelected = true; }
+        finally { _settingTheTab = false; }
+        RefreshChrome();
+        if (!has && focusWasInTheTable) PreviewButton.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>The teacher chose a tab (a click, or the arrow keys on the bar): focus stays on the bar.</summary>
+    private void SectionTabs_SelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    {
+        if (_settingTheTab || _isTornDown) return;
+        var tab = ReferenceEquals(sender.SelectedItem, ProblemsTab) ? SectionProblems.Tab.Problems : SectionProblems.Tab.Website;
+        SectionProblems.Show(tab, _window.Workspace.WorkspacePath, _course.Code, _sectionNumber);
+        RefreshChrome();
+    }
+
+    /// <summary>Shows a tab from code — Show on the alert — and, for Problems, puts the keyboard in the table.</summary>
+    private void ShowTab(SectionProblems.Tab tab, bool focusTheTable)
+    {
+        SectionProblems.Show(tab, _window.Workspace.WorkspacePath, _course.Code, _sectionNumber);
+        ShowTheProblems();
+        if (tab != SectionProblems.Tab.Problems || !focusTheTable) return;
+        // After the dialog has gone: a ContentDialog gives focus back to where
+        // it was when it closes, which would be under the tab that now covers
+        // it. Low priority, so it runs after that.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            findings = findings.Except(held).ToList();
-            if (_linksChecklistDecided is null)
+            if (!_isTornDown) _problemsView.FocusTheTable();
+        });
+    }
+
+    /// <summary>Asks for the alert, posted: a burst of reads — the marker, the store's Changed, activation — raises it once.</summary>
+    private void QueueTheProblemsAlert()
+    {
+        if (_problemsAlertQueued || _isTornDown || DispatcherQueue is null) return;
+        _problemsAlertQueued = true;
+        bool accepted = DispatcherQueue.TryEnqueue(async () =>
+        {
+            _problemsAlertQueued = false;
+            try { await RaiseTheProblemsAlertIfDueAsync(); }
+            catch (Exception ex) { App.LogDiagnostic($"Problems alert: {ex.Message}"); }
+        });
+        if (!accepted) _problemsAlertQueued = false;
+    }
+
+    /// <summary>
+    /// Raises the alert about new problems when this section's record found
+    /// something NEW and nobody has answered it (<c>sectionProblems.alert</c>),
+    /// and nothing else is in front of it. Not raised behind today's-class
+    /// question, the links checklist or another of this view's dialogs: it
+    /// stays due in the store, and each of those going away asks again.
+    /// One window holds it for the section (<see cref="SectionProblems.ClaimTheAlert"/>).
+    /// </summary>
+    private async Task RaiseTheProblemsAlertIfDueAsync()
+    {
+        if (_isTornDown || !IsLoaded) return;
+        if (_healthDialogIsUp || _todaysClassQuestionUp || _linksChecklistUp) return;
+        if (_window.Workspace.WorkspacePath is not { } folder) return;
+        if (SectionProblems.RecordWithAnAlertDue(folder, _course.Code, _sectionNumber) is not { } due) return;
+        if (!SectionProblems.ClaimTheAlert(folder, _course.Code, _sectionNumber, due.AlertKey)) return;
+
+        // A NEW problem with a repair keeps it on the alert; never on a course
+        // kept for reference (#241), whose folders a repair would write into.
+        var repairable = ReferenceCourse.IsKeptForReference(_course)
+            ? new List<SiteHealthFinding>()
+            : due.NewRows.Where(row => row.Fixable).Select(row => row.AsFinding(_course.Code, _sectionNumber)).ToList();
+        string? repairTitle = SiteHealthRepair.ButtonTitle(repairable);
+
+        ContentDialogResult? choice = null;
+        SiteHealthRepair.Outcome? outcome = null;
+        _healthDialogIsUp = true;
+        try
+        {
+            choice = await ShowHealthDialogAsync(FolderProblemsDialog.NewProblems(
+                due, ReferenceCourse.ShownCode(_course), _sectionNumber, repairTitle));
+            // Never answered on behalf of a teacher who did not answer: a
+            // dialog that never got on screen, or one closed because this view
+            // went away, leaves the alert due.
+            if (choice is { } answered && !_isTornDown)
             {
-                _heldLinksFinding = held;
-                // A build that never prints a marker (an older builder) gets
-                // the alert after all.
-                _ = ReleaseTheHeldLinksFindingLater();
-            }
-            else if (_linksChecklistDecided == false)
-            {
-                _healthQueue.Note(held, false);
+                string answer = answered switch
+                {
+                    ContentDialogResult.Primary => SectionProblemsRules.AnsweredShow,
+                    ContentDialogResult.Secondary => SectionProblemsRules.AnsweredRepair,
+                    _ => SectionProblemsRules.AnsweredNotNow,
+                };
+                SectionProblems.Answer(due, answer, folder, _course.Code, _sectionNumber);
+                if (answered == ContentDialogResult.Primary)
+                    ShowTab(SectionProblems.Tab.Problems, focusTheTable: true);
+                else if (answered == ContentDialogResult.Secondary)
+                {
+                    // A deploy's record says students still see the old site.
+                    outcome = SiteHealthRepair.OutcomeOfRepairing(repairable, _course,
+                        due.CameFromADeploy ? SiteHealthRepair.Occasion.Publishing : SiteHealthRepair.Occasion.Building);
+                    // A repair CHANGES the section's content on the teacher's behalf.
+                    _ = RefreshPublishedMarker();
+                }
             }
         }
-        if (_healthQueue.Note(findings, cameFromPublishing)) QueueHealthPresentation();
+        finally
+        {
+            _healthDialogIsUp = false;
+            SectionProblems.ReleaseTheAlert(folder, _course.Code, _sectionNumber);
+        }
+
+        if (choice is null)
+        {
+            // Another dialog held the one slot WinUI allows: asked again once it
+            // has had time to go, and not onto a section nobody is looking at.
+            await Task.Delay(2000);
+            if (!_isTornDown && IsLoaded) QueueTheProblemsAlert();
+            return;
+        }
+        if (outcome is not null)
+        {
+            // Shown only AFTER the alert it was asked for from has gone
+            // (siteHealth.repair.oneAlertAtATime).
+            if (outcome.CanRebuild && WhyTheRepairCannotBePreviewedNow() is { } instead) outcome = instead;
+            await PresentRepairOutcomeAsync(outcome);
+        }
+    }
+
+    /// <summary>
+    /// The Problems tab's own repair button: the alert's repair, for one
+    /// problem, its outcome shown as the alert's is — and then the keyboard
+    /// back on that problem's row (review change 3), which stays until the
+    /// next build; the table is never left with focus nowhere.
+    /// </summary>
+    private async Task RepairFromTheProblemsTabAsync(SectionProblemRow row)
+    {
+        if (_healthDialogIsUp) return;
+        try
+        {
+            var record = SectionProblems.Record(_window.Workspace.WorkspacePath, _course.Code, _sectionNumber);
+            var outcome = SiteHealthRepair.OutcomeOfRepairing(new[] { row.AsFinding(_course.Code, _sectionNumber) }, _course,
+                record?.CameFromADeploy == true ? SiteHealthRepair.Occasion.Publishing : SiteHealthRepair.Occasion.Building);
+            _ = RefreshPublishedMarker();
+            if (outcome is null) return;
+            if (outcome.CanRebuild && WhyTheRepairCannotBePreviewedNow() is { } instead) outcome = instead;
+            await PresentRepairOutcomeAsync(outcome);
+        }
+        catch (Exception ex) { App.LogDiagnostic($"Repair from the Problems tab: {ex.Message}"); }
+        if (!_isTornDown && !_problemsView.FocusRow(row.Id) && _problemsView.Visibility == Visibility.Visible)
+            _problemsView.FocusTheTable();
     }
 
     // ---- The links checklist (#392, #399, #405) ---------------------------
 
-    private const string LinksIntoHiddenPagesCheck = "linksIntoHiddenPages";
-    private IReadOnlyList<SiteHealthFinding>? _heldLinksFinding;
     /// <summary>Null until this build's marker arrives; then whether the checklist is being shown.</summary>
     private bool? _linksChecklistDecided;
     private bool _linksChecklistUp;
     private string? _linksChecklistShownFor;
 
-    private async Task ReleaseTheHeldLinksFindingLater()
-    {
-        await Task.Delay(TimeSpan.FromSeconds(45));
-        if (_linksChecklistDecided is null) ReleaseTheHeldLinksFinding();
-    }
-
-    private void ReleaseTheHeldLinksFinding()
-    {
-        if (_heldLinksFinding is not { } held) return;
-        _heldLinksFinding = null;
-        if (_healthQueue.Note(held, false)) QueueHealthPresentation();
-    }
-
     private void DecideTheLinksChecklist(LinksChecklistMarker marker)
     {
         var offer = LinksChecklistShowing.AfterAWatchedBuild(_course, _sectionNumber, marker);
         _linksChecklistDecided = offer is not null;
-        if (offer is null) { ReleaseTheHeldLinksFinding(); return; }
-        _heldLinksFinding = null;
+        if (offer is null) return;
         _ = PresentTheLinksChecklistAsync(offer, "after a build in this window");
     }
 
@@ -922,8 +1075,13 @@ public sealed partial class SectionDetailView : UserControl
         _linksChecklistUp = true;
         try
         {
-            // Other findings first (siteHealth.repair.oneAlertAtATime).
-            while ((_healthDialogIsUp || _healthQueue.PendingCount > 0 || _todaysClassQuestionUp) && !_isTornDown)
+            // The alert about new problems first (#734: the checklist FOLLOWS
+            // it, sectionProblems.alert), read from a record that is current —
+            // the build printed its PLANTOIR_PROBLEMS: marker before this one,
+            // but the read is asynchronous — and today's-class question (#406).
+            await ReadTheProblemsNowAsync();
+            QueueTheProblemsAlert();
+            while ((_healthDialogIsUp || _problemsAlertQueued || TheProblemsAlertIsDue() || _todaysClassQuestionUp) && !_isTornDown)
                 await Task.Delay(300);
             if (_isTornDown) return;
             _linksChecklistShownFor = offer.BuildId;
@@ -936,8 +1094,16 @@ public sealed partial class SectionDetailView : UserControl
         {
             App.LogDiagnostic($"Links checklist: {ex.Message}");
         }
-        finally { _linksChecklistUp = false; }
+        finally
+        {
+            _linksChecklistUp = false;
+            QueueTheProblemsAlert();   // #734: a later build's alert waited behind the checklist
+        }
     }
+
+    /// <summary>Whether this section's alert about new problems is due and unanswered (in any window).</summary>
+    private bool TheProblemsAlertIsDue() =>
+        SectionProblems.RecordWithAnAlertDue(_window.Workspace.WorkspacePath, _course.Code, _sectionNumber) is not null;
 
     /// <summary>Today's-class question launches nothing; anything that tries is refused.</summary>
     private sealed class NoLauncher : ILauncherRunner
@@ -1006,7 +1172,11 @@ public sealed partial class SectionDetailView : UserControl
             return outcome == TodaysClassOnTheFrontPage.Outcome.Written;
         }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return false; }
-        finally { _todaysClassQuestionUp = false; }
+        finally
+        {
+            _todaysClassQuestionUp = false;
+            QueueTheProblemsAlert();   // #734: it waited behind this question
+        }
     }
 
     private async Task SayAsync(string sentence)
@@ -1019,101 +1189,14 @@ public sealed partial class SectionDetailView : UserControl
         });
     }
 
-    private void QueueHealthPresentation()
-    {
-        if (_healthPresentationQueued || _healthDialogIsUp) return;
-        _healthPresentationQueued = true;
-        bool accepted = DispatcherQueue.TryEnqueue(async () =>
-        {
-            _healthPresentationQueued = false;
-            await PresentPendingHealthFindingsAsync();
-        });
-        // A refused enqueue (the dispatcher is shutting down) would otherwise
-        // leave the flag set forever, and every later finding would be dropped
-        // by the guard above rather than shown.
-        if (!accepted) _healthPresentationQueued = false;
-    }
-
-    /// <summary>
-    /// Show what is waiting, then whatever arrived while it was on screen.
-    /// </summary>
-    private async Task PresentPendingHealthFindingsAsync()
-    {
-        if (_healthDialogIsUp) return;
-        // Folder findings wait behind today's-class question (#406).
-        while (_todaysClassQuestionUp && !_isTornDown) await Task.Delay(300);
-        if (_healthQueue.TakeNext() is not { } next) return;
-        var findings = next.Findings;
-        bool cameFromPublishing = next.CameFromPublishing;
-
-        _healthDialogIsUp = true;
-        bool putBack = false;
-        try
-        {
-            var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings,
-                repairIsOffered: !ReferenceCourse.IsKeptForReference(_course)));
-            if (choice is null)
-            {
-                // It never got on screen — another dialog held the one slot
-                // WinUI allows, for longer than the retries covered. Hand the
-                // batch back rather than losing it: TakeNext marked it shown,
-                // and a dialog nobody saw has told nobody anything.
-                _healthQueue.PutBack(findings, cameFromPublishing);
-                putBack = true;
-            }
-            else if (choice == ContentDialogResult.Primary)
-            {
-                var outcome = SiteHealthRepair.OutcomeOfRepairing(
-                    findings, _course,
-                    cameFromPublishing
-                        ? SiteHealthRepair.Occasion.Publishing
-                        : SiteHealthRepair.Occasion.Building);
-                // The marker is refreshed because a repair CHANGES the
-                // section's content on the teacher's behalf, and nothing else
-                // would: RefreshPublishedMarker runs when the section stops
-                // being busy and on window activation, and the section stopped
-                // being busy before this dialog appeared while a dialog does
-                // not make the window active again.
-                _ = RefreshPublishedMarker();
-                if (outcome is not null)
-                {
-                    // Shown only AFTER the dialog it was asked for from has
-                    // gone — contracts/shared-rules.json ->
-                    // siteHealth.repair.oneAlertAtATime.
-                    if (outcome.CanRebuild && WhyTheRepairCannotBePreviewedNow() is { } instead)
-                        outcome = instead;
-                    await PresentRepairOutcomeAsync(outcome);
-                }
-            }
-        }
-        finally
-        {
-            _healthDialogIsUp = false;
-        }
-
-        if (putBack)
-        {
-            // Try again once whatever is holding the slot has had time to go,
-            // rather than recursing straight back into the same refusal. It
-            // stops of its own accord: the batch is presented the first time
-            // the slot is free.
-            await Task.Delay(2000);
-            // Not onto a section nobody is looking at. EffectiveXamlRoot falls
-            // back to the WINDOW's root, so a replaced view would go on
-            // retrying and eventually put a dialog about the old section over
-            // whatever the teacher switched to.
-            if (_isTornDown || !IsLoaded) return;
-            QueueHealthPresentation();
-            return;
-        }
-
-        await PresentPendingHealthFindingsAsync();
-    }
-
     private async Task PresentRepairOutcomeAsync(SiteHealthRepair.Outcome outcome)
     {
-        var choice = await ShowHealthDialogAsync(FolderProblemsDialog.RepairOutcome(outcome));
+        _healthDialogIsUp = true;
+        ContentDialogResult? choice;
+        try { choice = await ShowHealthDialogAsync(FolderProblemsDialog.RepairOutcome(outcome)); }
+        finally { _healthDialogIsUp = false; }
         if (choice == ContentDialogResult.Primary) await PreviewAgainAfterRepairAsync();
+        QueueTheProblemsAlert();
     }
 
     /// <summary>
@@ -2519,12 +2602,6 @@ public sealed partial class SectionDetailView : UserControl
             ReleaseBuildClaim();
             deployPublish = null;
             deployBuild = null;
-
-            // This build asks the folder question again, and its answer is the
-            // one carrying the sentence about what students can see — so a
-            // finding a preview already reported must not be suppressed here
-            // as "already shown".
-            _healthQueue.ForgetShown();
 
             // The whole sequence — an optional shared build, then each
             // destination's own deploy — happens inside RunAsync, which

@@ -15,6 +15,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -137,9 +138,30 @@
         </InfoBar>
         </StackPanel>
 
+        <!-- Website | Problems (#734, the mac's #717), only while the section's
+             OWN last build found something: with none, the section looks as it
+             always has. Its own row under the notices, not in the toolbar,
+             whose rule is every item ALWAYS present (the reason the mac kept
+             it out of its toolbar too). A SelectorBar, not a TabView: a
+             TabView would move the live web view between containers, which is
+             how its page and scroll are thrown away. The chosen tab is the
+             store's (SectionProblems), because this view is rebuilt on every
+             change of selection. -->
+        <SelectorBar x:Name="SectionTabs" Grid.Row="2" Margin="8,4,8,0" Visibility="Collapsed"
+                     SelectionChanged="SectionTabs_SelectionChanged"
+                     AutomationProperties.AutomationId="sectionTabs">
+            <SelectorBarItem x:Name="WebsiteTab" IsSelected="True"
+                             AutomationProperties.AutomationId="sectionTabWebsite" />
+            <SelectorBarItem x:Name="ProblemsTab"
+                             AutomationProperties.AutomationId="sectionTabProblems" />
+        </SelectorBar>
+
         <!-- Base layer stays MOUNTED under the full-bleed web view — the
-             console never inherits a departing web view's geometry. -->
-        <Grid Grid.Row="2">
+             console never inherits a departing web view's geometry. The
+             Problems tab (SectionProblemsView, added in code) is the LAST child
+             of this grid, over both, so the web view is never removed from the
+             tree and its source never reset. -->
+        <Grid x:Name="ContentArea" Grid.Row="3">
             <Grid x:Name="BaseLayer">
                 <StackPanel x:Name="NoPreviewState" HorizontalAlignment="Center" VerticalAlignment="Center"
                             Spacing="8" MaxWidth="460">

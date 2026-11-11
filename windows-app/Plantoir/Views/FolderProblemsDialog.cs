@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -7,17 +6,15 @@ using Plantoir.Core.Models;
 namespace Plantoir.Views;
 
 /// <summary>
-/// What a teacher reads when a build found something wrong with their course's
-/// folders, and what they read after pressing the button that puts it right.
+/// What a teacher reads when a build found something NEW wrong with their
+/// course (#734), and what they read after pressing the button that puts it
+/// right.
 ///
-/// <para><b>The sentences are not this file's to write.</b> Each finding
-/// carries its own <c>Sentence</c> and <c>Detail</c> in the
-/// <c>PLANTOIR_HEALTH:</c> line the build printed — that is the whole reason
-/// the wording travels in the payload, so that the same problem cannot be
-/// worded differently on the two platforms. Nothing here composes a sentence
-/// from a check's <c>Name</c>. What this file DOES choose is the chrome: the
-/// title when there is more than one problem, and the button labels, which come
-/// from <see cref="SiteHealthRepair"/>.</para>
+/// <para><b>The sentences are not this file's to write.</b> A problem's own
+/// sentence travels in the section's Problems record, worded by the build's
+/// own makers, so the same problem cannot be worded differently on the two
+/// platforms; the alert's words are <c>sectionProblems.words</c> and the
+/// button labels <see cref="SiteHealthRepair"/>'s.</para>
 ///
 /// <para>The pair of dialogs, and the order they appear in, are pinned by
 /// <c>contracts/shared-rules.json</c> -&gt; <c>siteHealth.repair</c>.</para>
@@ -25,32 +22,38 @@ namespace Plantoir.Views;
 public static class FolderProblemsDialog
 {
     /// <summary>
-    /// The findings themselves.
-    ///
-    /// <para>One problem names itself in the title; several are counted,
-    /// because a title listing three sentences is not a title. The repair
-    /// button appears only when this app can really put something right —
-    /// <see cref="SiteHealthRepair.ButtonTitle"/> decides, from the check's
-    /// NAME, and returns null for the four that are never offered.</para>
+    /// The alert about NEW problems (#734, the mac's #717): raised only when a
+    /// build of the section found something new that nobody has answered
+    /// (<c>sectionProblems.alert</c>). It replaced the dialog that put every
+    /// finding of every build in front of the teacher, which they dismissed
+    /// and nothing kept.
     /// </summary>
-    public static ContentDialog Findings(IReadOnlyList<SiteHealthFinding> findings, bool repairIsOffered = true)
+    /// <remarks>
+    /// <para>The title counts the new problems; the message is the new
+    /// problem's own sentence when there is exactly one, then where Show takes
+    /// you, then how many went — every word <c>sectionProblems.words</c>
+    /// (<see cref="SectionProblemsWording"/>). Buttons: Show (the default:
+    /// it selects the section's Problems tab), the repair as the second answer
+    /// when a NEW problem has one, and Not Now (<see cref="SiteHealthRepair.CloseTitle"/>
+    /// beside another button). No "Don't ask again" box, deliberately: the
+    /// mac found its suppression toggle was window-wide (#731), and an answer
+    /// is remembered by the record's alert key anyway.</para>
+    /// </remarks>
+    /// <param name="repairTitle">The repair's button title, or null when no new problem has one (or the course is kept for reference).</param>
+    public static ContentDialog NewProblems(SectionProblemsRecord record, string shownCode, int sectionNumber, string? repairTitle)
     {
+        var stack = new StackPanel { Spacing = 12 };
+        foreach (string paragraph in SectionProblemsWording.AlertParagraphs(record.NewRows, record.GoneIds.Count))
+            stack.Children.Add(Paragraph(paragraph));
         var dialog = new ContentDialog
         {
-            Title = Title(findings),
-            Content = Body(findings),
-            CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: false, isARepair: false),
+            Title = SectionProblemsWording.AlertTitle(record.NewIds.Count, shownCode, sectionNumber),
+            Content = stack,
+            PrimaryButtonText = SectionProblemsWording.Show,
+            DefaultButton = ContentDialogButton.Primary,
+            CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: true, isARepair: false),
         };
-        // A course kept for reference is told its findings and offered no
-        // repair (#241): a repair CREATES files inside the course, and the
-        // folders are left unlocked so the preview works, so it would succeed
-        // on a frozen course. The button is not drawn at all.
-        if (repairIsOffered && SiteHealthRepair.ButtonTitle(findings) is { } repairLabel)
-        {
-            dialog.PrimaryButtonText = repairLabel;
-            dialog.DefaultButton = ContentDialogButton.Primary;
-            dialog.CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: true, isARepair: false);
-        }
+        if (repairTitle is not null) dialog.SecondaryButtonText = repairTitle;
         return dialog;
     }
 
@@ -80,30 +83,6 @@ public static class FolderProblemsDialog
             dialog.CloseButtonText = SiteHealthRepair.CloseTitle(besideAnotherButton: true, isARepair: true);
         }
         return dialog;
-    }
-
-    // ---- The words around the findings -----------------------------------
-
-    /// <summary>
-    /// The title lives in <see cref="FolderProblemQueue"/>, with the rest of
-    /// this feature's judgement, because the test project cannot reach a WinUI
-    /// project and a sentence a teacher reads deserves a test.
-    /// </summary>
-    private static string Title(IReadOnlyList<SiteHealthFinding> findings) =>
-        FolderProblemQueue.Title(findings);
-
-    private static UIElement Body(IReadOnlyList<SiteHealthFinding> findings)
-    {
-        var stack = new StackPanel { Spacing = 12 };
-        foreach (var finding in findings)
-        {
-            // With one finding the sentence is already the title, so repeating
-            // it here would have the teacher read it twice.
-            if (findings.Count > 1)
-                stack.Children.Add(Paragraph(finding.Sentence, bold: true));
-            stack.Children.Add(Paragraph(finding.Detail));
-        }
-        return stack;
     }
 
     private static TextBlock Paragraph(string text, bool bold = false) => new()
