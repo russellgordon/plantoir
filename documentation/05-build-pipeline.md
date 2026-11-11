@@ -2124,11 +2124,14 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
 - **Not owed on Windows:** an image or workspace check (it has neither), and
   no change to `BuildFreshness.NeedsRebuild` (the "Rejected" above).
 - **Netlify and Cloudflare** go through `deploy.py`'s
-  `ensure_base_url_and_rebuild`, which until #768 looked for the workspace's
-  `quartz.config.ts` at the literal `/tmp/quartz-builds/…`, which Windows
-  never has, so they rebuilt on every deploy. That is #768, below the
-  measurements in its own issue; the stamp check is what made it safe to
-  stop.
+  `ensure_base_url_and_rebuild`, which looks for the workspace's
+  `quartz.config.ts` at the literal `/tmp/quartz-builds/…`. Windows never
+  has it, so its Netlify and Cloudflare deploys rebuild on EVERY deploy —
+  confirmed in 1.9.3's verify-deploy log (" Updating Quartz baseUrl to …"
+  on a site whose address had not changed). That is #768, deliberately not
+  fixed with #749: the stamp makes a skipped rebuild safe for the toolchain
+  and the runtime, but not for an edited page, which deploy.py does not ask
+  about; at the command line the bug is what rebuilds an edited page today.
 
 ## Printable pages: what the build does (#454, v1.6.0)
 
