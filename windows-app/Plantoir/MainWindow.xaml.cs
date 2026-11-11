@@ -1011,22 +1011,23 @@ public sealed partial class MainWindow : Window
     private bool ThisWindowIsShowing(string folderPath) =>
         WorkingFolder.IsTheSame(Workspace.WorkspacePath, folderPath);
 
-    public bool IsSectionBusy(string courseCode, int section)
+    public bool IsSectionBusy(string folder, string courseCode, int section)
     {
         // Busy, to the caller asking before a DEPLOY, means "a deploy is
-        // already running" — not "a preview is up". The Deploy path stops a
+        // already on its way" — not "a preview is up". The Deploy path stops a
         // running preview itself and waits for it (deploy-during-preview
         // port, mac commit "Allow Deploy button to stop active preview
         // before publishing"), so reporting a preview as busy here made the
         // assistant refuse — and say so — while the deploy went ahead.
-        // _isPreparingDeploy counts too (2C's implementation review, L-1): a
-        // deploy between its press and its runner starting is already on its
-        // way, and a second one would only be refused by the window.
-        if (DetailHost.Content is SectionDetailView detail)
-        {
-            return detail.IsDeployingOrPreparing;
-        }
-        return false;
+        // Preparing counts too (2C's implementation review, L-1): a deploy
+        // between its press and its runner starting is already on its way,
+        // and a second one would only be refused by the window.
+        //
+        // Asked of the SECTION's run, by the caller's folder (#728), never of
+        // the view on screen: until #728 this read whatever section the pane
+        // showed and ignored its arguments, so a section deploying while the
+        // teacher looked at another read as idle.
+        return SectionDeployRun.UnderWay(SectionRuns.Find(folder, courseCode, section), folder, courseCode, section);
     }
 
     /// <summary>

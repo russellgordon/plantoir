@@ -19,6 +19,29 @@ namespace Plantoir.Views;
 public sealed partial class TaskProgressView : UserControl
 {
     private readonly System.Collections.Generic.List<ScriptRunner> _registered = new();
+
+    /// <summary>
+    /// Each registered runner's handler, so it can be let go (#728). A
+    /// section's deploy runner is SHARED by every view of the section now
+    /// (<c>SectionRuns</c>), and a handler left on it would keep a view taken
+    /// off screen alive and raising dialogs for good. Hooked on Loaded,
+    /// unhooked on Unloaded.
+    /// </summary>
+    private readonly System.Collections.Generic.Dictionary<ScriptRunner, System.ComponentModel.PropertyChangedEventHandler> _hooked = new();
+
+    /// <summary>
+    /// The runners whose question is on screen in SOME view right now — one
+    /// asker per question. Two windows on one section show the same deploy, and
+    /// both would otherwise put up the same credential question, each sending
+    /// its own answer to the one prompt (#728). Interface thread only.
+    /// </summary>
+    private static readonly System.Collections.Generic.HashSet<ScriptRunner> s_asking = new();
+
+    /// <summary>A view asking a question was taken off screen before it was answered: another may ask it.</summary>
+    private static event Action<ScriptRunner>? QuestionLeftUnanswered;
+
+    private ScriptRunner? _askingFor;
+    private bool _leaving;
     private ScriptRunner? _runner;
     private MultiDestinationDeployRunner? _multiRunner;
     private string _title = "";
@@ -34,7 +57,44 @@ public sealed partial class TaskProgressView : UserControl
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _tick.Tick += (_, _) => { if (_runner is { } r && (r.IsRunning || r.IsBetweenPhases)) Render(); };
-        Unloaded += (_, _) => _tick.Stop();
+        Loaded += (_, _) =>
+        {
+            _leaving = false;
+            foreach (var runner in _registered) Hook(runner);
+            QuestionLeftUnanswered -= AskIfStillWaiting;
+            QuestionLeftUnanswered += AskIfStillWaiting;
+            // A question asked while no view showed the section is asked now.
+            foreach (var runner in _registered)
+                if (runner.IsAwaitingInput) _ = AskQuestion(runner);
+        };
+        Unloaded += (_, _) =>
+        {
+            _tick.Stop();
+            _leaving = true;
+            QuestionLeftUnanswered -= AskIfStillWaiting;
+            foreach (var (runner, handler) in _hooked) runner.PropertyChanged -= handler;
+            _hooked.Clear();
+            // Leaving with a question up: hand it on rather than cancel it.
+            if (_askingFor is { } asked)
+            {
+                s_asking.Remove(asked);
+                _askingFor = null;
+                QuestionLeftUnanswered?.Invoke(asked);
+            }
+        };
+    }
+
+    private void AskIfStillWaiting(ScriptRunner runner)
+    {
+        if (_registered.Contains(runner) && runner.IsAwaitingInput) _ = AskQuestion(runner);
+    }
+
+    private void Hook(ScriptRunner runner)
+    {
+        if (_hooked.ContainsKey(runner)) return;
+        System.ComponentModel.PropertyChangedEventHandler handler = (sender, e) => RunnerChanged((ScriptRunner)sender!, e);
+        _hooked[runner] = handler;
+        runner.PropertyChanged += handler;
     }
 
     private void EnsureTicking(bool on)
@@ -52,7 +112,11 @@ public sealed partial class TaskProgressView : UserControl
     {
         if (_registered.Contains(runner)) return;
         _registered.Add(runner);
-        runner.PropertyChanged += (sender, e) => RunnerChanged((ScriptRunner)sender!, e);
+        if (_leaving) return;   // hooked when this view is loaded again
+        Hook(runner);
+        // A runner met already waiting — a deploy that asked while nobody was
+        // looking at its section (#728) — is asked now, not never.
+        if (runner.IsAwaitingInput) _ = AskQuestion(runner);
     }
 
     public Action? OnCancel { get; set; }
@@ -394,8 +458,10 @@ public sealed partial class TaskProgressView : UserControl
 
     private async System.Threading.Tasks.Task AskQuestion(ScriptRunner runner)
     {
-        if (_questionDialogShowing || XamlRoot is null) return;
+        if (_questionDialogShowing || XamlRoot is null || _leaving) return;
+        if (!s_asking.Add(runner)) return;   // another view is asking it
         _questionDialogShowing = true;
+        _askingFor = runner;
         try
         {
             var req = Plantoir.Core.Scripting.CredentialRequests.MatchPrompt(runner.PendingQuestion);
@@ -453,7 +519,7 @@ public sealed partial class TaskProgressView : UserControl
                     richDialogShown = true;
                     var result = await dialog.ShowAsync();
                     if (result == ContentDialogResult.Primary) runner.SendLine(getAnswer());
-                    else runner.CancelPendingQuestion();
+                    else if (!_leaving) runner.CancelPendingQuestion();   // closed with its window: handed on
                 }
                 catch (Exception ex) when (!richDialogShown)
                 {
@@ -489,10 +555,18 @@ public sealed partial class TaskProgressView : UserControl
                 answerBox.Loaded += (_, _) => { answerBox.Focus(FocusState.Programmatic); answerBox.SelectAll(); };
                 var result = await dialog.ShowAsync();
                 if (result == ContentDialogResult.Primary) runner.SendLine(answerBox.Text);
-                else runner.CancelPendingQuestion();   // the script's own clean-up runs
+                else if (!_leaving) runner.CancelPendingQuestion();   // the script's own clean-up runs; closed with its window: handed on
             }
         }
-        finally { _questionDialogShowing = false; }
+        finally
+        {
+            _questionDialogShowing = false;
+            if (ReferenceEquals(_askingFor, runner))
+            {
+                s_asking.Remove(runner);
+                _askingFor = null;
+            }
+        }
     }
 
     // ---- Details disclosure ----------------------------------------------

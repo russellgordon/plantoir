@@ -282,7 +282,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.True(start > 0);
         int end = source.IndexOf("WillBeRefused: true", start, StringComparison.Ordinal) + "WillBeRefused: true".Length;
         string body = source[start..end];
-        int open = body.IndexOf("_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)", StringComparison.Ordinal);
+        int open = body.IndexOf("_deployRun.IsAsking || DialogGate.IsOpen(EffectiveXamlRoot)", StringComparison.Ordinal);
         int cannotAsk = body.IndexOf("LaterClassesAnswer.CannotAsk", StringComparison.Ordinal);
         int refused = body.IndexOf("DeployWillBeRefused()", StringComparison.Ordinal);
         Assert.True(open > 0 && cannotAsk > open && refused > cannotAsk,
@@ -309,7 +309,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         int refusals = Where("MultiDestinationDeployRunner.RefusalReason(destinations");
         int asked = Where("AskAboutClassesDatedLaterAsync(\"Deploy\")");
         int savedNotice = Where("ActivityTrail.Event.DeployUsedTheSavedSettings");
-        int claimed = Where("_deployRunner.ClaimConsole()");
+        int claimed = Where("run.Runner.ClaimConsole()");
         int stopped = Where("await StopPreviewAsync()");
         Assert.True(refusals > start && asked > refusals && savedNotice > asked && claimed > savedNotice && stopped > claimed,
             $"DeployAsync's order is wrong: refusals {refusals}, asked {asked}, saved notice {savedNotice}, claimed {claimed}, stopped {stopped}");

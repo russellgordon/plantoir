@@ -151,19 +151,24 @@ public class SectionDetailTeardownSourceTests
     {
         string code = WithoutComments(Source);
 
-        // Three starts decide a folder: the Preview button, the assistant's
-        // automated preview (which "Preview Again" after a repair also goes
-        // through), and the deploy — the last AFTER its own preview stop, so
-        // that stop still names the preview's folder. (A fourth,
+        // Two starts decide this view's work folder: the Preview button and
+        // the assistant's automated preview (which "Preview Again" after a
+        // repair also goes through). The DEPLOY's folder is its run's since
+        // #728 (run.Folder, noted AFTER its own preview stop, so that stop
+        // still names the preview's folder): a deploy outlives the view, and
+        // Cancel from a view that came back must still aim at it. (A fourth,
         // StagePreviewForCapture, set it for a staged picture with nothing
         // serving; it went with #380, when the marketing pictures began to
         // photograph a REAL preview, which goes through the Preview button's
         // start like a teacher's.)
         var written = Regex.Matches(code, @"_folderThisSectionWorksIn\s*=\s*[^=]");
-        Assert.True(written.Count == 3,
-            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 3 (the two " +
-            "preview starts and the deploy). Delete one and every stop it fed " +
+        Assert.True(written.Count == 2,
+            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 2 (the two " +
+            "preview starts). Delete one and every stop it fed " +
             "becomes a silent no-op wearing the shape of this fix working.");
+        var deployFolder = Regex.Matches(code, @"\brun\.Folder\s*=\s*workspacePath;");
+        Assert.True(deployFolder.Count == 1,
+            $"the deploy notes its run's folder {deployFolder.Count} time(s), expected 1 (after its preview stop).");
 
         // The registration key is written exactly once, and readonly makes
         // the compiler say so: a deploy starting in the one render pass
