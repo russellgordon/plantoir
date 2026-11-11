@@ -656,7 +656,12 @@ the question on rather than cancelling it — but only once that dialog has CLOS
 tells the next live view to ask. Handed on at once (the first build of this fix),
 the next view was usually in the SAME window, met WinUI's one-ContentDialog rule
 while the first was still closing, threw, and nobody asked again, so the deploy
-waited for ever (#728's third review, found by reading). A view asking also waits
+waited for ever (#728's third review, found by reading). NOT driven through the
+window, and why: the only question a deploy asks is a publishing credential, which
+needs a Netlify or Cloudflare destination with no saved credential, and answering it
+would reach that service; and in the same window only the in-app assistant changes
+the selection under an open dialog (a click on the sidebar is held by the modal
+dialog), which needs the local model. `QuestionAskersTests` pins the order instead. A view asking also waits
 while any other dialog is up in its window (`DialogGate.IsOpen`), asks again
 shortly if `ShowAsync` throws all the same, and a dialog whose question went away —
 the deploy cancelled from another window, or ended — is closed. A dialog
