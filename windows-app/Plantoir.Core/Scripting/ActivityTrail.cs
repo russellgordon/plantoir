@@ -751,6 +751,14 @@ public static class ActivityTrail
         /// says whether it was the network, the disk or the download.
         /// </summary>
         SwiftCouldNotBeGotReady,
+        /// <summary>
+        /// A section's set of problems CHANGED (#734, the mac's #717): written
+        /// once per alert key, by <see cref="Plantoir.Core.Models.SectionProblems"/>
+        /// when the app first reads the record — counts and the kinds' names,
+        /// never a page — and, as a second line of the same event, the answer
+        /// the teacher gave the alert (Show, the repair, or Not Now).
+        /// </summary>
+        ProblemsChanged,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -887,6 +895,7 @@ public static class ActivityTrail
         Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
+        Event.ProblemsChanged => "problems changed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

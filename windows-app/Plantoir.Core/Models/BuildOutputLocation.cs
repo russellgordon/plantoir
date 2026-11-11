@@ -59,6 +59,44 @@ public static class BuildOutputLocation
     }
 
     /// <summary>
+    /// Where the LAUNCHERS wrote this working folder's builds — and so where
+    /// anything a build leaves for the app to read (a section's
+    /// <c>.problems.json</c>, #734) is: <c>$env:LOCALAPPDATA\Plantoir\builds\{folder id}</c>,
+    /// computed exactly as <c>Enter-NativeRuntime</c> in <c>preview.ps1</c>,
+    /// <c>deploy.ps1</c> and <c>setup.ps1</c> computes it.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why a second function beside <see cref="BuildsRootFor"/>.</b>
+    /// The two agree for every teacher. They part under <c>--state-dir</c>
+    /// (#664): <see cref="BuildsRootFor"/> follows <see cref="AppDataRoot"/>,
+    /// which the flag redirects, while the launchers compute the root from
+    /// the REAL <c>LOCALAPPDATA</c> and are not told about the redirect (only
+    /// their trail lines follow it, #682). And <c>PLANTOIR_BUILD_ROOT</c>,
+    /// which <see cref="BuildsRootFor"/> honours, is OVERWRITTEN by every
+    /// launcher before the Python reads it — so it never moves where a build
+    /// is written, and this function ignores it.</para>
+    ///
+    /// <para><b>Read-only by intent.</b> It names where a build's records ARE;
+    /// nothing should write or delete through it. The readers that still use
+    /// <see cref="BuildsRootFor"/> — <see cref="BuildFreshness"/> (Deploy's
+    /// rebuild question), <c>PreviewedPageSource.ListPathFor</c> (#690's page
+    /// list for Open in Obsidian) and <c>AssistWorkspace.LegacyMarkerHomes</c>
+    /// — read the redirected root under <c>--state-dir</c> and find nothing
+    /// there. Left as they are, deliberately, and said in
+    /// documentation/12-windows-app.md → "Which builds root the Problems tab
+    /// reads": nothing proves any of them wrong for a teacher, and each one's
+    /// "found nothing" is a safe answer (a rebuild, an empty page list, a
+    /// marker not moved).</para>
+    /// </remarks>
+    public static string WhereTheLaunchersBuild(string workingFolderPath)
+    {
+        string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA") is { Length: > 0 } fromTheEnvironment
+            ? fromTheEnvironment
+            : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(localAppData, "Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolderPath));
+    }
+
+    /// <summary>
     /// Where a course's built sites are kept:
     /// <c>…\builds\{id}\{COURSE}</c>.
     /// </summary>
