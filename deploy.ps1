@@ -15,9 +15,14 @@ Examples:
   .\deploy.bat ICS3U 1 --target cloudflare
 
 Notes:
-- Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
-- You must build first (the static site goes to 'public/' in that section folder).
-- --target chooses where the built site goes. netlify (the default) or cloudflare.
+- Deploys the section's built site from Plantoir's builds folder on this PC.
+- You must build first (.\preview.bat <COURSE> <SECTION> --build-only).
+- With neither --target nor --to-folder, the course's own settings decide
+  where it goes, as Plantoir's Deploy button does: every destination they
+  name is deployed in turn, and a course that names none goes to Netlify.
+- --target chooses where the built site goes instead: netlify or cloudflare.
+- A site an earlier version of Plantoir built is built again before it is
+  deployed to a folder.
 - The token for whichever service you deploy to is stored as a Windows Generic
   Credential and injected securely at runtime. Netlify and Cloudflare tokens are
   stored separately, so using one never disturbs the other.
@@ -168,16 +173,23 @@ $TEAM_SLUG   = ''
 $RESET_TOKEN = $false
 $TO_FOLDER = ''
 $TARGET = 'netlify'
+# Whether --target was typed. Without it, and without --to-folder, the
+# destination comes from the course's own settings (#739, below).
+$TARGET_WAS_GIVEN = $false
 $ACCOUNT_ARG = ''
 $NON_INTERACTIVE = $false
+# Every flag as typed, kept for the legs of a course with more than one
+# destination (below), which run this script again once per destination.
+$DEPLOY_FLAGS_AS_GIVEN = @()
+if ($args.Count -gt 2) { $DEPLOY_FLAGS_AS_GIVEN = @($args[2..($args.Count - 1)]) }
 
 for ($i = 2; $i -lt $args.Count; $i++) {
   switch -Regex ($args[$i]) {
     '^--help$|^-h$'      { Show-Help; exit 0 }
     '^--diagnose$'       { $DIAGNOSE = '--diagnose'; continue }
     '^--non-interactive$' { $NON_INTERACTIVE = $true; continue }
-    '^--target$'         { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --target"; Show-Help; exit 1 }; $TARGET = ([string]$args[$i+1]).ToLower(); $i++; continue }
-    '^--target=(.+)$'    { $TARGET = $Matches[1].ToLower(); continue }
+    '^--target$'         { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --target"; Show-Help; exit 1 }; $TARGET = ([string]$args[$i+1]).ToLower(); $TARGET_WAS_GIVEN = $true; $i++; continue }
+    '^--target=(.+)$'    { $TARGET = $Matches[1].ToLower(); $TARGET_WAS_GIVEN = $true; continue }
     '^--account$'        { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --account"; Show-Help; exit 1 }; $ACCOUNT_ARG = ([string]$args[$i+1]).Trim(); $i++; continue }
     '^--account=(.+)$'   { $ACCOUNT_ARG = $Matches[1].Trim(); continue }
     '^--team$'           { if ($i + 1 -ge $args.Count) { Write-Host "Missing value for --team"; Show-Help; exit 1 }; $TEAM_SLUG = $args[$i+1]; $i++; continue }
@@ -316,6 +328,132 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
     Write-Host ""
     exit 1
   }
+}
+
+# ---- Where this course deploys, when no destination was typed (#739) ----
+# Russell, 2026-11-01 (mac #668): a deploy typed at the command line goes
+# where the course's settings say, as the app's Deploy button does - so a
+# course made for Cloudflare Pages is not quietly deployed to Netlify. Read
+# only when neither --target nor --to-folder was given; either one still
+# decides, exactly as before. The mapping is the app's (DeployCommand.Arguments,
+# contracts/app-rules.json -> deployArguments), and the cases are
+# app-rules.json -> savedDestinations, run against Get-SavedDestinations by
+# windows-app/test_launcher_rules.ps1:
+#   deploy_target absent, "", null or "netlify" -> Netlify
+#   "cloudflare_pages"                         -> --target cloudflare
+#   "local_folder"                             -> --to-folder deploy_folder_path
+# and each additional_deploy_targets entry is deployed after it, one leg each,
+# by running this script again with that leg's flag - the app's own shape
+# (MultiDestinationDeployRunner), so every leg goes through every check below,
+# the deploy guard included (a leg's guard never counts its own parent: this
+# run is an ancestor). A leg that fails does not stop the others; the run ends
+# with the first failing leg's exit code. The legs come from a variable, never
+# from stdin, which is the trap deploy.sh fell into (#668 review H1).
+#
+# Read with ConvertFrom-Json: no extra interpreter. A settings file that is
+# there and cannot be read REFUSES rather than falling back to Netlify:
+# falling back is exactly the silent wrong-host deploy this exists to stop.
+# An ABSENT file is left to the course-folder check further down.
+#
+# Pure over its arguments: $null when the settings cannot be read, otherwise
+# one entry per destination, main first, each with Kind, Path, Words (what a
+# teacher reads), Flags (the leg's arguments) and Refusal (the sentence when
+# the destination cannot be deployed, else $null).
+function Get-SavedDestinations([string]$Text, [string]$Course) {
+  $settings = $null
+  try { $settings = $Text | ConvertFrom-Json -ErrorAction Stop } catch { return $null }
+  if ($null -eq $settings -or $settings -isnot [System.Management.Automation.PSCustomObject]) { return $null }
+  function AsText($value) {
+    if ($null -eq $value) { return '' }
+    if ($value -is [string]) { return $value }
+    return ($value | ConvertTo-Json -Compress -Depth 5)
+  }
+  $found = New-Object System.Collections.Generic.List[object]
+  $pairs = New-Object System.Collections.Generic.List[object]
+  $main = AsText $settings.deploy_target
+  if (-not $main) { $main = 'netlify' }
+  $pairs.Add(@($main, (AsText $settings.deploy_folder_path)))
+  $extras = $settings.additional_deploy_targets
+  if ($extras -is [System.Array]) {
+    foreach ($extra in $extras) {
+      if ($extra -isnot [System.Management.Automation.PSCustomObject]) { continue }
+      if ($extra.type -isnot [string] -or -not $extra.type) { continue }
+      $pairs.Add(@($extra.type, (AsText $extra.path)))
+    }
+  }
+  foreach ($pair in $pairs) {
+    $kind = [string]$pair[0]
+    # One line per leg, as deploy.sh carries a tab-separated line: a tab or a
+    # line break in a path becomes a space there, and here too.
+    $path = ([string]$pair[1]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
+    $words = 'Netlify'
+    if ($kind -ceq 'cloudflare_pages') { $words = 'Cloudflare Pages' }
+    elseif ($kind -ceq 'local_folder') { $words = 'a folder on this computer' }
+    $flags = @(); $refusal = $null
+    if ($kind -ceq 'netlify') { $flags = @('--target', 'netlify') }
+    elseif ($kind -ceq 'cloudflare_pages') { $flags = @('--target', 'cloudflare') }
+    elseif ($kind -ceq 'local_folder') {
+      if (-not $path) { $refusal = ("{0} deploys to a folder on this computer, but no folder is chosen in its settings." -f $Course) }
+      else { $flags = @('--to-folder', $path) }
+    } else {
+      $refusal = ("{0}'s settings name a destination Plantoir does not know: {1}." -f $Course, $kind)
+    }
+    $found.Add([pscustomobject]@{ Kind = $kind; Path = $path; Words = $words; Flags = $flags; Refusal = $refusal })
+  }
+  return ,$found.ToArray()
+}
+
+if (-not $TARGET_WAS_GIVEN -and -not $TO_FOLDER -and (Test-Path -LiteralPath $referenceCfg -PathType Leaf)) {
+  $savedText = $null
+  try { $savedText = [IO.File]::ReadAllText($referenceCfg) } catch { $savedText = $null }
+  $legs = $null
+  if ($null -ne $savedText) { $legs = Get-SavedDestinations $savedText $COURSE_CODE }
+  if ($null -eq $legs -or @($legs).Count -eq 0) {
+    Write-Host ""
+    Write-Host ("Plantoir could not read where {0} deploys from its settings." -f $COURSE_CODE)
+    Write-Host "   Nothing was deployed. Choose one with --target netlify or --target cloudflare."
+    Write-Host ""
+    exit 1
+  }
+  $legs = @($legs)
+  # Clearing a token deploys nothing, so only the main destination is asked.
+  if ($RESET_TOKEN) { $legs = @($legs[0]) }
+  if ($legs.Count -gt 1) {
+    $firstFailure = 0
+    foreach ($leg in $legs) {
+      if ($leg.Refusal) {
+        Write-Host ""
+        Write-Host ("{0} Nothing was deployed there." -f $leg.Refusal)
+        if ($firstFailure -eq 0) { $firstFailure = 1 }
+        continue
+      }
+      Write-Host ""
+      Write-Host ("Deploying {0} section {1} to {2}, as its settings say." -f $COURSE_CODE, $SECTION_NUM, $leg.Words)
+      $legArguments = @($COURSE_CODE, [string]$SECTION_NUM) + $DEPLOY_FLAGS_AS_GIVEN + $leg.Flags
+      # A leg is this script again, in a powershell.exe of its own, so its
+      # every exit (a refusal, a question nobody can answer) ends that leg and
+      # not this run. It inherits this console, so a question still reaches
+      # whoever is there.
+      $legStatus = 1
+      try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @legArguments
+        $legStatus = $LASTEXITCODE
+      } catch { $legStatus = 1 }
+      if ($legStatus -ne 0 -and $firstFailure -eq 0) { $firstFailure = $legStatus }
+    }
+    exit $firstFailure
+  }
+  $only = $legs[0]
+  if ($only.Refusal) {
+    Write-Host ""
+    Write-Host ("{0} Nothing was deployed." -f $only.Refusal)
+    Write-Host ""
+    exit 1
+  }
+  if ($only.Kind -ceq 'cloudflare_pages') { $TARGET = 'cloudflare' }
+  elseif ($only.Kind -ceq 'local_folder') { $TO_FOLDER = $only.Path }
+  else { $TARGET = 'netlify' }
+  Write-Host ("Deploying to {0}, as {1}'s settings say." -f $only.Words, $COURSE_CODE)
 }
 
 # >>> DEPLOY WHILE ITS SECTION DEPLOYS BLOCK >>> - identical in preview.ps1 and
@@ -615,6 +753,54 @@ function Resolve-PublishFolder([string]$Asked, [string]$WorkingFolder) {
   return [IO.Path]::GetFullPath((Join-Path -Path $WorkingFolder -ChildPath $p))
 }
 
+# ---- Did THIS version build the site? (#749, mac #746) ----
+# A site is deployed as it was built, and nothing a teacher wrote had to
+# change for the toolchain to change: 1.9.1's tick-box and quiz print rules
+# were in the app and in .toolchain, and a section redeployed under 1.9.1 still
+# served 1.9.0's stylesheet because its pages had not changed. Every build
+# stamps the folder that holds public\ with the toolchain that built it
+# (.built-with-toolchain), and the shared Python is asked whether that is this
+# toolchain - its identity on Windows is a hash of .toolchain and the runtime's
+# manifest, remembered between runs (scripts/toolchain_paths.py). Only the
+# folder branch asks here: Netlify and Cloudflare go through deploy.py, whose
+# ensure_base_url_and_rebuild asks the same question.
+#
+# True only when the answer is a plain yes. ANY failure of the check - Python
+# missing, an import that fails, a traceback, a stamp that cannot be read -
+# is "build again", the safe direction: a wrong answer that way costs one
+# build, and the other way publishes a stale site and says it succeeded.
+# Nothing is redirected, because under this script's
+# $ErrorActionPreference = 'Stop' a native program's stderr read through a
+# redirection on Windows PowerShell 5.1 becomes a terminating error, and the
+# deploy would exit 1 instead of building; the Python says nothing on stderr
+# itself, and the call is inside try/catch for the program that cannot start.
+# The code has no double quotes: Windows PowerShell 5.1 does not escape them
+# when it hands an argument to a native program.
+function Test-BuiltByThisToolchain([string]$Python, [string]$ScriptsDir, [string]$SectionDir) {
+  $check = @'
+import os, sys
+sys.stderr = open(os.devnull, 'w')
+try:
+    sys.path.insert(0, sys.argv[1])
+    import toolchain_paths
+    same = toolchain_paths.site_was_built_by_this_toolchain(sys.argv[2])
+except BaseException:
+    same = False
+os._exit(0 if same is True else 1)
+'@
+  $saved = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = 1
+    & $Python -c $check $ScriptsDir $SectionDir | Out-Null
+    return ($LASTEXITCODE -eq 0)
+  } catch {
+    return $false
+  } finally {
+    $ErrorActionPreference = $saved
+  }
+}
+
 function Test-CarriesLiveReload([string]$root) {
   # Does any page under $root still carry the preview's live-reload client?
   #
@@ -823,15 +1009,35 @@ if ($TO_FOLDER) {
   # deploy.sh. Detection that read only `index.html` could not see the one
   # state the wait below exists for.
   $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
-  if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
-    # Plain words (#296, rule 1): this used to say "bakes in a live-reload
-    # script". deploy.sh took this wording (#407) and changed "for
-    # publishing" to "before it is deployed", because publishing marks a page
-    # for the website and this step is the deploy; taken back here word for
-    # word (#438). Three dots rather than deploy.sh's ellipsis character:
-    # every line this file prints is ASCII.
-    Write-Host "This site was built by a preview, which adds live updating"
-    Write-Host "  that students' browsers would ask about. Rebuilding it before it is deployed..."
+  # Two reasons to build again first, asked in deploy.sh's order and folded
+  # into ONE rebuild, so each line below is printed from one place: a site an
+  # earlier version of Plantoir built (#749, above Test-BuiltByThisToolchain),
+  # and a site a preview built. A build-only build answers both - it is this
+  # toolchain's and carries no live updating - so the wait and the checks
+  # after it are the same for either. Not for --reset-token, which deploys
+  # nothing.
+  $rebuildReason = $null
+  if (-not $RESET_TOKEN) {
+    $stampPython = Enter-NativeRuntime
+    if (-not (Test-BuiltByThisToolchain $stampPython $env:PLANTOIR_SCRIPTS_DIR $SECTION_DIR_HOST)) { $rebuildReason = 'toolchain' }
+  }
+  if (-not $rebuildReason -and (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { $rebuildReason = 'preview' }
+  if ($rebuildReason) {
+    if ($rebuildReason -eq 'toolchain') {
+      # deploy.sh's two lines (#746), in ASCII: three dots for its ellipsis,
+      # and no picture in front. LauncherRulesContractTests pins them.
+      Write-Host "Plantoir has been updated since this site was built, so it is"
+      Write-Host "   building it again before it is deployed..."
+    } else {
+      # Plain words (#296, rule 1): this used to say "bakes in a live-reload
+      # script". deploy.sh took this wording (#407) and changed "for
+      # publishing" to "before it is deployed", because publishing marks a
+      # page for the website and this step is the deploy; taken back here
+      # word for word (#438). Three dots rather than deploy.sh's ellipsis
+      # character: every line this file prints is ASCII.
+      Write-Host "This site was built by a preview, which adds live updating"
+      Write-Host "  that students' browsers would ask about. Rebuilding it before it is deployed..."
+    }
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
     # publish can meet a question nobody is there to answer: preview.ps1 asks
     # about a course code ending in a zero, and about a section the
@@ -1024,6 +1230,105 @@ function Test-CloudflareToken([string]$token) {
   } catch { return $false }
 }
 
+# ---- What a SAVED token's check heard back, as one word (#705, mac #716) ----
+#
+#   accepted  the service answered and took the token
+#   refused   the service answered and said no: HTTP 400, 401 or 403 with
+#             the service's own answer in the body
+#   unheard   anything else - no answer at all (offline, a timeout, a name
+#             that did not resolve), a captive portal's page or redirect, a
+#             429, a 5xx, a 2xx that does not say yes, or a 400/401/403 that
+#             is not the service's answer (a school web filter's block page)
+#
+# Only "refused" may clear a saved token. Until #705 the check was the same
+# yes/no probe the PASTE check uses, whose catch swallowed every failure, so a
+# PC on a captive portal or a school network that dropped for a moment lost a
+# good token (and, for Cloudflare, its account) and was sent to make another -
+# which a deploy set for later cannot even answer. The paste checks
+# (Test-CloudflareToken, Test-TokenValid) are deliberately left as they were,
+# as on the mac: a refused paste is not saved, so it costs nothing beyond
+# being asked again. The legacy tokens.json migration uses Test-TokenValid too
+# and so treats no answer as "not valid" - the mac's validate_token does the
+# same there - which leaves that file alone rather than clearing anything.
+#
+# The URL and the two patterns each service's body must match are
+# contracts/app-rules.json -> savedTokenCheck.services, and the cases are
+# savedTokenCheck.cases; windows-app/test_launcher_rules.ps1 runs every case
+# through Get-TokenCheckAnswer with THESE patterns and checks they are the
+# contract's. The patterns are written so .NET and deploy.sh's grep -E read
+# them identically: literal characters and ranges only (a POSIX class such as
+# [[:space:]] is, to .NET, a set of the letters in it - wrong, with no error).
+function Get-TokenCheckPatterns([string]$Service) {
+  if ($Service -eq 'cloudflare') {
+    return [pscustomobject]@{
+      Url = 'https://api.cloudflare.com/client/v4/user/tokens/verify'
+      Accepted = "`"success`":[ `t]*true"
+      Refused = "`"success`":[ `t]*false"
+    }
+  }
+  return [pscustomobject]@{
+    Url = 'https://api.netlify.com/api/v1/user'
+    Accepted = "`"id`"[ `t]*:"
+    Refused = "`"code`":[ `t]*4[0-9][0-9]"
+  }
+}
+
+# Pure over its arguments, so the contract's cases run against it. Status 0
+# means nothing answered. Matched case-SENSITIVELY, as grep -E matches.
+function Get-TokenCheckAnswer([int]$Status, [string]$Body, [string]$AcceptPattern, [string]$RefusalPattern) {
+  if ($null -eq $Body) { $Body = '' }
+  if ($Status -eq 400 -or $Status -eq 401 -or $Status -eq 403) {
+    if (-not $RefusalPattern -or [regex]::IsMatch($Body, $RefusalPattern)) { return 'refused' }
+    return 'unheard'
+  }
+  if ($Status -ge 200 -and $Status -le 299) {
+    if (-not $AcceptPattern -or [regex]::IsMatch($Body, $AcceptPattern)) { return 'accepted' }
+    return 'unheard'
+  }
+  return 'unheard'
+}
+
+# Asks once and returns the status and the body, never throwing: every
+# failure to get an answer is status 0. System.Net.Http rather than
+# Invoke-WebRequest, because on Windows PowerShell 5.1 a 4xx THROWS there and
+# its body is hard to get back reliably, and a refusal is read from its body.
+# Redirects are not followed, so a captive portal's 302 is heard as itself
+# (unheard), not as the portal's 200 page. The system proxy is used, as
+# Invoke-WebRequest uses it; a proxy that asks for its own sign-in answers
+# 407, which is "unheard" and keeps the token (reasoned, not measured: no
+# such proxy here). The token goes in the Authorization header only.
+function Invoke-TokenCheck([string]$Url, [string]$Token) {
+  $client = $null; $handler = $null; $request = $null; $response = $null
+  try {
+    Add-Type -AssemblyName System.Net.Http
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $handler.AllowAutoRedirect = $false
+    $client = New-Object System.Net.Http.HttpClient($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds(20)
+    $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, $Url)
+    $request.Headers.Authorization = New-Object System.Net.Http.Headers.AuthenticationHeaderValue('Bearer', $Token)
+    $response = $client.SendAsync($request).GetAwaiter().GetResult()
+    $body = ''
+    try { $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() } catch { $body = '' }
+    return [pscustomobject]@{ Status = [int]$response.StatusCode; Body = [string]$body }
+  } catch {
+    return [pscustomobject]@{ Status = 0; Body = '' }
+  } finally {
+    foreach ($disposable in @($response, $request, $client, $handler)) {
+      if ($null -ne $disposable) { try { $disposable.Dispose() } catch {} }
+    }
+  }
+}
+
+# The word for one service's saved token. An empty token is refused, as
+# deploy.sh's token_check_answer says.
+function Get-SavedTokenAnswer([string]$Service, [string]$Token) {
+  if (-not $Token) { return 'refused' }
+  $patterns = Get-TokenCheckPatterns $Service
+  $heard = Invoke-TokenCheck $patterns.Url $Token
+  return (Get-TokenCheckAnswer $heard.Status $heard.Body $patterns.Accepted $patterns.Refused)
+}
+
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
 # in the dashboard and asking for it loses people.
@@ -1142,11 +1447,25 @@ $CF_TOKEN   = ''
 $CF_ACCOUNT = ''
 if ($TARGET -eq 'cloudflare') {
   $CF_TOKEN = Get-CfTokenFromCredMan
-  if ($CF_TOKEN -and -not (Test-CloudflareToken $CF_TOKEN)) {
-    Write-Host "The saved Cloudflare token no longer works, so it has been cleared."
-    Remove-CfTokenInCredMan
-    Remove-CfAccountInCredMan
-    $CF_TOKEN = ''
+  if ($CF_TOKEN) {
+    # Cleared only when Cloudflare SAYS no; kept when it could not be asked
+    # (#705, above Get-TokenCheckPatterns). The run stops there rather than
+    # carrying on, because the upload needs the same connection and would only
+    # fail later with a less useful message.
+    switch (Get-SavedTokenAnswer 'cloudflare' $CF_TOKEN) {
+      'accepted' { }
+      'refused' {
+        Write-Host "The saved Cloudflare token no longer works, so it has been cleared."
+        Remove-CfTokenInCredMan
+        Remove-CfAccountInCredMan
+        $CF_TOKEN = ''
+      }
+      default {
+        Write-Host "Plantoir could not reach Cloudflare to check the saved token, so this section was not deployed there."
+        Write-Host "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+        exit 1
+      }
+    }
   }
   if (-not $CF_TOKEN) {
 @"
@@ -1211,10 +1530,21 @@ this computer.
 $TOKEN = ''
 if ($TARGET -eq 'netlify') {
 $TOKEN = Get-TokenFromCredMan
-if ($TOKEN -and -not (Test-TokenValid $TOKEN)) {
-  Write-Host "The saved Netlify token no longer works, so it has been cleared."
-  Remove-TokenInCredMan
-  $TOKEN = $null
+if ($TOKEN) {
+  # Cleared only when Netlify SAYS no, as Cloudflare's is (#705).
+  switch (Get-SavedTokenAnswer 'netlify' $TOKEN) {
+    'accepted' { }
+    'refused' {
+      Write-Host "The saved Netlify token no longer works, so it has been cleared."
+      Remove-TokenInCredMan
+      $TOKEN = $null
+    }
+    default {
+      Write-Host "Plantoir could not reach Netlify to check the saved token, so this section was not deployed there."
+      Write-Host "   The token is still saved. Check that this computer is online, then try again in a few minutes."
+      exit 1
+    }
+  }
 }
 if (-not $TOKEN -and (Test-Path $TOKENS_FILE)) {
   $migrated = $false

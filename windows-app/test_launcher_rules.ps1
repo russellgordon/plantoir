@@ -5,7 +5,7 @@
     dot-sourced: that would run the launcher).
 
 .DESCRIPTION
-    Six lists, each deserialised and never retyped:
+    Ten sections; the lists are deserialised and never retyped:
 
     1. app-rules.json -> previewPorts.hostBlockCases, through preview.ps1's
        Find-FreePreviewPort (#286). A native walk binds ONE pair per block,
@@ -51,6 +51,24 @@
        [IO.Path]::IsPathRooted calls rooted and which are not absolute
        (C:state, \state\Logs), and a check that both launchers read the
        contract's variable name.
+
+    7. app-rules.json -> savedTokenCheck.cases (#705 / mac #716), through
+       deploy.ps1's Get-TokenCheckAnswer with the patterns deploy.ps1 carries,
+       which must be the contract's.
+
+    8. Invoke-TokenCheck against a listener on 127.0.0.1 (a 401 is read, a
+       302 is not followed, the token goes in the Bearer header) and a closed
+       port (status 0).
+
+    9. app-rules.json -> savedDestinations.cases (#739 / mac #668), through
+       deploy.ps1's Get-SavedDestinations.
+
+    10. The real deploy.ps1, offline, in a scratch working folder with its
+        credentials stubbed: the saved legs run and keep going after a failed
+        one, a folder publish builds again unless the toolchain check says a
+        plain yes (#749), and a saved token whose check hears nothing is kept.
+        Needs the runtime's Python (PLANTOIR_RUNTIME or windows-app\Vendor\
+        runtime) and skips by name without it.
 
     Run with:  powershell -NoProfile -File windows-app\test_launcher_rules.ps1
 #>
@@ -434,6 +452,279 @@ foreach ($launcher in @('preview.ps1', 'deploy.ps1')) {
             [Environment]::SetEnvironmentVariable($trailVariable, $savedVariable)
             Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
+}
+
+# ---- 7. A saved token is cleared only when the service says no (#705) ----
+# app-rules.json -> savedTokenCheck.cases, every one, through deploy.ps1's
+# Get-TokenCheckAnswer with the patterns deploy.ps1 itself carries
+# (Get-TokenCheckPatterns) - and those patterns, and the URLs, must be the
+# contract's, so neither side's table can drift from the other.
+Import-LauncherFunctions (Join-Path $repo 'deploy.ps1') @('Get-TokenCheckPatterns', 'Get-TokenCheckAnswer', 'Invoke-TokenCheck', 'Get-SavedDestinations')
+$tokenRules = $appRules.savedTokenCheck
+foreach ($service in @('cloudflare', 'netlify')) {
+    $carried = Get-TokenCheckPatterns $service
+    $written = $tokenRules.services.$service
+    Report 'savedTokenCheck.services' "$service url" ($carried.Url -ceq [string]$written.url) "deploy.ps1 asks '$($carried.Url)', the contract '$($written.url)'"
+    Report 'savedTokenCheck.services' "$service accepted pattern" ($carried.Accepted -ceq [string]$written.acceptedWhenTheBodyMatches) "deploy.ps1 carries '$($carried.Accepted)'"
+    Report 'savedTokenCheck.services' "$service refused pattern" ($carried.Refused -ceq [string]$written.refusedWhenTheBodyMatches) "deploy.ps1 carries '$($carried.Refused)'"
+}
+foreach ($case in @($tokenRules.cases)) {
+    $patterns = Get-TokenCheckPatterns ([string]$case.service)
+    $got = Get-TokenCheckAnswer ([int]$case.status) ([string]$case.body) $patterns.Accepted $patterns.Refused
+    Report 'savedTokenCheck.cases' $case.name ($got -ceq [string]$case.expect) "expected $($case.expect), got $got"
+}
+
+# ---- 8. What the check hears from a real server (#705) ----
+# Invoke-TokenCheck against a listener on this PC: a 401 or 403 is READ
+# (Invoke-WebRequest would have thrown), a 302 is not followed, the token is
+# sent as a Bearer header and nowhere else, and a closed port is status 0.
+# Plain HTTP on 127.0.0.1, which needs no administrator rights here.
+$probe = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+$probe.Start(); $port = ([System.Net.IPEndPoint]$probe.LocalEndpoint).Port; $probe.Stop()
+$listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add("http://127.0.0.1:$port/")
+$listener.Start()
+$served = [hashtable]::Synchronized(@{})
+$server = [powershell]::Create()
+$null = $server.AddScript({
+    param($listener, $served)
+    $answers = @{
+        '/refused401' = @(401, '{"success":false,"errors":[{"code":1000,"message":"Invalid API Token"}]}')
+        '/filter403'  = @(403, "<html><body>Blocked by the school's web filter</body></html>")
+        '/yes200'     = @(200, '{"result":{"status":"active"},"success":true}')
+        '/portal302'  = @(302, '<html>Sign in to the Wi-Fi</html>')
+        '/portal'     = @(200, '<html>Sign in to the Wi-Fi</html>')
+    }
+    while ($listener.IsListening) {
+        try { $context = $listener.GetContext() } catch { break }
+        $path = $context.Request.Url.AbsolutePath
+        $served[$path] = [string]$context.Request.Headers['Authorization']
+        $answer = $answers[$path]; if (-not $answer) { $answer = @(404, 'none') }
+        $context.Response.StatusCode = [int]$answer[0]
+        if ($answer[0] -eq 302) { $context.Response.RedirectLocation = 'http://127.0.0.1:' + $context.Request.Url.Port + '/portal' }
+        $bytes = [Text.Encoding]::UTF8.GetBytes([string]$answer[1])
+        $context.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+        $context.Response.Close()
+    }
+}).AddArgument($listener).AddArgument($served)
+$serving = $server.BeginInvoke()
+try {
+    $base = "http://127.0.0.1:$port"
+    $cf = Get-TokenCheckPatterns 'cloudflare'
+    foreach ($c in @(
+        @{ path = '/refused401'; status = 401; word = 'refused' },
+        @{ path = '/filter403';  status = 403; word = 'unheard' },
+        @{ path = '/yes200';     status = 200; word = 'accepted' },
+        @{ path = '/portal302';  status = 302; word = 'unheard' })) {
+        $heard = Invoke-TokenCheck ($base + $c.path) 'stub-token-never-leaves-this-test'
+        $word = Get-TokenCheckAnswer $heard.Status $heard.Body $cf.Accepted $cf.Refused
+        Report 'tokenCheckOverHttp' $c.path (($heard.Status -eq $c.status) -and ($word -eq $c.word)) "expected $($c.status)/$($c.word), got $($heard.Status)/$word"
+        Report 'tokenCheckOverHttp' ($c.path + ' sends the token as a Bearer header') ($served[$c.path] -ceq 'Bearer stub-token-never-leaves-this-test') "the server saw '$($served[$c.path])'"
+    }
+    Report 'tokenCheckOverHttp' 'a redirect is not followed' (-not $served.ContainsKey('/portal')) 'the portal page behind the 302 was fetched'
+    # Port 9 (discard) is closed on this PC: nothing answers, and that is 0.
+    $nothing = Invoke-TokenCheck 'http://127.0.0.1:9/' 'stub-token-never-leaves-this-test'
+    Report 'tokenCheckOverHttp' 'nothing answering is status 0' (($nothing.Status -eq 0) -and ((Get-TokenCheckAnswer $nothing.Status $nothing.Body $cf.Accepted $cf.Refused) -eq 'unheard')) "got $($nothing.Status)"
+} finally {
+    $listener.Stop(); $listener.Close()
+    try { $null = $server.EndInvoke($serving) } catch {}
+    $server.Dispose()
+}
+
+# ---- 9. Where a course deploys when no destination is typed (#739) ----
+# app-rules.json -> savedDestinations.cases, every one, through deploy.ps1's
+# Get-SavedDestinations. The settings are handed over as the JSON TEXT the
+# file would hold; settingsText is handed over as written.
+$destRules = $appRules.savedDestinations
+$destSentences = $destRules.sentences
+foreach ($case in @($destRules.cases)) {
+    if ($case.PSObject.Properties.Name -contains 'settingsText') { $text = [string]$case.settingsText }
+    else { $text = $case.settings | ConvertTo-Json -Depth 10 }
+    $legs = Get-SavedDestinations $text ([string]$destRules.course)
+    if ($case.PSObject.Properties.Name -contains 'expectUnreadable' -and $case.expectUnreadable) {
+        Report 'savedDestinations.cases' $case.name ($null -eq $legs) 'read settings the case says cannot be read'
+        continue
+    }
+    if ($null -eq $legs) { Report 'savedDestinations.cases' $case.name $false 'could not read the settings'; continue }
+    $legs = @($legs)
+    $want = @($case.expectLegs)
+    $ok = $legs.Count -eq $want.Count
+    $detail = "expected $($want.Count) legs, got $($legs.Count)"
+    for ($k = 0; $ok -and $k -lt $want.Count; $k++) {
+        $gotFlags = (@($legs[$k].Flags) -join ' | ')
+        $wantFlags = ''; if ($want[$k].PSObject.Properties.Name -contains 'flags') { $wantFlags = (@($want[$k].flags) -join ' | ') }
+        $wantRefusal = ''; if ($want[$k].PSObject.Properties.Name -contains 'refusal') { $wantRefusal = [string]$want[$k].refusal }
+        if ($legs[$k].Kind -cne [string]$want[$k].kind -or $gotFlags -cne $wantFlags -or ("$($legs[$k].Refusal)") -cne $wantRefusal) {
+            $ok = $false
+            $detail = "leg $k expected [$($want[$k].kind)] '$wantFlags' '$wantRefusal', got [$($legs[$k].Kind)] '$gotFlags' '$($legs[$k].Refusal)'"
+        }
+        $wordsFor = $destSentences.where.PSObject.Properties[[string]$legs[$k].Kind]
+        $wantWords = if ($wordsFor) { [string]$wordsFor.Value } else { [string]$destSentences.where.netlify }
+        if ($ok -and $legs[$k].Words -cne $wantWords) { $ok = $false; $detail = "leg $k reads '$($legs[$k].Words)', the contract '$wantWords'" }
+    }
+    Report 'savedDestinations.cases' $case.name $ok $detail
+}
+# The refusals Get-SavedDestinations writes are the contract's templates.
+$sampleFolder = @(Get-SavedDestinations '{"deploy_target":"local_folder"}' 'ICS3U')[0].Refusal
+Report 'savedDestinations.sentences' 'noFolder' ($sampleFolder -ceq ([string]$destSentences.noFolder).Replace('{course}', 'ICS3U')) "wrote '$sampleFolder'"
+$sampleKind = @(Get-SavedDestinations '{"deploy_target":"x_y"}' 'ICS3U')[0].Refusal
+Report 'savedDestinations.sentences' 'unknownKind' ($sampleKind -ceq ([string]$destSentences.unknownKind).Replace('{course}', 'ICS3U').Replace('{kind}', 'x_y')) "wrote '$sampleKind'"
+
+# ---- 10. The real deploy.ps1, offline, in a scratch working folder ----
+# What the pure functions above cannot show: that the launcher itself reads
+# the saved legs, runs each one, keeps going after a failed leg and ends with
+# the first failing leg's code (#739); that a folder publish asks which
+# toolchain built the site and builds again when the answer is anything but
+# a plain yes, a check that THROWS included (#749); and that a saved token is
+# kept when its check hears nothing (#705). A COPY of deploy.ps1 (it runs
+# from its own folder), the real runtime only for its Python
+# (PLANTOIR_RUNTIME, read only), LOCALAPPDATA pointed into the scratch folder
+# so the builds root is the scratch folder's, a stand-in preview.bat that says
+# it was asked and exits with PREVIEW_STUB_EXIT, and a stand-in
+# scripts\toolchain_paths.py whose answer is STAMP_STUB.
+$runtime = $env:PLANTOIR_RUNTIME
+if (-not $runtime -or -not (Test-Path -LiteralPath (Join-Path $runtime 'python\python.exe'))) {
+    $runtime = Join-Path $repo 'windows-app\Vendor\runtime'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python\python.exe'))) {
+    Skip 'realDeploy' 'every real-launcher run' 'no runtime Python (windows-app\Vendor\fetch-runtime.ps1, or PLANTOIR_RUNTIME)'
+} else {
+    $work = Join-Path ([IO.Path]::GetTempPath()) ('deploy-run-' + [Guid]::NewGuid().ToString('N'))
+    $null = New-Item -ItemType Directory -Force -Path $work
+    $saved = @{}
+    foreach ($name in @('LOCALAPPDATA', 'PLANTOIR_RUNTIME', 'PLANTOIR_TRAIL_DIR', 'PREVIEW_STUB_EXIT', 'STAMP_STUB', 'TOKEN_CHECK_STUB_URL')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+    try {
+        # The copy is STUBBED wherever it would touch this PC's real
+        # credentials: its credential functions only say what they were asked
+        # to do, both token checks ask TOKEN_CHECK_STUB_URL (a closed port), and
+        # it stops before the website builder - as the mac's
+        # test_deploy_token_refusal.py stubs deploy.sh. So no run here, and no
+        # launcher made wrong by a mutation, can deploy anything or clear a token.
+        $source = [IO.File]::ReadAllText((Join-Path $repo 'deploy.ps1'))
+        $marker = "# ======================`r`n# Native run (no container)"
+        if (-not $source.Contains($marker)) { $marker = "# ======================`n# Native run (no container)" }
+        $stubbed = $source
+        foreach ($pair in @(
+            @('https://api.cloudflare.com/client/v4/user/tokens/verify', $null),
+            @('https://api.netlify.com/api/v1/user', $null))) {
+            Report 'realDeploy' ("deploy.ps1 still asks " + $pair[0]) ($stubbed.Contains("Url = '" + $pair[0] + "'")) 'the URL moved, so the stub below proves nothing'
+            $stubbed = $stubbed.Replace("Url = '" + $pair[0] + "'", "Url = `$env:TOKEN_CHECK_STUB_URL")
+        }
+        $stubs = @'
+function Get-CfTokenFromCredMan { 'stub-token-never-leaves-this-test' }
+function Remove-CfTokenInCredMan { Write-Host 'CLEARED-THE-CLOUDFLARE-TOKEN' }
+function Remove-CfAccountInCredMan { Write-Host 'CLEARED-THE-CLOUDFLARE-ACCOUNT' }
+function Get-CloudflareAccountId([string]$token) { '0123456789abcdef0123456789abcdef' }
+function Set-CfAccountInCredMan([string]$id) { }
+function Get-TokenFromCredMan { 'stub-token-never-leaves-this-test' }
+function Remove-TokenInCredMan { Write-Host 'CLEARED-THE-NETLIFY-TOKEN' }
+function Set-TokenInCredMan([string]$token) { Write-Host 'WROTE-A-NETLIFY-TOKEN' }
+function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-TOKEN' }
+'@
+        $anchor = 'if ($RESET_TOKEN -and $TARGET -eq ''cloudflare'') {'
+        Report 'realDeploy' 'deploy.ps1 still carries the place the stubs go' ($stubbed.Contains($anchor) -and $stubbed.Contains($marker)) 'a marker moved'
+        $stubbed = $stubbed.Replace($anchor, $stubs + "`r`n" + $anchor).Replace($marker, "Write-Host 'REACHED-THE-WEBSITE-BUILDER'`r`nexit 0`r`n" + $marker)
+        [IO.File]::WriteAllText((Join-Path $work 'deploy.ps1'), $stubbed)
+        $env:TOKEN_CHECK_STUB_URL = 'http://127.0.0.1:9/'
+        $null = New-Item -ItemType Directory -Force -Path (Join-Path $work 'scripts'), (Join-Path $work 'courses\ICS3U')
+        [IO.File]::WriteAllText((Join-Path $work 'preview.bat'), "@echo off`r`necho PREVIEW-WAS-ASKED %*`r`nexit /b %PREVIEW_STUB_EXIT%`r`n")
+        [IO.File]::WriteAllText((Join-Path $work 'scripts\toolchain_paths.py'),
+            "import os`nwhat = os.environ.get('STAMP_STUB', '')`nif what == 'throw':`n    raise RuntimeError('a check that throws')`ndef site_was_built_by_this_toolchain(section_dir):`n    return what == 'yes'`n")
+        $env:LOCALAPPDATA = Join-Path $work 'home'
+        $env:PLANTOIR_RUNTIME = $runtime
+        $env:PLANTOIR_TRAIL_DIR = Join-Path $work 'trail'
+
+        function Invoke-ScratchDeploy([string[]]$Arguments) {
+            $info = New-Object System.Diagnostics.ProcessStartInfo
+            $info.FileName = 'powershell.exe'
+            $quoted = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + (Join-Path $work 'deploy.ps1') + '"'))
+            foreach ($a in $Arguments) { if ($a -match '\s') { $quoted += ('"' + $a + '"') } else { $quoted += $a } }
+            $info.Arguments = $quoted -join ' '
+            $info.WorkingDirectory = $work
+            $info.UseShellExecute = $false
+            $info.RedirectStandardOutput = $true
+            $info.RedirectStandardError = $true
+            $info.RedirectStandardInput = $true
+            $process = [Diagnostics.Process]::Start($info)
+            $process.StandardInput.Close()
+            $out = $process.StandardOutput.ReadToEndAsync(); $err = $process.StandardError.ReadToEndAsync()
+            if (-not $process.WaitForExit(180000)) { try { $process.Kill() } catch {}; return [pscustomobject]@{ Code = -1; Said = 'TIMED OUT' } }
+            $process.WaitForExit()
+            return [pscustomobject]@{ Code = $process.ExitCode; Said = ($out.Result + $err.Result) }
+        }
+        function Set-Settings([string]$Json) { [IO.File]::WriteAllText((Join-Path $work 'courses\ICS3U\course_config.json'), $Json) }
+
+        # Where the copy builds into: the launcher names it when it is missing.
+        Set-Settings '{"course_code":"ICS3U"}'
+        $first = Invoke-ScratchDeploy @('ICS3U', '1', '--to-folder', (Join-Path $work 'published'))
+        $sectionDir = $null
+        $lines = @($first.Said -split "`r?`n")
+        for ($k = 0; $k -lt $lines.Count - 1; $k++) { if ($lines[$k] -like 'Section directory not found on host:*') { $sectionDir = $lines[$k + 1].Trim() } }
+        Report 'realDeploy' 'the launcher names the section it builds into' ($null -ne $sectionDir -and $sectionDir.StartsWith((Join-Path $work 'home'))) ("said: " + $first.Said)
+        if ($sectionDir) {
+            $null = New-Item -ItemType Directory -Force -Path (Join-Path $sectionDir 'public')
+            [IO.File]::WriteAllText((Join-Path $sectionDir 'public\index.html'), '<html>a built site</html>')
+
+            # #749: a plain yes publishes as it is; no, or a check that throws, builds first.
+            foreach ($c in @(
+                @{ stamp = 'yes';   rebuild = $false; code = 0 },
+                @{ stamp = 'no';    rebuild = $true;  code = 3 },
+                @{ stamp = 'throw'; rebuild = $true;  code = 3 })) {
+                $env:STAMP_STUB = $c.stamp; $env:PREVIEW_STUB_EXIT = '3'
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--to-folder', (Join-Path $work 'published'))
+                $asked = $run.Said.Contains('PREVIEW-WAS-ASKED ICS3U 1 --build-only')
+                $said = $run.Said.Contains('Plantoir has been updated since this site was built, so it is')
+                Report 'realDeploy' ("toolchain check answering '" + $c.stamp + "'") (($asked -eq $c.rebuild) -and ($said -eq $c.rebuild) -and ($run.Code -eq $c.code)) ("exit $($run.Code), rebuilt $asked; said: " + $run.Said)
+            }
+            Report 'realDeploy' 'a site this version built is published' (Test-Path -LiteralPath (Join-Path $work 'published\section1\index.html')) 'nothing reached the folder'
+
+            # #739: two saved folder legs. The first is refused by the leg
+            # itself (a drive-relative folder, exit 1); the second builds first
+            # and its stand-in build needs an answer (exit 3). Both run, and the
+            # run ends with the FIRST failing leg's code. Then the other order.
+            $env:STAMP_STUB = 'no'; $env:PREVIEW_STUB_EXIT = '3'
+            $good = (Join-Path $work 'published2').Replace('\', '/')
+            Set-Settings ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"C:relative","additional_deploy_targets":[{"type":"local_folder","path":"' + $good + '"}]}')
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
+            $legLine = [string]$destSentences.eachLeg
+            $legLine = $legLine.Replace('{course}', 'ICS3U').Replace('{section}', '1').Replace('{where}', [string]$destSentences.where.local_folder)
+            $legsSaid = ([regex]::Matches($run.Said, [regex]::Escape($legLine))).Count
+            Report 'realDeploy' 'every saved leg runs, after a failed one too' (($legsSaid -eq 2) -and $run.Said.Contains('partly written') -and $run.Said.Contains('PREVIEW-WAS-ASKED ICS3U 1 --build-only --non-interactive')) ("said: " + $run.Said)
+            Report 'realDeploy' 'the run ends with the first failing leg''s code (1 then 3)' ($run.Code -eq 1) "exit $($run.Code)"
+            Set-Settings ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $good + '","additional_deploy_targets":[{"type":"local_folder","path":"C:relative"}]}')
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
+            Report 'realDeploy' 'the run ends with the first failing leg''s code (3 then 1)' ($run.Code -eq 3) ("exit $($run.Code); said: " + $run.Said)
+
+            # Settings that cannot be read refuse, and never fall back to
+            # Netlify (which, in this copy, would meet a stand-in token).
+            Set-Settings '{ not json'
+            $run = Invoke-ScratchDeploy @('ICS3U', '1')
+            $couldNot = ([string]$destSentences.couldNotRead[0]).Replace('{course}', 'ICS3U')
+            Report 'realDeploy' 'unreadable settings refuse, and do not fall back to Netlify' (($run.Code -eq 1) -and $run.Said.Contains($couldNot) -and $run.Said.Contains([string]$destSentences.couldNotRead[1]) -and -not $run.Said.Contains('Netlify')) ("exit $($run.Code); said: " + $run.Said)
+
+            # #705: a saved token whose check hears nothing is KEPT: the
+            # copy's stand-in token is checked against a closed port.
+            Set-Settings '{"course_code":"ICS3U"}'
+            foreach ($service in @('cloudflare', 'netlify')) {
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--target', $service, '--non-interactive')
+                $kept = (-not $run.Said.Contains('CLEARED-THE')) -and $run.Said.Contains('to check the saved token, so this section was not deployed there') -and -not $run.Said.Contains('REACHED-THE-WEBSITE-BUILDER')
+                Report 'realDeploy' "a $service token whose check hears nothing is kept" ($kept -and $run.Code -eq 1) ("exit $($run.Code); said: " + $run.Said)
+            }
+            # A Cloudflare course, and nothing typed: the one-destination line,
+            # and it is Cloudflare's token that is checked. Then a typed
+            # --target netlify wins over the same settings, and nothing is read.
+            Set-Settings '{"course_code":"ICS3U","deploy_target":"cloudflare_pages"}'
+            $oneLine = ([string]$destSentences.oneDestination).Replace('{where}', [string]$destSentences.where.cloudflare_pages).Replace('{course}', 'ICS3U')
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
+            Report 'realDeploy' 'a Cloudflare course with nothing typed deploys to Cloudflare' ($run.Said.Contains($oneLine) -and $run.Said.Contains('could not reach Cloudflare')) ("said: " + $run.Said)
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--target', 'netlify', '--non-interactive')
+            Report 'realDeploy' 'a typed --target wins over the settings' ((-not $run.Said.Contains("settings say")) -and $run.Said.Contains('could not reach Netlify')) ("said: " + $run.Said)
+        }
+    } finally {
+        foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        $env:TOKEN_CHECK_STUB_URL = $null
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 

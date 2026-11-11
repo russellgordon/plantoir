@@ -899,6 +899,17 @@ function Restore-Config {
     if ($originalConfig) { Write-Utf8NoBom $config $originalConfig }
 }
 
+# The #749 step edits one stylesheet in the folder's .toolchain to stand for a
+# new version of Plantoir; this puts it back byte for byte on every exit path.
+$script:StyleEdited = $null
+$script:StyleOriginal = $null
+function Restore-Stylesheet {
+    if ($script:StyleEdited -and $null -ne $script:StyleOriginal) {
+        try { [IO.File]::WriteAllBytes($script:StyleEdited, $script:StyleOriginal) } catch { }
+        $script:StyleEdited = $null
+    }
+}
+
 # Kill a process AND ITS CHILDREN.
 #
 # `$process.Kill($true)` is what this used to call, and under Windows
@@ -1613,10 +1624,72 @@ Check-EngineFolder "the folder" (Join-Path $folderTarget "section$Section")
 Check-NoMarkerFolder "the folder" (Join-Path $folderTarget "section$Section")
 Check-ServedCase "the folder" (Join-Path $folderTarget "section$Section")
 
+# ------------------------- a new version of Plantoir rebuilds the site (#749)
+# The mac's #746 on Windows. A folder publish never enters deploy.py, so
+# deploy.ps1 asks the shared Python which toolchain built the site. One edit to
+# a stylesheet in this folder's .toolchain stands for a new version: the next
+# publish, with no page changed, must build again and ship the edit; the one
+# after must not build at all. Offline; put back on every exit path.
+Hdr "A site an earlier version built is built again before it is deployed (#749)"
+$styleFile = Join-Path $WorkingFolder ".toolchain\support\quartz\components\styles\tasks.scss"
+if (-not (Test-Path -LiteralPath $styleFile)) {
+    No "no .toolchain\support\quartz\components\styles\tasks.scss to stand for a new version"
+} else {
+    $script:StyleOriginal = [IO.File]::ReadAllBytes($styleFile)
+    $script:StyleEdited = $styleFile
+    $styleMark = "plantoir-verify-749-" + $script:RunMark.Replace(' ', '-').Replace(':', '-')
+    [IO.File]::WriteAllText($styleFile, ([Text.Encoding]::UTF8.GetString($script:StyleOriginal)) + "`n.$styleMark { color: #749749; }`n", $script:NoBom)
+    Ok "one rule added to tasks.scss in .toolchain, as a new version of Plantoir would change it"
+    Set-Destination -Primary "local_folder" -FolderPath $folderTarget
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $newVersion = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-new-version.log")
+    $rebuildSeconds = [int]$clock.Elapsed.TotalSeconds
+    if ($newVersion.ExitCode -eq 0) { Ok "the publish after the new version exited 0" } else { No "the publish after the new version exited $($newVersion.ExitCode)" }
+    if ($newVersion.Log -match 'Plantoir has been updated since this site was built') { Ok "it said the site would be built again, and why" }
+    else { No "it did not build the site again - a new version's stylesheet would not reach students" }
+    $css = Join-Path $folderTarget "section$Section\index.css"
+    if ((Test-Path -LiteralPath $css) -and ([IO.File]::ReadAllText($css)).Contains($styleMark)) { Ok "the deployed index.css carries the new version's rule" }
+    else { No "the deployed index.css does not carry the new version's rule" }
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $sameVersion = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-same-version.log")
+    $sameSeconds = [int]$clock.Elapsed.TotalSeconds
+    if ($sameVersion.ExitCode -eq 0) { Ok "the next publish exited 0" } else { No "the next publish exited $($sameVersion.ExitCode)" }
+    if ($sameVersion.Log -match 'Plantoir has been updated since this site was built|Rebuilding it before it is deployed') { No "the next publish built again although nothing had changed" }
+    else { Ok "the next publish, with nothing changed, did not build again" }
+    $script:Measured += "A folder publish after a new version (#749): $rebuildSeconds s with the rebuild, then $sameSeconds s with nothing changed"
+    Restore-Stylesheet
+    Ok "tasks.scss put back as it was"
+}
+
+# --------------- the course's own destinations, nothing typed (#739, offline)
+# A deploy given neither --target nor --to-folder reads the course's settings
+# and runs a leg per destination (app-rules.json -> savedDestinations). Two
+# FOLDER legs, so no web host is touched: both must be written, and the run
+# says each leg. Then the first leg is one its own run refuses (a folder with
+# no drive), and the run must still write the second and end with the first
+# failing leg's code.
+Hdr "The course's own destinations, nothing typed - two folders (#739)"
+$folderB = Join-Path $work "published-b"
+foreach ($f in @($folderTarget, $folderB)) { Remove-Item -Recurse -Force $f -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Force -Path $f | Out-Null }
+Set-Destination -Primary "local_folder" -FolderPath $folderTarget -AdditionalJson "[{`"type`":`"local_folder`",`"path`":`"$($folderB.Replace('\','\\'))`"}]"
+$twoLegs = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-two-saved-legs.log")
+if ($twoLegs.ExitCode -eq 0) { Ok "a deploy with nothing typed and two saved folders exited 0" } else { No "a deploy with nothing typed and two saved folders exited $($twoLegs.ExitCode)" }
+$legsSaid = ([regex]::Matches([string]$twoLegs.Log, "Deploying $Course section $Section to a folder on this computer, as its settings say\.")).Count
+if ($legsSaid -eq 2) { Ok "it said each of the two legs" } else { No "it said $legsSaid legs, not 2" }
+Check-Folder "the first saved folder" (Join-Path $folderTarget "section$Section")
+Check-Folder "the second saved folder" (Join-Path $folderB "section$Section")
+Remove-Item -Recurse -Force $folderB -ErrorAction SilentlyContinue; New-Item -ItemType Directory -Force -Path $folderB | Out-Null
+Set-Destination -Primary "local_folder" -FolderPath "C:no-drive-folder" -AdditionalJson "[{`"type`":`"local_folder`",`"path`":`"$($folderB.Replace('\','\\'))`"}]"
+$failedFirst = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "deploy-first-leg-fails.log")
+if ($failedFirst.ExitCode -eq 1) { Ok "a run whose first leg failed ends with that leg's code (1)" } else { No "a run whose first leg failed exited $($failedFirst.ExitCode), not 1" }
+Check-Folder "the leg after a failed one" (Join-Path $folderB "section$Section")
+
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
     Set-Destination -Primary "netlify"
-    $netlifyRun = Measure-Deploy "Netlify, first publish with the engine" "deploy.bat" @($Course, "$Section") (Join-Path $work "deploy-netlify.log")
+    # Named, as the app names every leg since #739: with no destination typed
+    # deploy.ps1 reads the course's settings and deploys every saved leg.
+    $netlifyRun = Measure-Deploy "Netlify, first publish with the engine" "deploy.bat" @($Course, "$Section", "--target", "netlify") (Join-Path $work "deploy-netlify.log")
     if ($netlifyRun.ExitCode -eq 0) { Ok "publish to Netlify exited 0" } else { No "publish to Netlify exited $($netlifyRun.ExitCode)" }
     $netlifyUrl = Url-FromLog $netlifyRun.Log
     if ($netlifyUrl) {
@@ -1630,9 +1703,11 @@ if ($haveNetlify) {
 Hdr "Destination 3 of 3 - Cloudflare Pages"
 if ($haveCloudflare) {
     Set-Destination -Primary "cloudflare_pages"
-    # --target is REQUIRED: deploy.ps1 defaults $TARGET to netlify and never
-    # reads deploy_target from the configuration. Setting the config key alone
-    # published to Netlify while this script reported a Cloudflare pass.
+    # --target is passed, as the app passes it. Before #739 it was REQUIRED
+    # because deploy.ps1 never read deploy_target (setting the key alone once
+    # published to Netlify while this script reported a Cloudflare pass); now
+    # a flagless call would deploy every saved destination, so each case here
+    # names the one it is about.
     $cloudflareRun = Measure-Deploy "Cloudflare, first publish with the engine" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "deploy-cloudflare.log")
     $cfSnapped = Save-CloudflareUpload "Cloudflare Pages" $cloudflareRun.Log (Join-Path $work "cf-alone")
     if ($cloudflareRun.ExitCode -eq 0) { Ok "publish to Cloudflare exited 0" } else { No "publish to Cloudflare exited $($cloudflareRun.ExitCode)" }
@@ -1651,16 +1726,17 @@ if ($haveCloudflare) {
 
 # ------------------------------------------------------------- the pairings
 # Run as the APP runs them: the primary first, then each additional, one
-# launcher call apiece. `additional_deploy_targets` is not handled by the
-# launcher at all - the app loops - so this exercises the launcher half the way
-# the app drives it. That the app produces exactly these argument lists is a
-# separate question, already pinned by app-rules.json -> deployArguments.
+# launcher call apiece, each NAMING its destination (MultiDestinationDeployRunner
+# loops; app-rules.json -> deployArguments pins the argument lists). Since #739
+# deploy.ps1 given no destination also runs every saved leg itself - the
+# offline two-folder case above proves that path - so a flagless Netlify call
+# here would deploy the folder leg too, and every call is named.
 Hdr "Pairing 1 of 3 - Netlify primary, a folder also"
 if ($haveNetlify) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
-    Set-Destination -Primary "netlify" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
-    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section") -LogFile (Join-Path $work "pair1-netlify.log")
+    Set-Destination -Primary "netlify" -AdditionalJson "[{`"type`":`"local_folder`",`"path`":`"$($folderTarget.Replace('\','\\'))`"}]"
+    $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "netlify") -LogFile (Join-Path $work "pair1-netlify.log")
     $legTwo = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "pair1-folder.log")
     if ($legOne.ExitCode -eq 0 -and $legTwo.ExitCode -eq 0) { Ok "both legs exited 0" }
     else { No "a leg failed (netlify $($legOne.ExitCode), folder $($legTwo.ExitCode))" }
@@ -1680,7 +1756,7 @@ Hdr "Pairing 2 of 3 - Cloudflare primary, a folder also"
 if ($haveCloudflare) {
     Remove-Item -Recurse -Force $folderTarget -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $folderTarget | Out-Null
-    Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"folder_path`":`"$($folderTarget.Replace('\','\\'))`"}]"
+    Set-Destination -Primary "cloudflare_pages" -AdditionalJson "[{`"type`":`"local_folder`",`"path`":`"$($folderTarget.Replace('\','\\'))`"}]"
     $legOne = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--target", "cloudflare") -LogFile (Join-Path $work "pair2-cf.log")
     # Kept NOW: the folder leg below rebuilds the section before production
     # is judged, and the wait used to read the index.html it had rewritten.
@@ -1706,7 +1782,7 @@ if ($haveCloudflare) {
 Hdr "Pairing 3 of 3 - Netlify primary, Cloudflare also"
 if ($haveNetlify -and $haveCloudflare) {
     Set-Destination -Primary "netlify" -AdditionalJson '[{"type":"cloudflare_pages"}]'
-    $legOne = Measure-Deploy "Netlify, second publish" "deploy.bat" @($Course, "$Section") (Join-Path $work "pair3-netlify.log")
+    $legOne = Measure-Deploy "Netlify, second publish" "deploy.bat" @($Course, "$Section", "--target", "netlify") (Join-Path $work "pair3-netlify.log")
     Set-Destination -Primary "cloudflare_pages"
     $legTwo = Measure-Deploy "Cloudflare, second publish" "deploy.bat" @($Course, "$Section", "--target", "cloudflare") (Join-Path $work "pair3-cf.log")
     $cfSnapped = Save-CloudflareUpload "Cloudflare (paired with Netlify)" $legTwo.Log (Join-Path $work "cf-with-netlify")
@@ -1762,6 +1838,7 @@ exit 0
 finally {
     Restore-FirstPublishState
     Restore-Config
+    Restore-Stylesheet
     Stop-AnyPreview
     Remove-RunnerPage
 
