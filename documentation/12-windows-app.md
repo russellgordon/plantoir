@@ -6770,10 +6770,22 @@ sentence from the seam — was rejected: the window's dialog would never be
 shown, and the window and the assistant would word the same refusal from two
 places.
 
-**The answer, in the window.** Every flagged class is listed ticked, and two
-buttons always sit beside Cancel: Hide Ticked and Deploy (the default) and
-Keep All and Deploy. Hide Ticked records the unticked as kept, then hides the
-ticked with Hide Pages…'s OWN call through this window's `plantoir-mcp`
+**The answer, in the window — a tick means it GOES OUT (#726, the mac's
+#694).** Every flagged class is listed ticked, and ONE button sits beside
+Cancel: Deploy Ticked (`AssistWording.DeployTickedButton`, the default,
+Return). Russell's two rulings on #694 (2026-10-25): a ticked box always means
+included, in this sheet and every checklist in the app; and unticking a class
+means it is not deployed AND it is unpublished, so the preview is left in the
+state the deployed site will be in (a deploy-time-only exclusion was rejected
+for letting the two drift apart). Until #726 this sheet said the opposite —
+"Hide classes dated later?", ticked meant HIDE, with Hide Ticked and Deploy
+and Keep All and Deploy beside Cancel; Keep All went because, with every row
+ticked to go out, it only repeated Return. The split is
+`ClassesDatedLater.AnswerAtDeploy` (ticked → kept at its date, unticked →
+hidden), so the direction is unit-tested rather than read off the view
+(`ClassesDatedLaterAtDeployTests.TickedIsKept_UntickedIsHidden`). Deploy
+Ticked records the ticked as kept, then hides the unticked with Hide Pages…'s
+OWN call through this window's `plantoir-mcp`
 (`MainWindow.HideClassesForTheDeploy` → `SectionVerbs.Perform`) — so it is
 backed up as `_menu-section<N>`, Section ▸ Undo Last Change takes it back, and
 pages only those classes link to go with them — with NO preview either side:
@@ -6781,7 +6793,8 @@ pages only those classes link to go with them — with NO preview either side:
 restart (the plan review's M1; a hide that failed would otherwise leave the
 teacher with no preview for a deploy that never happened). Its "ran from a
 menu" line names Hide Pages…, whose call it is, with "N classes dated later,
-at Deploy" as its counts — the mac's own line. A ticked class still visible
+unticked at Deploy" as its counts (`ClassesDatedLater.UntickedAtDeployCounts`)
+— the mac's own words since #694. An unticked class still visible
 afterwards stops the deploy, and the teacher is shown what the hide said. The
 "asked about…" line is written AFTER the hide, so a hide that left a class
 visible is recorded as cancelled rather than as hidden (the mac writes it
@@ -6825,21 +6838,34 @@ tests pin to a morning — with a second's slack; both are local time.
 `ScheduledRunTests` runs it both ways, and with an earlier night's success
 record that must not count.
 
-**Section ▸ Publish Pages…** asks about the ticked classes after the choice
-and before the plan, in the same dialog (a `LaterClasses` stage): the ticked
-are left out and stay hidden ("Leave N Hidden and Continue", or "Publish Them
-All" with none ticked), the unticked are kept, and with nothing left nothing is
-published and the dialog closes.
+**Section ▸ Publish Pages… never asks (#726, the mac's #694).** It goes
+straight from the choice to its plan, publishes what is ticked, and writes
+nothing to `LaterClassesKept` or the trail about classes dated later. Publishing
+changes only the local preview, and a teacher publishes next week's classes
+precisely to check them there; the old `LaterClasses` stage took the teacher's
+tick and turned it into "leave hidden", so Return undid the publish they had
+asked for. Recording a class as kept from there would also let it skip the
+Deploy question. The stage, `ClassesDatedLater.FlaggedIfPublishing` and the
+sentences `laterClassesAtPublish`, `leaveOutAndContinueButton` and
+`publishThemAllButton` went with it. **What that costs, knowingly:** a class
+published there for a preview check goes online at the next SCHEDULED deploy
+unasked, because no launcher reads this rule (`classesDatedLater.neverAskedFrom`,
+measured on the mac on 2026-11-01). The scheduled deploy is unchanged here;
+whether it should hold such a class back is #727, Russell's decision.
 
 **Testing it**: unit — `FutureDatedClassesContractTests` (24 cases, the
 record's shape, the rollover undo), the four `assist-cases.json` scenarios
 (green; the three ledgered ones left the ledger), `ClassesDatedLaterAtDeployTests`
 (an open dialog not waited on, no window, the hide with no preview, the server's
-hold, what is kept, the window's order), `ScheduledRunTests` (both ways), the
-wording walk (17 keys declared). Through the window: `LaterClassesAtDeployUiTests`
-— Cancel deploys nothing and leaves the preview serving; Hide Ticked hides one
-class, keeps the unticked one and deploys to a folder; Keep All and Deploy, then
-a second Deploy that asks nothing.
+hold, what is kept, the window's order; since #726 also the tick's direction,
+the one button, Publish Pages… asking nothing, the contract asking at Deploy
+only, and the hide's counts), `ScheduledRunTests` (both ways), the
+wording walk. Through the window: `LaterClassesAtDeployUiTests`
+— Cancel deploys nothing and leaves the preview serving; Deploy Ticked with one
+class unticked hides it, keeps the ticked one and deploys to a folder; Return
+with every class ticked keeps them all, then a second Deploy that asks nothing;
+and Publish Pages… on a hidden class dated later publishes it with no question
+and no kept record, after which Deploy asks about it.
 
 REJECTED, with the reason:
 - **Asking before the window's refusals, or after the assistant's stop**: see
@@ -8912,9 +8938,9 @@ dispatcher, with the generator's samples. No ledger entry, no contract edit.
 
 ### 1. The picker and the later-classes question are tables
 
-`Views/TickTable` draws all three: Publish Pages… and Hide Pages…'s first stage
-(Page, Folder, Date) and #475's question at Publish Pages… and at Deploy (Page,
-Date). One builder, so the three cannot drift. A `ListView` with
+`Views/TickTable` draws them all: Publish Pages… and Hide Pages…'s first stage
+(Page, Folder, Date) and #475's question at Deploy (Page, Date; it was also
+asked at Publish Pages… until #726). One builder, so they cannot drift. A `ListView` with
 `SelectionMode = Single` — there has to BE a selected row for Space to tick —
 1-epx border, a plain header (the mac's picker does not sort, so neither does
 this), each row a `CheckBox` whose content IS the title (trimmed, the whole
@@ -8954,8 +8980,9 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
 - Return with a row selected reaches Continue — when Continue is live —
   because a `ListView` keeps Return for itself (measured for #548), so the
   table catches it. At Deploy, a plain `ContentDialog`, Return records "the
-  main button" and hides the dialog, and the answer is read as Hide Ticked and
-  Deploy. Escape needs nothing: it reaches the dialog.
+  main button" and hides the dialog, and the answer is read as the main
+  button — Deploy Ticked since #726 (Hide Ticked and Deploy before it).
+  Escape needs nothing: it reaches the dialog.
 - **Narrator** hears each row's state: `AutomationProperties.ItemStatus`
   "ticked" / "not ticked", set on every change (the plan review's amendment 1).
   A box is named by its title — "title — folder" for two pages of one title —
@@ -9151,8 +9178,9 @@ before the button texts are cleared): Working clears both buttons,
 ContentDialog's "NoneVisible" state collapses that row, and holding the host
 alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
 clears the hold for every other stage, so the plan and the answer fit their
-own content. It applies after Choose and after the question about classes
-dated later too (grow-only Working, as the mac; the test asserts the picker's
+own content. It applies after Choose (and applied after Publish Pages…'s
+question about classes dated later, until #726 removed that question)
+(grow-only Working, as the mac; the test asserts the picker's
 417 held at Working as well as the plan's), and to the three page items only
 (gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
 is CLAMPED to what the window leaves room for — the window's height less what
