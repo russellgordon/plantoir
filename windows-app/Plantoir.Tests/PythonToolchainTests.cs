@@ -194,14 +194,19 @@ public class PythonToolchainTests
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        // The runtime's Python reads python3NN._pth, which REPLACES sys.path
-        // (so the script's own folder is not on it) and ignores the PYTHON*
-        // variables below. These files import their siblings by bare name,
-        // so 50 of 93 failed with ModuleNotFoundError when first run that way
-        // (#764, measured on 3.11.9 and 3.14.10 alike). The shim puts the
-        // working directory - scripts\, the file's own folder - first on
-        // sys.path, as the product's entry scripts do for themselves, and
-        // -B / -X utf8 stand in for the variables it would ignore.
+        // The runtime's Python reads python3NN._pth, which REPLACES sys.path:
+        // the script's own folder is not on it, and PYTHONPATH is ignored.
+        // These files import their siblings by bare name, so 50 of 93 failed
+        // with ModuleNotFoundError when first run that way (#764, measured on
+        // 3.11.9 and 3.14.10 alike). The shim puts the working directory -
+        // scripts\, the file's own folder - first on sys.path, as the
+        // product's entry scripts do for themselves. The three variables set
+        // below ARE honoured there, although sys.flags.ignore_environment
+        // reads 1 (measured on 3.14.10, 2026-11-11: PYTHONIOENCODING=latin-1
+        // gave stdout iso8859-1, PYTHONDONTWRITEBYTECODE=1 gave
+        // sys.dont_write_bytecode True, PYTHONUTF8 moved utf8_mode); -B and
+        // -X utf8 say the same on the command line, so the run does not
+        // depend on that.
         if (Interpreter.IsRuntime)
         {
             foreach (string argument in new[] { "-B", "-X", "utf8", "-c", RuntimeShim })

@@ -45,6 +45,16 @@ public sealed class RuntimePythonTests : IDisposable
 
     // MARK: - The recipe and the build
 
+    /// <summary>
+    /// A statement the recipe RUNS, not one it mentions: the line must start
+    /// with the text (after indentation), so the same text behind <c>#</c>, or
+    /// inside a sentence, does not count (the implementation review showed
+    /// every check here passing with its line commented out).
+    /// </summary>
+    private static void AssertStatement(string text, string statement, string what) =>
+        Assert.True(Regex.IsMatch(text, @"(?m)^[ \t]*" + Regex.Escape(statement)),
+            $"{what} does not run `{statement}` (a commented-out or quoted copy does not count).");
+
     [Fact]
     public void TheWindowsRuntimeRecipeCarriesTheContractsPython()
     {
@@ -52,35 +62,37 @@ public sealed class RuntimePythonTests : IDisposable
         string version = WindowsPython["version"]!.ToString();
         string contains = WindowsPython["windowsRuntimeContains"]!.ToString();
         Assert.Contains(version, contains);
-        Assert.True(recipe.Contains(contains, StringComparison.Ordinal),
-            $"fetch-runtime.ps1 does not pin {contains} (contracts/toolchain.json -> windowsPython).");
+        AssertStatement(recipe, contains, "fetch-runtime.ps1 (contracts/toolchain.json -> windowsPython)");
 
         string floor = WindowsPython["opensslAtLeast"]!.ToString();
-        Assert.True(recipe.Contains($"$PythonOpensslAtLeast = \"{floor}\"", StringComparison.Ordinal),
-            $"fetch-runtime.ps1 does not set $PythonOpensslAtLeast = \"{floor}\" (windowsPython -> opensslAtLeast).");
-        Assert.Contains("Assert-PythonOpenssl \"$pyDir\\python.exe\" $PythonOpensslAtLeast", recipe);
+        AssertStatement(recipe, $"$PythonOpensslAtLeast = \"{floor}\"", "fetch-runtime.ps1 (windowsPython -> opensslAtLeast)");
+        AssertStatement(recipe, "$pyOpenssl = Assert-PythonOpenssl \"$pyDir\\python.exe\" $PythonOpensslAtLeast", "fetch-runtime.ps1");
 
         // The zip by hash AND size, and the three wheels by version AND hash,
         // binary only. A wheel line's version is the image's pin.
         Assert.Matches(new Regex(@"(?m)^\$PythonZipSha256 = ""[0-9a-f]{64}""\r?$"), recipe);
-        Assert.Contains("Assert-Sha256 $pyZip $PythonZipSha256 $PythonZipLength", recipe);
+        AssertStatement(recipe, "Assert-Sha256 $pyZip $PythonZipSha256 $PythonZipLength", "fetch-runtime.ps1");
         foreach (var (package, pin) in new[] { ("python-frontmatter", "pythonFrontmatter"), ("PyYAML", "pyyaml"), ("Pillow", "pillow") })
         {
-            string line = $"\"{package}=={Pin(pin)} --hash=sha256:";
-            int at = recipe.IndexOf(line, StringComparison.Ordinal);
-            Assert.True(at >= 0, $"fetch-runtime.ps1's $PythonWheels has no {package}=={Pin(pin)} with a hash.");
-            Assert.Matches(new Regex(@"^[0-9a-f]{64}"""), recipe[(at + line.Length)..]);
+            Assert.True(Regex.IsMatch(recipe,
+                    @"(?m)^[ \t]*""" + Regex.Escape($"{package}=={Pin(pin)} --hash=sha256:") + @"[0-9a-f]{64}"",?\r?$"),
+                $"fetch-runtime.ps1's $PythonWheels has no line {package}=={Pin(pin)} --hash=sha256:<64 hex>.");
         }
-        Assert.Contains("--only-binary :all: --require-hashes --no-deps -r $pyReq", recipe);
+        AssertStatement(recipe, "--only-binary :all: --require-hashes --no-deps -r $pyReq", "fetch-runtime.ps1's pip install");
     }
+
+    /// <summary>The project text with its XML comments taken out: a guard inside one is no guard.</summary>
+    private static string ProjectOutsideComments() =>
+        Regex.Replace(File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj")),
+            "<!--.*?-->", "", RegexOptions.Singleline);
 
     [Fact]
     public void TheBuildRefusesARuntimeOnAnotherPython()
     {
-        string project = File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir", "Plantoir.csproj"));
+        string project = ProjectOutsideComments();
         string version = WindowsPython["version"]!.ToString();
         Assert.Contains($"<_PlantoirRuntimePython>{version}</_PlantoirRuntimePython>", project);
-        Assert.Contains("IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimePythonPattern))", project);
+        Assert.Contains("<Error Condition=\"!$([System.Text.RegularExpressions.Regex]::IsMatch($(_PlantoirRuntimeManifest), $(_PlantoirRuntimePythonPattern)))\"", project);
     }
 
     [Fact]
@@ -92,7 +104,8 @@ public sealed class RuntimePythonTests : IDisposable
         var section = Regex.Match(installer, @"(?m)^\[InstallDelete\]\r?$").Index;
         var next = Regex.Match(installer, @"(?m)^\[Files\]\r?$").Index;
         Assert.True(section > 0 && next > section, "installer.iss has no [InstallDelete] section before its [Files] section.");
-        Assert.Contains("Type: filesandordirs; Name: \"{app}\\runtime\\python\"", installer[section..next]);
+        // The whole line, anchored: the same entry behind ';' is a comment.
+        Assert.Matches(new Regex(@"(?m)^Type: filesandordirs; Name: ""\{app\}\\runtime\\python""\r?$"), installer[section..next]);
     }
 
     // MARK: - A fetched runtime

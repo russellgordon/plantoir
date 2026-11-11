@@ -10609,8 +10609,11 @@ decides what `publish: no` means (08 → "Whether students see a page").
   `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which, with
   its version and OpenSSL. Until #764 they ran on PATH's interpreter (3.14.7
   on this PC) while teachers ran 3.11.9. The runtime's `._pth` replaces
-  `sys.path` and ignores `PYTHON*` variables, so run plainly 50 of 93 files
-  failed with `ModuleNotFoundError`. That happened on 3.11.9 and 3.14.10
+  `sys.path`: the script's own folder is not on it and `PYTHONPATH` is
+  ignored. So, run plainly, 50 of 93 files failed with
+  `ModuleNotFoundError`. (`PYTHONIOENCODING`, `PYTHONDONTWRITEBYTECODE` and
+  `PYTHONUTF8` ARE honoured there, measured on 3.14.10, although
+  `sys.flags.ignore_environment` reads 1.) That happened on 3.11.9 and 3.14.10
   alike. A shim (`runpy.run_path` with the working directory, `scripts\`,
   first on `sys.path`, plus `-B -X utf8`) does what the product's entry
   scripts do for themselves. With it, 93/93 pass on both (273 s and 293 s).

@@ -39,7 +39,7 @@ has a supported OpenSSL (3.5 LTS), Windows binaries still coming (3.14 is in
 bugfix until about 2027-10) and a win_amd64 wheel for every pin below.
 contracts/toolchain.json -> windowsPython holds the version, the OpenSSL
 floor and what was rejected. The shared scripts\ must still run on the
-image's 3.11 (ScriptsParseAsPython311Tests).
+image's 3.11 (RuntimePythonTests.TheSharedScriptsParseAsPython311).
 Change a pin here and the Dockerfile's reasoning applies to you.
 
 NOT committed (~600 MB of fetched output) - this repository ships recipes,
@@ -369,7 +369,8 @@ function Set-QuartzLoopbackBinds([string]$Path) {
 # first three fields: for OpenSSL 3 that tuple is (major, minor, 0, patch,
 # status) - 3.5.9 is (3, 5, 0, 9, 0) - so its first three read 3.5.0, which
 # refused 3.5.9 on this script's first run (2026-11-11). Lifted between these
-# markers and run by FetchRuntimePythonOpensslTests against stand-in pythons
+# markers and run by RuntimePythonTests.TheFetchRefusesAPythonBelowTheOpensslFloor
+# against stand-in pythons
 # and against the real runtime.
 # BEGIN Assert-PythonOpenssl
 function Assert-PythonOpenssl([string]$Python, [string]$AtLeast) {
