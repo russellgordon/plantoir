@@ -978,7 +978,13 @@ function Set-Destination {
     if ($json.PSObject.Properties.Name -contains 'deploy_folder_path') { $json.deploy_folder_path = $FolderPath }
     else { $json | Add-Member -NotePropertyName deploy_folder_path -NotePropertyValue $FolderPath }
     if ($AdditionalJson) {
-        $json | Add-Member -NotePropertyName additional_deploy_targets -NotePropertyValue (ConvertFrom-Json $AdditionalJson) -Force
+        # Unwrapped into a plain array: Windows PowerShell 5.1 hands the
+        # parsed array over wrapped, and ConvertTo-Json then writes it as
+        # {"value":[...],"Count":1} - which nothing read while every call here
+        # named its destination, and which a no-flag deploy (#739) reads,
+        # correctly, as no additional destinations at all.
+        $extras = [object[]]@((ConvertFrom-Json $AdditionalJson) | ForEach-Object { $_ })
+        $json | Add-Member -NotePropertyName additional_deploy_targets -NotePropertyValue $extras -Force
     } elseif ($json.PSObject.Properties.Name -contains 'additional_deploy_targets') {
         $json.PSObject.Properties.Remove('additional_deploy_targets')
     }
