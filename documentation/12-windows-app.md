@@ -550,6 +550,132 @@ follow edits](05-build-pipeline.md#a-running-preview-does-not-follow-edits-671).
 
 ---
 
+## A section's deploy outlives its view (#728, the mac's #706)
+
+**The fault, found by reading rather than driven.** `MainWindow.ShowDetailForSelection`
+builds a fresh `SectionDetailView` for every selection, and the deploy runner and
+"preparing" were that view's fields. Clicking another section and back left the
+deploy running unseen in the old object while the new one showed a blank console
+with Deploy enabled — the button never asked `CourseActivity.IsPublishingSection`,
+and `IsSectionBusy` read only the view on screen. A press then reached
+`deploy.ps1`'s "already being deployed" refusal, or, during the build leg, started a
+second build (the mac measured that killing the first, "failed (exit 1) after
+17.5s", on an Apple M4 Pro, #706). The rule both apps now follow is
+`shared-rules.json` → `returningToASectionMidDeploy`.
+
+**A second fault that is Windows' own.** The deploy handed its BUILD lease to the
+view's preview build claim (`_buildWork = deployBuild`), and `Unloaded` →
+`StopPreview` → `ReleaseLease` → `ReleaseBuildClaim` gives that claim back. So
+leaving a section mid-deploy deleted the deploy's on-disk `building` lease while
+the build still ran: an outside assistant's `deploy_section`, or a scheduled run,
+was then told the course was free to build. The mac never had it — its claims are
+held by `claimAPublish` with a `defer` inside `deployAndWait`, so they live as long
+as the function. Observed by reading `SectionDetailView.xaml.cs` on `dev`
+a8b7a65d6 (the handover at the deploy, the release in the teardown region); not
+driven. Now the deploy's claims are the RUN's (`SectionDeployRun.Hold` /
+`EndPublish`), and `StopPreview` lets go of the preview's alone. The
+`ReleaseBuildClaim()` just before the handover stays: it lets go of the PREVIOUS
+build claim — a preview's, or the assistant's rebuild — not the deploy's.
+
+**The shape** (Core, so the rule is unit-tested):
+
+- `SectionKey` (`Models/SectionKey.cs`): folder through `WorkingFolder.Resolved`
+  and compared case-insensitively, course case-insensitive, section. Built
+  canonical, so `C:\Work\` and `c:\work` are one key. `PerSectionStore<T>` beside
+  it creates an entry on first ask and never replaces or removes one. Both are
+  meant for #734's per-section Problems store too.
+- `SectionDeployRun` (`Scripting/SectionDeployRun.cs`): the runner, `IsPreparing`,
+  `IsAsking` (the question about classes dated later is up in SOME window), the
+  `Folder` Cancel aims at, the deploy's claims, and the ending: `Endings`,
+  `EndingShown`, `PreviewLastStartedAt`, a waiting `Ending` (findings and the links
+  checklist's marker) taken read-and-clear by exactly one view. `SectionRuns.Deploy`
+  makes one, from a view, on the interface thread; `SectionRuns.Find` never does.
+- `SectionDeployRun.UnderWay(run, folder, course, section)` is preparing ∨ running ∨
+  asking ∨ the in-process publish record. The Deploy button (and so Section ▸
+  Deploy… and its key, which read the button), `DeployAsync`'s first check,
+  `DeployWillBeRefused`, `MainWindow.IsSectionBusy` (now given the caller's folder,
+  so a section not on screen still answers) and the Preview button, the links
+  checklist offered on appearing, today's-class re-check and the folder-repair
+  check all read it.
+
+**Why `IsAsking` is on the run** (the plan review's finding, Opus 5.5). With it on
+the view, a second window on the same section (File ▸ New Window) could put the
+question again while the first was up, back the course up and hide classes, and
+only then be refused by the "another deploy began while the question was up"
+check — a refusal after a change, which `classesDatedLater.order` forbids. Now the
+second window's Deploy is greyed and its press returns before anything.
+`SectionRunsTests.AQuestionUpInOneWindow_MakesTheSectionUnderWayInEveryWindow`.
+
+**Threading and lifetime.** Every Plantoir window is created on the one interface
+thread (`App.OpenWindow`), so the run's notifications are raised synchronously and
+reach every view on the thread it lives on. The deploy task — `DeployAsync` of the
+view that was pressed — keeps that view object alive until it ends, exactly as
+before; what changed is that every other view of the section binds to the same run.
+`DeployAsync` takes the run ONCE, from the folder it has just checked, and uses only
+that object (the mac's plan review H1: a window re-pointed at another folder
+mid-await must not split one deploy across two runs). `IsPreparing` is cleared in
+the `finally`. The view hooks the run and its runner on `Loaded` and lets go on
+`Unloaded`; so does `TaskProgressView` for every runner it registered — otherwise a
+view taken off screen stays subscribed to a shared runner for good. A window closed
+mid-deploy: its views let go; the deploy runs on; another window on the folder shows
+it. The last window, or quitting: unchanged — the quit question counts the
+`CourseActivity` record the run still writes. The in-app assistant's deploy goes
+through `MainWindow.DeployForAsync` → the view's `DeployAsync`, so it is the
+section's run and the assistant still awaits its outcome. A scheduled run, an
+outside assistant or a command line is another PROCESS and is not in the run: not
+greyed (`knownLimits`), refused in words by the work leases or the launcher.
+
+**The ending, shown once.** After the deploy: `run.EndPublish()`, THEN
+`run.NoteEnded(...)`, because the runner's own `IsRunning=false` arrives before the
+publish record ends — a view redrawing on it would leave Deploy greyed. Live views
+handle `Endings` by taking what the deploy left (links checklist, then folder
+problems) and calling `RefreshChrome`; the view that started a deploy and was left
+only deposits. A view appearing first notes `EndingToHideOnAppearing()` (an ending
+another view has shown), then takes. The console goes to the deploy when
+`IsShown(hidden, the view's own preview start)` says so: always while under way;
+afterwards only for an ending this view did not hide, and never over a preview of
+the section that started after the deploy did — a returning view has no preview
+start of its own, so the section's `PreviewLastStartedAt`, which both preview starts
+record, decides (the mac's M1 and L3).
+
+**One asker per question.** A deploy's credential question on a shared runner would
+otherwise be raised in every window showing the section, each sending its own answer
+to one prompt. `TaskProgressView` keeps a process-wide set of runners whose question
+is up; the first view asks, and a view taken off screen with the dialog up hands the
+question on (the next live view asks it) rather than cancelling it. A question that
+arrived while nobody showed the section is asked when a view registers the runner.
+For the mac: its `TaskProgressView` binds the alert and the credential sheet to
+`runner.isAwaitingInput` (`awaitingInputBinding`, `awaitingCredentialBinding`), so
+two windows on one section both present it; answering one clears `isAwaitingInput`
+and the other is dismissed by its binding (reported to the director, who files it).
+
+**`theAssistantWithNoWindow`.** The contract's case is a deploy recorded with no
+run (the mac's `AssistSiteWork`). Windows never reaches it: `AssistWindow.MainWindowForBuilds`
+opens a section window, so the in-app assistant's deploy IS the section's run and is
+shown on return. `SectionRunsTests.ReturningToASectionMidDeploy` simulates the
+state — a publish record with no run — to pin the rule only.
+
+**Kept, deliberately.** A preview being built still stops when its section is left
+(its port lease, its web view and the quit record belong to the window). No trail
+line for navigation (`rejected`): the fix REMOVES lines — the second "started
+deploy.ps1" and the launcher's refusal no longer happen.
+
+**Rejected on this side.** Leaving the deploy's claim in `_buildWork` and skipping
+its release on `Unloaded`: a view would still own a claim that outlives it.
+Removing finished runs, or making the store observable: a reader would watch an
+object nothing writes (the mac's reason). Making a run from `IsSectionBusy`: a
+caller off the interface thread would bind the runner to the wrong context — `Find`
+never creates.
+
+**Tests.** `SectionRunsTests` (the key, the store, `UnderWay`, `IsAsking`, the
+ending's order, take-and-clear, shown once, a later preview, and the eleven contract
+cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing never
+deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
+the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
+test `ReturningToASectionMidDeployUiTests`.
+
+---
+
 ## Scheduled deploys
 
 There is no `launchd`. `TaskScheduling` registers a task with **Task Scheduler**
@@ -1385,8 +1511,9 @@ the 2026-10-23 full run and passed alone).
 Until bundle 11 the suite drove no Preview and no Deploy, so course import,
 courses kept for reference, Copy a Page, preview and publishing had never been
 proven through the window. Russell lifted the rule against it — "I don't care
-if you have real build folders. We need to test this. End to end." — and five
-classes now run the real launchers:
+if you have real build folders. We need to test this. End to end." — and these
+classes run the real launchers (five at the time; more have joined since,
+`LaterClassesAtDeployUiTests` among them):
 
 | Class | What it drives | What it reads back |
 |---|---|---|
@@ -1395,6 +1522,7 @@ classes now run the real launchers:
 | `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
 | `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
 | `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+| `ReturningToASectionMidDeployUiTests` (#728) | Deploy of a two-section course to a folder, padded with 1,200 plain pages so the deploy outlasts leaving and coming back; section 2 and back mid-deploy; Section ▸ Deploy… and Ctrl+Shift+D tried while greyed; away while it ends, back twice | the "Deploying …-S1" progress and Cancel on return, Deploy and the menu item unavailable (asserted, since Invoke on a greyed button throws), "Done" once and then the ordinary state, and the trail: ONE "started deploy.ps1 UIBACK 1", no "already being deployed" |
 
 **What a test that runs a launcher owes, and where it is done.** The launchers
 build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
@@ -4113,8 +4241,11 @@ that is why the two are separate commits in that order.
 The fix is structural, and two notes rather than one:
 
 - `_folderThisSectionWorksIn` — written where a folder is DECIDED: the two
-  preview starts, and the deploy only AFTER its own preview stop, so that stop
-  still names the preview's folder. Read by every stop.
+  preview starts. Read by every stop. (The deploy wrote it too, only AFTER its
+  own preview stop, until #728 moved the deploy's folder to its run —
+  `SectionDeployRun.Folder`, noted at the same point — because a deploy
+  outlives the view and Cancel from a view that came back must still aim at
+  it; "A section's deploy outlives its view" above.)
 - `_folderThisSectionRegisteredIn` — written once, `readonly`, at
   construction, and read only by `ReleaseLease`'s folder-keyed sweep. Kept
   apart from the work folder because a deploy starting in the one render pass
@@ -6739,8 +6870,9 @@ a change; a question after the stop would make Cancel cost the teacher the
 preview they were reading. The saved-settings notice and its "deployed using
 the saved settings" line moved AFTER the question (the plan review's M4): a
 Cancel must not leave either behind. A second Deploy press while the question
-is up returns at once (`_isAskingAboutLaterClasses`; `_isPreparingDeploy` is
-still false at that point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
+is up returns at once (`SectionDeployRun.IsAsking` since #728, on the run so
+a second window's press returns too; `IsPreparing` is still false at that
+point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
 reads that order from the source, as `ReferenceRefusalTests` already did for the
 reference refusal — the window cannot be built in a unit test.
 
@@ -6755,8 +6887,9 @@ record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
 stop: stopping the preview for a deploy that never starts would cost the
 teacher the page they were reading (2C's implementation review, L-1;
 `ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
-`IsSectionBusy` counts a deploy being prepared (`_isPreparingDeploy`) as well
-as one running. One check comes BEFORE that reading: a window already asking
+`IsSectionBusy` counts a deploy being prepared as well as one running — since
+#728 by asking the section's run, by the caller's folder
+(`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
 this question, or with any dialog up, answers `CannotAsk`, refused with
 `deployWaitsForAnOpenQuestion` and nothing stopped
 (`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
