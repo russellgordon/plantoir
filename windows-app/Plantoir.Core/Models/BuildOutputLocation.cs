@@ -90,10 +90,7 @@ public static class BuildOutputLocation
     /// </remarks>
     public static string WhereTheLaunchersBuild(string workingFolderPath)
     {
-        string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA") is { Length: > 0 } fromTheEnvironment
-            ? fromTheEnvironment
-            : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(localAppData, "Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolderPath));
+        return Path.Combine(AppDataRoot.AsTheLaunchersSeeIt, "builds", FolderContainers.FolderIdentifier(workingFolderPath));
     }
 
     /// <summary>

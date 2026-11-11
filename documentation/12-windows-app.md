@@ -757,7 +757,9 @@ computes `Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)` and
 then OVERWRITES `PLANTOIR_BUILD_ROOT` with it — so that variable, which
 `BuildsRootFor` honours, never moves where a build is written. The question
 "where did the launchers write this section's build records" now has one named
-answer, `BuildOutputLocation.WhereTheLaunchersBuild`, which ignores both, and
+answer, `BuildOutputLocation.WhereTheLaunchersBuild` (over
+`AppDataRoot.AsTheLaunchersSeeIt`, so `RealStateTripwireTests`' one-place rule
+holds), which ignores both, and
 the store reads through it (`SectionProblemsStoreTests.TheRecordsAreWhereTheLaunchersBuild`
 also reads the three launchers for that expression). It is read-only by
 intent. **The other readers were left on `BuildsRootFor`, deliberately:**
@@ -813,7 +815,8 @@ measured: the Tab-order rule needs the collapse anyway, and the collapse kept
 the scroll. **A collapsed `SelectorBar`'s items stay in the UI Automation tree,
 marked off screen** (measured): a test that asks whether the bar is shown must
 read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
-(selection follows focus, measured).
+(selection followed focus on the last run; one earlier run moved the focus
+only, so the UI test accepts either and says which).
 
 **The table.** Include (a box; ticked means included, every row starts ticked,
 for the session), Kind, Page (or Whole section / Whole course), Problem (the
