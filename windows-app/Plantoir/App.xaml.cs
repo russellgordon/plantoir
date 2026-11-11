@@ -235,7 +235,7 @@ public partial class App : Application
             try
             {
                 int pruned = ToolchainMirror.PruneIndexes(indexFolder, DateTime.UtcNow);
-                if (pruned > 0) LogDiagnostic($"Pruned {pruned} toolchain index file(s) nobody has used for a while");
+                if (pruned > 0) LogDiagnostic($"Pruned {pruned} mirror index file(s) unused for 90 days or left over");
             }
             catch (Exception ex) { LogDiagnostic($"index prune: {ex.Message}"); }
         });
