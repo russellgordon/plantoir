@@ -124,7 +124,7 @@ public class AssistScenarioTests : IDisposable
 
         // A scenario this app owes is held open by name: it must still FAIL,
         // and the day it passes this says to delete its ledger entry. (None
-        // is held today: #475's three landed with #489's 2C.)
+        // is held today: #690's "on a Mac without Obsidian" went with #720.)
         // Each case is its own test here, so the ledger's "it now passes"
         // direction is checked case by case rather than through GapsIn.
         if (NamedGapLedger.Holding(NamedGapLedger.AssistScenarios, scenarioName) is { } owed)
@@ -271,6 +271,8 @@ public class AssistScenarioTests : IDisposable
                     "notInTheList" => new OpenInObsidianPress.Opened(new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NotInTheList)),
                     "waitingForAnAnswer" => new OpenInObsidianPress.WaitingForAnAnswer(),
                     "alreadyOpening" => new OpenInObsidianPress.AlreadyOpening(),
+                    // #720 (the mac's #698): the press went ahead and handed Obsidian nothing.
+                    "didNotOpen" => new OpenInObsidianPress.DidNotOpen(),
                     var other => throw new InvalidOperationException($"{scenarioName}: obsidianPress {other}"),
                 };
                 return Task.FromResult(press);
@@ -711,13 +713,17 @@ public class AssistScenarioTests : IDisposable
         JsonNode.Parse(File.ReadAllText(ContractLoader.GetContractPath("assist-wording.json")))!
             ["wording"]!.AsObject());
 
-    /// <summary>"wording.deployed" to the real sentence, placeholders filled in.</summary>
+    /// <summary>
+    /// "wording.deployed" to the real sentence, placeholders filled in —
+    /// <c>{machine}</c> as this app says it (#720; the mac's
+    /// <c>sentence(named:)</c> fills it with <c>MachineWord.filling</c>).
+    /// </summary>
     private static string Sentence(string named)
     {
         string key = named.StartsWith("wording.", StringComparison.Ordinal) ? named["wording.".Length..] : named;
         var found = AllWording.Value[key]
             ?? throw new InvalidOperationException($"No sentence called {key} in assist-wording.json");
-        return found.GetValue<string>()
+        return MachineWord.Fill(found.GetValue<string>())
             .Replace("{course}", Course, StringComparison.Ordinal)
             .Replace("{section}", SectionNumber.ToString(), StringComparison.Ordinal)
             .Replace("{page}", PageInTheSentence.Value ?? "Unit 1, Day 1", StringComparison.Ordinal);

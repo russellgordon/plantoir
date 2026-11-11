@@ -30,6 +30,9 @@ public class MachineWordContractTests
     {
         ["shared-rules.json:appUpdates.wording.elsewhereWork"] = filled =>
             filled == UpdateWording.ElsewhereWork("{course}") ? null : $"UpdateWording says \"{UpdateWording.ElsewhereWork("{course}")}\"",
+        // #720 (the mac's #698): the assistant's Open in Obsidian where Obsidian is not installed.
+        ["assist-wording.json:wording.obsidianIsNotOnThisMachine"] = filled =>
+            filled == AssistWording.ObsidianIsNotOnThisMachine() ? null : $"AssistWording says \"{AssistWording.ObsidianIsNotOnThisMachine()}\"",
         ["app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence"] = filled =>
             filled == PreviewReachability.Sentence(PreviewReachability.Verdict.TheSiteNeverAnswered)
                 ? null : $"PreviewReachability says \"{PreviewReachability.Sentence(PreviewReachability.Verdict.TheSiteNeverAnswered)}\"",

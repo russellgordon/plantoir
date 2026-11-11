@@ -641,8 +641,11 @@ public sealed class ObsidianOpenRouteTests : IDisposable
 
     /// <summary>
     /// The runner's reply to a press that failed says nothing false: not "no
-    /// window", not "opened" - openInObsidianIsInTheSectionWindow, whose every
-    /// clause is true (the contract has no sentence for a failed press).
+    /// window", not "opened" - the contract's openInObsidianDidNotOpen (#720,
+    /// the mac's #698), both for a press that reported DidNotOpen and for one
+    /// that THREW, which the runner's own catch turns into DidNotOpen. Until
+    /// #720 this was openInObsidianIsInTheSectionWindow, which is written for
+    /// an assistant in another app.
     /// </summary>
     [Theory]
     [InlineData(true)]
@@ -666,7 +669,7 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         };
         var (answer, handed) = await runner.Run(call, default);
         Assert.True(handed);
-        Assert.Equal(Plantoir.Core.Assist.AssistWording.OpenInObsidianIsInTheSectionWindow("MPM2D", "1"), answer.Summary);
+        Assert.Equal(Plantoir.Core.Assist.AssistWording.OpenInObsidianDidNotOpen("MPM2D", "1"), answer.Summary);
     }
 
     /// <summary>A server that is never to be called: the app answers open_in_obsidian.</summary>
