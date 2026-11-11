@@ -140,23 +140,83 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
             if (_publishStopped == value) return;
             _publishStopped = value;
             Raise(nameof(PublishStopped));
-            Raise(nameof(WarningVisibility));
-            Raise(nameof(WarningTooltip));
+            RaiseTheWarning();
         }
     }
 
+    private bool _hasProblems;
+    /// <summary>
+    /// Whether this section's OWN Problems record has a row (#734,
+    /// <c>sectionProblems.sectionMarker</c>): read from memory
+    /// (<see cref="Plantoir.Core.Models.SectionProblems.HasMarker"/>) on every
+    /// reconcile and whenever the store says a record changed — never from
+    /// disk while the tree draws.
+    /// </summary>
+    public bool HasProblems
+    {
+        get => _hasProblems;
+        set
+        {
+            if (_hasProblems == value) return;
+            _hasProblems = value;
+            Raise(nameof(HasProblems));
+            RaiseTheWarning();
+        }
+    }
+
+    /// <summary>The course a section row belongs to, for the warning's id; empty on any other row.</summary>
+    public string CourseCode { get; init; } = "";
+
+    /// <summary>The section a section row is; 0 on any other row.</summary>
+    public int SectionNumber { get; init; }
+
+    private void RaiseTheWarning()
+    {
+        Raise(nameof(WarningVisibility));
+        Raise(nameof(WarningTooltip));
+        Raise(nameof(WarningId));
+    }
+
     public string WarningGlyph => Glyphs.Warning;
+
+    /// <summary>
+    /// ONE warning glyph for both reasons (#734, <c>sectionMarker.rule</c>;
+    /// #717 plan review, MED 7): a stopped scheduled deploy, and problems the
+    /// section's last build found. Two near-identical glyphs with two meanings
+    /// was rejected on the mac and is not copied here.
+    /// </summary>
     public Visibility WarningVisibility =>
-        PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
-    // The mac's sentence (SidebarView.stoppedPublishTooltip), word for word
-    // since #441 (v1.4.4). It names no date deliberately: the badge can stand
-    // for days if nobody dismisses it, and a hover that said "on Tuesday"
-    // would have to be right about WHICH Tuesday; the section's own notice
-    // carries the date in full.
-    public string WarningTooltip => PublishStopped is not null
-        ? "A deploy that was set to happen on its own did not get through. " +
-          "Open this section to see what happened."
-        : "";
+        PublishStopped is not null || HasProblems ? Visibility.Visible : Visibility.Collapsed;
+
+    // The stopped deploy's sentence is the mac's (SidebarView.stoppedPublishTooltip),
+    // word for word since #441 (v1.4.4). It names no date deliberately: the
+    // badge can stand for days if nobody dismisses it, and a hover that said
+    // "on Tuesday" would have to be right about WHICH Tuesday; the section's
+    // own notice carries the date in full. Then markerHelp, when the section's
+    // last build found problems — each sentence that applies, in that order.
+    public const string StoppedPublishWarning =
+        "A deploy that was set to happen on its own did not get through. " +
+        "Open this section to see what happened.";
+
+    /// <summary>
+    /// What the warning says — its tooltip, its Name and the ROW's help text,
+    /// so Narrator says it on the row (a tooltip on a child icon is not read).
+    /// </summary>
+    public string WarningTooltip => string.Join(" ", new[]
+    {
+        PublishStopped is not null ? StoppedPublishWarning : "",
+        HasProblems ? Plantoir.Core.Models.SectionProblemsWording.MarkerHelp : "",
+    }.Where(sentence => sentence.Length > 0));
+
+    /// <summary>
+    /// The warning's automation id, unique across the window: the course is
+    /// in it as well as the section (review change 3), and it names the
+    /// stopped deploy when that applies, so a test that finds that one still
+    /// does (the mac's <c>stoppedPublishBadge-</c> / <c>problemsBadge-</c>).
+    /// </summary>
+    public string WarningId => PublishStopped is not null
+        ? $"stoppedPublishBadge-{CourseCode}-section{SectionNumber}"
+        : $"problemsBadge-{CourseCode}-section{SectionNumber}";
 }
 
 public sealed partial class SidebarPane : UserControl
@@ -306,6 +366,25 @@ public sealed partial class SidebarPane : UserControl
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection))
                 RefreshMinusButton(_window.CurrentSituation());
         };
+    }
+
+    /// <summary>
+    /// The store read a record again (#734): every section row's warning is
+    /// set from memory, without rebuilding the tree or reading anything.
+    /// </summary>
+    public void RefreshProblemMarkers()
+    {
+        string? folder = Workspace.WorkspacePath;
+        void Walk(IEnumerable<SidebarRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                if (row.SectionNumber > 0 && row.CourseCode.Length > 0)
+                    row.HasProblems = SectionProblems.HasMarker(folder, row.CourseCode, row.SectionNumber);
+                Walk(row.Children);
+            }
+        }
+        Walk(_roots);
     }
 
     // ---- Building the tree ----------------------------------------------
@@ -795,6 +874,8 @@ public sealed partial class SidebarPane : UserControl
                     Glyph = DocumentGlyph,
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
+                    CourseCode = course.Code,
+                    SectionNumber = number,
                 };
             row.Menu = ReferenceCourse.IsKeptForReference(course) ? ReferenceSectionMenu(course, number) : SectionMenu(course, number);
             // Re-read on EVERY pass, not only when the row is first created —
@@ -820,6 +901,10 @@ public sealed partial class SidebarPane : UserControl
                 outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
                     ? result.When
                     : null;
+            // #734: the section's OWN Problems record has a row — from the
+            // store's memory, never the disk; the store reads the files at the
+            // moments one can have changed and says so (OnProblemsChanged).
+            row.HasProblems = SectionProblems.HasMarker(Workspace.WorkspacePath, course.Code, number);
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);

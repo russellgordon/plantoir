@@ -170,6 +170,12 @@ public sealed partial class MainWindow : Window
                 // here until something else happened to reload the tree.
                 if (Workspace.State == WorkspaceState.Ready) Sidebar.Refresh();
                 ApplyMenuEnablement();
+                // #734: a build this window did not watch — the MCP server's, a
+                // terminal's, a scheduled run's — may have rewritten a section's
+                // Problems record. Activated fires often (focus moving between
+                // this window and a dialog of its own fires it again), so it is
+                // read at most every few seconds, and off this thread.
+                ReadTheProblems(throttled: true);
             }
         };
         // Covers app launch itself, in case the window's first Activated
@@ -213,9 +219,28 @@ public sealed partial class MainWindow : Window
                 if (IsClosed || Workspace.State != WorkspaceState.Ready) return;
                 Sidebar.Refresh();
                 if (DetailHost.Content is Views.SectionDetailView detail) detail.ShowHowTheScheduledPublishTurnedOut();
+                ReadTheProblems(throttled: false);   // #734: the run built, so its record moved
             });
         }
         Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += ScheduledRecordsChanged;
+
+        // #734: a section's Problems record. Its sidebar marker follows the
+        // store, which says when it read something new; a run in this app that
+        // printed PLANTOIR_PROBLEMS: has the course read again for this
+        // window's folder. Static events, so let go on close.
+        void ProblemsChanged(string folder, string course)
+        {
+            if (IsClosed) return;
+            DispatcherQueue.TryEnqueue(() => { if (!IsClosed) Sidebar.RefreshProblemMarkers(); });
+        }
+        void ProblemsMarkerArrived(SectionProblemsMarker marker)
+        {
+            if (IsClosed || Workspace.WorkspacePath is not { } folder) return;
+            if (Workspace.Courses.FirstOrDefault(c => c.Code.Equals(marker.Course, StringComparison.OrdinalIgnoreCase)) is not { } course) return;
+            _ = SectionProblems.ReloadAsync(folder, course.Code, course.SectionNumbers.ToList());
+        }
+        SectionProblems.Changed += ProblemsChanged;
+        SectionProblems.MarkerArrived += ProblemsMarkerArrived;
 
         // #473: the folder's copy of the tools started or ended — on the
         // copy's own thread, so carried to this window's. Static like the two
@@ -259,6 +284,8 @@ public sealed partial class MainWindow : Window
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
             // The event is static: a subscription left behind would root this window.
             Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
+            SectionProblems.Changed -= ProblemsChanged;
+            SectionProblems.MarkerArrived -= ProblemsMarkerArrived;
             OpenRecentList.Changed -= OpenRecentChanged;   // static too (#488)
             Workspace.UnregisterWindow();
         };
@@ -278,6 +305,8 @@ public sealed partial class MainWindow : Window
                 && _verbs is not null && !WorkingFolder.IsTheSame(_verbsFolder, Workspace.WorkspacePath)) DropVerbs();
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)
                 or nameof(WorkspaceViewModel.Courses)) { ShowDetailForSelection(); ApplyMenuEnablement(); }
+            // #734: the folder's courses loaded (or changed): read their records.
+            if (args.PropertyName is nameof(WorkspaceViewModel.Courses)) ReadTheProblems(throttled: false);
             // The selection is part of the window's memory (row 99).
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection)) App.RememberOpenWindows();
         };
@@ -1193,6 +1222,23 @@ public sealed partial class MainWindow : Window
             Workspace.IsShowingArchived,
             Workspace.Selection?.Serialized,
             Workspace.IsShowingBackups);
+    }
+
+    private DateTime _problemsReadAt = DateTime.MinValue;
+
+    /// <summary>
+    /// Reads every course's Problems record for this window's folder, on a
+    /// worker (#734, <see cref="SectionProblems.ReloadAllAsync"/>). Throttled
+    /// for window activation, which fires on every return of focus: at most
+    /// once in three seconds. A record that has not moved costs a stat.
+    /// </summary>
+    private void ReadTheProblems(bool throttled)
+    {
+        if (IsClosed || Workspace.State != WorkspaceState.Ready || Workspace.WorkspacePath is not { } folder) return;
+        var now = DateTime.UtcNow;
+        if (throttled && now - _problemsReadAt < TimeSpan.FromSeconds(3)) return;
+        _problemsReadAt = now;
+        _ = SectionProblems.ReloadAllAsync(folder, Workspace.Courses.ToList());
     }
 
     // ---- State switching -------------------------------------------------
