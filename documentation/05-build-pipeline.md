@@ -2095,12 +2095,39 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   every mac workspace sets `PLANTOIR_TOOLCHAIN_ID`, so `current_toolchain_id`
   never reaches the hash there; the image TAG changes once because
   `scripts/` changed, as any shared-Python change does.
-- **The id is remembered, because the hash is slow here.** Measured on a
-  Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro 26200, Defender
-  real-time protection on), a working folder outside OneDrive, the runtime's
-  Python 3.14.10: 13,029 files, 40.8 MB; the content hash took **131 s the
-  first time** the files were read that session and **2.4–3.1 s warm**
-  (median of four), at the start of every build, previews included. So where
+- **Course SETUP's folders are not the toolchain.** `support/example_content`,
+  `support/example_course` and `support/skeletons` (top level of `support/`
+  only; `_SUPPORT_NOT_BUILT_FROM`) are left out of the identity. Read by
+  grep of every `SUPPORT_DIR` reader: only `setup_course.py` (and the
+  image-only `check_runner_rules_against_the_site.py`) reads them; nothing
+  `build_site.py`, `deploy.py` or `site_said.py` imports does, and the
+  launchers' build path does not either, so a change to them cannot change a
+  built site. They are most of `support/` by count, and the review measured
+  why that matters (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
+  Defender on, runtime Python 3.14.10, folders untouched since October):
+  `.toolchain\support` 12,655 files read in **105.8 s cold**,
+  `example_content` alone 9,829 files in 91.9 s, everything else about 4.3 s.
+  1.9.0 took no hash on Windows, so including them would have added that wait,
+  silently, to the first build in EVERY working folder after the update — and
+  again after each later update that changed any toolchain file, since the
+  app's mirror skips unchanged files by size and time and they stay cold.
+  (The first measurement here, 131 s over 13,029 files, was that cost.) On
+  the mac nothing changes: every workspace sets `PLANTOIR_TOOLCHAIN_ID`, so
+  the hash never runs; a build there run by hand without it would merely not
+  rebuild a site when only those three folders changed — which no built site
+  can show.
+- **The id is remembered, because even the rest is slow to read cold.** With
+  the three folders left out, the same machine: 499 files, 22.8 MB on a
+  current `.toolchain` (warm: content hash **0.13 s**, stat walk 0.01 s);
+  a folder last written 2026-10-16 and not read by this session (337 files,
+  20.1 MB): **1.63 s** the first read, 0.12 s after. "Cold" is the best this
+  PC allows without an administrator's tool to empty the file cache: the
+  machine had been up since 2026-10-14, so a folder not read in this session
+  may still have been cached, and another session may have read it; the
+  runtime's `quartz` sources, which every build here reads, were warm. The
+  cost is paid at the first build in a working folder after installing, or
+  after an update that changed any toolchain file — not per session: a
+  reboot alone costs a cache hit, because the fingerprint reads no files. So where
   `PLANTOIR_BUILD_ROOT` is set (Windows only; never in the container) the id
   is kept in `<build root>\.toolchain-id.cache` — one line holding a
   fingerprint, one the id. The fingerprint is a sha256 over every file's
@@ -2108,9 +2135,10 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   paths (the scripts come from `.toolchain` or the folder itself,
   `deploy.ps1`'s `Enter-NativeRuntime`). Walked with `os.scandir` and
   `DirEntry.stat()`, which on Windows read the size and time from the
-  directory listing: 0.28–0.34 s, against 0.94 s for `os.walk` + `os.stat`;
-  stat only, so a OneDrive file that is only in the cloud is not downloaded by
-  asking. A hit costs **0.40 s** in all. The cache is written through
+  directory listing (over the 13,029 files before the exclusion: 0.28–0.34 s,
+  against 0.94 s for `os.walk` + `os.stat`); stat only, so a OneDrive file that
+  is only in the cloud is not downloaded by asking. A hit costs **0.01 s**
+  (0.40 s before the exclusion). The cache is written through
   `<name>.<pid>.tmp` and `os.replace`; any failure (another process reading
   it) is ignored and the id is worked out next time. **Racy-entry rule
   (git's):** it is not written while any file is younger than 2 s, so an edit
@@ -2132,6 +2160,14 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   fixed with #749: the stamp makes a skipped rebuild safe for the toolchain
   and the runtime, but not for an edited page, which deploy.py does not ask
   about; at the command line the bug is what rebuilds an edited page today.
+  **A safe fix is more than the path.** Pointing it at
+  `toolchain_paths.WORK_DIR` alone would make a `deploy.bat` typed after an
+  edit deploy the last build. It needs a page-freshness signal handed over by
+  whoever knows — the app, which already asks `BuildFreshness` before every
+  window deploy (the assistant always builds, the scheduled wrapper asks its
+  shell twin) — or deploy.py asking the same question itself; and a decision
+  on whether the command line should keep the mac's "deploy publishes what
+  was built" shape.
 
 ## Printable pages: what the build does (#454, v1.6.0)
 

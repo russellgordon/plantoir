@@ -429,7 +429,18 @@ if (-not $TARGET_WAS_GIVEN -and -not $TO_FOLDER -and (Test-Path -LiteralPath $re
       }
       Write-Host ""
       Write-Host ("Deploying {0} section {1} to {2}, as its settings say." -f $COURSE_CODE, $SECTION_NUM, $leg.Words)
-      $legArguments = @($COURSE_CODE, [string]$SECTION_NUM) + $DEPLOY_FLAGS_AS_GIVEN + $leg.Flags
+      $legArguments = @()
+      foreach ($argument in (@($COURSE_CODE, [string]$SECTION_NUM) + $DEPLOY_FLAGS_AS_GIVEN + $leg.Flags)) {
+        # Windows PowerShell 5.1 wraps an argument with a space in quotes and
+        # escapes nothing, so a saved folder like C:\Sites\pub one\ reached
+        # the leg as C:\Sites\pub one" - the last backslash escaped the
+        # quote (measured, #749's review). Doubling the trailing backslashes
+        # of such an argument is what the program's own reading undoes. A
+        # quote cannot be in a Windows folder name, so none is handled.
+        $text = [string]$argument
+        if ($text -match '\s' -and $text -match '\\+$') { $text = $text + $Matches[0] }
+        $legArguments += $text
+      }
       # A leg is this script again, in a powershell.exe of its own, so its
       # every exit (a refusal, a question nobody can answer) ends that leg and
       # not this run. It inherits this console, so a question still reaches

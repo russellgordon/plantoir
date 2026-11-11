@@ -336,6 +336,17 @@ BUILT_WITH_TOOLCHAIN_MARKER = ".built-with-toolchain"
 # packages, which are pinned by the recipe rather than read from it.
 _NOT_THE_TOOLCHAIN = {"__pycache__", "node_modules"}
 
+# Folders of support/ that no BUILD or DEPLOY reads, only course SETUP: the
+# ready-made courses (example_content, example_course) and the generated
+# skeletons. Read by setup_course.py when a course is made or pre-populated,
+# and by nothing build_site.py, deploy.py or site_said.py imports (#749's
+# review, by grep of every SUPPORT_DIR reader). Left out of the identity
+# because they are most of support/ by count - measured on a Lenovo 20QES70500,
+# 9,829 of support's 12,655 files are example_content alone, 91.9 s of a
+# 105.8 s cold read - and a change to them cannot change a built site. Top
+# level of support/ only; the same names anywhere else are hashed.
+_SUPPORT_NOT_BUILT_FROM = {"example_content", "example_course", "skeletons"}
+
 
 # The bundled runtime's own record of what it carries (Windows: <runtime>\
 # manifest.json, written by fetch-runtime.ps1 and naming every pin - node,
@@ -376,7 +387,8 @@ def _the_toolchain_files():
     os.scandir and DirEntry.stat, because on Windows the directory listing
     already carries the size and the time: measured on a Lenovo 20QES70500
     (i5-8365U, Windows 11 26200), 13,029 files, 0.34 s against os.walk and
-    os.stat's 0.94 s."""
+    os.stat's 0.94 s (both before support's setup-only folders were left
+    out, which leaves a few hundred)."""
     found = []
     for label, root in _toolchain_roots():
         if not root.is_dir():
@@ -396,6 +408,8 @@ def _the_toolchain_files():
                 try:
                     if entry.is_dir(follow_symlinks=False):
                         if name in _NOT_THE_TOOLCHAIN:
+                            continue
+                        if label == "support" and prefix == "" and name in _SUPPORT_NOT_BUILT_FROM:
                             continue
                         pending.append((entry.path, prefix + name + "/"))
                         continue
@@ -493,14 +507,15 @@ def _remember_id(cache: Path, fingerprint: str, identity: str, files) -> None:
 def _hash_of_the_toolchain_files() -> str:
     """A hash of every file under the scripts, support, contracts and the
     Quartz scaffold's own sources, by relative path and content, and of the
-    bundled runtime's manifest when there is one. Measured in the container on
-    2026-11-01: 12,911 files in 0.3 s. Measured natively on Windows on
-    2026-11-11 (Lenovo 20QES70500, i5-8365U, Windows 11 26200, Defender on,
-    a working folder outside OneDrive): 13,029 files, 40.8 MB, 3.0 s warm and
-    131 s on the first run after the files had gone cold - so where
+    bundled runtime's manifest when there is one; support's setup-only
+    folders are left out (_SUPPORT_NOT_BUILT_FROM). Measured in the container
+    on 2026-11-01: 12,911 files in 0.3 s. Measured natively on Windows on
+    2026-11-11 (Lenovo 20QES70500, i5-8365U, Windows 11 26200, Defender on):
+    with those folders, 13,029 files and 131 s on a cold first read; without
+    them, 337-499 files, 1.63 s on a first read and 0.13 s warm - and where
     PLANTOIR_BUILD_ROOT is set the id is remembered against a stat-only
     fingerprint of the same files and only worked out again when that
-    changes."""
+    changes (a hit: 0.01 s)."""
     files = _the_toolchain_files()
     cache = _toolchain_id_cache()
     if cache is None:

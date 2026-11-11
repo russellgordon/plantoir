@@ -288,6 +288,28 @@ class WhichToolchainThisIs(unittest.TestCase):
         self.assertNotEqual(with_one, toolchain_paths.current_toolchain_id(),
                             "a runtime-only change (a new Python) did not change the toolchain")
 
+    def test_only_the_setup_folders_of_support_are_left_out(self):
+        # Exactly these three, at the top of support/ only: what course SETUP
+        # reads and no build or deploy does (#749's review).
+        self.assertEqual(toolchain_paths._SUPPORT_NOT_BUILT_FROM,
+                         {"example_content", "example_course", "skeletons"})
+        before = toolchain_paths.current_toolchain_id()
+        for folder in ("example_content/ADA1O", "example_course/EXC2O", "skeletons/arts"):
+            page = self.tmp / "support" / folder / "page.md"
+            page.parent.mkdir(parents=True)
+            page.write_text("a page a course is made from\n", encoding="utf-8")
+        self.assertEqual(before, toolchain_paths.current_toolchain_id(),
+                         "a file only course setup reads changed the toolchain")
+        nested = self.tmp / "support" / "quartz" / "example_content" / "note.scss"
+        nested.parent.mkdir(parents=True)
+        nested.write_text("a {}\n", encoding="utf-8")
+        self.assertNotEqual(before, toolchain_paths.current_toolchain_id(),
+                            "the same name deeper in support/ is a file a build reads")
+        between = toolchain_paths.current_toolchain_id()
+        (self.tmp / "support" / "colour_schemes.json").write_text("{}\n", encoding="utf-8")
+        self.assertNotEqual(between, toolchain_paths.current_toolchain_id(),
+                            "a file elsewhere in support/ no longer changed the toolchain")
+
     def test_the_remembered_id_is_used_while_nothing_has_changed(self):
         cache = self._use_a_cache()
         self._age_everything()

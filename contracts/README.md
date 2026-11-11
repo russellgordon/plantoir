@@ -1735,8 +1735,10 @@ the legs, or "cannot be read"). Both run on Windows against the real
 `deploy.ps1` (`windows-app/test_launcher_rules.ps1`). **They do NOT turn the
 mac red**: nothing there reads either key yet; the `mac` issue asks
 `scripts/test_deploy_token_refusal.py` and `scripts/test_deploy_sh_destination.py`
-to run them against `deploy.sh`, and says the one pattern change deploy.sh
-needs (`[[:space:]]` to a bracket of a space and a tab). `activityTrail.mustRecord`
+to run them against `deploy.sh`, and says why the contract spells its
+patterns with a bracket of a space and a tab rather than deploy.sh's
+`[[:space:]]` (which .NET misreads; deploy.sh's own spelling is correct for
+grep). `activityTrail.mustRecord`
 is unchanged (no event for these, as on the mac for #746, #716 and #668's
 launcher half).
 

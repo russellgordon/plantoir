@@ -696,6 +696,18 @@ function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-T
             $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
             Report 'realDeploy' 'the run ends with the first failing leg''s code (3 then 1)' ($run.Code -eq 3) ("exit $($run.Code); said: " + $run.Said)
 
+            # A saved folder with a space AND a trailing separator, handed to a
+            # leg's own powershell.exe (#749's review): Windows PowerShell 5.1
+            # quotes it as "...\pub one\", and a backslash before the closing
+            # quote escapes it, so the leg would read a folder ending in a quote.
+            $env:STAMP_STUB = 'yes'
+            $spaced = Join-Path $work 'pub one'
+            $plain = Join-Path $work 'pubtwo'
+            Set-Settings ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + ($spaced + '\').Replace('\', '\\') + '","additional_deploy_targets":[{"type":"local_folder","path":"' + ($plain + '\').Replace('\', '\\') + '"}]}')
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
+            $bothWritten = (Test-Path -LiteralPath (Join-Path $spaced 'section1\index.html')) -and (Test-Path -LiteralPath (Join-Path $plain 'section1\index.html'))
+            Report 'realDeploy' 'a saved folder with a space and a trailing separator is the folder each leg publishes to' ($bothWritten -and $run.Code -eq 0) ("exit $($run.Code); said: " + $run.Said)
+
             # Settings that cannot be read refuse, and never fall back to
             # Netlify (which, in this copy, would meet a stand-in token).
             Set-Settings '{ not json'
