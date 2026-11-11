@@ -54,9 +54,47 @@ public static class QuestionAskers
         lock (s_gate)
         {
             released = s_asking.TryGetValue(runner, out var holder) && ReferenceEquals(holder, asker);
-            if (released) s_asking.Remove(runner);
+            if (released) { s_asking.Remove(runner); s_handOnWhenDone.Remove(runner); }
         }
         if (released) LeftUnanswered?.Invoke(runner);
+    }
+
+    private static readonly HashSet<ScriptRunner> s_handOnWhenDone = new();
+
+    /// <summary>
+    /// The asker is leaving while its dialog is still OPEN: the question is
+    /// handed on only when that dialog has finished closing
+    /// (<see cref="Done"/>), never at once. WinUI allows one ContentDialog per
+    /// window and refuses a second while the first is still closing
+    /// (documentation/12-windows-app.md), so a hand-on made at once, in the
+    /// same window, had the next view's ShowAsync throw — after which nobody
+    /// asked and the deploy waited for an answer for ever (#728's third review).
+    /// <see cref="HandOn"/> stays for an asker that never got a dialog up.
+    /// </summary>
+    public static void HandOnWhenDone(ScriptRunner runner, object asker)
+    {
+        lock (s_gate)
+            if (s_asking.TryGetValue(runner, out var holder) && ReferenceEquals(holder, asker))
+                s_handOnWhenDone.Add(runner);
+    }
+
+    /// <summary>
+    /// The asker's dialog has closed (its ShowAsync returned, or it was never
+    /// shown): its claim is let go, and a hand-on asked for meanwhile happens
+    /// now — exactly once.
+    /// </summary>
+    public static void Done(ScriptRunner runner, object asker)
+    {
+        bool handOn = false;
+        lock (s_gate)
+        {
+            if (s_asking.TryGetValue(runner, out var holder) && ReferenceEquals(holder, asker))
+            {
+                s_asking.Remove(runner);
+                handOn = s_handOnWhenDone.Remove(runner);
+            }
+        }
+        if (handOn) LeftUnanswered?.Invoke(runner);
     }
 
     /// <summary>
@@ -73,7 +111,7 @@ public static class QuestionAskers
     /// <summary>For tests only.</summary>
     internal static void Reset()
     {
-        lock (s_gate) s_asking.Clear();
+        lock (s_gate) { s_asking.Clear(); s_handOnWhenDone.Clear(); }
         LeftUnanswered = null;
     }
 }

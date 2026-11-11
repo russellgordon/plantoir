@@ -83,11 +83,25 @@ public sealed partial class TaskProgressView : UserControl
             // view's dialog (it sits on the window, not in the view, so it
             // would otherwise stay up) and hand the question on rather than
             // cancel it. The dialog's own ending then sends nothing (_leaving).
+            //
+            // With a dialog UP, the hand-on waits until that dialog has
+            // CLOSED (AskQuestion's finally → QuestionAskers.Done): the next
+            // view is usually in this same window, and WinUI refuses a second
+            // ContentDialog while the first is still closing — handed on at
+            // once, the next ShowAsync threw and nobody asked again (#728's
+            // third review). With none up yet, it is handed on at once.
             if (_askingFor is { } asked)
             {
-                _askingFor = null;
-                try { _openQuestion?.Hide(); } catch { }
-                QuestionAskers.HandOn(asked, this);
+                if (_openQuestion is { } open)
+                {
+                    QuestionAskers.HandOnWhenDone(asked, this);
+                    try { open.Hide(); } catch { }
+                }
+                else
+                {
+                    _askingFor = null;
+                    QuestionAskers.HandOn(asked, this);
+                }
             }
         }
     }
@@ -200,6 +214,15 @@ public sealed partial class TaskProgressView : UserControl
     {
         if (e.PropertyName == nameof(ScriptRunner.IsAwaitingInput) && runner.IsAwaitingInput)
             _ = AskQuestion(runner);
+        // The question went away under its dialog — the deploy was cancelled
+        // from another window, or it ended: close the stale dialog. Its ending
+        // sends nothing, because the runner no longer waits (WhatToDo).
+        if (e.PropertyName is nameof(ScriptRunner.IsAwaitingInput) or nameof(ScriptRunner.IsRunning)
+            && (!runner.IsAwaitingInput || !runner.IsRunning)
+            && ReferenceEquals(_askingFor, runner) && _openQuestion is { } stale)
+        {
+            try { stale.Hide(); } catch { }
+        }
         if (e.PropertyName == nameof(ScriptRunner.LastExitCode) && !runner.IsRunning
             && ReferenceEquals(runner, _runner))
             AutoExpandOnUnexplainedFailure();
@@ -470,8 +493,17 @@ public sealed partial class TaskProgressView : UserControl
         if (!QuestionAskers.TryClaim(runner, this)) return;   // another view is asking it
         _questionDialogShowing = true;
         _askingFor = runner;
+        bool askAgain = false;
         try
         {
+            // Another dialog up in this window (a question handed on as it
+            // closes, a folder problem, a refusal): wait for it — WinUI shows
+            // one ContentDialog at a time and throws for a second.
+            for (int waited = 0; Plantoir.Services.DialogGate.IsOpen(XamlRoot) && waited < 150; waited++)
+            {
+                await System.Threading.Tasks.Task.Delay(200);
+                if (_leaving || !runner.IsAwaitingInput || XamlRoot is null) return;
+            }
             var req = Plantoir.Core.Scripting.CredentialRequests.MatchPrompt(runner.PendingQuestion);
             bool richDialogShown = false;
             if (req is not null)
@@ -577,12 +609,27 @@ public sealed partial class TaskProgressView : UserControl
                 }
             }
         }
+        catch (Exception ex)
+        {
+            // A dialog that could not be shown (another one opened in the same
+            // beat, say) must not leave the deploy waiting with nobody asking:
+            // ask again shortly, if this view is still here and it still waits.
+            App.LogDiagnostic($"The question dialog could not be shown: {ex.Message}");
+            askAgain = !_leaving && runner.IsAwaitingInput;
+        }
         finally
         {
             _questionDialogShowing = false;
             _openQuestion = null;
-            QuestionAskers.Release(runner, this);
             if (ReferenceEquals(_askingFor, runner)) _askingFor = null;
+            // Lets the claim go and, if this view left with the dialog up,
+            // hands the question on NOW — after the dialog has closed.
+            QuestionAskers.Done(runner, this);
+        }
+        if (askAgain)
+        {
+            await System.Threading.Tasks.Task.Delay(500);
+            if (!_leaving && runner.IsAwaitingInput) _ = AskQuestion(runner);
         }
     }
 

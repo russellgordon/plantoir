@@ -155,10 +155,17 @@ public sealed class SectionDeployRunSourceTests
         Assert.Contains("if (runner.IsAwaitingInput) _ = AskQuestion(runner);", panel);
         // The rule is QuestionAskers' (QuestionAskersTests); the panel must use it.
         Assert.Contains("QuestionAskers.TryClaim(runner, this)", panel);
-        Assert.Contains("QuestionAskers.HandOn(asked, this)", panel);
-        Assert.Contains("_openQuestion?.Hide()", panel);
-        Assert.True(panel.IndexOf("_openQuestion?.Hide()", StringComparison.Ordinal) < panel.IndexOf("QuestionAskers.HandOn(asked, this)", StringComparison.Ordinal),
-                    "the leaving view must close its dialog before handing the question on");
+        // Leaving with a dialog up: the hand-on is DEFERRED to the dialog's
+        // close (#728's third review), so the leaving branch asks for it and
+        // hides; the finally, after ShowAsync has returned, is what hands on.
+        string letGo = panel[panel.IndexOf("internal void LetGo()", StringComparison.Ordinal)..];
+        letGo = letGo[..letGo.IndexOf("private void AskIfStillWaiting", StringComparison.Ordinal)];
+        Assert.Contains("QuestionAskers.HandOnWhenDone(asked, this)", letGo);
+        Assert.Contains("open.Hide()", letGo);
+        Assert.Contains("QuestionAskers.Done(runner, this)", panel);
+        Assert.DoesNotContain("QuestionAskers.Release(runner, this)", panel);
+        // A dialog whose question went away (cancelled elsewhere, ended) is closed.
+        Assert.Contains("_openQuestion is { } stale", panel);
         Assert.Contains("QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput)", panel);
         Assert.DoesNotContain("ContentDialogResult.Primary) runner.SendLine", panel);
     }

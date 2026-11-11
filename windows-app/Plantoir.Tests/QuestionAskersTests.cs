@@ -54,6 +54,46 @@ public sealed class QuestionAskersTests : IDisposable
         Assert.False(QuestionAskers.TryClaim(runner, new object()), "the left view's release freed the new asker's claim");
     }
 
+    /// <summary>
+    /// A hand-on asked for while the leaving view's dialog is still OPEN waits
+    /// until that dialog has closed (<see cref="QuestionAskers.Done"/>), and
+    /// then exactly one view gets the question (#728's third review: handed
+    /// on at once, the next view in the same window met WinUI's one-dialog
+    /// rule, its ShowAsync threw, and nobody asked again).
+    /// </summary>
+    [Fact]
+    public void AHandOnWhileTheDialogIsOpen_WaitsUntilItCloses_ThenOneViewGetsIt()
+    {
+        var runner = new ScriptRunner();
+        object leaving = new(), next = new(), another = new();
+        var handedOn = new List<ScriptRunner>();
+        QuestionAskers.LeftUnanswered += handedOn.Add;
+        Assert.True(QuestionAskers.TryClaim(runner, leaving));
+
+        QuestionAskers.HandOnWhenDone(runner, leaving);   // the view leaves; its dialog is closing
+        Assert.Empty(handedOn);
+        Assert.False(QuestionAskers.TryClaim(runner, next), "the question was free while the old dialog was still up");
+
+        QuestionAskers.Done(runner, leaving);              // its ShowAsync has returned
+        Assert.Equal(new[] { runner }, handedOn);
+        Assert.True(QuestionAskers.TryClaim(runner, next));
+        Assert.False(QuestionAskers.TryClaim(runner, another), "two views got the handed-on question");
+
+        QuestionAskers.Done(runner, leaving);              // twice: nothing more
+        QuestionAskers.Done(runner, next);                 // the next view answers: an ordinary end
+        Assert.Single(handedOn);
+
+        // Not asked to hand on: Done only lets the claim go.
+        Assert.True(QuestionAskers.TryClaim(runner, another));
+        QuestionAskers.Done(runner, another);
+        Assert.Single(handedOn);
+        // A hand-on asked by a view that does not hold the claim is ignored.
+        Assert.True(QuestionAskers.TryClaim(runner, next));
+        QuestionAskers.HandOnWhenDone(runner, another);
+        QuestionAskers.Done(runner, next);
+        Assert.Single(handedOn);
+    }
+
     /// <summary>A dialog closing after its view left sends nothing, whichever button it reports.</summary>
     [Theory]
     [InlineData(true, false, true, QuestionAskers.Answer.Send)]

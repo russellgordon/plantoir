@@ -373,8 +373,11 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     internal void LetGoAsTheWindowCloses()
     {
-        OnUnloaded(this, new RoutedEventArgs());
+        // The panel first: it is what hands a question on and lets go of the
+        // shared runners, and the Unloaded work below redraws a window that is
+        // closing, which must not be able to skip it by throwing.
         Progress.LetGo();
+        OnUnloaded(this, new RoutedEventArgs());
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)

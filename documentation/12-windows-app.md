@@ -650,7 +650,16 @@ question; the first view asks. A view taken off screen with the dialog up — a 
 closing, or the assistant changing the selection under a credential dialog
 (`MainWindow.DeployForAsync`, `AskAboutClassesDatedLaterFor`) — closes its own dialog
 (`_openQuestion.Hide()`: the dialog sits on the window, not in the view) and hands
-the question on, the next live view asking it, rather than cancelling it. A dialog
+the question on rather than cancelling it — but only once that dialog has CLOSED:
+`QuestionAskers.HandOnWhenDone` marks it, and the dialog's own `finally`, after its
+`ShowAsync` has returned, calls `QuestionAskers.Done`, which lets the claim go and
+tells the next live view to ask. Handed on at once (the first build of this fix),
+the next view was usually in the SAME window, met WinUI's one-ContentDialog rule
+while the first was still closing, threw, and nobody asked again, so the deploy
+waited for ever (#728's third review, found by reading). A view asking also waits
+while any other dialog is up in its window (`DialogGate.IsOpen`), asks again
+shortly if `ShowAsync` throws all the same, and a dialog whose question went away —
+the deploy cancelled from another window, or ended — is closed. A dialog
 that closes after its view left sends nothing, whichever button it reports
 (`QuestionAskers.WhatToDo`), so the left view and the new asker can never both reach
 the one prompt (`QuestionAskersTests`; the hide itself is pinned by a source scan and

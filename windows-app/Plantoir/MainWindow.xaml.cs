@@ -1754,8 +1754,7 @@ public sealed partial class MainWindow : Window
         _trackedSettings = DetailHost.Content as CourseSettingsView;
         if (_trackedDetail is { } current) current.PreviewChromeChanged += DetailChanged;
         if (_trackedSettings is { } settings) settings.SaveStateChanged += DetailChanged;
-        // Closed takes the pane down (#728): a closed window's menus are not redrawn.
-        if (!IsClosed) ApplyMenuEnablement();
+        ApplyMenuEnablement();
     }
 
     private void DetailChanged(object? sender, EventArgs e) => ApplyMenuEnablement();
