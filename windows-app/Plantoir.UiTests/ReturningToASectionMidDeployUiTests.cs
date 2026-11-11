@@ -1,0 +1,130 @@
+using System.Diagnostics;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Input;
+using FlaUI.Core.Tools;
+using FlaUI.Core.WindowsAPI;
+using Xunit.Abstractions;
+
+namespace Plantoir.UiTests;
+
+/// <summary>
+/// #728 (the mac's #706) through the real window: a section left while its
+/// deploy runs and come back to shows THAT deploy, with Deploy unavailable,
+/// and starts nothing; a deploy that finished while the teacher was on another
+/// section is shown once, and after that the section is in its ordinary state
+/// (<c>shared-rules.json</c> → <c>returningToASectionMidDeploy</c>).
+/// </summary>
+/// <remarks>
+/// <para>Runs the real build and the real <c>deploy.ps1 --to-folder</c>, as
+/// <see cref="PublishToFolderUiTests"/> does — publish-to-a-folder only. The
+/// course is padded with plain pages so the deploy runs long enough to leave
+/// and come back while it is still building; the build's length is printed.</para>
+///
+/// <para>"Starts nothing" is read off the trail: exactly one "started
+/// deploy.ps1" line for the section, and no "already being deployed". A
+/// press on a greyed control cannot be made through UI Automation (Invoke on a
+/// disabled button throws), so the Deploy button is asserted unavailable, and
+/// the press is tried through Section ▸ Deploy… and its key, Ctrl+Shift+D.</para>
+/// </remarks>
+[Collection("drives the real app")]
+public class ReturningToASectionMidDeployUiTests
+{
+    private const string Code = "UIBACK";
+    private const int PaddingPages = 1200;
+    private static readonly TimeSpan LongEnough = TimeSpan.FromMinutes(15);
+
+    private readonly ITestOutputHelper _output;
+    public ReturningToASectionMidDeployUiTests(ITestOutputHelper output) => _output = output;
+
+    private static string Deploying(int section) => $"Deploying {Code}-S{section}";
+
+    private static bool Shows(DrivenApp app, string name) =>
+        app.Window.FindFirstDescendant(cf => cf.ByName(name)) is { IsOffscreen: false };
+
+    private static string[] TrailLines(DrivenApp app) => MenuBar.Trail(app).Split('\n');
+
+    [UiFact]
+    public void ReturningShowsTheDeploy_AndStartsNothing_ThenItsEndingOnce()
+    {
+        string? published = null;
+        using var app = new DrivenApp(courses =>
+        {
+            published = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(courses)!)!, "published");
+            Directory.CreateDirectory(published);
+            string dir = EndToEnd.WriteCourse(courses, Code, "Back Mid Deploy", new[] { "Concepts" },
+                config =>
+                {
+                    EndToEnd.PublishesTo(published)(config);
+                    config["num_sections"] = 2;
+                    config["section_numbers"] = new System.Text.Json.Nodes.JsonArray(1, 2);
+                });
+            Directory.CreateDirectory(Path.Combine(dir, "section2", "All Classes"));
+            File.WriteAllText(Path.Combine(dir, "section2", "index.md"), $"---\ntitle: {Code}\n---\n# Section 2\n");
+            for (int page = 1; page <= PaddingPages; page++)
+                EndToEnd.WritePage(Path.Combine(dir, "Concepts", $"Padding {page:0000}.md"),
+                    $"title: Padding {page:0000}\npublish: true", $"A page to make the build take a while ({page}).");
+        });
+        string siteIndex = Path.Combine(published!, "section1", "index.html");
+
+        app.SelectSection(Code, 1);
+        var deploy = app.Find("deployButton", "the Deploy button");
+        Assert.True(deploy.IsEnabled, "Deploy was unavailable before anything ran");
+        var pressed = Stopwatch.StartNew();
+        deploy.AsButton().Invoke();
+        Assert.True(Retry.WhileFalse(() => Shows(app, Deploying(1)), TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(250)).Result,
+                    "the deploy never showed its progress" + app.AnsweredSoFar);
+
+        // ---- Away to section 2 and back while it runs.
+        app.SelectSection(Code, 2);
+        Assert.True(Retry.WhileFalse(() => app.Find("deployButton", "section 2's Deploy button").IsEnabled,
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result,
+                    "another section's deploy greyed section 2's Deploy");
+        app.SelectSection(Code, 1);
+        Assert.False(File.Exists(siteIndex), $"the deploy finished in {pressed.Elapsed.TotalSeconds:0} s, before the test came back: raise PaddingPages");
+        Assert.True(Shows(app, Deploying(1)), "coming back showed a blank console, not the deploy still running");
+        Assert.False(app.Find("deployButton", "the Deploy button").IsEnabled, "Deploy was available mid-deploy on return");
+        var cancel = app.FindOrNull("taskCancelButton", TimeSpan.FromSeconds(5));
+        Assert.True(cancel is { IsOffscreen: false }, "the returned deploy's Cancel cannot be reached");
+        var items = MenuBar.Open(app, "Section", "sectionDeploy");
+        Assert.False(items["sectionDeploy"].IsEnabled, "Section ▸ Deploy… was live mid-deploy on return");
+        MenuBar.Close();
+        try { EndToEnd.PressMenuBarItem(app, "Section", "sectionDeploy"); }
+        catch (Exception refused)
+        {
+            _output.WriteLine($"the greyed Section ▸ Deploy… could not be pressed: {refused.GetType().Name}");
+            MenuBar.Close();
+        }
+        CopyAPageEscapeUiTests.Front(app);
+        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_D);
+        Thread.Sleep(1500);
+        Assert.Single(TrailLines(app), line => line.Contains($"started deploy.ps1 {Code} 1"));
+
+        // ---- Away again while it ends; it ended while the teacher was away.
+        app.SelectSection(Code, 2);
+        Assert.True(app.WaitAnsweringDialogs(() => File.Exists(siteIndex)
+                                                   && TrailLines(app).Any(line => line.Contains("finished deploy.ps1")),
+                                             LongEnough),
+                    "the deploy never finished" + app.AnsweredSoFar);
+        _output.WriteLine($"deployed {PaddingPages} padding pages in {pressed.Elapsed.TotalSeconds:0} s (pressed to finished, while away)");
+        Thread.Sleep(1500);
+        app.SelectSection(Code, 1);
+        Assert.True(Retry.WhileFalse(() => app.FindOrNull("taskPhaseLabel", TimeSpan.FromMilliseconds(300))?.Name == "Done",
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result,
+                    "a deploy that finished while away did not show how it ended");
+        Assert.True(Retry.WhileFalse(() => app.Find("deployButton", "the Deploy button").IsEnabled,
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result,
+                    "Deploy stayed unavailable after the deploy ended");
+
+        // ---- Shown once: the next visit is the section's ordinary state.
+        app.SelectSection(Code, 2);
+        app.SelectSection(Code, 1);
+        Assert.True(Retry.WhileFalse(() => !Shows(app, Deploying(1)), TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result,
+                    "a deploy whose ending was already shown came back on the next visit");
+        Assert.True(app.Find("deployButton", "the Deploy button").IsEnabled, "Deploy was unavailable in the ordinary state");
+
+        string[] trail = TrailLines(app);
+        Assert.Single(trail, line => line.Contains($"started deploy.ps1 {Code} 1"));
+        Assert.DoesNotContain(trail, line => line.Contains("already being deployed"));
+        _output.WriteLine(string.Join("\n", trail.Where(line => line.Contains("deploy.ps1") || line.Contains("preview.ps1"))));
+    }
+}
