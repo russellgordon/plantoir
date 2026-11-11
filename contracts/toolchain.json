@@ -583,7 +583,8 @@
           {"id": "GHSA-v5mp-jgw5-2x6j", "severity": "high"},
           {"id": "GHSA-4qx8-w7c3-pj3p", "severity": "high"},
           {"id": "GHSA-9j65-hcg3-gc64", "severity": "high"},
-          {"id": "GHSA-9qmh-m7c6-f92p", "severity": "high"}
+          {"id": "GHSA-9qmh-m7c6-f92p", "severity": "high"},
+          {"id": "GHSA-h895-cgqg-jf52", "severity": "high"}
         ]
       },
       {

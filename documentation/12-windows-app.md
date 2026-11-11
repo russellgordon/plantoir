@@ -10680,7 +10680,12 @@ Python and OpenSSL in its Measured block: "3.14.10, OpenSSL 3.5.9 29 Sep 2026".
   GHSA-h895-cgqg-jf52 (toml, in Quartz's tree, high). It was new in the
   advisory database that day and is identical on the 3.11.9 runtime, so it
   is not this piece's. Python's part of the audit, the comparator, ran on
-  3.14.10.
+  3.14.10. [#767](https://github.com/russellgordon/plantoir/issues/767)
+  accepted it on the existing `toml` entry (`npmAudit.accepted`, whose
+  reason already names prototype pollution from the teacher's own TOML).
+  After that the audit reads `COUNTS audited=5 advisories=55 accepted=55
+  blocking=0 reported=0 stale=0` (exit 0). The 54s in the #719 section above
+  and in 02 are that day's count.
 
 **Rejected.** 3.13.17, 3.12.10 and 3.15.2, for the reasons in the table.
 python-build-standalone 3.11.18 (OpenSSL 3.5.9 and the image's minor, but a
