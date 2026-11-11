@@ -11,7 +11,7 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
     runtime\python\     Python 3.11 embeddable + python-frontmatter 1.3.0,
                         PyYAML 6.0.3, Pillow 12.3.0
     runtime\quartz\     Quartz v4.5.0 + this repo's patches + node_modules
-    runtime\wrangler\   wrangler 4.80.0 (npm prefix; Cloudflare deploys)
+    runtime\wrangler\   wrangler 4.156.0 (npm prefix; Cloudflare deploys)
     runtime\fonts\      Noto Color Emoji (social sharing cards)
     runtime\vendor\     the page features a site carries only when a page
                         asks for them (#496, #503, #568): pagedjs\ (Paged.js
@@ -26,10 +26,12 @@ Windows pieces, and the app ships the folder the same way it ships llama/.
 
 Pins mirror the Dockerfile deliberately: Node 22.23.4 because that is the
 image's exact pin and Quartz v4.5.0 was revalidated on it (#640, #675);
-wrangler 4.80.0, below 4.87 because 4.87.0 is the first wrangler whose
-engines need Node 22 (the boundary was never 4.100, which this comment said
-until #675) - the pin is shared, and moving it is its own piece now that
-both platforms run 22; Python 3.11 to match the python:3.11-slim base.
+wrangler 4.156.0, the newest 4.x on 2026-10-31, the image's exact pin since
+#699 and this runtime's since #719 (it was held at 4.80.0, below 4.87, the
+first wrangler whose engines need Node 22, until both platforms ran Node
+22.23.4; that ceiling, mustStayBelow, is retired, and 4.156.0's own undici
+is 7.30.1 where 4.80.0's was 7.24.4); Python 3.11 to match the
+python:3.11-slim base.
 Change a pin here and the Dockerfile's reasoning applies to you.
 
 NOT committed (~600 MB of fetched output) - this repository ships recipes,
@@ -67,7 +69,7 @@ $ProgressPreference = 'SilentlyContinue'
 # line, spacing included, against the contract.
 $NodeVersion     = "22.23.4"
 $PythonVersion   = "3.11.9"
-$WranglerVersion = "4.80.0"
+$WranglerVersion = "4.156.0"
 $QuartzTag       = "v4.5.0"
 $EmojiFontTag    = "v2.047"
 
@@ -432,7 +434,7 @@ try {
     Remove-Item Env:\PLANTOIR_CONTRACTS_DIR
     Write-Host "Quartz $QuartzTag patched and provisioned." -ForegroundColor Green
 
-    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.80.0, below 4.87) -----
+    # ---- wrangler (Cloudflare's deploy CLI, pinned at 4.156.0, #699/#719) ------
     $wranglerDir = Join-Path $Runtime "wrangler"
     New-Item -ItemType Directory -Force $wranglerDir | Out-Null
     & "$nodeDir\npm.cmd" install --prefix $wranglerDir --no-audit --no-fund --silent "wrangler@$WranglerVersion"

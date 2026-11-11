@@ -63,10 +63,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; would otherwise stay inside it, for Node to resolve. And
 ; runtime\vendor\geogebra (#687): scripts\geogebra_engine.py makes the folder
 ; whole, so the next GeoGebra version must not inherit this one's files.
+; runtime\wrangler (#719): wrangler 4.80.0 -> 4.156.0 is an npm prefix
+; install whose dependencies are hoisted into runtime\wrangler\node_modules,
+; and the move changes most of them in place (89 -> 91 packages; sharp
+; 0.34.5 -> 0.35.5, ws 8.18.0 -> 8.21.0, undici 7.24.4 -> 7.30.1, miniflare
+; 4 -> 5), so every file an old version had and its new one does not would
+; stay beside the new tree, for Node to resolve and for the audit to find.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\runtime\vendor\tikz-engine\node_modules"
 Type: filesandordirs; Name: "{app}\runtime\node"
 Type: filesandordirs; Name: "{app}\runtime\vendor\geogebra"
+Type: filesandordirs; Name: "{app}\runtime\wrangler"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
