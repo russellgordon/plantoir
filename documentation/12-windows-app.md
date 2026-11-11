@@ -3339,8 +3339,10 @@ produce. So the fixture stopped inventing them: `RealTools` dispatches to the
 real `PlantoirTools` against a course in a temp folder, which is the shape
 `AssistFixture.makeRunner` has had on the mac since the scenario suite shipped.
 (Since #690 a scripted `given.modelReply` answers the first request only, as
-the mac's runner does since #610, and the ten Open in Obsidian cases' keys are
-read — "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".)
+the mac's runner does since #610 — or, since #720, every request up to a fuse
+when `given.modelReplyAnswers` is `everyRequest` — and the Open in Obsidian
+cases' keys are read, eleven of them since #720 — "The assistant's Open in
+Obsidian on Windows (#690, the mac's #610)".)
 
 Five things about it are decisions rather than details.
 
@@ -4384,13 +4386,13 @@ stayed in the ledger against #360. It was built in parity bundle 6a —
 `AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
 and `NamedGapLedger` was empty from bundle 9, but for a few hours on
 2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
-until #548 landed them — and since 2026-10-28 it holds two entries against
+until #548 landed them — and from 2026-10-28 it held two entries against
 mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.
 Mac #698 landed on 2026-10-31: the key is now `obsidianIsNotOnThisMachine`,
 carrying `{machine}`, and the scenario is "open in Obsidian where Obsidian is
-not installed presses nothing (#610)", so both entries are deleted with the
-commit that takes the regenerated contract — the `windows` issue opened with
-#698 lists them.)
+not installed presses nothing (#610)"; #720 deleted both entries on
+2026-11-10 with the commit that took the regenerated contract, so it is empty
+again.)
 
 ---
 
@@ -10519,18 +10521,20 @@ So Windows has a fifth outcome, `OpenInObsidianPress.DidNotOpen` — from the
 route, from `SidebarPane`'s `Finishing` for a course kept for reference (which
 used to report `Opened` from a `finally` even when the route threw before
 opening), from `AssistantsObsidianPress`, and from the runner's own `catch` —
-and the reply is `wording.openInObsidianIsInTheSectionWindow`: the least wrong
-sentence there is, because each of its clauses is true (opening a page in
-Obsidian happens in Plantoir; open the section there and press Open in
-Obsidian; nothing was opened). It reads a little oddly from the in-app
-assistant, which is IN Plantoir. The contract has no sentence for a press that
-failed, and that gap is the mac's to fill, since Windows cannot regenerate
-`assist-wording.json`: mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`
-— landed 2026-10-31 as `wording.openInObsidianDidNotOpen` and the scenario
-"open in Obsidian whose press failed before Obsidian was handed anything says
-nothing was opened (#698)", which this app switches to with the regenerated
-contract. `AFailedPressIsAnsweredWithoutAFalseSentence` and
+and since [#720](https://github.com/russellgordon/plantoir/issues/720)
+(2026-11-10) the reply is the contract's `wording.openInObsidianDidNotOpen`
+(`AssistWording.OpenInObsidianDidNotOpen`), which says nothing was opened and
+sends the teacher to that section's own button. Until then it was
+`wording.openInObsidianIsInTheSectionWindow`, chosen as the least wrong
+sentence the contract had — each of its clauses is true — but written for an
+assistant in another app, so it read oddly from the in-app one. The contract
+had no sentence for a press that failed and Windows cannot regenerate
+`assist-wording.json`, so mac [#698](https://github.com/russellgordon/plantoir/issues/698)
+added the key and the scenario "open in Obsidian whose press failed before
+Obsidian was handed anything says nothing was opened (#698)"
+(`given.obsidianPress: "didNotOpen"`) on 2026-10-31, and #720 took them.
+`AFailedPressIsAnsweredWithoutAFalseSentence` (a press that reports
+`DidNotOpen` and one that throws), the scenario and
 `TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 
 **Two divergences from the mac, chosen here (the mac should KNOW):**
@@ -10598,25 +10602,92 @@ the eight `cardPhrasings.matches` shapes are in `AssistCardCommand.FixedShapes`;
 `.nearMisses` and `.recordedOnly`. Putting it on Windows' list would be a fresh
 measurement on this tier under the same pre-registered rule.
 
-**`wording.obsidianIsNotOnThisMac` is held open, not said.** It names "this Mac"
-without `{machine}`, against `specialNames.platformWording.machine.rule`, and
-Windows cannot regenerate `assist-wording.json`. Windows says
-`AssistWording.ObsidianIsNotOnThisPc` ("…not on this PC…", listed in
-`ContractTests.WindowsOnlyWording`), and `NamedGapLedger` holds the key and the
+**`wording.obsidianIsNotOnThisMachine` is said with `{machine}` filled**
+(since [#720](https://github.com/russellgordon/plantoir/issues/720),
+2026-11-10). `AssistWording.ObsidianIsNotOnThisMachine()` is a METHOD that
+fills the contract's sentence through `MachineWord` ("…not on this PC…"); it
+is not a field because `ContractTests` compares string fields verbatim and the
+contract's copy carries the placeholder. `MachineWordContractTests` says it
+from `specialNames.platformWording.machine.usedIn`. From 2026-10-28 to #720
+the key was `wording.obsidianIsNotOnThisMac`, which named "this Mac" without
+`{machine}`: Windows said `AssistWording.ObsidianIsNotOnThisPc` (in
+`ContractTests.WindowsOnlyWording`) and `NamedGapLedger` held the key and the
 scenario "open in Obsidian on a Mac without Obsidian presses nothing (#610)"
-against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-(v1.9.1), which asks for `{machine}` in that sentence. **Landed on the mac
-2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` (recorded in
-`specialNames.platformWording.machine.usedIn`) and the
-scenario is renamed "open in Obsidian where Obsidian is not installed presses
-nothing (#610)"; the mac also added `wording.openInObsidianDidNotOpen` and a
-`given.obsidianPress: "didNotOpen"` scenario for `DidNotOpen` (below). Until
-Windows takes the regenerated contract, the paragraph above describes this
-app as it stands.
+against mac [#698](https://github.com/russellgordon/plantoir/issues/698),
+which renamed the key, gave it the placeholder and renamed the scenario "open
+in Obsidian where Obsidian is not installed presses nothing (#610)" on
+2026-10-31. #720 deleted the member, the row and both entries.
 
-**The scenario runner** implements `given.obsidianPress`, `given.obsidianPage`
-(fills `{page}` through an async-local the static `Sentence()` reads),
+**The scenario runner** implements `given.obsidianPress` (`didNotOpen`
+included since #720), `given.obsidianPage` (fills `{page}` through an
+async-local the static `Sentence()` reads, which also fills `{machine}` with
+`MachineWord` since #720, as the mac's `sentence(named:)` does),
 `given.obsidianInstalled`, `given.keptForReference` and the event
 `openInObsidian`; `surface: "mcp"` leaves the seam unset so the real server's
 refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
-answers the FIRST request only and plain text after it.
+answers the FIRST request only and plain text after it — unless
+`given.modelReplyAnswers` is `everyRequest` (#720, below).
+
+## The lap cap on Windows (#720, the mac's #689)
+
+One teacher action asks the model at most `shared-rules.json` →
+`assistantLapLimit.mostModelRequestsPerTurn` (6) times. The rule, why six and
+what was rejected are in `10-local-ai-assistant.md` → "A turn asks the model at
+most six times (#689)"; this is how Windows keeps it.
+
+- **Where the count lives.** `AssistAgent.Run`'s loop, `MostStepsPerTurn`
+  (`internal`, pinned to the contract key by
+  `AssistLapCapTests.TheCapIsTheContractsNumber`). One step is one request:
+  the loop's `_model.Ask` is the only place the agent asks the model, and the
+  loop is entered from `Say` and `Approve` only, so both actions start the
+  count again (`EachSentenceStartsTheCountAgain`: two turns of three reads and
+  an answer, eight requests, no cap). The name stayed `MostStepsPerTurn`
+  (director's ruling); its comment says it counts requests.
+- **At the cap** (`WentRoundWithoutFinishing`) the seventh request is never
+  sent and the sixth chosen tool has run. The turn is wound back out of
+  `_messages` (`WindTheTurnBack`), while the lines already returned keep every
+  `tools` line. The trail gets "assistant went round without finishing", and
+  its line is `AssistAgent.WentRoundWithoutFinishingLine`, the mac's words: the
+  count, the last tool in words, stopped, taken back. It never carries the
+  teacher's sentence or an argument value. The teacher reads
+  `AssistWording.WentRoundWithoutFinishing`. The literal it replaced had curly
+  apostrophes and no "nothing was changed". A turn that answers on the sixth
+  request is answered (`ATurnThatAnswersOnTheSixthRequestIsAnswered`). After
+  Go, `Approve` already moved `_turnBeganAt` past the approved result and
+  emptied `_sentThisTurn`/`_typedThisTurn`, so a wind-back can never erase a
+  call that ran; no approved call laps today, because every write is handed
+  back.
+- **Why "nothing was changed" is true here — and the test that comes first.**
+  The mac decides per outcome (`shouldContinue`). Windows decides by name: a
+  call ends the turn when it is in `AssistToolRunner.WriteTools` (or is
+  `check_section` / `read_remembered_timetable`). A write missing from that
+  list would lap, and the sentence would be false. So
+  `EveryWriteALapCanRunIsAWriteTool` takes every tool a LAP can run —
+  `ForTheLocalModel` (the model's choices; anything else is refused unoffered),
+  `DeploysToStudents` and `PlanTwins`' writes (what Go runs) — and requires
+  every one the server does not annotate `ReadOnly` to be in the list.
+  `EveryWriteToolNamesAServedWrite` checks the other way: every entry is a
+  served, non-ReadOnly tool, which catches the `roll_over_course` misspelling
+  this list once carried. A card's DIRECT run (`RunCommand` → `RunTool`)
+  never laps. A card held for approval reaches `Run()` only through `Approve`,
+  with a tool already in scope. That is why `explain_publishing`, a card that
+  is not annotated ReadOnly and writes nothing, is outside the test's scope.
+  Both tests held with the list unchanged. `check_section` still ends the turn
+  here and laps on the mac, a known difference that is unchanged. The
+  contract's scenario uses `list_pages`, which laps on both.
+- **The scenario runner** serves `given.modelReplyAnswers: "everyRequest"`
+  through a fuse READ from the contract (6 × 3 + 2 = 20, as the mac serves),
+  then plain text. Without the cap, the case fails rather than hanging. The
+  case's sentence matches no fixed phrasing on Windows either: it reaches the
+  model six times.
+- **Must-fails** (copy and restore, i5-8365U, with another worktree's suites
+  running on the same CPU):
+  - loop bound raised to 100: `AModelThatLoopsIsStoppedAfterSixSteps`, the
+    wind-back test, the trail test and the scenario fail.
+  - `WindTheTurnBack()` removed: the wind-back test fails.
+  - the `Note` removed: the trail test and
+    `ActivityTrailWiringTests.EveryDeclaredEventIsReferencedSomewhereInProductCode`
+    fail.
+  - the fuse set to 1: the scenario fails.
+  - `publish_pages` dropped from `WriteTools` and `roll_over_course` added:
+    both write-tools tests fail, each naming its tool.
