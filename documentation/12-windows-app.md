@@ -10641,8 +10641,9 @@ most six times (#689)"; this is how Windows keeps it.
   the loop's `_model.Ask` is the only place the agent asks the model, and the
   loop is entered from `Say` and `Approve` only, so both actions start the
   count again (`EachSentenceStartsTheCountAgain`: two turns of three reads and
-  an answer, eight requests, no cap). The name stayed `MostStepsPerTurn`
-  (director's ruling); its comment says it counts requests.
+  an answer, eight requests, no cap). The name stayed `MostStepsPerTurn`,
+  because issue #720 and the earlier write-ups name it that way and a rename
+  would make them wrong; its comment says it counts requests.
 - **At the cap** (`WentRoundWithoutFinishing`) the seventh request is never
   sent and the sixth chosen tool has run. The turn is wound back out of
   `_messages` (`WindTheTurnBack`), while the lines already returned keep every
