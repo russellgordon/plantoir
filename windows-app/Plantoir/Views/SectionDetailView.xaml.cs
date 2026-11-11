@@ -18,8 +18,11 @@ namespace Plantoir.Views;
 
 /// <summary>
 /// One section: preview it in an embedded browser, publish it, watch either
-/// as a layered progress task. Created fresh per selection so runners and
-/// leases never leak between sections.
+/// as a layered progress task. Created fresh per selection so the preview's
+/// runner and leases never leak between sections. The DEPLOY is not the
+/// view's: it is the section's <see cref="SectionDeployRun"/>, owned by the
+/// app, so coming back to a section mid-deploy shows that deploy (#728, the
+/// mac's #706; <c>shared-rules.json</c> → <c>returningToASectionMidDeploy</c>).
 /// </summary>
 public sealed partial class SectionDetailView : UserControl
 {
@@ -27,7 +30,24 @@ public sealed partial class SectionDetailView : UserControl
     private readonly Course _course;
     private readonly int _sectionNumber;
     private readonly ScriptRunner _previewRunner = new(SynchronizationContext.Current);
-    private readonly MultiDestinationDeployRunner _deployRunner = new(SynchronizationContext.Current);
+
+    /// <summary>
+    /// The section's deploy run (<see cref="SectionRuns"/>), keyed by the
+    /// folder this view was BUILT in — the same object for every view of the
+    /// section in every window, never replaced. <see cref="DeployAsync"/> takes
+    /// its own run once, from the folder it checked, and uses only that.
+    /// </summary>
+    private readonly SectionDeployRun _deployRun;
+
+    /// <summary>The section's deploy runner, for the readers outside <see cref="DeployAsync"/>.</summary>
+    private MultiDestinationDeployRunner DeployRunner => _deployRun.Runner;
+
+    /// <summary>
+    /// The ending this view hid as it appeared — one some other view had
+    /// already shown (#706's M1: a finished deploy is shown only until one view
+    /// has displayed how it ended).
+    /// </summary>
+    private int? _endingHiddenHere;
     private PreviewLeases.Lease? _lease;
 
     /// <summary>
@@ -67,10 +87,10 @@ public sealed partial class SectionDetailView : UserControl
     private readonly string? _folderThisSectionRegisteredIn;
 
     // The on-disk half of the same claims. In-memory leases are invisible to
-    // the MCP server, which is a different process entirely.
+    // the MCP server, which is a different process entirely. A DEPLOY's claims
+    // are its run's (SectionDeployRun.Hold), not these: this view gives its own
+    // back when it is taken off screen, and a deploy outlives it (#728).
     private WorkLease.Held? _previewWork;
-    private WorkLease.Held? _publishWork;
-    private IDisposable? _publishActivity;
 
     /// <summary>
     /// Held only while a build is actually running, and dropped the moment the
@@ -101,18 +121,10 @@ public sealed partial class SectionDetailView : UserControl
     private bool _isWaitingForServer;
     private CancellationTokenSource? _serverWait;
 
-    /// <summary>
-    /// True for the span between Deploy being clicked and
-    /// <see cref="MultiDestinationDeployRunner.RunAsync"/> actually taking
-    /// over — <c>_deployRunner.IsRunning</c> alone stays false through that
-    /// whole prep phase (stopping a running preview can take ~20s), which
-    /// left the Deploy button clickable again the instant the phase
-    /// started and let a second click race the first's own
-    /// stop-preview-then-deploy sequence. Mirrors the mac's
-    /// `SectionDetailView.isPreparingDeploy` (documentation/05-build-pipeline.md,
-    /// row 318a).
-    /// </summary>
-    private bool _isPreparingDeploy;
+    // "Preparing to deploy" (press → RunAsync taking over, row 318a) and "the
+    // question about classes dated later is up" are the RUN's since #728:
+    // SectionDeployRun.IsPreparing and .IsAsking, so every view of the
+    // section — in any window — sees them.
 
     /// <summary>
     /// Guards <see cref="RefreshPublishedMarker"/> against an out-of-order
@@ -199,15 +211,22 @@ public sealed partial class SectionDetailView : UserControl
     public void PreviewGoForward() { if (Preview.CanGoForward) Preview.GoForward(); }
     public void PreviewReload() { if (HasPreview) _ = ReloadAsAppAsync(); }
 
-    internal bool IsBusy => _previewRunner.IsRunning || _deployRunner.IsRunning;
+    /// <summary>
+    /// Whether THIS app has a deploy of the section on its way — the run
+    /// preparing, running or asking its question in any window, or the
+    /// in-process publish record (<see cref="SectionDeployRun.UnderWay"/>).
+    /// Every reader below asks this, never a runner of its own: a view that
+    /// came back mid-deploy must not offer Deploy, Preview or the links
+    /// checklist (#728 plan review, finding 2).
+    /// </summary>
+    private bool DeployIsUnderWay => SectionDeployRun.UnderWay(_deployRun, _folderThisSectionRegisteredIn, _course.Code, _sectionNumber);
+
+    internal bool IsBusy => _previewRunner.IsRunning || DeployIsUnderWay;
     // What "busy" means to a DEPLOY since the deploy-during-preview port: a
     // running preview no longer stands in the way (Deploy stops it itself),
-    // so only a deploy already running does. Mac parity: deployAndWait()'s
-    // check is deployRunner.isRunning, evaluated after the stop.
-    internal bool IsDeploying => _deployRunner.IsRunning;
-
-    /// <summary>A deploy running, or one between the press and its runner starting (<c>_isPreparingDeploy</c>).</summary>
-    internal bool IsDeployingOrPreparing => _deployRunner.IsRunning || _isPreparingDeploy;
+    // so only a deploy already on its way does. Mac parity: deployAndWait()'s
+    // check, evaluated after the stop.
+    internal bool IsDeploying => DeployIsUnderWay;
     private string TitleText => $"{ReferenceCourse.ShownCode(_course)}-S{_sectionNumber}";
 
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
@@ -217,6 +236,8 @@ public sealed partial class SectionDetailView : UserControl
         _course = course;
         _sectionNumber = sectionNumber;
         _folderThisSectionRegisteredIn = window.Workspace.WorkspacePath;
+        // On the interface thread, so a run made here binds its runner to it.
+        _deployRun = SectionRuns.Deploy(_folderThisSectionRegisteredIn, course.Code, sectionNumber);
         SectionTitle.Text = TitleText;
         ObsidianButton.IsEnabled = FolderActions.ObsidianIsInstalled;
 
@@ -238,7 +259,7 @@ public sealed partial class SectionDetailView : UserControl
         // Each runner is bound to the progress view exactly once — its
         // question dialog and outcome states follow whichever runner the
         // view is currently showing, chosen in RefreshChrome via Show().
-        // _deployRunner's own leg runners are registered lazily, as each
+        // The deploy run's leg runners are registered lazily, as each
         // becomes active — see RefreshChrome's Progress.Show call, which
         // registers idempotently. Only one leg is ever running at a time,
         // so there is never a moment a question from an un-registered leg
@@ -275,19 +296,10 @@ public sealed partial class SectionDetailView : UserControl
                 _previewRunner.LinksChecklistMarker is { } marker)
                 DecideTheLinksChecklist(marker);
         };
-        _deployRunner.PropertyChanged += (_, args) =>
-        {
-            RefreshChrome();
-            if (args.PropertyName == nameof(_deployRunner.IsRunning) && !_deployRunner.IsRunning)
-            {
-                _ = RefreshPublishedMarker();
-                // A publish this window ran: its build's marker, if it printed one.
-                if (_deployRunner.Legs.Select(leg => leg.Runner.LinksChecklistMarker).LastOrDefault(m => m is not null) is { } marker)
-                    DecideTheLinksChecklist(marker);
-                else
-                    ReleaseTheHeldLinksFinding();
-            }
-        };
+        // The section's deploy run is SHARED (#728), so it is hooked on Loaded
+        // and let go on Unloaded (OnLoaded / OnUnloaded): a view taken off
+        // screen and left subscribed would be kept alive by the run for good
+        // and would go on deciding the links checklist.
         Preview.CoreWebView2Initialized += (_, args) =>
         {
             if (args.Exception is not null) return;
@@ -322,31 +334,107 @@ public sealed partial class SectionDetailView : UserControl
         // closed, so this is the first moment there is anywhere to say it.
         // On Loaded rather than in the constructor: presenting needs a
         // XamlRoot, and the view has none until it is in the tree.
-        Loaded += (_, _) =>
-        {
-            // #473: the buttons follow the folder's readiness as the copy of
-            // the tools starts and ends. Subscribed here and let go on
-            // Unloaded: the event is static, and a view is replaced on every
-            // change of selection, so one left subscribed is rooted for good.
-            ToolchainReadiness.Changed -= OnReadinessChanged;
-            ToolchainReadiness.Changed += OnReadinessChanged;
-            // #514: the button's title follows File ▸ Settings ▸ Preview live.
-            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
-            AppSettings.PreviewOpensAtChanged += OnPreviewOpensAtChanged;
-            RefreshChrome();
-            TakeAnythingTheScheduledDeployFound();
-            OfferTheLinksChecklistIfWaiting();
-        };
-        Unloaded += (_, _) =>
-        {
-            _isTornDown = true;
-            ToolchainReadiness.Changed -= OnReadinessChanged;
-            AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
-            StopPreview();
-            _window.Activated -= OnWindowActivated;
-        };
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
         RefreshChrome();
         _ = RefreshPublishedMarker();
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        // #473: the buttons follow the folder's readiness as the copy of
+        // the tools starts and ends. Subscribed here and let go on
+        // Unloaded: the event is static, and a view is replaced on every
+        // change of selection, so one left subscribed is rooted for good.
+        ToolchainReadiness.Changed -= OnReadinessChanged;
+        ToolchainReadiness.Changed += OnReadinessChanged;
+        // #514: the button's title follows File ▸ Settings ▸ Preview live.
+        AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
+        AppSettings.PreviewOpensAtChanged += OnPreviewOpensAtChanged;
+        // #728: the section's deploy, whoever in this app started it. Coming
+        // back asks the run and starts NOTHING (selectingStartsALauncher).
+        _deployRun.PropertyChanged -= OnDeployRunChanged;
+        _deployRun.PropertyChanged += OnDeployRunChanged;
+        _deployRun.Runner.PropertyChanged -= OnDeployRunnerChanged;
+        _deployRun.Runner.PropertyChanged += OnDeployRunnerChanged;
+        // An ending some view has already shown is hidden here — decided
+        // BEFORE this view takes anything, or it would hide its own (#706, M1).
+        _endingHiddenHere = _deployRun.EndingToHideOnAppearing();
+        TakeWhatTheDeployLeft();
+        RefreshChrome();
+        TakeAnythingTheScheduledDeployFound();
+        OfferTheLinksChecklistIfWaiting();
+    }
+
+    /// <summary>
+    /// The window is closing (MainWindow.Closed): let go as Unloaded would,
+    /// without relying on WinUI to raise it (#728 implementation review).
+    /// Safe twice — every step is an unsubscribe or a stop of nothing.
+    /// </summary>
+    internal void LetGoAsTheWindowCloses()
+    {
+        // The panel first: it is what hands a question on and lets go of the
+        // shared runners, and the Unloaded work below redraws a window that is
+        // closing, which must not be able to skip it by throwing.
+        Progress.LetGo();
+        OnUnloaded(this, new RoutedEventArgs());
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _isTornDown = true;
+        ToolchainReadiness.Changed -= OnReadinessChanged;
+        AppSettings.PreviewOpensAtChanged -= OnPreviewOpensAtChanged;
+        _deployRun.PropertyChanged -= OnDeployRunChanged;
+        _deployRun.Runner.PropertyChanged -= OnDeployRunnerChanged;
+        // A preview being built still stops when its section is left
+        // (#706 kept it so: its port, its web view and the quit record are the
+        // window's). The DEPLOY goes on — it is the run's, claims and all.
+        StopPreview();
+        _window.Activated -= OnWindowActivated;
+    }
+
+    // ---- The section's deploy, shared (#728) ------------------------------
+
+    private void OnDeployRunnerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (_isTornDown) return;
+        RefreshChrome();
+        if (args.PropertyName == nameof(MultiDestinationDeployRunner.IsRunning) && !DeployRunner.IsRunning)
+            _ = RefreshPublishedMarker();
+    }
+
+    /// <summary>
+    /// The run changed: preparing, asking, or a deploy ENDED. An ending is
+    /// announced after the publish record has ended, while the runner's own
+    /// IsRunning=false arrived before it — so this redraws, or Deploy would
+    /// stay greyed after the deploy (#728 plan review, finding 4).
+    /// </summary>
+    private void OnDeployRunChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (_isTornDown) return;
+        if (args.PropertyName == nameof(SectionDeployRun.Endings)) TakeWhatTheDeployLeft();
+        RefreshChrome();
+    }
+
+    /// <summary>
+    /// What a finished deploy left — its links-checklist marker and its folder
+    /// problems — taken by exactly ONE view (read-and-clear), the one showing
+    /// the section when it ended or the first to show it afterwards. The view
+    /// that started a deploy and was left only deposits.
+    /// </summary>
+    private void TakeWhatTheDeployLeft()
+    {
+        if (_isTornDown || _deployRun.IsUnderWayHere) return;
+        if (_deployRun.TakeEnding() is not { } ending) return;
+        _ = RefreshPublishedMarker();
+        // A publish this app ran: its build's marker, if it printed one.
+        if (ending.LinksMarker is { } marker) DecideTheLinksChecklist(marker);
+        else ReleaseTheHeldLinksFinding();
+        // What the build said about this course's folders: from a PUBLISH, so
+        // a repair made now is not on the students' site until the next one.
+        NoteHealthFindings(ending.Findings, cameFromPublishing: true);
+        _deployRun.NoteEndingShown();
     }
 
     // ---- The " — Edited" marker -------------------------------------------
@@ -451,13 +539,14 @@ public sealed partial class SectionDetailView : UserControl
         // commit "Allow Deploy button to stop active preview before
         // publishing"): Deploy_Click stops the preview itself and waits for
         // the stop — sweep included — before building. Only a deploy already
-        // running disables the button.
+        // on its way — from ANY view or window of this app (#728), or the
+        // question about classes dated later up anywhere — disables the button.
         // #473: while the app is still copying what it needs into this folder
         // (or could not finish), nothing here may build from it. Disabled, not
         // queued (Russell's decision), with the banner's own sentence as the
         // reason. Read from the folder on screen, like `building` above.
         string? notReady = ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath);
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !_isAskingAboutLaterClasses && !building && notReady is null;
+        DeployButton.IsEnabled = !DeployIsUnderWay && !building && notReady is null;
         if (notReady is not null)
             ToolTipService.SetToolTip(DeployButton, notReady);
         else if (building)
@@ -487,16 +576,21 @@ public sealed partial class SectionDetailView : UserControl
         // Bind ONCE per runner (in the constructor) and only swap which is
         // shown here — re-subscribing on every event could swallow the
         // IsAwaitingInput transition that raises the question dialog.
+        // The deploy's when the section's run says so (#728): always while it
+        // is under way; afterwards only for an ending this view did not hide,
+        // and never over a preview of the section that started after the
+        // deploy did — this view's own preview start, or, for a view that
+        // came back and has none, the section's last (the mac's M1 and L3).
         bool showDeploy = !_previewRunner.IsRunning &&
-            (_deployRunner.IsRunning || _isPreparingDeploy ||
-             (_deployRunner.StartedAt ?? DateTime.MinValue) > (_previewRunner.StartedAt ?? DateTime.MinValue));
+            _deployRun.IsShown(_endingHiddenHere, _previewRunner.StartedAt);
+        var deployRunner = DeployRunner;
         if (showDeploy)
         {
-            // _isPreparingDeploy: nothing is running on _deployRunner yet —
-            // ActiveRunner would either be blank (a fresh leg has never
-            // rendered) or the PREVIOUS deploy's stale outcome. Neither is
-            // what is actually happening right now (row 318a).
-            if (_isPreparingDeploy && !_deployRunner.IsRunning)
+            // Preparing: nothing is running on the runner yet — ActiveRunner
+            // would either be blank (a fresh leg has never rendered) or the
+            // PREVIOUS deploy's stale outcome. Neither is what is actually
+            // happening right now (row 318a).
+            if (_deployRun.IsPreparing && !deployRunner.IsRunning)
             {
                 Progress.ShowPreparing($"Deploying {TitleText}");
             }
@@ -505,10 +599,10 @@ public sealed partial class SectionDetailView : UserControl
                 // Multi-destination courses get a leg count in the title, so a
                 // teacher watching the progress bar knows it is running a
                 // sequence rather than a single deploy that is unusually slow.
-                string title = _deployRunner.Legs.Count > 1
-                    ? $"Deploying {TitleText} — destination {Math.Min(_deployRunner.CurrentLegIndex + 1, _deployRunner.Legs.Count)} of {_deployRunner.Legs.Count}"
+                string title = deployRunner.Legs.Count > 1
+                    ? $"Deploying {TitleText} — destination {Math.Min(deployRunner.CurrentLegIndex + 1, deployRunner.Legs.Count)} of {deployRunner.Legs.Count}"
                     : $"Deploying {TitleText}";
-                Progress.Show(_deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: _deployRunner);
+                Progress.Show(deployRunner.ActiveRunner, title, onCancel: CancelDeploy, multiRunner: deployRunner);
             }
         }
         else
@@ -518,9 +612,11 @@ public sealed partial class SectionDetailView : UserControl
                     : $"Preview of {TitleText}",
                 onCancel: CancelPreview);
 
-        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || _deployRunner.HasAnyOutput
+        // A deploy's output counts only while the deploy is the one shown: an
+        // ending already shown elsewhere leaves the section's ordinary state.
+        bool anyOutput = _previewRunner.Transcript.Lines.Count > 0 || (showDeploy && deployRunner.HasAnyOutput)
                          || _previewRunner.Transcript.CurrentLine.Length > 0;
-        bool showConsole = _isWaitingForServer || IsBusy || _isPreparingDeploy || anyOutput;
+        bool showConsole = _isWaitingForServer || _previewRunner.IsRunning || showDeploy || anyOutput;
         Progress.Visibility = showConsole ? Visibility.Visible : Visibility.Collapsed;
         NoPreviewState.Visibility = showConsole ? Visibility.Collapsed : Visibility.Visible;
         Preview.Visibility = previewShown ? Visibility.Visible : Visibility.Collapsed;
@@ -800,7 +896,7 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>For a build this window did not watch: a fresh offer with something new.</summary>
     private void OfferTheLinksChecklistIfWaiting()
     {
-        if (_previewRunner.IsRunning || _deployRunner.IsRunning) return;
+        if (_previewRunner.IsRunning || DeployIsUnderWay) return;
         if (LinksChecklistShowing.ForABuildNotWatched(_course, _sectionNumber) is { } offer)
             _ = PresentTheLinksChecklistAsync(offer, "when the section was opened");
     }
@@ -1067,7 +1163,7 @@ public sealed partial class SectionDetailView : UserControl
                 false);
         }
 
-        if (_deployRunner.IsRunning || _isPreparingDeploy
+        if (DeployIsUnderWay
             || CourseActivity.IsPublishing(workspacePath, _course.Code))
         {
             return new SiteHealthRepair.Outcome(
@@ -1258,6 +1354,9 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            // The section's last preview start, for a view that comes back with
+            // none of its own: a later preview wins over a finished deploy (#728).
+            _deployRun.NotePreviewStarted(_previewRunner.StartedAt ?? DateTime.UtcNow);
             SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
             await WaitForPreviewServer();
@@ -1530,6 +1629,9 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            // The section's last preview start, for a view that comes back with
+            // none of its own: a later preview wins over a finished deploy (#728).
+            _deployRun.NotePreviewStarted(_previewRunner.StartedAt ?? DateTime.UtcNow);
             SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
             await WaitForPreviewServer(new StartPageRequest(atLastViewed, frontPageWasJustChanged));
@@ -1869,11 +1971,15 @@ public sealed partial class SectionDetailView : UserControl
         RefreshChrome();
     }
 
+    /// <summary>
+    /// The section's deploy, cancelled from whichever view shows it (#728):
+    /// aimed at the folder the deploy noted for its work, never the window's.
+    /// </summary>
     private void CancelDeploy()
     {
-        if (_deployRunner.IsRunning && _folderThisSectionWorksIn is { } workspacePath)
+        if (_deployRun.Runner.IsRunning && _deployRun.Folder is { } workspacePath)
             PreviewStopper.StopSectionProcesses(workspacePath, _course.Code, _sectionNumber);
-        _deployRunner.Cancel();
+        _deployRun.Runner.Cancel();
     }
 
     private void StopPreview()
@@ -2003,7 +2109,10 @@ public sealed partial class SectionDetailView : UserControl
     /// </remarks>
     internal bool DeployWillBeRefused()
     {
-        if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return true;
+        // A deploy on its way from ANY view or window of this app, the question
+        // up in any of them, or the publish record (#728, the mac's M2: the
+        // question must not be asked before a refusal).
+        if (DeployIsUnderWay) return true;
         if (ReferenceCourse.KeptOnDisk(_course.DirectoryPath) is not null) return true;
         if (ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath) is not null) return true;
         if (_window.Workspace.WorkspacePath is not { } folder) return true;
@@ -2013,8 +2122,8 @@ public sealed partial class SectionDetailView : UserControl
                    _window.Workspace.Settings.CloudflareAccountId.Trim()) is not null;
     }
 
-    /// <summary>True from the moment the question is put until it is answered: a second Deploy waits for it.</summary>
-    private bool _isAskingAboutLaterClasses;
+    // From the moment the question is put until it is answered, a second
+    // Deploy waits for it — in ANY window: SectionDeployRun.IsAsking (#728).
 
     /// <summary>Where the trail says the in-app assistant's deploy was asked (<c>activityTrail</c> → "asked about classes…").</summary>
     internal const string TheInAppAssistantsDeploy = "the in-app assistant's deploy";
@@ -2034,7 +2143,7 @@ public sealed partial class SectionDetailView : UserControl
     /// </summary>
     internal async Task<LaterClassesAtADeploy> AskAboutClassesDatedLaterForTheAssistantAsync()
     {
-        if (_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+        if (_deployRun.IsAsking || DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
         if (DeployWillBeRefused()) return new LaterClassesAtADeploy(LaterClassesAnswer.NothingToAsk, WillBeRefused: true);
         return await AskAboutClassesDatedLaterAsync(TheInAppAssistantsDeploy);
     }
@@ -2042,9 +2151,10 @@ public sealed partial class SectionDetailView : UserControl
     /// <summary>
     /// The question about classes dated after the next class (#475;
     /// <c>shared-rules.json</c> → <c>classesDatedLater</c>), put in this
-    /// window. Every flagged class is listed, ticked to hide, with two buttons
-    /// beside Cancel, always: Hide Ticked and Deploy (the default) and Keep All
-    /// and Deploy.
+    /// window. Every flagged class is listed TICKED TO GO OUT, with one button
+    /// beside Cancel: Deploy Ticked, the default (#726, the mac's #694: a
+    /// ticked box always means included). Keep All and Deploy went — with
+    /// every row ticked it only repeated Return.
     /// </summary>
     /// <param name="route">Where it was asked, as the trail line names it: "Deploy", or the in-app assistant's deploy.</param>
     /// <returns>
@@ -2058,13 +2168,15 @@ public sealed partial class SectionDetailView : UserControl
     /// <para>The list is decided ONCE, when the question is put, on this
     /// computer's day: an answer given after midnight acts on the classes it
     /// listed, never on a list worked out afresh.</para>
-    /// <para>Hide Ticked and Deploy records the unticked as kept at their dates
-    /// (<see cref="LaterClassesKept"/>) and hides the ticked with Hide
+    /// <para>Deploy Ticked records the TICKED as kept at their dates
+    /// (<see cref="LaterClassesKept"/>) and hides the UNTICKED with Hide
     /// Pages…'s OWN call through this window's runner
     /// (<see cref="MainWindow.HideClassesForTheDeploy"/>) — backed up,
-    /// undoable — with no preview either side. A ticked class still visible
-    /// afterwards stops the deploy, and the teacher is shown what the hide
-    /// said. Keep All and Deploy keeps every listed class and hides nothing.</para>
+    /// undoable — with no preview either side, so the preview is left as the
+    /// deployed site will be (Russell's ruling 2 on #694). An unticked class
+    /// still visible afterwards stops the deploy, and the teacher is shown what
+    /// the hide said. Return with every row ticked keeps them all and hides
+    /// nothing. The split is <see cref="ClassesDatedLater.AnswerAtDeploy"/>.</para>
     /// </remarks>
     internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterAsync(string route)
     {
@@ -2076,11 +2188,14 @@ public sealed partial class SectionDetailView : UserControl
         if (flagged.Count == 0 || ClassesDatedLater.NextClassDay(today, pages) is not { } nextDay)
             return LaterClassesAnswer.NothingToAsk;
         if (DialogGate.IsOpen(EffectiveXamlRoot)) return LaterClassesAnswer.CannotAsk;
+        // Another window put the question while this deploy was awaiting its
+        // refusals (#728): never a second question, and nothing changed.
+        if (_deployRun.IsAsking) return LaterClassesAnswer.CannotAsk;
 
         bool meeting = _course.Configuration.ClassNoun == ClassNoun.Meeting;
         string title = meeting ? AssistWording.LaterClassesTitleForAMeeting : AssistWording.LaterClassesTitle;
         // A table, the picker's shape (#634, the mac's #608): Page with its
-        // box, and Date; Space ticks the row, Return is Hide Ticked and Deploy.
+        // box, and Date; Space ticks the row, Return is Deploy Ticked.
         var table = TickTable.ForLaterClasses(flagged, title);
         var boxes = table.Rows.Select(row => (Page: flagged[row.Index], row.Box)).ToList();
         var content = new StackPanel { Spacing = 12, MinWidth = 460 };
@@ -2101,8 +2216,7 @@ public sealed partial class SectionDetailView : UserControl
         {
             Title = title,
             Content = content,
-            PrimaryButtonText = AssistWording.HideTickedAndDeployButton,
-            SecondaryButtonText = AssistWording.KeepAllAndDeployButton,
+            PrimaryButtonText = AssistWording.DeployTickedButton,
             CloseButtonText = AssistWording.MenuCancelButton,
             DefaultButton = ContentDialogButton.Primary,
         };
@@ -2126,7 +2240,7 @@ public sealed partial class SectionDetailView : UserControl
         dialog.Closed += (_, _) => { if (dialog.XamlRoot is { } root) root.Changed -= refit; };
         // Return with a row selected is the main button: the list keeps Return
         // for itself (measured for #548), so the table catches it and the
-        // dialog closes as if Hide Ticked and Deploy had been pressed.
+        // dialog closes as if Deploy Ticked had been pressed.
         bool returnPressed = false;
         table.Enter = () =>
         {
@@ -2135,31 +2249,29 @@ public sealed partial class SectionDetailView : UserControl
         };
         AutomationProperties.SetAutomationId(dialog, "laterClassesDialog");
 
-        _isAskingAboutLaterClasses = true;
+        _deployRun.IsAsking = true;
         RefreshChrome();
         try
         {
             var chosen = await ShowDialogSafelyAsync(dialog);
             if (returnPressed) chosen = ContentDialogResult.Primary;
-            if (chosen is not (ContentDialogResult.Primary or ContentDialogResult.Secondary))
+            if (chosen != ContentDialogResult.Primary)
             {
                 ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
                     ClassesDatedLater.CancelledLine(route, flagged.Count), _course.Code, _sectionNumber);
                 return LaterClassesAnswer.Cancelled;
             }
 
-            var ticked = chosen == ContentDialogResult.Secondary
-                ? new List<ClassesDatedLater.Page>()
-                : boxes.Where(row => row.Box.IsChecked == true).Select(row => row.Page).ToList();
-            var keeping = flagged.Where(page => !ticked.Contains(page)).ToList();
+            // Ticked goes out and is kept; unticked is hidden first (#726).
+            var (keeping, hiding) = ClassesDatedLater.AnswerAtDeploy(flagged, boxes.Select(row => row.Box.IsChecked == true).ToList());
             LaterClassesKept.Keep(_course.DirectoryPath, _sectionNumber, keeping);
 
-            if (ticked.Count > 0)
+            if (hiding.Count > 0)
             {
                 var hid = await _window.HideClassesForTheDeploy(_course.Code, _sectionNumber,
-                                                                 ticked.Select(page => page.Place).ToList());
+                                                                 hiding.Select(page => page.Place).ToList());
                 bool stillVisible = ClassesDatedLater.ClassPages(_course, _sectionNumber)
-                    .Any(page => page.Visible && ticked.Any(asked => asked.Place == page.Place));
+                    .Any(page => page.Visible && hiding.Any(asked => asked.Place == page.Place));
                 if (hid is null || stillVisible)
                 {
                     ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
@@ -2179,12 +2291,12 @@ public sealed partial class SectionDetailView : UserControl
             }
 
             ActivityTrail.Note(ActivityTrail.Event.LaterClassesAsked,
-                ClassesDatedLater.AskedLine(route, flagged.Count, ticked.Count, keeping.Count), _course.Code, _sectionNumber);
+                ClassesDatedLater.AskedLine(route, flagged.Count, hiding.Count, keeping.Count), _course.Code, _sectionNumber);
             return LaterClassesAnswer.GoAhead;
         }
         finally
         {
-            _isAskingAboutLaterClasses = false;
+            _deployRun.IsAsking = false;
             RefreshChrome();
         }
     }
@@ -2217,20 +2329,22 @@ public sealed partial class SectionDetailView : UserControl
         // an exception before the deploy started.
         string? outcomeMessage = AssistWording.DeployDidNotFinish(_course.Code, _sectionNumber.ToString());
         // This deploy's claim, taken before the preview stop (#289). Given back
-        // in the finally unless handed to _buildWork/_publishWork.
+        // in the finally unless handed to the run (#728).
         WorkLease.Held? deployBuild = null;
         WorkLease.Held? deployPublish = null;
+        // The section's run, taken ONCE below from the folder this deploy
+        // checked, and the only one used after that (#728; the mac's plan
+        // review H1: a window re-pointed at another folder mid-await must not
+        // split one deploy across two runs).
+        SectionDeployRun? run = null;
+        bool ranTheRunner = false;
         try
         {
-            // _isPreparingDeploy closes a real window, not just a display
-            // one: _deployRunner.IsRunning alone stays false through this
-            // whole prep phase (stopping any preview, waiting for the stop
-            // sweep) — a second click there would race its own
-            // stop-preview-then-deploy sequence against the first's
-            // (row 318a).
-            // _isAskingAboutLaterClasses: the question below is up, and nothing
-            // is claimed yet — a second press waits for its answer (M4).
-            if (_deployRunner.IsRunning || _isPreparingDeploy || _isAskingAboutLaterClasses) return outcomeMessage;
+            // A deploy on its way in ANY view or window of this app: preparing
+            // (press → RunAsync, row 318a — a second click there would race
+            // the first's stop-preview-then-deploy sequence), running, the
+            // question below up (M4), or the publish record (#728).
+            if (DeployIsUnderWay) return outcomeMessage;
             // FIRST, before anything is stopped, built or uploaded (#241, door
             // 1): a course kept for reference is never deployed. The button is
             // not drawn on one; this is what the assistant's hand-back, or a
@@ -2256,6 +2370,7 @@ public sealed partial class SectionDetailView : UserControl
             if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet") is { } declined)
                 return declined;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
+            run = SectionRuns.Deploy(workspacePath, _course.Code, _sectionNumber);
 
             // The SAVED settings, read at the press (#357 / mac #335): the
             // launcher, the approval card and the scheduled run all read the
@@ -2300,7 +2415,7 @@ public sealed partial class SectionDetailView : UserControl
                 if (answer is LaterClassesAnswer.Cancelled or LaterClassesAnswer.CannotAsk)
                     return AssistWording.DeployWasCancelled;
                 // Another deploy may have begun while the question was up.
-                if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+                if (SectionDeployRun.UnderWay(run, workspacePath, _course.Code, _sectionNumber)) return outcomeMessage;
             }
 
             // After the question, never before it (M4): a deploy cancelled
@@ -2318,17 +2433,16 @@ public sealed partial class SectionDetailView : UserControl
 
             // Claim the console for the deploy panel BEFORE touching the
             // preview runner below. Stopping a running preview sets its own
-            // WasStoppedByUser and flips IsRunning false without touching
-            // _deployRunner.StartedAt — until ClaimConsole() gives it a real
-            // timestamp, RefreshChrome's showDeploy comparison kept picking
-            // the just-stopped preview panel, flashing "Stopped" for a beat
-            // before the deploy panel took over (row 317). _isPreparingDeploy
-            // covers what the timestamp alone does not: _deployRunner.Legs
-            // still holds the PREVIOUS deploy's runners until RunAsync
+            // WasStoppedByUser and flips IsRunning false without touching the
+            // deploy runner's StartedAt — until ClaimConsole() gives it a real
+            // timestamp, RefreshChrome's comparison kept picking the
+            // just-stopped preview panel, flashing "Stopped" for a beat
+            // before the deploy panel took over (row 317). IsPreparing
+            // covers what the timestamp alone does not: the runner's Legs
+            // still hold the PREVIOUS deploy's runners until RunAsync
             // replaces them with fresh ones a little further down.
-            _deployRunner.ClaimConsole();
-            _isPreparingDeploy = true;
-            RefreshChrome();
+            run.Runner.ClaimConsole();
+            run.IsPreparing = true;   // every view of the section redraws
 
             // The claim is taken BEFORE the preview stop, and looked at at once
             // (#289, takeThenCheck): the stop ends builds by working directory,
@@ -2341,8 +2455,7 @@ public sealed partial class SectionDetailView : UserControl
             {
                 ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
                     WorkLease.DeclineTrailLine("Deploy", other), _course.Code, _sectionNumber);
-                _isPreparingDeploy = false;
-                RefreshChrome();
+                run.IsPreparing = false;
                 await ShowDialogSafelyAsync(new ContentDialog
                 {
                     Title = "Cannot Deploy Yet",
@@ -2366,11 +2479,11 @@ public sealed partial class SectionDetailView : UserControl
             // the PREVIEW's work and must keep naming the folder that preview
             // started in. Only once it is over does this deploy become the
             // work this view is doing.
-            _folderThisSectionWorksIn = workspacePath;
+            run.Folder = workspacePath;
 
             // Said AFTER the stop, as on the mac: a deploy that began while
             // we were waiting is the one thing that still stands in the way.
-            if (_deployRunner.IsRunning) return outcomeMessage;
+            if (run.Runner.IsRunning) return outcomeMessage;
             // No second look after the stop any more (#289). It used to ask
             // again because the leases came off with the preview and the stop
             // can take ~20 s; now this deploy's own build lease has been up
@@ -2387,33 +2500,25 @@ public sealed partial class SectionDetailView : UserControl
 
             // The publish is on the books for its WHOLE life — the quiet build
             // included — and comes off them on every exit path: the normal
-            // end and the catch.
-            _publishActivity?.Dispose();
-            _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
+            // end and the catch. On the RUN, with this deploy's leases: the
+            // view is thrown away when the teacher clicks another section,
+            // and until #728 the build lease rode on the view's preview build
+            // claim, which it gives back on Unloaded — mid-deploy.
+            run.EndPublish();   // anything a previous deploy left (never expected)
+            run.Hold(CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber));
             // The section's next deploy ends the app's undo of getting it ready
             // for the start of the year (#355, startOfYear.undo.app).
             Plantoir.Core.Assist.StartOfYearSessionUndo.End(workspacePath, _course.Code, _sectionNumber);
-            // Handed over to the fields EndPublishActivity releases. A deploy
-            // builds and then uploads, and both end together, so the build
-            // claim can simply run its whole length.
-            _publishWork = deployPublish;
+            // Handed over to the run, which gives them back in EndPublish. A
+            // deploy builds and then uploads, and both end together, so the
+            // build claim can simply run its whole length.
+            run.Hold(deployPublish, deployBuild);
+            // The PREVIOUS build claim — a preview's, or the assistant's
+            // rebuild — is let go here, as before; never the deploy's own
+            // (#728 plan review, finding 3).
             ReleaseBuildClaim();
-            _buildWork = deployBuild;
             deployPublish = null;
             deployBuild = null;
-
-            // The real progress panel takes over from here — RunAsync is
-            // about to give _deployRunner.Legs fresh runners of its own and
-            // start reporting real progress on them. No RefreshChrome() call
-            // belongs between this line and RunAsync: _deployRunner.Legs
-            // still holds the PREVIOUS deploy's (finished, stale-outcome)
-            // runners until RunAsync's own synchronous prefix replaces them,
-            // so a refresh sandwiched here would repaint that stale outcome
-            // for exactly the beat this whole fix exists to close — RunAsync
-            // sets IsRunning and notifies synchronously, before its first
-            // await, and that notification is what calls RefreshChrome (see
-            // the constructor's _deployRunner.PropertyChanged subscription).
-            _isPreparingDeploy = false;
 
             // This build asks the folder question again, and its answer is the
             // one carrying the sentence about what students can see — so a
@@ -2426,8 +2531,16 @@ public sealed partial class SectionDetailView : UserControl
             // also resolves each leg's own milestones and custom domain.
             // For the overwhelming majority of courses (one destination)
             // this behaves exactly as a single deploy always did.
-            await _deployRunner.RunAsync(saved, _sectionNumber, destinations, cloudflareAccount,
+            //
+            // STARTED before IsPreparing is cleared: RunAsync's synchronous
+            // prefix gives the runner fresh legs and sets IsRunning, so the
+            // redraw that clearing IsPreparing causes shows THIS deploy's legs,
+            // never the previous one's stale outcome (row 318a's beat).
+            ranTheRunner = true;
+            var running = run.Runner.RunAsync(saved, _sectionNumber, destinations, cloudflareAccount,
                 workspacePath, needsBuild);
+            run.IsPreparing = false;
+            await running;
             // The single place that decides which sentence a teacher (or the
             // assistant, relaying it) hears — success, all-destinations,
             // partial, or every-destination-failed — from what actually
@@ -2437,33 +2550,36 @@ public sealed partial class SectionDetailView : UserControl
             // build refused while the section was still being deployed is
             // said as itself (#467 / mac #439).
             outcomeMessage = (MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish(
-                                  _course.Code, _sectionNumber.ToString(), _deployRunner.Legs.FirstOrDefault())
+                                  _course.Code, _sectionNumber.ToString(), run.Runner.Legs.FirstOrDefault())
                               ?? MultiDestinationDeployRunner.Result(
-                                  _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome)).Message;
+                                  _course.Code, _sectionNumber.ToString(), destinations.Count, run.Runner.CurrentOutcome)).Message;
             // Added to what the assistant says, too (#357): it pressed this button.
             if (savedNotice is not null) outcomeMessage += " " + savedNotice;
-            EndPublishActivity();
+            run.EndPublish();
 
             // What the build said about this course's folders, taken from the
             // FIRST leg: every destination publishes the same built site, so a
             // second leg only repeats the findings. A deploy that skipped the
             // build (nothing had changed) reports none, which is correct — the
-            // checks run inside the build.
+            // checks run inside the build. And its links-checklist marker, if
+            // it printed one.
             //
-            // AFTER EndPublishActivity, deliberately: the publish is off the
-            // books by now, so "Preview Again" is not refused on account of
-            // this view's own publish having just finished. And NOT awaited —
-            // the assistant awaits DeployAsync for its answer, and it must not
-            // wait on a teacher reading a dialog.
-            NoteHealthFindings(_deployRunner.Legs.FirstOrDefault()?.Runner, cameFromPublishing: true);
+            // Handed to the RUN, announced AFTER EndPublish (so a view redrawing
+            // on it sees Deploy available again), and taken by exactly one view
+            // — the one showing the section, or the first to show it later
+            // (#728). NOT awaited: the assistant awaits DeployAsync for its
+            // answer, and it must not wait on a teacher reading a dialog.
+            run.NoteEnded(run.Runner.Legs.FirstOrDefault()?.Runner.HealthFindings ?? Array.Empty<SiteHealthFinding>(),
+                          run.Runner.Legs.Select(leg => leg.Runner.LinksChecklistMarker).LastOrDefault(m => m is not null));
         }
         catch (Exception ex)
         {
             App.LogDiagnostic($"Deploy_Click exception: {ex}");
             // An exception between BeginPublish and the normal end would
             // otherwise leave the course registered as publishing — holding
-            // the publish and build claims — until the view is torn down.
-            EndPublishActivity();
+            // the publish and build claims — for as long as the app runs.
+            run?.EndPublish();
+            if (ranTheRunner) run?.NoteEnded(Array.Empty<SiteHealthFinding>(), null);
         }
         finally
         {
@@ -2475,25 +2591,13 @@ public sealed partial class SectionDetailView : UserControl
 
             // A safety net for every early-return path above (the refusal
             // dialog, "already deploying", "the assistant is building",
-            // an exception before the flag was cleared): _isPreparingDeploy
-            // must never survive past this method, or the Deploy button and
-            // the console stay stuck showing "Preparing to deploy…" forever.
-            if (_isPreparingDeploy)
-            {
-                _isPreparingDeploy = false;
-                RefreshChrome();
-            }
+            // an exception before the flag was cleared): IsPreparing must
+            // never survive past this method, or the Deploy button and the
+            // console stay stuck showing "Preparing to deploy…" in every view
+            // of the section until quit. Clearing it redraws them.
+            if (run is { IsPreparing: true }) run.IsPreparing = false;
         }
         return outcomeMessage;
-    }
-
-    private void EndPublishActivity()
-    {
-        _publishActivity?.Dispose();
-        _publishActivity = null;
-        _publishWork?.Dispose();
-        _publishWork = null;
-        ReleaseBuildClaim();
     }
 
     // ---- Browser chrome --------------------------------------------------

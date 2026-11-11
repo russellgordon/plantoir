@@ -293,13 +293,13 @@ public class ContractTests
         // #475 (the rest of #489): the question about classes dated after the
         // next class, with the generator's own examples — the next class on
         // Friday, 2026-10-09, a row on Wednesday, 2026-10-14, Unit 2, Day 5
-        // (and Day 6) named, two ticked to stay hidden.
+        // (and Day 6) named. Asked at Deploy only since #726 (the mac's #694):
+        // laterClassesAtPublish and leaveOutAndContinueButton were retired, and
+        // the constants (deployTickedButton, the titles, the notes) are
+        // compared by the value walk below.
         Pair("laterClassesAtDeploy", AssistWording.LaterClassesAtDeploy(new DateOnly(2026, 10, 9)),
              AssistWording.LaterClassesAtDeployForAMeeting(new DateOnly(2026, 10, 9)));
-        Pair("laterClassesAtPublish", AssistWording.LaterClassesAtPublish(new DateOnly(2026, 10, 9)),
-             AssistWording.LaterClassesAtPublishForAMeeting(new DateOnly(2026, 10, 9)));
         Assert.Equal(wording["laterClassesDay"]!.ToString(), AssistWording.LaterClassesDay(new DateOnly(2026, 10, 14)));
-        Assert.Equal(wording["leaveOutAndContinueButton"]!.ToString(), AssistWording.LeaveOutAndContinueButton(2));
         Assert.Equal(wording["deployHasClassesDatedLater"]!.ToString(),
                      AssistWording.DeployHasClassesDatedLater("{course}", "{section}", new[] { "Unit 2, Day 5" }));
         Assert.Equal(wording["deployHasClassesDatedLaterNamingSeveral"]!.ToString(),

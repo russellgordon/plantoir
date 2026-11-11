@@ -150,6 +150,14 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         Notify(nameof(StartedAt));
     }
 
+    /// <summary>For tests only (#728): a deploy running, or not, since <paramref name="startedAt"/>, with no process behind it.</summary>
+    internal void SetStateForTests(bool running, DateTime? startedAt)
+    {
+        IsRunning = running;
+        StartedAt = startedAt;
+        Notify(nameof(IsRunning));
+    }
+
     /// <summary>
     /// Cancels whichever leg is currently running. The remaining,
     /// not-yet-started legs are simply never reached — <see cref="RunAsync"/>'s

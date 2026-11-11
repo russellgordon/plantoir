@@ -282,7 +282,7 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         Assert.True(start > 0);
         int end = source.IndexOf("WillBeRefused: true", start, StringComparison.Ordinal) + "WillBeRefused: true".Length;
         string body = source[start..end];
-        int open = body.IndexOf("_isAskingAboutLaterClasses || DialogGate.IsOpen(EffectiveXamlRoot)", StringComparison.Ordinal);
+        int open = body.IndexOf("_deployRun.IsAsking || DialogGate.IsOpen(EffectiveXamlRoot)", StringComparison.Ordinal);
         int cannotAsk = body.IndexOf("LaterClassesAnswer.CannotAsk", StringComparison.Ordinal);
         int refused = body.IndexOf("DeployWillBeRefused()", StringComparison.Ordinal);
         Assert.True(open > 0 && cannotAsk > open && refused > cannotAsk,
@@ -309,9 +309,102 @@ public sealed class ClassesDatedLaterAtDeployTests : IDisposable
         int refusals = Where("MultiDestinationDeployRunner.RefusalReason(destinations");
         int asked = Where("AskAboutClassesDatedLaterAsync(\"Deploy\")");
         int savedNotice = Where("ActivityTrail.Event.DeployUsedTheSavedSettings");
-        int claimed = Where("_deployRunner.ClaimConsole()");
+        int claimed = Where("run.Runner.ClaimConsole()");
         int stopped = Where("await StopPreviewAsync()");
         Assert.True(refusals > start && asked > refusals && savedNotice > asked && claimed > savedNotice && stopped > claimed,
             $"DeployAsync's order is wrong: refusals {refusals}, asked {asked}, saved notice {savedNotice}, claimed {claimed}, stopped {stopped}");
+    }
+
+    // ---- #726 (the mac's #694): ticked means deployed -----------------------
+
+    private static string ViewSource(string file) =>
+        File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", file)).Replace("\r\n", "\n");
+
+    /// <summary>From <paramref name="signature"/> to the method's closing brace at four spaces.</summary>
+    private static string MethodBody(string source, string signature)
+    {
+        int start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start > 0, $"no {signature}");
+        int end = source.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        Assert.True(end > start, $"no end to {signature}");
+        return source[start..end];
+    }
+
+    private static ClassesDatedLater.Page Later(string title, int day) =>
+        new($"section1/All Classes/{title}", title, Today.AddDays(day), true);
+
+    /// <summary>
+    /// A ticked class goes out and is kept at its date; an unticked one is
+    /// hidden (Russell's rulings on #694, <c>classesDatedLater.answers</c>).
+    /// Before #726 a tick meant HIDE: swapping the two lists back turns this red.
+    /// </summary>
+    [Fact]
+    public void TickedIsKept_UntickedIsHidden()
+    {
+        var flagged = new[] { Later("Unit 2, Day 5", 3), Later("Unit 2, Day 6", 4), Later("Unit 2, Day 7", 5) };
+        var (kept, hidden) = ClassesDatedLater.AnswerAtDeploy(flagged, new[] { true, false, true });
+        Assert.Equal(new[] { "Unit 2, Day 5", "Unit 2, Day 7" }, kept.Select(page => page.Title));
+        Assert.Equal(new[] { "Unit 2, Day 6" }, hidden.Select(page => page.Title));
+
+        var (allKept, noneHidden) = ClassesDatedLater.AnswerAtDeploy(flagged, new[] { true, true, true });
+        Assert.Equal(3, allKept.Count);
+        Assert.Empty(noneHidden);
+        Assert.Throws<ArgumentException>(() => ClassesDatedLater.AnswerAtDeploy(flagged, new[] { true }));
+    }
+
+    /// <summary>
+    /// The window's question has ONE button beside Cancel — Deploy Ticked, the
+    /// default — and its answer is <see cref="ClassesDatedLater.AnswerAtDeploy"/>
+    /// of the boxes as ticked. Red on the code before #726 (Hide Ticked and
+    /// Deploy, with Keep All and Deploy as the secondary button).
+    /// </summary>
+    [Fact]
+    public void TheDeployQuestionHasOneButtonBesideCancel()
+    {
+        string body = MethodBody(ViewSource(Path.Combine("Views", "SectionDetailView.xaml.cs")),
+                                 "internal async Task<LaterClassesAnswer> AskAboutClassesDatedLaterAsync(string route)");
+        Assert.Contains("PrimaryButtonText = AssistWording.DeployTickedButton", body);
+        Assert.DoesNotContain("SecondaryButtonText", body);
+        Assert.DoesNotContain("ContentDialogResult.Secondary", body);
+        Assert.Contains("ClassesDatedLater.AnswerAtDeploy(flagged, boxes.Select(row => row.Box.IsChecked == true).ToList())", body);
+    }
+
+    /// <summary>
+    /// Section ▸ Publish Pages… asks nothing about classes dated later and
+    /// records nothing as kept (<c>classesDatedLater.neverAskedFrom</c>). Red
+    /// on the code before #726, which had a LaterClasses stage there.
+    /// </summary>
+    [Fact]
+    public void PublishPagesNeverAsks()
+    {
+        string source = ViewSource(Path.Combine("Views", "SectionVerbDialog.cs"));
+        Assert.DoesNotContain("ClassesDatedLater.", source);
+        Assert.DoesNotContain("LaterClassesKept.", source);
+        Assert.DoesNotContain("Stage.LaterClasses", source);
+        Assert.DoesNotContain("LaterClassesTitle", source);
+    }
+
+    /// <summary>The contract asks at Deploy only (the mac's testTheContractAsksOnlyAtDeploy).</summary>
+    [Fact]
+    public void TheContractAsksOnlyAtDeploy()
+    {
+        var rule = ContractLoader.LoadJson("shared-rules.json")["classesDatedLater"]!;
+        Assert.DoesNotContain("Publish Pages", rule["askedFrom"]!.ToString());
+        Assert.Contains("Publish Pages", rule["neverAskedFrom"]!.ToString());
+        Assert.Contains("TICKED to go out", rule["answers"]!.ToString());
+    }
+
+    /// <summary>
+    /// The hide at Deploy is Hide Pages…'s own call, and its "ran from a menu"
+    /// line counts the classes as UNTICKED at Deploy (the mac's words).
+    /// </summary>
+    [Fact]
+    public void TheHideIsCountedAsUntickedAtDeploy()
+    {
+        Assert.Equal("1 class dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(1));
+        Assert.Equal("3 classes dated later, unticked at Deploy", ClassesDatedLater.UntickedAtDeployCounts(3));
+        string body = MethodBody(ViewSource("MainWindow.Verbs.cs"),
+                                 "internal async Task<AssistToolAnswer?> HideClassesForTheDeploy(");
+        Assert.Contains("ClassesDatedLater.UntickedAtDeployCounts(places.Count)", body);
     }
 }
