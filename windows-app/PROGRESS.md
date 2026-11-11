@@ -761,8 +761,10 @@ remembered. The honest way to keep this list right is
   happen.** The shared Python checks a course's folders during every build and
   prints one `PLANTOIR_HEALTH:` line per problem;
   `Plantoir.Core/Models/SiteHealthFinding.cs` parses them,
-  `SiteHealthRepair.cs` puts right the two that can be put right, and
-  `Views/FolderProblemsDialog.cs` shows the rest. The app's preview and
+  `SiteHealthRepair.cs` puts right the two that can be put right, and —
+  since #734 — the section's Problems tab, its sidebar warning and its one
+  alert show them, from the record the build writes (`SectionProblems`;
+  before that `Views/FolderProblemsDialog.cs` showed them on every build). The app's preview and
   publish are covered, and so is the assistant (`Plantoir.Mcp/
   LauncherRunner.cs` lifts findings out and `SiteHealthFinding.Appending`
   says them). **The scheduled deploy is covered too, differently**: it runs

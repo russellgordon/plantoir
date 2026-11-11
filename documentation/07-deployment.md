@@ -3676,7 +3676,9 @@ and whichever finishes last wears the badge in BOTH sidebars
 (`ScheduledPublishOutcomeTests.testTwoFoldersRunsKeepTheirOwnRecord` runs the
 two generated wrappers and fails with the id taken out of `recordURL`). The
 readers — the sidebar badge, the section's notice and its Dismiss, the
-section's findings dialog — compute the id of the folder that is open with the
+section's taking of the run's folder problems (no dialog of their own since
+#717 on the mac and #734 on Windows: the section's Problems record holds the
+same problems, and its alert is raised from that) — compute the id of the folder that is open with the
 same `folderIdentifier`. **#212's notification is keyed the same way**
 (`scheduled-publish.<CODE>.section<N>.<folder id>`), and for the same race: a
 section-only key let one folder's run replace, and its Dismiss withdraw, the

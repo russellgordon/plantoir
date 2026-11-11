@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-11-11 | A section's Problems tab on Windows: every problem the last preview or deploy found, one row each with a tick, sortable, the repair in the row; one warning on the section in the sidebar until its own next build is clean; and ONE alert, only when a build found something new, offering Show. **It replaces the dialog that listed every folder problem on every build**, so the notes must say that dialog is gone | Windows (the mac since v1.9.1, #717) | [#734](https://github.com/russellgordon/plantoir/issues/734) |
 
 
 ## Warnings the release notes MUST carry

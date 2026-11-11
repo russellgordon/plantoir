@@ -882,9 +882,12 @@ public sealed partial class SectionDetailView : UserControl
         bool has = SectionProblemsRules.HasMarker(record);
         bool focusWasInTheTable = _problemsView.ContainsFocus();
         SectionTabs.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
-        if (record is not null && has)
-            _problemsView.Show(record, SectionProblems.OtherRecords(folder, _course, _sectionNumber));
         var tab = SectionProblems.TabFor(folder, _course.Code, _sectionNumber);
+        // The rows are made when the tab SHOWS, not when the record is read:
+        // 300 rows took 522 ms to make on this PC (review change 4), which a
+        // section opening on its Website tab must not pay.
+        if (record is not null && has && tab == SectionProblems.Tab.Problems)
+            _problemsView.Show(record, SectionProblems.OtherRecords(folder, _course, _sectionNumber));
         _settingTheTab = true;
         try { (tab == SectionProblems.Tab.Problems ? ProblemsTab : WebsiteTab).IsSelected = true; }
         finally { _settingTheTab = false; }
@@ -898,7 +901,7 @@ public sealed partial class SectionDetailView : UserControl
         if (_settingTheTab || _isTornDown) return;
         var tab = ReferenceEquals(sender.SelectedItem, ProblemsTab) ? SectionProblems.Tab.Problems : SectionProblems.Tab.Website;
         SectionProblems.Show(tab, _window.Workspace.WorkspacePath, _course.Code, _sectionNumber);
-        RefreshChrome();
+        ShowTheProblems();
     }
 
     /// <summary>Shows a tab from code — Show on the alert — and, for Problems, puts the keyboard in the table.</summary>
