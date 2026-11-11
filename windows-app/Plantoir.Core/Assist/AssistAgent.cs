@@ -409,13 +409,23 @@ public sealed class AssistAgent
     };
 
     /// <summary>
-    /// How many tool calls one turn may make before the loop stops.
+    /// How many times one teacher action — a sentence (<see cref="Say"/>) or Go
+    /// (<see cref="Approve"/>) — may ask the model: <c>shared-rules.json</c> →
+    /// <c>assistantLapLimit</c> → <c>mostModelRequestsPerTurn</c>, pinned by
+    /// <c>AssistLapCapTests.TheCapIsTheContractsNumber</c> (#720, the mac's #689).
     ///
-    /// A small model that has lost the thread repeats itself rather than
-    /// stopping, and a runaway loop against a teacher's course is the failure
-    /// nobody would forgive. Reading, planning and then acting is three.
+    /// <para>One step of <see cref="Run"/>'s loop is exactly one request: the
+    /// loop's <c>_model.Ask</c> is the only place this agent asks the model, so
+    /// counting steps counts requests, and both doors start the count again.
+    /// The request that would exceed it is never sent; the tool the last
+    /// request chose has run.</para>
+    ///
+    /// <para>A small model that has lost the thread repeats itself rather than
+    /// stopping. Reading, planning and then acting is three; a turn that has
+    /// not finished in six has gone round rather than forward. Six was this
+    /// agent's number from the start, which is why the mac took it.</para>
     /// </summary>
-    private const int MostStepsPerTurn = 6;
+    internal const int MostStepsPerTurn = 6;
 
     private readonly string _courseCode;
 
@@ -1852,6 +1862,8 @@ public sealed class AssistAgent
             try { await priming.WaitAsync(cancellation); } catch { /* warm-up is best-effort */ }
         }
 
+        // The tool the last lap ran, for the trail line if the cap is reached.
+        string? lastTool = null;
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
             var asking = System.Diagnostics.Stopwatch.StartNew();
@@ -2050,15 +2062,57 @@ public sealed class AssistAgent
                 return lines;
             }
 
+            lastTool = name;
             var answer = await RunTool(call, lines, cancellation);
             lines.Add(new Line("tools", answer.Summary));
             if (TurnEnded(lines)) return lines;
         }
 
-        lines.Add(new Line("assistant",
-            "I’ve gone round several times without finishing. Tell me what you’d like me to do next."));
+        return WentRoundWithoutFinishing(lines, lastTool);
+    }
+
+    /// <summary>
+    /// The turn asked the model <see cref="MostStepsPerTurn"/> times and had
+    /// not finished (#720, the mac's #689): the request that would exceed it
+    /// is not sent, the turn is wound back out of what the model is sent, the
+    /// trail says so, and the teacher reads the contract's sentence.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>"Nothing was changed" is true here, not assumed.</b> A lap
+    /// follows only a call that was not handed back to the app, and every
+    /// write is (<see cref="AssistToolRunner.WriteTools"/>, pinned by
+    /// <c>AssistLapCapTests.EveryWriteALapCanRunIsAWriteTool</c>), so
+    /// everything this turn ran was a read or a refusal.</para>
+    ///
+    /// <para><b>Wound back</b> because #215 measured what a repeated pattern
+    /// left in the history does: a model at temperature 0 copies what it can
+    /// see, so the teacher's next sentence would begin from six repeats of the
+    /// call that ran away. Only <c>_messages</c> goes; the lines already
+    /// returned keep every tool line the turn showed. Safe after Go too:
+    /// <see cref="Approve"/> moves <c>_turnBeganAt</c> past the approved
+    /// call's result, so winding back can never erase a call that ran.</para>
+    /// </remarks>
+    private List<Line> WentRoundWithoutFinishing(List<Line> lines, string? lastTool)
+    {
+        WindTheTurnBack();
+        ActivityTrail.Note(ActivityTrail.Event.AssistantWentRoundWithoutFinishing,
+            WentRoundWithoutFinishingLine(MostStepsPerTurn, lastTool), _courseCode, _section);
+        lines.Add(new Line("assistant", AssistWording.WentRoundWithoutFinishing));
         return lines;
     }
+
+    /// <summary>
+    /// The trail line for <see cref="ActivityTrail.Event.AssistantWentRoundWithoutFinishing"/>:
+    /// how many times the model was asked, the tool it last chose IN WORDS,
+    /// that nothing more ran, and that the turn was taken back. Never the
+    /// teacher's sentence ("assistant asked" has it) and never argument
+    /// values, which are their page titles. The mac's words
+    /// (<c>sayItWentRoundWithoutFinishing</c>).
+    /// </summary>
+    internal static string WentRoundWithoutFinishingLine(int requests, string? lastTool) =>
+        $"the assistant went round {requests} times in one turn without finishing" +
+        (lastTool is { Length: > 0 } ? ", last choosing " + Spaced(lastTool) : "") +
+        " — stopped there, nothing more was run, and the turn was taken back out of the conversation";
 
     /// <summary>
     /// Where a plain "add the next class" would land, for settler S3 (#440):

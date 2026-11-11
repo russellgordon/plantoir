@@ -577,8 +577,10 @@ public class AssistAgentTests
 
         var lines = rig.Say("Do something odd");
 
-        Assert.Equal(6, rig.Tools.Calls.Count);
-        Assert.Contains("without finishing", lines[^1].Text);
+        // The contract's number and sentence (#720): AssistLapCapTests has the
+        // rest — the wind-back, the trail line, the boundary and the reset.
+        Assert.Equal(AssistAgent.MostStepsPerTurn, rig.Tools.Calls.Count);
+        Assert.Equal(AssistWording.WentRoundWithoutFinishing, lines[^1].Text);
     }
 
     [Fact]

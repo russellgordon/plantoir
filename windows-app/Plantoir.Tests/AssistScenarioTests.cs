@@ -221,7 +221,7 @@ public class AssistScenarioTests : IDisposable
         }
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory())
             { Surface = surface, Today = () => PinnedToday });
-        var model = new ScriptedModel(given?["modelReply"] as JsonObject);
+        var model = new ScriptedModel(given?["modelReply"] as JsonObject, given?["modelReplyAnswers"]?.ToString());
         // The contract's LOCAL schemas, as the window's own narrowed surface
         // declares them (#440 scenario "an empty add_next_class from the model
         // runs"): with no schemas the agent's course gate binds nothing to an
@@ -828,12 +828,32 @@ public class AssistScenarioTests : IDisposable
     /// course) or <c>content</c>. Every later request is answered with plain
     /// text, as the mac's runner does since #610 (#690): a hand-back that
     /// stopped ending the turn would otherwise ask again for ever.
+    ///
+    /// <para>When <c>given.modelReplyAnswers</c> is <c>"everyRequest"</c>
+    /// (#689, #720) the reply answers EVERY request up to a FUSE well past
+    /// <c>assistantLapLimit.mostModelRequestsPerTurn</c> — three times it, plus
+    /// two, as the mac serves — and plain text after, so an agent without the
+    /// cap fails on the count rather than hanging.</para>
     /// </summary>
     private sealed class ScriptedModel : IChatModel
     {
         private readonly JsonObject? _reply;
+        private readonly int _answered;
 
-        public ScriptedModel(JsonObject? modelReply = null) => _reply = modelReply;
+        public ScriptedModel(JsonObject? modelReply = null, string? answers = null)
+        {
+            _reply = modelReply;
+            _answered = answers switch
+            {
+                null => 1,
+                "everyRequest" => Fuse,
+                var other => throw new InvalidOperationException($"modelReplyAnswers {other}"),
+            };
+        }
+
+        /// <summary>How many requests an <c>everyRequest</c> reply answers before plain text.</summary>
+        private static int Fuse =>
+            ContractLoader.LoadJson("shared-rules.json")["assistantLapLimit"]!["mostModelRequestsPerTurn"]!.GetValue<int>() * 3 + 2;
 
         /// <summary>
         /// How many requests reached the engine over the whole conversation —
@@ -846,11 +866,11 @@ public class AssistScenarioTests : IDisposable
         {
             Requests++;
             if (_reply is null) return Task.FromResult<ModelReply?>(null);
-            // The scripted reply answers the FIRST request only; every later
-            // one is plain text, as the mac's runner does since #610: a
-            // hand-back regression would otherwise loop for ever, since the
-            // agent has no lap cap.
-            if (Requests > 1)
+            // The scripted reply answers the FIRST request only (or, for
+            // everyRequest, up to the fuse); every later one is plain text, as
+            // the mac's runner does since #610: a suite must not depend on the
+            // cap it checks, so a hand-back regression fails on the count.
+            if (Requests > _answered)
                 return Task.FromResult<ModelReply?>(new ModelReply(
                     new JsonObject { ["role"] = "assistant", ["content"] = "Here it is." }, "stop"));
 

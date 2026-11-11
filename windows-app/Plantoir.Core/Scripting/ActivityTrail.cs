@@ -102,6 +102,16 @@ public static class ActivityTrail
         /// worse than none.
         /// </summary>
         AssistantRepeatedTheRequestBack,
+        /// <summary>
+        /// One teacher action asked the model
+        /// <c>assistantLapLimit.mostModelRequestsPerTurn</c> times without
+        /// finishing (#720, the mac's #689): the turn was stopped, nothing more
+        /// ran, and it was taken back out of the conversation. Carries course,
+        /// section, the count and the tool it last chose in words — never the
+        /// sentence and never argument values. Not "answer was cut off": every
+        /// answer in the turn finished, and none was the last.
+        /// </summary>
+        AssistantWentRoundWithoutFinishing,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -774,6 +784,7 @@ public static class ActivityTrail
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
         Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",
+        Event.AssistantWentRoundWithoutFinishing => "assistant went round without finishing",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",
