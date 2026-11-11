@@ -756,7 +756,10 @@ remembered. The honest way to keep this list right is
   reached from the sidebar's Schedule Deploy… and from the assistant, sharing
   one refusal path so the two cannot drift.
 - **Three publishing destinations**, not one: `deploy.ps1` handles Netlify,
-  Cloudflare Pages and a plain folder.
+  Cloudflare Pages and a plain folder. Since 1.9.3 it reads the course's own
+  destinations when none is typed (#739), keeps a saved token it could not
+  check (#705), and rebuilds a site an earlier version built before a folder
+  publish (#749); the app names every leg, Netlify included.
 - **Folder-problem checks, surfaced in two of the three places they can
   happen.** The shared Python checks a course's folders during every build and
   prints one `PLANTOIR_HEALTH:` line per problem;

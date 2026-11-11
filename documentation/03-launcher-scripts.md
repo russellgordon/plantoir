@@ -2505,8 +2505,9 @@ all XNU compares).
     `--reset-token` (or `--logout`) clears it. A SAVED token (Netlify's or
     Cloudflare's) is cleared on its own only when the service answers 400,
     401 or 403 in its own words (a web filter's block page is not a
-    refusal); with no answer the mac launcher keeps it and stops (#716,
-    `token_check_answer`; `deploy.ps1`'s half is #705) —
+    refusal); with no answer the launcher keeps it and stops (#716,
+    `token_check_answer`; `deploy.ps1`'s `Get-TokenCheckAnswer` since 1.9.3,
+    #705; the cases are `contracts/app-rules.json` → `savedTokenCheck`) —
     `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
@@ -3047,7 +3048,8 @@ deployed"; three things belong here, beside the launchers themselves:
   interpreter, and any failure records nothing and publishes anyway
   ([`07-deployment.md`](07-deployment.md) → "The published-pages record
   (#379)"; `scripts/test_published_pages_record.py` cuts the function out of
-  the launcher and runs it). `deploy.ps1`'s folder branch owes the same.
+  the launcher and runs it). `deploy.ps1`'s folder branch does the same in
+  `Record-PublishedPages`.
 - **It fails CLOSED.** A settings file that exists and cannot be read refuses.
   A settings file that is absent is left to the course-folder check further
   down, which already says that in its own words.

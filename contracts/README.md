@@ -437,7 +437,9 @@ recounted 2026-09-07.
 | Where a NEW course deploys (Cloudflare Pages) and what an absent `deploy_target` means (Netlify), the picker's order, the sentences a teacher reads while choosing and when each is shown, and the Account ID: the new-course window lets a missing one wait, the first deploy refuses it ([#668](https://github.com/russellgordon/plantoir/issues/668)) | `app-rules.json` → `publishingDestinations` (`netlifyNoteCases` 7, `wizardAccountID.cases` 4, `deployWithoutAnAccountID.cases` 6, `sentences` 5) | PublishingDestinations (10), WizardStructure and ListTableGolden (the seven goldens), and `scripts/test_setup_course_deploy_target.py` (4: a course made at the command line gets the new-course default, a re-run keeps the destination the window wrote, and writes none over an older file that names none). AUTHORED 2026-11-01; no Windows reader yet |
 | Progress milestones and marker origins | `app-rules.json` → `milestones`, `markerOrigins` | TaskMilestone (12) |
 | Failure explanations | `app-rules.json` → `failureExplanations` | FailureExplainer (10) |
-| What a teacher reads when a pasted Cloudflare token is refused (#695), or a saved token could not be checked (#716) — the launchers' own lines, lifted and joined — and that a saved token is cleared only on a 400/401/403 that is the service's own answer | `app-rules.json` → `failureExplanations.cases` (the four whose output carries "did not accept that token" or "to check the saved token") | `scripts/test_deploy_token_refusal.py` (15): pins both launchers' printed lines to the cases' `expect`, and RUNS `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed. Discovered by Windows' `PythonToolchainTests`; the run half skips off a Mac. |
+| What a teacher reads when a pasted Cloudflare token is refused (#695), or a saved token could not be checked (#716) — the launchers' own lines, lifted and joined — and that a saved token is cleared only on a 400/401/403 that is the service's own answer | `app-rules.json` → `failureExplanations.cases` (the four whose output carries "did not accept that token" or "to check the saved token") | `scripts/test_deploy_token_refusal.py` (15): pins both launchers' printed lines to the cases' `expect`, and RUNS `deploy.sh`'s saved-token checks with the Keychain and `curl` stubbed. Discovered by Windows' `PythonToolchainTests`; the run half skips off a Mac. On Windows since 1.9.3 (#725) `FailureExplainer` lifts all four (`ContractTests.AppRules_FailureExplanations_MatchesContract`). |
+| When a SAVED publishing token is cleared, kept, or used: the service's answer read as `accepted`, `refused` or `unheard` (#705 on Windows, #716 on the mac) | `app-rules.json` → `savedTokenCheck` (`services`, `patternDialect`, `refusalStatuses`, `cases` 25; AUTHORED from Windows 2026-11-11) | `windows-app/test_launcher_rules.ps1` sections 7, 8 and 10 (every case through `deploy.ps1`'s `Get-TokenCheckAnswer` with the patterns it carries, which must be the contract's; `Invoke-TokenCheck` against a listener on 127.0.0.1; the real launcher, credentials stubbed, keeping a token whose check hears nothing), run by `LauncherRulesContractTests`. **The mac: unrun** until `scripts/test_deploy_token_refusal.py` reads the cases (the `mac` issue). |
+| Where a deploy given no destination goes: the course's saved destinations, one leg each, and the refusals (#739 items 7 and 8 on Windows, #668 on the mac) | `app-rules.json` → `savedDestinations` (`sentences`, `course`, `cases` 18; AUTHORED from Windows 2026-11-11) | `windows-app/test_launcher_rules.ps1` sections 9 and 10 (every case through `deploy.ps1`'s `Get-SavedDestinations`; the real launcher running two saved folder legs, keeping going after a failed one, ending with the first failing leg's code, refusing unreadable settings, and a typed `--target` winning); `verify-deploy.ps1`'s offline two-folder step. **The mac: unrun** until `scripts/test_deploy_sh_destination.py` reads the cases (the `mac` issue). |
 | Where a publish to a folder on this computer lands, and that a copy which did not finish is never reported as published (#227) | `shared-rules.json` → `folderPublishTarget` (`cases`, `partialCopy`) | `scripts/test_deploy_folder_target.py` (3), which RUNS `deploy.sh` from a working folder named with a colon — verify.sh and Windows' PythonToolchainTests, which skips it where bash cannot reach a scratch folder. **The bash launcher's**: the four cases with `appliesOn: ["mac"]` use a colon, which NTFS forbids and Windows reads as a drive letter; the other two are portable in meaning and are what `deploy.ps1` would run if it had a reader. The app's half — refusing a partial path, handing over a trimmed one, and the sentence for a copy that did not finish — is in `configurationRules.deployFolder`, `deployArguments` and `failureExplanations` |
 | Special folder names: what is blocked, what is confirmed, what a rename says, which keys it carries, and how the new name is SPELLED inside a link | `shared-rules.json` → `specialNames` | SharedRulesContractTests (24), SpecialFolderRenamer (22), FolderPathRewriterTests (2) |
 | What a teacher reads under the four Content Structure lists | `shared-rules.json` → `specialNames.contentStructureTip` | `SharedRulesContract` (3 functions, plus one further assertion inside `testSpecialNamesSentencesMatchContract`). Proposed from Windows 2026-09-07 and adopted here 2026-09-09 ([#72](https://github.com/russellgordon/plantoir/issues/72)); Windows' wording won, widened to “folders and files”. **Not counted in the `SharedRulesContractTests (24)` row above**, which is left as it stands. Whether a teacher can SEE it is checked on Windows (`CourseSettingsCaptionUiTests`) and NOT here: an XCUITest was tried and reached this caption in one run of four, so the mac's on-screen half is the source scan's deletion guard — `documentation/09-mac-app.md` says what went wrong and which part is worth fixing. Two of the four go beyond the string: the entry must carry no `reason` key — pinned on the side that authors this file, because the cost lands on Windows, whose `NoBlockedSentenceInTheContractIsUnusedHere` sweeps every top-level `reason` — and `CourseSettingsView` must actually DRAW the constant, measured by mutation, because the other three stay green when the line that renders it is deleted. |
@@ -1679,6 +1681,9 @@ list grew, and it DOES turn Windows red: `app-rules.json` →
 `deploy.ps1`'s, and "could not reach Cloudflare / Netlify to check the saved
 token" (`deploy.sh` only until Windows' #705). Windows' `FailureExplainer.cs`
 stays red on all four until it lifts and joins them. No generated half moves.
+(Both closed on Windows 2026-11-11: `deploy.ps1` prints the two "could not
+reach" lines since #705, and `FailureExplainer.cs` lifts all four since
+#725.)
 
 **Re-taken 2026-11-01 with [#668](https://github.com/russellgordon/plantoir/issues/668)**
 (Cloudflare Pages the default for a new course), on `issue/668-cloudflare-default`
@@ -1718,6 +1723,24 @@ counted. One list grew, and it DOES turn Windows red:
 assistant to fix problems") until Windows records it. No generated half moves.
 
 **Re-taken at the merge of #668 into `dev` after #717 part two (2026-11-01, Fable):** the walker reads **445** lists (442 + #668's three) and `activityTrail.mustRecord` is **154** (#717b's event and #668's), the counts both branches said whichever landed second would take.
+
+**Re-taken 2026-11-11 with Windows' #749/#705/#739 (items 7 and 8)**, on
+`issue/749-deploy-launcher-and-stored-keys` off `dev` d0af4d333, which read
+**445**: **447**. Two new AUTHORED top-level keys, proposed from Windows:
+`app-rules.json` → `savedTokenCheck` (each service's URL and the two body
+patterns, written so `grep -E` and .NET read them alike, and 25 `cases`: a
+status and a body → `accepted`, `refused` or `unheard`) and
+`savedDestinations` (the sentences and 18 `cases`: a `course_config.json` →
+the legs, or "cannot be read"). Both run on Windows against the real
+`deploy.ps1` (`windows-app/test_launcher_rules.ps1`). **They do NOT turn the
+mac red**: nothing there reads either key yet; the `mac` issue asks
+`scripts/test_deploy_token_refusal.py` and `scripts/test_deploy_sh_destination.py`
+to run them against `deploy.sh`, and says why the contract spells its
+patterns with a bracket of a space and a tab rather than deploy.sh's
+`[[:space:]]` (which .NET misreads; deploy.sh's own spelling is correct for
+grep). `activityTrail.mustRecord`
+is unchanged (no event for these, as on the mac for #746, #716 and #668's
+launcher half).
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through

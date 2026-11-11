@@ -112,6 +112,9 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
+| 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
+| 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
 
 
 ## Warnings the release notes MUST carry

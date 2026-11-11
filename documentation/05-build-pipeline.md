@@ -1998,8 +1998,10 @@ SCSS on every build, and no `.quartz-cache` was involved.
   `preview.sh`, or deploy.py's own — stamps the name of the image it really
   ran. Otherwise (Windows, native) a hash of `SCRIPTS_DIR`, `SUPPORT_DIR`,
   `CONTRACTS_DIR` and `QUARTZ_DIR/quartz`, skipping `__pycache__`,
-  `node_modules`, `.pyc` and dot-files: 12,911 files in 0.3 s in the
-  container.
+  `node_modules`, `.pyc` and dot-files, plus the runtime's
+  `manifest.json` beside `QUARTZ_DIR` when there is one: 12,911 files in 0.3 s
+  in the container. On Windows the id is REMEMBERED between runs (#749,
+  "Windows" below), because there the hash took seconds.
 - **`deploy.sh`** compares the stamp with its own `$IMAGE` (plain string, no
   Python on the host) right after it finds the built site, for every
   destination; a missing, empty or different stamp runs `preview.sh
@@ -2056,13 +2058,116 @@ say the same.)
 The same Python runs natively, so hole (1) does not exist there: `build_site`
 reads the app's current `.toolchain` directly and `install_quartz_additions`
 refreshes the persistent workspace by content. Hole (2) does: a deploy that
-does not build uploads the old site. Read from the code, not measured on
-Windows: `ensure_base_url_and_rebuild` looks for the workspace's
-`quartz.config.ts` at the hard-coded `/tmp/quartz-builds/…`, which Windows
-never has, so its Netlify and Cloudflare deploys already rebuild every time;
-the stamp check now says why a rebuild is due rather than relying on that. A
-folder publish from `deploy.ps1` publishes without entering `deploy.py`, and
-must ask the same question.
+does not build uploads the old site. Closed in 1.9.3 (#749):
+
+- **The folder publish asks.** `deploy.ps1`'s `--to-folder` branch never
+  enters `deploy.py`, so it calls `Test-BuiltByThisToolchain`, which runs the
+  runtime's Python on `toolchain_paths.site_was_built_by_this_toolchain(<the
+  section's build folder>)`. Only a plain yes skips the build; ANY failure —
+  a traceback, an import that fails, a Python that will not start — builds
+  again, the direction that costs one build rather than a stale site. The
+  call redirects nothing: under `$ErrorActionPreference = 'Stop'`, Windows
+  PowerShell 5.1 turns a native program's redirected stderr into a
+  terminating error, which would have made a check that throws end the
+  deploy with exit 1 instead of building. The Python silences its own stderr
+  instead, and `test_launcher_rules.ps1` runs a check that throws.
+- **One rebuild, two reasons.** deploy.sh has two rebuild blocks (toolchain,
+  then preview), and prints each failure line in both. `deploy.ps1` works out
+  the reason first — toolchain if the stamp is not this toolchain's, else
+  preview if the site carries live updating — prints that reason's two lines
+  and runs the ONE existing `preview.bat --build-only`, wait and checks, since
+  a build-only build answers both. `TheRebuildLinesAreDeploySHsWordForWord`
+  takes deploy.sh's copies `Distinct().Single()` for that reason.
+- **The runtime is part of the identity.** The four roots do not cover the
+  bundled runtime: Quartz's ROOT files (`quartz.layout.ts`, where patches
+  land), `node_modules`, the vendored engines and Python itself are not
+  hashed, so #764's move to Python 3.14.10, or a re-applied Quartz patch,
+  would have left every site "built by this version". `toolchain_paths` now
+  also hashes `QUARTZ_DIR.parent/manifest.json` (Windows: `runtime\
+  manifest.json`), labelled `runtime`. Two honest limits: a
+  `fetch-runtime.ps1` run with nothing to do does not rewrite the manifest
+  (so nothing changes, correctly), and the manifest names only what it lists —
+  an npm package moved without a pin in it would not show. Rejected: each
+  `Enter-NativeRuntime` setting `PLANTOIR_TOOLCHAIN_ID` from the runtime —
+  three launchers to keep in step, where one line in the shared Python
+  covers them all. **The mac is unchanged by this, read from the code:** the
+  container has no `/opt/manifest.json` (the Dockerfile copies none), and
+  every mac workspace sets `PLANTOIR_TOOLCHAIN_ID`, so `current_toolchain_id`
+  never reaches the hash there; the image TAG changes once because
+  `scripts/` changed, as any shared-Python change does.
+- **Course SETUP's folders are not the toolchain.** `support/example_content`,
+  `support/example_course` and `support/skeletons` (top level of `support/`
+  only; `_SUPPORT_NOT_BUILT_FROM`) are left out of the identity. Read by
+  grep of every `SUPPORT_DIR` reader: only `setup_course.py` (and the
+  image-only `check_runner_rules_against_the_site.py`) reads them; nothing
+  `build_site.py`, `deploy.py` or `site_said.py` imports does, and the
+  launchers' build path does not either, so a change to them cannot change a
+  built site. They are most of `support/` by count, and the review measured
+  why that matters (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro 26200,
+  Defender on, runtime Python 3.14.10, folders untouched since October):
+  `.toolchain\support` 12,655 files read in **105.8 s cold**,
+  `example_content` alone 9,829 files in 91.9 s, everything else about 4.3 s.
+  1.9.0 took no hash on Windows, so including them would have added that wait,
+  silently, to the first build in EVERY working folder after the update — and
+  again after each later update that changed any toolchain file, since the
+  app's mirror skips unchanged files by size and time and they stay cold.
+  (The first measurement here, 131 s over 13,029 files, was that cost.) On
+  the mac nothing changes: every workspace sets `PLANTOIR_TOOLCHAIN_ID`, so
+  the hash never runs; a build there run by hand without it would merely not
+  rebuild a site when only those three folders changed — which no built site
+  can show.
+- **The id is remembered, because even the rest is slow to read cold.** With
+  the three folders left out, the same machine: 499 files, 22.8 MB on a
+  current `.toolchain` (warm: content hash **0.13 s**, stat walk 0.01 s);
+  a folder last written 2026-10-16 and not read by this session (337 files,
+  20.1 MB): **1.63 s** the first read, 0.12 s after. "Cold" is the best this
+  PC allows without an administrator's tool to empty the file cache: the
+  machine had been up since 2026-10-14, so a folder not read in this session
+  may still have been cached, and another session may have read it; the
+  runtime's `quartz` sources, which every build here reads, were warm. The
+  cost is paid at the first build in a working folder after installing, or
+  after an update that changed any toolchain file — not per session: a
+  reboot alone costs a cache hit, because the fingerprint reads no files. So where
+  `PLANTOIR_BUILD_ROOT` is set (Windows only; never in the container) the id
+  is kept in `<build root>\.toolchain-id.cache` — one line holding a
+  fingerprint, one the id. The fingerprint is a sha256 over every file's
+  label, relative path, size and `st_mtime_ns`, plus the roots' ABSOLUTE
+  paths (the scripts come from `.toolchain` or the folder itself,
+  `deploy.ps1`'s `Enter-NativeRuntime`). Walked with `os.scandir` and
+  `DirEntry.stat()`, which on Windows read the size and time from the
+  directory listing (over the 13,029 files before the exclusion: 0.28–0.34 s,
+  against 0.94 s for `os.walk` + `os.stat`); stat only, so a OneDrive file that
+  is only in the cloud is not downloaded by asking. A hit costs **0.01 s**
+  (0.40 s before the exclusion). The cache is written through
+  `<name>.<pid>.tmp` and `os.replace`; any failure (another process reading
+  it) is ignored and the id is worked out next time. **Racy-entry rule
+  (git's):** it is not written while any file is younger than 2 s, so an edit
+  in the same tick and to the same size cannot leave a stale id. The
+  remaining false hit is a file changed to the same size AND the same mtime —
+  a copy that keeps the time (`File.Copy` does) of a different file with the
+  same length — which needs two builds of the bundle to collide to the
+  nanosecond. Not measured: a working folder IN OneDrive (none exists on this
+  PC, and copying one there would upload it); the stat walk does not read
+  files, so it should not depend on that.
+- **Not owed on Windows:** an image or workspace check (it has neither), and
+  no change to `BuildFreshness.NeedsRebuild` (the "Rejected" above).
+- **Netlify and Cloudflare** go through `deploy.py`'s
+  `ensure_base_url_and_rebuild`, which looks for the workspace's
+  `quartz.config.ts` at the literal `/tmp/quartz-builds/…`. Windows never
+  has it, so its Netlify and Cloudflare deploys rebuild on EVERY deploy —
+  confirmed in 1.9.3's verify-deploy log (" Updating Quartz baseUrl to …"
+  on a site whose address had not changed). That is #768, deliberately not
+  fixed with #749: the stamp makes a skipped rebuild safe for the toolchain
+  and the runtime, but not for an edited page, which deploy.py does not ask
+  about; at the command line the bug is what rebuilds an edited page today.
+  **A safe fix is more than the path.** Pointing it at
+  `toolchain_paths.WORK_DIR` alone would make a `deploy.bat` typed after an
+  edit deploy the last build. It needs a page-freshness signal handed over by
+  whoever knows — the app, which already asks `BuildFreshness` before every
+  window deploy (the assistant always builds, the scheduled wrapper asks its
+  shell twin) — or deploy.py asking the same question itself; and a decision
+  on whether the command line should keep the mac's "deploy publishes what
+  was built" shape.
 
 ## Printable pages: what the build does (#454, v1.6.0)
 
