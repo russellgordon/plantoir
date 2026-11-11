@@ -617,10 +617,13 @@ mid-await must not split one deploy across two runs). `IsPreparing` is cleared i
 the `finally`. The view hooks the run and its runner on `Loaded` and lets go on
 `Unloaded`; so does `TaskProgressView` for every runner it registered — otherwise a
 view taken off screen stays subscribed to a shared runner for good. A window closed
-mid-deploy: `MainWindow.Closed` sets `DetailHost.Content = null`, so the section
-view's `Unloaded` runs and it lets go explicitly, not on whether WinUI raises
-`Unloaded` when a Window closes (nothing here measured that; the implementation
-review's finding); the deploy runs on; another window on the folder shows it. The last window, or quitting: unchanged — the quit question counts the
+mid-deploy: `MainWindow.Closed` calls the section view's `LetGoAsTheWindowCloses()`
+(its `Unloaded` work, and the progress panel's `LetGo()`), so it lets go
+explicitly, not on whether WinUI raises `Unloaded` when a Window closes (nothing
+here measured that; the implementation review's finding). Called on the view
+rather than by setting `DetailHost.Content = null`, so the closing window's tree
+is not changed under it; both are idempotent. The deploy runs on; another window
+on the folder shows it. The last window, or quitting: unchanged — the quit question counts the
 `CourseActivity` record the run still writes. The in-app assistant's deploy goes
 through `MainWindow.DeployForAsync` → the view's `DeployAsync`, so it is the
 section's run and the assistant still awaits its outcome. A scheduled run, an

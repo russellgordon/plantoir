@@ -366,6 +366,17 @@ public sealed partial class SectionDetailView : UserControl
         OfferTheLinksChecklistIfWaiting();
     }
 
+    /// <summary>
+    /// The window is closing (MainWindow.Closed): let go as Unloaded would,
+    /// without relying on WinUI to raise it (#728 implementation review).
+    /// Safe twice — every step is an unsubscribe or a stop of nothing.
+    /// </summary>
+    internal void LetGoAsTheWindowCloses()
+    {
+        OnUnloaded(this, new RoutedEventArgs());
+        Progress.LetGo();
+    }
+
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         _isTornDown = true;

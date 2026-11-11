@@ -63,7 +63,15 @@ public sealed partial class TaskProgressView : UserControl
             foreach (var runner in _registered)
                 if (runner.IsAwaitingInput) _ = AskQuestion(runner);
         };
-        Unloaded += (_, _) =>
+        Unloaded += (_, _) => LetGo();
+    }
+
+    /// <summary>
+    /// Let go of every runner and hand on a question this view has up — on
+    /// Unloaded, and from a closing window (#728), so safe twice.
+    /// </summary>
+    internal void LetGo()
+    {
         {
             _tick.Stop();
             _leaving = true;
@@ -81,7 +89,7 @@ public sealed partial class TaskProgressView : UserControl
                 try { _openQuestion?.Hide(); } catch { }
                 QuestionAskers.HandOn(asked, this);
             }
-        };
+        }
     }
 
     private void AskIfStillWaiting(ScriptRunner runner)

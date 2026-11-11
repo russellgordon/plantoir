@@ -242,14 +242,16 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             IsClosed = true;
-            // Take the pane down EXPLICITLY (#728 implementation review): the
-            // section view's Unloaded is what lets go of the section's shared
-            // deploy run and hands on a question it has up, and nothing
-            // measured that WinUI raises it when a Window closes. A deploy
+            // Let go EXPLICITLY (#728 implementation review): the section
+            // view's Unloaded is what lets go of the section's shared deploy
+            // run and hands on a question it has up, and nothing measured that
+            // WinUI raises it when a Window closes. Called on the view rather
+            // than by emptying the pane (`DetailHost.Content = null`), so the
+            // closing window's visual tree is not changed under it. A deploy
             // started here runs on regardless — it is its run's, held by its
             // own task — and the quit question was asked before Closed.
-            try { DetailHost.Content = null; }
-            catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: the detail pane could not be taken down: {ex.Message}"); }
+            try { (DetailHost.Content as SectionDetailView)?.LetGoAsTheWindowCloses(); }
+            catch (Exception ex) { App.LogDiagnostic($"MainWindow.Closed: the section view could not let go: {ex.Message}"); }
             SectionMenuActivity.Changed -= ActivityChanged;
             AssistActivity.Changed -= ActivityChanged;
             DropVerbs();   // this window's menu server stops; its undo list goes with it (#489)
@@ -1752,7 +1754,8 @@ public sealed partial class MainWindow : Window
         _trackedSettings = DetailHost.Content as CourseSettingsView;
         if (_trackedDetail is { } current) current.PreviewChromeChanged += DetailChanged;
         if (_trackedSettings is { } settings) settings.SaveStateChanged += DetailChanged;
-        ApplyMenuEnablement();
+        // Closed takes the pane down (#728): a closed window's menus are not redrawn.
+        if (!IsClosed) ApplyMenuEnablement();
     }
 
     private void DetailChanged(object? sender, EventArgs e) => ApplyMenuEnablement();
