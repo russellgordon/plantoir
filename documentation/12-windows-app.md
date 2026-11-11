@@ -250,6 +250,22 @@ teacher is asked for a token that is already stored, with nothing to say so.
 Write through the launcher's own `CredApi`, and never advise `cmdkey` in a
 support note.
 
+**A saved token is cleared only when the service says no (#705, 1.9.3).**
+`deploy.ps1` checks a saved Netlify or Cloudflare token with
+`Get-SavedTokenAnswer`: `accepted`, `refused` (400, 401 or 403 whose body is
+the service's own refusal) or `unheard` (everything else, no answer
+included). Only `refused` deletes the credential (and Cloudflare's account);
+`unheard` keeps it and stops with the two "could not reach" lines. Until then
+any exception from the check deleted it, so a flaky school network or a
+captive portal cost a teacher their token. The request is made with
+`System.Net.Http.HttpClient`, not `Invoke-WebRequest`: on Windows PowerShell
+5.1 a 4xx throws there and the body, which is what tells a refusal from a
+web filter's block page, is hard to get back. Redirects are not followed;
+the system proxy is used as before (a 407 is `unheard` — reasoned, not
+measured). The rule and its cases are `contracts/app-rules.json` →
+`savedTokenCheck`; the why is
+[07 → "A token Cloudflare refuses (#695)…"](07-deployment.md).
+
 ---
 
 ## Running the launchers: ConPTY
@@ -690,13 +706,19 @@ problem — **nobody answers a question at 6 a.m.**
 ## Publishing: the destination is an argument
 
 `deploy_target` in `course_config.json` is read by the **app**, which turns it
-into a `--target` flag. **`deploy.ps1` and `deploy.py` read no key to
-choose a destination** — they default to Netlify and change destination
-only on `--target`. (`deploy.sh` reads it since #668 when it is given no
-destination; `deploy.ps1` matching it is the #668 `windows` issue.) (`build_site.py` does read
-it, but for working out a site's domain, not for deciding where to publish.) Anything driving a launcher directly must pass the flag itself;
-see [deployment](07-deployment.md), where the failure that sentence caused is
-recorded.
+into a flag for every leg it runs — `--target netlify` included since 1.9.3
+(#739 item 8, `DeployCommand.Arguments`; `contracts/app-rules.json` →
+`deployArguments`). **`deploy.ps1` reads it too since 1.9.3, but only when it
+is given no destination** (#739 item 7, as `deploy.sh` since #668): one saved
+destination is set and named ("Deploying to Cloudflare Pages, as ICS3U's
+settings say."), several run `deploy.ps1` once per leg in a `powershell.exe`
+of its own, settings that cannot be read refuse, and a typed `--target` or
+`--to-folder` wins (`Get-SavedDestinations`; `savedDestinations`).
+**`deploy.py` still reads no key**: it defaults to Netlify and changes only
+on `--target`. (`build_site.py` reads it for a site's domain, not to choose
+where to publish.) Anything driving `deploy.ps1` directly that means ONE
+destination must name it, or every saved leg is deployed; see
+[deployment](07-deployment.md) → "Choosing a destination (#668)".
 
 ---
 
@@ -8005,6 +8027,18 @@ never moved beside the wired adapter). Since #743 and #719 a `-FirstPublish`
 run asks a brand-new site again for a file before failing it, and every
 Cloudflare leg fails if wrangler handed it to Workers: "wrangler 4.156.0, a
 brand-new site's files asked again, and the loopback guard", below.
+
+**Since 1.9.3 (#749, #739)** every Netlify call names `--target netlify`
+(a flagless call would deploy every saved leg), the plain run has two
+offline folder steps before the credentialed legs — one stylesheet in the
+folder's `.toolchain` edited to stand for a new version of Plantoir, after
+which a folder publish with no page changed must build again and ship the
+rule, and the next must not build (the timings go in the Result block); and
+a deploy with nothing typed over two saved folders, both written, then a
+first leg that fails while the second is still written and the run exits 1
+— and `Set-Destination` writes an additional folder's `path`, the key the
+app and the launchers read (it wrote `folder_path`, which nothing read while
+the harness passed every flag itself).
 
 Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
 with a YouTube frame, and the borrowed page). The FIRST, from a fresh state

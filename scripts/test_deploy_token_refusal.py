@@ -29,9 +29,10 @@ one rule about lifting them:
     `curl` replaced by a stub that answers with a chosen status, and reads
     what was cleared.
 
-`deploy.ps1`'s half of #716 is Windows' issue #705: until it lands that
-launcher prints no "could not reach" lines, and the drift check below asks
-only that IF it carries them they say what the contract says.
+`deploy.ps1`'s half of #716 is Windows' #705 (1.9.3): it prints the same
+"could not reach" lines, which the drift check below pins to the contract,
+and its three-word rule runs against `contracts/app-rules.json` ->
+`savedTokenCheck.cases` in `windows-app/test_launcher_rules.ps1`.
 
 Both launchers are read with encoding="utf-8" (deploy.sh's ❌ and em dashes
 would not survive a Windows code page) and line by line with the ending
@@ -167,7 +168,7 @@ class TheLaunchersSayWhatTheContractLifts(unittest.TestCase):
         self.assertEqual(sorted(said), sorted(expects))
 
     def test_deploy_ps1_if_it_says_them_says_them_word_for_word(self):
-        """Windows' #705 is what adds them; until then there is nothing to pin."""
+        """Windows' #705 added them (1.9.3); each one must be a contract sentence."""
         said = _sentences_printed_after(_launcher_lines("deploy.ps1"), UNHEARD_MARKER)
         expects = _expects_for(UNHEARD_MARKER)
         for sentence in said:
