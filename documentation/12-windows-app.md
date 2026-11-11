@@ -872,6 +872,23 @@ where to publish.) Anything driving `deploy.ps1` directly that means ONE
 destination must name it, or every saved leg is deployed; see
 [deployment](07-deployment.md) → "Choosing a destination (#668)".
 
+**A folder path reaches the launcher as it was saved (#749's reviews).** A
+saved folder with a space AND a trailing backslash (`C:\Sites\pub one\`,
+which `DeployFolderProblem` accepts) was mangled twice over: the app's
+`ScriptRunner` wrapped an argument with a space in quotes and escaped nothing,
+and `deploy.ps1`'s own legs went through Windows PowerShell 5.1, which does the
+same — either way the last backslash escaped the closing quote and the
+launcher read `C:\Sites\pub one"`. `ScriptRunner.QuotedArgument` now follows
+the Windows rule (quote an argument with a space, tab or quote, or an empty
+one; double the backslashes before an escaped quote and before the closing
+quote) for EVERY launcher the app runs, and `ScriptRunnerQuotingTests` round-
+trips twelve shapes through a real `powershell.exe -File`; `deploy.ps1`
+doubles the trailing backslashes of a spaced argument it hands a leg (see the
+comment in its leg loop, and `test_launcher_rules.ps1` section 10).
+`Plantoir.Mcp` uses `ProcessStartInfo.ArgumentList` and was never affected;
+`PtyDriver`'s own joiner has the same naive rule but is fed only the
+harness's `cmd.exe /c "<runner>.cmd"`.
+
 ---
 
 ## Working on this app
