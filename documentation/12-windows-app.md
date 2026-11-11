@@ -10532,8 +10532,9 @@ Brotli, although no `*brotli*` file and no Brotli string is in any Pillow
 `.pyd` (it is linked in statically). Its version cannot be read from the
 binary. And the runtime's Python 3.11.9 reports `ssl.OPENSSL_VERSION`
 "OpenSSL 3.0.13 30 Jan 2024", the TLS under every Netlify publish and
-`deploy.py`'s Cloudflare API calls on Windows. Both are reported to the
-director for their own issue; nothing is changed here.
+`deploy.py`'s Cloudflare API calls on Windows. Nothing is changed
+here: the OpenSSL half is #764 (v1.9.3, moving the runtime's Python), and
+Pillow's Brotli is #766, which asks for its version on both platforms.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
