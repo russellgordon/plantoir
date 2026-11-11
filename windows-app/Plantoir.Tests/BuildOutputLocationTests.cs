@@ -391,6 +391,47 @@ public class BuildOutputLocationTests : IDisposable
         Assert.True(Directory.Exists(unmarked));
     }
 
+    /// <summary>
+    /// #735 (mac #683): the sweep takes a gone folder's toolchain index with
+    /// its builds, named by the builds folder's OWN name, and a kept folder's
+    /// index stays. The gone folder is never hashed again: its index is found
+    /// under the entry's name even though the marker names a path nothing can
+    /// resolve. By default the index folder is the one BESIDE the builds
+    /// parent, which here is this test's scratch folder.
+    /// </summary>
+    [Fact]
+    public void AGoneFoldersIndexGoesWithItsBuilds()
+    {
+        string home = Path.Combine(_root, "home");
+        string gone = Path.Combine(home, "Deleted Teaching");
+        string alive = Path.Combine(home, "Teaching");
+        Directory.CreateDirectory(alive);
+        string indexes = Path.Combine(_root, ToolchainMirror.IndexFolderName);
+        Directory.CreateDirectory(indexes);
+
+        // The gone folder's builds entry carries a name of its own, so the
+        // index can only be found by that name, never by hashing the path.
+        string goneEntry = Path.Combine(_buildsRoot, "0badc0de");
+        Directory.CreateDirectory(goneEntry);
+        File.WriteAllText(Path.Combine(goneEntry, BuildOutputLocation.WorkingFolderMarkerName), gone);
+        string aliveEntry = Path.Combine(_buildsRoot, FolderContainers.FolderIdentifier(alive));
+        Directory.CreateDirectory(aliveEntry);
+        File.WriteAllText(Path.Combine(aliveEntry, BuildOutputLocation.WorkingFolderMarkerName), alive);
+
+        string goneIndex = Path.Combine(indexes, "0badc0de" + ToolchainMirror.ManifestName);
+        string hashedIndex = Path.Combine(indexes, FolderContainers.FolderIdentifier(gone) + ToolchainMirror.ManifestName);
+        string aliveIndex = Path.Combine(indexes, FolderContainers.FolderIdentifier(alive) + ToolchainMirror.ManifestName);
+        foreach (string index in new[] { goneIndex, hashedIndex, aliveIndex }) File.WriteAllText(index, "x");
+
+        var swept = BuildOutputLocation.DiscardBuildsForMissingWorkingFolders(_buildsRoot, home,
+            workingFolderMayStillExist: path => path != gone);
+
+        Assert.Single(swept);
+        Assert.False(File.Exists(goneIndex), "the gone folder's index was left behind");
+        Assert.True(File.Exists(hashedIndex), "the sweep hashed the gone folder's path again");
+        Assert.True(File.Exists(aliveIndex), "a kept folder's index went");
+    }
+
     [Fact]
     public void TheSystemIsAskedWhyAFolderIsMissingNotJustWhetherItIs()
     {

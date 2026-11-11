@@ -254,4 +254,146 @@ public sealed class ToolchainFingerprintTests : IDisposable
         Assert.Single(entries);
         Assert.True(entries.ContainsKey("dockerfile"));   // compared without regard to case, as Windows paths are
     }
+
+    // ---- #735 (mac #683): pruning the index ---------------------------------
+
+    private static readonly DateTime Now = new(2026, 11, 11, 12, 0, 0, DateTimeKind.Utc);
+
+    private string PruneFolder()
+    {
+        string folder = Path.Combine(_root, "toolchain-index");
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    private static string Aged(string path, TimeSpan age)
+    {
+        if (!File.Exists(path) && !Directory.Exists(path)) File.WriteAllText(path, "x");
+        if (Directory.Exists(path)) Directory.SetLastWriteTimeUtc(path, Now - age);
+        else File.SetLastWriteTimeUtc(path, Now - age);
+        return path;
+    }
+
+    /// <summary>
+    /// A pass that has nothing to change does not rewrite the index, and it
+    /// still marks it used: a folder opened every day must never look unused.
+    /// </summary>
+    [Fact]
+    public void APassMarksAnUnchangedIndexUsed()
+    {
+        WriteManifest();
+        ToolchainMirror.RefreshToolchain(_folder, _bundled);
+        string index = ToolchainMirror.IndexPathFor(_folder);
+        string before = File.ReadAllText(index);
+        var longAgo = DateTime.UtcNow - TimeSpan.FromDays(200);
+        File.SetLastWriteTimeUtc(index, longAgo);
+
+        var pass = ToolchainMirror.RefreshToolchain(_folder, _bundled);
+
+        Assert.Equal(0, pass.Changed);
+        Assert.Equal(before, File.ReadAllText(index));           // not rewritten...
+        Assert.True(File.GetLastWriteTimeUtc(index) > DateTime.UtcNow - TimeSpan.FromMinutes(5),
+            "the pass did not mark the index it read as used");  // ...but marked
+    }
+
+    [Fact]
+    public void AnIndexUnusedForNinetyDaysIsRemoved()
+    {
+        string folder = PruneFolder();
+        string old = Aged(Path.Combine(folder, "aaaaaaaa.hashes"), TimeSpan.FromDays(91));
+        string recent = Aged(Path.Combine(folder, "bbbbbbbb.hashes"), TimeSpan.FromDays(89));
+
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now));
+
+        Assert.False(File.Exists(old));
+        Assert.True(File.Exists(recent));
+    }
+
+    [Fact]
+    public void ALeftoverTemporaryIndexIsRemoved()
+    {
+        string folder = PruneFolder();
+        string leftover = Aged(Path.Combine(folder, "aaaaaaaa.hashes.4242.tmp"), TimeSpan.FromHours(25));
+        string inFlight = Aged(Path.Combine(folder, "bbbbbbbb.hashes.4243.tmp"), TimeSpan.FromHours(23));
+
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now));
+
+        Assert.False(File.Exists(leftover));
+        Assert.True(File.Exists(inFlight));
+    }
+
+    [Fact]
+    public void NothingButIndexesIsTouched()
+    {
+        string folder = PruneFolder();
+        TimeSpan ancient = TimeSpan.FromDays(400);
+        string text = Aged(Path.Combine(folder, "notes.txt"), ancient);
+        string otherTmp = Aged(Path.Combine(folder, "something.tmp"), ancient);
+        string notAPid = Aged(Path.Combine(folder, "aaaaaaaa.hashes.x.tmp"), ancient);
+        Directory.CreateDirectory(Path.Combine(folder, "cccccccc.hashes"));
+        string hashesFolder = Aged(Path.Combine(folder, "cccccccc.hashes"), ancient);
+        string plain = Path.Combine(folder, "plain");
+        Directory.CreateDirectory(plain);
+        string nested = Aged(Path.Combine(plain, "dddddddd.hashes"), ancient);
+
+        Assert.Equal(0, ToolchainMirror.PruneIndexes(folder, Now));
+
+        foreach (string kept in new[] { text, otherTmp, notAPid, nested })
+            Assert.True(File.Exists(kept), kept);
+        Assert.True(Directory.Exists(hashesFolder));
+    }
+
+    /// <summary>
+    /// The folder the app prunes is the one the indexes are written in, and
+    /// under the suite it is NOT the teacher's real one. Compared with the real
+    /// folder built from the system's own answer for %LOCALAPPDATA%, never
+    /// from <see cref="AppDataRoot"/>, because a comparison with the
+    /// redirected root itself could not fail.
+    /// </summary>
+    [Fact]
+    public void APruneUnderTheSuiteNeverReachesTheRealIndexFolder()
+    {
+        string real = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "toolchain-index");
+        Assert.NotEqual(Path.GetFullPath(real), Path.GetFullPath(ToolchainMirror.IndexFolder), StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(ToolchainMirror.IndexFolder, Path.GetDirectoryName(ToolchainMirror.IndexPathFor(_folder)));
+        Assert.Equal(Path.Combine(Path.GetDirectoryName(BuildOutputLocation.BuildsParent)!, ToolchainMirror.IndexFolderName),
+                     ToolchainMirror.IndexFolder);
+    }
+
+    /// <summary>
+    /// The app prunes once a launch, off the UI thread, with the folder the
+    /// indexes are written in. Read from <c>App.xaml.cs</c> with its comments
+    /// taken out, so a call that is commented out fails here.
+    /// </summary>
+    [Fact]
+    public void TheAppPrunesTheIndexFolderOffTheUiThreadOnceALaunch()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Dockerfile"))) dir = dir.Parent;
+        Assert.NotNull(dir);
+        string source = File.ReadAllText(Path.Combine(dir!.FullName, "windows-app", "Plantoir", "App.xaml.cs"));
+        string code = System.Text.RegularExpressions.Regex.Replace(
+            System.Text.RegularExpressions.Regex.Replace(source, @"/\*.*?\*/", "", System.Text.RegularExpressions.RegexOptions.Singleline),
+            @"//[^\n]*", "");
+
+        var call = System.Text.RegularExpressions.Regex.Match(code,
+            @"string\s+(\w+)\s*=\s*ToolchainMirror\.IndexFolder\s*;\s*_\s*=\s*System\.Threading\.Tasks\.Task\.Run\(\s*\(\)\s*=>\s*\{\s*try\s*\{\s*int\s+\w+\s*=\s*ToolchainMirror\.PruneIndexes\(\s*(\w+)\s*,\s*DateTime\.UtcNow\s*\)\s*;");
+        Assert.True(call.Success, "App.xaml.cs no longer prunes ToolchainMirror.IndexFolder inside Task.Run");
+        Assert.Equal(call.Groups[1].Value, call.Groups[2].Value);
+        // In OnLaunched, beside the builds sweep: after it, once.
+        Assert.True(code.IndexOf("DiscardBuildsForMissingWorkingFolders(", StringComparison.Ordinal) < call.Index);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"PruneIndexes\("));
+    }
+
+    /// <summary>The prune takes its folder with no default: a caller has to say which one.</summary>
+    [Fact]
+    public void ThePruneHasNoDefaultFolder()
+    {
+        var method = typeof(ToolchainMirror).GetMethod(nameof(ToolchainMirror.PruneIndexes))!;
+        var folder = method.GetParameters()[0];
+        Assert.Equal(typeof(string), folder.ParameterType);
+        Assert.False(folder.IsOptional);
+        Assert.False(folder.HasDefaultValue);
+    }
 }

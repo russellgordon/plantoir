@@ -9505,12 +9505,13 @@ their indexes go by age.
   ever open again.
 
 **Windows** has the same index (`ToolchainMirror.IndexPathFor` →
-`AppDataRoot\toolchain-index\<id>.hashes`) and the same leak; its issue
-carries the mark, the 90 days, the `.tmp` sweep, removal with its own builds
-sweep (`DiscardBuildsForMissingWorkingFolders`), and the one trap there:
-its `ToolchainFingerprintTests` write to the real `AppDataRoot`, so a prune
-must not run in that test host. NTFS last-access times are unreliable too,
-so it must mark the file explicitly.
+`AppDataRoot\toolchain-index\<id>.hashes`) and had the same leak until
+Windows 1.9.3 (#735), which matches all of this: the mark at read time, the
+90 days, the `.tmp` sweep, and removal with its own builds sweep
+(`DiscardBuildsForMissingWorkingFolders`). The trap this paragraph used to
+name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
+already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
+→ "Pruning the index (#735)" has the Windows details.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 

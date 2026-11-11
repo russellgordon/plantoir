@@ -238,13 +238,25 @@ public static class BuildOutputLocation
     /// not on this computer just now reads its attributes locally and is
     /// simply present. Anything but those two codes is "may still exist" and
     /// is kept. Erring toward litter is the safe direction.</para>
+    ///
+    /// <para><b>The folder's toolchain index goes with its builds</b> (#735,
+    /// the Windows half of mac #683): <c>&lt;indexFolder&gt;\&lt;entry's
+    /// name&gt;.hashes</c>, named by the builds folder's OWN name, which is the
+    /// same <see cref="FolderContainers.FolderIdentifier"/>. Never by hashing
+    /// the recorded path again: that resolves through a folder that no longer
+    /// exists. The index folder defaults to <c>toolchain-index</c> BESIDE the
+    /// builds parent, which in the app is <see cref="ToolchainMirror.IndexFolder"/>,
+    /// so a test that passes its own builds parent never reaches the real
+    /// one.</para>
     /// </summary>
     public static IReadOnlyList<string> DiscardBuildsForMissingWorkingFolders(
         string? buildsParent = null, string? homeDirectory = null,
-        Func<string, bool>? workingFolderMayStillExist = null)
+        Func<string, bool>? workingFolderMayStillExist = null, string? indexFolder = null)
     {
         var swept = new List<string>();
         string parent = buildsParent ?? BuildsParent;
+        string indexes = indexFolder ?? Path.Combine(
+            Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(parent)) ?? parent, ToolchainMirror.IndexFolderName);
         string home = (homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var mayExist = workingFolderMayStillExist ?? WorkingFolderMayStillExist;
@@ -266,6 +278,12 @@ public static class BuildOutputLocation
             // by the next launch. Litter, not an error.
             try { CourseRestorer.DeleteTree(entry); swept.Add(entry); }
             catch (Exception) { }
+            try
+            {
+                string index = Path.Combine(indexes, Path.GetFileName(entry) + ToolchainMirror.ManifestName);
+                if (File.Exists(index)) File.Delete(index);
+            }
+            catch (Exception) { /* by age, at the next launch's prune */ }
         }
         return swept;
     }

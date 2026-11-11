@@ -174,7 +174,97 @@ public static class ToolchainMirror
     /// <c>--state-dir</c> run keeps its own.
     /// </summary>
     internal static string IndexPathFor(string workspacePath) =>
-        AppDataRoot.Combine("toolchain-index", FolderContainers.FolderIdentifier(workspacePath) + ManifestName);
+        Path.Combine(IndexFolder, FolderContainers.FolderIdentifier(workspacePath) + ManifestName);
+
+    /// <summary>The name of the folder the indexes are kept in, beside <c>builds</c>.</summary>
+    public const string IndexFolderName = "toolchain-index";
+
+    /// <summary>
+    /// The folder every index lives in, and the one the app prunes once a
+    /// launch (#735). Public so the suite can compare it with the REAL folder:
+    /// under <c>dotnet test</c> <see cref="AppDataRoot"/> is redirected to a
+    /// scratch folder, and the test that proves a prune there never reaches
+    /// the teacher's own indexes has to be able to fail.
+    /// </summary>
+    public static string IndexFolder => AppDataRoot.Combine(IndexFolderName);
+
+    /// <summary>How long an index may go unused before the prune removes it (#735, mac #683).</summary>
+    public static readonly TimeSpan UnusedIndexLimit = TimeSpan.FromDays(90);
+
+    /// <summary>How old a leftover temporary index must be before the prune removes it.</summary>
+    public static readonly TimeSpan LeftoverTemporaryLimit = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Marks an index USED (#735, the Windows half of mac #683): its write time
+    /// set to now. Called by every pass right after it READS the index,
+    /// whether or not the pass then rewrites it, because a pass with nothing
+    /// to change never rewrites it, and a folder opened every day would
+    /// otherwise look unused after ninety. NTFS last-access times are not a
+    /// substitute: Windows updates them lazily, or not at all where they are
+    /// turned off. Best effort; it never creates a file that is not there.
+    /// </summary>
+    internal static void MarkIndexUsed(string indexPath, DateTime nowUtc)
+    {
+        try
+        {
+            if (File.Exists(indexPath)) File.SetLastWriteTimeUtc(indexPath, nowUtc);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Removes, from <paramref name="indexFolder"/> and nothing below it,
+    /// every <c>*.hashes</c> unused for more than <see cref="UnusedIndexLimit"/>
+    /// and every leftover <c>*.hashes.&lt;pid&gt;.tmp</c> (the shape
+    /// <see cref="WriteFingerprints"/> uses, left only by an interrupted write)
+    /// older than <see cref="LeftoverTemporaryLimit"/>. Plain files only: a
+    /// folder, a link or any other name is left alone. The folder is an
+    /// argument with NO default, so a caller has to say which one it means;
+    /// the app passes <see cref="IndexFolder"/> once a launch. Best effort;
+    /// answers how many files it removed.
+    ///
+    /// <para>A wrongly removed index costs one pass that reads every copy
+    /// once; a dead one costs up to the manifest's size. The race with a pass
+    /// reading the same index (removed between its read and its mark) ends
+    /// the same way: the next pass reads in full and writes it again.</para>
+    /// </summary>
+    public static int PruneIndexes(string indexFolder, DateTime nowUtc)
+    {
+        int removed = 0;
+        IEnumerable<string> files;
+        try { files = Directory.EnumerateFiles(indexFolder, "*", SearchOption.TopDirectoryOnly).ToList(); }
+        catch { return 0; }
+        foreach (string file in files)
+        {
+            try
+            {
+                string name = Path.GetFileName(file);
+                TimeSpan limit;
+                if (name.EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase)) limit = UnusedIndexLimit;
+                else if (IsLeftoverTemporary(name)) limit = LeftoverTemporaryLimit;
+                else continue;
+                var info = new FileInfo(file);
+                if ((info.Attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) continue;
+                if (nowUtc - info.LastWriteTimeUtc <= limit) continue;
+                info.Delete();
+                removed++;
+            }
+            catch { }
+        }
+        return removed;
+    }
+
+    /// <summary><c>&lt;id&gt;.hashes.&lt;pid&gt;.tmp</c>: what <see cref="WriteFingerprints"/> writes first.</summary>
+    private static bool IsLeftoverTemporary(string name)
+    {
+        if (!name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) return false;
+        string withoutTmp = name[..^".tmp".Length];
+        int dot = withoutTmp.LastIndexOf('.');
+        if (dot <= 0) return false;
+        string pid = withoutTmp[(dot + 1)..];
+        return pid.Length > 0 && pid.All(char.IsAsciiDigit)
+            && withoutTmp[..dot].EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Reads a manifest or index; null when there is none or it cannot be read.
     /// A line that does not parse is skipped: that file is simply read, as before #559.</summary>
@@ -297,8 +387,11 @@ public static class ToolchainMirror
         string toolchainRoot = Path.Combine(workspacePath, ".toolchain");
         string? indexPath = null;
         try { indexPath = IndexPathFor(workspacePath); } catch { }
-        var pass = new MirrorPass(ReadFingerprints(Path.Combine(bundledRoot, ManifestName)),
-                                  indexPath is null ? null : ReadFingerprints(indexPath));
+        var applied = indexPath is null ? null : ReadFingerprints(indexPath);
+        // #735: marked used at READ time, whether or not this pass rewrites it,
+        // so the launch prune never takes the index of a folder still opened.
+        if (applied is not null) MarkIndexUsed(indexPath!, DateTime.UtcNow);
+        var pass = new MirrorPass(ReadFingerprints(Path.Combine(bundledRoot, ManifestName)), applied);
         var result = default(CopyResult);
         foreach (string name in RecipeRootFiles)
             result += SyncFile(Path.Combine(bundledRoot, name), Path.Combine(toolchainRoot, name), null, pass, name);
