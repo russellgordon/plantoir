@@ -58,6 +58,29 @@ The image is layered as follows (in order):
    The certificate store could not wait for either, so it has a late layer of
    its own (item 6 below, and
    [The certificate store](#the-certificate-store-639-v190)).
+
+   **The shared scripts run on two Pythons (#764, 2026-11-11).** This
+   image's 3.11.15 is no longer the Python every teacher runs: Windows'
+   runtime moved from 3.11.9 to **3.14.10** for its OpenSSL (3.0.13 ->
+   3.5.9; `documentation/12-windows-app.md` → "Python 3.14.10 in the
+   runtime"). Nothing here changes and the mac owes nothing: this image's
+   TLS is Debian's `libssl3t64` (the floor in item 6) and is current. What
+   the mac must KNOW: **`scripts/` and `support/` must keep running on
+   3.11**, and no unit-test gate runs them on 3.11 any more. `verify.sh`
+   runs `scripts/test_*.py` on the Mac's own `python3`, not in the image;
+   only what the launchers run inside the container meets 3.11, at build
+   time. Windows runs the shared tests on 3.14.10 (its runtime's Python,
+   `PythonToolchainTests`) and, as the one 3.11 check, parses every
+   `scripts/` and `support/` file with `ast.parse(..., feature_version=(3,
+   11))` (`RuntimePythonTests.TheSharedScriptsParseAsPython311`). That
+   rejects `type X = ...`, `def f[T]`, `class C[T]` and 3.14's unbracketed
+   `except A, B:`; it does NOT catch PEP 701 quote reuse inside an
+   f-string, or a call to a standard-library function added after 3.11. So
+   use neither in shared code. The same edit changed `contracts/toolchain.json`,
+   which is in the build context: the mac's image tag moves with it, so
+   every working folder on a Mac gets a new image and a recreated container
+   the next time it builds (cheap late layers; nothing about the image
+   changes).
 2. **`pip install python-frontmatter==1.3.0 PyYAML==6.0.3 Pillow==12.3.0`** —
    the Python dependencies, all three PINNED since 2026-09-18 (issue #140) at
    the versions the image already carried, so the pin changed nothing about
@@ -826,8 +849,11 @@ its next base bump.
 which measured two things this paragraph used to deny: Pillow 12.3.0's
 FreeType has a Brotli decoder linked in statically, with no version readable,
 and the image carries the same Pillow pin, unmeasured here (#766); and
-Windows' Python 3.11.9 carries OpenSSL 3.0.13 (#764).
-`documentation/12-windows-app.md` → "#714 on Windows".
+Windows' Python 3.11.9 carried OpenSSL 3.0.13, which #764 (Windows 1.9.3)
+ended by moving that runtime to Python 3.14.10 with OpenSSL 3.5.9 (see "The
+shared scripts run on two Pythons" under the base layer above).
+`documentation/12-windows-app.md` → "#714 on Windows" and "Python 3.14.10 in
+the runtime".
 
 ### Node 22 (#640, v1.9.0)
 

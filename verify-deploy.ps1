@@ -655,6 +655,11 @@ if (-not (Test-Path (Join-Path $script:Runtime 'manifest.json')) -or -not (Test-
 }
 $script:RuntimePython = Join-Path $script:Runtime 'python\python.exe'
 Ok "runtime ($runtimeSaid): $($script:Runtime)"
+# The Python every Netlify publish and deploy.py's Cloudflare calls run on,
+# and the OpenSSL under them (#764: 3.11.9 carried 3.0.13 unnoticed). Recorded,
+# not judged: fetch-runtime.ps1 and the app's build refuse the wrong one.
+$pythonSaid = (& $script:RuntimePython -I -c "import ssl, sys; print(sys.version.split()[0] + ', ' + ssl.OPENSSL_VERSION)" 2>&1 | Out-String).Trim()
+$script:Measured += "the runtime's Python and the OpenSSL its deploy requests use: $pythonSaid"
 # Which of the variables that make wrangler 4.108+ delegate a NEW project to
 # Workers this run hands it (names only): the evidence that Check-NoDelegation
 # was asked under the trigger, not around it (#719).

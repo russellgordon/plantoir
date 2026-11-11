@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Plantoir.Tests;
 
@@ -50,6 +51,10 @@ namespace Plantoir.Tests;
 /// </summary>
 public class PythonToolchainTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public PythonToolchainTests(ITestOutputHelper output) => _output = output;
+
     /// <summary>
     /// Files deliberately not run here, each with the reason.
     ///
@@ -100,10 +105,35 @@ public class PythonToolchainTests
     public void SharedPythonTestFilePasses(string fileName)
     {
         var result = RunPython(fileName);
+        _output.WriteLine($"ran on {Interpreter.Describe()}");
 
         Assert.True(
             result.ExitCode == 0,
-            $"scripts/{fileName} failed (exit code {result.ExitCode}).\n\n{result.Output}");
+            $"scripts/{fileName} failed on {Interpreter.Describe()} (exit code {result.ExitCode}).\n\n{result.Output}");
+    }
+
+    /// <summary>
+    /// #764: the shared tests run on the interpreter a TEACHER runs, the
+    /// runtime's own Python, whenever a runtime is fetched (this checkout's
+    /// <c>windows-app\Vendor\runtime</c>, or <c>PLANTOIR_RUNTIME</c>). Until
+    /// #764 they ran on PATH's <c>python</c> (3.14.7 on the build PC) while
+    /// teachers ran 3.11.9, so the gate had never run them on the shipping
+    /// interpreter. Says which one ran, and its version, either way.
+    /// </summary>
+    [Fact]
+    public void TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched()
+    {
+        _output.WriteLine($"the shared Python tests run on {Interpreter.Describe()}");
+        if (NativeRuntime.Folder is { } runtime)
+        {
+            string expected = Path.GetFullPath(Path.Combine(runtime, "python", "python.exe"));
+            Assert.True(Interpreter.IsRuntime && string.Equals(Path.GetFullPath(Interpreter.Path), expected, StringComparison.OrdinalIgnoreCase),
+                $"A runtime is fetched at {runtime}, but the shared tests run on {Interpreter.Describe()}, not on {expected}.");
+        }
+        else
+        {
+            Assert.False(Interpreter.IsRuntime, $"No runtime is fetched, yet the shared tests claim to run on one: {Interpreter.Describe()}.");
+        }
     }
 
     /// <summary>
@@ -153,7 +183,7 @@ public class PythonToolchainTests
     {
         var start = new ProcessStartInfo
         {
-            FileName = PythonExecutable,
+            FileName = Interpreter.Path,
             // Run from `scripts/`, exactly as `verify.sh` does (`cd scripts && python3 …`).
             // These files import their siblings by BARE NAME — `import deploy`,
             // `import netlify_badge` — which resolves only when the interpreter's
@@ -164,6 +194,24 @@ public class PythonToolchainTests
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        // The runtime's Python reads python3NN._pth, which REPLACES sys.path:
+        // the script's own folder is not on it, and PYTHONPATH is ignored.
+        // These files import their siblings by bare name, so 50 of 93 failed
+        // with ModuleNotFoundError when first run that way (#764, measured on
+        // 3.11.9 and 3.14.10 alike). The shim puts the working directory -
+        // scripts\, the file's own folder - first on sys.path, as the
+        // product's entry scripts do for themselves. The three variables set
+        // below ARE honoured there, although sys.flags.ignore_environment
+        // reads 1 (measured on 3.14.10, 2026-11-11: PYTHONIOENCODING=latin-1
+        // gave stdout iso8859-1, PYTHONDONTWRITEBYTECODE=1 gave
+        // sys.dont_write_bytecode True, PYTHONUTF8 moved utf8_mode); -B and
+        // -X utf8 say the same on the command line, so the run does not
+        // depend on that.
+        if (Interpreter.IsRuntime)
+        {
+            foreach (string argument in new[] { "-B", "-X", "utf8", "-c", RuntimeShim })
+                start.ArgumentList.Add(argument);
+        }
         start.ArgumentList.Add(fileName);
 
         // WITHOUT THESE TWO, TWO FILES FAIL ON WINDOWS AND IT LOOKS LIKE A
@@ -188,7 +236,7 @@ public class PythonToolchainTests
         start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
 
         using var process = Process.Start(start)
-            ?? throw new InvalidOperationException($"Could not start {PythonExecutable}.");
+            ?? throw new InvalidOperationException($"Could not start {Interpreter.Path}.");
 
         // Read both streams before waiting. A child that fills a redirected
         // pipe blocks writing to it while the parent blocks waiting for exit,
@@ -236,9 +284,49 @@ public class PythonToolchainTests
     /// the one outcome every part of this file is written to prevent — and it
     /// is the same rule <c>verify-deploy.ps1</c>'s own header states.</para>
     /// </summary>
-    private static string PythonExecutable => cachedPython ??= FindPython();
+    internal static PythonInterpreter Interpreter => cachedInterpreter ??= FindInterpreter();
 
-    private static string? cachedPython;
+    private static PythonInterpreter? cachedInterpreter;
+
+    private const string RuntimeShim =
+        "import os, runpy, sys; sys.argv = sys.argv[1:]; sys.path.insert(0, os.getcwd()); runpy.run_path(sys.argv[0], run_name='__main__')";
+
+    /// <summary>
+    /// The runtime's Python when a runtime is fetched (#764), else PATH's.
+    /// A runtime that has a manifest but no Python is broken, not absent, and
+    /// throws rather than quietly testing PATH's interpreter instead.
+    /// </summary>
+    private static PythonInterpreter FindInterpreter()
+    {
+        if (NativeRuntime.Folder is { } runtime)
+        {
+            string python = Path.Combine(runtime, "python", "python.exe");
+            if (!File.Exists(python))
+                throw new InvalidOperationException(
+                    $"The runtime at {runtime} has a manifest.json but no python\\python.exe. Re-run windows-app\\Vendor\\fetch-runtime.ps1.");
+            return new PythonInterpreter(python, IsRuntime: true, VersionOf(python, "-I"));
+        }
+        string onPath = FindPython();
+        return new PythonInterpreter(onPath, IsRuntime: false, VersionOf(onPath));
+    }
+
+    private static string VersionOf(string python, params string[] flags)
+    {
+        var probe = new ProcessStartInfo(python)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (string flag in flags) probe.ArgumentList.Add(flag);
+        probe.ArgumentList.Add("-c");
+        probe.ArgumentList.Add("import ssl, sys; print(sys.version.split()[0] + ', ' + ssl.OPENSSL_VERSION)");
+        using var process = Process.Start(probe)!;
+        string said = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit(20_000);
+        return said;
+    }
 
     private static string FindPython()
     {
@@ -272,4 +360,10 @@ public class PythonToolchainTests
             + "The shared tests under scripts/ cannot run without one. Install Python 3, "
             + "or add the reason this machine cannot have it to NotRunHere in PythonToolchainTests.");
     }
+}
+
+/// <summary>Which Python the shared tests run on, and what it said it is (#764).</summary>
+internal sealed record PythonInterpreter(string Path, bool IsRuntime, string Version)
+{
+    public string Describe() => $"{(IsRuntime ? "the runtime's Python" : "PATH's python")} {Version} ({Path})";
 }

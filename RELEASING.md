@@ -326,7 +326,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > ran here before. They need no Docker, so they cover the shared Python and
    > say nothing about the image. It DISCOVERS them rather than listing them,
    > so no number is kept in step by hand; this said "all fifteen" when there
-   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
+   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.
+   > Since #764 they run on the bundled runtime's own Python whenever a
+   > runtime is fetched, so on the build PC they test the interpreter that
+   > ships.)
 
    **Revisit the npm audit** (#667). Read verify.sh's line about the image's
    npm packages. A SKIP there means nothing was checked, so run verify.sh
