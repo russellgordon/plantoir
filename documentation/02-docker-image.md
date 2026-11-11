@@ -788,7 +788,8 @@ of their own, and a `debianPackage`, which `verify.sh` reads: for every pin
 that has one it runs `dpkg-query` and `dpkg --compare-versions … ge` in the
 fresh image, and a failure names the package, the version found and the
 floor. Neither has `windowsRuntimeContains`: Windows' Python and Node carry
-no separate libbrotli, and Windows' Python ships its own OpenSSL.
+no separate libbrotli file (Pillow's FreeType links a decoder in statically;
+see below), and Windows' Python ships its own OpenSSL.
 
 **Rejected:**
 
@@ -820,8 +821,13 @@ It compiles with `--network none`, and every download its build makes is
 checked by SHA-256, so it decodes nothing anyone else chose; it moves with
 its next base bump.
 
-**Windows: nothing to do.** It has no image. Its Python and Node carry no
-separate libbrotli, and Node 22.23.4's bundled Brotli is the fixed one.
+**Windows: no Debian package to floor.** It has no image, and Node
+22.23.4's bundled Brotli is the fixed one. Corrected by #719 (2026-11-11),
+which measured two things this paragraph used to deny: Pillow 12.3.0's
+FreeType has a Brotli decoder linked in statically, with no version readable,
+and the image carries the same Pillow pin, unmeasured here (#766); and
+Windows' Python 3.11.9 carries OpenSSL 3.0.13 (#764).
+`documentation/12-windows-app.md` → "#714 on Windows".
 
 ### Node 22 (#640, v1.9.0)
 

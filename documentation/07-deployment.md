@@ -1514,7 +1514,11 @@ delegated, for three reasons, any one of which is enough:
 `verify-deploy.sh` fails a Cloudflare leg whose log carries the delegation's
 notice ("now part of Cloudflare Workers"), and was run with `CLAUDECODE` and
 `AI_AGENT` set in its own environment on 2026-10-31: every leg stayed on
-Pages. **Do not drop `--branch`** to "simplify" the call, and do not pass
+Pages. `verify-deploy.ps1` → `Check-NoDelegation` does the same on Windows
+since #719, where it is the stronger test, because the harness's own
+environment (under Claude Code, `CLAUDECODE=1`) reaches wrangler; the Result
+block names which of `CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID` and
+`GEMINI_CLI` the run carried. **Do not drop `--branch`** to "simplify" the call, and do not pass
 `--force`: wrangler documents `--force` as the opt-out, but it also prints a
 "Notice to agents" line, and the guards above already make it unnecessary.
 
@@ -1918,8 +1922,13 @@ asserts the total the log holds, never a fixed number. Pinning "8 retries in
 all" failed 3 of 9 review runs (12/1/0), because a second-granular clock let 3
 retries fit instead of 4. After the change, 12 runs in a row were 13/0/0. Proved
 must-fail by copy-and-restore: with the retry taken out, 4 of the 5 fail, and
-the plain-run case passes either way. **Windows owes the same in
-`verify-deploy.ps1`** (`Check-Engine`, `-SelfTest`).
+the plain-run case passes either way. **Windows has the same since #743**:
+`verify-deploy.ps1` → `Get-CheckedResponse` and `Measure-NewSiteRetries`,
+called from `Check-Engine` for the same fetches, with the same five
+`-SelfTest` cases against a byte-for-byte copy of the mac's stub; with the
+retry taken out, 4 of the 5 fail there too (`documentation/12-windows-app.md`
+→ "wrangler 4.156.0, a brand-new site's files asked again, and the loopback
+guard").
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the

@@ -7999,7 +7999,10 @@ be the "nothing skipped" run `RELEASING.md` asks for (the #568
 implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
-never moved beside the wired adapter).
+never moved beside the wired adapter). Since #743 and #719 a `-FirstPublish`
+run asks a brand-new site again for a file before failing it, and every
+Cloudflare leg fails if wrangler handed it to Workers: "wrangler 4.156.0, a
+brand-new site's files asked again, and the loopback guard", below.
 
 Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
 with a YouTube frame, and the borrowed page). The FIRST, from a fresh state
@@ -8012,7 +8015,9 @@ run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight
 were the Swift program, once per host and folder, then reported as skips;
 these totals are from BEFORE the change above, which turns those eight into
 asserted passes, so a clean run should now read 148 passed, 0 failed,
-0 skipped — the next release run re-measures it); publishes of 10–12 s to
+0 skipped — the next release run re-measures it; the checks have grown
+since, and on 2026-11-10 (#719) the `-FirstPublish` run read 170 passed,
+0 failed, 0 skipped and the plain run 168 passed, 0 failed, 0 skipped); publishes of 10–12 s to
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 
@@ -8164,7 +8169,10 @@ On scratch copies, not committed: a wait that returns `$true` at once
 failed **4 of the 8**, the mac's figure (07 → "`./verify-deploy.sh
 --self-test`"); comparing the front page only failed "only the static files moved (same front page)", the
 case that must fail without the mark; dropping the `\s*` failed the `\r\n`
-case and the unmarked-page case.
+case and the unmarked-page case. (That was the whole self-test until #743,
+which added the mac's five #740 cases against a second stub: it now reads
+13 passed, 0 failed in about 30 s — "wrangler 4.156.0, a brand-new site's
+files asked again, and the loopback guard", below.)
 
 The must-fail count was 3, not the mac's 4, until review found why:
 `Measure-Case` hid the call's Ok lines and returned only its result and its
@@ -10150,7 +10158,8 @@ is no longer needed for the browser checks). Quartz's `npm ls --all` is
 EBADENGINE), and so is the TikZ engine's (251 lines). The contract's
 triangle through `plantoir-figures.mjs` is the same 1,540 bytes, SHA-256
 `8c68b085…6827b37`, as on 20.18.1. wrangler 4.80.0 answers `--version` on
-it. `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
+it (4.156.0 since #719: "wrangler 4.156.0, a brand-new site's files asked
+again, and the loopback guard", below). `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
 which warns without it.
 
 **A Node bump is a full re-fetch, and the script now says so.** Until #675
@@ -10170,7 +10179,14 @@ and matches it with a regex, because Windows PowerShell 5.1's `ConvertTo-Json`
 writes `"node":  "20.18.1"` with two spaces and a BOM, so a `Contains` of the
 spaced text would be wrong either way. Proven against four hand-made
 manifests: Node 20 refused, 22.23.4 accepted, 22.23.45 refused, no
-`geogebra` key refused.
+`geogebra` key refused. Since #719 it names `_PlantoirRuntimeWrangler` the
+same way (regex, held to `pins` → `wrangler` by the same test), so a runtime
+still on wrangler 4.80.0 stops the build: "windows-app\Vendor\runtime does
+not carry wrangler 4.156.0 (its manifest.json names another). Delete
+windows-app\Vendor\runtime, re-run windows-app\Vendor\fetch-runtime.ps1 (a
+full fetch, about 600 MB) and build again." Proven 2026-11-11: the 4.80.0
+runtime's own manifest refused with that line, the 4.156.0 one built, and
+the test failed with the project file's value changed to 4.80.0.
 
 A second fix the re-fetch found: the scaffold bake (`setup_course`'s two
 `ensure_…` calls) prints a check mark, and with the script's output sent to a
@@ -10331,6 +10347,12 @@ GitHub published all six on 2026-10-27, after the list's `reviewed`
 undici and satori in the image, so verify.sh's next online run should see the
 same six.
 
+(The wrangler half of what follows is history since #699 and #719: wrangler
+4.156.0 bundles undici 7.30.1, its tree has no advisory, and the wrangler
+entries in `npmAudit.accepted` were deleted as stale. Windows' audit on
+4.156.0 is in "wrangler 4.156.0, a brand-new site's files asked again, and
+the loopback guard", below.)
+
 **All six were then accepted, on evidence** (`research/npm-audit/2026-10-28.md`
 has what was read and measured; `npmAudit.accepted` carries each reason, and
 `reviewed` is 2026-10-28). The fact that decides the undici five:
@@ -10360,6 +10382,161 @@ it is in this piece (the implementation review raised it; widening what a
 hand-run install closes is its own change, #700, not a side effect of a Node bump).
 Until then: stop any preview and let a scheduled deploy finish before
 installing by hand.
+
+## wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)
+
+Three pieces of the runtime and its publishing harness, done together
+because the credentialed run that judges the first needs the second. The
+mac's reasoning is not repeated: [02 → wrangler 4.156.0
+(#699)](02-docker-image.md), [07 → "A brand-new site's files, asked again
+(#740)"](07-deployment.md) and [03 → "Every preview address is this Mac's
+own (#684)"](03-launcher-scripts.md). This is what Windows does
+differently, and what it measured (2026-11-10/11, Lenovo 20QES70500, Intel
+Core i5-8365U, 16 GB, Windows 11 Pro 26200, wired Ethernet, Ontario; another
+agent's test suites were running in a second worktree for part of it).
+
+**wrangler 4.80.0 → 4.156.0** (#719). `fetch-runtime.ps1`'s
+`$WranglerVersion = "4.156.0"` is the contract's `windowsRuntimeContains`
+(one space), so `TheWindowsRuntimeRecipeCarriesTheSamePins` turned green;
+`Wrangler_StaysBelowVersionThatNeedsNode22` was deleted with the contract's
+`mustStayBelow`, and `TheRuntimesNodeSatisfiesWranglersEngines` stays. A
+base pin changed, so the fetch refuses an existing runtime (delete it and
+re-run): a fresh fetch took **223 s** (the 4.80.0 one the same evening 322 s).
+`wrangler --version` 4.156.0, `engines.node` `>=22.0.0`. `runtime\wrangler`
+is 177 MB on disk (158 MB on 4.80.0); its installed lockfile holds 91
+packages (89), none dropped, most moved (sharp 0.34.5 → 0.35.5, ws 8.18.0 →
+8.21.0, undici 7.24.4 → 7.30.1, miniflare 4.20260401.0 → 5.20261023.3-beta).
+
+**The installer now empties `{app}\runtime\wrangler`** (`installer.iss` →
+`[InstallDelete]`, the plan review's H1). The prefix install hoists every
+dependency into `runtime\wrangler\node_modules`, and Inno never removes a
+file the new version does not carry, so an install over 1.9.0 would have
+kept 4.80.0's files beside 4.156.0's in the same package folders, for Node
+to resolve and for the audit to find. NOT yet proved on a real upgrade: that
+is #700's measured install over 1.9.0, which must then run
+`windows-app\audit-runtime.ps1 -Runtime "<{app}>\runtime"` (expect exit 0,
+`blocking=0`, `stale=0`) and `"<{app}>\runtime\node\node.exe"
+"<{app}>\runtime\wrangler\node_modules\wrangler\bin\wrangler.js" --version`
+(expect 4.156.0), and look for files under `runtime\wrangler\node_modules`
+dated before the install.
+
+**The audit** (`windows-app\audit-runtime.ps1`): on 4.156.0 exit 0, `COUNTS
+audited=5 advisories=54 accepted=54 blocking=0 reported=0 stale=0` — the
+mac's numbers for the image exactly, so the installed tree adds no advisory
+the image's does not. On the 4.80.0 runtime kept aside, the same script with
+the new accepted list: exit 1, **14 blocking** (sharp, undici, ws) and 21
+reported, every one in the wrangler tree — the must-fail #719 predicted.
+
+**The Workers delegation, tested for real.** wrangler 4.108+ hands a NEW
+static project to Workers when it believes an agent drives it. On Windows
+`deploy.py` runs natively, so the harness's own `CLAUDECODE` and `AI_AGENT`
+(it ran under Claude Code) reached wrangler while it made a first upload
+to a project `ensure_pages_project` had just created. `verify-deploy.ps1` →
+`Check-NoDelegation` (the mac's `check_no_delegation`) fails a Cloudflare
+leg whose log says "now part of Cloudflare Workers", and the run records
+which of `CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID` and `GEMINI_CLI` it
+carried (names only). Every leg stayed on Pages: `--branch=main` and the
+API-made project hold here too. `Measure-Deploy`'s count no longer needs
+"(N already uploaded)", which a first-ever upload does not print (the mac's
+#712). The transcript is `research/wrangler/2026-11-10-windows-first-upload.md`.
+
+**A brand-new site's files, asked again** (#743). `Get-CheckedResponse` is
+`fetch_headers`, `Measure-NewSiteRetries` is `measure_new_site_retries`,
+and `Check-Engine` calls the first for exactly the fetches the mac
+switched (the engine's files, the worker's CSP, Swift's thread and program,
+COEP on the engine folders, KaTeX's stylesheet and face) and the second at
+its end, with its own retry log per call. On a `-FirstPublish` run only, an
+answer that is not HTTP 200 (plus COEP `require-corp` for the COEP checks)
+is asked again every 5 s until a 60 s deadline fixed at the first ask
+(`VERIFY_DEPLOY_NS_POLL`, `VERIFY_DEPLOY_NS_WAIT`); each retry prints an
+`[again]` line (ASCII, not the mac's arrow: the file is BOM-less UTF-8 that
+Windows PowerShell 5.1 reads as ANSI), and the Result block carries one line
+per site. A plain run, and the `http://localhost:` preview on any run, ask
+once. `Check-PageLinks` is not retried, as on the mac. `Get-Response` moved
+up beside `Get-CheckedResponse`, unchanged, because `-SelfTest` runs before
+the helpers.
+
+`-SelfTest` gained the mac's five cases against its second stub, `files.py`,
+copied byte for byte: **13 passed, 0 failed, 0 skipped**, ten runs in a row,
+29–31 s each. The never-served case asserts 2–5 retries and the count case
+the total the log holds (it read "3 file(s) needed asking again, 8 retries
+in all, at most 4 for one file, the longest 4 s"). Must-fail on a scratch
+copy with the retry taken out (`break` in place of the first-publish test):
+**9 passed, 4 failed**, the plain-run case passing either way — the mac's
+figure. The credentialed `-FirstPublish` run said "no file needed asking
+again" for both new sites on every leg, so, as on the mac, the retry has yet
+to be seen firing live.
+
+**How a red `-FirstPublish` check is read.** A per-file check that is red
+after its 60 s is a failure. A page-link 404 on a brand-new site
+(`Check-PageLinks`, not retried — the mac's 2026-10-31 run had one, doc 07)
+is checked once by hand a few minutes later and recorded as such, red in
+the run and "200 by hand at <time>" beside it; a run is never re-run until
+it is green.
+
+**The loopback guard** (#730). The rewrite is now `Set-QuartzLoopbackBinds`,
+between BEGIN/END markers above the fetch's `try`: it requires
+`server.listen(argv.port)` and `new WebSocketServer({ port: argv.wsPort })`
+each EXACTLY once and refuses, naming "the preview server" or "the
+live-reload websocket", when either is not; the guard it replaced passed on
+any `127.0.0.1` in the file. It also reads and writes `handlers.js` as UTF-8
+with no BOM. The old `Get-Content -Raw` read it as ANSI and `Set-Content
+-Encoding utf8` wrote a BOM, so the "Get started" bullets at lines 217-219
+were mojibake (`â€¢`) in every runtime made until now; the new fetch's file
+differs from upstream Quartz v4.5.0's in lines 442-443 only (`diff`), with
+no BOM. `FetchRuntimeLoopbackGuardTests` (5) lift the function and run it
+through powershell.exe on a fixture of Quartz's own two lines and a bullet
+line: both rewritten with every other byte kept, one site missing either
+way, neither, and a site twice. Must-fail with the old guard between the
+markers: all 5 red (the one-site and twice cases because the old guard
+passes them, the both-sites case on the bytes, neither-site because the old
+message names no site). REJECTED: "at least once" (a second bind site in a
+new Quartz is a change to look at, not to rewrite blind), and a regex over
+the whole file for `127.0.0.1` (what failed).
+
+**Measured on a real preview** (2026-11-11, `preview.bat ICS3U 1` in
+`C:\Users\lenov\Desktop\plantoir-deploy-verify`, with `PLANTOIR_RUNTIME` set
+by hand to the new runtime — unset, the launcher would have used the
+INSTALLED 1.9.0 runtime): `Get-NetTCPConnection -State Listen -LocalPort
+8081,9081` listed `127.0.0.1:8081` and `127.0.0.1:9081`, both owned by the
+one `node`, and nothing on `0.0.0.0` or `::`. `curl.exe` got 200 from
+`127.0.0.1:8081` and `localhost:8081`; from the PC's LAN address
+(192.168.2.21) on 8081 and 9081, and from `[::1]:8081`, it was refused
+(exit 7). `preview.bat ICS3U 1 --stop` stopped 3 processes and left no
+listener and no `node` naming the folder.
+
+**Cancel during a Cloudflare upload, on 4.156.0** (2026-11-11). The app's
+Cancel is `ScriptRunner.CancelByUser`: a `\x03` written into the pseudo
+console, then a kill two seconds later if anything is still running. That
+was reproduced with a scratch copy of PtyDriver whose only change is a reply
+that writes `\x03`, running the launcher the way the app does
+(`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File
+deploy.ps1 ICS3U 1 --target cloudflare`, `PLANTOIR_RUNTIME` the new
+runtime), and firing on the line under wrangler's banner, the moment
+`pages deploy` began. Node's exit codes were logged by a `--require`
+preload in `NODE_OPTIONS`. **wrangler 4.156.0 exited 0**, as both versions
+did on the mac (#699), and so did the launcher, 42 s after it started and
+with nothing printed after the banner: no "Deploy complete", no traceback.
+So nothing moves `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL` (130, -2,
+0xC000013A) or the Cancel wording, which the app chooses from its own
+`WasCancelled`, set before the `\x03`, not from the exit code. The window's
+sentence itself was not looked at in this piece. Through `deploy.bat`
+instead (how `verify-deploy.ps1` and a teacher at a command line run it),
+wrangler also exited 0 but `cmd.exe` then stopped at "Terminate batch job
+(Y/N)?" and waited until it was killed; the app never goes through `cmd`.
+
+**#714 on Windows** (Debian's Brotli in the image): the runtime's Node
+reports `process.versions.brotli` 1.1.0 and `process.versions.openssl`
+3.5.9 (Node 22.23.4). But Pillow 12.3.0's FreeType DOES carry a Brotli
+decoder of its own: `ImageFont.truetype` loads a WOFF2 font
+(`KaTeX_AMS-Regular.woff2`), which FreeType can only do when built with
+Brotli, although no `*brotli*` file and no Brotli string is in any Pillow
+`.pyd` (it is linked in statically). Its version cannot be read from the
+binary. And the runtime's Python 3.11.9 reports `ssl.OPENSSL_VERSION`
+"OpenSSL 3.0.13 30 Jan 2024", the TLS under every Netlify publish and
+`deploy.py`'s Cloudflare API calls on Windows. Nothing is changed
+here: the OpenSSL half is #764 (v1.9.3, moving the runtime's Python), and
+Pillow's Brotli is #766, which asks for its version on both platforms.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 

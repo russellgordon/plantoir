@@ -342,6 +342,11 @@ public class ToolchainContractTests
         string node = pins.First(p => p?["pin"]?.ToString() == "node")!["value"]!.ToString();
         Assert.Contains($"<_PlantoirRuntimeNode>{node}</_PlantoirRuntimeNode>", project);
         Assert.Contains("_PlantoirRuntimeManifest.Contains('&quot;geogebra&quot;')", project);
+        // #719: and the wrangler the runtime must carry, so a build PC that
+        // never re-fetched cannot ship 4.80.0's tree under a 4.156.0 pin.
+        string wrangler = pins.First(p => p?["pin"]?.ToString() == "wrangler")!["value"]!.ToString();
+        Assert.Contains($"<_PlantoirRuntimeWrangler>{wrangler}</_PlantoirRuntimeWrangler>", project);
+        Assert.Contains("$(_PlantoirRuntimeWranglerPattern)", project);
     }
 
     /// <summary>
@@ -441,26 +446,12 @@ public class ToolchainContractTests
             "Cloudflare would break. Raise Node, or keep wrangler at a version whose engines it satisfies.");
     }
 
-    [Fact]
-    public void Wrangler_StaysBelowVersionThatNeedsNode22()
-    {
-        var doc = ContractLoader.LoadJson("toolchain.json");
-        var pins = doc["pins"]!.AsArray();
-        var wrangler = pins.First(p => p?["pin"]?.ToString() == "wrangler")!;
-
-        string pinned = wrangler["value"]!.ToString();
-        string ceiling = wrangler["mustStayBelow"]!.ToString();
-
-        var pinnedParts = pinned.Split('.').Select(int.Parse).ToList();
-        var ceilingParts = ceiling.Split('.').Select(int.Parse).ToList();
-
-        Assert.Equal(pinnedParts[0], ceilingParts[0]);
-        Assert.True(pinnedParts[1] < ceilingParts[1],
-            $"wrangler {pinned} is at or past {ceiling}, whose engines need Node 22. Both platforms run Node 22 " +
-            "now (the image since #640, Windows' runtime since #675), so the ceiling no longer protects anything: " +
-            "moving wrangler is its own piece, which re-checks nodeEngine and retires mustStayBelow on both " +
-            "platforms. Raise the pin in that piece, not here.");
-    }
+    // Wrangler_StaysBelowVersionThatNeedsNode22 was deleted with the
+    // contract's mustStayBelow (#699 on the mac, #719 here): both platforms
+    // run Node 22.23.4, so the 4.87 ceiling protected nothing. The invariant
+    // that matters from now on is TheRuntimesNodeSatisfiesWranglersEngines,
+    // above, and TheWindowsRuntimeRecipeCarriesTheSamePins holds
+    // fetch-runtime.ps1's $WranglerVersion to the pin.
 
     [Fact]
     public void Patches_AllExistAndAreAppliedInDockerfile()
