@@ -536,7 +536,7 @@ public class ProblemsTabUiTests
                                                           TimeSpan.FromMilliseconds(300)) is not null,
                                      TimeSpan.FromSeconds(30)).Result,
                     "the links checklist followed the alert");
-        app.Find("linksChecklistNotNow", "Not Now").AsButton().Invoke();
+        // Nothing is published: the run's teardown closes the app with the checklist up.
     }
 
     /// <summary>
