@@ -3108,6 +3108,9 @@ on geogebra.org (`material_id:`, fetched once and kept — item 9).
    invented). `--full-rebuild` leaves the copies alone (`_prepare_geogebra`
    passes `full_rebuild` and `geogebra.prepare` deliberately ignores it); a
    copy unused for 90 days goes (`figures.PRUNE_DAYS`, the same rule). The
+   copies survive every clear of the course's builds folder, while the built
+   sites do not (#789: "The kept copies of geogebra.org sketches survive the
+   clear", below). The
    site's copy is written to `quartz/static/geogebra-sketches/<key[:16]>.ggb`
    — a geogebra.org sketch has no file in `content/` for Quartz to publish —
    and the card names the author and the licence (06 → Q4). Said: "📐
@@ -4233,6 +4236,58 @@ course or a section discards its build outright as well, so the clearing is a
 safety net rather than the only defence. Renaming a course is the exception:
 its build is carried across, because a rename used to cost nothing and should
 still cost nothing.
+
+### The kept copies of geogebra.org sketches survive the clear (GitHub #789)
+
+One thing under a course's builds folder is not derived from the notes:
+`.geogebra-cache`, the copies of geogebra.org sketches the course's pages
+name (item 9 of the GeoGebra section above). A cleared copy comes back only
+while the Mac is online, and offline a sketch with no copy is a folder
+problem. Each copy is named by the key of the fence that asked for it, so it
+is right for any page that still carries that fence, however the course
+folder came back. That is why the clear keeps it while the built sites go:
+the clear exists because a build may be older than the pages it would
+publish, and a copy keyed by its fence cannot be.
+
+What keeps it, on the mac, in both implementations of the rule:
+
+| Where the course is | What happens to the builds folder | The kept copies |
+|---|---|---|
+| Never linked, a missing link, a link elsewhere, a file where the link belongs | Every entry is removed except `.geogebra-cache` | Stay where they are |
+| A real `.merged_output` moved out of the working folder | The old builds folder is removed and the moved site takes its place | Carried into the moved site first; its copy wins a shared key |
+| A whole course restored from a backup (the app) | `discardBuiltSites`: the built sites go | Stay where they are |
+| A course or a section archived | Discarded outright, as before | Go with the course |
+
+**Measured** (2026-11-12): the launchers' block against a scratch folder
+lost a planted copy for a course never linked, a link naming another Mac's
+folder and a missing link, and kept it for a course already linked; after
+the change every row keeps it. The eight cases in
+`contracts/shared-rules.json` → `buildOutputLocation.keptCopiesSurviveTheClear`
+fail on the old block (23 of 66 checks in `scripts/test_build_output_link.sh`),
+and the app's six fault-free cases fail on the old `BuildOutputLocation.swift`
+(18 checks, measured in a standalone harness).
+
+**No sweep was added.** A copy whose fence has gone stays until
+`geogebraFences.cache`'s own rule takes it: an entry unused for 90 days
+(`figures.PRUNE_DAYS`) is removed by the next build that reads the folder.
+Moving a copy keeps its modification time, so surviving a clear does not
+reset that clock, and the folder stays bounded by the fences a course has
+used in the last 90 days.
+
+**Rejected:** setting the copies aside and putting them back (an
+interrupted run strands them, and `discardBuildsForMissingCourses` removes
+every builds-folder entry that is not a course code); moving them into the
+course folder so they travel with it (Russell's first ruling on #789,
+replaced the same day: a build that fetches would write into the course
+folder, which the check of whether anything changed since the last build
+could read as a change, and it would add files to whatever syncs or backs up
+the course, so a second Mac fetches again the first time it builds online,
+as before); keeping `.figure-cache` and `.swift-cache` as well (made on this
+Mac with no network, so clearing them costs a rebuild and nothing else).
+
+**Windows** has no link and so no clear of this kind; it discards a
+course's whole builds folder when a course is restored from a backup, which
+takes `.geogebra-cache` with it. That is the `windows` issue for #789.
 
 **The Windows layout has the same hole in a different shape.** There is no link
 there, so the "no link means clear it" rule cannot be copied — but
