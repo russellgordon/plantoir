@@ -648,7 +648,9 @@
           "workingFolderUnderAHiddenFolder" : true
         },
         {
-          "course" : [],
+          "course" : [
+
+          ],
           "expect" : "reuse",
           "name" : "a course with nothing in it"
         },
