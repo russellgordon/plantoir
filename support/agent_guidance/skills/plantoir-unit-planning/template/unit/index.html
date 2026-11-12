@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Chemical Reactions Unit Plan</title>
+<link rel="stylesheet" href="../assets/plan.css">
+</head>
+<body style="margin:0">
+<!--
+  TEMPLATE for one unit's plan page, from the plantoir-unit-planning skill.
+  Copy this file into courses/<CODE>/.internal/planning/<unit-slug>/index.html
+  and replace every course, date, section, lesson and file below. All of it is
+  invented: the course, the unit, the sections and the lessons are examples.
+
+  The look comes from ../assets/plan.css. Use only the classes it defines (the
+  patterns below use every one of them); add no <style> block and no rule of
+  your own, and link no font or script from the internet.
+
+  The order of the page is fixed: the header, the calendar, how the sections
+  differ, the lessons, each day's materials, and the assessment drafts.
+-->
+<main>
+<header>
+  <div class="eyebrow">SNC2D · Unit 3 · February 8 to 19, 2027</div>
+  <h1>Chemical Reactions Unit Plan</h1>
+  <p class="lede">Five lessons, a quiz, a unit test and a showcase across two sections and a colleague's section, with the long weekend in the middle.</p>
+  <div class="facts">
+    <span><b>Section 1</b> 8 classes</span>
+    <span><b>Section 2</b> 7 classes</span>
+    <span><b>A colleague's section</b> 7 classes</span>
+    <span><b>Wednesday</b> 60 min, all other days 75 min</span>
+    <span><b>No classes</b> Mon Feb 15</span>
+  </div>
+  <div class="legend">
+    <span class="chip lesson">L3</span> lesson
+    <span class="chip assess">Quiz</span> assessment for learning
+    <span class="chip assess">Test</span> assessment of learning
+    <span class="chip capstone"><a href="#showcase" style="color:inherit">Showcase</a></span> capstone, not on the test
+  </div>
+</header>
+
+<section>
+  <h2>Calendar</h2>
+  <!--
+    PATTERN: one row per school day, the date first and then one cell per
+    section, in the order of the header row. A cell is the section's "Day n",
+    the lesson's chip and its title linking to the lesson's card (#l1, #l2 ...).
+    A day a section does not meet is td.none, "No class". A day nobody meets
+    (a holiday, a long weekend) is one tr.break row. A note under a date, such
+    as a shorter period, is span.wed.
+  -->
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Date</th><th>Section 1</th><th>Section 2</th><th>A colleague's section</th></tr></thead>
+    <tbody>
+      <tr><td class="date"><b>Mon</b> Feb 8</td><td><span class="day">Day 1</span><span class="chip lesson">L1</span> <a href="#l1">Signs of a chemical change</a></td><td><span class="day">Day 1</span><span class="chip lesson">L1</span> <a href="#l1">Signs of a chemical change</a></td><td class="none">No class</td></tr>
+      <tr><td class="date"><b>Tue</b> Feb 9</td><td><span class="day">Day 2</span><span class="chip lesson">L2</span> <a href="#l2">Word and symbol equations</a></td><td class="none">No class</td><td><span class="day">Day 1</span><span class="chip lesson">L1</span> <a href="#l1">Signs of a chemical change</a></td></tr>
+      <tr><td class="date"><b>Wed</b> Feb 10 <span class="wed">60 min</span></td><td class="none">No class</td><td><span class="day">Day 2</span><span class="chip lesson">L2</span> <a href="#l2">Word and symbol equations</a></td><td><span class="day">Day 2</span><span class="chip lesson">L2</span> <a href="#l2">Word and symbol equations</a></td></tr>
+      <tr><td class="date"><b>Thu</b> Feb 11</td><td><span class="day">Day 3</span><span class="chip lesson">L3</span> <a href="#l3">Balancing equations</a></td><td><span class="day">Day 3</span><span class="chip lesson">L3</span> <a href="#l3">Balancing equations</a></td><td class="none">No class</td></tr>
+      <tr><td class="date"><b>Fri</b> Feb 12</td><td><span class="day">Day 4</span><span class="chip assess"><a href="#quiz" style="color:inherit">Quiz</a></span> <a href="#day4">Quiz, then synthesis</a></td><td><span class="day">Day 4</span><span class="chip assess"><a href="#quiz" style="color:inherit">Quiz</a></span> <a href="#day4">Quiz, then synthesis</a></td><td><span class="day">Day 3</span><span class="chip lesson">L3</span> <a href="#l3">Balancing equations</a></td></tr>
+      <tr class="break"><td class="date">Feb 13 to 15</td><td>Long weekend</td><td>Long weekend</td><td>Long weekend</td></tr>
+      <tr><td class="date"><b>Tue</b> Feb 16</td><td><span class="day">Day 5</span><span class="chip lesson">L4</span> <a href="#l4">Displacement reactions</a></td><td class="none">No class</td><td><span class="day">Day 4</span><span class="chip assess"><a href="#quiz" style="color:inherit">Quiz</a></span> <a href="#day4">Quiz, then synthesis</a></td></tr>
+      <tr><td class="date"><b>Wed</b> Feb 17 <span class="wed">60 min</span></td><td><span class="day">Day 6</span><span class="chip lesson">L5</span> <a href="#l5">Review</a></td><td><span class="day">Day 5</span><span class="chip lesson">L4</span> <a href="#l4">Displacement reactions</a></td><td><span class="day">Day 5</span><span class="chip lesson">L4</span> <a href="#l4">Displacement reactions</a></td></tr>
+      <tr><td class="date"><b>Thu</b> Feb 18</td><td><span class="day">Day 7</span><span class="chip assess"><a href="#test" style="color:inherit">Test</a></span> <a href="#testday">Unit test</a></td><td><span class="day">Day 6</span><span class="chip lesson">L5</span> <a href="#l5">Review</a></td><td><span class="day">Day 6</span><span class="chip lesson">L5</span> <a href="#l5">Review</a></td></tr>
+      <tr><td class="date"><b>Fri</b> Feb 19</td><td><span class="day">Day 8</span><span class="chip capstone"><a href="#showcase" style="color:inherit">Showcase</a></span> <a href="#showcase">Reaction showcase</a></td><td><span class="day">Day 7</span><span class="chip assess"><a href="#test" style="color:inherit">Test</a></span> <a href="#testday">Unit test</a></td><td><span class="day">Day 7</span><span class="chip assess"><a href="#test" style="color:inherit">Test</a></span> <a href="#testday">Unit test</a></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>How the sections differ</h2>
+  <!-- PATTERN: one bullet per section that departs from the common order, its name in bold. -->
+  <ul>
+    <li><b>Section 1</b> meets on Monday and loses the Wednesday of the first week, so it writes the test on Thursday and has the showcase on the last Friday.</li>
+    <li><b>Section 2</b> loses Tuesday of the second week, so the review moves to Thursday and the test to Friday. It has no showcase day.</li>
+    <li><b>A colleague's section</b> starts a day later and writes the quiz after the long weekend, on Tuesday February 16.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Lessons</h2>
+  <p class="lede" style="margin-bottom:14px">One card per lesson, in the order the calendar uses them. The rows of each card follow the lesson shape on the teacher's How I Teach page; the labels below are examples.</p>
+  <!--
+    PATTERN: a lesson card. article.card with the lesson's id, its chip and
+    title, then span.ok "✓ reviewed" ONLY once the lesson has been reviewed,
+    and span.src naming what it was adapted from. div.acts holds one row per
+    part of the lesson: a span label and a paragraph. Replace the labels with
+    the teacher's own lesson shape. The last row is ONE link to the day's
+    materials further down this page, never a list of files.
+  -->
+  <div class="cards">
+
+    <article class="card" id="l1"><div class="top"><h3><span class="chip lesson">L1</span> Signs of a chemical change<span class="ok" title="Reviewed and approved">✓ reviewed</span></h3><span class="src">Textbook 5.1</span></div>
+      <div class="acts">
+        <div><span>Warm-up</span><p>Four photographs (rust, a burnt match, melting ice, a fizzing tablet): which are new substances?</p></div>
+        <div><span>Lesson</span><p>The five signs of a chemical change, each shown at the front, and why one sign alone is not proof.</p></div>
+        <div><span>Practice</span><p>Sorting cards in groups, then a short written check.</p></div>
+        <div><span>Files</span><p><a href="#day1">Day 1 materials</a>, further down this page.</p></div>
+      </div></article>
+
+    <article class="card" id="l2"><div class="top"><h3><span class="chip lesson">L2</span> Word and symbol equations</h3><span class="src">Textbook 5.2</span></div>
+      <div class="acts">
+        <div><span>Warm-up</span><p>Name the reactants and products in three sentences.</p></div>
+        <div><span>Lesson</span><p>From a word equation to a skeleton equation, with the states of matter.</p></div>
+        <div><span>Practice</span><p>Ten equations to write, the last two from a description only.</p></div>
+        <div><span>Files</span><p><a href="#day2">Day 2 materials</a>, further down this page.</p></div>
+      </div></article>
+
+    <article class="card" id="l3"><div class="top"><h3><span class="chip lesson">L3</span> Balancing equations</h3><span class="src">Textbook 5.3</span></div>
+      <div class="acts">
+        <div><span>Warm-up</span><p>Count the atoms on each side of two equations.</p></div>
+        <div><span>Lesson</span><p>Conservation of mass, then balancing by inspection with coefficients only.</p></div>
+        <div><span>Practice</span><p>A set that grows from two elements to four.</p></div>
+        <div><span>Files</span><p><a href="#day3">Day 3 materials</a>, further down this page.</p></div>
+      </div></article>
+
+    <article class="card" id="l4"><div class="top"><h3><span class="chip lesson">L4</span> Displacement reactions</h3><span class="src">Textbook 5.5</span></div>
+      <div class="acts">
+        <div><span>Warm-up</span><p>Which metal is more reactive? Three pairs from the activity series.</p></div>
+        <div><span>Lesson</span><p>Single and double displacement, predicted from the activity series.</p></div>
+        <div><span>Practice</span><p>Predict and balance six reactions.</p></div>
+        <div><span>Files</span><p><a href="#day5">Day 5 materials</a>, further down this page.</p></div>
+      </div></article>
+
+    <article class="card" id="l5"><div class="top"><h3><span class="chip lesson">L5</span> Review</h3><span class="src">Written for this unit</span></div>
+      <div class="acts">
+        <div><span>Warm-up</span><p>One question from each lesson.</p></div>
+        <div><span>Practice</span><p>A review set with its answers, and time to ask questions.</p></div>
+        <div><span>Files</span><p><a href="#day6">Day 6 materials</a>, further down this page.</p></div>
+      </div></article>
+
+    <article class="card capstone" id="showcase"><div class="top"><h3><span class="chip capstone">Showcase</span> Reaction showcase</h3><span class="src">Written for this unit</span></div>
+      <div class="acts">
+        <div><span>Task</span><p>Groups present one everyday reaction, its balanced equation and its type. Not on the test.</p></div>
+      </div></article>
+
+  </div>
+</section>
+
+<section id="day1">
+  <h2>Day 1 materials<span class="ok" title="Reviewed and approved">✓ reviewed</span></h2>
+  <p class="lede" style="margin-bottom:14px">Everything handed out on Day 1, with its answer key.</p>
+  <!--
+    PATTERN: a day's materials. A section with the id the lesson card links
+    to, "Day n materials", and span.ok "✓ reviewed" ONLY after the review.
+    One article.card per handout. Its "Files" row links each PDF in pdfs/
+    beside this page, by its real name with spaces written %20, opening in a
+    new tab:
+
+      <div><span>Files</span><p><a href="pdfs/Warm-up%20-%20Signs%20of%20Change.pdf" target="_blank">Warm-up</a> · <a href="pdfs/Warm-up%20-%20Signs%20of%20Change%20-%20Answers.pdf" target="_blank">Answers</a></p></div>
+
+    Write a link only once the PDF has been copied into pdfs/: every link on
+    this page must open a file that is there.
+  -->
+  <div class="cards">
+    <article class="card"><div class="top"><h3><span class="chip lesson">L1</span> Warm-up</h3><span class="src">One page</span></div>
+      <div class="acts">
+        <div><span>Holds</span><p>Four photographs to sort, with room to give a reason for each.</p></div>
+        <div><span>Files</span><p>Not made yet.</p></div>
+      </div></article>
+  </div>
+</section>
+
+<section id="day2">
+  <h2>Day 2 materials</h2>
+  <p class="lede" style="margin-bottom:14px">Not made yet.</p>
+</section>
+
+<section id="day3">
+  <h2>Day 3 materials</h2>
+  <p class="lede" style="margin-bottom:14px">Not made yet.</p>
+</section>
+
+<section id="day4">
+  <h2>Day 4 materials</h2>
+  <p class="lede" style="margin-bottom:14px">The quiz first, then the synthesis lesson that follows it.</p>
+</section>
+
+<section id="day5">
+  <h2>Day 5 materials</h2>
+  <p class="lede" style="margin-bottom:14px">Not made yet.</p>
+</section>
+
+<section id="day6">
+  <h2>Day 6 materials</h2>
+  <p class="lede" style="margin-bottom:14px">Not made yet.</p>
+</section>
+
+<section id="testday">
+  <h2>Test day materials</h2>
+  <p class="lede" style="margin-bottom:14px">The test and its solutions are under Assessment drafts below.</p>
+</section>
+
+<section>
+  <h2>Assessment drafts</h2>
+  <p class="lede" style="margin-bottom:14px">Drafts made with the plantoir-handouts skill, each reviewed by a second agent who solved every question again.</p>
+  <!--
+    PATTERN: an assessment card, article.card.assess with the chip
+    span.chip.assess. Its rows say what it covers, and its "Files" row links
+    each version and its solutions in pdfs/, as a day's materials do. The test
+    card's last row links the curriculum correlation page.
+  -->
+  <div class="cards">
+    <article class="card assess" id="quiz"><div class="top"><h3><span class="chip assess">Quiz</span> Writing and balancing equations</h3><span class="src">Assessment for learning</span></div>
+      <div class="acts">
+        <div><span>Covers</span><p>Lessons 1 to 3: signs of a change, word and symbol equations, balancing.</p></div>
+        <div><span>Files</span><p>Not made yet.</p></div>
+      </div></article>
+    <article class="card assess" id="test"><div class="top"><h3><span class="chip assess">Test</span> Chemical Reactions</h3><span class="src">Assessment of learning</span></div>
+      <div class="acts">
+        <div><span>Covers</span><p>Lessons 1 to 5. The showcase is not on it.</p></div>
+        <div><span>Files</span><p>Not made yet.</p></div>
+        <div><span>Review</span><p><a href="correlation.html">Curriculum correlation</a>: marks by expectation and by concept, question by question.</p></div>
+      </div></article>
+  </div>
+</section>
+
+<p class="lede"><a href="../index.html">All unit plans for this course</a></p>
+
+</main>
+
+</body>
+</html>

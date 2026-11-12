@@ -75,3 +75,7 @@ website/updates/*.xml.signature  -text
 
 # GeoGebra sketches (#578): a .ggb is a zip, shipped as saved from GeoGebra.
 *.ggb     binary
+
+# The unit-plan template's fonts (#707): woff2, pinned by SHA-256 in
+# contracts/shared-rules.json -> unitPlanning.agentGuidance.fonts.
+*.woff2   binary

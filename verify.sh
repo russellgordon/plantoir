@@ -664,6 +664,13 @@ else
   cat /tmp/verify_my_progress_test.log
 fi
 
+if (cd scripts && python3 test_unit_plan_template.py) >/tmp/verify_unit_plan_template_test.log 2>&1; then
+  pass "unit plans: the template's two stylesheets are the example's blocks plus the one --ok edit, every shipped class keeps its rule, the fonts are the pinned bytes, and every page is noindex with every link resolving (scripts/test_unit_plan_template.py, #707)"
+else
+  fail "unit plans: the template's stylesheets, fonts and pages (scripts/test_unit_plan_template.py, #707)"
+  cat /tmp/verify_unit_plan_template_test.log
+fi
+
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else
