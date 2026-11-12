@@ -2029,6 +2029,16 @@ launchers would, under `RealBuildsRoot`, which `Dispose` deletes. And a
 collapsed `SelectorBar`'s items are still in the tree, off screen: ask
 `IsOffscreen`, not presence (`ProblemsTabUiTests.Showing`).
 
+**A test may press an outside door, at a STUB (#736).** `FixWithButtonsUiTests`
+puts a folder holding a stub `claude.exe` and an npm-shaped `codex.cmd` first
+on the TEST process's PATH before `DrivenApp` launches the app — ShellExecute
+hands the app this process's environment, and both doors search PATH first —
+and names the file the stub writes in `PLANTOIR_PROBE_OUTPUT`. A press then
+opens a console window for a moment, the stub writes down its argument vector
+and exits (the `.cmd` ends with `exit`, so the door's `cmd /k` closes too), and
+no real assistant starts. Restore both variables in `finally`. Never press a
+door without a stub first on PATH: it would start the real Claude or Codex.
+
 **Still never done from a test:** scheduling a deploy (it registers a REAL
 Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
 real globally unique site — `verify-deploy.ps1` owns those).
