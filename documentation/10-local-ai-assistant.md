@@ -7975,6 +7975,24 @@ it will not. The mac's greeting does not cut the name and need not: its shell
 script has no such limit. It may match, for one greeting on both platforms.
 Test: `OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`.
 
+### A last sentence on the Revise doors: unit planning (#707)
+
+Since #707 the plain greeting the two Revise doors send ends with one more
+sentence, after the reference-courses sentence: in a course with no unit
+plan, an instruction to say in the first reply that the assistant can help
+plan a unit (every session, until a plan exists: Russell, 2026-11-12); once
+plans exist, an instruction to remind the teacher which units have one and
+where they are kept, without describing them. The words, bounds and cases are
+`app-rules.json` → `outsideAgents.greetingUnitPlans` and
+`greetingUnitPlansCases`; the plans are read from each unit's `plan.json`
+(`shared-rules.json` → `unitPlanning.planFile`). Fix with Claude… and Fix
+with Codex… are untouched, since their message replaces the greeting. No
+tool description, schema or prompt moved, and the local model's digest
+(`scripts/test_tool_surface_digest.py`) is unchanged: the skill the sentence
+points the session at is `plantoir-unit-planning`, written into the working
+folder like the others (`documentation/09-mac-app.md` → "Unit planning
+(#707)").
+
 ## Telling an outside assistant how the course is taught (#209)
 
 Asked "How about my teaching style?", both doors' sessions said they did not

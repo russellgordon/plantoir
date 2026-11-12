@@ -49,3 +49,10 @@ that matches the task before writing:
   are checked, shuffling, and graphs and code inside questions are in
   `.agents/skills/plantoir-quizzes/SKILL.md` (the same file is at
   `.claude/skills/plantoir-quizzes/SKILL.md`).
+- **Planning a unit** - "plan the next unit", a thread or a module, a
+  calendar across my sections, a colleague teaching the same unit on other
+  dates, lesson cards, assessment drafts, a curriculum correlation, or
+  seeing, changing or adopting a unit plan: how to gather, agree and only
+  then build the plan in `courses/<CODE>/.internal/planning/` (never in the
+  course's pages) is in `.agents/skills/plantoir-unit-planning/SKILL.md`
+  (the same file is at `.claude/skills/plantoir-unit-planning/SKILL.md`).

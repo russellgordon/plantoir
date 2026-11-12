@@ -670,6 +670,66 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #707: the unit-planning skill travels the same way, with its whole
+    /// template, the fonts included, each the bytes the contract pins, and
+    /// both root files name it. The handouts and page-authoring skills name
+    /// it, and the handouts skill no longer calls handouts.json the ONE place
+    /// under a dot folder an assistant may write. It stays out of the page
+    /// routing table, since a plan is not part of a page.
+    func testTheUnitPlanningSkillIsWrittenWithItsTemplateAndBothRootFilesNameIt() throws {
+        let unitPlanning: [String: Any] = try SharedRulesContractTests.section("unitPlanning")
+        let guidance: [String: Any] = try XCTUnwrap(unitPlanning["agentGuidance"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let template: [String] = try XCTUnwrap(guidance["template"] as? [String])
+        let fonts: [[String: Any]] = try XCTUnwrap(guidance["fonts"] as? [[String: Any]])
+        let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let pageAuthoring: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["pageAuthoringSkill"] as? [String: Any])
+        let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
+        XCTAssertFalse(routesTo.contains(skillName), "a unit plan is not part of a page")
+        XCTAssertFalse(template.isEmpty)
+        XCTAssertFalse(fonts.isEmpty)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            let skill: String = try String(
+                contentsOf: skillFolder.appendingPathComponent("SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("This working folder holds courses for Plantoir"), home)
+            XCTAssertTrue(skill.contains(".internal/planning"), home)
+            XCTAssertTrue(skill.contains("read_how_i_teach"), home)
+            XCTAssertTrue(skill.contains("list_curriculum_expectations"), home)
+            XCTAssertTrue(skill.contains("`plantoir-handouts`"), home)
+            XCTAssertTrue(skill.contains("plan.json"), home)
+            for file in template {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: skillFolder.appendingPathComponent(file).path),
+                              "\(home): the template's \(file) must be written beside the skill")
+            }
+            for font in fonts {
+                let file: String = try XCTUnwrap(font["file"] as? String)
+                let bytes: Int = try XCTUnwrap(font["bytes"] as? Int)
+                let sha256: String = try XCTUnwrap(font["sha256"] as? String)
+                let data: Data = try Data(contentsOf: skillFolder.appendingPathComponent(file))
+                XCTAssertEqual(data.count, bytes, "\(home): \(file)")
+                XCTAssertEqual(ToolchainFingerprints.sha256(of: data), sha256, "\(home): \(file)")
+            }
+            for mentioning in mentionedBy {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
+                XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+                XCTAssertTrue(other.contains(".internal/planning/"), "\(home): \(mentioning) must name the plan folder")
+            }
+            let handouts: String = try String(
+                contentsOf: folder.appendingPathComponent("\(home)/skills/plantoir-handouts/SKILL.md"), encoding: .utf8)
+            XCTAssertFalse(handouts.contains("This is the one file in"), "\(home): handouts.json is no longer the only one")
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+        }
+    }
+
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
         let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"

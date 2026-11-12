@@ -33,6 +33,10 @@ Do not build it as HTML, a Word file or anything else unless the teacher
 asks for that. If the teacher has already said which they want, do that
 without asking again.
 
+A unit plan's assessments are made here too, and copied into the plan by
+the `plantoir-unit-planning` skill (`.claude/skills/plantoir-unit-planning/SKILL.md`,
+the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
+
 ## 2. Before writing anything
 
 - **Start from an existing source.** Ask whether the teacher has a handout
@@ -65,11 +69,12 @@ without asking again.
     ```
 
     `folder` is the full path, `teacherSaid` their own words, `recorded`
-    today's date. A new answer replaces the file. This is the one file in
-    a folder whose name starts with a dot that you may write; leave
-    everything else under `.internal` alone. It lives there because it
-    travels with the course (a backup, an archive, a restore) and is never
-    copied to the class website.
+    today's date. A new answer replaces the file. This is one of the two
+    places in a folder whose name starts with a dot that you may write (the
+    other is `.internal/planning/`, the `plantoir-unit-planning` skill's);
+    leave everything else under `.internal` alone. It lives there because
+    it travels with the course (a backup, an archive, a restore) and is
+    never copied to the class website.
 - **On the class website, only the PDF a page hands out.** Copy it into
   the course's `Media` folder and follow section 4 of `plantoir-printing`:
   - `Name.pdf` - the default.

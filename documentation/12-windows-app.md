@@ -2700,8 +2700,8 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   the section rewritten at every launch. **Files are read with a strict
   UTF-8 decoder**, so a file saved in another encoding is refused, never
   written over (`addCases` "cannot be read again").
-- **The skills are whatever `support\agent_guidance\skills\` holds**, six
-  today: `plantoir-page-authoring` (#596, the one the root files name FIRST;
+- **The skills are whatever `support\agent_guidance\skills\` holds**:
+  `plantoir-page-authoring` (#596, the one the root files name FIRST;
   it routes to the four below, `printablePages.agentGuidance.pageAuthoringSkill`),
   `plantoir-printing`, `plantoir-math-graphs`, `plantoir-runnable-code`,
   `plantoir-quizzes` (#563) and `plantoir-handouts` (#631, a PDF made from
@@ -2709,10 +2709,16 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   since #715 a `patterns` subfolder holding `.tex` files and one `.py` -
   copied like any other file, never run by the app;
   `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"
-  and "Tables, the scaffold, cards and the remembered folder (#715)"). The
+  and "Tables, the scaffold, cards and the remembered folder (#715)") and
+  `plantoir-unit-planning` (#707, a `template` folder of pages, two
+  stylesheets and 19 `.woff2` fonts pinned by SHA-256,
+  `unitPlanning.agentGuidance`, 09 → "Unit planning (#707)"). The
   handouts skill has an assistant write ONE file inside a course,
   `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
-  handouts are kept); the app neither reads it nor needs to, and a backup,
+  handouts are kept), and the unit-planning skill a folder,
+  `courses/<CODE>/.internal/planning/`, whose `plan.json` files the mac
+  reads for the Revise doors' greeting (Windows owes that reader: the
+  `windows` issue for #707); the app neither reads handouts.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
