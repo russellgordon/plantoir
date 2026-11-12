@@ -1044,12 +1044,45 @@ names its Netlify calls and runs a no-flag deploy over two saved folders
 (both written; then a first leg that fails, and the run still writes the
 second and ends with exit 1). The rules, sentences and eighteen cases are
 proposed from Windows as `contracts/app-rules.json` → `savedDestinations`,
-run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`; the mac's
-`test_deploy_sh_destination.py` is asked to read them too (the `mac` issue
-for #739). `deploy.py` is unchanged (it does one destination per call). The
-new-course default, its sentences and every case are
-`contracts/app-rules.json` → `publishingDestinations`; the Swift is
-`PublishingDestinations`.
+run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. `deploy.py`
+is unchanged (it does one destination per call). The new-course default, its
+sentences and every case are `contracts/app-rules.json` →
+`publishingDestinations`; the Swift is `PublishingDestinations`.
+
+**The mac runs the eighteen cases too, since #771.** `deploy.sh` carries
+`the_saved_destinations`, `destination_words` and
+`flags_for_the_saved_destination` between `# BEGIN saved_destinations` and
+`# END saved_destinations`, and `test_deploy_sh_destination.py`'s
+`TheSavedDestinationsAreTheContracts` cuts them out and runs every case
+through the launcher's own reading loop twice on a Mac: once with `plutil`
+on PATH, and once with a PATH holding only a `python3` and `tr`, so the
+Python reader is the one used. On any other bash (Windows' Git Bash, under
+`PythonToolchainTests`) it runs the Python reader only. The same class pins
+every `sentences` template to a printed line of the #668 block (the
+placeholders written as the launcher writes them, and the cross or target
+taken off the front), checks the block prints no other sentence, and pins
+`sentences.where` to `destination_words`, including Netlify's word for a
+kind it does not list. Function-level rather than one launcher run per case:
+the eight whole-launcher tests above already cover the loop that runs the
+legs, and 36 runs of the launcher would cost minutes.
+
+**The contract found a mac fault, and #771 fixed it.** Measured on macOS
+26.6 with the functions cut from `deploy.sh`: the Python reader passed 18 of
+18 cases and the `plutil` reader 17 of 18. Settings of `["netlify"]` are a
+JSON array, which `plutil -convert json` converts with exit 0; every
+`-extract` on it then fails, which reads as a course naming no destination,
+so the course DEPLOYED TO NETLIFY. That is the silent wrong-host deploy the
+block exists to stop, and the Python reader and `deploy.ps1` already refused
+it. The `plutil` reader now converts the file to JSON on stdout and requires
+its first character to be `{`, since `plutil` writes the converted JSON with
+no leading space (measured: leading whitespace in the file is dropped). It
+gives 18 of 18. The other shapes `plutil` was measured on refused already: a
+top-level string or number and an empty file fail to convert, and `null`
+converts but every `-extract` fails, which reads as Netlify, as the contract
+says. One difference remains and is accepted: an XML or binary property list
+whose top level is a dictionary, saved as `course_config.json`, is read on a
+Mac and refused by the Python reader. Plantoir never writes one and it is not
+a contract case, so it is left alone rather than given a second check.
 
 **Why.** Netlify moved new accounts to a credit-based plan, and the free one
 is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
@@ -1356,8 +1389,29 @@ not followed, the Bearer header sent) and a closed port, and runs the real
 closed port: the token is kept, the two lines are said, exit 1. The app's
 `FailureExplainer` lifts all four cases (`TokenRefusedMarker`,
 `SavedTokenUnheardMarker`). deploy.sh's own pattern was already fixed on the
-mac (#716), so #705's "check the mac" needs no issue; reading the contract's
-cases there is the `mac` issue for #705.
+mac (#716), so #705's "check the mac" needed no issue.
+
+**The mac runs the 25 cases too, since #771.** `deploy.sh` names the two
+addresses and four patterns once, between `# BEGIN saved_token_check_rules`
+and `# END saved_token_check_rules` (`CLOUDFLARE_TOKEN_CHECK_URL`,
+`CLOUDFLARE_TOKEN_ACCEPTED` and so on), spelled as the contract spells them:
+`$'…'` quoting makes the `\t` a real TAB, because `grep -E` reads a backslash
+inside a bracket literally. Both saved-token checks pass those names to
+`token_check_answer`, which is also between markers.
+`test_deploy_token_refusal.py`'s `TheSavedTokenRuleIsTheContracts` checks
+that the six values, as bash expands them, are `savedTokenCheck.services`
+byte for byte, that the two call sites pass them, and runs every case
+through the cut-out `token_check_answer` with `curl` stubbed (status 0 is
+curl's `000`, with the exit code a timeout gives). Measured before the
+change: deploy.sh's old `[[:space:]]` patterns gave 25 of 25 in `grep -E`
+too, so no answer a teacher sees moved; what changed is that there is one
+table. REJECTED: reading the patterns from `.toolchain/contracts` at run
+time, because a Mac has no host `python3` to read JSON with, and a `plutil`
+read of a nested key costs a process per deploy and fails in a way the rest
+of the launcher does not; and keeping `[[:space:]]`, which also takes CR, VT
+and FF (`grep -E` reads line by line, so never LF), so the test could compare
+only behaviour and never the text. The paste checks keep their own
+`[[:space:]]` patterns, deliberately, as above: they are not this rule.
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 

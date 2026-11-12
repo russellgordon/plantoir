@@ -32,7 +32,9 @@ one rule about lifting them:
 `deploy.ps1`'s half of #716 is Windows' #705 (1.9.3): it prints the same
 "could not reach" lines, which the drift check below pins to the contract,
 and its three-word rule runs against `contracts/app-rules.json` ->
-`savedTokenCheck.cases` in `windows-app/test_launcher_rules.ps1`.
+`savedTokenCheck.cases` in `windows-app/test_launcher_rules.ps1`. Since #771
+the last class here runs the same cases through deploy.sh's
+`token_check_answer`, and pins its addresses and patterns to the contract's.
 
 Both launchers are read with encoding="utf-8" (deploy.sh's ❌ and em dashes
 would not survive a Windows code page) and line by line with the ending

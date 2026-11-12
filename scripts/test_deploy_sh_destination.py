@@ -13,6 +13,10 @@ course's settings: it reads the destination, says it, and then stops at the
 missing recipe for the website builder, long before anything needs Docker,
 the network or a credential. The line it says is what is read here.
 
+The last class runs `contracts/app-rules.json` -> `savedDestinations` (#771):
+every case through the reader functions cut from deploy.sh, with each
+reader, and every sentence pinned to the line the launcher prints.
+
 Listed in verify.sh; Windows' PythonToolchainTests discovers it, and skips it
 there when no bash can run the launcher (see test_deploy_non_interactive).
 
