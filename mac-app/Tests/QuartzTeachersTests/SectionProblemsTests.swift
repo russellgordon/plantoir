@@ -360,11 +360,24 @@ final class SectionProblemsTests: XCTestCase {
             SidebarView.warningIdentifier(courseCode: "SCH3U", sectionNumber: 1, stoppedPublish: false),
             "two courses' Section 1 warnings are told apart"
         )
+        XCTAssertEqual(
+            SidebarView.clockIdentifier(courseCode: "MPM2D", sectionNumber: 1),
+            "scheduledDeployBadge-MPM2D-section1"
+        )
+    }
+
+    /// #772: the row takes both identifiers from the rules above, and no
+    /// identifier in the sidebar names the section alone. Read from the
+    /// source, so the old section-only form fails here rather than merely
+    /// failing to compile.
+    func testNoWarningIdentifierNamesTheSectionAlone() throws {
         let sidebar: String = try readSource("QuartzTeachers/Views/SidebarView.swift")
         let label: String = try body(of: "func sectionRowLabel(", in: sidebar)
-        XCTAssertTrue(label.contains("SidebarView.warningIdentifier("), "the row takes its identifier from the rule")
+        XCTAssertTrue(label.contains("SidebarView.warningIdentifier("), "the warning takes its identifier from the rule")
+        XCTAssertTrue(label.contains("SidebarView.clockIdentifier("), "the clock takes its identifier from the rule")
         XCTAssertFalse(sidebar.contains("\"problemsBadge-section"), "no identifier names the section alone")
         XCTAssertFalse(sidebar.contains("\"stoppedPublishBadge-section"), "no identifier names the section alone")
+        XCTAssertFalse(sidebar.contains("\"scheduledDeployBadge-section"), "no identifier names the section alone")
     }
 
     /// #731 (implementation review H1): the add-ons offer's "Don't ask
