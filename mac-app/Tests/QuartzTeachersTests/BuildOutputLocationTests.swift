@@ -418,6 +418,147 @@ final class BuildOutputLocationTests: XCTestCase {
         XCTAssertEqual(BuildOutputLocation.trailLine(courseCode: "ICS3U"), expected)
     }
 
+    // MARK: - Kept copies of geogebra.org sketches (#789)
+
+    /// The contract's `buildOutputLocation` section, read from disk.
+    func buildOutputRules() throws -> [String: Any] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        return try XCTUnwrap(all["buildOutputLocation"] as? [String: Any])
+    }
+
+    /// The folder the app keeps is the one the contract names, which is the
+    /// one the GeoGebra fences write their copies into.
+    func testTheKeptCopiesFolderIsTheContracts() throws {
+        let rules: [String: Any] = try buildOutputRules()
+        let kept: [String: Any] = try XCTUnwrap(rules["keptCopiesSurviveTheClear"] as? [String: Any])
+        XCTAssertEqual(kept["folder"] as? String, BuildOutputLocation.keptCopiesFolderName)
+    }
+
+    /// Writes one kept copy that says which place it started in.
+    func writeKeptCopy(_ key: String, saying place: String, in folder: URL) throws {
+        let copies: URL = folder.appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+        try FileManager.default.createDirectory(at: copies, withIntermediateDirectories: true)
+        try Data(place.utf8).write(to: copies.appendingPathComponent("\(key).ggb"))
+    }
+
+    /// Every case in `keptCopiesSurviveTheClear.cases` without a `fault`,
+    /// the same list `scripts/test_build_output_link.sh` runs against the
+    /// launchers' block. The cases with a fault shadow a shell command and
+    /// are the shell suite's alone.
+    func testKeptCopiesSurviveEveryClearTheContractNames() throws {
+        let rules: [String: Any] = try buildOutputRules()
+        let kept: [String: Any] = try XCTUnwrap(rules["keptCopiesSurviveTheClear"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(kept["cases"] as? [[String: Any]])
+        let outside: String = "beside the built sites"
+        let inside: String = "in the course folder"
+        var casesRun: Int = 0
+
+        for testCase in cases {
+            if testCase["fault"] != nil {
+                continue
+            }
+            casesRun += 1
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let courseState: String = try XCTUnwrap(testCase["courseFolder"] as? String)
+            let buildsFolder: [String: Any] = try XCTUnwrap(testCase["buildsFolder"] as? [String: Any])
+            let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
+
+            // A course code of its own for each case, so one case's folders
+            // cannot answer for another's.
+            let code: String = "KC\(casesRun)"
+            let courseURL: URL = try makeCourse(code)
+            let target: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: code)
+            if buildsFolder["builtSite"] as? Bool == true {
+                let publicURL: URL = target.appendingPathComponent("section1").appendingPathComponent("public")
+                try FileManager.default.createDirectory(at: publicURL, withIntermediateDirectories: true)
+                try Data(outside.utf8).write(to: publicURL.appendingPathComponent("index.html"))
+            }
+            let outsideKeys: [String] = try XCTUnwrap(buildsFolder["keptCopies"] as? [String])
+            for key in outsideKeys {
+                try writeKeptCopy(key, saying: outside, in: target)
+            }
+
+            let link: URL = courseURL.appendingPathComponent(".merged_output")
+            if courseState == "a link to another Mac's builds folder" {
+                try FileManager.default.createSymbolicLink(
+                    at: link,
+                    withDestinationURL: URL(fileURLWithPath: "/Users/somebody-else/builds/xxxx/\(code)")
+                )
+            } else if courseState == "a file where the link belongs" {
+                try Data("not a folder".utf8).write(to: link)
+            } else if courseState == "a built site of its own" {
+                try makeCourse(code, withBuiltSiteSaying: inside)
+                let insideKeys: [String] = testCase["courseFolderKeptCopies"] as? [String] ?? []
+                for key in insideKeys {
+                    try writeKeptCopy(key, saying: inside, in: link)
+                }
+            } else {
+                XCTAssertEqual(courseState, "no link", "a case this test does not know how to set up")
+            }
+
+            try BuildOutputLocation.ensureLink(courseDirectory: courseURL, workingFolderURL: workingFolder)
+
+            XCTAssertEqual(
+                try? FileManager.default.destinationOfSymbolicLink(atPath: link.path),
+                target.path,
+                "\(name): the link points at this Mac's builds folder"
+            )
+            let wantSite: String = try XCTUnwrap(expect["builtSite"] as? String)
+            if wantSite == "gone" {
+                XCTAssertNil(builtPage(inCourse: courseURL), "\(name): the built pages are gone")
+            } else {
+                XCTAssertEqual(builtPage(inCourse: courseURL), wantSite, "\(name): the built pages")
+            }
+            let wantCopies: [String: String] = try XCTUnwrap(expect["keptCopies"] as? [String: String])
+            let readPlace: URL = link.appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+            for (key, place) in wantCopies {
+                let copy: URL = readPlace.appendingPathComponent("\(key).ggb")
+                XCTAssertEqual(
+                    try? String(contentsOf: copy, encoding: .utf8),
+                    place,
+                    "\(name): copy \(key) is kept where the next build reads it"
+                )
+            }
+            let present: [String] = (try? FileManager.default.contentsOfDirectory(atPath: readPlace.path)) ?? []
+            XCTAssertEqual(present.count, wantCopies.count, "\(name): and no other copy is there")
+            if expect["onlyTheKeptCopiesRemain"] as? Bool == true {
+                XCTAssertEqual(
+                    try FileManager.default.contentsOfDirectory(atPath: target.path),
+                    [BuildOutputLocation.keptCopiesFolderName],
+                    "\(name): only the kept copies remain in the builds folder"
+                )
+            }
+        }
+        XCTAssertGreaterThan(casesRun, 0, "the contract carries cases without a fault")
+    }
+
+    /// Restoring a whole course from a backup clears its built sites, which
+    /// can be older than the pages put back, and keeps its kept copies.
+    func testRestoringACourseKeepsItsKeptCopies() throws {
+        let courseURL: URL = try makeCourse("ICS3U", withBuiltSiteSaying: "<html>x</html>")
+        try BuildOutputLocation.ensureLink(courseDirectory: courseURL, workingFolderURL: workingFolder)
+        let target: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: "ICS3U")
+        try writeKeptCopy("a", saying: "kept", in: target)
+
+        BuildOutputLocation.discardBuiltSites(forWorkingFolder: workingFolder, courseCode: "ICS3U")
+
+        XCTAssertNil(builtPage(inCourse: courseURL), "the built pages are gone")
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: target.path),
+            [BuildOutputLocation.keptCopiesFolderName]
+        )
+        let copy: URL = target
+            .appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+            .appendingPathComponent("a.ggb")
+        XCTAssertEqual(try? String(contentsOf: copy, encoding: .utf8), "kept")
+    }
+
     // MARK: - Renaming
 
     /// A rename used to cost nothing, because the built site sat inside the
