@@ -12041,6 +12041,27 @@ The second look, at `ssInstall`, refuses by `Abort`: exit **3** (measured on the
 The look repeats every second, so what was ended is seen gone and work that
 STARTS during the wait (a scheduled deploy firing) is seen and waited for too.
 
+**The hand-run wizard does not ask about a preview it has just closed.** For
+**5 s** after it ends something (`RunningWorkGraceAfterEndingMs`), the
+hand-run path looks again every second instead of showing the box; after
+that, work still there is asked about as before. The fault this closes was
+measured on the real 1.9.3 candidate (round three, W-preview, below): the look
+that ended a preview's `node.exe` counted its `build_site.py` python as work in
+the same pass, and 0.2 s after the ending the wizard showed "Plantoir is still
+building or deploying a course… Retry / Cancel", false for a preview; the
+python left by itself 0.3 s later. The silent path never had this, because it
+already looks again before deciding anything (B2: nothing running 1.24 s after
+the ending). Five seconds is about four times the longest exit measured, and
+costs a teacher with a real build beside the preview only that delay before
+the same box. Rejected: not counting a preview server's PARENT as work — the
+parent is the same `python.exe` image as a deploy's, and telling them apart
+means reading a process tree the safe defaults above deliberately do not
+trust; a timer on what was ended is the smaller rule. The harness takes this
+path under `/VERYSILENT /SUPPRESSMSGBOXES` with one `#define`
+(`RunningWorkSilent=False`, never set by `installer.iss`), so the box answers
+its default, Cancel, unseen and unheard, and a box that would have been shown
+is a refusal in its log.
+
 **The rule that tells a preview from a build.** `--serve` as a whole token,
 the separator `preview.ps1` (`Test-IsServing`) and `scripts/stop_preview.py`
 already use: `build_site.py` starts a preview's Quartz as `node
@@ -12268,6 +12289,30 @@ candidate did NOT yet carry this fix:
 | C, a build running | exit 0 in 178 s, but `python311.dll` and a cp311 `.pyd` held by the interpreter survived `[InstallDelete]`; the build itself failed ("python311.zip" gone under it) |
 | C2, a folder deploy's build | exit 0 in 186 s; build and deploy succeeded, destination whole (336 files); five cp311 files left |
 
+**Rounds two and three (2026-11-12), with the fix.** Same PC and method; an
+UNSIGNED candidate built from `dev` 50c9c4db3 (277,906,644 bytes, SHA-256
+`377ee4e7…0607c9`), each case from a clean signed 1.9.0, the app always
+launched with `--state-dir` (it otherwise processes the owner's scheduled
+records at start-up), the signed 1.9.0 and the owner's state restored and
+compared byte for byte at the end of each round:
+
+| Case | Result |
+|---|---|
+| A2, nothing running | **0**, 240 s; all five folders exact, nothing outside them the candidate does not carry; `llama\` 0 → 52 files |
+| B2, a preview serving | **0**, 169.8 s; the server ended, nothing running 1.24 s later; tree exact; the app starts |
+| C3, a full-rebuild build | **0**, 261.7 s; waited 94.2 s (and saw the build's Quartz `node.exe` start during the wait); the build finished; no cp311 |
+| C2b, a folder deploy's build | **0**, 252.7 s; waited 94.2 s; build and deploy exit 0, destination whole |
+| R, a build made endless (its python suspended), at-quit | **7**, 603.2 s; listing identical; nothing reopened; marker `work` |
+| R2a, the same with `/RELAUNCH=1` | **7**, 608.5 s; listing identical; 1.9.0 reopened once with `--update-not-installed-for-work` |
+| R2b, Plantoir opened by hand 31 s into the wait | **7**, 31.7 s (0.6 s after it opened); one Plantoir only; marker `reopened` |
+| W, hand-run wizard, a build running | box after 1.5 s; Cancel refused with nothing changed; Retry while running asked again; Retry after the build finished installed (213 s) |
+| W, hand-run wizard, a preview serving | **FAIL** on that candidate: the false box above, 0.2 s after the ending. Closed by the 5 s grace; the harness's `hand-preview` case reproduces it (its must-fail) and passes with the fix. Not re-measured on a real installer |
+| D, Install and Reopen with a preview open | **0**, 135.7 s; 1.9.0 quit in 1.8 s and ended its own preview, so no serving node outlived it; 1.9.3 reopened on the folder |
+| E1, a 1.9.0 scheduled run firing as the copy starts | **5**, 9.9 s, a broken install (runtime folders empty): KNOWN, 1.9.0 → 1.9.3 is not protected (above); the release notes' line stays |
+| E2, a 1.9.3 scheduled run firing during the copy | **0**, 151.1 s; it stood down at once; setup met `WinRT.Runtime.dll` in use once (1 s retry). The stood-down run is lost: job and task gone, the section reads "could not run as set" |
+| X, a Cloudflare (wrangler) deploy mid-install | **0**, 164 s; wrangler's node waited for; the deploy completed and the live site served it |
+| #764 items 5 to 7 | pass: the refresh removes the old bytecode before any preview; preview then deploy from 1.9.3; a task registered under 1.9.0 deployed after the upgrade |
+
 ### What the harness proves (`windows-app/installer-tests/`)
 
 `run-harness.ps1` compiles the SAME include into a harness installer with its
@@ -12295,10 +12340,14 @@ it at every Windows cut. Results, this PC, 2026-11-12:
 | open-at-start | `Plantoir.exe` open and never quitting, `/RELAUNCH=1` | **7**, 21.1 s; no second copy started beside it; marker `work` |
 | scheduled-during-copy | a scheduled run of the harness's OWN `{app}\Plantoir.exe` started at `ssInstall`, standing down when it sees `installing.<pid>` | **0**, 2.6 s; it stood down at once, the copy completed |
 | scheduled-that-waits-breaks-it (must-fail) | the same run behaving as the first build did: WAITING while the marker is there | **5**, 6.6 s: the copy of `Plantoir.exe` met it "in use" four times, the hidden box defaulted to Abort, rollback (case B in miniature) |
+| hand-preview | the hand-run path (`RunningWorkSilent=False`), the serve shape with its python outliving the ended server by 2 s (`--linger-ms 2000`) | **0**, 3.5 s; no box asked; the python gone by itself; tree exactly version 2 |
+| hand-build-and-preview | the hand-run path, the same preview plus a build node that never ends | **7**, 6.1 s; the server ended, the box asked after the 5 s grace (Cancel, its suppressed default); the build untouched; tree byte-identical; marker `work` |
 
 Every case also checks the markers: a refusal leaves `update-not-installed.txt`
 with its reason, a finished install leaves none, and no `installing.*` is ever
-left behind (all held). All 14 in 234 s. Must-fails (`-MustFail`, each
+left behind (all held). All 14 in 234 s; with the two `hand-*` cases
+(2026-11-12, the grace above), **17 passed, 0 failed** (16 cases and the
+untouched check). Must-fails (`-MustFail`, each
 compiled from an edited COPY of the include): the check made to answer `''`
 → serve **exit 5** and a part-replaced tree (the night's case B, reproduced);
 the preview rule never matching → serve refused, exit 7; one look only → the
@@ -12306,16 +12355,16 @@ late case installed before the late work had ended (judged by time: whether
 Inno's in-use retries then trip over it depends on timing, exit 5 on one run
 and 0 after retries on another); the wait removed → build exit 5; a reopened
 Plantoir counted as work → came-back waited the full 21.5 s; the second-copy
-guard removed → open-at-start started a second Plantoir; and the scheduled run that waits (above) → exit 5. Every run: "the real
+guard removed → open-at-start started a second Plantoir; the hand-run grace set
+to 0 → hand-preview refused, exit 7 (round three's W-preview, reproduced); and the scheduled run that waits (above) → exit 5. Every run: "the real
 Plantoir untouched" (42,764 files and its uninstall key, the same fingerprint
 before and after). Source must-fails, each red and restored: the
 `PrepareToInstall` call, the `ssInstall` look, the `__pycache__` line, the
 `#include`.
-**Not proven, and re-measured on the real candidate** (#700's closing comment
-lists the pass line of each): B, C and C2 again with the fix; D, Install and
-Reopen after a quit with a preview open; E, a scheduled deploy firing
-mid-install; a Netlify or Cloudflare deploy (wrangler running) during an
-install; and the hand-run wizard's Retry box, which makes a sound.
+**Not proven by the harness, and measured on the real candidate** (rounds two
+and three, above): B, C and C2 with the fix; D; E; a Cloudflare deploy during
+an install; and the hand-run wizard's box as a teacher SEES it (the harness
+proves when it is asked, not what the window shows).
 
 **For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
 KNOW about #700").
