@@ -1578,16 +1578,28 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Empty(_launcher.Runs);
     }
 
+    /// <summary>
+    /// Was <c>ACloudflareSectionIsSentBackToPlantoirToDeploy</c> until #739:
+    /// this path refused EVERY Cloudflare section ("needs the account ID
+    /// Plantoir stores"), on the belief that only the app could pass the ID.
+    /// It reads the same settings the app does, so with the ID saved the
+    /// section is now deployed, the ID handed over with <c>--account</c>.
+    /// Every refusal case is in <c>HeadlessCloudflareDeployTests</c>.
+    /// </summary>
     [Fact]
-    public async Task ACloudflareSectionIsSentBackToPlantoirToDeploy()
+    public async Task ACloudflareSectionWithTheIdSavedIsDeployedNotSentBackToPlantoir()
     {
+        const string fakeId = "0123456789abcdef0123456789abcdef";
         AddCourse("SNC1W", "Science", 1, deployTarget: "cloudflare_pages");
-        var workspace = Open();
+        Directory.CreateDirectory(Path.Combine(_folder, "courses", "SNC1W", ".cloudflare_sites"));
+        File.WriteAllText(Path.Combine(_folder, "courses", "SNC1W", ".cloudflare_sites", "section1.json"), "{}");
+        AssistWorkspace.CloudflareAccountIdOverrideForTests = () => fakeId;
 
-        var refusal = await Assert.ThrowsAsync<AssistRefusal>(() => workspace.Deploy("SNC1W", 1));
+        var result = await Open().Deploy("SNC1W", 1);
 
-        Assert.Contains("needs the account ID Plantoir stores", refusal.Message);
-        Assert.Empty(_launcher.Runs);
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(new[] { "preview", "deploy" }, _launcher.Runs.Select(r => r.Launcher));
+        Assert.Contains(fakeId, _launcher.Runs[1].Arguments);
     }
 
     [Fact]

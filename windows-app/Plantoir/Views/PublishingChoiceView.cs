@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Models;
 
@@ -26,6 +28,17 @@ namespace Plantoir.Views;
 /// console prompt, because the app publishes with nothing attached to answer a
 /// prompt — and a token scoped to Pages cannot look its own account up
 /// (checked against a real token).
+///
+/// <para><b>Since #739 (the mac's #668)</b> the picker offers Cloudflare Pages
+/// first (<see cref="PublishingDestinations.PickerOrder"/>), says
+/// <see cref="PublishingDestinations.CloudflareCaption"/> wherever Cloudflare is
+/// configured and <see cref="PublishingDestinations.NetlifyNote"/> wherever
+/// Netlify is, and, in the new-course dialog only (<c>accountIdMayWait</c>),
+/// lets a MISSING Account ID wait: the orange sentence stays, with
+/// <see cref="PublishingDestinations.AccountIdCanWait"/> after it, and
+/// <see cref="Problem"/> does not hold Create back for it. The ID's sentence and
+/// the 25 MB note are ONE block when both apply, the ID's first
+/// (<see cref="PublishingDestinations.CloudflareNotice"/>).</para>
 /// </summary>
 public sealed class PublishingChoiceView
 {
@@ -42,10 +55,6 @@ public sealed class PublishingChoiceView
     /// </summary>
     public event Action? AccountRefreshed;
 
-    private const int NetlifyIndex = 0;
-    private const int CloudflareIndex = 1;
-    private const int FolderIndex = 2;
-
     private readonly Func<string> _getTarget;
     private readonly Func<string> _getPath;
     private readonly Func<string> _getAccount;
@@ -58,9 +67,10 @@ public sealed class PublishingChoiceView
     private readonly TextBlock _accountValue;
     private readonly TextBlock _problemText;
     private readonly TextBlock _caption;
-    private readonly TextBlock _cloudflareProblemText;
+    private readonly TextBlock _cloudflareNotice;
     private readonly TextBlock _cloudflareCaption;
-    private readonly TextBlock _cloudflareSizeNote;
+    private readonly TextBlock _netlifyNote;
+    private readonly bool _accountIdMayWait;
     private readonly Window _pickerOwner;
     private bool _updatingFromModel;
     private bool _listeningForTheAccount;
@@ -76,15 +86,20 @@ public sealed class PublishingChoiceView
     /// the mac's <c>CloudflareDetailFields</c>, reused in both places.
     /// </summary>
     private TextBlock? _additionalAccountValue;
-    private TextBlock? _additionalCloudflareProblemText;
+    private TextBlock? _additionalCloudflareNotice;
+    private TextBlock? _additionalNetlifyNote;
 
     /// <summary>
     /// What is wrong with the current choice, or null when nothing is —
     /// always null in Netlify mode, which needs no settings here. Checks
     /// every ADDITIONAL destination too, for the same reason the primary's
     /// own check exists: a bad folder or missing Cloudflare Account ID
-    /// blocks Save/Create, rather than failing silently the first time a
+    /// blocks Save, rather than failing silently the first time a
     /// deploy actually reaches it. Mirrors the mac's PublishingChoiceView.
+    /// In the new-course dialog a MISSING Account ID is not a problem here
+    /// (#739; <see cref="PublishingDestinations.WizardCreateRefusal"/>): it is
+    /// shown as a warning and refused at the first deploy instead. An ID that
+    /// cannot be one still is.
     /// </summary>
     public string? Problem
     {
@@ -93,7 +108,7 @@ public sealed class PublishingChoiceView
             string? primaryProblem = _getTarget() switch
             {
                 "local_folder" => CourseConfiguration.DeployFolderProblem(_getPath()),
-                "cloudflare_pages" => CourseConfiguration.CloudflareAccountProblem(_getAccount()),
+                "cloudflare_pages" => AccountRefusal(),
                 _ => null,
             };
             if (primaryProblem is not null) return primaryProblem;
@@ -102,7 +117,7 @@ public sealed class PublishingChoiceView
                 string? problem = target.Type switch
                 {
                     "local_folder" => CourseConfiguration.DeployFolderProblem(target.Path),
-                    "cloudflare_pages" => CourseConfiguration.CloudflareAccountProblem(_getAccount()),
+                    "cloudflare_pages" => AccountRefusal(),
                     _ => null,
                 };
                 if (problem is not null) return problem;
@@ -111,14 +126,25 @@ public sealed class PublishingChoiceView
         }
     }
 
+    /// <summary>What the Account ID holds back: anything wrong with it in Course Settings, only a malformed one in the new-course dialog.</summary>
+    private string? AccountRefusal() => _accountIdMayWait
+        ? PublishingDestinations.WizardCreateRefusal(_getAccount())
+        : CourseConfiguration.CloudflareAccountProblem(_getAccount());
+
+    /// <param name="accountIdMayWait">True in the new-course dialog only: a
+    /// MISSING Account ID is a warning there, not a refusal (#739). Course
+    /// Settings leaves it false, because saving a changed destination still
+    /// needs the ID.</param>
     public PublishingChoiceView(Window pickerOwner,
                                 Func<string> getTarget, Action<string> setTarget,
                                 Func<string> getPath, Action<string> setPath,
                                 Func<string> getAccount,
                                 Func<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> getAdditional,
-                                Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> setAdditional)
+                                Action<IReadOnlyList<CourseConfiguration.AdditionalDeployTarget>> setAdditional,
+                                bool accountIdMayWait = false)
     {
         _pickerOwner = pickerOwner;
+        _accountIdMayWait = accountIdMayWait;
         _getTarget = getTarget;
         _getPath = getPath;
         _getAccount = getAccount;
@@ -127,18 +153,21 @@ public sealed class PublishingChoiceView
 
         Root = new StackPanel { Spacing = 6 };
 
+        // In pickerOrder (#739): Cloudflare Pages, Netlify, a folder. An
+        // unknown or absent saved value shows as Netlify, which is what it
+        // deploys to (whenTheKeyIsAbsent).
         var targetBox = new ComboBox { MinWidth = 300 };
-        targetBox.Items.Add("Netlify");
-        targetBox.Items.Add("Cloudflare Pages");
-        targetBox.Items.Add("A folder on this PC");
-        targetBox.SelectedIndex = getTarget() switch
-        {
-            "local_folder" => FolderIndex,
-            "cloudflare_pages" => CloudflareIndex,
-            _ => NetlifyIndex,
-        };
+        foreach (string type in PublishingDestinations.PickerOrder) targetBox.Items.Add(FriendlyName(type));
+        int savedIndex = IndexOf(getTarget());
+        targetBox.SelectedIndex = savedIndex >= 0 ? savedIndex : IndexOf(PublishingDestinations.WhenTheKeyIsAbsent);
         AutomationProperties.SetAutomationId(targetBox, "deployTargetPicker");
+        AutomationProperties.SetName(targetBox, "Deploy to");
         Root.Children.Add(FormBuilders.LabeledRow("Deploy to", targetBox));
+
+        // ---- Netlify as the primary: its note sits under the picker (#739).
+        // As an additional destination it sits under that switch instead.
+        _netlifyNote = NoteLine("netlifyNote");
+        Root.Children.Add(_netlifyNote);
 
         // ---- Folder ----
         _folderArea = new StackPanel { Spacing = 4 };
@@ -164,28 +193,24 @@ public sealed class PublishingChoiceView
         // ---- Cloudflare ----
         // The ID is SHOWN here and edited in File ▸ Settings ▸ Deploying (#491).
         _cloudflareArea = new StackPanel { Spacing = 4 };
+        // Why it is offered first (#739), said plainly and without figures.
+        var recommended = FormBuilders.ExampleCaption(PublishingDestinations.CloudflareCaption);
+        AutomationProperties.SetAutomationId(recommended, "cloudflareCaption");
+        _cloudflareArea.Children.Add(recommended);
         _accountValue = AccountDisplay(_cloudflareArea, "cloudflareAccountValue", "cloudflareAccountOpenSettings");
 
-        _cloudflareProblemText = CautionLine("cloudflareAccountProblem");
-        _cloudflareArea.Children.Add(_cloudflareProblemText);
         // Where to FIND the ID went to Settings with the field it explains.
         _cloudflareCaption = FormBuilders.ExampleCaption(
             "Each section gets its own free site at yourproject.pages.dev. The first deploy asks for an API token with the Cloudflare Pages permission.");
         _cloudflareArea.Children.Add(_cloudflareCaption);
 
-        // Stays on screen the whole time Cloudflare is chosen — it is a
-        // standing fact about the destination, not a mistake to correct, so
-        // it is worded as a heads-up and never hides the way the problem
-        // line does.
-        _cloudflareSizeNote = CautionLine("cloudflareSizeNote");
-        // The area's own visibility already hides this with everything else
-        // when another destination is chosen.
-        _cloudflareSizeNote.Visibility = Visibility.Visible;
-        _cloudflareSizeNote.Text =
-            "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. " +
-            "Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. " +
-            "Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely.";
-        _cloudflareArea.Children.Add(_cloudflareSizeNote);
+        // The ID's problem and the 25 MB fact, ONE block (#739). The 25 MB
+        // sentence never hides while Cloudflare is chosen: a standing fact
+        // about the destination, met while choosing rather than when a deploy
+        // fails halfway through an upload. The area's own visibility hides it
+        // with everything else when another destination is chosen.
+        _cloudflareNotice = NoticeBlock();
+        _cloudflareArea.Children.Add(_cloudflareNotice);
         Root.Children.Add(_cloudflareArea);
 
         // ---- Also publish to, for redundancy — real redundancy needs a
@@ -198,12 +223,10 @@ public sealed class PublishingChoiceView
         targetBox.SelectionChanged += (_, _) =>
         {
             if (_updatingFromModel) return;
-            setTarget(targetBox.SelectedIndex switch
-            {
-                FolderIndex => "local_folder",
-                CloudflareIndex => "cloudflare_pages",
-                _ => "netlify",
-            });
+            int chosen = targetBox.SelectedIndex;
+            setTarget(chosen >= 0 && chosen < PublishingDestinations.PickerOrder.Count
+                ? PublishingDestinations.PickerOrder[chosen]
+                : PublishingDestinations.WhenTheKeyIsAbsent);
             RefreshAreas();
             RebuildAdditionalArea();
             Changed?.Invoke();
@@ -315,6 +338,13 @@ public sealed class PublishingChoiceView
         if (_additionalAccountValue is not null) ShowAccount(_additionalAccountValue);
     }
 
+    private static int IndexOf(string type)
+    {
+        for (int i = 0; i < PublishingDestinations.PickerOrder.Count; i++)
+            if (PublishingDestinations.PickerOrder[i] == type) return i;
+        return -1;
+    }
+
     private static string FriendlyName(string type) => type switch
     {
         "local_folder" => "A folder on this PC",
@@ -331,7 +361,8 @@ public sealed class PublishingChoiceView
     {
         _additionalArea.Children.Clear();
         _additionalAccountValue = null;
-        _additionalCloudflareProblemText = null;
+        _additionalCloudflareNotice = null;
+        _additionalNetlifyNote = null;
         var availableTypes = CourseConfiguration.AvailableAdditionalDeployTargetTypes(_getTarget());
         if (availableTypes.Count == 0) return;
 
@@ -353,6 +384,7 @@ public sealed class PublishingChoiceView
                 IsOn = CourseConfiguration.HasAdditionalDeployTarget(_getAdditional(), type),
             };
             AutomationProperties.SetAutomationId(toggle, $"additionalDeployTarget-{type}");
+            AutomationProperties.SetName(toggle, "Also deploy to " + FriendlyName(type));
             var row = FormBuilders.LabeledRow(FriendlyName(type), toggle);
             _additionalArea.Children.Add(row);
 
@@ -412,12 +444,24 @@ public sealed class PublishingChoiceView
                 // requires an ID before Save can enable, so the ID, why it
                 // holds Save back, and the way to Settings belong here too.
                 detailArea = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 4) };
+                var recommended = FormBuilders.ExampleCaption(PublishingDestinations.CloudflareCaption);
+                AutomationProperties.SetAutomationId(recommended, "additionalCloudflareCaption");
+                detailArea.Children.Add(recommended);
                 _additionalAccountValue = AccountDisplay(detailArea, "additionalCloudflareAccountValue",
                                                          "additionalCloudflareAccountOpenSettings");
-                var problemText = CautionLine("additionalCloudflareAccountProblem");
-                detailArea.Children.Add(problemText);
-                _additionalCloudflareProblemText = problemText;
+                // The same one block as the primary's (#739).
+                _additionalCloudflareNotice = NoticeBlock();
+                detailArea.Children.Add(_additionalCloudflareNotice);
                 RefreshAdditionalCloudflareProblem();
+                _additionalArea.Children.Add(detailArea);
+            }
+            else if (type == "netlify")
+            {
+                // An additional Netlify destination is deployed every time the
+                // primary is, so it spends the allowance as a primary one does.
+                detailArea = new StackPanel { Spacing = 4, Margin = new Thickness(0, 0, 0, 4) };
+                _additionalNetlifyNote = NoteLine("additionalNetlifyNote");
+                detailArea.Children.Add(_additionalNetlifyNote);
                 _additionalArea.Children.Add(detailArea);
             }
 
@@ -428,11 +472,13 @@ public sealed class PublishingChoiceView
                 _setAdditional(CourseConfiguration.SettingAdditionalDeployTarget(_getAdditional(), toggle.IsOn, capturedType));
                 if (capturedDetailArea is not null)
                     capturedDetailArea.Visibility = toggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+                RefreshNotes();
                 Changed?.Invoke();
             };
             if (detailArea is not null)
                 detailArea.Visibility = toggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
         }
+        RefreshNotes();
     }
 
     private void RefreshAdditionalProblem(TextBlock problemText, string type)
@@ -445,10 +491,56 @@ public sealed class PublishingChoiceView
 
     private void RefreshAdditionalCloudflareProblem()
     {
-        if (_additionalCloudflareProblemText is null) return;
-        string? problem = CourseConfiguration.CloudflareAccountProblem(_getAccount());
-        _additionalCloudflareProblemText.Text = problem ?? "";
-        _additionalCloudflareProblemText.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+        if (_additionalCloudflareNotice is null) return;
+        ShowNotice(_additionalCloudflareNotice, "additionalCloudflareAccountProblem", "additionalCloudflareSizeNote");
+    }
+
+    /// <summary>
+    /// Fills a Cloudflare notice from <see cref="PublishingDestinations.CloudflareNotice"/>:
+    /// one TextBlock, so Narrator reads it as one block in that order, named by
+    /// what it leads with, as the mac's identifier is.
+    /// </summary>
+    private void ShowNotice(TextBlock notice, string problemId, string sizeNoteId)
+    {
+        var parts = PublishingDestinations.CloudflareNotice(_getAccount(), _accountIdMayWait);
+        var caution = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+        var secondary = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        notice.Inlines.Clear();
+        foreach (var part in parts)
+            notice.Inlines.Add(new Run { Text = part.Text, Foreground = part.Caution ? caution : secondary });
+        AutomationProperties.SetAutomationId(notice, parts.Count > 1 ? problemId : sizeNoteId);
+        AutomationProperties.SetName(notice, string.Concat(parts.Select(part => part.Text)).TrimEnd());
+    }
+
+    private static TextBlock NoticeBlock() => new()
+    {
+        FontSize = 12,
+        TextWrapping = TextWrapping.Wrap,
+    };
+
+    /// <summary>Netlify's note in the secondary colour, collapsed until <see cref="RefreshNotes"/> shows it.</summary>
+    private static TextBlock NoteLine(string automationId)
+    {
+        var line = FormBuilders.ExampleCaption(PublishingDestinations.NetlifyNote);
+        line.Visibility = Visibility.Collapsed;
+        AutomationProperties.SetAutomationId(line, automationId);
+        return line;
+    }
+
+    /// <summary>
+    /// Netlify's note wherever Netlify is configured (<c>netlifyNoteCases</c>):
+    /// under the picker when it is the primary (an absent key counts), under
+    /// its switch when it is an additional destination.
+    /// </summary>
+    private void RefreshNotes()
+    {
+        string primary = _getTarget();
+        var additional = _getAdditional().Select(target => target.Type).ToList();
+        bool shows = PublishingDestinations.ShowsNetlifyNote(primary, additional);
+        bool netlifyIsPrimary = PublishingDestinations.ShowsNetlifyNote(primary, Array.Empty<string>());
+        _netlifyNote.Visibility = shows && netlifyIsPrimary ? Visibility.Visible : Visibility.Collapsed;
+        if (_additionalNetlifyNote is not null)
+            _additionalNetlifyNote.Visibility = shows && !netlifyIsPrimary ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static TextBlock CautionLine(string automationId)
@@ -476,8 +568,14 @@ public sealed class PublishingChoiceView
         // reports on whichever mode is active.
         string? problem = Problem;
         ShowProblem(_problemText, _caption, folderMode ? problem : null);
-        ShowProblem(_cloudflareProblemText, _cloudflareCaption, cloudflareMode ? problem : null);
+        // The notice says what is wrong with the ID even where that does not
+        // hold Create back (the new-course dialog, #739), so it is read from
+        // the ID rather than from Problem.
+        bool accountProblem = CourseConfiguration.CloudflareAccountProblem(_getAccount()) is not null;
+        _cloudflareCaption.Visibility = accountProblem ? Visibility.Collapsed : Visibility.Visible;
+        ShowNotice(_cloudflareNotice, "cloudflareAccountProblem", "cloudflareSizeNote");
         RefreshAdditionalCloudflareProblem();
+        RefreshNotes();
     }
 
     private static void ShowProblem(TextBlock line, TextBlock caption, string? problem)

@@ -172,9 +172,6 @@ internal static class NamedGapLedger
     private const string FixWithAnAssistant =
         "Fix with Claude… and Fix with Codex… on the Problems tab are #736's, the piece after #734 (the tab it hands rows from); its line is written by the buttons it adds.";
 
-    private const string CloudflareAccountIdRefusal =
-        "The Deploy button's refusal for a missing or broken Cloudflare Account ID is #739's (item 6); its line is written by that refusal, which #739 adds.";
-
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- activityTrail.mustRecord. #514's two events ("preview started
@@ -182,7 +179,6 @@ internal static class NamedGapLedger
         // landed with batch 6; #581's four (Obsidian's add-ons for diagrams
         // and graphs) with #581. "problems changed" landed with #734.
         Owed(ActivityTrailEvents, 736, V193, FixWithAnAssistant, "asked an assistant to fix problems"),
-        Owed(ActivityTrailEvents, 739, V193, CloudflareAccountIdRefusal, "deploy refused for the Cloudflare Account ID"),
 
         // ---- specialNames.platformWording.keys
 

@@ -2540,13 +2540,29 @@ public sealed partial class SectionDetailView : UserControl
             // prevent (row 305's RefusalReason).
             if (MultiDestinationDeployRunner.RefusalReason(destinations, cloudflareAccount) is { } problem)
             {
+                // #739 (the mac's #668): on the trail by KIND when it is the
+                // Account ID's, the refusal every new course meets at its first
+                // deploy now that Cloudflare Pages is the default; never the ID.
+                if (PublishingDestinations.AccountIdRefusalTrailLine(destinations, cloudflareAccount) is { } line)
+                    ActivityTrail.Note(ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId, line,
+                                       _course.Code, _sectionNumber);
+                // The Account ID is put right in File ▸ Settings ▸ Deploying,
+                // so its refusal offers the way there; a folder's is put right
+                // in the course's own settings and does not. OK stays the
+                // default button. Settings is a window of its own, not a second
+                // dialog, and is opened from the answer after this one has
+                // closed, so nothing here outlives a rebuilt view.
+                bool opensSettings = PublishingDestinations.DeployRefusalOpensSettings(problem, cloudflareAccount);
                 var problemDialog = new ContentDialog
                 {
                     Title = "This section can't be deployed yet",
                     Content = problem,
+                    PrimaryButtonText = opensSettings ? "Open Settings…" : "",
                     CloseButtonText = "OK",
+                    DefaultButton = ContentDialogButton.Close,
                 };
-                await ShowDialogSafelyAsync(problemDialog);
+                if (await ShowDialogSafelyAsync(problemDialog) == ContentDialogResult.Primary)
+                    SettingsWindow.Show(SettingsSection.Deploying);
                 return outcomeMessage;
             }
 

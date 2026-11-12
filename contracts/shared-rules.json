@@ -2886,6 +2886,11 @@
         "why": "This prompt is NOT silent, so whatever the teacher types echoes into the output. It is the one place an identifier reaches the transcript by being typed."
       },
       {
+        "expect": "A request to the Cloudflare API (/accounts/[removed: account id]/pages/projects/ics3u-1/deployments) failed.",
+        "input": "A request to the Cloudflare API (/accounts/9b2c4d6e8f0a1b3c5d7e9f0a1b2c3d4e/pages/projects/ics3u-1/deployments) failed.",
+        "why": "Proposed from Windows with #739 (rule accountPath). wrangler names the API resource that failed, and every Pages resource is /accounts/<id>/pages/…, so a failing Cloudflare deploy prints the identifier with no label and no flag beside it: neither accountFlag nor accountIdentifier sees it, and at 32 characters the 40-character rule does not either. Read in wrangler's own source (\"A request to the Cloudflare API (${resource}) failed.\"), not from a real failure. The project name after it is KEPT: it is the site, which is public."
+      },
+      {
         "expect": "token [removed: token] rejected",
         "input": "token qQb7Z_kL8mN3pR5tV9wX1yA2cD4eF6gH8jK0lM2n rejected",
         "why": "A run of exactly 40 token characters is the shape of a Cloudflare API token, and it goes wherever it appears, with or without a label. Exactly 40 - neither 39 nor 41 - so ordinary long words and identifiers are left alone."
