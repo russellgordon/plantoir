@@ -60,20 +60,21 @@ public class OutsideDoorTests : IDisposable
     {
         var sent = ClaudeCodeLauncher.Arguments(@"C:\Users\t\AppData\Local\Plantoir\assist\mcp-ICS3U.json",
                                                 ClaudeCodeLauncher.Greeting("ICS3U", name));
-        AssertArrives(StubExe(), sent, sent);
+        AssertArrives(StubExe(), sent, Cleaned(sent));
     }
 
-    /// <summary>The same through npm's <c>claude.cmd</c> shim: arrives unchanged but for a line break, which cmd cannot carry.</summary>
+    /// <summary>The same through npm's <c>claude.cmd</c> shim, BOTH shapes (the modern <c>%*</c> and the older one inside an <c>IF (…) ELSE (…)</c> block, where a <c>)</c> must be careted).</summary>
     [Theory]
     [MemberData(nameof(HostileNames))]
     public void TheClaudeDoorsGreetingArrivesWholeThroughAShim(string name)
     {
         var sent = ClaudeCodeLauncher.Arguments(@"C:\Users\t\AppData\Local\Plantoir\assist\mcp-ICS3U.json",
                                                 ClaudeCodeLauncher.Greeting("ICS3U", name));
-        AssertArrives(StubShim("claude.cmd"), sent, OnOneLine(sent));
+        AssertArrives(StubShim("claude.cmd"), sent, Cleaned(sent));
+        AssertArrives(StubShim("claude.cmd", oldShape: true), sent, Cleaned(sent));
     }
 
-    /// <summary>Fix with Claude…'s message, with the name in the course AND in the page names, to both stubs.</summary>
+    /// <summary>Fix with Claude…'s message, with the name in the course AND in the page names, to the exe and both shim shapes.</summary>
     [Theory]
     [MemberData(nameof(HostileNames))]
     public void TheFixMessageArrivesWhole(string name)
@@ -87,14 +88,15 @@ public class OutsideDoorTests : IDisposable
         Assert.DoesNotContain(";", message);
         Assert.DoesNotContain("\"", message);
         var sent = ClaudeCodeLauncher.Arguments(@"C:\cfg\mcp-ICS3U.json", message);
-        AssertArrives(StubExe(), sent, sent);
-        AssertArrives(StubShim("claude.cmd"), sent, OnOneLine(sent));
+        AssertArrives(StubExe(), sent, Cleaned(sent));
+        AssertArrives(StubShim("claude.cmd"), sent, Cleaned(sent));
+        AssertArrives(StubShim("claude.cmd", oldShape: true), sent, Cleaned(sent));
     }
 
     /// <summary>
     /// The Codex door: five TOML overrides and the message, the server's
     /// folder hostile as well, to a stub <c>codex.exe</c> and npm's
-    /// <c>codex.cmd</c>; the folder still reads back as a list of two.
+    /// <c>codex.cmd</c> in both shapes; the folder still reads back as a list of two.
     /// </summary>
     [Theory]
     [MemberData(nameof(HostileNames))]
@@ -102,9 +104,74 @@ public class OutsideDoorTests : IDisposable
     {
         string server = @"C:\Program Files\Plan ""toir"" & Co\plantoir-mcp.exe";
         var sent = CodexLauncher.Arguments(server, _folder + "\\", "-AP CALC- & ^(x)|y", ClaudeCodeLauncher.Greeting("ICS3U", name));
-        AssertArrives(StubExe(), sent, sent);
-        AssertArrives(StubShim("codex.cmd"), sent, OnOneLine(sent));
+        AssertArrives(StubExe(), sent, Cleaned(sent));
+        AssertArrives(StubShim("codex.cmd"), sent, Cleaned(sent));
+        AssertArrives(StubShim("codex.cmd", oldShape: true), sent, Cleaned(sent));
     }
+
+    /// <summary>
+    /// A NUL (U+0000) in the message runs NO second command through the shim.
+    /// Without <see cref="OutsideDoor.Clean"/> the NUL ends the command line at
+    /// CreateProcess, dropping the wrapper's closing quote, so <c>/s</c> strips
+    /// the message's opening quote and an <c>&amp;</c> the greeting carries runs
+    /// a second command. With the clean, the NUL is a space and the quotes
+    /// stay balanced. Must-fail: delete the C0 replacement in <c>Clean</c> and
+    /// the marker appears. The marker path has no space, so no quoting hides it.
+    /// </summary>
+    [Fact]
+    public void ANulInTheMessageRunsNoSecondCommandThroughTheShim()
+    {
+        string marker = Path.Combine(_scratch, "SECOND_COMMAND_RAN.txt");
+        // The greeting argument carries an unconditional operator, a redirect to
+        // the marker, then a NUL — the class the reviewer got a marker file
+        // from in 20 of 20 shim runs. The `&`/`>` are inside the argument's
+        // quotes, so ForCmd leaves them un-careted; only the NUL dropping the
+        // wrapper's close quote (without Clean) exposes them. The marker path
+        // has no space, so nothing re-quotes it. Built as the last argument,
+        // exactly where the greeting goes, so no surrounding `(` is in the way.
+        string message = "ok & echo ran> " + marker + " & rem\0tail";
+        var sent = ClaudeCodeLauncher.Arguments(@"C:\cfg\mcp-ICS3U.json", message);
+        foreach (bool old in new[] { false, true })
+        {
+            if (File.Exists(marker)) File.Delete(marker);
+            Run(OutsideDoor.StartInfo(StubShim("claude.cmd", oldShape: old), sent, _folder, keepOpen: false), allowNothing: true);
+            Assert.False(File.Exists(marker), $"a NUL let a second command run (old shape: {old})");
+        }
+    }
+
+    /// <summary>A NUL in any argument or the working folder is gone by the time it reaches <see cref="OutsideDoor.StartInfo"/>'s command line, for both shapes.</summary>
+    [Fact]
+    public void ANulNeverReachesTheCommandLine()
+    {
+        var info = OutsideDoor.StartInfo(@"C:\Program Files\x.exe", new[] { "a\0b", "c" }, "C:\\Teaching\0vault");
+        Assert.DoesNotContain('\0', info.Arguments);
+        Assert.DoesNotContain('\0', info.WorkingDirectory);
+        var shim = OutsideDoor.StartInfo(@"C:\npm\codex.cmd", new[] { "a\0b" }, "C:\\Teaching\0vault");
+        Assert.DoesNotContain('\0', shim.Arguments);
+        Assert.DoesNotContain('\0', shim.WorkingDirectory);
+        // And it round-trips as a space through a real start, both stubs.
+        var sent = new[] { "before\0after", "plain" };
+        AssertArrives(StubExe(), sent, Cleaned(sent));
+        AssertArrives(StubShim("codex.cmd"), sent, Cleaned(sent));
+    }
+
+    /// <summary>
+    /// An <c>.exe</c> that fails at once is a door that did NOT open:
+    /// <see cref="OutsideDoor.Start"/> watches briefly and returns false. One
+    /// that stays returns true. No window: these run with no shell and no
+    /// console.
+    /// </summary>
+    [Fact]
+    public void AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor()
+    {
+        Assert.False(OutsideDoor.Start(NoWindow("/c exit 1")));
+        Assert.True(OutsideDoor.Start(NoWindow("/c exit 0")));
+        // One that stays past the grace reads as open (it finishes on its own).
+        Assert.True(OutsideDoor.Start(NoWindow("/c ping -n 3 127.0.0.1 >nul"), TimeSpan.FromMilliseconds(250)));
+    }
+
+    private static ProcessStartInfo NoWindow(string arguments) =>
+        new(OutsideDoor.Cmd, arguments) { UseShellExecute = false, CreateNoWindow = true };
 
     /// <summary>
     /// The must-fail: 1.9.0's Claude door, as it joined its line when Windows
@@ -177,22 +244,39 @@ public class OutsideDoorTests : IDisposable
 
     private string StubExe() => StubProgramCollection.ProbeExe;
 
-    /// <summary>A shim in npm's cmd-shim shape, whose program is the probe: <c>%*</c> parsed by cmd a second time.</summary>
-    private string StubShim(string name)
+    /// <summary>
+    /// A shim in npm's cmd-shim shape, whose program is the probe: <c>%*</c> is
+    /// parsed by cmd a second time. The MODERN shape runs <c>%*</c> on the
+    /// final <c>endLocal &amp; … &amp; "%_prog%" … %*</c> line; the OLDER one
+    /// runs it INSIDE an <c>IF (…) ELSE (…)</c> block, where an un-careted
+    /// <c>)</c> in the arguments would close the block early — which is why the
+    /// caret set must hold <c>(</c> and <c>)</c>.
+    /// </summary>
+    private string StubShim(string name, bool oldShape = false)
     {
-        string folder = Directory.CreateDirectory(Path.Combine(_scratch, "npm")).FullName;
+        string folder = Directory.CreateDirectory(Path.Combine(_scratch, oldShape ? "npm-old" : "npm")).FullName;
         File.Copy(StubProgramCollection.ProbeExe, Path.Combine(folder, "node.exe"), overwrite: true);
         string shim = Path.Combine(folder, name);
-        File.WriteAllText(shim, string.Join("\r\n",
-            "@ECHO off", "GOTO start", ":find_dp0", "SET dp0=%~dp0", "EXIT /b", ":start", "SETLOCAL", "CALL :find_dp0", "",
-            "IF EXIST \"%dp0%\\node.exe\" (", "  SET \"_prog=%dp0%\\node.exe\"", ") ELSE (", "  SET \"_prog=node\"",
-            "  SET PATHEXT=%PATHEXT:;.JS;=;%", ")", "",
-            "endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"%dp0%\\node_modules\\cli.js\" %*", ""));
+        string text = oldShape
+            ? string.Join("\r\n",
+                "@IF EXIST \"%~dp0\\node.exe\" (",
+                "  \"%~dp0\\node.exe\"  \"%~dp0\\cli.js\" %*",
+                ") ELSE (",
+                "  @SETLOCAL",
+                "  @SET PATHEXT=%PATHEXT:;.JS;=;%",
+                "  node  \"%~dp0\\cli.js\" %*",
+                ")", "")
+            : string.Join("\r\n",
+                "@ECHO off", "GOTO start", ":find_dp0", "SET dp0=%~dp0", "EXIT /b", ":start", "SETLOCAL", "CALL :find_dp0", "",
+                "IF EXIST \"%dp0%\\node.exe\" (", "  SET \"_prog=%dp0%\\node.exe\"", ") ELSE (", "  SET \"_prog=node\"",
+                "  SET PATHEXT=%PATHEXT:;.JS;=;%", ")", "",
+                "endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\"  \"%dp0%\\cli.js\" %*", "");
+        File.WriteAllText(shim, text);
         return shim;
     }
 
-    private static IReadOnlyList<string> OnOneLine(IReadOnlyList<string> sent) =>
-        sent.Select(a => a.Replace("\r\n", " ").Replace('\n', ' ')).ToList();
+    /// <summary>What each argument is after <see cref="OutsideDoor.Clean"/> — the control characters that break a command line gone.</summary>
+    private static IReadOnlyList<string> Cleaned(IReadOnlyList<string> sent) => sent.Select(OutsideDoor.Clean).ToList();
 
     private void AssertArrives(string program, IReadOnlyList<string> sent, IReadOnlyList<string> expected)
     {
@@ -258,7 +342,13 @@ public sealed class StubProgramCollection
         string csc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                                   "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
         if (!File.Exists(csc)) throw new InvalidOperationException($"No C# compiler at {csc}; .NET Framework 4.8 is part of Windows 11.");
+        // Clean up any probe folders a crash before this left behind, and the
+        // one this run makes when the process ends — the stub compiler used to
+        // leave a plantoir-probe-* folder in %TEMP% per run.
+        foreach (string old in SafeEnumerate(Path.GetTempPath(), "plantoir-probe*"))
+            try { Directory.Delete(old, recursive: true); } catch { }
         string folder = Directory.CreateTempSubdirectory("plantoir-probe").FullName;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(folder, recursive: true); } catch { } };
         string source = Path.Combine(folder, "probe.cs"), exe = Path.Combine(folder, "probe.exe");
         File.WriteAllText(source, """
             using System; using System.IO; using System.Text;
@@ -279,5 +369,11 @@ public sealed class StubProgramCollection
         process.WaitForExit();
         if (!File.Exists(exe)) throw new InvalidOperationException("The stub did not compile: " + said);
         return exe;
+    }
+
+    private static IEnumerable<string> SafeEnumerate(string root, string pattern)
+    {
+        try { return Directory.EnumerateDirectories(root, pattern); }
+        catch { return Array.Empty<string>(); }
     }
 }

@@ -169,7 +169,12 @@ public static class ClaudeCodeLauncher
         catch { return false; }
 
         string prompt = greeting ?? Greeting(courseCode, courseName);
-        if (!OutsideDoor.Start(OutsideDoor.StartInfo(claude, Arguments(configPath, prompt), workspacePath)))
+        var arguments = Arguments(configPath, prompt);
+        // Refuse rather than start into a command line cmd will reject as too
+        // long and leave at a silent prompt — Revise With ▸'s plain greeting
+        // puts no cap on the course's name. No "assistant opened" line then.
+        if (!OutsideDoor.WithinCommandLineLimit(claude, arguments)) return false;
+        if (!OutsideDoor.Start(OutsideDoor.StartInfo(claude, arguments, workspacePath)))
             return false;
 
         // outsideAgents.agents[claude].trailLine (#210). This door shipped

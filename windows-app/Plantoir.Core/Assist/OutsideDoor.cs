@@ -72,30 +72,92 @@ public static class OutsideDoor
     public static ProcessStartInfo StartInfo(string program, IReadOnlyList<string> arguments, string folder,
                                              bool keepOpen = true)
     {
+        // EVERY argument and the working folder are cleaned of the control
+        // characters that break a command line BEFORE any quoting (Clean), so
+        // neither shape and neither start mode can be split by one. The
+        // program's own path is ours (FindClaude/FindCodex), never hostile
+        // input, so it is not touched.
+        var clean = new List<string>(arguments.Count);
+        foreach (string argument in arguments) clean.Add(Clean(argument));
+        string workingFolder = Clean(folder);
         if (IsBatch(program))
             return new ProcessStartInfo
             {
                 FileName = Cmd,
-                Arguments = CmdArguments(program, arguments, keepOpen),
-                WorkingDirectory = folder,
+                Arguments = CmdArguments(program, clean, keepOpen),
+                WorkingDirectory = workingFolder,
                 UseShellExecute = true,
             };
         return new ProcessStartInfo
         {
             FileName = program,
-            Arguments = CommandLine(arguments),
-            WorkingDirectory = folder,
+            Arguments = CommandLine(clean),
+            WorkingDirectory = workingFolder,
             UseShellExecute = true,
         };
     }
 
-    /// <summary>Starts it. False when nothing started, so the caller says <c>couldNotStart</c>.</summary>
-    public static bool Start(ProcessStartInfo info)
+    /// <summary>
+    /// Every C0 control but tab, and DEL, replaced with a space before any
+    /// quoting. A NUL (U+0000) is the dangerous one: CreateProcess and
+    /// ShellExecute both END the command line at it, which through the shim's
+    /// <c>/s /k "…"</c> wrapper drops the wrapper's closing quote, so
+    /// <c>/s</c> strips the message's OPENING quote instead and the tail runs
+    /// unquoted and uncareted (a second command). Through an <c>.exe</c> a NUL
+    /// only truncates, which is still wrong. A newline is cleaned here too, so
+    /// the old line-only handling is gone. **Left as they are:** C1 controls
+    /// (U+0080–U+009F), the line/paragraph separators U+2028/2029 and the
+    /// bidi overrides — none of them ends or splits a Windows command line
+    /// (measured 2026-11-12), and they are characters a name might carry; what
+    /// a control character does on a page, in the title or on the trail is a
+    /// separate matter (issue-control-characters-in-course-name, drafted).
+    /// </summary>
+    public static string Clean(string value)
+    {
+        var text = new StringBuilder(value.Length);
+        foreach (char c in value) text.Append((c < 0x20 && c != '\t') || c == 0x7F ? ' ' : c);
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Whether this door's whole command line, as <see cref="StartInfo"/> would
+    /// build it, is within cmd's limit in UTF-16 units
+    /// (<see cref="FixWithAssistant.CommandLineMaxUtf16"/>). Over it, the shim
+    /// path fails SILENTLY — cmd says the line is too long and leaves a prompt
+    /// — so a door refuses rather than start into that (Revise With ▸'s plain
+    /// greeting has no cap on the course's name; Fix with… drops rows to fit
+    /// through its own bound). Checked for both shapes so the behaviour does
+    /// not change when a teacher's <c>claude</c> is an <c>.exe</c> on one PC
+    /// and a <c>.cmd</c> on another.
+    /// </summary>
+    public static bool WithinCommandLineLimit(string program, IReadOnlyList<string> arguments) =>
+        LineLength(program, arguments) <= FixWithAssistant.CommandLineMaxUtf16;
+
+    /// <summary>
+    /// Starts it. False when nothing started, so the caller says
+    /// <c>couldNotStart</c>. For an <c>.exe</c> (never a shim, which is
+    /// <c>cmd /k</c> and stays), it also watches BRIEFLY: ShellExecute returns
+    /// success and the window closes before a teacher could read an error, so
+    /// a program gone within the grace with a non-zero code is reported as a
+    /// door that did NOT open. Rejected: a multi-second wait (it freezes the
+    /// click) and an off-thread watch (Open is synchronous and its result is
+    /// what shows the could-not-start sentence); a short synchronous grace
+    /// catches the common instant failure without a visible freeze.
+    /// </summary>
+    public static bool Start(ProcessStartInfo info, TimeSpan? watchFor = null)
     {
         try
         {
-            using var process = Process.Start(info);
-            return process is not null;
+            var process = Process.Start(info);
+            if (process is null) return false;
+            try
+            {
+                int grace = (int)(watchFor ?? TimeSpan.FromMilliseconds(400)).TotalMilliseconds;
+                if (process.WaitForExit(grace) && process.ExitCode != 0) { process.Dispose(); return false; }
+            }
+            catch { /* cannot watch it (no handle through the shell): assume it started */ }
+            process.Dispose();
+            return true;
         }
         catch { return false; }
     }

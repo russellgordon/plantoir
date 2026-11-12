@@ -1116,6 +1116,88 @@ and a double quote. The stub `.exe` is compiled at test time with the C#
 compiler .NET Framework 4.8 puts on every Windows 11, so no project was added
 to the solution for it.
 
+**Control characters are cleaned before any quoting** (`OutsideDoor.Clean`,
+the security review's finding 1). Every C0 control but tab, and DEL, becomes a
+space in every argument AND the working folder, in both shapes and both start
+modes. The one that mattered is the NUL (U+0000): CreateProcess and
+ShellExecute both END the command line at it, so through the shim's
+`/s /k "…"` wrapper the NUL dropped the wrapper's closing quote, `/s` then
+stripped the message's OPENING quote instead, and an `&` the message carried
+— left un-careted by `ForCmd` because it sat inside the message's quotes —
+ran a second command (the reviewer got a marker file in 20 of 20 shim runs;
+`OutsideDoorTests.ANulInTheMessageRunsNoSecondCommandThroughTheShim` is the
+must-fail). Through an `.exe` a NUL only truncated. A course name is read from
+`course_config.json` by Newtonsoft, which keeps `\u0000`, and nothing in Core
+sanitised it. **Left as they are:** C1 controls (U+0080–U+009F), the
+line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
+splits a command line (measured) and they are characters a name might carry.
+Whether a control character belongs in a course name at all — it also reaches
+the sidebar, the title and the trail — is the follow-up
+`issue-control-characters-in-course-name`, not this piece.
+
+**The caret set includes `(` and `)`**, and an OLD npm shim shape proves it:
+`cmd-shim`'s older form runs `%*` INSIDE an `IF (…) ELSE (…)` block, where an
+un-careted `)` in the arguments closes the block early. `OutsideDoorTests`
+runs the hostile set through both the modern shape (where `%*` is on the final
+`endLocal & … & "%_prog%" … %*` line) and the old one; removing `(` and `)`
+from the caret set turns the old-shape cases red (18 of them, measured), while
+the modern ones stay green — which is why the parens needed a shape that
+exercises them.
+
+**Over cmd's 8,191-character command line, a door refuses rather than start.**
+The shim path fails there silently — cmd says the line is too long and leaves
+a prompt — so `OutsideDoor.WithinCommandLineLimit`, checked for both shapes,
+makes the door's `Open` return false before starting, and no "assistant
+opened" line is written. Revise With ▸'s plain greeting has no cap on the
+course's name, which is what can reach the limit; Fix with… stays under it by
+dropping rows through its own bound. The teacher sees the door's own
+"couldn't start" sentence, the same as any other failure to start.
+
+### What a teacher sees in place of Windows Terminal (#736)
+
+Since neither door puts `wt.exe` in front, what opens is whatever Windows
+starts for the program:
+
+- **An `.exe` door** (`claude.exe`, `codex.exe` — the common case) is launched
+  with ShellExecute, which gives a console program its own window. On Windows
+  11, where Windows Terminal is the default terminal, that window IS Windows
+  Terminal; on a PC set to the classic console, it is a console window. Either
+  way its title is the program's, and **it closes when the session ends** —
+  the one change a returning teacher may notice, since the old `cmd /k` left a
+  prompt behind after Claude exited.
+- **A shim door** (`claude.cmd`, `codex.cmd`) opens through `cmd /v:off /s /k`,
+  so cmd stays at a prompt after the session, as before.
+- **A door that fails to start is now honest.** On the `.exe` path ShellExecute
+  returns success and the window closes before a teacher could read an error,
+  so `OutsideDoor.Start` watches the process for a short grace (≈400 ms) and,
+  if it has exited non-zero by then, reports the door as NOT opened: the
+  could-not-start sentence shows and no "assistant opened" line is written.
+  A program that stays open past the grace reads as opened. **Rejected:** a
+  multi-second wait (it freezes the click for every successful open) and an
+  off-thread watch (the result has to come back synchronously to drive the
+  sentence). Measured: a stub exiting 1 at once is caught; one that stays is
+  not (`OutsideDoorTests.AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor`).
+
+**A known limit (npm's shim `node` fallback, unchanged from 1.9.0).** When
+`claude.cmd`/`codex.cmd` cannot find its bundled `node.exe` it falls back to
+bare `node`, which cmd resolves against the current directory before PATH — and
+the door opens AT the teacher's working folder. A `node.exe` dropped into that
+folder could run instead of the real Node. It is npm's shim, not Plantoir's
+code; the smallest fix would be to open the door with a neutral working
+directory and name the folder another way, but both doors are meant to open at
+the working folder (the skills and guidance are there), so that is a product
+decision rather than a one-line change. Recorded here, and in the security
+draft, as a known limit.
+
+**"Open in Terminal" takes its folder as an argument, not spliced into a
+command** (same review, finding 5): `OutsideTerminal` (Core) returns the launch
+as data — `wt.exe` with the folder as `-d`'s own argument, the classic-console
+fallback with the folder as the start info's working directory and no
+`-Command`. The old fallback ran `powershell -Command "Set-Location '{path}'"`,
+which a `'` in a course's name broke out of, and `wt -d "{path}"` split at a
+`;`. `OutsideTerminalTests` pins it for a folder named with `'`, `;`, `&` and a
+trailing `\`.
+
 ---
 
 ## Scheduled deploys

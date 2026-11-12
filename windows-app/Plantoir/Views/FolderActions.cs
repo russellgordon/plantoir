@@ -28,22 +28,35 @@ public static class FolderActions
         catch { }
     }
 
-    /// <summary>Windows Terminal at the folder; classic console as fallback.</summary>
+    /// <summary>
+    /// Windows Terminal at the folder; classic console as fallback. The folder
+    /// is a course's path on disk — a teacher may name a course with a <c>'</c>,
+    /// <c>;</c>, <c>&amp;</c> or a trailing <c>\</c> — so it goes as an ARGUMENT,
+    /// never spliced into a string. <c>wt.exe</c>'s <c>-d</c> takes it through
+    /// <c>ArgumentList</c> (which splits at <c>;</c> if the folder is joined
+    /// into the string), and the fallback uses the start info's own
+    /// <c>WorkingDirectory</c> with no <c>-Command</c> at all, so there is no
+    /// script for a <c>'</c> to break out of.
+    /// </summary>
     public static void OpenTerminal(string path)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo("wt.exe", $"-d \"{path}\"") { UseShellExecute = false });
-        }
+        try { Process.Start(StartInfoFor(Plantoir.Core.Models.OutsideTerminal.WindowsTerminal(path))); }
         catch
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo("powershell.exe", $"-NoExit -Command \"Set-Location '{path}'\"")
-                { UseShellExecute = true });
-            }
+            try { Process.Start(StartInfoFor(Plantoir.Core.Models.OutsideTerminal.Fallback(path))); }
             catch { }
         }
+    }
+
+    private static ProcessStartInfo StartInfoFor(Plantoir.Core.Models.OutsideTerminal.Launch launch)
+    {
+        var info = new ProcessStartInfo(launch.File)
+        {
+            UseShellExecute = launch.UseShellExecute,
+            WorkingDirectory = launch.WorkingDirectory,
+        };
+        foreach (string argument in launch.Arguments) info.ArgumentList.Add(argument);
+        return info;
     }
 
     // ---- Obsidian --------------------------------------------------------

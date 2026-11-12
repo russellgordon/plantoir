@@ -89,6 +89,9 @@ public static class CodexLauncher
 
         var arguments = Arguments(server, workspacePath, courseCode,
                                   greeting ?? ClaudeCodeLauncher.Greeting(courseCode, courseName));
+        // Refuse rather than start into a command line cmd rejects as too long
+        // and leaves at a silent prompt. No "assistant opened" line then.
+        if (!OutsideDoor.WithinCommandLineLimit(codex, arguments)) return false;
         if (!OutsideDoor.Start(OutsideDoor.StartInfo(codex, arguments, workspacePath))) return false;
 
         // outsideAgents.agents[codex].trailLine. A course-wide door carries
