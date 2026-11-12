@@ -151,12 +151,17 @@ nonisolated enum ClaudeCodeLauncher {
     /// - Parameter greeting: the opening message, when it is not the plain
     ///   one — Fix with Claude… (#717) hands over the problems a teacher
     ///   ticked (`FixWithAssistant`). Nil sends `greeting(courseCode:…)`.
+    /// - Parameter unitPlans: the course's unit plans, read at the click
+    ///   (`UnitPlans.toMention(for:)`), on the Revise door only. Nil says
+    ///   nothing about unit planning: Fix with Claude… passes none, and its
+    ///   own message replaces the greeting anyway (#707, ruling 4).
     @discardableResult
     static func open(
         workspacePath: String,
         courseCode: String,
         courseName: String,
         referenceCourses: [String] = [],
+        unitPlans: UnitPlans.Reading? = nil,
         greeting openingMessage: String? = nil
     ) -> Bool {
         guard let claude: String = findClaude(),
@@ -173,6 +178,7 @@ nonisolated enum ClaudeCodeLauncher {
                 claudePath: claude,
                 serverPath: server,
                 referenceCourses: referenceCourses,
+                unitPlans: unitPlans,
                 greeting: openingMessage
             )
         } catch {
@@ -194,6 +200,7 @@ nonisolated enum ClaudeCodeLauncher {
         claudePath: String,
         serverPath: String,
         referenceCourses: [String] = [],
+        unitPlans: UnitPlans.Reading? = nil,
         greeting openingMessage: String? = nil
     ) throws -> String {
         let configPath: String = try writeConfig(
@@ -201,10 +208,13 @@ nonisolated enum ClaudeCodeLauncher {
         )
 
         var prompt: String = greeting(
-            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
+            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses,
+            unitPlans: unitPlans?.plans
         )
+        var said: UnitPlans.Reading? = unitPlans
         if let openingMessage {
             prompt = openingMessage.replacingOccurrences(of: "\"", with: "'")
+            said = nil
         }
 
         let scriptPath: String = try writeLauncherScript(
@@ -215,7 +225,7 @@ nonisolated enum ClaudeCodeLauncher {
             prompt: prompt
         )
 
-        ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode))
+        ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode, unitPlans: said))
 
         return scriptPath
     }
@@ -229,6 +239,18 @@ nonisolated enum ClaudeCodeLauncher {
     /// The line the trail carries. It names WHICH assistant was started.
     static func trailSentence(courseCode: String) -> String {
         return "started Claude Code for \(courseCode)"
+    }
+
+    /// The same line, with what the greeting said about unit planning when
+    /// it said anything (#707): `UnitPlans.trailClause`, on a Revise door
+    /// only. A report of "the assistant started talking about planning"
+    /// starts here.
+    static func trailSentence(courseCode: String, unitPlans: UnitPlans.Reading?) -> String {
+        var line: String = trailSentence(courseCode: courseCode)
+        if let unitPlans {
+            line += UnitPlans.trailClause(unitPlans)
+        }
+        return line
     }
 
     /// The sentence that asks the session to read the teacher's How I Teach
@@ -252,10 +274,16 @@ nonisolated enum ClaudeCodeLauncher {
     ///   SAME code as this one, each as "ICS3U-2025 (2025–26)". Empty for the
     ///   overwhelming majority of courses, and then the greeting is the same
     ///   paragraph for every course, with no sentence about them.
+    /// - Parameter unitPlans: the course's unit plans (#707), or nil to say
+    ///   nothing about planning. An empty list is a course with no plan yet,
+    ///   and gets `UnitPlans.noneSentence` (Russell, 2026-11-12: every
+    ///   session, until a plan exists); a list names them. The sentence goes
+    ///   LAST, so the opening instructions keep their order.
     static func greeting(
         courseCode: String,
         courseName: String,
-        referenceCourses: [String] = []
+        referenceCourses: [String] = [],
+        unitPlans: [UnitPlans.Plan]? = nil
     ) -> String {
         var text: String = "I'm a teacher working on \(courseCode)"
         let trimmedName: String = courseName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -283,6 +311,9 @@ nonisolated enum ClaudeCodeLauncher {
             text.append(" I also keep earlier \(courseCode) courses for reference: \(listed). ")
             text.append("You can read them and build on what is there; they are never deployed, ")
             text.append("and nothing in them can be changed.")
+        }
+        if let unitPlans {
+            text.append(" " + UnitPlans.greetingSentence(unitPlans, courseCode: courseCode))
         }
         return text.replacingOccurrences(of: "\"", with: "'")
     }

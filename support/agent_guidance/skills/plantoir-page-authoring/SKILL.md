@@ -650,6 +650,9 @@ enableToc: false
   replaced; another section's date is never touched.
 - Add new class pages with Plantoir (or the assistant in it), which numbers
   them and moves later ones along; do not renumber class pages by hand.
+- A unit planned with the `plantoir-unit-planning` skill becomes class
+  pages one day at a time, when the teacher asks for that day: add the
+  class with the plan tools, then write its pages here.
 
 ## 21. Key Links
 
@@ -681,9 +684,10 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   pages share the name.
 - Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
   Course Settings write it), or anything in a folder whose name starts with
-  a dot. (The one exception is `plantoir-handouts`' own
+  a dot. (The two exceptions are `plantoir-handouts`' own
   `.internal/handouts/handouts.json`, the folder where a course's handouts
-  are kept.)
+  are kept, and `plantoir-unit-planning`'s `.internal/planning/`, where a
+  course's unit plans are kept.)
 
 ## 23. Check it
 

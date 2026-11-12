@@ -1,0 +1,58 @@
+
+/* Layout: a dated calendar table first (date column, one column per block), then the lesson recipes it refers to, then the open decisions. */
+:root{
+  --bg:#f7f6f2; --fg:#1f2a2e; --muted:#5c6a70; --rule:#d9d6cc; --panel:#ffffff;
+  --accent:#0f5f6b; --accent-soft:#dcecee; --assess:#8a4b0a; --assess-soft:#f6e6cf;
+  --capstone:#4a3a7a; --capstone-soft:#e6e0f4; --off:#ebe9e2;
+  --display:"IBM Plex Serif",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15191b; --fg:#e8e6df; --muted:#9aa6ab; --rule:#2f3639; --panel:#1d2326;
+  --accent:#5fc0cc; --accent-soft:#143a40; --assess:#f0b56a; --assess-soft:#3d2a12;
+  --capstone:#b7a6ec; --capstone-soft:#2d2546; --off:#1a1f21; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15191b; --fg:#e8e6df; --muted:#9aa6ab; --rule:#2f3639; --panel:#1d2326;
+  --accent:#5fc0cc; --accent-soft:#143a40; --assess:#f0b56a; --assess-soft:#3d2a12;
+  --capstone:#b7a6ec; --capstone-soft:#2d2546; --off:#1a1f21; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+main{max-width:1040px;margin:0 auto;display:grid;gap:40px}
+h1{font-family:var(--display);font-weight:600;font-size:2rem;line-height:1.15;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:1.35rem;margin:0 0 12px;text-wrap:balance}
+h3{font-size:1rem;font-weight:600;margin:0}
+p{margin:0;max-width:68ch}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+header{display:grid;gap:10px}
+.lede{color:var(--muted);max-width:70ch}
+.facts{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:.9rem;color:var(--muted)}
+.facts b{color:var(--fg);font-weight:500}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.85rem;color:var(--muted);align-items:center}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.78rem;font-weight:500;line-height:1.5;white-space:nowrap}
+.chip.lesson{background:var(--accent-soft);color:var(--accent)}
+.chip.assess{background:var(--assess-soft);color:var(--assess)}
+.chip.capstone{background:var(--capstone-soft);color:var(--capstone)}
+.chip.off{background:var(--off);color:var(--muted)}
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
+th,td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--rule)}
+th{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--panel);position:sticky;top:0}
+td.date{font-family:var(--mono);font-size:.82rem;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
+td.date b{color:var(--fg);font-weight:500}
+td .day{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-right:6px}
+td.none{color:var(--muted);font-style:italic}
+td a{color:inherit;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:2px}
+tr.break td{background:var(--off);color:var(--muted);font-style:italic}
+.wed{font-size:.72rem;color:var(--muted)}
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;display:grid;gap:8px;min-width:0}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.card .src{font-size:.78rem;color:var(--muted)}
+.acts{display:grid;gap:6px;font-size:.88rem}
+.acts div{display:grid;grid-template-columns:5.2em 1fr;gap:8px}
+.acts span{color:var(--muted);font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;padding-top:3px}
+.card.assess{border-color:var(--assess)}
+.card.capstone{border-color:var(--capstone)}
+ul{margin:0;padding-left:1.2em;display:grid;gap:6px;max-width:72ch}
+.cols{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+@media (max-width:480px){.acts div{grid-template-columns:1fr}}
+.ok{display:inline-block;margin-left:.4em;font-size:.9em;color:#1f7a3a;font-weight:700}

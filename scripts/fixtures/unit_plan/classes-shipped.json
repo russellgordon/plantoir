@@ -1,0 +1,59 @@
+{
+  "rule": "Every class each stylesheet defined in a release that shipped it. A later release may ADD rules at the end of a sheet; it never removes or renames one, so a plan written against an older template keeps its look (contracts/shared-rules.json -> unitPlanning.appendOnly). Add a release's list when it ships; never edit an earlier one.",
+  "releases": {
+    "1.10.0": {
+      "plan.css": [
+        "acts",
+        "assess",
+        "break",
+        "capstone",
+        "card",
+        "cards",
+        "chip",
+        "cols",
+        "date",
+        "day",
+        "eyebrow",
+        "facts",
+        "lede",
+        "legend",
+        "lesson",
+        "none",
+        "off",
+        "ok",
+        "src",
+        "tablewrap",
+        "top",
+        "wed"
+      ],
+      "correlation.css": [
+        "assess",
+        "bar",
+        "barcell",
+        "break",
+        "call",
+        "capstone",
+        "chip",
+        "code",
+        "cols",
+        "eyebrow",
+        "facts",
+        "group",
+        "lede",
+        "legend",
+        "lesson",
+        "none",
+        "note",
+        "num",
+        "off",
+        "q",
+        "reading",
+        "sec",
+        "tablewrap",
+        "total",
+        "wording",
+        "zero"
+      ]
+    }
+  }
+}

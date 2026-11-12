@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Test Curriculum Correlation</title>
+<link rel="stylesheet" href="../assets/correlation.css">
+</head>
+<body style="margin:0">
+<!--
+  TEMPLATE for one unit's curriculum correlation page, from the
+  plantoir-unit-planning skill. Copy this file into
+  courses/<CODE>/.internal/planning/<unit-slug>/correlation.html beside the
+  unit's index.html, and replace everything below.
+
+  Every expectation code and wording here is INVENTED. On a real page each
+  code and its wording is copied exactly from list_curriculum_expectations,
+  and every mark from the test as written. Each "Share" column totals exactly
+  100.0%; a total that does not is a mistake to fix, never to print.
+
+  The look comes from ../assets/correlation.css. Use only the classes it
+  defines; add no <style> block and no rule of your own.
+
+  The order of the page is fixed: question by question, marks by expectation,
+  concept emphasis, then the gaps.
+-->
+<main>
+<header>
+  <div class="eyebrow">SNC2D · Unit 3 · Draft check, February 1, 2027</div>
+  <h1>Test Curriculum Correlation</h1>
+  <p class="lede">How the Chemical Reactions test lines up with the strand's expectations, question by question.</p>
+  <div class="facts">
+    <span><b>Questions</b> 6</span>
+    <span><b>Marks</b> 20</span>
+    <span><b>Overall expectations</b> 2</span>
+    <span><b>Specific expectations</b> 6, of which 5 are assessed</span>
+  </div>
+  <p class="note">Every code and wording on this page is an example, to be replaced by the curriculum's own.</p>
+  <div class="legend">
+    <span class="chip lesson">A1.1</span> main expectation
+    <span class="code sec">also A1.2</span> also touched
+    <span class="chip assess">Not assessed</span> not on the test
+  </div>
+  <p class="lede"><a href="index.html">Back to the unit plan</a></p>
+</header>
+
+<section>
+  <h2>1. Question by question</h2>
+  <!--
+    PATTERN: one tr.group row per category, then one row per question. The
+    last row is tr.total, its marks the sum of the column above.
+  -->
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Q</th><th>Cat.</th><th class="num">Marks</th><th>What it asks</th><th>Specific expectations</th><th>Overall</th><th>Fit note</th></tr></thead>
+    <tbody>
+      <tr class="group"><td colspan="7">Knowledge</td></tr>
+      <tr><td class="q">1</td><td>K</td><td class="num">3</td><td>Name the sign of a chemical change in three descriptions</td><td><span class="chip lesson">A1.1</span></td><td class="code">A1</td><td class="note">Direct</td></tr>
+      <tr><td class="q">2</td><td>K</td><td class="num">3</td><td>Write a word equation as a skeleton equation</td><td><span class="chip lesson">A1.2</span> <span class="code sec">also A2.1</span></td><td class="code">A1</td><td class="note">Direct</td></tr>
+      <tr class="group"><td colspan="7">Application</td></tr>
+      <tr><td class="q">3</td><td>A</td><td class="num">4</td><td>Balance four equations</td><td><span class="chip lesson">A2.1</span></td><td class="code">A2</td><td class="note">Direct</td></tr>
+      <tr><td class="q">4</td><td>A</td><td class="num">4</td><td>Classify four reactions by type</td><td><span class="chip lesson">A2.2</span></td><td class="code">A2</td><td class="note">Direct</td></tr>
+      <tr class="group"><td colspan="7">Thinking</td></tr>
+      <tr><td class="q">5</td><td>T</td><td class="num">3</td><td>Find the mistake in a balanced equation</td><td><span class="chip lesson">A2.1</span></td><td class="code">A2</td><td class="note">Reasoning</td></tr>
+      <tr><td class="q">6</td><td>T</td><td class="num">3</td><td>Predict the products of a displacement reaction</td><td><span class="chip lesson">A2.3</span> <span class="code sec">also A2.2</span></td><td class="code">A2</td><td class="note">Reasoning</td></tr>
+      <tr class="total"><td colspan="2">Total</td><td class="num">20</td><td colspan="4" class="note">Six questions</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>2. Marks by expectation</h2>
+  <p class="note">Each question's marks are credited to its main expectation only, so each table totals the test.</p>
+  <h3>By overall expectation</h3>
+  <!-- PATTERN: a bar is div.bar in td.barcell, its width the row's share. -->
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Overall</th><th>Specifics in it</th><th class="num">Marks</th><th class="num">Share</th><th class="barcell">Of 20</th><th>Questions</th></tr></thead>
+    <tbody>
+      <tr><td class="code">A1</td><td class="note">A1.1, A1.2, A1.3</td><td class="num">6</td><td class="num">30.0%</td><td class="barcell"><div class="bar" style="width:30%"></div></td><td>1, 2</td></tr>
+      <tr><td class="code">A2</td><td class="note">A2.1, A2.2, A2.3</td><td class="num">14</td><td class="num">70.0%</td><td class="barcell"><div class="bar" style="width:70%"></div></td><td>3, 4, 5, 6</td></tr>
+      <tr class="total"><td colspan="2">Total</td><td class="num">20</td><td class="num">100.0%</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>By specific expectation</h3>
+  <!-- PATTERN: an expectation the test does not assess is tr.zero, with the chip span.chip.assess "Not assessed". -->
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Code and wording</th><th class="num">Marks</th><th class="num">Share</th><th>Questions credited</th><th>Also touched</th></tr></thead>
+    <tbody>
+      <tr><td><span class="code">A1.1</span><span class="wording">Example wording: identify the signs that a chemical change has taken place.</span></td><td class="num">3</td><td class="num">15.0%</td><td>1</td><td></td></tr>
+      <tr><td><span class="code">A1.2</span><span class="wording">Example wording: write word and skeleton equations for simple reactions.</span></td><td class="num">3</td><td class="num">15.0%</td><td>2</td><td></td></tr>
+      <tr class="zero"><td><span class="code">A1.3</span><span class="wording">Example wording: describe how a chemical change is used in everyday life.</span></td><td class="num">0</td><td class="num">0.0%</td><td><span class="chip assess">Not assessed</span></td><td class="note">The showcase</td></tr>
+      <tr><td><span class="code">A2.1</span><span class="wording">Example wording: balance chemical equations using the law of conservation of mass.</span></td><td class="num">7</td><td class="num">35.0%</td><td>3, 5</td><td class="note">2</td></tr>
+      <tr><td><span class="code">A2.2</span><span class="wording">Example wording: classify reactions as synthesis, decomposition or displacement.</span></td><td class="num">4</td><td class="num">20.0%</td><td>4</td><td class="note">6</td></tr>
+      <tr><td><span class="code">A2.3</span><span class="wording">Example wording: predict the products of a displacement reaction.</span></td><td class="num">3</td><td class="num">15.0%</td><td>6</td><td></td></tr>
+      <tr class="total"><td>Total</td><td class="num">20</td><td class="num">100.0%</td><td colspan="2" class="note">Five of six assessed</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>3. Concept emphasis</h2>
+  <p class="note">The bars share one scale: the longest is the concept with the most marks.</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Concept</th><th class="num">Marks</th><th class="num">Share</th><th class="barcell">Weight</th><th>Questions</th></tr></thead>
+    <tbody>
+      <tr><td>Balancing equations</td><td class="num">7</td><td class="num">35.0%</td><td class="barcell"><div class="bar" style="width:100%"></div></td><td>3, 5</td></tr>
+      <tr><td>Types of reactions</td><td class="num">7</td><td class="num">35.0%</td><td class="barcell"><div class="bar" style="width:100%"></div></td><td>4, 6</td></tr>
+      <tr><td>Signs of a chemical change</td><td class="num">3</td><td class="num">15.0%</td><td class="barcell"><div class="bar" style="width:42.9%"></div></td><td>1</td></tr>
+      <tr><td>Writing equations</td><td class="num">3</td><td class="num">15.0%</td><td class="barcell"><div class="bar" style="width:42.9%"></div></td><td>2</td></tr>
+      <tr class="total"><td>Total</td><td class="num">20</td><td class="num">100.0%</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Each question is counted under one concept.</p>
+
+  <!-- PATTERN: div.reading holds the paragraphs that read the numbers; div.call is the one point left for the teacher to decide. -->
+  <div class="reading">
+    <h3>What the numbers show</h3>
+    <p><b>Balancing and classifying carry the test.</b> Together they are 70.0% of the marks, as they are most of the lessons.</p>
+    <p><b>Every lesson that teaches something new is assessed.</b> The showcase is meant to sit outside the test.</p>
+    <div class="call">
+      <div class="eyebrow">For the teacher to judge</div>
+      <p>A1.3 is not assessed. Is the showcase enough evidence for it, or should a short question cover it?</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>4. Gaps</h2>
+  <div class="cols">
+    <div class="reading">
+      <h3>In the strand, not on the test</h3>
+      <ul>
+        <li><b>Everyday uses</b> <span class="code">A1.3</span>, covered by the showcase only.</li>
+      </ul>
+    </div>
+    <div class="reading">
+      <h3>On the test, not in the plan</h3>
+      <p>Nothing: every question practises a lesson in the plan.</p>
+      <p class="note">Checked against the lesson cards on the unit plan.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+</body>
+</html>

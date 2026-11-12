@@ -47,3 +47,10 @@ matches the task before writing:
   (`.claude/skills/plantoir-quizzes/SKILL.md`) - the ` > [!quiz] ` callout
   for every kind, how answers are checked, shuffling, and graphs and code
   inside questions.
+- **Planning a unit** - "plan the next unit", a thread or a module, a
+  calendar across my sections, a colleague teaching the same unit on other
+  dates, lesson cards, assessment drafts, a curriculum correlation, or
+  seeing, changing or adopting a unit plan: the `plantoir-unit-planning`
+  skill (`.claude/skills/plantoir-unit-planning/SKILL.md`). The plan lives
+  in `courses/<CODE>/.internal/planning/`, never in the course's pages, and
+  nothing is built until the teacher says to.
