@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -145,9 +144,21 @@ public static class ClaudeCodeLauncher
     /// <summary>
     /// Open a session for one course. Returns false when it could not be
     /// started, so the caller can say so rather than leaving a teacher looking
-    /// at nothing.
+    /// at nothing. <paramref name="greeting"/> is Fix with Claude…'s message
+    /// (#736, <see cref="FixWithAssistant"/>); null is Revise With ▸'s plain
+    /// <see cref="Greeting"/>.
     /// </summary>
-    public static bool Open(string workspacePath, string courseCode, string courseName)
+    /// <remarks>
+    /// Started by <see cref="OutsideDoor.StartInfo"/>: <c>claude.exe</c>
+    /// directly, by argument vector, with no command interpreter and no
+    /// Windows Terminal in front; npm's <c>claude.cmd</c> through
+    /// <c>cmd /v:off /s /k</c>. Until 1.9.3 this door joined
+    /// <c>wt.exe -d … cmd /k "claude" … "greeting"</c> by hand, and cmd's quote
+    /// rule left the greeting — the course's name in it — outside quotes, so
+    /// cmd read it as part of the command (documentation/12-windows-app.md →
+    /// "What the outside doors hand to Windows, and how").
+    /// </remarks>
+    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null)
     {
         string? claude = FindClaude();
         string? server = FindServer();
@@ -157,30 +168,9 @@ public static class ClaudeCodeLauncher
         try { configPath = WriteConfig(workspacePath, courseCode, server); }
         catch { return false; }
 
-        string prompt = Greeting(courseCode, courseName);
-        var arguments = Arguments(configPath, prompt);
-        string command =
-            $"\"{claude}\" {arguments[0]} \"{arguments[1]}\" {arguments[2]} \"{arguments[3]}\"";
-
-        // Windows Terminal when it is there, because a teacher will be reading
-        // this for a while; the classic console otherwise.
-        var info = new ProcessStartInfo { UseShellExecute = true, WorkingDirectory = workspacePath };
-        if (OnPath("wt.exe") is not null)
-        {
-            info.FileName = "wt.exe";
-            info.Arguments = $"-d \"{workspacePath}\" cmd /k {command}";
-        }
-        else
-        {
-            info.FileName = "cmd.exe";
-            info.Arguments = $"/k {command}";
-        }
-
-        try
-        {
-            if (Process.Start(info) is null) return false;
-        }
-        catch { return false; }
+        string prompt = greeting ?? Greeting(courseCode, courseName);
+        if (!OutsideDoor.Start(OutsideDoor.StartInfo(claude, Arguments(configPath, prompt), workspacePath)))
+            return false;
 
         // outsideAgents.agents[claude].trailLine (#210). This door shipped
         // writing NOTHING on the trail, so a teacher who handed a course to
@@ -192,11 +182,22 @@ public static class ClaudeCodeLauncher
     }
 
     /// <summary>
-    /// The opening message. It names the course and points at the plan tools,
-    /// because the safety of every write here depends on a plan being shown to
-    /// the teacher first — and an assistant that starts by reading is far more
-    /// useful than one that starts by asking what to do.
+    /// Whether a message would keep this door's whole command line under
+    /// cmd's 8,191 UTF-16 units (<c>fixWith.charactersAre</c>), with this PC's
+    /// real <c>claude</c> and the configuration's real path; null when the door
+    /// is not here.
     /// </summary>
+    public static Func<string, bool>? Fits(string courseCode)
+    {
+        if (FindClaude() is not { } claude) return null;
+        string config = ConfigPath(courseCode);
+        return message => OutsideDoor.LineLength(claude, Arguments(config, message)) <= FixWithAssistant.CommandLineMaxUtf16;
+    }
+
+    /// <summary>Where <see cref="WriteConfig"/> writes a course's connection.</summary>
+    internal static string ConfigPath(string courseCode) =>
+        Path.Combine(Plantoir.Core.Models.AppDataRoot.Combine("assist"), $"mcp-{courseCode}.json");
+
     /// <summary>
     /// The argv after <c>claude</c>, as <c>outsideAgents.agents[claude].arguments</c>
     /// states it — what <see cref="Open"/> passes, and what the contract reader
@@ -209,6 +210,12 @@ public static class ClaudeCodeLauncher
     internal const string HowITeachSentence =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
 
+    /// <summary>
+    /// The opening message. It names the course and points at the plan tools,
+    /// because the safety of every write here depends on a plan being shown to
+    /// the teacher first — and an assistant that starts by reading is far more
+    /// useful than one that starts by asking what to do.
+    /// </summary>
     internal static string Greeting(string courseCode, string courseName)
     {
         var text = new StringBuilder();
@@ -242,7 +249,7 @@ public static class ClaudeCodeLauncher
         // Still named after the course (writesForTheConnection: mcp-{course}.json)
         // so two doors opened seconds apart cannot overwrite each other's file
         // mid-launch — although what it says no longer depends on the course.
-        string path = Path.Combine(directory, $"mcp-{courseCode}.json");
+        string path = ConfigPath(courseCode);
         File.WriteAllText(path, ConfigText(workspacePath, server, courseCode));
         return path;
     }

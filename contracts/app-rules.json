@@ -2852,6 +2852,8 @@
       "where" : "Under the table on the section's Problems tab, Claude's first.",
       "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
       "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
+      "notEnabledHelp" : "Tick a problem this section still has to hand it over.",
+      "notEnabledHelpWhy" : "Proposed from Windows with #736 (2026-11-11): while the buttons cannot be pressed, Windows gives each this as its help text, which Narrator reads with the button, because a greyed button alone tells somebody who cannot see it nothing about why. The mac owes the same sentence as the buttons' accessibility hint while they are disabled.",
       "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
       "atTheClick" : "The same refusal Revise With ▸ makes at the click (a Claude or Codex session already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
       "opensAt" : "The working folder, as both doors always do: that is where the skills and the guidance are. The message names each page by its place from there, courses/<COURSE>/<page>.md.",

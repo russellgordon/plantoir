@@ -168,9 +168,8 @@ internal static class NamedGapLedger
     // Two held open by #734 on 2026-11-11, for the Windows 1.9.3 catch-up:
     // each is a later piece of the same release, so each goes when that piece
     // lands (and this test fails, saying so, the moment its event exists).
-
-    private const string FixWithAnAssistant =
-        "Fix with Claude… and Fix with Codex… on the Problems tab are #736's, the piece after #734 (the tab it hands rows from); its line is written by the buttons it adds.";
+    // #736's ("asked an assistant to fix problems") went the same day, with
+    // the Fix with… buttons that write it.
 
     private const string CloudflareAccountIdRefusal =
         "The Deploy button's refusal for a missing or broken Cloudflare Account ID is #739's (item 6); its line is written by that refusal, which #739 adds.";
@@ -180,8 +179,8 @@ internal static class NamedGapLedger
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
         // landed with batch 6; #581's four (Obsidian's add-ons for diagrams
-        // and graphs) with #581. "problems changed" landed with #734.
-        Owed(ActivityTrailEvents, 736, V193, FixWithAnAssistant, "asked an assistant to fix problems"),
+        // and graphs) with #581. "problems changed" landed with #734, "asked
+        // an assistant to fix problems" with #736.
         Owed(ActivityTrailEvents, 739, V193, CloudflareAccountIdRefusal, "deploy refused for the Cloudflare Account ID"),
 
         // ---- specialNames.platformWording.keys
