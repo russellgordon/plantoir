@@ -2195,7 +2195,7 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
 since it was built, and builds again otherwise, however it was started.**
 Russell's ruling, 2026-11-12, on #768: Deploy pressed in the app, a deploy
 set for later, and `deploy.sh`, `deploy.ps1` or `deploy.bat` typed at a
-command line, on either platform. The rule and its 28 cases are
+command line, on either platform. The rule and its 29 cases are
 `contracts/app-rules.json` → `buildFreshness.reuseTheLastBuild`; this
 section is the reasoning.
 
@@ -2256,11 +2256,13 @@ build costs a minute, a reused stale one publishes last week's site.
    would otherwise hide a change made since. **It holds only while the build
    is still dated later than now** (the implementation review's M2, measured:
    a build dated 2 s ahead, then an edit; asked at once every reader said
-   `clock`, asked 2.5 s later every reader reused). A page edited while the
-   clock is behind the build's date carries that wrong clock's times, so once
-   real time passes the build's date no time-based reader can see it. A
-   deploy, or Deploy pressed, while the build is still dated ahead rebuilds
-   and closes the window. Recorded in `knownLimits` as a decision.
+   `clock`, asked 2.5 s later every reader reused). Anything changed while
+   the clock reads earlier than the build's date (a page edited, deleted or
+   renamed), and deployed after real time has passed that date, is sent as
+   last built by every reader: no time a reader can see is later than the
+   build's. A deploy, or Deploy pressed, while the build is still dated ahead
+   rebuilds and closes the window. Recorded in `knownLimits` as a decision; a
+   fingerprint that needs no clock is a later piece.
 6. **Changed means strictly later.** A save at the very instant the build
    started reads as built, as before.
 
@@ -2292,7 +2294,16 @@ M3): the build follows it, so every reader must. BSD `find` given a link
 stops at it, and `FileManager`'s enumerator does not descend into one, so
 deploy.sh, the scheduled shell and the app all reused after an edit behind
 it while deploy.py built. Both shell readers use `find -H`, and the app
-walks `resolvingSymlinksInPath()` of the course folder. **A link INSIDE the
+walks `resolvingSymlinksInPath()` of the course folder. **The link's own
+times are read as well** (the fix review's M1): reading through the link
+alone lost the one signal the old readers had, so a linked course pointed
+at another folder made before the build reused in deploy.sh, the scheduled
+shell and the app, and the build would have sent that folder's pages. Each
+shell reader asks `find` twice on the course folder, with `-H` and without;
+Python adds `os.lstat`; the app reads the unresolved path too. The same
+holds one level down: a section folder that is a link and is POINTED at
+another folder changes the link's own times, which the walk reads as an
+entry, so it builds; what is not seen is a change BEHIND such a link. **A link INSIDE the
 course is still not followed by any reader** (`knownLimits`): a section
 folder kept elsewhere and linked in reads as built after a change behind
 it, while the build follows it. `Media` is not such a link: it is a real

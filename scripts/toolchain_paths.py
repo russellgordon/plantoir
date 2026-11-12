@@ -611,9 +611,13 @@ def note_the_toolchain_that_built(section_dir: Path, toolchain_id: str) -> None:
 #   * "Changed" means strictly LATER than the reference, the start of the
 #     build that made the site (.build-started, #265), or the site's front
 #     page when that is earlier or there is no marker.
-#   * A reference later than NOW means build. A clock that was ahead when the
-#     site was built (set by hand, or corrected later) would otherwise hide
-#     every change made since.
+#   * A reference later than NOW means build. While the build is still dated
+#     ahead, a clock that was ahead when the site was built (set by hand, or
+#     corrected later) would otherwise hide a change made since. Once real
+#     time passes the build's date it no longer fires: buildFreshness.
+#     reuseTheLastBuild.knownLimits.
+#   * A course folder that is itself a link is read through it, and the
+#     link's own times count too, so pointing it at another folder builds.
 # Every part errs toward building: a needless build costs a minute, a reused
 # stale one publishes last week's site and reports success.
 # ---------------------------------------------------------------------------
@@ -668,6 +672,15 @@ def something_in_the_course_is_newer(course_dir: Path, reference_ns: int) -> boo
             return True
     except OSError:
         return False
+    # A course folder that is a link: the link's OWN times too. Pointing it
+    # at another folder made before the build changes nothing behind it, only
+    # the link (the #768 fix review's M1). For a real folder this is the
+    # same stat again.
+    try:
+        if _the_later_change_ns(os.lstat(course_dir)) > reference_ns:
+            return True
+    except OSError:
+        pass
     for folder, folder_names, file_names in os.walk(course_dir):
         kept_folders = []
         for name in folder_names:

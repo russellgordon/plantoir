@@ -147,6 +147,15 @@ final class ReuseTheLastBuildTests: XCTestCase {
             let old: Date = try modificationDate(of: url)
             try write("written over where it stands\n", to: url)
             try setModificationDate(old, of: url)
+        case "pointTheLinkAtAnOlderCopy":
+            // The course folder is a link: made again under a temporary name
+            // and renamed over it, as `ln -sfn` does, pointing at the copy
+            // made before the build.
+            let current: URL = URL(fileURLWithPath: try fileManager.destinationOfSymbolicLink(atPath: courseURL.path))
+            let older: URL = current.deletingLastPathComponent().appendingPathComponent("older-" + courseURL.lastPathComponent)
+            let beside: URL = courseURL.deletingLastPathComponent().appendingPathComponent(courseURL.lastPathComponent + ".relinking")
+            try fileManager.createSymbolicLink(at: beside, withDestinationURL: older)
+            XCTAssertEqual(rename(beside.path, courseURL.path), 0)
         case "createKeepingAnOldTime":
             try write("restored from a backup\n", to: url)
             try setModificationDate(Date(timeIntervalSinceNow: -365 * 24 * 3600), of: url)
@@ -180,6 +189,10 @@ final class ReuseTheLastBuildTests: XCTestCase {
                 at: courseURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try fileManager.createSymbolicLink(at: courseURL, withDestinationURL: keptURL)
+            try fileManager.createDirectory(
+                at: caseURL.appendingPathComponent("kept-elsewhere/older-C", isDirectory: true),
+                withIntermediateDirectories: true
+            )
         } else {
             try fileManager.createDirectory(at: courseURL, withIntermediateDirectories: true)
         }
@@ -193,6 +206,15 @@ final class ReuseTheLastBuildTests: XCTestCase {
         let files: [String] = testCase["course"] as? [String] ?? theCourse
         for relative in files {
             try write(relative + "\n", to: courseURL.appendingPathComponent(relative))
+        }
+        if testCase["courseFolderIsALink"] as? Bool == true {
+            let olderURL: URL = caseURL.appendingPathComponent("kept-elsewhere/older-C", isDirectory: true)
+            for relative in files {
+                try write(relative + ", an older copy\n", to: olderURL.appendingPathComponent(relative))
+            }
+            try fileManager.createSymbolicLink(
+                at: olderURL.appendingPathComponent(".merged_output"), withDestinationURL: buildsURL
+            )
         }
         pause()
         for change in changes(of: testCase, when: "beforeTheBuildStarted") {

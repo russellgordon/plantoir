@@ -97,7 +97,17 @@ def _cut_out(name: str) -> str:
     return text[text.index(begin) + len(begin):text.index(end)]
 
 
+def _can_make_links() -> bool:
+    with tempfile.TemporaryDirectory() as tmp:
+        return freshness_cases.can_make_links(Path(tmp))
+
+
+CAN_MAKE_LINKS = _can_make_links()
+
+
 def _skipped_here(case: dict) -> bool:
+    if case.get("courseFolderIsALink") and not CAN_MAKE_LINKS:
+        return True
     return ON_WINDOWS and "windows" in case.get("knownLimitOn", [])
 
 
@@ -170,7 +180,7 @@ class TheSharedAnswerIsTheContracts(unittest.TestCase):
         for case in CONTRACT["cases"]:
             with self.subTest(case=case["name"]):
                 if _skipped_here(case):
-                    self.skipTest("knownLimitOn windows: " + case["name"])
+                    self.skipTest("not on this computer: " + case["name"])
                 with tempfile.TemporaryDirectory() as tmp:
                     course, section = freshness_cases.build(
                         Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN, PREVIEW_PAGE)
@@ -188,7 +198,7 @@ class TheSharedAnswerIsTheContracts(unittest.TestCase):
         for case in CONTRACT["cases"]:
             with self.subTest(case=case["name"]):
                 if _skipped_here(case):
-                    self.skipTest("knownLimitOn windows: " + case["name"])
+                    self.skipTest("not on this computer: " + case["name"])
                 if freshness_cases.expected(case, reads_the_stamp=False)[1] == "preview":
                     continue
                 with tempfile.TemporaryDirectory() as tmp:

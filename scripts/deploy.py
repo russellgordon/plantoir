@@ -174,24 +174,6 @@ def safe_clean_public_dir(public_dir: Path):
     except Exception:
         pass
 
-def _preview_client_pattern():
-    """
-    The live-reload client a PREVIEW build bakes into every page, as a bytes
-    pattern: contracts/app-rules.json -> buildFreshness.previewBuild.signature.
-    The tag, then any run of the `between` bytes (the C locale's [[:space:]],
-    spelled out rather than a Unicode \\s), then the client's first statement.
-    """
-    signature = contracts.section("app-rules", "buildFreshness", "previewBuild", "signature")
-    between = b""
-    for character in signature["between"]:
-        between += re.escape(character.encode("utf-8"))
-    return re.compile(
-        re.escape(signature["scriptTag"].encode("utf-8"))
-        + b"[" + between + b"]*"
-        + re.escape(signature["client"].encode("utf-8"))
-    )
-
-
 def rebuild_for_production(course_code: str, section: str, host_os: str):
     """
     Rebuild the section site for production using build_site.py --build-only.
@@ -1462,15 +1444,9 @@ def main():
     # own words cannot produce the raw tag, because Quartz writes "<" as "&lt;"
     # in text and in attributes. Pages are read as BYTES and whole: the rule is
     # about bytes, and Quartz puts the tag and the statement on different lines.
-    is_preview_build = False
-    preview_client = _preview_client_pattern()
-    for page in public_dir.rglob("*.html"):
-        try:
-            if preview_client.search(page.read_bytes()):
-                is_preview_build = True
-                break
-        except OSError:
-            continue
+    # One Python reading of the rule, shared with the deploy's own question
+    # (#768): toolchain_paths.site_carries_preview_client.
+    is_preview_build = toolchain_paths.site_carries_preview_client(public_dir)
     if is_preview_build:
         print(" Preview build detected (live-reload client) — rebuilding for production…")
         rebuild_for_production(args.course, str(args.section), _HOST_OS)

@@ -1325,8 +1325,10 @@ site_was_built_by_this_toolchain() {
 #     is `pages`. Folders count: a deletion or a rename shows only there.
 #   * `find -H`: a course folder that is itself a link is read through it,
 #     as the build reads it. Without it find stops at the link and every
-#     change behind it reads as built (the #768 review's M3). A link INSIDE
-#     the course is still not followed, by any reader.
+#     change behind it reads as built (the #768 review's M3). The link's
+#     own times are read as well (a second find without -H), so pointing it
+#     at another folder made before the build builds (the fix review's M1).
+#     A link INSIDE the course is still not followed, by any reader.
 # BEGIN pages_or_clock_ask_for_a_build
 pages_or_clock_ask_for_a_build() {
   local course="$1" section="$2" front since now changed
@@ -1346,6 +1348,10 @@ pages_or_clock_ask_for_a_build() {
     fi
   fi
   changed="$(find -H "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  if [[ -z "$changed" ]]; then
+    # Without -H: a course folder that is a link, by the link's own times.
+    changed="$(find "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  fi
   if [[ -z "$changed" ]]; then
     changed="$(find -H "$course" -mindepth 1 -name '.*' -prune -o \( -newer "$since" -o -cnewer "$since" \) -print -quit 2>/dev/null)"
   fi

@@ -6,7 +6,8 @@ own readers (GitHub #136).
 Serve mode bakes a live-reload client into every page it builds, and a site
 that carries it must never be published. Whether a built site carries it is
 answered in six places: BuildFreshness in each app, the mac's scheduled
-publish, `deploy.sh` (three times), `deploy.py` and `deploy.ps1`. Until #136
+publish, `deploy.sh` (four times), `toolchain_paths` (deploy.py's, and the
+deploy's own question since #768) and `deploy.ps1`. Until #136
 the apps read the front page alone while the launchers read every page, so a
 clean front page in front of a preview's pages was "fresh" to the app and
 "a preview's" to the launcher — which then rebuilt it under the wrong leg.
@@ -18,10 +19,13 @@ the shared toolchain owns:
 
 - **deploy.sh.** Its rule is cut out of the launcher — not retyped: one
   `LIVE_RELOAD_CLIENT_PATTERN`, which bash must read as the contract's
-  `asABasicRegex`, and one `site_carries_preview_client`, called exactly three
-  times. That function is then RUN through bash against each case under a
+  `asABasicRegex`, and one `site_carries_preview_client`, called exactly four
+  times (three on the built site, one in `why_this_deploy_builds_first`). That function is then RUN through bash against each case under a
   UTF-8 locale, the way a Terminal runs it (#291). Skipped where there is no
   bash that can reach a scratch folder, as the launcher tests beside it are.
+- **toolchain_paths.site_carries_preview_client.** The one Python reading of
+  the rule (#768: deploy.py's `main` and `why_build_before_deploying` both
+  call it, and Windows' deploy.ps1 will), run against each case directly.
 - **deploy.py.** The real program, which reads the signature from the
   contract, is RUN against each case with a stand-in
   `build_site.py` and no Netlify token, so it stops before anything leaves the
@@ -152,7 +156,7 @@ class TheLaunchersReadTheContractsCases(unittest.TestCase):
 
     # MARK: - deploy.sh
 
-    def test_deploy_sh_defines_the_rule_once_and_uses_it_three_times(self):
+    def test_deploy_sh_defines_the_rule_once_and_uses_it_four_times(self):
         text = deploy_sh_text()
         self.assertEqual(
             len(DEPLOY_SH_PATTERN_LINE.findall(text)), 1,
@@ -164,10 +168,16 @@ class TheLaunchersReadTheContractsCases(unittest.TestCase):
         )
         self.assertEqual(
             len(DEPLOY_SH_CALL.findall(text)), 3,
-            "deploy.sh checks for a preview's build before the folder copy, after "
-            "its rebuild, and to say it could not remove it — three times. A "
+            "deploy.sh checks the built site for a preview's build before the folder "
+            "copy, after its rebuild, and to say it could not remove it — three times. A "
             "different count means the launcher changed and this file must be told.",
         )
+        self.assertEqual(
+            len(re.findall(r"site_carries_preview_client \"\$2/public\"", text)), 1,
+            "and once more in why_this_deploy_builds_first, which asks a preview's "
+            "site before the toolchain (#768) — four calls in all",
+        )
+        self.assertEqual(len(re.findall(r"\bsite_carries_preview_client \"", text)), 4)
         self.assertEqual(
             DEPLOY_SH_BARE_GREP.findall(text), [],
             "a grep for the bare address is the #291 fault: every check goes "
@@ -203,6 +213,21 @@ class TheLaunchersReadTheContractsCases(unittest.TestCase):
                     finally:
                         make_readable(locked)
                     self.assertEqual(result.returncode == 0, test_case["expectPreview"], test_case["name"])
+
+    # MARK: - toolchain_paths
+
+    def test_the_shared_python_answers_every_case_as_the_contract_does(self):
+        import toolchain_paths
+        for test_case in self.cases_this_machine_can_build():
+            with self.subTest(test_case["name"]):
+                with tempfile.TemporaryDirectory() as scratch:
+                    public_dir = Path(scratch) / "public"
+                    locked = write_pages(test_case, public_dir)
+                    try:
+                        answer = toolchain_paths.site_carries_preview_client(public_dir)
+                    finally:
+                        make_readable(locked)
+                self.assertEqual(answer, test_case["expectPreview"], test_case["name"])
 
     # MARK: - deploy.py
 

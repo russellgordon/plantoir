@@ -982,9 +982,10 @@ enum ScheduledDeploy {
             + " \(shellQuoted(builtPublicPath)); then")
         lines.append("    BUILD_WHY=\(BuildFreshness.RebuildReason.preview.rawValue)")
         lines.append("  else")
-        // The build dated later than now (#768's review, M1): a clock that
-        // was ahead then would hide every change made since. Compared with a
-        // file made now, removed again by its own path.
+        // The build dated later than now (#768's review, M1): while it is, a
+        // clock that was ahead then would hide a change made since; once real
+        // time passes the build's date it no longer fires (knownLimits).
+        // Compared with a file made now, removed again by its own path.
         lines.append("    DATED_LATER=\"\"")
         lines.append("    NOW_FILE=\"$(/usr/bin/mktemp \"${TMPDIR:-/tmp}/plantoir-now.XXXXXX\" 2>/dev/null)\" || NOW_FILE=\"\"")
         lines.append("    if [ -n \"$NOW_FILE\" ]; then")
@@ -1000,7 +1001,12 @@ enum ScheduledDeploy {
         // change time shows a file copied in with its old time kept. `-H`
         // reads a course folder that is itself a link through it, as the
         // build does; without it find stops at the link (the #768 review's M3).
+        // The course folder is asked twice, through the link and as the link,
+        // so pointing a linked course at another folder builds (the fix
+        // review's M1).
         lines.append("    elif [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
+            + " \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print 2>/dev/null)\" ]"
+            + " || [ -n \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
             + " \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print 2>/dev/null)\" ]"
             + " || [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -mindepth 1 -name '.*' -prune"
             + " -o \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print -quit 2>/dev/null)\" ]; then")

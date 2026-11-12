@@ -33,6 +33,18 @@ def the_contract(repository_root: Path) -> dict:
         return json.load(handle)["buildFreshness"]["reuseTheLastBuild"]
 
 
+def can_make_links(scratch: Path) -> bool:
+    """Whether this computer lets the tests make a symbolic link (Windows
+    without Developer Mode does not); the linked-course cases need one."""
+    probe = Path(scratch) / "link-probe"
+    try:
+        os.symlink(scratch, probe, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        return False
+    os.remove(probe)
+    return True
+
+
 def _pause() -> None:
     time.sleep(PAUSE_SECONDS)
 
@@ -70,6 +82,14 @@ def _apply(course: Path, change: dict) -> None:
         with open(path, "w", encoding="utf-8") as handle:
             handle.write("written over where it stands\n")
         os.utime(path, ns=(old.st_atime_ns, old.st_mtime_ns))
+    elif what == "pointTheLinkAtAnOlderCopy":
+        # The course folder is a link; point it at the copy made before the
+        # build, the way `ln -sfn` does: a new link under a temporary name,
+        # renamed over the old one.
+        older = Path(os.readlink(course)).parent / ("older-" + course.name)
+        beside = course.with_name(course.name + ".relinking")
+        os.symlink(older, beside, target_is_directory=True)
+        os.replace(beside, course)
     elif what == "createKeepingAnOldTime":
         _write(path, "restored from a backup\n")
         a_year_ago = time.time_ns() - 365 * 24 * 3600 * 1_000_000_000
@@ -101,6 +121,10 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
         kept.mkdir(parents=True)
         course.parent.mkdir(parents=True)
         os.symlink(kept, course, target_is_directory=True)
+        # And an older copy of it beside, made before the build, for
+        # `pointTheLinkAtAnOlderCopy`: other words, the same built sites.
+        older = root / "kept-elsewhere" / ("older-" + COURSE_CODE)
+        older.mkdir(parents=True)
     else:
         course.mkdir(parents=True)
     # The built sites live outside the course, behind a hidden link, as the
@@ -120,6 +144,11 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
     files = case.get("course", the_course)
     for relative in files:
         _write(course / relative, f"{relative}\n")
+    if case.get("courseFolderIsALink"):
+        older = root / "kept-elsewhere" / ("older-" + COURSE_CODE)
+        for relative in files:
+            _write(older / relative, f"{relative}, an older copy\n")
+        os.symlink(builds, older / ".merged_output", target_is_directory=True)
     _pause()
     for change in _changes(case, "beforeTheBuildStarted"):
         _apply(course, change)

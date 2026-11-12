@@ -264,8 +264,8 @@ they did not agree:
 |---|---|---|---|
 | `BuildFreshness.builtForPreview` (mac) | `mac-app/QuartzTeachers/Models/BuildFreshness.swift` | every `*.html` under `public/`, as bytes — the front page ALONE until #136 | `carriesLiveReloadClient`: every occurrence of the client, whitespace stepped back over, then the tag |
 | The scheduled publish's own check (mac) | `ScheduledDeploy.oneShotCommand` | `LC_ALL=C grep -rzqs --include='*.html'` over `public/` — `index.html` alone until #136 | `BuildFreshness.liveReloadPattern`, the contract's `asABasicRegex` |
-| `deploy.sh`, folder leg | one `site_carries_preview_client`, called three times | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
-| `deploy.py`, Netlify and Cloudflare | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract |
+| `deploy.sh`, every destination | one `site_carries_preview_client`, called four times: first in `why_this_deploy_builds_first`, which asks a preview's site before the toolchain for every destination (#768), then three times in the folder leg | the whole tree, since 2026-09-05 | `LIVE_RELOAD_CLIENT_PATTERN`, under `LC_ALL=C grep -rzqs` |
+| `toolchain_paths.site_carries_preview_client` (deploy.py's `main` and `why_build_before_deploying`, Netlify and Cloudflare, both platforms) | `public_dir.rglob("*.html")` | the whole tree, since 2026-09-05, as bytes | the contract's `scriptTag` and `client`, read from the contract; one Python copy since #768 |
 | `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
 | `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 

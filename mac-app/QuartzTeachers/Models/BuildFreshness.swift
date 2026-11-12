@@ -70,8 +70,10 @@ enum BuildFreshness {
             of: buildStartedMarkerURL(course: course, sectionNumber: sectionNumber)
         )
         let reference: Date = referenceDate(builtDate: builtDate, buildStartedDate: startedDate)
-        // A clock that was ahead when the site was built would otherwise hide
-        // every change made since (the #768 plan review's M1).
+        // While the build is still dated later than now, a clock that was
+        // ahead when the site was built would otherwise hide a change made
+        // since (the #768 plan review's M1). Once real time passes the build's
+        // date this no longer fires: `reuseTheLastBuild.knownLimits`.
         if reference > now {
             return .clock
         }
@@ -327,6 +329,14 @@ enum BuildFreshness {
         }
 
         var newestDate: Date? = latestChangeDate(of: courseFolder)
+        // A course folder that is a link: the link's own times too, read
+        // through the unresolved path. Pointing the link at another folder
+        // made before the build changes nothing behind it, only the link (the
+        // #768 fix review's M1). For a real folder it is the same folder.
+        let asNamed: URL = URL(fileURLWithPath: course.directoryURL.path, isDirectory: false)
+        if let linkDate = latestChangeDate(of: asNamed), newestDate == nil || linkDate > newestDate! {
+            newestDate = linkDate
+        }
         for case let entryURL as URL in enumerator {
             if entryURL.lastPathComponent.hasPrefix(".") {
                 // Hidden, with everything under it. Only a real folder is
