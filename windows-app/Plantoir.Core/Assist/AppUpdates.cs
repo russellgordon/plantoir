@@ -125,9 +125,161 @@ public static class AppUpdates
     /// Restart Manager must not close plantoir-mcp or a scheduled run on the
     /// update path; the app quits itself first.
     /// </summary>
-    public static string InstallerArguments(bool relaunch, string? returnTo = null) =>
+    public static string InstallerArguments(bool relaunch, string? returnTo = null, string? logPath = null, string? stateFolder = null) =>
         "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1" + (relaunch ? " /RELAUNCH=1" : "") +
-        (string.IsNullOrEmpty(returnTo) ? "" : $" \"/RETURNTO={returnTo}\"");
+        (string.IsNullOrEmpty(returnTo) ? "" : $" \"/RETURNTO={returnTo}\"") +
+        // #700: where setup writes its own log (Inno's /LOG=), so a refused or
+        // failed update can be read afterwards. Only updates FROM 1.9.3 on pass
+        // it: 1.9.0's app starts the 1.9.3 installer without it.
+        (string.IsNullOrEmpty(logPath) ? "" : $" \"/LOG={logPath}\"") +
+        // #700: a redirected state folder (--state-dir), where the installer
+        // writes its refusal and installing markers. Absent: {localappdata}\Plantoir.
+        (string.IsNullOrEmpty(stateFolder) ? "" : $" \"/STATEDIR={stateFolder}\"");
+
+    // ---- The installer's log (#700) -------------------------------------------
+
+    /// <summary>The prefix of the installer logs kept in the app's Logs folder.</summary>
+    public const string InstallerLogPrefix = "installer-";
+
+    /// <summary>
+    /// The path for the next installer log in <paramref name="logFolder"/>,
+    /// after removing all but the newest one already there, so at most two
+    /// are ever kept: this update's and the one before. An installer log holds
+    /// paths and the names of the programs it waited for, never a command
+    /// line (installer-running-work.iss logs image paths only) and nothing a
+    /// teacher typed; it is NOT part of the problem report in this piece, and
+    /// if it ever joins it, the report's LogRedactor rules apply to it too.
+    /// </summary>
+    public static string NextInstallerLog(string logFolder, DateTime utcNow)
+    {
+        try
+        {
+            Directory.CreateDirectory(logFolder);
+            var old = new DirectoryInfo(logFolder).GetFiles(InstallerLogPrefix + "*.log")
+                .OrderByDescending(f => f.LastWriteTimeUtc).Skip(1).ToList();
+            foreach (var file in old)
+                try { file.Delete(); } catch (Exception) { }
+        }
+        catch (Exception) { }
+        return Path.Combine(logFolder, InstallerLogPrefix + utcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + ".log");
+    }
+
+    // ---- The installer's refusal marker (#700) --------------------------------
+
+    /// <summary>
+    /// Written by installer-running-work.iss into the state folder whenever
+    /// it REFUSES an install (at quit, Install and Reopen, a hand-run Cancel,
+    /// or InitializeSetup's outside-assistant refusal): line 1 the version
+    /// that was waiting, line 2 why (<c>work</c>, <c>assistant</c> or
+    /// <c>reopened</c>). A completed install deletes it. The next launch reads
+    /// it, writes `update held while work is under way` and deletes it,
+    /// because an at-quit refusal reopens nothing and the old app's last line,
+    /// "update installing … as Plantoir quits", would otherwise stand
+    /// uncorrected.
+    /// </summary>
+    public const string NotInstalledMarker = "update-not-installed.txt";
+
+    /// <summary>Older than this, a refusal explains nothing about now: deleted without a line.</summary>
+    public static readonly TimeSpan NotInstalledMarkerLongestAge = TimeSpan.FromDays(14);
+
+    /// <summary>
+    /// The trail line for a refusal marker in <paramref name="stateFolder"/>,
+    /// or null; the marker is deleted either way. No line for a marker older
+    /// than <see cref="NotInstalledMarkerLongestAge"/>, one naming a version
+    /// this copy already is (or is newer than), or one that does not read.
+    /// </summary>
+    public static string? ConsumeNotInstalledMarker(string stateFolder, Version running, DateTime utcNow)
+    {
+        string path = Path.Combine(stateFolder, NotInstalledMarker);
+        if (!File.Exists(path)) return null;
+        string[] lines;
+        DateTime written;
+        try
+        {
+            lines = File.ReadAllText(path).Replace("\r", "").Split('\n');
+            written = File.GetLastWriteTimeUtc(path);
+        }
+        catch (Exception) { lines = Array.Empty<string>(); written = DateTime.MinValue; }
+        try { File.Delete(path); } catch (Exception) { }
+
+        if (utcNow - written > NotInstalledMarkerLongestAge) return null;
+        if (lines.Length < 2 || !Version.TryParse(lines[0].Trim(), out var waiting)) return null;
+        if (Normalised(waiting) <= Normalised(running)) return null;
+        return NotInstalledSentence(lines[1].Trim(), Spell(waiting));
+    }
+
+    private static Version Normalised(Version v) => new(v.Major, v.Minor, Math.Max(v.Build, 0));
+
+    /// <summary>The line for each reason the installer can give, with the version that was waiting.</summary>
+    public static string? NotInstalledSentence(string reason, string version) => reason switch
+    {
+        "work" => $"the new version was not installed: a course was still being built or deployed when it came to install; it will be offered again ({version} waiting)",
+        "assistant" => $"the new version was not installed: {UpdateWording.AssistantElsewhereWork} had started; it will be offered again ({version} waiting)",
+        "reopened" => $"the new version was not installed: Plantoir was opened again while it waited to install; it will be offered again ({version} waiting)",
+        _ => null,
+    };
+
+    // ---- The installing marker (#700) ------------------------------------------
+
+    /// <summary>
+    /// <c>installing.&lt;pid&gt;</c> in the state folder: written by the
+    /// installer at ssInstall, once its last look found nothing running, and
+    /// deleted at ssPostInstall and in DeinitializeSetup. A scheduled run that
+    /// starts while it is there stands down AT ONCE (<see cref="ScheduledRun"/>):
+    /// waiting would hold Plantoir.exe while the installer replaces it.
+    /// </summary>
+    public const string InstallingMarkerPrefix = "installing.";
+
+    /// <summary>
+    /// The pid of a LIVE installer with a marker in the state folder, or null.
+    /// Stale — deleted and counted for nothing, so a killed installer never
+    /// holds a scheduled deploy back — when the marker is older than
+    /// <see cref="InstallingMarkerLongestAge"/>, its process is gone, its pid
+    /// now belongs to a process started AFTER the marker was written (the id
+    /// reused), or that process cannot be read at all. The last is the
+    /// review's case: setup runs as the teacher, so its own process can always
+    /// be read, and "access denied" (a SYSTEM process that took the pid after
+    /// setup was killed or the power went) means it is NOT the installer.
+    /// </summary>
+    public static int? LiveInstaller(string stateFolder, Func<int, DateTime?>? startOf = null, DateTime? utcNow = null)
+    {
+        startOf ??= StartTimeUtc;
+        DateTime now = utcNow ?? DateTime.UtcNow;
+        List<string> markers;
+        try { markers = Directory.EnumerateFiles(stateFolder, InstallingMarkerPrefix + "*").ToList(); }
+        catch (Exception) { return null; }
+        foreach (string marker in markers)
+        {
+            if (!int.TryParse(Path.GetFileName(marker)[InstallingMarkerPrefix.Length..], out int pid) || pid <= 0) continue;
+            DateTime written;
+            try { written = File.GetLastWriteTimeUtc(marker); } catch (Exception) { continue; }
+            DateTime? started;
+            try { started = startOf(pid); } catch (Exception) { started = null; }
+            bool young = now - written <= InstallingMarkerLongestAge;
+            if (young && started is { } s && s > DateTime.MinValue && s <= written.AddSeconds(2)) return pid;
+            try { File.Delete(marker); } catch (Exception) { }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// An installing marker older than this is stale whatever its pid says:
+    /// [Files] takes three to five minutes on the build PC (277 s for the whole
+    /// 1.9.0 → 1.9.3 install, 2026-11-12), so an hour is far past any real copy.
+    /// </summary>
+    public static readonly TimeSpan InstallingMarkerLongestAge = TimeSpan.FromHours(1);
+
+    /// <summary>The process's start (UTC), or null when it is gone OR cannot be read.</summary>
+    private static DateTime? StartTimeUtc(int pid)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            if (process.HasExited) return null;
+            return process.StartTime.ToUniversalTime();
+        }
+        catch (Exception) { return null; }   // gone, or another account's (access denied): not the teacher's installer
+    }
 
     /// <summary>
     /// What installer.iss starts Plantoir with when it REFUSES an update
@@ -136,11 +288,28 @@ public static class AppUpdates
     /// </summary>
     public const string UpdateNotInstalledArgument = "--update-not-installed";
 
+    /// <summary>
+    /// What installer.iss starts Plantoir with when it refused an Install and
+    /// Reopen because a build or a deploy was still running from the install
+    /// folder after its wait (#700, installer-running-work.iss). A DIFFERENT
+    /// argument from <see cref="UpdateNotInstalledArgument"/>, deliberately:
+    /// the 1.9.0 app the 1.9.3 installer reopens knows only that one, and would
+    /// write "helping an assistant in another app had started", which is false
+    /// for this refusal. Given this one it writes no line at all, which is
+    /// better than a wrong one (CLAUDE.md rule 5).
+    /// </summary>
+    public const string UpdateNotInstalledForWorkArgument = "--update-not-installed-for-work";
+
     /// <summary>The `update held while work is under way` line for that launch, or null when it is an ordinary one.</summary>
-    public static string? NotInstalledLine(IEnumerable<string> arguments) =>
-        arguments.Any(a => string.Equals(a, UpdateNotInstalledArgument, StringComparison.OrdinalIgnoreCase))
+    public static string? NotInstalledLine(IEnumerable<string> arguments)
+    {
+        var given = arguments.ToList();
+        if (given.Any(a => string.Equals(a, UpdateNotInstalledForWorkArgument, StringComparison.OrdinalIgnoreCase)))
+            return "the new version was not installed: a course was still being built or deployed when it came to install; it will be offered again";
+        return given.Any(a => string.Equals(a, UpdateNotInstalledArgument, StringComparison.OrdinalIgnoreCase))
             ? $"the new version was not installed: {UpdateWording.AssistantElsewhereWork} had started; it will be offered again"
             : null;
+    }
 
     /// <summary>
     /// Whether this copy may update itself (ruling 3). Only a copy under

@@ -76,14 +76,20 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; would stay in Lib\site-packages too. Python 3.14 loads none of them (it
 ; reads python314._pth only, and a cp311 extension is not a cp314 one), but a
 ; tree holding two Pythons is what the next reader and the next audit find.
-; The same running-process exposure as runtime\node (#700): a preview build
-; or a scheduled deploy running runtime\python\python.exe at install time.
+; A process running from one of these folders holds its files, so nothing may
+; be deleted here while one runs: PrepareToInstall waits for that work, or ends
+; a preview's server, BEFORE this section runs (#700, installer-running-work.iss).
+; Toolchain\scripts\__pycache__ (#700): bytecode some run of the bundled
+; scripts wrote beside them, which no version ships; measured over 1.9.0, 12
+; .pyc files for three Pythons (cpython-311, -312 and -314) were the only
+; files an upgrade left that the new version does not carry.
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\runtime\vendor\tikz-engine\node_modules"
 Type: filesandordirs; Name: "{app}\runtime\node"
 Type: filesandordirs; Name: "{app}\runtime\vendor\geogebra"
 Type: filesandordirs; Name: "{app}\runtime\wrangler"
 Type: filesandordirs; Name: "{app}\runtime\python"
+Type: filesandordirs; Name: "{app}\Toolchain\scripts\__pycache__"
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -112,9 +118,14 @@ Filename: "{app}\Plantoir.exe"; Flags: nowait; Check: WantsRelaunch
 // /NOCLOSEAPPLICATIONS so Restart Manager does not close plantoir-mcp or a
 // scheduled run either -- CloseApplicationsFilter below still names them for a
 // hand-run install. InitializeSetup also refuses an update while plantoir-mcp
-// runs, for one started after the app's last check. Residual risk, UNEXERCISED:
-// a file still in use at copy time leaves the update to fail under /NORESTART.
-// A hand-run installer keeps the kill and the closing.
+// runs, for one started after the app's last check. A file still in use at
+// copy time made the update fail part way (measured 2026-11-12, #700: a
+// preview serving, exit 5, a broken install), so PrepareToInstall now waits
+// for work running from {app}, or ends a preview's server, before any file is
+// changed (installer-running-work.iss, below). A hand-run installer keeps the
+// kill and the closing.
+#include "installer-running-work.iss"
+
 function IsUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:PLANTOIRUPDATE|0}') = '1';
@@ -132,6 +143,9 @@ begin
             '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
     begin
       Result := False;
+      // #700: the refusal leaves its marker, so the trail says so even when
+      // nothing is reopened (and with the version that waited).
+      RunningWorkWriteRefusalMarker('assistant');
       // Ruling 12: the app has already quit, so reopen it and let it say why.
       if ExpandConstant('{param:RETURNTO|}') <> '' then
         Exec(ExpandConstant('{param:RETURNTO|}'), '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode);
@@ -142,6 +156,15 @@ end;
 function WantsRelaunch: Boolean;
 begin
   Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
+// Before ANY file is changed (#700): runs before [InstallDelete] and [Files],
+// and before Restart Manager's check on a hand-run install. A non-empty answer
+// stops setup on the Preparing to Install page, which a silent install leaves
+// with exit code 7, nothing deleted and nothing copied.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := RunningWorkBeforeChangingFiles(IsUpdate, WantsRelaunch);
 end;
 
 // The `app updated` trail line (#428 item 1): Plantoir writes "by its own
@@ -164,6 +187,14 @@ var
 begin
   if CurStep = ssInstall then
   begin
+    // Looked for again (#700): a hand-run wizard can sit on Restart Manager's
+    // page for minutes after PrepareToInstall, and a scheduled deploy can
+    // start meanwhile. Still before [InstallDelete]; Abort here ends setup
+    // with nothing changed.
+    if RunningWorkBeforeChangingFiles(IsUpdate, WantsRelaunch) <> '' then
+      Abort;
+    // A scheduled run that starts during the copy waits while this is there.
+    RunningWorkInstallingBegins;
     DeleteFile(UpdatedByItselfMarker);
     if not IsUpdate then
     begin
@@ -171,9 +202,21 @@ begin
       Exec('taskkill.exe', '/F /IM llama-server.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
   end;
+  if CurStep = ssPostInstall then
+  begin
+    RunningWorkInstallingEnds;
+    RunningWorkInstalledCleanly;
+  end;
   if (CurStep = ssPostInstall) and IsUpdate then
   begin
     ForceDirectories(ExpandConstant('{localappdata}\Plantoir'));
     SaveStringToFile(UpdatedByItselfMarker, '{#AppVersion}', False);
   end;
+end;
+
+// #700: a failed or cancelled install must not leave the installing marker
+// (ssPostInstall never comes for one). Harmless when it was never written.
+procedure DeinitializeSetup;
+begin
+  RunningWorkInstallingEnds;
 end;

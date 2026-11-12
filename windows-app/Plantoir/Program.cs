@@ -34,6 +34,17 @@ public static class Program
         // is) and its token — parsed by TaskScheduling.ScheduledRunFrom, tested.
         if (Plantoir.Core.Assist.TaskScheduling.ScheduledRunFrom(args) is var (job, token))
         {
+            // #700: a new version is being installed over this program right
+            // now. Stand down and EXIT AT ONCE, with no notification (posting
+            // one loads more of the files being replaced): while this process
+            // lives it holds Plantoir.exe, and the installer would fail to
+            // replace it. The run records why; the section says it did not run.
+            if (Plantoir.Core.Assist.ScheduledRun.AnInstallerIsReplacingThisProgram())
+            {
+                Plantoir.Core.Assist.ScheduledRun.Execute(job, taskToken: token);
+                Environment.Exit(0);
+                return;
+            }
             // One toast for the section, whatever happened (#324) — what it
             // needs is read BEFORE the run, whose one-shot clearing deletes
             // the job file (#448).

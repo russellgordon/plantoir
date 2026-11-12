@@ -771,7 +771,7 @@
         "why": "Added with #204. Separates 'never offered' from 'offered and skipped' - the two answers to the same report."
       },
       {
-        "carries": "what was under way, in the same words the teacher was shown (appUpdates.wording), and the version waiting",
+        "carries": "what was under way, in the same words the teacher was shown (appUpdates.wording), and the version waiting; on Windows also, at the next launch, an install the INSTALLER refused (#700: work still running from the install folder, an outside assistant, or Plantoir opened again during its wait), with why and the version that waited, read from its refusal marker",
         "event": "update held while work is under way",
         "why": "Added with #204. The one line that explains an update that 'did not happen' when the teacher clicked, and the proof that the install gate ran. See appUpdates.mayNotInstallWhile."
       },

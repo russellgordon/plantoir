@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-11-12 | Updating Plantoir with a preview open no longer breaks the install: the installer closes the preview, waits up to ten minutes for a build or a deploy to finish, and otherwise leaves the old version exactly as it was and offers the update again. **The 1.9.0 notes' "close any preview… before you install by hand" warning can be dropped ONLY IF the morning's real-installer cases pass** (B, C, C2, D and the hand-run wizard, #700's closing comment); until then keep it | Windows only (the mac's updater replaces the whole app and has no counterpart) | #700 |
 | 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
 | 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
 | 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
@@ -133,6 +134,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-11-12 | **Windows 1.9.3, before you update: if a deploy is scheduled to run in the next few minutes, let it finish first.** (Plain words for the notes: "If you have a deploy set to run on its own in the next few minutes, wait until it has run before you update.") | #700: the 1.9.0 → 1.9.3 update runs 1.9.0's scheduled-deploy code, which does not know the new installer's marker, so a scheduled deploy firing during the 3 to 5 minute copy holds Plantoir.exe and the install can fail part way, leaving a broken install (case B, measured 2026-11-12). Updates from 1.9.3 on are protected. Keep the 1.9.0 notes' "close any preview first" line too unless the morning's real-installer cases pass (the row above). |
 
 ## Trim the roadmap
 
@@ -193,7 +195,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    made before 2026-10-22 is refused until the fetch is re-run), and **run
    `windows-app\Vendor\fetch-obsidian-addons.ps1`** — it returns at once when
    the seven add-on files already match the contract's pins, and the build
-   REFUSES a missing or stale copy (#581). Then `az login`, then
+   REFUSES a missing or stale copy (#581), and **run `windows-app\Vendor\fetch-llama.ps1`** — `publish.ps1` refuses a bundle without the assistant's engine, which the signed 1.9.0 shipped without (#700). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **After installing it over the previous
@@ -202,7 +204,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `startup.log`'s `tools copy finished` says `0 read in full`; if not,
    compare one file's ticks in `{app}\Toolchain\.hashes` with its
    `LastWriteTimeUtc.Ticks` (`documentation/12-windows-app.md` → "What the
-   director must check at the cut"). **Then build and sign the Windows update feed
+   director must check at the cut"). **Run the installer harness and measure
+   one upgrade over the previous Windows release** (#700, checklist step 3a).
+   **Then build and sign the Windows update feed
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.
@@ -431,6 +435,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
        powershell -File Vendor\fetch-runtime.ps1
        powershell -File Vendor\fetch-obsidian-addons.ps1
+       powershell -File Vendor\fetch-llama.ps1
        powershell -File publish.ps1 -Sign
 
    One-time tooling on a new machine (the Azure account/identity setup itself
@@ -450,6 +455,50 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    with an RFC 3161 timestamp.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
+
+   **Run `windows-app\Vendor\fetch-llama.ps1` first** (once per clone; it
+   refuses a zip whose size or SHA-256 is not the pinned b10435 one).
+   `publish.ps1` REFUSES to build without the assistant's engine — it checks
+   `Vendor\llama` before the build and the published `llama\` before the
+   installer is compiled — because the signed 1.9.0 shipped with no `llama\`
+   at all (#700). `-WithoutAssistantEngine` is for a developer's bundle and is
+   refused together with `-Sign`.
+
+   `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before it publishes
+   (#700): without that, the first publish in a fresh clone or worktree
+   stopped after about 108 s with `NETSDK1004 … Plantoir.Mcp\obj\project.assets.json
+   not found`, because the app's project publishes the server through an
+   `<MSBuild>` task that does not restore.
+
+   **3a. Prove the installer's running-work check, and measure one real
+   upgrade (#700), every Windows cut.**
+
+   - **The harness**, from the repository root, `/VERYSILENT` throughout, no
+     sound, about five minutes:
+
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1 -MustFail
+
+     Both must end `… passed, 0 failed` (exit 0) and print "PASS the real
+     Plantoir untouched". It compiles `installer-running-work.iss` — the file
+     `installer.iss` includes — into a harness installer with its OWN AppId
+     and folder, so it never installs, upgrades or uninstalls the real
+     Plantoir. No suite runs it (`windows-app/installer-tests/README.md` says
+     why); a change to `installer.iss` or the include is not done until it
+     has passed.
+   - **A measured upgrade over the PREVIOUS Windows release**, with the
+     candidate installer and the app's own at-quit arguments
+     (`AppUpdates.InstallerArguments(relaunch: false, ReturnTo)`), on a
+     quiet machine and again with a preview serving and with a build
+     running: exit 0, the emptied runtime folders exactly the candidate's
+     (no file of the old version), and the runtime checks the release's
+     issues name. `documentation/12-windows-app.md` → "The installer waits
+     for work that is still running (#700)" lists the cases and their pass
+     lines; the 1.9.3 one is the first, and how it was done (backup, a
+     throwaway working folder, restoring the signed release afterwards) is
+     in #700's closing comment. The update path is the PREVIOUS version's
+     app code running THIS version's installer, so it is the one thing no
+     test of the new app can stand in for.
 
 4. **Build the signed macOS bundle**, with **Xcode 26.6** — the release
    Xcode until a deliberate piece moves it (#613):

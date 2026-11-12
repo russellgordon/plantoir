@@ -246,6 +246,13 @@ public static class ScheduledRun
         /// </summary>
         public Func<string, int?> CopyingTheFolder { get; init; } = folder =>
             ToolchainReadiness.LiveCopiers(folder, exceptThisProcess: true) is { Count: > 0 } pids ? pids[0] : null;
+
+        /// <summary>
+        /// The process id of a LIVE installer replacing this copy of Plantoir
+        /// now, or null (#700) — read from its <c>installing.&lt;pid&gt;</c>
+        /// marker in the state folder (<see cref="AppUpdates.LiveInstaller"/>).
+        /// </summary>
+        public Func<int?> Installing { get; init; } = () => AppUpdates.LiveInstaller(AppDataRoot.Current);
     }
 
     /// <summary>How the run ended — for the process's exit code and for tests.</summary>
@@ -260,6 +267,24 @@ public static class ScheduledRun
         // between writing a new job and replacing the task). Do nothing, and
         // leave the task alone.
         if (!string.IsNullOrEmpty(taskToken) && taskToken != job.Token) return Ending.NoLongerStands;
+
+        // 0. A new version of Plantoir is being installed over this one right
+        // now (#700): its installer's installing.<pid> marker is live. Stand
+        // down AT ONCE, before anything else is read or loaded. Waiting is the
+        // wrong answer: while this process lives it holds Plantoir.exe's own
+        // image, so when the installer reaches that file the copy fails "in
+        // use", a silent install aborts, and its rollback after [InstallDelete]
+        // leaves a broken install (measured 2026-11-12, case B). The deploy is
+        // recorded and turned off the way every stood-down run is: the
+        // section's band says it did not run and to deploy it or schedule
+        // another, and the trail says why.
+        if (world.Installing() is { } installer)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
+                InstallStoodDownLine(installer), job.CourseCode, job.Section);
+            StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
+            return Ending.StoodDown;
+        }
 
         var course = ReadCourse(job.WorkingFolder, job.CourseCode);
 
@@ -436,6 +461,17 @@ public static class ScheduledRun
     /// — another program's work on the course, a copy of the folder's tools
     /// (#477), or both — and, for a copy, which program.
     /// </summary>
+    /// <summary>The line when the run met an installer replacing Plantoir (#700), and stood down at once.</summary>
+    internal static string InstallStoodDownLine(int installer) =>
+        $"did not run: a new version of Plantoir was being installed (process {installer}), so it stood down at once and left the site as it was";
+
+    /// <summary>
+    /// Whether an installer is replacing this program right now (#700), for
+    /// Program.Main to ask before it loads anything a run does not need, the
+    /// notification machinery included.
+    /// </summary>
+    public static bool AnInstallerIsReplacingThisProgram(World? world = null) => (world ?? new World()).Installing() is not null;
+
     internal static string WaitedLine(int seconds, bool metTheCourse, bool metACopy, int? copier) =>
         (metTheCourse, metACopy) switch
         {
