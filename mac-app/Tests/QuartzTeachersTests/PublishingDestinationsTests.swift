@@ -63,10 +63,15 @@ final class PublishingDestinationsTests: XCTestCase {
         // page. And no figures: the hosts change them (#668, M2 and M3).
         for (name, sentence) in sentences {
             XCTAssertFalse(sentence.lowercased().contains("publish"), "\(name) says publish for a deploy")
-            // The size note's 25 is the one figure kept: Cloudflare's
-            // per-file limit is the fact that sentence exists to state (#775).
-            for digit in "0123456789" where name != "netlifyNote" && name != "cloudflareSizeNote" {
-                XCTAssertFalse(sentence.contains(digit), "\(name) carries a figure")
+            // The size note keeps one figure, "25 MB": Cloudflare's per-file
+            // limit is the fact that sentence exists to state (#775). Only
+            // that is taken out before looking, so a second figure still fails.
+            var checked: String = sentence
+            if name == "cloudflareSizeNote" {
+                checked = checked.replacingOccurrences(of: "25 MB", with: "")
+            }
+            for digit in "0123456789" where name != "netlifyNote" {
+                XCTAssertFalse(checked.contains(digit), "\(name) carries a figure")
             }
         }
         // The note's only figure is the year Netlify's plans changed.
