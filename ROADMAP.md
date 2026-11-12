@@ -91,7 +91,9 @@ Small fixes and conveniences. Mac first where it says so.
     ([#516](https://github.com/russellgordon/plantoir/issues/516)).
 - **Change the time of a scheduled deploy on the Mac**, without cancelling
   it and scheduling again, as Windows already allows. ([#525](https://github.com/russellgordon/plantoir/issues/525))
-- Behind the scenes: old build folders are cleared away
+- Behind the scenes: a check before each release that every kind of diagram
+  and interactive page really draws on the published test sites, GitHub
+  Pages included ([#597](https://github.com/russellgordon/plantoir/issues/597)); old build folders are cleared away
   ([#722](https://github.com/russellgordon/plantoir/issues/722)), and a handful of checks that the Mac and Windows apps behave
   the same way.
 
@@ -118,9 +120,6 @@ Small fixes and conveniences. Mac first where it says so.
 - **Diagrams and fonts served by your own site**, as maths and GeoGebra
   already are, so pages look right without reaching other websites.
   ([#566](https://github.com/russellgordon/plantoir/issues/566))
-- Behind the scenes: a check before each release that every kind of diagram
-  and interactive page really draws on the published test sites
-  ([#597](https://github.com/russellgordon/plantoir/issues/597)).
 
 ---
 
