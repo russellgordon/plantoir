@@ -9,6 +9,7 @@ except ImportError:
     frontmatter = None
 import subprocess
 import signal
+import html
 import json
 import re
 import unicodedata
@@ -6203,7 +6204,10 @@ COVERAGE_LEVELS = [
 
 def append_coverage_styles(base_scss_path: Path):
     """
-    Styles for the curriculum coverage map.
+    Styles for the curriculum coverage map, appended to the site's base.scss.
+    The block itself is `coverage_stylesheet()`, which the map Plantoir shows
+    for a section (#793, `coverage_tab_page`) uses too, so the two maps cannot
+    drift apart in colour, ring or spacing.
 
     Colours are fixed rather than taken from the theme: the map's whole job
     is a graded reading from red through green to navy, and a colour scheme
@@ -6215,12 +6219,27 @@ def append_coverage_styles(base_scss_path: Path):
     REPLACED rather than skipped: a stylesheet that survives from a previous
     build must still pick up a change made since.
     """
-    marker = "/* === curriculum coverage map === */"
     if not base_scss_path.exists():
         return
     text = base_scss_path.read_text(encoding="utf-8")
-    if marker in text:
-        text = text[:text.index(marker)].rstrip() + "\n"
+    if COVERAGE_STYLES_MARKER in text:
+        text = text[:text.index(COVERAGE_STYLES_MARKER)].rstrip() + "\n"
+    text += "\n\n" + coverage_stylesheet()
+    base_scss_path.write_text(text, encoding="utf-8")
+    print("✅ Appended curriculum coverage map styles to base.scss")
+
+
+COVERAGE_STYLES_MARKER = "/* === curriculum coverage map === */"
+
+
+def coverage_stylesheet() -> str:
+    """
+    The coverage map's CSS, from its marker line to the end: plain CSS (no
+    SCSS syntax), reading three theme variables, `--lightgray`, `--gray` and
+    `--dark`, which Quartz defines on a site and `coverage_tab_page` defines
+    from the section's colour scheme.
+    """
+    marker = COVERAGE_STYLES_MARKER
 
     # Both rules for a step come from the one definition above, so a fill
     # can never end up wearing a label that was chosen for a different
@@ -6237,9 +6256,7 @@ def append_coverage_styles(base_scss_path: Path):
     level_hover_rules = ("/* Each step keeps the label it wears at rest. */\n"
                          + "\n".join(level_hover_rules))
 
-    text += f"""
-
-{marker}
+    return f"""{marker}
 .coverage-panel {{
   /* The cell colours are fixed on purpose — the graded reading is the
      whole point (see COVERAGE_LEVELS) — but the page behind them is not. Plantoir's colour
@@ -6418,8 +6435,6 @@ a.coverage-chip:focus-visible {{
   line-height: 1.35;
 }}
 """
-    base_scss_path.write_text(text, encoding="utf-8")
-    print("✅ Appended curriculum coverage map styles to base.scss")
 
 
 def patch_render_page_transclude_title(render_page_tsx_path: Path):
@@ -8475,7 +8490,8 @@ _NOT_GIVEN = object()
 
 def _coverage_counts(content_root: Path, curriculum_dirs, specific: dict,
                      class_folders: list, graded_folders: list,
-                     graded_was_configured: bool, taught=_NOT_GIVEN):
+                     graded_was_configured: bool, taught=_NOT_GIVEN,
+                     every_page: bool = False, leave_out=()):
     """
     How many pages address each expectation, and which of those are assessed.
 
@@ -8510,6 +8526,18 @@ def _coverage_counts(content_root: Path, curriculum_dirs, specific: dict,
     a class page, directly or through one page a class page links to. A
     concept page written in August and never put in a class has not
     addressed anything yet, and the map should say so.
+
+    `every_page` (#793) answers the other question, the one the map Plantoir
+    shows for a section asks: what would this map say if every page in it
+    were published? It drops the published test above and NOTHING else, so
+    the taught rule, the curriculum folders, the maps themselves, code and
+    comments and the graded-folder rule are the site's own. One function,
+    two answers, so the two maps cannot drift; the site's call passes neither
+    new argument and its page is byte for byte what it was (the goldens in
+    test_coverage_maps.py). `leave_out` is the build's copies, RESOLVED, that
+    must not count whatever they say: the map for the app passes the pages whose
+    settings could not be read (#246), which the build cannot place in a
+    section (shared-rules.json -> coverageTab.whatCounts).
     """
     if isinstance(curriculum_dirs, Path):
         curriculum_dirs = [curriculum_dirs]
@@ -8525,11 +8553,13 @@ def _coverage_counts(content_root: Path, curriculum_dirs, specific: dict,
             continue
         if _is_coverage_page_name(page.name):
             continue
+        if leave_out and page.resolve() in leave_out:
+            continue
         try:
             text = page.read_text(encoding="utf-8")
         except Exception:
             continue
-        if _is_draft(text):
+        if not every_page and _is_draft(text):
             continue
         relative = page.relative_to(content_root)
         # A page in a Tasks folder is assessed work — that is what makes an
@@ -8575,7 +8605,8 @@ COVERAGE_WORDS = {
 }
 
 
-def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assessed: bool) -> str:
+def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assessed: bool,
+                   href_for=None, labels=None) -> str:
     """One cell: the expectation's code, coloured by how often it is addressed.
 
     The count is NOT printed. Fifty-odd cells each carrying a digit turns
@@ -8583,16 +8614,35 @@ def _coverage_cell(code: str, page: Path, content_root: Path, count: int, assess
     the reading is the colour, and the exact count is a hover away. It
     still reaches a screen reader through the label, where it costs
     nothing.
+
+    The site passes neither `href_for` nor `labels`, and gets exactly the
+    cell it always had. The map for the app (#793) passes both: `href_for`
+    names its link (None draws the cell as a plain span, for a code whose
+    page the build cannot name), and `labels` asks for a `title=` carrying
+    the same words as the label, since that map has no hover preview, and
+    for everything written into the cell to be escaped.
     """
     level = min(count, 4)
-    href = _quartz_page_slug(page.relative_to(content_root))
+    href = (href_for(code, page) if href_for is not None
+            else _quartz_page_slug(page.relative_to(content_root)))
     marker = ' data-assessed="true"' if assessed else ""
     label = f"{code}, {COVERAGE_WORDS[level]}"
     if assessed:
         label += ", included in assessed work"
-    return (f'<a class="internal coverage-cell coverage-{level}" href="{href}"{marker} '
-            f'aria-label="{label}">'
-            f'<span class="coverage-code">{code}</span></a>')
+    if labels is None:
+        return (f'<a class="internal coverage-cell coverage-{level}" href="{href}"{marker} '
+                f'aria-label="{label}">'
+                f'<span class="coverage-code">{code}</span></a>')
+    label = html.escape(label, quote=True)
+    shown = html.escape(code, quote=True)
+    if href is None:
+        return (f'<span class="coverage-cell coverage-{level}"{marker} role="img" '
+                f'aria-label="{label}" title="{label}">'
+                f'<span class="coverage-code">{shown}</span></span>')
+    return (f'<a class="internal coverage-cell coverage-{level}" '
+            f'href="{html.escape(href, quote=True)}"{marker} '
+            f'aria-label="{label}" title="{label}">'
+            f'<span class="coverage-code">{shown}</span></a>')
 
 
 def build_curriculum_coverage(content_root: Path, course_code: str,
@@ -8671,21 +8721,15 @@ def build_curriculum_coverage(content_root: Path, course_code: str,
     return written
 
 
-def _coverage_page(content_root: Path, course_code: str, title: str, folder: str,
-                   specific: dict, overall: dict, covered_by: dict, assessed_by: dict,
-                   include_notes: bool, graded_folders, graded_was_configured: bool,
-                   first_class_stamp, names_the_folder: bool):
-    """
-    One map page's text, and its counts.
+def _coverage_columns(content_root: Path, specific: dict, overall: dict,
+                      covered_by: dict, assessed_by: dict, href_for=None, labels=None):
+    """The strand columns of one map, and whether it has chips.
 
-    A course with ONE map named `Curriculum Coverage` gets exactly the page it
-    always had — byte for byte, pinned by `test_coverage_maps.py`'s goldens.
-    Otherwise the intro names the folder, so two maps side by side say which
-    is which. A map with no overall expectations (the College Board's skills
-    have none to be evaluated) leaves out everything about the chips: the
-    sentence under the legend, the standings row, and the chips' part of the
-    notes — a page that explains chips it does not show reads as broken.
-    """
+    Shared by the site's map and the map for the app (#793). The site passes
+    neither `href_for` nor `labels`. `labels`, from
+    shared-rules.json -> coverageTab.pageWords, gives each chip words of its
+    own (on the site a chip is a colour and a code, and nothing else says
+    which colour it is) and escapes what is written into it."""
     strands = {}
     for code in specific:
         strands.setdefault(strand_of(code), []).append(code)
@@ -8705,8 +8749,12 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
                             if overall_of(code) == overall_code)
             page = overall.get(overall_code)
             state = "yes" if evaluated else "no"
-            if page:
-                href = _quartz_page_slug(page.relative_to(content_root))
+            if labels is not None:
+                chips.append(_coverage_chip_for_the_app(
+                    overall_code, state, page, href_for, labels))
+            elif page:
+                href = (href_for(overall_code, page) if href_for is not None
+                        else _quartz_page_slug(page.relative_to(content_root)))
                 chips.append(f'<a class="internal coverage-chip coverage-chip-{state}" '
                              f'href="{href}">{overall_code}</a>')
             else:
@@ -8714,16 +8762,42 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
         for code in strands[strand]:
             count = len(covered_by[code])
             cells.append(_coverage_cell(code, specific[code], content_root, count,
-                                        bool(assessed_by[code])))
+                                        bool(assessed_by[code]), href_for=href_for,
+                                        labels=labels))
         chips_html = f'<div class="coverage-chips">{"".join(chips)}</div>' if chips else ""
         has_chips = has_chips or bool(chips)
+        letter = strand if labels is None else html.escape(strand, quote=True)
         columns.append(
             '<div class="coverage-strand">'
-            f'<div class="coverage-letter">{strand}</div>'
+            f'<div class="coverage-letter">{letter}</div>'
             f'{chips_html}'
             f'{"".join(cells)}'
             "</div>")
 
+    return columns, has_chips
+
+
+def _coverage_chip_for_the_app(overall_code: str, state: str, page, href_for, labels: dict) -> str:
+    """One overall expectation's chip on the map for the app (#793): its
+    state in words as well as in colour, and a link only where `href_for`
+    names one."""
+    words_key = "chipAssessed" if state == "yes" else "chipNotAssessed"
+    label = html.escape(labels[words_key].replace("{code}", overall_code), quote=True)
+    shown = html.escape(overall_code, quote=True)
+    href = href_for(overall_code, page) if (page and href_for is not None) else None
+    if href is None:
+        return (f'<span class="coverage-chip coverage-chip-{state}" role="img" '
+                f'aria-label="{label}" title="{label}">{shown}</span>')
+    return (f'<a class="internal coverage-chip coverage-chip-{state}" '
+            f'href="{html.escape(href, quote=True)}" aria-label="{label}" '
+            f'title="{label}">{shown}</a>')
+
+
+def _coverage_standing_counts(specific: dict, overall: dict, covered_by: dict,
+                              assessed_by: dict) -> dict:
+    """The numbers in a map's standings: how many specific expectations,
+    how many no page addresses, how many exactly one does, and which overall
+    expectations have no assessed work. Both maps' tables come from here."""
     total = len(specific)
     uncovered = [code for code in specific if not covered_by[code]]
     once = [code for code in specific if len(covered_by[code]) == 1]
@@ -8732,6 +8806,62 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
         related = [code for code in specific if overall_of(code) == overall_code]
         if related and not any(assessed_by[code] for code in related):
             unevaluated.append(overall_code)
+    return {"total": total, "uncovered": uncovered, "once": once, "unevaluated": unevaluated}
+
+
+# The words under the map, the same on the site and in the map for the app.
+COVERAGE_ASSESSED_LEGEND = "Included in assessed work — the cell carries a ring"
+
+# The names of the standings' rows, the same on the site and in the map for
+# the app, in the order both tables show them.
+COVERAGE_STANDING_ROWS = {
+    "total": "Specific expectations",
+    "uncovered": "Not yet addressed",
+    "once": "Addressed by exactly one page",
+    "unevaluated": "Overall expectations with no assessed work",
+}
+
+
+def _coverage_panel_html(columns: list) -> str:
+    """The panel both maps draw: the strand columns, the rule and the legend.
+    The site's page carries it between blank lines, so a change here is a
+    change to the site's page, which the goldens see."""
+    return f"""<div class="coverage-panel">
+<div class="coverage-map">{"".join(columns)}</div>
+<hr class="coverage-rule">
+<div class="coverage-legend">
+<div class="coverage-legend-row"><span class="coverage-key coverage-0"></span><span class="coverage-legend-label">{COVERAGE_WORDS[0].capitalize()}</span></div>
+<div class="coverage-legend-row"><span class="coverage-key coverage-1"></span><span class="coverage-legend-label">{COVERAGE_WORDS[1].capitalize()}</span></div>
+<div class="coverage-legend-row"><span class="coverage-key coverage-2"></span><span class="coverage-legend-label">{COVERAGE_WORDS[2].capitalize()}</span></div>
+<div class="coverage-legend-row"><span class="coverage-key coverage-3"></span><span class="coverage-legend-label">{COVERAGE_WORDS[3].capitalize()}</span></div>
+<div class="coverage-legend-row"><span class="coverage-key coverage-4"></span><span class="coverage-legend-label">{COVERAGE_WORDS[4].capitalize()}</span></div>
+<div class="coverage-legend-row"><span class="coverage-key coverage-2" data-assessed="true"></span><span class="coverage-legend-label">{COVERAGE_ASSESSED_LEGEND}</span></div>
+</div>
+</div>"""
+
+
+def _coverage_page(content_root: Path, course_code: str, title: str, folder: str,
+                   specific: dict, overall: dict, covered_by: dict, assessed_by: dict,
+                   include_notes: bool, graded_folders, graded_was_configured: bool,
+                   first_class_stamp, names_the_folder: bool):
+    """
+    One map page's text, and its counts.
+
+    A course with ONE map named `Curriculum Coverage` gets exactly the page it
+    always had — byte for byte, pinned by `test_coverage_maps.py`'s goldens.
+    Otherwise the intro names the folder, so two maps side by side say which
+    is which. A map with no overall expectations (the College Board's skills
+    have none to be evaluated) leaves out everything about the chips: the
+    sentence under the legend, the standings row, and the chips' part of the
+    notes — a page that explains chips it does not show reads as broken.
+    """
+    columns, has_chips = _coverage_columns(content_root, specific, overall,
+                                           covered_by, assessed_by)
+    standing = _coverage_standing_counts(specific, overall, covered_by, assessed_by)
+    total = standing["total"]
+    uncovered = standing["uncovered"]
+    once = standing["once"]
+    unevaluated = standing["unevaluated"]
 
     # The explanatory sections, which the teacher can switch off.
     # The page must describe THIS course's rule. It used to say "the Tasks
@@ -8756,7 +8886,7 @@ def _coverage_page(content_root: Path, course_code: str, title: str, folder: str
 each strand letter is that strand's overall expectations: green when
 assessed work addresses them, red when nothing marked does.""" if has_chips
                      else "Hover any cell to preview the expectation.")
-    unevaluated_row = (f"| Overall expectations with no assessed work | {len(unevaluated)} |\n"
+    unevaluated_row = (f"| {COVERAGE_STANDING_ROWS['unevaluated']} | {len(unevaluated)} |\n"
                        if has_chips else "")
 
     body = f"""---
@@ -8768,18 +8898,7 @@ publish: true
 The map is built from this site's own links each time the site is built, so
 it cannot drift from the course.
 
-<div class="coverage-panel">
-<div class="coverage-map">{"".join(columns)}</div>
-<hr class="coverage-rule">
-<div class="coverage-legend">
-<div class="coverage-legend-row"><span class="coverage-key coverage-0"></span><span class="coverage-legend-label">{COVERAGE_WORDS[0].capitalize()}</span></div>
-<div class="coverage-legend-row"><span class="coverage-key coverage-1"></span><span class="coverage-legend-label">{COVERAGE_WORDS[1].capitalize()}</span></div>
-<div class="coverage-legend-row"><span class="coverage-key coverage-2"></span><span class="coverage-legend-label">{COVERAGE_WORDS[2].capitalize()}</span></div>
-<div class="coverage-legend-row"><span class="coverage-key coverage-3"></span><span class="coverage-legend-label">{COVERAGE_WORDS[3].capitalize()}</span></div>
-<div class="coverage-legend-row"><span class="coverage-key coverage-4"></span><span class="coverage-legend-label">{COVERAGE_WORDS[4].capitalize()}</span></div>
-<div class="coverage-legend-row"><span class="coverage-key coverage-2" data-assessed="true"></span><span class="coverage-legend-label">Included in assessed work — the cell carries a ring</span></div>
-</div>
-</div>
+{_coverage_panel_html(columns)}
 
 {chip_sentence}
 
@@ -8787,9 +8906,9 @@ it cannot drift from the course.
 
 | | |
 | --- | --- |
-| Specific expectations | {total} |
-| Not yet addressed | {len(uncovered)} |
-| Addressed by exactly one page | {len(once)} |
+| {COVERAGE_STANDING_ROWS['total']} | {total} |
+| {COVERAGE_STANDING_ROWS['uncovered']} | {len(uncovered)} |
+| {COVERAGE_STANDING_ROWS['once']} | {len(once)} |
 {unevaluated_row}
 {notes}"""
     return body, {"total": total, "uncovered": len(uncovered), "unevaluated": len(unevaluated)}
@@ -8812,6 +8931,430 @@ def announce_coverage_maps(maps: list, course: str, section_number: int, printer
               "expectations": item["expectations"]} for item in maps]
     # At most machineLineLength.maxCharacters (#666), as PLANTOIR_DATED: is.
     printer(machine_line.listed(prefix, {"course": course, "section": section_number}, "maps", named))
+
+
+# === The map Plantoir shows on a section's Coverage tab (#793) ==============
+#
+# Every build of a section also writes, BESIDE its built website, that
+# section's curriculum coverage map as it would be if every existing page were
+# published: one stand-alone page in the section's own colours, and a small
+# record the app reads without parsing HTML. contracts/shared-rules.json ->
+# coverageTab says what counts and what the page says; contracts/
+# file-formats.json -> coverageTabMap says what is written where and in what
+# order. documentation/05-build-pipeline.md -> "The Coverage tab's map (#793)"
+# says why, and what was rejected.
+#
+# SEAM (#768, for 793b and the merge). A deploy that REUSES the last build
+# (#768) runs no Python, so this map is left exactly as the last build that
+# ran wrote it, carrying that build's own start (`startedNs`). That is the
+# true answer: the build was reused because nothing in the course changed
+# since it started. Nothing here re-dates an old map, and nothing in #768
+# needs to call into this code. What 793b must connect is the READER: the
+# tab's "pages have changed since" line compares the record's `startedNs`
+# with #768's change walk (BuildFreshness's, factored as the plan review's
+# M1 `changedSince(reference:course:now:)`, clock rule included), never with
+# `public/index.html` or `.build-started`, which describe the site rather
+# than the map.
+
+COVERAGE_TAB_FOLDER = ".coverage-tab"
+COVERAGE_TAB_RECORD = "about.json"
+COVERAGE_TAB_RECORD_VERSION = 1
+COVERAGE_TAB_LINK_SCHEME = "plantoir-coverage"
+# The scheme a section gets when it has chosen none, or chosen one that is
+# not in support/colour_schemes.json: the colours its site wears then.
+COVERAGE_TAB_DEFAULT_SCHEME = "quartz-standard"
+# The nine colours a scheme carries, in the order Quartz writes them.
+COVERAGE_TAB_COLOUR_KEYS = ["light", "lightgray", "gray", "darkgray", "dark",
+                            "secondary", "tertiary", "highlight", "textHighlight"]
+
+
+def coverage_tab_folder(host_output_dir: Path) -> Path:
+    """Where the map for the app is written: beside `public/`, never in it."""
+    return Path(host_output_dir) / COVERAGE_TAB_FOLDER
+
+
+def coverage_tab_page_words() -> dict:
+    """shared-rules.json -> coverageTab.pageWords. Raises when the contract
+    cannot be read; the caller turns that into its one warning line."""
+    return contracts.section("shared-rules", "coverageTab", "pageWords")
+
+
+def coverage_tab_link(build_id: str, map_index: int, code: str) -> str:
+    """`plantoir-coverage:open/<buildId>/<map>/<code>` (coverageTab.link)."""
+    return (f"{COVERAGE_TAB_LINK_SCHEME}:open/"
+            f"{urllib.parse.quote(str(build_id), safe='')}/{int(map_index)}/"
+            f"{urllib.parse.quote(str(code), safe='')}")
+
+
+def coverage_as_if_published(content_root: Path, course_dir: Path, coverage_plan: list,
+                             class_folders: list, graded_folders: list,
+                             graded_was_configured: bool, taught,
+                             unreadable_copies) -> dict:
+    """
+    Every map of the section as it would be if every page were published.
+
+    `coverage_plan` is the build's own `plan_coverage_maps` answer, so this
+    map covers exactly the folders the site's would. `unreadable_copies` are
+    the build's copies of pages whose settings could not be read (#246),
+    which are left out (coverageTab.unreadablePages). Returns {"maps": [...],
+    "hiddenCounted": n}: each map carries its title, folder, whether the
+    intro names the folder, the expectations, the counts and, for each code
+    whose page the build can name, that page as a path below the course
+    folder. `hiddenCounted` is the number of different pages, across every
+    map, that address something and that students cannot see yet.
+    """
+    leave_out = set()
+    for copy in unreadable_copies:
+        leave_out.add(Path(copy).resolve())
+    mapped_dirs = []
+    for folder, _ in coverage_plan:
+        mapped_dirs.append(folder)
+    several = len(coverage_plan) > 1
+    maps = []
+    counted_pages = set()
+    for curriculum_dir, title in coverage_plan:
+        # Silent: the site's map already said which page a repeated code
+        # uses (the plan review's L3), and saying it twice reads as two faults.
+        specific, overall = _collect_expectations(curriculum_dir, printer=lambda line: None)
+        if not specific:
+            continue
+        covered_by, assessed_by = _coverage_counts(content_root, mapped_dirs, specific,
+                                                   class_folders, graded_folders or [],
+                                                   graded_was_configured, taught=taught,
+                                                   every_page=True, leave_out=leave_out)
+        for code in covered_by:
+            for place in covered_by[code]:
+                counted_pages.add(place)
+        pages = {}
+        for code in specific:
+            source = _vault_relative_source(specific[code], course_dir)
+            if source is not None:
+                pages[code] = source
+        for code in overall:
+            source = _vault_relative_source(overall[code], course_dir)
+            if source is not None:
+                pages[code] = source
+        maps.append({
+            "title": title,
+            "folder": curriculum_dir.name,
+            "namesTheFolder": several or title != COVERAGE_PAGE_TITLE,
+            "specific": specific,
+            "overall": overall,
+            "covered_by": covered_by,
+            "assessed_by": assessed_by,
+            "standing": _coverage_standing_counts(specific, overall, covered_by, assessed_by),
+            "pages": pages,
+        })
+    hidden = 0
+    for place in sorted(counted_pages):
+        try:
+            text = (content_root / place).read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if _is_draft(text):
+            hidden += 1
+    return {"maps": maps, "hiddenCounted": hidden}
+
+
+def _coverage_tab_count_lines(words: dict, hidden: int, unreadable: int) -> list:
+    """coverageTab.countLines: the hidden-pages line always, the
+    unreadable-pages line only when a page was left out."""
+    lines = []
+    if hidden == 0:
+        lines.append(words["hiddenNone"])
+    elif hidden == 1:
+        lines.append(words["hiddenOne"])
+    else:
+        lines.append(words["hiddenMany"].replace("{n}", str(hidden)))
+    if unreadable == 1:
+        lines.append(words["unreadableOne"])
+    elif unreadable > 1:
+        lines.append(words["unreadableMany"].replace("{n}", str(unreadable)))
+    return lines
+
+
+def coverage_tab_scheme_colours(config: dict, section_number: int, schemes=None) -> dict:
+    """The section's own colour scheme's {lightMode, darkMode} (Russell's
+    ruling, 2026-11-12), or quartz-standard's when it has none or an unknown
+    one. `schemes` is support/colour_schemes.json's list, read when not given."""
+    if schemes is None:
+        schemes = load_colour_schemes()
+    chosen = None
+    colour_map = config.get("color_schemes") or {}
+    if isinstance(colour_map, dict):
+        chosen = colour_map.get(f"section{section_number}")
+    for scheme_id in (chosen, COVERAGE_TAB_DEFAULT_SCHEME):
+        if not scheme_id:
+            continue
+        scheme = find_scheme_by_id(schemes, scheme_id)
+        if scheme and isinstance(scheme.get("colors"), dict):
+            colours = scheme["colors"]
+            if isinstance(colours.get("lightMode"), dict) and isinstance(colours.get("darkMode"), dict):
+                return colours
+    return {"lightMode": {}, "darkMode": {}}
+
+
+def _coverage_tab_colour_rules(palette: dict) -> str:
+    """One `--name: value;` per colour the scheme carries. A value is used
+    only when it is plainly a colour, so nothing in a scheme file can close
+    the rule early."""
+    rules = []
+    for key in COVERAGE_TAB_COLOUR_KEYS:
+        value = palette.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[#(),.%\w\s-]+", value):
+            rules.append(f"  --{key}: {value};")
+    return "\n".join(rules)
+
+
+# The page's own few rules around the site's coverage stylesheet: the body in
+# the scheme's colours, a system font (nothing may load from the network),
+# the headings, the count lines and the standings table.
+COVERAGE_TAB_SHELL_CSS = """* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 1.5rem 1.75rem 2.5rem;
+  background: var(--light);
+  color: var(--darkgray);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+main { max-width: 60rem; }
+h1, h2 { color: var(--dark); line-height: 1.25; }
+h1 { font-size: 1.45rem; margin: 0 0 0.2rem; }
+h2 { font-size: 1.2rem; margin: 2rem 0 0.4rem; }
+.coverage-tab-subheading { margin: 0 0 1rem; color: var(--darkgray); }
+.coverage-tab-count { margin: 0.25rem 0; }
+.coverage-tab-hint { margin: 0.6rem 0 1rem; }
+.coverage-standings { border-collapse: collapse; margin: 0.6rem 0 0; }
+.coverage-standings caption { text-align: left; font-weight: 700; color: var(--dark); padding-bottom: 0.4rem; }
+.coverage-standings th, .coverage-standings td { border: 1px solid var(--gray); padding: 0.3rem 0.7rem; }
+.coverage-standings th { text-align: left; font-weight: 400; }
+.coverage-standings td { text-align: right; font-variant-numeric: tabular-nums; }
+.coverage-tab-foot { margin-top: 2rem; max-width: 42rem; }
+.coverage-code { color: inherit; }
+"""
+
+COVERAGE_TAB_CSP = "default-src 'none'; style-src 'unsafe-inline'"
+
+
+def coverage_tab_page(maps: list, course_display: str, section_number, build_id: str,
+                      colours: dict, words: dict, hidden: int, unreadable: int,
+                      site_map_on: bool) -> str:
+    """
+    The whole HTML document for the app's Coverage tab: `maps` is
+    `coverage_as_if_published`'s list, `colours` the section's scheme
+    (`coverage_tab_scheme_colours`), `words` coverageTab.pageWords.
+
+    No script, no event attribute, nothing from outside: the CSP meta says
+    so a fourth time after the app's own guards (793b), and the only links
+    are `plantoir-coverage:` ones. Everything that came from the course is
+    escaped (coverageTab.escaping).
+    """
+    def escaped(text) -> str:
+        return html.escape(str(text), quote=True)
+
+    course = escaped(course_display)
+    heading = escaped(words["heading"])
+    subheading = escaped(words["subheading"].replace("{course}", str(course_display))
+                         .replace("{section}", str(section_number)))
+    count_lines = []
+    for line in _coverage_tab_count_lines(words, hidden, unreadable):
+        count_lines.append(f'<p class="coverage-tab-count">{escaped(line)}</p>')
+
+    sections = []
+    for index, one_map in enumerate(maps):
+        pages = one_map["pages"]
+
+        def href_for(code, page, index=index, pages=pages):
+            if code not in pages:
+                return None
+            return coverage_tab_link(build_id, index, code)
+
+        # No content folder: with href_for given, nothing asks for a site slug.
+        columns, has_chips = _coverage_columns(None, one_map["specific"], one_map["overall"],
+                                               one_map["covered_by"], one_map["assessed_by"],
+                                               href_for=href_for, labels=words)
+        if one_map["namesTheFolder"]:
+            intro = (words["introNamingTheFolder"].replace("{folder}", str(one_map["folder"]))
+                     .replace("{course}", str(course_display)))
+        else:
+            intro = words["intro"].replace("{course}", str(course_display))
+        hint = (f'\n<p class="coverage-tab-hint">{escaped(words["chipsHint"])}</p>'
+                if has_chips else "")
+        standing = one_map["standing"]
+        rows = [("total", standing["total"]), ("uncovered", len(standing["uncovered"])),
+                ("once", len(standing["once"]))]
+        if has_chips:
+            rows.append(("unevaluated", len(standing["unevaluated"])))
+        table_rows = []
+        for key, number in rows:
+            table_rows.append(f'<tr><th scope="row">{escaped(COVERAGE_STANDING_ROWS[key])}</th>'
+                              f'<td>{number}</td></tr>')
+        sections.append(
+            f'<section aria-labelledby="coverage-map-{index}">\n'
+            f'<h2 id="coverage-map-{index}">{escaped(one_map["title"])}</h2>\n'
+            f'<p>{escaped(intro)}</p>\n'
+            f'{_coverage_panel_html(columns)}{hint}\n'
+            f'<table class="coverage-standings">\n'
+            f'<caption>{escaped(words["standingsCaption"])}</caption>\n'
+            f'{chr(10).join(table_rows)}\n'
+            f'</table>\n'
+            f'</section>')
+
+    foot = words["whatCountsHere"] if site_map_on else words["whatCountsHereSiteMapOff"]
+    light = _coverage_tab_colour_rules(colours.get("lightMode") or {})
+    dark = _coverage_tab_colour_rules(colours.get("darkMode") or {})
+    newline = "\n"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="{COVERAGE_TAB_CSP}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{heading} · {course}</title>
+<style>
+:root {{
+{light}
+}}
+@media (prefers-color-scheme: dark) {{
+:root {{
+{dark}
+}}
+}}
+{COVERAGE_TAB_SHELL_CSS}{coverage_stylesheet()}</style>
+</head>
+<body>
+<main>
+<h1>{heading}</h1>
+<p class="coverage-tab-subheading">{subheading}</p>
+{newline.join(count_lines)}
+{(newline + newline).join(sections)}
+<p class="coverage-tab-foot">{escaped(foot)}</p>
+</main>
+</body>
+</html>
+"""
+
+
+def _remove_other_coverage_tab_pages(folder: Path, keep: str | None) -> None:
+    """Every `map-*.html` in the folder but `keep`, one by one by name."""
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if name == keep:
+            continue
+        if name.startswith("map-") and name.endswith(".html"):
+            try:
+                os.remove(folder / name)
+            except OSError:
+                pass
+
+
+def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Path,
+                       course_code: str, course_display: str, section_number: int,
+                       build_id: str, occasion: str, coverage_plan: list,
+                       class_folders: list, graded_folders: list,
+                       graded_was_configured: bool, taught, config: dict,
+                       site_map_on: bool, unreadable_copies=None, words=None,
+                       schemes=None) -> dict:
+    """
+    Writes `<host_output_dir>/.coverage-tab/`: the page first (a temporary
+    file renamed into place), `about.json` LAST, then every other `map-*.html`
+    removed, so a reader of `about.json` always finds the page it names
+    (file-formats.json -> coverageTabMap.orderOfWriting). A course with no
+    curriculum folder holding an expectation page gets `"maps": []`, no page,
+    and any older page removed. Returns the record. Raises on failure; the
+    build's call is `make_the_coverage_tab`, which never lets it stop a build.
+    """
+    if unreadable_copies is None:
+        unreadable_copies = []
+        for copy, _, _ in _unreadable_pages:
+            unreadable_copies.append(copy)
+    if words is None:
+        words = coverage_tab_page_words()
+    folder = coverage_tab_folder(host_output_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+
+    answer = coverage_as_if_published(content_root, course_dir, coverage_plan, class_folders,
+                                      graded_folders, graded_was_configured, taught,
+                                      unreadable_copies)
+    maps = answer["maps"]
+    # Pages, not entries: a copy met twice (a section's page over a shared
+    # one of the same name) is one page.
+    unreadable_pages = set()
+    for copy in unreadable_copies:
+        unreadable_pages.add(Path(copy).resolve())
+    unreadable = len(unreadable_pages)
+
+    # The build's own start, by the filesystem's clock (BUILD_STARTED_MARKER
+    # says why that clock and not this process's): the moment the build
+    # began reading, which is what "pages have changed since" is measured
+    # against. None when the marker could not be made.
+    started_ns = None
+    started_at = None
+    try:
+        started_ns = os.stat(Path(host_output_dir) / BUILD_STARTED_PENDING).st_mtime_ns
+        started_at = (datetime.fromtimestamp(started_ns / 1_000_000_000, tz=timezone.utc)
+                      .strftime("%Y-%m-%dT%H:%M:%SZ"))
+    except OSError:
+        started_ns = None
+
+    page_name = None
+    if maps:
+        page_name = f"map-{build_id}.html"
+        text = coverage_tab_page(maps, course_display, section_number, build_id,
+                                 coverage_tab_scheme_colours(config, section_number, schemes),
+                                 words, answer["hiddenCounted"], unreadable, site_map_on)
+        temporary = folder / f".{page_name}.{os.getpid()}.tmp"
+        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        os.replace(temporary, folder / page_name)
+
+    record_maps = []
+    for one_map in maps:
+        standing = one_map["standing"]
+        record_maps.append({
+            "title": one_map["title"],
+            "folder": one_map["folder"],
+            "expectations": standing["total"],
+            "notYetAddressed": len(standing["uncovered"]),
+            "addressedOnce": len(standing["once"]),
+            "overallWithoutAssessedWork": len(standing["unevaluated"]),
+            "pages": one_map["pages"],
+        })
+    record = {
+        "version": COVERAGE_TAB_RECORD_VERSION,
+        "course": course_code,
+        "section": section_number,
+        "buildId": build_id,
+        "startedNs": started_ns,
+        "startedAt": started_at,
+        "occasion": occasion,
+        "siteMapSwitchedOn": bool(site_map_on),
+        "page": page_name,
+        "hiddenPagesCounted": answer["hiddenCounted"],
+        "unreadablePagesLeftOut": unreadable,
+        "maps": record_maps,
+    }
+    _write_json_atomically(folder / COVERAGE_TAB_RECORD, record)
+    _remove_other_coverage_tab_pages(folder, page_name)
+    return record
+
+
+def make_the_coverage_tab(*arguments, printer=print, **keywords) -> dict | None:
+    """`write_coverage_tab`, never failing the build: anything that goes wrong
+    is one warning line, and the build goes on. Prints nothing on success
+    (shared-rules.json -> coverageTab.whenItIsWritten)."""
+    try:
+        return write_coverage_tab(*arguments, **keywords)
+    except Exception as error:
+        printer(f"⚠️  The coverage map Plantoir shows for this section could not be "
+                f"made this time: {error}")
+        return None
 
 
 def set_backlinks_structural_pages(backlinks_tsx_path: Path, content_root: Path,
@@ -9506,6 +10049,20 @@ def build_section_site(
     set_backlinks_overall_children(
         output_dir / "quartz" / "components" / "Backlinks.tsx", content_root,
         coverage_plan)
+
+    # === The map Plantoir shows on the section's Coverage tab (#793) ==========
+    # ALWAYS, and whatever coverage_wanted says (Russell's ruling, 2026-11-12):
+    # the setting decides what students see, not the teacher's planning view.
+    # After the How I Teach sweep, the #246 hiding and the clearing of a site
+    # this build cannot replace; BEFORE the problems record below, so the
+    # PLANTOIR_PROBLEMS: line also means this map is on disk. Beside the site,
+    # never in content/ or public/. Never fails the build.
+    make_the_coverage_tab(
+        host_output_dir, content_root, course_dir, course_code,
+        displayed_course_code(config, course_code), section_number,
+        _this_build_id, "deploy" if build_only else "preview", coverage_plan,
+        class_folders_here, graded_folders_here, graded_was_configured_here,
+        taught_here, config, coverage_wanted)
     # ==========================================================================
 
     # === Post-pass — sync 'created' timestamps for non-class pages =============

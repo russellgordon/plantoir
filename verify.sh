@@ -1267,6 +1267,26 @@ else
   cat /tmp/verify_page_sources_test.log
 fi
 
+# ---- build_site.py: the map Plantoir shows on a section's Coverage tab (#793) ----
+# Every coverageTab counting case both ways (the site's count, and the count
+# if every page were published) through the build's own process_frontmatter,
+# which is why it runs in the image; the count lines, the links, the
+# escaping, the colours, the record and where it is written; and that no
+# deploy and no page of the site carries it. deploy.sh is mounted because
+# the test reads its folder publish, and the image carries no launcher at
+# /opt. The site's own map is test_coverage_maps.py, in step 0.
+echo ""
+echo "🔎 Checking the coverage map Plantoir shows for a section…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_coverage_tab.py" /opt/scripts/test_coverage_tab.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_coverage_tab.py >/tmp/verify_coverage_tab_test.log 2>&1; then
+  pass "build_site.py: the coverage map for a section's Coverage tab counts, says and sits where the contract says (scripts/test_coverage_tab.py, #793)"
+else
+  fail "build_site.py: the coverage map for a section's Coverage tab does not count, say or sit where the contract says (scripts/test_coverage_tab.py, #793)"
+  cat /tmp/verify_coverage_tab_test.log
+fi
+
 # ---- the published-pages record (#379) ----
 # The build's list of the pages it shows (beside public/, never inside it,
 # written only after the site was built), deploy.py's fragment after each

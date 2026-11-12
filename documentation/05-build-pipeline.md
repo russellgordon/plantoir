@@ -1863,7 +1863,9 @@ subfolders inside the curriculum folder: their nested pages now count.
 map page: a College Board page that transcludes `![[A1.1]]` is curriculum
 material, not a lesson that addressed Ontario's A1.1. A link finds its
 expectation in any letter case, as Obsidian and Quartz resolve it. The
-"taught" crawl is done once per build for every map.
+"taught" crawl is done once per build for every map. The same
+`_coverage_counts` also counts the map Plantoir shows on a section's Coverage
+tab, with `every_page=True` ("The Coverage tab's map (#793)", below).
 
 **Everywhere else a title was a literal.** Key Links gets each map directly
 under the bullet pointing into its folder (the "…curriculum expectations]]"
@@ -1949,6 +1951,164 @@ framework's text is the teacher's to bring. A teacher makes the folder
 (`College Board Curriculum`), ticks it under Course Settings → "Curriculum
 folders", and asks Revise With ▸ Claude… to draft one page per code from the
 framework they have; the next build draws its map.
+
+
+## The Coverage tab's map (#793)
+
+Every build of a section, a preview, a deploy's build and a build-only run
+alike, also writes that section's curriculum coverage map as it would be **if
+every existing page were published**, beside the built website, for the app
+to show on the section's Coverage tab. 793a (this section) is the map and the
+record, in the shared Python, so Windows has it the moment its runtime carries
+this `build_site.py`. 793b is the tab in the app, and
+`documentation/09-mac-app.md` will carry it. The rules are
+`contracts/shared-rules.json` → `coverageTab` and `contracts/file-formats.json`
+→ `coverageTabMap`; `scripts/test_coverage_tab.py` runs both.
+
+**One counting function, two answers.** `_coverage_counts(..., every_page=False,
+leave_out=())`. The site's call (`build_curriculum_coverage`) passes neither
+new argument and is today's call; the tab's (`coverage_as_if_published`)
+passes `every_page=True`, which skips the published test (`_is_draft`) and
+NOTHING else. The taught rule, the curriculum folders, the maps themselves,
+code and `%%` comments and the graded-folder rule are the site's, so a written
+but unpublished test draws its ring and greens its overall expectation's chip.
+The site's page is byte for byte what it was: the prototype the plan review
+made (`_coverage_columns` split out of `_coverage_page`, `href_for` on the cell
+and chips) passed the 24 goldens of `test_coverage_maps.py` before anything
+else was written, and still does. The legend, the standings' row names and the
+stylesheet are shared the same way (`_coverage_panel_html`,
+`COVERAGE_STANDING_ROWS`, `coverage_stylesheet()`); the site's `base.scss`
+with the coverage block appended hashes the same as on `dev` e7c452711 (a
+test pins the hash). The counting cases (`coverageTab.whatCounts.countingCases`,
+13) run every rule both ways, and the last of them is the anti-drift case: with
+every page published the two answers are identical.
+
+**What counts, and what does not.** Every page the build copies into the
+section's content: anything the site would show if its publish setting were
+true, including a page held back from this section only
+(`publishForSection<N>: false` is resolved before counting, so each section's
+map is its own). Not counted: excluded folders and files (never copied), the
+How I Teach page, another section's pages, the curriculum folders' own pages
+and the build's own pages. **A page whose settings could not be read (#246)
+is LEFT OUT** (Russell's ruling, 2026-11-12), through `leave_out`: the build
+cannot tell which section such a page was meant for, and counting it would
+overstate every section's map. The page says how many there were, the same
+number the Problems tab lists, and points to that tab. It also says, always,
+how many of the pages it counted students cannot see yet (`hiddenPagesCounted`),
+which is the teacher's one check against a deliberately unpublished answer key
+or last year's draft inflating the map. Which cells only unpublished pages
+colour is NOT marked in this release (ruled out, 2026-11-12).
+
+**The page.** `coverage_tab_page`: one HTML document, a `<section>` per map in
+the site's plan order (a course with two curriculum folders gets both, stacked,
+with the site's titles; a chooser would need a script), the site's panel and
+stylesheet, a real standings table with `<th scope="row">`, and the sentences
+of `coverageTab.pageWords`. Colours are the SECTION'S own scheme (Russell's
+ruling, 2026-11-12): its `lightMode` as CSS variables on `:root` and its
+`darkMode` under `prefers-color-scheme: dark`; no choice, or an unknown id, is
+`quartz-standard`, what a site with no choice wears. The coverage fills are the
+site's fixed scale. No script, no event attribute, no external reference, no
+font: a system font stack, and a Content-Security-Policy meta of
+`default-src 'none'; style-src 'unsafe-inline'`, which 793b's viewer does not
+rely on alone. Every cell and chip says its state in words (`aria-label` and
+the same `title=`), so a colour or a ring is never the only signal; on the site
+a chip is still colour and code only. Everything from the course (the course
+code a teacher reads, a folder's name and the title made from it) goes through
+`html.escape` with quotes; codes are limited to the expectation shapes and
+escaped too; an overall page's title after its code and every file name never
+reach the page. The sentence about clicking a code is deliberately not on the
+page: on a Mac without Obsidian, and on Windows until its tab is wired, it
+would be false, so 793b says it above the page (the plan review's L1).
+
+**Links.** Each cell and chip whose page the build can name is
+`plantoir-coverage:open/<buildId>/<map>/<code>`; a code whose source
+`_vault_relative_source` cannot name is a span. The page names no file: the
+app looks the code up in `about.json`'s `maps[map].pages[code]`, a path below
+the course folder the build wrote, and refuses one that is no longer a file
+inside the course. A link carrying another build id is a click on an older
+page than the record, and opens nothing. Rejected: a `file:` link or a list
+index alone. A file link lets page content name a path, and an index can
+point at the wrong item when page and record come from different builds.
+
+**Where, and why it can never be on a site.** `<section's built
+output>/.coverage-tab/`, beside `public/`, `.page-sources.json` and
+`.problems.json`: `map-<buildId>.html` and `about.json`. Deploys send `public/`
+alone (deploy.py hands `section_dir / "public"` to wrangler and to the Netlify
+manifest; deploy.sh's folder publish rsyncs `${PUBLIC_DIR_HOST}/`), Quartz
+reads only `content/`, nothing in `content/` links to it, and the dot name
+keeps it out of every change walk. `test_coverage_tab.py` builds a Netlify
+manifest over a section holding the folder, runs the folder publish's own
+rsync, and reads every page of the site's content, and none carries it.
+Rejected: `content/` (Quartz would publish it, and the date pass and the links
+checklist would meet it), `public/` (every deploy would upload it), and the
+course folder (it would sync, Obsidian would show it, and #768's walk would
+read every build as a change).
+
+**Order of writing.** The page (a temporary file, then `os.replace`), then
+`about.json` (`_write_json_atomically`), then every other `map-*.html`,
+listed and removed one by one by name. A reader of `about.json` always finds
+the page it names. A course whose curriculum has gone gets `"maps": []`,
+`"page": null`, and its last page removed, so a stale map never outlives the
+curriculum.
+
+**When.** In the ALWAYS part, straight after the site's maps and the Backlinks
+edits, and **whatever the section's coverage-map setting says** (Russell's
+ruling, 2026-11-12: the setting decides what students see, not the teacher's
+planning view; the page's last paragraph changes to say the site's map is off,
+and `siteMapSwitchedOn` records it). After the How I Teach sweep, the #246
+hiding and `_clear_a_site_this_build_cannot_replace`; BEFORE
+`section_problems.write_after_build`, so the `PLANTOIR_PROBLEMS:` line every
+build already prints also means this map is on disk, and the app needs no new
+machine line. It never fails a build: `make_the_coverage_tab` turns any error
+(an unwritable folder, a contract it cannot read) into one ⚠️ line. A
+successful map prints NOTHING, which the plan first proposed as a 🗺️ line and
+the plan review's M4 rejected: on its own, 793a would have named a tab no app
+has yet, under the site's own 🗺️ line with different numbers for the same
+expectations. The record carries the numbers instead.
+
+**Its clock, and a reused build.** `startedNs` is the `st_mtime_ns` of the
+build's own `.build-started.pending`, read when the map is written (nothing
+touches the marker in between), so it is the filesystem's clock the teacher's
+Save is stamped with, as BUILD_STARTED_MARKER explains; `null` when the marker
+could not be made. A deploy that REUSES the last build (#768) runs no Python,
+so the map stays exactly as the last build that ran left it, with that
+build's start. That is the true answer, because the build was reused for
+having nothing newer than its start, and nothing ever re-dates an old map. A
+build that wrote the map and then failed in Quartz leaves a map newer than the
+site; a deploy that then reuses the site does so only because nothing changed
+since the older site began, so both are true of the same pages. The seam for
+793b is marked in the code (`# SEAM (#768, for 793b and the merge)` above
+`COVERAGE_TAB_FOLDER`): the tab compares `startedNs` with #768's change walk,
+clock rule included (the plan review's M1), and never with
+`public/index.html` or `.build-started`, which describe the site.
+
+**What clears it.** Every build replaces it. The launchers' clearing of a
+course's built output (`link_course_build_output`: no link, a wrong link,
+archived, restored, replaced) removes it with the site, deliberately: #789
+keeps only `.geogebra-cache` through that clear, and a restored course's map
+could describe pages that are gone. The colour scheme can change after a
+build; the map keeps the old colours until the next build, and its record
+says how old it is.
+
+**Measured.** The extra count costs nothing a teacher could notice: the plan
+measured 4 to 6 ms per count on merged copies of four payloads (ICS3U, SPH3U,
+SCH4U, MPM2D, 233 to 319 pages), and the whole of `write_coverage_tab` (the
+count, the page, both files) took 36 to 85 ms on the same four on an M4 Pro
+(host Python 3.14 with the image's pinned python-frontmatter, 2026-11-12),
+writing pages of 26 to 43 KB. The page was rendered headless in
+Chromium in light and dark (a scratch copy, not a teacher's course) and both
+read as the site's map does, the ring visible in each. The duplicate-code
+warnings `_collect_expectations` prints are silenced for this pass, since the
+site's pass already said them (the plan review's L3).
+
+**Rejected, beyond the above.** Counting in Swift or C#, or drawing the map
+natively (two more copies of the counting rule and the layout); making the map
+when the tab opens (a second build path and a wait, ruled out); the site's
+"What counts" and "Reading it honestly" notes, which say only published pages
+count. The full list is `coverageTab.rejected`.
+
+**Trail.** None from 793a: the build already records itself, and 793a shows
+a teacher nothing. The line for looking at the tab is 793b's.
 
 
 ## Which toolchain built a site (#746)
