@@ -330,6 +330,11 @@ public sealed class ToolchainFingerprintTests : IDisposable
         string text = Aged(Path.Combine(folder, "notes.txt"), ancient);
         string otherTmp = Aged(Path.Combine(folder, "something.tmp"), ancient);
         string notAPid = Aged(Path.Combine(folder, "aaaaaaaa.hashes.x.tmp"), ancient);
+        // Near misses of <id>.hashes.<pid>.tmp: each is one part short or over.
+        string notAnIndexTmp = Aged(Path.Combine(folder, "notes.4242.tmp"), ancient);
+        string noPid = Aged(Path.Combine(folder, "x.hashes.tmp"), ancient);
+        string lettersPid = Aged(Path.Combine(folder, "x.hashes.abc.tmp"), ancient);
+        string notTmp = Aged(Path.Combine(folder, "x.hashes.1.tmp.bak"), ancient);
         Directory.CreateDirectory(Path.Combine(folder, "cccccccc.hashes"));
         string hashesFolder = Aged(Path.Combine(folder, "cccccccc.hashes"), ancient);
         string plain = Path.Combine(folder, "plain");
@@ -338,7 +343,7 @@ public sealed class ToolchainFingerprintTests : IDisposable
 
         Assert.Equal(0, ToolchainMirror.PruneIndexes(folder, Now));
 
-        foreach (string kept in new[] { text, otherTmp, notAPid, nested })
+        foreach (string kept in new[] { text, otherTmp, notAPid, notAnIndexTmp, noPid, lettersPid, notTmp, nested })
             Assert.True(File.Exists(kept), kept);
         Assert.True(Directory.Exists(hashesFolder));
     }
