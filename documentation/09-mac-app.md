@@ -808,8 +808,18 @@ row; another section's build never puts it on or takes it off. The stopped
 scheduled deploy already drew the same glyph, so when both apply it is still
 one glyph, and its help and accessibility label say each sentence that applies
 (`warningTooltip`); the clock beside it keeps saying a deploy is scheduled.
-Identifier `problemsBadge-section<N>`, or `stoppedPublishBadge-section<N>`
-when the stopped deploy applies, so the tests that find that one still do.
+Identifier `problemsBadge-<COURSE>-section<N>`, or
+`stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies, so
+a test can find the stopped deploy's warning by that name
+(`SidebarView.warningIdentifier`). The
+course is in it since #772, in Windows' form (#734): the sidebar is one list
+holding every course, so an identifier naming the section alone repeated
+whenever two courses each had a Section N, and a UI test finding "the"
+warning found the first course's. No UI test or screenshot harness read the
+old form, so nothing else changed with it. The clock beside a scheduled
+deploy is `scheduledDeployBadge-<COURSE>-section<N>` in the same form and
+for the same reason (`SidebarView.clockIdentifier`); Windows has no such
+identifier.
 **Rejected:** a second triangle (plan review, MED 7 — two near-identical
 glyphs, two meanings).
 
@@ -1015,10 +1025,14 @@ expanding `%NAME%`). The message is the mac's, character for character; what
 was measured and rejected is documentation/12-windows-app.md → "Fix with
 Claude… and Fix with Codex…" and "What the outside doors hand to Windows, and
 how". Windows also proposed `fixWith.notEnabledHelp`, the sentence a greyed
-button gives to assistive technology, which the mac owes as an accessibility
-hint.
+button gives to assistive technology. The mac gives it to both buttons as
+their accessibility hint while they are disabled, and no hint while they are
+enabled (#776: `FixWithAssistant.notEnabledHelp`, `buttonHint(hasRows:)`). A
+hint and not a `.help` tooltip, because the enabled buttons carry no tooltip
+and a sighted teacher can see the ticks; the hint is what VoiceOver reads,
+which is the job Windows' help text does for Narrator.
 
-**Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
+**Tests.** `FixWithAssistantTests` (14): the words and bounds pinned (no piece
 with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
 kinds a deploy writes, both case lists (no message with a semicolon, a newline
 or ". ("), no semicolon and no unbounded name with every input carrying them,
@@ -1026,8 +1040,9 @@ the closing per kind, rule 1 over the message, the
 real `rowState` leaving a row out, which pages are shared, both doors sending
 the message they are given (and the plain greeting without one), the message
 surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
-apostrophe in it, the trail line against the contract's, and a source scan of
-the view.
+apostrophe in it, the trail line against the contract's, a source scan of
+the view, and the disabled buttons' hint in both states with both buttons
+carrying it (#776).
 
 ## One folder, however it is spelled
 
@@ -9987,6 +10002,27 @@ tag, the container name and the site address, which is what a report is read
 for. The rules are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `problemReportRedaction`, so both apps redact identically.
+
+A Cloudflare Account ID is removed in three shapes: after `--account`
+(`accountFlag`), after the words "Account ID" (`accountIdentifier`), and
+inside an API path, `/accounts/<id>/…` (`accountPath`, #773, proposed from
+Windows with #739). The third is what a failing wrangler call prints: it
+names the resource it asked for, and every Pages resource starts with the
+account. The ID is 32 characters, under the 40 that the long-secret rule
+needs, so without `accountPath` it reached the run records, the trail and
+the problem report whole. The one file this rule does not reach is a
+scheduled deploy's own log, `~/Library/Logs/Plantoir/<label>.log`
+(`ScheduledDeploy.logURL`). launchd writes it directly from the agent's
+`StandardOutPath` and `StandardErrorPath`, so what `deploy.sh` and wrangler
+print lands there unredacted, appended night after night, and nothing removes
+it. It is not part of the problem report. The trail lines read from it go
+through the redactor; the log itself does not. Nothing a launcher prints
+reaches an outside assistant on the mac beyond its own fixed refusal
+sentences and the build's findings: the MCP server's deploy answers with
+fixed sentences (`MultiDestinationDeployRunner.result`, `AssistWording`),
+never the transcript, and the server writes nothing to stdout but its
+replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
+which is why it redacts that output too (documentation/12-windows-app.md).
 
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app

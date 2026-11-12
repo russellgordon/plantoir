@@ -809,8 +809,8 @@ tooltip, its Name and the ROW's `HelpText` say each sentence that applies
 (Narrator reads the row, not a tooltip on a child icon). **Its id names the
 course as well as the section** — `problemsBadge-<COURSE>-section<N>`, or
 `stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies —
-because two courses' Section 1 rows are in one tree (the mac's id has the
-section only; it has one window per section). The old fixed id
+because two courses' Section 1 rows are in one tree. The mac uses the same
+form since #772; its sidebar is one list of every course too. The old fixed id
 `scheduledPublishWarning` had no reader.
 
 **Website | Problems.** A `SelectorBar` in its own row under the notices, shown
@@ -1017,7 +1017,7 @@ the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
 `greetingCases`). A button is HIDDEN when its assistant is not on this PC or
 the course is kept for reference, and GREYED when nothing ticked is handed
 over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
-(proposed from Windows; the mac owes the same as an accessibility hint).
+(proposed from Windows; the mac gives the same as an accessibility hint since #776).
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons
@@ -1406,8 +1406,11 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   (`AccountIdRefusalTrailLine`) and the Cloudflare notice as ordered runs
   (`CloudflareNotice`). `PublishingDestinationsContractTests` runs all three
   case lists against it and pins the sentences; the views only draw what it
-  returns. The 25 MB sentence moved there from the view (it is not a contract
-  sentence) so the block's ORDER is testable.
+  returns. The 25 MB sentence moved there from the view so the block's ORDER is
+  testable. It became a contract sentence with #775,
+  `publishingDestinations.sentences.cloudflareSizeNote`, which
+  `TheSentencesAreTheContracts` must pin (its count of five is red until it
+  does).
 - **The new-course dialog** (`NewCourseDialog`) starts `_deployTarget` at
   `NewCourseDefault` and always writes it; its Deploying header carries
   `wizardCaption` (automation id `wizardDeployingCaption`); its
@@ -1477,8 +1480,9 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   names its resource, `/accounts/<id>/pages/…`, which no rule caught. A new
   rule, `accountPath`, and its case in `shared-rules.json` →
   `problemReportRedaction` (proposed from Windows; the mac's
-  `LogRedactor.swift` lacks it, so its suite goes red until it adds it, the
-  `mac` issue). On the window's side the console is the teacher's own; what
+  `LogRedactor.swift` has it since #773, which also found that no launcher
+  output reaches an outside assistant on the mac beyond fixed sentences:
+  documentation/09-mac-app.md, the problem report's redaction). On the window's side the console is the teacher's own; what
   it writes to disk already went through `LogRedactor` (the run transcripts,
   `ProblemReportStore.SaveRunTranscript`, and the trail), so the new rule
   covers them too. A scheduled Cloudflare leg's output goes to a temporary
