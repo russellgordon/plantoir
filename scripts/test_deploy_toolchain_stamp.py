@@ -38,6 +38,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -250,6 +251,150 @@ class WhichToolchainThisIs(unittest.TestCase):
             patch.start()
             self.addCleanup(patch.stop)
         os.environ.pop(toolchain_paths.TOOLCHAIN_ID_VARIABLE, None)
+        # No cache unless a test asks for one (the native Windows run sets it).
+        os.environ.pop("PLANTOIR_BUILD_ROOT", None)
+
+    # ---- #749: the runtime is part of the toolchain, and the id is remembered
+
+    def _age_everything(self, seconds_ago=600):
+        """Files written just now are 'racy' and never cached; set them back."""
+        moment = time.time() - seconds_ago
+        for folder, _subfolders, files in os.walk(self.tmp):
+            for name in files:
+                os.utime(os.path.join(folder, name), (moment, moment))
+
+    def _use_a_cache(self):
+        build_root = self.tmp / "builds"
+        build_root.mkdir()
+        os.environ["PLANTOIR_BUILD_ROOT"] = str(build_root)
+        return build_root / toolchain_paths.TOOLCHAIN_ID_CACHE_NAME
+
+    def _uncached_id(self):
+        saved = os.environ.pop("PLANTOIR_BUILD_ROOT", None)
+        try:
+            return toolchain_paths.current_toolchain_id()
+        finally:
+            if saved is not None:
+                os.environ["PLANTOIR_BUILD_ROOT"] = saved
+
+    def test_the_runtimes_manifest_is_part_of_the_toolchain(self):
+        without = toolchain_paths.current_toolchain_id()
+        self.assertEqual(without, toolchain_paths.current_toolchain_id(), "no manifest is not stable")
+        manifest = self.tmp / "manifest.json"
+        manifest.write_text('{"python": "3.14.9"}\n', encoding="utf-8")
+        with_one = toolchain_paths.current_toolchain_id()
+        self.assertNotEqual(without, with_one, "a runtime manifest changed nothing")
+        manifest.write_text('{"python": "3.14.10"}\n', encoding="utf-8")
+        self.assertNotEqual(with_one, toolchain_paths.current_toolchain_id(),
+                            "a runtime-only change (a new Python) did not change the toolchain")
+
+    def test_only_the_setup_folders_of_support_are_left_out(self):
+        # Exactly these three, at the top of support/ only: what course SETUP
+        # reads and no build or deploy does (#749's review).
+        self.assertEqual(toolchain_paths._SUPPORT_NOT_BUILT_FROM,
+                         {"example_content", "example_course", "skeletons"})
+        before = toolchain_paths.current_toolchain_id()
+        for folder in ("example_content/ADA1O", "example_course/EXC2O", "skeletons/arts"):
+            page = self.tmp / "support" / folder / "page.md"
+            page.parent.mkdir(parents=True)
+            page.write_text("a page a course is made from\n", encoding="utf-8")
+        self.assertEqual(before, toolchain_paths.current_toolchain_id(),
+                         "a file only course setup reads changed the toolchain")
+        nested = self.tmp / "support" / "quartz" / "example_content" / "note.scss"
+        nested.parent.mkdir(parents=True)
+        nested.write_text("a {}\n", encoding="utf-8")
+        self.assertNotEqual(before, toolchain_paths.current_toolchain_id(),
+                            "the same name deeper in support/ is a file a build reads")
+        between = toolchain_paths.current_toolchain_id()
+        (self.tmp / "support" / "colour_schemes.json").write_text("{}\n", encoding="utf-8")
+        self.assertNotEqual(between, toolchain_paths.current_toolchain_id(),
+                            "a file elsewhere in support/ no longer changed the toolchain")
+
+    def test_the_remembered_id_is_used_while_nothing_has_changed(self):
+        cache = self._use_a_cache()
+        self._age_everything()
+        first = toolchain_paths.current_toolchain_id()
+        self.assertTrue(cache.is_file(), "the id was not remembered")
+        self.assertEqual(first, self._uncached_id())
+        with mock.patch.object(toolchain_paths, "_hash_of_the_contents",
+                               side_effect=AssertionError("read every file although nothing changed")):
+            self.assertEqual(first, toolchain_paths.current_toolchain_id())
+
+    def test_an_edited_file_is_worked_out_again(self):
+        self._use_a_cache()
+        self._age_everything()
+        before = toolchain_paths.current_toolchain_id()
+        self.style.write_text("vertical-align: calc(0.5cap - 8px);\n", encoding="utf-8")
+        self._age_everything(seconds_ago=300)
+        after = toolchain_paths.current_toolchain_id()
+        self.assertNotEqual(before, after, "the remembered id outlived an edit")
+        self.assertEqual(after, self._uncached_id())
+
+    def test_the_same_size_and_a_new_time_is_worked_out_again(self):
+        self._use_a_cache()
+        self._age_everything()
+        before = toolchain_paths.current_toolchain_id()
+        self.style.write_text("vertical-align: BASELINE;\n", encoding="utf-8")  # same length
+        self._age_everything(seconds_ago=300)
+        self.assertNotEqual(before, toolchain_paths.current_toolchain_id())
+
+    def test_a_new_runtime_is_worked_out_again(self):
+        self._use_a_cache()
+        manifest = self.tmp / "manifest.json"
+        manifest.write_text('{"python": "3.14.9"}\n', encoding="utf-8")
+        self._age_everything()
+        before = toolchain_paths.current_toolchain_id()
+        manifest.write_text('{"python": "3.14.10"}\n', encoding="utf-8")
+        self._age_everything(seconds_ago=300)
+        self.assertNotEqual(before, toolchain_paths.current_toolchain_id())
+
+    def test_a_file_changed_just_now_is_not_remembered(self):
+        cache = self._use_a_cache()
+        # Written in setUp a moment ago: within the racy window.
+        toolchain_paths.current_toolchain_id()
+        self.assertFalse(cache.exists(), "remembered an id for a file changed this instant")
+
+    def test_a_cache_that_cannot_be_read_is_worked_out_again(self):
+        cache = self._use_a_cache()
+        self._age_everything()
+        cache.write_bytes(b"\xff\xfe not a cache\n")
+        self.assertEqual(toolchain_paths.current_toolchain_id(), self._uncached_id())
+        cache.write_text(toolchain_paths._fingerprint_of(toolchain_paths._the_toolchain_files())
+                         + "\nnot-an-id\n", encoding="utf-8")
+        self.assertEqual(toolchain_paths.current_toolchain_id(), self._uncached_id())
+
+    def test_a_cache_for_another_folder_is_not_used(self):
+        cache = self._use_a_cache()
+        self._age_everything()
+        toolchain_paths.current_toolchain_id()
+        lines = cache.read_text(encoding="utf-8").splitlines()
+        cache.write_text(lines[0] + "\nfiles-0000000000000000\n", encoding="utf-8")
+        self.assertEqual(toolchain_paths.current_toolchain_id(), "files-0000000000000000",
+                         "the forged entry is not even read, so the next check proves nothing")
+        moved = mock.patch.object(toolchain_paths, "SCRIPTS_DIR", self.tmp / "elsewhere" / "scripts")
+        # copytree keeps every file's size and time, so only the folder differs.
+        shutil.copytree(self.tmp / "scripts", self.tmp / "elsewhere" / "scripts")
+        with moved:
+            self.assertNotEqual(toolchain_paths.current_toolchain_id(), "files-0000000000000000",
+                                "a remembered id was used for scripts in another folder")
+
+    def test_a_cache_that_cannot_be_written_changes_nothing(self):
+        cache = self._use_a_cache()
+        self._age_everything()
+        with mock.patch.object(toolchain_paths.os, "replace", side_effect=PermissionError("in use")):
+            identity = toolchain_paths.current_toolchain_id()
+        self.assertEqual(identity, self._uncached_id())
+        self.assertFalse(cache.exists())
+        self.assertEqual(list(cache.parent.glob("*.tmp")), [], "left its temporary file behind")
+
+    def test_the_cache_is_never_used_without_a_build_root(self):
+        # The container's case: no PLANTOIR_BUILD_ROOT, so every call reads
+        # the files, and a forged cache where one would be is never consulted.
+        self._age_everything()
+        self.assertIsNone(toolchain_paths._toolchain_id_cache())
+        with mock.patch.object(toolchain_paths, "_read_cached_id",
+                               side_effect=AssertionError("consulted a cache in the container")):
+            toolchain_paths.current_toolchain_id()
 
     def test_the_launchers_name_wins_when_it_gives_one(self):
         os.environ[toolchain_paths.TOOLCHAIN_ID_VARIABLE] = IMAGE

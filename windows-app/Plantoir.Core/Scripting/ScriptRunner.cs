@@ -158,6 +158,45 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     // ---- Launch ---------------------------------------------------------
 
     /// <summary>
+    /// One argument as a Windows command line must carry it so the program
+    /// reads it back unchanged - the rule CommandLineToArgvW and the C runtime
+    /// (and so powershell.exe -File) read by. An argument with no space, tab or
+    /// quote is passed as it is; any other, or an empty one, is quoted, every
+    /// run of backslashes before a quote is doubled and the quote escaped, and
+    /// the backslashes before the closing quote are doubled.
+    ///
+    /// <para>Until #749's third review this wrapped an argument holding a space
+    /// in quotes and escaped nothing, so a saved folder like
+    /// <c>C:\Sites\pub one\</c> reached deploy.ps1 as <c>C:\Sites\pub one"</c>
+    /// (its last backslash escaped the closing quote), a tab split an
+    /// argument in two, and an empty one vanished. deploy.ps1's own legs had
+    /// the same fault, fixed there (documentation/12-windows-app.md →
+    /// "Publishing: the destination is an argument").</para>
+    /// </summary>
+    public static string QuotedArgument(string argument)
+    {
+        if (argument.Length > 0 && argument.IndexOfAny(new[] { ' ', '\t', '"', '\n', '\v' }) < 0)
+            return argument;
+        var quoted = new StringBuilder("\"");
+        int backslashes = 0;
+        foreach (char character in argument)
+        {
+            if (character == '\\') { backslashes++; continue; }
+            if (character == '"')
+            {
+                quoted.Append('\\', backslashes * 2 + 1).Append('"');
+            }
+            else
+            {
+                quoted.Append('\\', backslashes).Append(character);
+            }
+            backslashes = 0;
+        }
+        quoted.Append('\\', backslashes * 2).Append('"');
+        return quoted.ToString();
+    }
+
+    /// <summary>
     /// Runs &lt;workingDirectory&gt;\&lt;scriptName&gt; via Windows PowerShell under a
     /// pseudo console (docker exec -it needs a real TTY). keepTranscript
     /// continues an earlier run's output so build-then-publish reads as one job.
@@ -224,12 +263,10 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
 
         var commandLine = new StringBuilder("powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ");
-        commandLine.Append('"').Append(scriptPath).Append('"');
+        commandLine.Append(QuotedArgument(scriptPath));
         foreach (string argument in arguments)
         {
-            commandLine.Append(' ');
-            if (argument.Contains(' ')) commandLine.Append('"').Append(argument).Append('"');
-            else commandLine.Append(argument);
+            commandLine.Append(' ').Append(QuotedArgument(argument));
         }
 
         // When the app carries the native runtime (node, python, Quartz,

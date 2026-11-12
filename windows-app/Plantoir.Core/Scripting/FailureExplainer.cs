@@ -17,6 +17,8 @@ public static class FailureExplainer
         ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
+        ?? TokenRefusedExplanation(output)
+        ?? SavedTokenUnheardExplanation(output)
         ?? FolderAccessExplanation(output)
         ?? UnreadableFrontPageExplanation(output)
         ?? MissingFrontPageExplanation(output)
@@ -239,6 +241,69 @@ public static class FailureExplainer
         ConnectionSigns.Any(output.Contains)
             ? "Your computer couldn't reach the internet. Check your connection, then try again."
             : null;
+
+    /// <summary>
+    /// The words both launchers print when Cloudflare refuses a token that was
+    /// just pasted (#725, mac #695): deploy.sh with a cross in front, deploy.ps1
+    /// without. The mac's <c>FailureExplainer.tokenRefusedMarker</c>.
+    /// </summary>
+    public const string TokenRefusedMarker = "Cloudflare did not accept that token";
+
+    /// <summary>
+    /// The words both launchers print when a SAVED token could not be checked
+    /// because the service did not answer, and the token was kept (#705, mac
+    /// #716). The mac's <c>FailureExplainer.savedTokenUnheardMarker</c>.
+    /// </summary>
+    public const string SavedTokenUnheardMarker = "to check the saved token, so this section was not deployed there";
+
+    /// <summary>
+    /// Cloudflare refused the token the teacher pasted (<c>app-rules.json</c> →
+    /// <c>failureExplanations.cases</c> 11 and 12). LIFTED and joined: the
+    /// launcher's two lines already are the sentence a teacher acts on.
+    /// Asked after <see cref="ConnectionExplanation"/>, in the mac's order;
+    /// nothing depends on that today, and case 11 is the whole transcript
+    /// Russell met, so it pins that nothing earlier in the chain answers first.
+    /// </summary>
+    private static string? TokenRefusedExplanation(string output) =>
+        LiftedAndJoinedSentence(TokenRefusedMarker, output);
+
+    /// <summary>
+    /// Cloudflare or Netlify could not be asked about the saved token, so it
+    /// was kept and the deploy stopped (cases 13 and 14). Lifted and joined
+    /// like the refusal above.
+    /// </summary>
+    private static string? SavedTokenUnheardExplanation(string output) =>
+        LiftedAndJoinedSentence(SavedTokenUnheardMarker, output);
+
+    /// <summary>
+    /// The first line carrying <paramref name="marker"/>, with everything
+    /// before its first ASCII letter or digit taken off (the mac's
+    /// <c>liftedSentence</c>, #471), joined after a space to the next line
+    /// that has words on it — the launchers break one sentence over two lines
+    /// for a console's width. Null when no line carries the marker. The mac's
+    /// <c>liftedAndJoinedSentence(startingWith:in:)</c>.
+    /// </summary>
+    internal static string? LiftedAndJoinedSentence(string marker, string output)
+    {
+        string[] lines = output.Replace("\r", "").Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            if (!lines[index].Contains(marker, StringComparison.Ordinal)) continue;
+            string line = lines[index];
+            int start = 0;
+            while (start < line.Length && !char.IsAsciiLetterOrDigit(line[start])) start++;
+            string sentence = line[start..].Trim();
+            for (int next = index + 1; next < lines.Length; next++)
+            {
+                string reason = lines[next].Trim();
+                if (reason.Length == 0) continue;
+                sentence += " " + reason;
+                break;
+            }
+            return sentence;
+        }
+        return null;
+    }
 
     private static string? MissingBuildExplanation(string output) =>
         output.Contains("Built site not found")

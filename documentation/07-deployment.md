@@ -7,13 +7,16 @@
 > (Russell, 2026-11-01): `./deploy.sh ICS3U 1` deploys where the course's
 > settings say, and every `additional_deploy_targets` entry as a leg of its
 > own; `--target` or `--to-folder` still decides when it is typed ("Choosing
-> a destination (#668)", below). **`deploy.ps1` and `deploy.py` still read
-> no key** and default to Netlify, so anything driving those directly — a
-> script, a test harness, a scheduled wrapper — has to pass the flag itself.
-> Setting the key and calling such a launcher publishes to Netlify,
-> silently; that is exactly how a deploy harness came to verify a
-> `netlify.app` address three times over and report three green Cloudflare
-> publishes (GUI-IMPROVEMENTS row 419)
+> a destination (#668)", below). **`deploy.ps1` does the same since 1.9.3**
+> (#739 item 7), with the same rules and sentences
+> (`contracts/app-rules.json` → `savedDestinations`). **`deploy.py` still
+> reads no key** and defaults to Netlify, so anything driving it directly has
+> to pass the flag itself — and since a launcher given no flag now deploys
+> EVERY saved destination, anything that means one destination names it.
+> Before the launchers read the key, setting it and calling one with no flag
+> published to Netlify, silently; that is exactly how a deploy harness came
+> to verify a `netlify.app` address three times over and report three green
+> Cloudflare publishes (GUI-IMPROVEMENTS row 419)
 > (see [the config reference](08-course-config-reference.md)). There are
 > three destinations, and most of this page describes the first:
 >
@@ -163,7 +166,11 @@ did on its own — and `deploy.py` asks the same in `ensure_base_url_and_rebuild
 Without it 1.9.1's stylesheet changes never reached a redeployed site. What was
 measured, the fix and what was rejected:
 [05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
-`deploy.ps1`'s folder publish owes the same check (the `windows` issue for #746).
+`deploy.ps1`'s folder publish asks the same question since 1.9.3 (#749): it
+runs the shared Python's `site_was_built_by_this_toolchain`, and anything but
+a plain yes builds first, in the one rebuild block it shares with the
+live-reload check below; the Windows section of 05 says how, and why the
+toolchain's id is remembered there.
 
 ### Automatic production rebuilds (live-reload detection)
 
@@ -1026,10 +1033,23 @@ every Python from PATH). **The app names every leg now** (`DeployCommand.argumen
 `--target netlify` included; `deployArguments` cases moved), because the
 Netlify leg of a course with a second destination, passed no flag, would
 otherwise have run both legs again; `verify-deploy.sh` names its Netlify
-legs for the same reason. **`deploy.ps1` has the same gap** and is Windows'
-obligation; `deploy.py` is unchanged (it does one destination per call). The rule, the
-sentences and every case are `contracts/app-rules.json` →
-`publishingDestinations`; the Swift is `PublishingDestinations`.
+legs for the same reason. **`deploy.ps1` closed the same gap in 1.9.3**
+(#739 items 7 and 8): `Get-SavedDestinations` reads the file with
+`ConvertFrom-Json` (no extra interpreter, the counterpart of `plutil`), the
+legs are a variable rather than a stream (so the mac's descriptor-3 trap
+cannot arise), each leg is `powershell.exe -File deploy.ps1 <course>
+<section> <every flag as typed> <the leg's flag>`, and the app's
+`DeployCommand.Arguments` names `--target netlify` too; `verify-deploy.ps1`
+names its Netlify calls and runs a no-flag deploy over two saved folders
+(both written; then a first leg that fails, and the run still writes the
+second and ends with exit 1). The rules, sentences and eighteen cases are
+proposed from Windows as `contracts/app-rules.json` → `savedDestinations`,
+run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`; the mac's
+`test_deploy_sh_destination.py` is asked to read them too (the `mac` issue
+for #739). `deploy.py` is unchanged (it does one destination per call). The
+new-course default, its sentences and every case are
+`contracts/app-rules.json` → `publishingDestinations`; the Swift is
+`PublishingDestinations`.
 
 **Why.** Netlify moved new accounts to a credit-based plan, and the free one
 is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
@@ -1127,9 +1147,10 @@ the ID's sentence first, then "it can wait", then the 25 MB note, as one block (
 
 **Windows** owes the same default, order, sentences, the warning in place of
 the refusal, Open Settings… on the refusal, the trail event, and a test that
-its new-course dialog WRITES `newCourseDefault`. Its goldens hold the
-setup answers rather than the written file, so none of them moves. The
-command-line half is shared Python and reaches it free.
+its new-course dialog WRITES `newCourseDefault` (#739 items 1 to 6). Its
+goldens hold the setup answers rather than the written file, so none of them
+moves. The command-line half is shared Python and reaches it free, and the
+launcher half (items 7 and 8) landed in 1.9.3, above.
 
 ## Cloudflare Pages (`--target cloudflare`)
 
@@ -1297,9 +1318,39 @@ launcher (copied in and restored) five of the twelve tests it had then fail, twe
 failures counting subtests: every "kept" case, the could-not-reach sentences,
 and the Netlify-refused pair — that last only because the old probe relied on
 `curl -f`, which the stub does not imitate, so it is not evidence of a fault.
-**Windows:** `deploy.ps1`'s half is #705; until it lands the two "could not
-reach" cases are matched by the explainer only, and the drift test asks only
-that IF `deploy.ps1` prints those lines they say what the contract says.
+**Windows (#705 and #725, 1.9.3).** `deploy.ps1` has the same three words.
+`Get-TokenCheckAnswer` is pure over the status and the body;
+`Invoke-TokenCheck` asks with `System.Net.Http.HttpClient` and returns status
+0 for every failure to get an answer. Not `Invoke-WebRequest`, which on
+Windows PowerShell 5.1 THROWS on a 4xx, and a refusal is read from the body.
+Redirects are not followed (`AllowAutoRedirect = $false`), so a portal's 302
+is heard as itself; the timeout is 20 s, as curl's `--max-time`; the token
+goes in the Authorization header only. The handler uses the system proxy, as
+`Invoke-WebRequest` does; a proxy that wants its own sign-in answers 407,
+which is `unheard` and keeps the token — reasoned, NOT measured, because
+there is no such proxy here. Matching is case-sensitive (`[regex]::IsMatch`,
+not `-match`, which ignores case in PowerShell, where grep does not). The
+paste checks (`Test-CloudflareToken`, `Test-TokenValid`) are unchanged, as on
+the mac, and so is the legacy `tokens.json` migration: like the mac's
+`validate_token` there, it treats no answer as "not valid", which leaves the
+file alone and clears nothing. **The rule is data since 1.9.3:**
+`contracts/app-rules.json` → `savedTokenCheck` — each service's URL, the two
+body patterns, and 25 cases — proposed from Windows so the two launchers stop
+holding it in two tables. The patterns are written so `grep -E` and .NET read
+them IDENTICALLY: `[[:space:]]`, deploy.sh's spelling, is a POSIX class that
+.NET reads as a set of the characters `[ : s p a c e`, matching wrongly with
+no error (measured: with it, two cases fail); a bracket of a real space and
+a real tab reads the same in both. `windows-app/test_launcher_rules.ps1`
+runs every case through `Get-TokenCheckAnswer` with the patterns
+`deploy.ps1` carries (and checks they are the contract's), runs
+`Invoke-TokenCheck` against a listener on 127.0.0.1 (a 401 body read, a 302
+not followed, the Bearer header sent) and a closed port, and runs the real
+`deploy.ps1` with its credential functions stubbed and its check pointed at a
+closed port: the token is kept, the two lines are said, exit 1. The app's
+`FailureExplainer` lifts all four cases (`TokenRefusedMarker`,
+`SavedTokenUnheardMarker`). deploy.sh's own pattern was already fixed on the
+mac (#716), so #705's "check the mac" needs no issue; reading the contract's
+cases there is the `mac` issue for #705.
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
@@ -1549,7 +1600,10 @@ destination.** Everything `deploy.py` does for the other two — most importantl
 — simply does not happen here, and each such guard has to be repeated in
 `deploy.sh` and `deploy.ps1` or it does not exist for this path. That is not
 hypothetical: the preview-build refusal was missing here for as long as the
-destination has existed. It exists for teachers whose board or
+destination has existed, and the "an earlier version built this site" check
+(#746) had to be written into both launchers for the same reason — on Windows
+in 1.9.3 (#749), where `deploy.ps1` asks the shared Python and folds both
+rebuild reasons into one rebuild. It exists for teachers whose board or
 university already gives them web space — they upload the folder however they
 normally do (SFTP, a network share, a sync client), and no third-party
 account is involved at all.
@@ -2147,6 +2201,14 @@ only for a NEW website, finding 12).
 
 Take the findings from the FIRST leg only. Every destination publishes the same
 built site, so a second leg repeats them.
+
+The APP runs a leg per destination itself (`MultiDestinationDeployRunner`),
+naming each one (`--target netlify` included, `deployArguments`). A launcher
+typed with no destination does the same on its own since #668 (deploy.sh)
+and 1.9.3 (deploy.ps1, #739): it runs itself once per saved destination,
+keeps going after a leg that fails, and exits with the first failing leg's
+code — "Choosing a destination (#668)", and `contracts/app-rules.json` →
+`savedDestinations`.
 
 ## When a scheduled publish does not get through
 
