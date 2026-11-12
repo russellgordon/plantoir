@@ -4002,34 +4002,62 @@ case is walked by `PlanningTabTests`. Sharing a plan is #709 and is not on
 this tab yet: no Share control, no placeholder for one, and no sentence
 about it.
 
-**The tabs are `DetailTabs`, and Settings stays mounted.** `MainWindowView`'s
-`.course` branch now draws `CourseDetailView`, which puts the Settings |
-Planning switch in the thin bar a section's Website | Problems tabs use
-(#717), then a `ZStack` with `CourseSettingsView` underneath and
-`PlanningTabView` drawn over it while Planning is chosen. A setting typed and
-not saved is still there after a look at the plan, and Course ▸ Save keeps
-its focused value.
+**The tabs are `DetailTabs`, and only the chosen tab is in the window.**
+`MainWindowView`'s `.course` branch draws `CourseDetailView`, which puts the
+Settings | Planning switch in the thin bar a section's Website | Problems tabs
+use (#717), then `CourseDetailContent`: the settings form OR the Planning
+tab, never both. With Planning chosen the form is not in the view tree, so no
+setting can hold the keyboard, be reached by Tab, be read by VoiceOver or sit
+in the responder chain.
 
-**Covered, the settings are DISABLED (708 implementation review H1).**
-Mounted under the plan, a field focused on Settings stayed the window's first
-responder: MEASURED in an offscreen window, a Space and an "x" typed with the
-plan on top replaced the course's name, unseen, and Tab walked into the hidden
-controls. So `CourseSettingsView` takes `isCovered`, and `CourseDetailView`
-passes `showsPlanning`: the form's controls are `.disabled` and hidden from
-VoiceOver while the plan is on top. Measured with that shape: the first
-responder became the window, the text stayed, and Tab reached nothing in the
-form. The toolbar (Open in Obsidian) and the menu's focused value are
-attached outside the disabled part, so they are as they were. **Course ▸
-Save on the Planning tab saves the form as it stands, which can only hold
-edits made while Settings showed**, because nothing in the form can take a key
-while it is covered; that keeps "an unsaved setting survives a look at the plan
-and ⌘S saves it" true from either tab. `CourseDetailFocusTests` hosts the real
-form in a window never put on screen, focuses Course name, covers it and
-types. REJECTED: taking the form out of the tree while Planning shows (it
-would lose what is half-typed in its own fields, such as a folder name not yet
-added, and the window's title and toolbar with it); moving the first responder
-to the web view (it holds only while nothing else takes focus, which is
-"unlikely", not "cannot").
+This is the third shape, and the first two failed in measurable ways (708
+implementation review H1, then 708 fix review H1). Planning drawn OVER a
+mounted form: a field focused on Settings stayed first responder, and a Space
+and an "x" typed with the plan on top replaced the course's name, unseen.
+Planning over a DISABLED form: text fields let go, but SwiftUI's `TextEditor`
+(the footer box) stays editable and first responder under `.disabled`, and a
+Space and a paste went into the footer; a focused settings table kept the
+keyboard too. Patching control by control would leave the next control added
+to the form to find out the same way, so the form is removed instead.
+MEASURED offscreen (`S/708/notlayered`, the review's footer case rebuilt):
+with the form removed the first responder became the window, the tree held no
+editable control, Space and a paste changed nothing, and nothing was left to
+undo; the layered shape, run the same way, kept `PlatformTextView` as first
+responder and the footer took " PASTED".
+
+**Nothing typed is lost by that.** What the teacher has typed and not saved is
+the course's `configuration` (an `@Observable` model the course owns, with
+`hasUnsavedChanges`), so it never lived in the form. What did live in the
+form as `@State` and is wanted after a switch moved to `CourseSettingsSession`,
+which the page owns: `saveNotice` (#265, which stays until the next Save, a
+Preview Again or leaving the course), `saveProblem`, `howITeachProblem`,
+`unitWordNotice`, `didJustSave` and `heldBackWasNoted` (#373, once per visit
+to the course). The add-folder field is a popover, which closes when the
+teacher clicks the tabs, and the rename sheet is window-modal, so neither can
+hold a half-typed name across a switch. Coming back to Settings shows the form
+as it was left, with nothing focused (measured: the first responder is the
+window). Open in Obsidian moved from the form's toolbar to the page's, so it
+is there on both tabs, and the page sets the window's title on Planning.
+
+**Undo is cleared on every switch** (`CourseDetailTabs.choose`, before the
+tab changes). The window has one undo manager, and an action a field
+registered stays on it after the field leaves: the fix review measured ⌘Z on
+the Planning tab undoing typing in the hidden footer box, leaving the box and
+the setting disagreeing. So ⌘Z on Settings undoes what was typed since the
+teacher last came to Settings, and on Planning there is nothing to undo.
+REJECTED: an undo scope per tab (SwiftUI offers no per-view undo manager on
+macOS, and a second manager would still have to drop the gone field's
+actions).
+
+**Course ▸ Save on Planning saves the settings as the teacher left them**
+(`CourseDetailTabs.planningCommands`): the form's own Save, run with the
+page's session, so its notices are there on return. Only edits made on
+Settings can be in it, since nothing on Planning edits a setting. Revert is
+not offered on Planning (708 fix review L1): it would discard edits the
+teacher cannot see. `CourseDetailStructureTests` draws the real form in a
+window never put on screen and checks the tree with Planning showing (no
+editable field, box or table), the footer case, Undo, and that a draft typed
+on Settings survives the switch and Save on Planning writes it.
 
 The tab chosen is the view's `@State`, because
 nothing outside the page selects Planning; `.id(code)` makes it Settings
@@ -4189,8 +4217,9 @@ both need Claude Code or Codex. Windows does #790 (#707's greeting) and
 #708's tab together, because `greetingUnitPlansCases` now carries these
 sentences and a greeting written with the folder wording fails them.
 
-REJECTED: a `TabView` (it unmounts the hidden tab, so an unsaved setting is
-lost); the switch in the toolbar (`DetailTabs`' comment); a disabled Planning
+REJECTED: Planning drawn over the settings form, mounted or disabled (the
+measurements above); a `TabView` (a different control from the section's
+switch for the same job, and it decides for itself what each tab keeps); the switch in the toolbar (`DetailTabs`' comment); a disabled Planning
 tab with no assistant (Russell ruled absent); the plan served through the
 website builder's preview (a file address needs no builder running, and a
 plan never goes through it); a new-window PDF sent to the default browser as

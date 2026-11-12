@@ -9,36 +9,18 @@ struct CourseSettingsView: View {
 
     let course: Course
 
-    /// Whether the course page's Planning tab is drawn over this form
-    /// (#708, `CourseDetailView`). While it is, every control in the form is
-    /// DISABLED, which takes the keyboard focus away from any field that had
-    /// it and keeps Tab out of the form: a key pressed on the plan can never
-    /// edit a setting the teacher cannot see (708 implementation review H1;
-    /// `CourseDetailFocusTests`). The form stays mounted, so an edit made
-    /// before the switch is still there after it, and Course ▸ Save still
-    /// saves it from either tab: it can only be an edit made while Settings
-    /// was showing. The toolbar and the menu's value are attached outside the
-    /// disabled part, so Open in Obsidian stays as it was.
-    var isCovered: Bool = false
+    /// What the form says and remembers beyond the settings themselves (its
+    /// notices, and whether "save held back" is on the trail), kept by the
+    /// course's page so they outlive this view (#708): the page draws this
+    /// form only while Settings is chosen. Nil gives the form a session of
+    /// its own, as a test that draws it alone wants.
+    var session: CourseSettingsSession? = nil
+
+    /// The session used when none was handed in.
+    @State var ownSession: CourseSettingsSession = CourseSettingsSession()
 
     @State var isShowingFoldersHelp: Bool = false
     @State var isRenamingUnitWord: Bool = false
-
-    /// What the last unit-word rename did, shown under the row until the
-    /// sheet is opened again.
-    @State var unitWordNotice: String? = nil
-    @State var saveProblem: String?
-
-    /// Why the How I Teach page could not be made, shown under its row until
-    /// the next press (#329).
-    @State var howITeachProblem: String? = nil
-    @State var didJustSave: Bool = false
-
-    /// What the last Save could not reach — a preview or a publish of this
-    /// course already running (issue #265). Unlike "Saved ✓" it does not
-    /// fade after three seconds: it has to stay long enough to be read, so it
-    /// stays until the next Save, Preview Again, or leaving this course.
-    @State var saveNotice: SettingsSaveNotice? = nil
 
     /// Counts the times this window has become key, so the page is drawn
     /// again — and the course folder walked again for the marks questions —
@@ -50,16 +32,6 @@ struct CourseSettingsView: View {
     /// Whether this window is key, read only to notice it BECOMING key.
     @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
 
-    /// The window's model — for Open in Obsidian, which every route asks
-    /// through `WorkspaceModel.openInObsidian` (#457). Optional, because
-    /// the tests that draw this form give it no window model.
-    @Environment(WorkspaceModel.self) var workspace: WorkspaceModel?
-
-    /// Whether `settings save held back` has been written on this visit to
-    /// the course, so a teacher typing in a held-back form leaves one line,
-    /// not one per keystroke. Starts afresh when the form is rebuilt for a
-    /// course (`.id(code)` in MainWindowView).
-    @State var heldBackWasNoted: Bool = false
 
     // MARK: - Body
 
@@ -444,8 +416,14 @@ struct CourseSettingsView: View {
             }
             .padding(12)
         }
-        .disabled(isCovered)
-        .accessibilityHidden(isCovered)
+        .sheet(isPresented: $isShowingFoldersHelp) {
+            SpecialFoldersHelpView(course: course)
+        }
+        .sheet(isPresented: $isRenamingUnitWord) {
+            UnitWordRenameSheet(course: course) { sentence in
+                unitWordNotice = sentence
+            }
+        }
         .navigationTitle(course.displayCode)
         // Course ▸ Save Course Settings ⌘S and Revert Course Settings (#457).
         // ⌘S lived on the Save button until then — a shortcut hung on a
@@ -456,25 +434,8 @@ struct CourseSettingsView: View {
             mayRevert: SaveEnablement.revertIsEnabled(hasUnsavedChanges: course.configuration.hasUnsavedChanges),
             perform: performSettingsMenuItem
         ))
-        .toolbar {
-            ToolbarItem {
-                Button("Open in Obsidian", systemImage: "square.and.pencil") {
-                    // The one route every Open in Obsidian takes (#457).
-                    workspace?.openInObsidian(course: course, sectionNumber: nil)
-                }
-                .disabled(!FolderActions.obsidianIsInstalled)
-                .help("Edit this course's pages in Obsidian")
-                .sheet(isPresented: $isShowingFoldersHelp) {
-                    SpecialFoldersHelpView(course: course)
-                }
-                .sheet(isPresented: $isRenamingUnitWord) {
-                    UnitWordRenameSheet(course: course) { sentence in
-                        unitWordNotice = sentence
-                    }
-                }
-                .accessibilityIdentifier("openCourseInObsidianButton")
-            }
-        }
+        // Open in Obsidian is in the course page's toolbar
+        // (`CourseDetailView`), so it is there on both tabs (#708).
         .navigationSubtitle(course.configuration.courseName)
         .onAppear {
             // The file may have moved on since this window read it: a build
@@ -493,6 +454,48 @@ struct CourseSettingsView: View {
     }
 
     // MARK: - Computed properties
+
+    /// The session this form reads and writes: the page's, or its own.
+    var settingsSession: CourseSettingsSession {
+        return session ?? ownSession
+    }
+
+    /// What the last unit-word rename did, shown under the row until the
+    /// sheet is opened again.
+    var unitWordNotice: String? {
+        get { return settingsSession.unitWordNotice }
+        nonmutating set { settingsSession.unitWordNotice = newValue }
+    }
+
+    var saveProblem: String? {
+        get { return settingsSession.saveProblem }
+        nonmutating set { settingsSession.saveProblem = newValue }
+    }
+
+    /// Why the How I Teach page could not be made, shown under its row until
+    /// the next press (#329).
+    var howITeachProblem: String? {
+        get { return settingsSession.howITeachProblem }
+        nonmutating set { settingsSession.howITeachProblem = newValue }
+    }
+
+    var didJustSave: Bool {
+        get { return settingsSession.didJustSave }
+        nonmutating set { settingsSession.didJustSave = newValue }
+    }
+
+    /// What the last Save could not reach (issue #265); see the session.
+    var saveNotice: SettingsSaveNotice? {
+        get { return settingsSession.saveNotice }
+        nonmutating set { settingsSession.saveNotice = newValue }
+    }
+
+    /// Whether `settings save held back` has been written on this visit to
+    /// the course; see the session.
+    var heldBackWasNoted: Bool {
+        get { return settingsSession.heldBackWasNoted }
+        nonmutating set { settingsSession.heldBackWasNoted = newValue }
+    }
 
     /// The course's How I Teach page, in Obsidian (#329): "Open" when the
     /// course has one, "Create and Open" when it has none — the page is then

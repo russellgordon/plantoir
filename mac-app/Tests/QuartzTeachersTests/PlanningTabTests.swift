@@ -343,19 +343,13 @@ final class PlanningTabTests: XCTestCase {
         )
     }
 
-    /// The course page keeps its settings mounted: Planning is drawn in a
-    /// `ZStack` AFTER `CourseSettingsView`, never in a `TabView`, and the
-    /// window's course branch uses that page.
-    func testThePlanningTabIsDrawnOverTheSettingsNeverInsteadOfThem() throws {
+    /// The window's course branch uses the tabbed page, and the page never
+    /// uses a `TabView`. Whether the two tabs are layered is proved by
+    /// drawing them (`CourseDetailStructureTests`), not by reading this file.
+    func testTheCourseBranchUsesTheTabbedPage() throws {
         let page: String = try PlanningTabTests.readSource("QuartzTeachers/Views/CourseSettings/CourseDetailView.swift")
-        let stack: Range<String.Index> = try XCTUnwrap(page.range(of: "ZStack {"))
-        let settings: Range<String.Index> = try XCTUnwrap(page.range(of: "CourseSettingsView(course: course)"))
-        let planning: Range<String.Index> = try XCTUnwrap(page.range(of: "PlanningTabView(course: course"))
-        XCTAssertTrue(stack.lowerBound < settings.lowerBound)
-        XCTAssertTrue(settings.lowerBound < planning.lowerBound)
         XCTAssertFalse(page.contains("TabView {"))
         XCTAssertFalse(page.contains("TabView("))
-
         let main: String = try PlanningTabTests.readSource("QuartzTeachers/Views/MainWindowView.swift")
         XCTAssertTrue(main.contains("CourseDetailView(course: course)"))
         XCTAssertFalse(main.contains("CourseSettingsView(course: course)"), "the course branch uses the tabbed page")

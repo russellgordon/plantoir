@@ -44,6 +44,12 @@ final class PlanWebViewGuardTests: XCTestCase {
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: root)
+        // The folder the runs share, once no run is left in it.
+        let shared: URL = root.deletingLastPathComponent()
+        let left: [String] = (try? FileManager.default.contentsOfDirectory(atPath: shared.path)) ?? []
+        if left.isEmpty {
+            try? FileManager.default.removeItem(at: shared)
+        }
     }
 
     /// Runs the main run loop until `condition` holds or `timeout` passes.
@@ -168,7 +174,9 @@ final class PlanWebViewGuardTests: XCTestCase {
 
         // Then the probe can see a load when nothing blocks it, so the zero
         // above is a measurement and not a deaf listener.
-        let plain: WKWebView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let plainConfiguration: WKWebViewConfiguration = WKWebViewConfiguration()
+        plainConfiguration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+        let plain: WKWebView = WKWebView(frame: .zero, configuration: plainConfiguration)
         plain.loadFileURL(page, allowingReadAccessTo: planningFolder)
         XCTAssertTrue(runUntil(timeout: 10) {
             listener.acceptWaiting()

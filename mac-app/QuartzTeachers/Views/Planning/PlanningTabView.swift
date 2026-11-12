@@ -127,10 +127,16 @@ struct PlanningTabView: View {
             // may have changed meanwhile, and its history is kept.
             lookAgain(reloadingThePage: true)
             // Once per appearance: what the tab had to offer (review M1).
-            ActivityTrail.note(
-                .lookedAtUnitPlans,
-                PlanningTab.openedTrailText(courseCode: course.code, choices: model.look.choices)
-            )
+            // While no plan can be shown, the line says so rather than
+            // counting plans the teacher cannot see (708 fix review L3).
+            if model.controller?.couldNotShow ?? false {
+                ActivityTrail.note(.lookedAtUnitPlans, PlanningTrail.couldNotShowText(courseCode: course.code))
+            } else {
+                ActivityTrail.note(
+                    .lookedAtUnitPlans,
+                    PlanningTab.openedTrailText(courseCode: course.code, choices: model.look.choices)
+                )
+            }
         }
         .onChange(of: model.controller?.currentPage) { (_: URL?, page: URL?) in
             followThePage(page)
