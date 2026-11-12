@@ -4203,8 +4203,14 @@ assistant is told to write and what the ready-made courses hold.
   item. The plan counted 58, with a search anchored at column 0 that missed
   every callout. All were converted on the opening line only; closers are
   bare. Most are terminal sessions and program output (tracebacks with
-  `^^^` markers under a line): a line wraps only when it is longer than the
-  window, so the markers stay under their characters at ordinary widths.
+  `^^^` markers under a line). A line wraps only when it is longer than the
+  window. Whether the markers, and the drawings made of characters (CRC
+  cards, a stack and a queue, `git log --graph`, aligned tables of output),
+  keep their shape was NOT measured: no converted page was previewed. On a
+  phone, at about 40 characters a row at 390 px, those blocks do wrap and a
+  drawing breaks apart. Whether a drawing in text is exempt from the rule,
+  or should become a Mermaid diagram or a table, is a question for Russell
+  (the #758 implementation review, L1, lists the pages).
   `lint_payload.py` and `lint_skeletons.py` (skeletons and EXC2O) refuse a
   bare text fence, and both run the rule's own accept and refuse cases
   first. verify.sh builds the EXC2O fixture, not ICS4U, so no gate reads
