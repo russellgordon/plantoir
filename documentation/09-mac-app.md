@@ -3929,12 +3929,21 @@ to the assistant to say one sentence in its first reply (707 plan review
 M3). Only `SidebarView.reviseWithClaude` and `.reviseWithCodex` pass the
 plans, read at the click by `UnitPlans.toMention(for:)` (nil on a course kept
 for reference, which has no door anyway). That read is a handful of small
-files; `greetingHowITeachSentence` avoids the disk at the click for a
+files, on the main actor; in a working folder kept in iCloud Drive with
+optimised storage, an evicted `plan.json` is downloaded before the door opens,
+which was accepted rather than measured (707a review L4); `greetingHowITeachSentence` avoids the disk at the click for a
 different reason (the page may not exist, and its tool handles that). Fix
 with Claude… and Fix with Codex… pass none, and their own message replaces
 the greeting, so they never mention planning (Russell's ruling 4). A name is
 `{unit}: {title}`, cut at 60 characters with "…"; at most six are named, then
-", and N more". `UnitPlans.read` never throws: a plan file that is not JSON,
+", and N more". Up to six plans are named in date order; with more, the
+ones covering today come first, then the upcoming soonest first, then the
+past most recent first (`greetingUnitPlans.order`), so a full-year course, or
+one carrying last year's plans, names what matters now (707a review M2).
+Each name is put on one line first (`UnitPlans.oneLine`: a line break or a
+tab is one space), because Windows' `cmd /k` door cannot carry a line break
+(review M1); #780's clean of course names should meet it in one function.
+`UnitPlans.read` never throws: a plan file that is not JSON,
 or breaks `planFile.rules`, is left out and counted. The trail's
 "assistant opened" line gains " · told about unit planning", " · reminded of
 1 unit plan" or " · reminded of N unit plans", and " · N plan.json could not
@@ -3954,7 +3963,13 @@ into `support/agent_guidance/skills/`, add one bullet to each root file, add a
 contract key for it under the feature it belongs to (`<feature>.agentGuidance`,
 as `unitPlanning.agentGuidance` is), and copy one of the
 `PrintablePagesTests.testThe…SkillIsWritten…` tests. No code enumerates the
-skills by name on either platform.
+skills by name on either platform. Three costs come with it (707a review):
+every change to the root files' managed section asks again every teacher who
+chose Not Now, so bullets landed in one release ask once; two skill pieces in
+flight both append to the end of `CLAUDE.md` and `AGENTS.md`, a small merge
+conflict; and a skill with binary or template files owes its own pinning test,
+as `scripts/test_unit_plan_template.py` is for this one, and a `windows` issue
+mirroring its `PrintablePagesTests` case.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

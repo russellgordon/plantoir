@@ -3,7 +3,7 @@
 The unit-plan template (#707) the `plantoir-unit-planning` skill copies from:
 its two stylesheets, its fonts, and its pages.
 
-Russell asked for "that exact format": his own Thread 2 plan site's look. So
+Russell asked for "that exact format": his own plan site's look. So
 each stylesheet is that site's own `<style>` block byte for byte
 (`scripts/fixtures/unit_plan/`, CSS only, extracted once from the two pages),
 after Plantoir's comment and its `@font-face` rules, with ONE edit: a `--ok`
@@ -224,8 +224,10 @@ class PagesTests(unittest.TestCase):
             listed.add(font["file"])
         on_disk = set()
         for path in TEMPLATE.rglob("*"):
-            if path.is_file():
-                on_disk.add(path.relative_to(SKILL).as_posix())
+            relative = path.relative_to(SKILL)
+            # Finder's .DS_Store and the like are not the template's (review L5).
+            if path.is_file() and not any(part.startswith(".") for part in relative.parts):
+                on_disk.add(relative.as_posix())
         self.assertEqual(listed, on_disk)
 
     def test_every_page_asks_search_engines_to_stay_away(self):

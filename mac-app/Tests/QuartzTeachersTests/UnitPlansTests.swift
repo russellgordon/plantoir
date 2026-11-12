@@ -176,16 +176,18 @@ final class UnitPlansTests: XCTestCase {
     func testTheUnitPlanSentenceFollowsTheContract() throws {
         let block: [String: Any] = try XCTUnwrap(try greetingRules()["greetingUnitPlansCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        XCTAssertGreaterThanOrEqual(cases.count, 16)
 
-        let scratchTrail: URL = folder.appendingPathComponent("trail", isDirectory: true)
         let previousStore: ProblemReportStore = ActivityTrail.store
-        ActivityTrail.store = ProblemReportStore(folderURL: scratchTrail)
         defer {
             ActivityTrail.store = previousStore
         }
 
         for (index, testCase) in cases.enumerated() {
+            // A store of its own per case, so one case's line can never
+            // stand in for another's (707a review L3).
+            let scratchTrail: URL = folder.appendingPathComponent("trail-\(index)", isDirectory: true)
+            ActivityTrail.store = ProblemReportStore(folderURL: scratchTrail)
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let courseCode: String = try XCTUnwrap(testCase["course"] as? String)
             let isKeptForReference: Bool = try XCTUnwrap(testCase["referenceCourse"] as? Bool)
@@ -194,6 +196,7 @@ final class UnitPlansTests: XCTestCase {
             let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
             let expectedTrail: String = try XCTUnwrap(expect["trail"] as? String)
             let expectedSentence: String? = expect["sentence"] as? String
+            let today: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(testCase["today"] as? String)), name)
 
             let course: URL = folder.appendingPathComponent("course-\(index)", isDirectory: true)
             try FileManager.default.createDirectory(at: course, withIntermediateDirectories: true)
@@ -211,7 +214,7 @@ final class UnitPlansTests: XCTestCase {
             }
 
             let reading: UnitPlans.Reading? = UnitPlans.toMention(
-                courseDirectory: course, isKeptForReference: isKeptForReference
+                courseDirectory: course, isKeptForReference: isKeptForReference, today: today
             )
             let plain: String = ClaudeCodeLauncher.greeting(courseCode: courseCode, courseName: "")
             let greeting: String = ClaudeCodeLauncher.greeting(
@@ -249,6 +252,8 @@ final class UnitPlansTests: XCTestCase {
             XCTAssertEqual(CodexLauncher.trailSentence(courseCode: courseCode, unitPlans: reading), codexLine, name)
             XCTAssertTrue(trail.contains(claudeLine), "\(name): \(claudeLine)\n\(trail)")
             XCTAssertTrue(trail.contains(codexLine), "\(name): \(codexLine)\n\(trail)")
+            XCTAssertFalse(trail.contains(claudeLine + UnitPlans.trailSeparator), "\(name): a clause too many\n\(trail)")
+            XCTAssertFalse(trail.contains(codexLine + UnitPlans.trailSeparator), "\(name): a clause too many\n\(trail)")
         }
     }
 

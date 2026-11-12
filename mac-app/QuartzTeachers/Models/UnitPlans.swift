@@ -104,17 +104,88 @@ nonisolated enum UnitPlans {
 
     /// What a Revise door on this course should be told, or nil when it is
     /// told nothing: a course kept for reference has no door at all, so its
-    /// plans are never announced.
-    static func toMention(courseDirectory: URL, isKeptForReference: Bool) -> Reading? {
+    /// plans are never announced. When there are more plans than the
+    /// greeting names, they are put in `namedFirst` order for `today`, so the
+    /// ones named are the ones that matter now (707a review M2).
+    static func toMention(
+        courseDirectory: URL, isKeptForReference: Bool, today: CalendarDay = CalendarDay.today()
+    ) -> Reading? {
         if isKeptForReference {
             return nil
         }
-        return read(courseDirectory: courseDirectory)
+        let reading: Reading = read(courseDirectory: courseDirectory)
+        if reading.plans.count <= mostUnitsNamed {
+            return reading
+        }
+        return Reading(plans: namedFirst(reading.plans, today: today), unreadable: reading.unreadable)
     }
 
     @MainActor
     static func toMention(for course: Course) -> Reading? {
         return toMention(courseDirectory: course.directoryURL, isKeptForReference: course.isKeptForReference)
+    }
+
+    /// The order for a course with more plans than the greeting names: the
+    /// plans covering `today` first (by first class), then the upcoming ones
+    /// soonest first, then the past ones most recent first, then the
+    /// undated; a tie by folder name. A plan with only one of its two dates
+    /// is read as starting and ending on that day.
+    static func namedFirst(_ plans: [Plan], today: CalendarDay) -> [Plan] {
+        var current: [Plan] = []
+        var upcoming: [Plan] = []
+        var past: [Plan] = []
+        var undated: [Plan] = []
+        for plan in plans {
+            guard let start = plan.firstClass ?? plan.lastClass,
+                  let end = plan.lastClass ?? plan.firstClass else {
+                undated.append(plan)
+                continue
+            }
+            if end < today {
+                past.append(plan)
+            } else if today < start {
+                upcoming.append(plan)
+            } else {
+                current.append(plan)
+            }
+        }
+        var ordered: [Plan] = sortedForTheGreeting(current)
+        ordered.append(contentsOf: sortedForTheGreeting(upcoming))
+        past.sort { (left: Plan, right: Plan) -> Bool in
+            let leftEnd: CalendarDay? = left.lastClass ?? left.firstClass
+            let rightEnd: CalendarDay? = right.lastClass ?? right.firstClass
+            if let leftEnd, let rightEnd, leftEnd != rightEnd {
+                return rightEnd < leftEnd
+            }
+            return left.slug < right.slug
+        }
+        ordered.append(contentsOf: past)
+        ordered.append(contentsOf: sortedForTheGreeting(undated))
+        return ordered
+    }
+
+    /// A plan's `unit` or `title` on one line: every run of white space (a
+    /// line break, a tab, several spaces) becomes one space, and the ends are
+    /// trimmed, so the greeting and the trail stay one line on both
+    /// platforms (707a review M1; Windows' `cmd /k` door cannot carry a line
+    /// break). This is NOT a general clean of control characters: #780 does
+    /// that for course names in this release, and the two should meet in one
+    /// function when it lands.
+    static func oneLine(_ text: String) -> String {
+        var result: String = ""
+        var lastWasSpace: Bool = false
+        for character in text {
+            if character.isWhitespace {
+                if !lastWasSpace {
+                    result.append(" ")
+                }
+                lastWasSpace = true
+            } else {
+                result.append(character)
+                lastWasSpace = false
+            }
+        }
+        return result.trimmingCharacters(in: .whitespaces)
     }
 
     /// A folder name the skill may give a unit, and the app reads as one.
@@ -139,8 +210,8 @@ nonisolated enum UnitPlans {
               let title = optionalText(values["title"]) else {
             return nil
         }
-        let trimmedUnit: String = unit.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedTitle: String = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUnit: String = oneLine(unit)
+        let trimmedTitle: String = oneLine(title)
         if trimmedUnit.isEmpty && trimmedTitle.isEmpty {
             return nil
         }
@@ -186,7 +257,7 @@ nonisolated enum UnitPlans {
         return sorted
     }
 
-    /// "Thread 2: Quadratic Relations", or whichever half is there, cut at
+    /// "Unit 3: Chemical Reactions", or whichever half is there, cut at
     /// `unitNameMaxCharacters` with "…" so the greeting has a bound whatever
     /// a plan is called.
     static func nameInTheGreeting(_ plan: Plan) -> String {

@@ -32640,14 +32640,14 @@
     "planFile": {
       "name": "plan.json",
       "keys": {
-        "unit": "text: the course's own word and number for the unit (\"Unit 3\", \"Thread 2\")",
+        "unit": "text: the course's own word and number for the unit (\"Unit 3\", \"Module B\")",
         "title": "text: the unit's name",
         "firstClass": "a day written yyyy-mm-dd: the unit's first class in any section",
         "lastClass": "a day written yyyy-mm-dd: its last",
         "sections": "a list of text: the calendar's columns, by the names the plan uses",
         "updated": "a day written yyyy-mm-dd: when the plan last changed"
       },
-      "rules": "Every key is optional, but unit and title are not BOTH empty (after trimming). A key that is present and not null has its type: text, a real day in exactly the form yyyy-mm-dd (2026-11-31 is not a day), a list whose every item is text. A file that is not a JSON object, or that breaks a rule, is UNREADABLE: left out of what the app names, and counted (the trail says how many). Unknown keys are ignored, so a later release can add one. A plan is read only from a folder whose name is a unit slug (slugRules) and not one of neverSlugs; any other folder, and a unit folder with no plan.json, is not a plan and is not counted.",
+      "rules": "Every key is optional, but unit and title are not BOTH empty (after each is put on one line: every run of white space, a line break or a tab included, becomes one space, and the ends are trimmed). A key that is present and not null has its type: text, a real day in exactly the form yyyy-mm-dd (2026-11-31 is not a day), a list whose every item is text. A file that is not a JSON object, or that breaks a rule, is UNREADABLE: left out of what the app names, and counted (the trail says how many). Unknown keys are ignored, so a later release can add one. A plan is read only from a folder whose name is a unit slug (slugRules) and not one of neverSlugs; any other folder, and a unit folder with no plan.json, is not a plan and is not counted.",
       "example": {
         "unit": "Unit 3",
         "title": "Chemical Reactions",
@@ -32666,11 +32666,11 @@
       "cases": [
         {
           "name": "a whole plan",
-          "folder": "thread-2",
-          "file": "{\"unit\": \"Thread 2\", \"title\": \"Quadratic Relations\", \"firstClass\": \"2026-11-02\", \"lastClass\": \"2026-11-27\", \"sections\": [\"Section 1\", \"Section 2\"], \"updated\": \"2026-10-31\"}",
+          "folder": "module-b",
+          "file": "{\"unit\": \"Module B\", \"title\": \"Ecosystems and Food Webs\", \"firstClass\": \"2027-04-05\", \"lastClass\": \"2027-04-23\", \"sections\": [\"Section 1\", \"Section 2\", \"A colleague's section\"], \"updated\": \"2027-03-29\"}",
           "expect": "read",
-          "named": "Thread 2: Quadratic Relations",
-          "firstClass": "2026-11-02"
+          "named": "Module B: Ecosystems and Food Webs",
+          "firstClass": "2027-04-05"
         },
         {
           "name": "a title only",
@@ -32687,6 +32687,14 @@
           "expect": "read",
           "named": "Unit 1",
           "firstClass": "2026-09-08"
+        },
+        {
+          "name": "a line break and a tab in a title become one space",
+          "folder": "unit-17",
+          "file": "{\"unit\": \"Unit 17\", \"title\": \"Waves\\nand\\t\\tSound\"}",
+          "expect": "read",
+          "named": "Unit 17: Waves and Sound",
+          "firstClass": null
         },
         {
           "name": "an unknown key is ignored",
@@ -32707,7 +32715,7 @@
         {
           "name": "neither unit nor title",
           "folder": "unit-5",
-          "file": "{\"firstClass\": \"2026-11-02\"}",
+          "file": "{\"firstClass\": \"2027-03-01\"}",
           "expect": "unreadable"
         },
         {
@@ -32962,7 +32970,7 @@
         "plantoir-handouts",
         "plantoir-page-authoring"
       ],
-      "why": "Russell, 2026-11-01: the plan site is 'that exact format', his own Thread 2 plan site's layout and look. The template's content is invented (an invented unit, sections called Section 1, Section 2 and A colleague's section); only the two pages' CSS came from the example, read for structure and CSS only with Russell's leave (2026-11-12).",
+      "why": "Russell, 2026-11-01: the plan site is 'that exact format', his own plan site's layout and look. The template's content is invented (an invented unit, sections called Section 1, Section 2 and A colleague's section); only the two pages' CSS came from the example, read for structure and CSS only with Russell's leave (2026-11-12).",
       "rejected": [
         "one merged stylesheet for both pages: the two pages' blocks differ in three shared rules (h2, h3, th) and the correlation page has a bare section rule, so one sheet cannot equal both (707 plan review H3)",
         "one sheet scoped by a body class: every selector rewritten and one class more specific, which changes the cascade against the inline styles the patterns carry, and cannot be proven equal to the example",

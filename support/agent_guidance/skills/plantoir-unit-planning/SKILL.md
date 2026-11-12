@@ -199,11 +199,12 @@ courses/<CODE>/.internal/planning/
   the template's copy differs, replacing what is there. Never change a file
   in it, and never add a stylesheet beside it.
 - **A unit's folder name** is lowercase letters, digits and hyphens, 1 to
-  40 characters, starting with a letter: `unit-3`, `thread-2-quadratics`.
+  40 characters, starting with a letter: `unit-3`, `module-b-ecosystems`.
   Never `assets`, `build`, `dist` or `out`.
 - **No folder anywhere under the planning folder** is called `build`,
-  `dist`, `out`, `node_modules`, `__pycache__`, `.git`, `.cache` or
-  `.quartz-cache`: a backup leaves a folder of those names out.
+  `dist`, `out`, `node_modules`, `__pycache__`, `.git`, `.cache`,
+  `.quartz-cache` or `.merged_output`: a backup leaves a folder of those
+  names out.
 - **Only pages, PDFs, the stylesheets and fonts, and `robots.txt` belong to
   the plan site.** A `.tex` file, an `.htaccess` or `.htpasswd`, and any
   other notes are kept somewhere else.
@@ -216,7 +217,7 @@ courses/<CODE>/.internal/planning/
   ```
 
   `unit` and `title` are text, and at least one of them is not empty: the
-  course's own word and number for the unit ("Unit 3", "Thread 2",
+  course's own word and number for the unit ("Unit 3", "Thread 4",
   "Module B") and its name. `firstClass`, `lastClass` and `updated` are
   dates written `yyyy-mm-dd`. `sections` lists the calendar's columns by
   the names the plan uses. Keep any other notes out of it.
