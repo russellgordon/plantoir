@@ -288,7 +288,9 @@ class PagesTests(unittest.TestCase):
         self.assertRegex("unit", rules["slugRules"]["pattern"])
         self.assertNotIn("unit", rules["neverSlugs"])
         for name in rules["neverFolderNames"]:
-            self.assertFalse(list(TEMPLATE.rglob(name)), f"a folder called {name} is left out of a backup")
+            # Folders only: a Finder .DS_Store FILE is no fault (fix review L1).
+            folders = [path for path in TEMPLATE.rglob(name) if path.is_dir()]
+            self.assertFalse(folders, f"a folder called {name} is left out of a backup")
 
 
 if __name__ == "__main__":
