@@ -195,10 +195,26 @@ per-user 1.1.0:
 Not measured: a real download and install offered BY the app (there is nothing
 newer than 1.4.2 to offer until the next release); the refusal while
 plantoir-mcp is actually publishing, as against serving (the installer's test
-is the process's name, so the two are the same to it); a file still in use at
-copy time under `/NORESTART`; and an all-users copy made by the 1.1.0
-installer meeting the per-user 1.4.2 installer, which needs an administrator
-at the PC.
+is the process's name, so the two are the same to it); and an all-users copy
+made by the 1.1.0 installer meeting the per-user 1.4.2 installer, which needs
+an administrator at the PC. (This list also named "a file still in use at
+copy time under `/NORESTART`" until 2026-11-12, when #700 measured it: a
+preview serving made the 1.9.0 → 1.9.3 update exit 5 and leave a broken
+install, and since Windows 1.9.3 the installer waits for such work, or ends a
+preview's server, before it changes any file — `12-windows-app.md` → "The
+installer waits for work that is still running (#700)".)
+
+**What the mac must KNOW about #700, and why it owes nothing.** The Windows
+installer replaces the app's runtime (Node, Python, wrangler) IN PLACE under
+`{app}\runtime`, and a preview or a build running from those folders holds
+their files; the update runs the OLD app's code with the NEW installer, so
+only the installer can protect the step. The mac has no counterpart: Sparkle
+swaps the whole bundle, and the website builder's tools run in Colima's VM
+from the image, not from inside the bundle being replaced, so nothing a
+preview holds is in the folder an update deletes. The shared rule is
+unchanged — `appUpdates.mayNotInstallWhile` still says an open preview does
+not hold an update — and Windows keeps it by ENDING a preview's server at
+install time rather than by holding the update for it.
 
 **A trap at the cut: the feed files must never have their line endings
 changed.** NetSparkle writes `windows.xml` with CR LF, and this repository is

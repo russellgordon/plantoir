@@ -11119,16 +11119,17 @@ stale=0 failed=0 unreachable=0`, exit 0. Offline (the registry pointed at a
 closed port) the script said SKIPPED and exited 2, with all five trees
 unreachable.
 
-**The installer does not close a running Node.** `CloseApplicationsFilter`
-names `*Plantoir*`, `*plantoir-mcp*` and `*llama-server*`, not `node.exe`,
-and `[InstallDelete]` now empties `{app}\runtime\node`. So a preview, or a
-scheduled deploy, still running from the old version at install time holds
-`{app}\runtime\node\node.exe` open, Restart Manager is not asked to close it,
-and the install can leave `runtime\node` half deleted. The filter is left as
-it is in this piece (the implementation review raised it; widening what a
-hand-run install closes is its own change, #700, not a side effect of a Node bump).
-Until then: stop any preview and let a scheduled deploy finish before
-installing by hand.
+**The installer did not close a running Node** (true of 1.9.0; fixed in
+1.9.3 by #700). `CloseApplicationsFilter` names `*Plantoir*`,
+`*plantoir-mcp*` and `*llama-server*`, not `node.exe`, and `[InstallDelete]`
+empties `{app}\runtime\node`. So a preview, or a scheduled deploy, still
+running from the old version at install time holds
+`{app}\runtime\node\node.exe` open, and the install can leave `runtime\node`
+half deleted — measured on 2026-11-12 it did worse (exit 5, a broken
+install). The filter was left as it was; what replaced the advice "stop any
+preview and let a scheduled deploy finish before installing by hand" is
+"The installer waits for work that is still running (#700)", at the end of
+this page.
 
 ## wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)
 
@@ -11159,8 +11160,11 @@ packages (89), none dropped, most moved (sharp 0.34.5 → 0.35.5, ws 8.18.0 →
 dependency into `runtime\wrangler\node_modules`, and Inno never removes a
 file the new version does not carry, so an install over 1.9.0 would have
 kept 4.80.0's files beside 4.156.0's in the same package folders, for Node
-to resolve and for the audit to find. NOT yet proved on a real upgrade: that
-is #700's measured install over 1.9.0, which must then run
+to resolve and for the audit to find. (Proved on 2026-11-12 by #700's
+measured install over 1.9.0 on a quiet machine: `runtime\wrangler`
+1,666/1,666 files and nothing old, the audit exit 0 with `blocking=0`, and
+`--version` 4.156.0; "The installer waits for work that is still running
+(#700)" below.) What that measurement had to run:
 `windows-app\audit-runtime.ps1 -Runtime "<{app}>\runtime"` (expect exit 0,
 `blocking=0`, `stale=0`) and `"<{app}>\runtime\node\node.exe"
 "<{app}>\runtime\wrangler\node_modules\wrangler\bin\wrangler.js" --version`
@@ -11347,7 +11351,11 @@ decides what `publish: no` means (08 → "Whether students see a page").
   But an upgrade would otherwise keep `python311.*`, setuptools, wheel,
   packaging, the cp311 `.pyd`s and a second pip `dist-info` beside the new
   tree. A preview build or scheduled deploy running `python.exe` at install
-  time is #700's exposure, the same as `runtime\node`'s.
+  time is #700's exposure, the same as `runtime\node`'s: measured
+  2026-11-12, a build that had exited before `[Files]` reached `python.exe`
+  still left `python311.dll` and its loaded cp311 `.pyd`s beside 3.14, at
+  exit 0. Since 1.9.3 the installer waits for it first ("The installer waits
+  for work that is still running (#700)", below).
 - `PythonToolchainTests` runs the shared `scripts/test_*.py` on the
   RUNTIME's Python whenever a runtime is fetched (this checkout's, or
   `PLANTOIR_RUNTIME`'s), and on PATH's `python` only when none is.
@@ -11780,3 +11788,205 @@ most six times (#689)"; this is how Windows keeps it.
   - the fuse set to 1: the scenario fails.
   - `publish_pages` dropped from `WriteTools` and `roll_over_course` added:
     both write-tools tests fail, each naming its tool.
+
+## The installer waits for work that is still running (#700, Windows 1.9.3)
+
+**What it does now.** Before the installer changes ANY file, it looks for
+processes whose executable is under `{app}` (`windows-app/installer-running-work.iss`,
+included by `installer.iss` and called from `PrepareToInstall`, then again at
+the start of `CurStepChanged(ssInstall)`; Inno calls `PrepareToInstall` before
+its own Restart Manager check and before `[InstallDelete]` and `[Files]`, and
+the harness's logs show the order). Then:
+
+| Found under `{app}` | Updater (`/PLANTOIRUPDATE=1`) | Hand-run |
+|---|---|---|
+| a preview's server: `node.exe` whose command line has `bootstrap-cli.mjs` and the whole token `--serve` | **ended**, with its children (`taskkill /F /T /PID`) | ended |
+| `llama-server.exe` | ended (the app that started it has quit) | left to the `taskkill` at `ssInstall`, as before |
+| `plantoir-mcp.exe` | **refused at once**, as `InitializeSetup` already refuses (one may be publishing in a folder the app never opened, and it serves for days) | left to the `taskkill` at `ssInstall`, as before |
+| `Plantoir.exe` | waited for (the app still quitting, or a scheduled run) | waited for only with `--run-scheduled-deploy`; a window is Restart Manager's to close, as before |
+| anything else (a build's `python.exe` or `node.exe`, a deploy's `python.exe`, wrangler's `node.exe`) | **waited for, never ended** | the same |
+
+A silent install waits up to **ten minutes** (`RunningWorkWaitSeconds`, 600)
+and then REFUSES: `PrepareToInstall` returns its sentence, setup ends with
+**exit code 7** ("the Preparing to Install stage determined that Setup cannot
+proceed", Inno's Setup Exit Codes page; 8 only when a restart is asked for, which
+this never does), and neither `[InstallDelete]` nor `[Files]` has run. A
+hand-run wizard asks instead, through `SuppressibleMsgBox` with Retry and
+Cancel (Cancel is the default under `/SUPPRESSMSGBOXES`), with no time limit.
+The second look, at `ssInstall`, refuses by `Abort`: exit **3** (measured on the harness; Inno's "fatal error preparing to move to the next phase"), still with nothing changed, because `[InstallDelete]` runs after it.
+The look repeats every second, so what was ended is seen gone and work that
+STARTS during the wait (a scheduled deploy firing) is seen and waited for too.
+
+**The rule that tells a preview from a build.** `--serve` as a whole token,
+the separator `preview.ps1` (`Test-IsServing`) and `scripts/stop_preview.py`
+already use: `build_site.py` starts a preview's Quartz as `node
+<output>\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port N
+--wsPort M` and a build's without `--serve`. The installer also requires the
+image to be `node.exe` and the command line to name `bootstrap-cli.mjs`, so
+wrangler's node (`wrangler.js pages deploy …`) can never match. A preview that
+is still building its pages already carries `--serve`, so it is ended too: the
+installer cannot tell it from one being read, and the app's own gate holds an
+update for a preview it is BUILDING (`appUpdates.mayNotInstallWhile`), so the
+installer meets one only when the app did not know of it. The preview's
+`build_site.py` (its parent, under `{app}\runtime\python`) is not ended: it
+is waited for, and it exits within a second of its server, because its only
+remaining job was `subprocess.run` of that server and its sync watcher is a
+daemon thread (`_start_public_sync_watcher`).
+
+**Why ten minutes.** The longest work measured on this PC in this page: a
+Swift course getting ready plus its build, 263 s; full rebuilds 63–129 s; a
+Cloudflare deploy waits up to 120 s for its address after its build; a
+scheduled deploy waits up to ten minutes for a busy course before it starts.
+The updater's own gate holds an update for every piece of work the app knows
+about, so the installer meets only what it did not know about (a launcher
+typed at the command line, a folder the app does not have open, a scheduled
+run that fired after the gate). Longer would keep a teacher who chose Install
+and Reopen without Plantoir for longer; shorter would refuse a real deploy
+that was about to finish. Either way a refusal costs nothing but the update
+being offered again.
+
+**How processes are found, and why not WMI.** `K32EnumProcesses`, then for
+each `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` and
+`QueryFullProcessImageNameW`, and for those under `{app}`
+`NtQueryInformationProcess(ProcessCommandLineInformation)` — `external`
+declarations in the Pascal, no helper program. Kernel calls cannot hang the
+way a WMI query does when the WMI service is slow or broken, and Inno's
+Pascal has no thread to put a timeout on a COM call. `wmic` is gone from
+current Windows, and starting PowerShell from an installer costs seconds and
+can be blocked by policy. Setup is a 32-bit process (Inno 6.7.3 ships only
+`Setup.e32`); the harness proves the command line of a 64-bit process reads
+correctly from it. No elevation is needed for the teacher's own processes,
+which are the only ones a per-user `{app}` can hold. **The safe defaults**: a
+process whose path cannot be read cannot be under this per-user folder and is
+skipped; a `node.exe` whose command line cannot be read counts as WORK, never
+as a preview (waiting is safe, killing is not); and if the list of processes
+cannot be had at all, the install goes ahead without looking, as every
+installer before 1.9.3 did — refusing every install on a machine where one
+call fails would be a fault of its own.
+
+**After a refusal on the update path.** `[Run]` never runs, so the include
+starts Plantoir itself, and only when the teacher's Install and Reopen asked
+for it (`/RELAUNCH=1` with `/RETURNTO`): with `--update-not-installed-for-work`,
+which the 1.9.3 app writes as "update held while work is under way — the new
+version was not installed: a course was still being built or deployed when it
+came to install; it will be offered again" (`AppUpdates.NotInstalledLine`).
+A NEW argument rather than `--update-not-installed`, because the app the
+installer reopens after a refusal is the OLD one: 1.9.0 knows only the old
+argument and would write "helping an assistant in another app had started",
+false for this refusal; given the new one it writes no line at all (rule 5: no
+line is better than a wrong one). An at-quit install (no `/RELAUNCH`) refused
+for work stays closed: the teacher quit, and a window appearing up to ten
+minutes later on a classroom screen is a surprise; the update is offered
+again at the next launch. The `plantoir-mcp` refusal keeps ruling 12's
+behaviour (reopen whenever `/RETURNTO` is given, with `--update-not-installed`),
+because it happens within a second of the quit.
+
+**What cannot be closed.** The last look is at `ssInstall`, milliseconds
+before `[InstallDelete]`. Work that starts AFTER it, during the three to five
+minutes `[Files]` takes, is not seen: a scheduled deploy firing mid-install
+starts `{app}\Plantoir.exe` while it is being replaced, and a launcher typed
+at that moment runs a half-copied runtime. Pausing Plantoir's scheduled
+tasks for the install was rejected (plan, 2026-11-11): a task the installer
+disabled stays disabled if setup dies part way, which is worse than one
+missed run. This is case E of the morning measurement below.
+
+**Rejected.**
+- **Restart Manager** (`CloseApplicationsFilter` naming `node.exe` and
+  `python.exe`): the updater passes `/NOCLOSEAPPLICATIONS` (bundle-8 ruling 8,
+  so Restart Manager does not close `plantoir-mcp` or a scheduled run), and the
+  1.9.0 → 1.9.3 update runs 1.9.0's app code with those arguments, so a filter
+  in the new installer protects no update at all. On a hand-run install it would
+  close a deploy's node part way, which is the next rejection.
+- **Killing a build or a deploy.** A deploy cut part way is the one thing a
+  teacher cannot get back (a site half uploaded, a Cloudflare project left
+  between versions); a build is cheap to redo but cannot be told from a
+  deploy's build by its processes. Waiting costs at most ten minutes.
+- **`CloseApplications=force`** on a hand-run install: it closes without
+  asking, the same objection.
+- **Refusing on an open preview.** `appUpdates.mayNotInstallWhile` (shared
+  with the mac) says an open preview does not hold an update, and a preview
+  never ends by itself, so every update over an open preview would be refused
+  after ten minutes. Ending its server keeps the shared rule unchanged.
+- **WMI**, `wmic` and PowerShell, above.
+- **Fixing it in the app** (stop previews before starting the installer,
+  `UpdatePrompts.QuitForInstallAfterTheCopy`): it protects only updates FROM
+  1.9.3 on, and the 1.9.0 → 1.9.3 one is the update that is happening now.
+
+**The app side (item 8 of the brief), left as it is.** `DecideAtQuit` installs
+at quit for `PostponedAtInstall` even with work under way — the contract's
+`appUpdates.atQuit` case "held by the updater's own last look, work under
+way", shared with the mac. With the installer now waiting for that work, or
+refusing with nothing changed, that install no longer breaks anything, so the
+shared case stands and nothing changed in the app except the new argument's
+trail line.
+
+**Also in this piece.** `[InstallDelete]` empties
+`{app}\Toolchain\scripts\__pycache__`: on the quiet upgrade below, its 12
+`.pyc` files (4 `cpython-311`, 2 `-312`, 6 `-314`) were the only files left
+that 1.9.3 does not carry; no other `__pycache__` under `{app}\Toolchain`
+existed. And `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before
+publishing: on a fresh worktree the first `publish.ps1` stopped after 108 s
+with `NETSDK1004` (the app's project publishes the server through an
+`<MSBuild>` task that does not restore); measured here, a Release `win-x64`
+build of `Plantoir.Mcp` with `--no-restore` gives that error on a fresh
+worktree and succeeds after `dotnet restore Plantoir.Mcp -r win-x64`.
+
+### What was measured on the real installer (2026-11-11/12)
+
+Lenovo 20QES70500 (Intel Core i5-8365U, 8 logical cores, 16 GB, Windows 11
+Pro 26200), the signed 1.9.0 installed, an UNSIGNED 1.9.3 candidate built from
+`dev` 80dd8cd3d (277,877,826 bytes), every run `/VERYSILENT /SUPPRESSMSGBOXES`
+with the 1.9.0 app's own at-quit arguments, a throwaway working folder (EXC2O),
+and the signed 1.9.0 restored afterwards from a hash-checked backup. The
+candidate did NOT yet carry this fix:
+
+| Case | Result |
+|---|---|
+| A, nothing running | exit 0 in 277 s; all five emptied folders exactly the candidate's (node 2,032, python 1,275, wrangler 1,666, geogebra 117, tikz 5,448 files); audit exit 0 `blocking=0`; wrangler 4.156.0; Python 3.14.10 with OpenSSL 3.5.9; the only leftovers the 12 `.pyc` above |
+| B, a preview serving | **exit 5 after 29 s**: at `runtime\node\node.exe`, "in use" four times, then "Defaulting to Abort for suppressed message box", rollback; left node 1 file, python 23, wrangler 0, `llama\` deleted, a 1.9.3 `Plantoir.exe` under a 1.9.0 uninstall key. **A broken install.** The preview kept serving |
+| C, a build running | exit 0 in 178 s, but `python311.dll` and a cp311 `.pyd` held by the interpreter survived `[InstallDelete]`; the build itself failed ("python311.zip" gone under it) |
+| C2, a folder deploy's build | exit 0 in 186 s; build and deploy succeeded, destination whole (336 files); five cp311 files left |
+
+### What the harness proves (`windows-app/installer-tests/`)
+
+`run-harness.ps1` compiles the SAME include into a harness installer with its
+own AppId, installs version 1 per-user in a temp folder, starts few-KB
+stand-ins from it in each shape, runs version 2 with the updater's arguments
+(wait shortened to 20 s by a `#define`), and fingerprints the real Plantoir's
+folder (42,764 files) and uninstall key before and after (unchanged in every
+run). Not part of `dotnet test`: it installs a program, takes minutes, and two
+runs at once would share its folder (its README). `RELEASING.md` step 3a runs
+it at every Windows cut. Results, this PC, 2026-11-12:
+
+| Case | Shape (stand-ins started from the harness's `{app}`) | Result |
+|---|---|---|
+| serve | `python.exe … build_site.py` holding `python311.dll`, waiting on `node.exe …\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081` | exit 0 in 3.2 s; the server ended, its python gone by itself; tree exactly version 2 |
+| build | python (9 s, holding `python311.dll`) and node `bootstrap-cli.mjs build` (7 s) | exit 0 in 8.7 s; both exited by themselves (exit code 0); no `python311.*`; `Toolchain\scripts\__pycache__` gone |
+| never | node `bootstrap-cli.mjs build` that never ends | **exit 7** in 21.5 s (20 s wait); the version-1 tree byte-identical (SHA-256 of every file); the work still running; Plantoir not reopened (at-quit) |
+| never-relaunch | wrangler-shaped node `wrangler.js pages deploy …` that never ends, `/RELAUNCH=1` | exit 7 in 21.7 s; tree byte-identical; the deploy untouched; Plantoir started once with `--update-not-installed-for-work` |
+| late | python (5 s); 3 s in, a wrangler-shaped node (12 s, holding a wrangler file) started by `cmd.exe` | exit 0 in 16.5 s; the late node named in the setup log and waited for; its held file replaced |
+| quitting-app | `Plantoir.exe` exiting after 4 s | exit 0 in 4.4 s |
+| assistant | `plantoir-mcp.exe` serving | exit 7 in 1.2 s; tree byte-identical; the server untouched; Plantoir started with `--update-not-installed` |
+| llama | `llama-server.exe` | exit 0 in 2.9 s; the engine ended |
+| hand-scheduled | hand-run silent install (Restart Manager on), `Plantoir.exe --run-scheduled-deploy …` for 6 s | exit 0 in 5.6 s; the run exited by itself |
+| ssinstall | PrepareToInstall made to answer `''`, so only the `ssInstall` look runs; node that never ends | **exit 3** in 21.9 s (Inno's code for an Abort at `ssInstall`); tree byte-identical; the work untouched |
+
+The first nine ran together in 166 s; `ssinstall`, added after, alone. Must-fails (`-MustFail`, each compiled
+from an edited COPY of the include, 115 s): the check made to answer `''` →
+the serve case **exit 5** and a part-replaced tree (the night's case B,
+reproduced on the harness); the preview rule made never to match → serve
+refused, exit 7; the loop made to stop after one wait → the late case exit 5;
+the wait removed → the build case exit 5. Every run: "the real Plantoir
+untouched" (42,764 files and the uninstall key, the same fingerprint before
+and after). Source must-fails, each red and restored: the `PrepareToInstall`
+call commented out, the `ssInstall` look removed, the `__pycache__` line
+commented out (two tests), the `#include` commented out.
+
+**Not proven, and re-measured on the real candidate** (#700's closing comment
+lists the pass line of each): B, C and C2 again with the fix; D, Install and
+Reopen after a quit with a preview open; E, a scheduled deploy firing
+mid-install; a Netlify or Cloudflare deploy (wrangler running) during an
+install; and the hand-run wizard's Retry box, which makes a sound.
+
+**For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
+KNOW about #700").

@@ -112,6 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
+| 2026-11-12 | Updating Plantoir with a preview open no longer breaks the install: the installer closes the preview, waits up to ten minutes for a build or a deploy to finish, and otherwise leaves the old version exactly as it was and offers the update again. **The 1.9.0 notes' "close any preview… before you install by hand" warning can be dropped** | Windows only (the mac's updater replaces the whole app and has no counterpart) | #700 |
 | 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
 | 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
 | 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
@@ -200,7 +201,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `startup.log`'s `tools copy finished` says `0 read in full`; if not,
    compare one file's ticks in `{app}\Toolchain\.hashes` with its
    `LastWriteTimeUtc.Ticks` (`documentation/12-windows-app.md` → "What the
-   director must check at the cut"). **Then build and sign the Windows update feed
+   director must check at the cut"). **Run the installer harness and measure
+   one upgrade over the previous Windows release** (#700, checklist step 3a).
+   **Then build and sign the Windows update feed
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.
@@ -448,6 +451,42 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    with an RFC 3161 timestamp.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
+
+   `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before it publishes
+   (#700): without that, the first publish in a fresh clone or worktree
+   stopped after about 108 s with `NETSDK1004 … Plantoir.Mcp\obj\project.assets.json
+   not found`, because the app's project publishes the server through an
+   `<MSBuild>` task that does not restore.
+
+   **3a. Prove the installer's running-work check, and measure one real
+   upgrade (#700), every Windows cut.**
+
+   - **The harness**, from the repository root, `/VERYSILENT` throughout, no
+     sound, about five minutes:
+
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1 -MustFail
+
+     Both must end `… passed, 0 failed` (exit 0) and print "PASS the real
+     Plantoir untouched". It compiles `installer-running-work.iss` — the file
+     `installer.iss` includes — into a harness installer with its OWN AppId
+     and folder, so it never installs, upgrades or uninstalls the real
+     Plantoir. No suite runs it (`windows-app/installer-tests/README.md` says
+     why); a change to `installer.iss` or the include is not done until it
+     has passed.
+   - **A measured upgrade over the PREVIOUS Windows release**, with the
+     candidate installer and the app's own at-quit arguments
+     (`AppUpdates.InstallerArguments(relaunch: false, ReturnTo)`), on a
+     quiet machine and again with a preview serving and with a build
+     running: exit 0, the emptied runtime folders exactly the candidate's
+     (no file of the old version), and the runtime checks the release's
+     issues name. `documentation/12-windows-app.md` → "The installer waits
+     for work that is still running (#700)" lists the cases and their pass
+     lines; the 1.9.3 one is the first, and how it was done (backup, a
+     throwaway working folder, restoring the signed release afterwards) is
+     in #700's closing comment. The update path is the PREVIOUS version's
+     app code running THIS version's installer, so it is the one thing no
+     test of the new app can stand in for.
 
 4. **Build the signed macOS bundle**, with **Xcode 26.6** — the release
    Xcode until a deliberate piece moves it (#613):

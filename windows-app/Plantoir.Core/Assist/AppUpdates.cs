@@ -136,11 +136,28 @@ public static class AppUpdates
     /// </summary>
     public const string UpdateNotInstalledArgument = "--update-not-installed";
 
+    /// <summary>
+    /// What installer.iss starts Plantoir with when it refused an Install and
+    /// Reopen because a build or a deploy was still running from the install
+    /// folder after its wait (#700, installer-running-work.iss). A DIFFERENT
+    /// argument from <see cref="UpdateNotInstalledArgument"/>, deliberately:
+    /// the 1.9.0 app the 1.9.3 installer reopens knows only that one, and would
+    /// write "helping an assistant in another app had started", which is false
+    /// for this refusal. Given this one it writes no line at all, which is
+    /// better than a wrong one (CLAUDE.md rule 5).
+    /// </summary>
+    public const string UpdateNotInstalledForWorkArgument = "--update-not-installed-for-work";
+
     /// <summary>The `update held while work is under way` line for that launch, or null when it is an ordinary one.</summary>
-    public static string? NotInstalledLine(IEnumerable<string> arguments) =>
-        arguments.Any(a => string.Equals(a, UpdateNotInstalledArgument, StringComparison.OrdinalIgnoreCase))
+    public static string? NotInstalledLine(IEnumerable<string> arguments)
+    {
+        var given = arguments.ToList();
+        if (given.Any(a => string.Equals(a, UpdateNotInstalledForWorkArgument, StringComparison.OrdinalIgnoreCase)))
+            return "the new version was not installed: a course was still being built or deployed when it came to install; it will be offered again";
+        return given.Any(a => string.Equals(a, UpdateNotInstalledArgument, StringComparison.OrdinalIgnoreCase))
             ? $"the new version was not installed: {UpdateWording.AssistantElsewhereWork} had started; it will be offered again"
             : null;
+    }
 
     /// <summary>
     /// Whether this copy may update itself (ruling 3). Only a copy under

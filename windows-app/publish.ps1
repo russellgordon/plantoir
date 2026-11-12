@@ -48,6 +48,14 @@ if (-not $version) { throw "No <Version> found in Plantoir.csproj" }
 Write-Host "Publishing Plantoir $version" -ForegroundColor Green
 
 # ---- Publish ----------------------------------------------------------------
+# Restore the MCP server for win-x64 first. Plantoir.csproj publishes it from
+# an <MSBuild> task after its own build (PublishMcpBesideApp), and that task
+# does not restore, so on a fresh clone or worktree the first publish stopped
+# with NETSDK1004 "Assets file ...\Plantoir.Mcp\obj\project.assets.json not
+# found" (measured 2026-11-12, #700). A restore that is already done costs
+# a second or two.
+dotnet restore Plantoir.Mcp\Plantoir.Mcp.csproj -r win-x64
+if ($LASTEXITCODE -ne 0) { throw "dotnet restore (Plantoir.Mcp) failed" }
 dotnet publish Plantoir\Plantoir.csproj -c Release -r win-x64
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 $publishDir = "Plantoir\bin\Release\net9.0-windows10.0.19041.0\win-x64\publish"
