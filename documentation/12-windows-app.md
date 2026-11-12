@@ -1477,8 +1477,9 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   names its resource, `/accounts/<id>/pages/…`, which no rule caught. A new
   rule, `accountPath`, and its case in `shared-rules.json` →
   `problemReportRedaction` (proposed from Windows; the mac's
-  `LogRedactor.swift` lacks it, so its suite goes red until it adds it, the
-  `mac` issue). On the window's side the console is the teacher's own; what
+  `LogRedactor.swift` has it since #773, which also found that no launcher
+  output reaches an outside assistant on the mac at all: documentation/
+  09-mac-app.md, the problem report's redaction). On the window's side the console is the teacher's own; what
   it writes to disk already went through `LogRedactor` (the run transcripts,
   `ProblemReportStore.SaveRunTranscript`, and the trail), so the new rule
   covers them too. A scheduled Cloudflare leg's output goes to a temporary
