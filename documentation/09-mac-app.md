@@ -4124,6 +4124,154 @@ conflict; and a skill with binary or template files owes its own pinning test,
 as `scripts/test_unit_plan_template.py` is for this one, and a `windows` issue
 mirroring its `PrintablePagesTests` case.
 
+### Tests, marking and report comments (#751, #750, #752)
+
+Three skills help a teacher with assessment: `plantoir-test-authoring`
+(#751) writes a unit test and the kit to mark it from, `plantoir-marking`
+(#750) marks papers onto feedback sheets, and a third drafts report
+comments (#752). Neither app reads or writes any file they make. Each
+reaches a working folder as every skill does, and the contract is
+`shared-rules.json` → `assessment`. This subsection was started by #751;
+#750 and #752 add theirs below.
+
+**The test-authoring skill (#751).** The eighth skill. For a unit test with
+versions it builds each version's paper and solutions (copies of
+`plantoir-handouts`' `starters/Quiz.tex`, in that skill's house style and
+its handouts folder), one Marking Guide for every version, a marking kit, a
+checks script where answers can be computed, a coverage table and, when
+wanted, a practice test. Its templates (`templates/`) are filled in with an
+invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
+
+- **What is fixed and what is offered (Russell, 2026-11-12).** Fixed for
+  every teacher: the teacher decides (one sentence in the first reply and
+  under the Marking Guide's title), only what the class was taught (asked
+  for, or read from the class pages, shown back, and checked question by
+  question), no trick wording, genuinely parallel versions, every answer
+  re-solved from scratch by an agent that did not write it with a second
+  agent filling `Coverage.md`, the assistant never inventing a question,
+  scenario or example involving firearms or ammunition (a teacher's own
+  material and curriculum content that requires the subject are left
+  alone), and nothing of the test in the pages a class website is built
+  from. The one place under `courses/` a test's PDFs may be copied is a
+  unit plan's `.internal/planning/<unit>/pdfs/`, which is never built into
+  a class site; both skills now say so in the same words (751 implementation
+  review M2: the first wording forbade `courses/` outright while the
+  unit-planning skill copied solutions into its plan folder). How the test is SHAPED
+  is the teacher's: How I Teach first, then a few plain questions (for an
+  Ontario course code, the four achievement chart categories are offered).
+  Russell's own shape (marks even across the categories, one part per page,
+  two versions on legal paper, the four kinds of part, a practice test) is
+  the test shape of the named template "Lessons students can catch up on"
+  (`handoutsSkill.offeredTemplate`), offered only to a teacher who has
+  shown an interest in both constructivist or Thinking Classrooms practice
+  and a school where students often miss class. REJECTED: his shape as the
+  rule, or as the default.
+- **The kit format is the contract between #751 and #750.** It is Russell's
+  own marks schema from the Thread 1 marking kit, generalised: point IDs
+  such as `B1.2`, one mark each, the SAME in every version, so versions are
+  parallel by construction and one marks record and one feedback sheet
+  serve every paper. What his sheet builder hard-coded for one test (the 40
+  point IDs and their meanings, each multiple-choice question's skill, the
+  strength concepts, the category and part names) moved into
+  `answers.json`, so the marking skill is course-neutral; his
+  `topic-links.json` shape (`{when, pages: [{title, path, anchor}]}`) moved
+  in as `topics`, without the per-section host, which #750 adds at marking
+  time. Its keys and rules are `assessment.kitFormat.rule`, in words in the
+  skill's `templates/Marking Kit/FORMAT.md`.
+- **No key that can hold a name.** Every key at every depth of the whole
+  kit and the whole marks record is read. A field key is refused when, read
+  run together whatever its case or separator, it contains `name`,
+  `student`, `pupil`, `learner`, `email`, `mail`, `username`, `surname`,
+  `nickname`, `handle` or `login`, or when it is only one of a short list
+  such as `first`, `last`, `author` or `parent` (`kitFormat.personWords`,
+  `personWholeKeys`); the format's own `studentNote` is the one exception.
+  A map key (a topic, a version, a point ID, an option letter) is the
+  teacher's data and is read word by word only, so the topic `ionic-names`
+  passes. Every object the format defines has a fixed key set and any
+  other key is refused (`unknownKeys`), with underscore notes allowed;
+  inside the marks record's `byQuestion`, `focus`, `strengths` and
+  `feedback`, which #750 defines, only the person check applies. The
+  checker reads keys, never what a value says, and its OK output says so:
+  a name typed inside a sentence is not something it can find. MEASURED:
+  the first version matched whole keys only, and `studentName`, `fullName`
+  and `first_name` all got an OK (751 implementation review M1); the first
+  fix walked only three places, and the same keys inside `checks`,
+  `closing`, `summary`, `feedback`, a note's value, `accept` or a
+  misconception still got an OK (751 fix review F1).
+  Russell's schema's `student` became `identifier`, and a category's label
+  is `title`. (Plan v2's own example used `name` for a category's label.)
+- **The paper, the guide and the kit agree.** `check_kit.py --paper A
+  "Version A.tex" --guide "Marking Guide.tex"` reads each version's
+  `\score{...}` marks column (by category, and question by question in
+  order) and the slash totals on the front, and the
+  guide's `\catrow{key}{out of}` rows, `\totalrow` and a `\pid` for every
+  point, and compares them with the kit's point counts. It reads the `.tex`
+  itself rather than a machine-readable line the templates would emit,
+  because such a line is typed by hand beside the numbers it describes and
+  can agree with the kit while the printed marks do not (REJECTED for that
+  reason). A paper laid out another way is reported unreadable, never
+  passed, and the skill then has the comparison done by hand and recorded
+  in `Coverage.md`. A paper whose number of `\score` marks is not its
+  number of questions (one score for a whole part) is refused as one that
+  could not be lined up: MEASURED on the first fix, such a paper with two
+  questions' marks swapped passed on its totals alone (751 fix review F2).
+  REJECTED: lining a part's one score up against several questions by
+  running totals, because that same swapped paper lines up too (worked
+  through by hand: K 2, then T 1 and T 2 against B1 and B2 together). Before this, nothing compared the printed marks with
+  the kit (751 implementation review M3).
+- **The one script that is not a starting point.** Russell's ruling is that
+  shipped scripts and templates are starting points the assistant adapts to
+  the teacher's header, categories, marks scheme and layout; each template
+  says at its top what may change and what must stay.
+  `scripts/check_kit.py` is the exception, said in its own header and in
+  the skill: it is the format's checker, run from the skill folder (which
+  the app restores whole), never copied, so a kit that passes it is a kit
+  `plantoir-marking` can read. It prints point IDs and keys, never a value
+  from a marks record. `templates/Checks/check_answers.py` is the
+  opposite: a worked example of a per-test checks script (it re-derives the
+  example's formulas, its balanced equations by trying coefficients, its
+  masses from molar masses, and its pH factor, from what each paper gives;
+  checks right answers sit under different letters and no given number is
+  reused). REJECTED: a generic checks script, which cannot work out the
+  answers of a test it has never seen (751 plan review H5).
+- **How a teacher finds out (Russell, 2026-11-12).** At the moment of need,
+  once, never pressed: `plantoir-unit-planning`, when a plan is built,
+  may mention that it can write the unit's test; this skill, when a kit is
+  finished, may mention marking. Each offer and its closing "Do not raise
+  it again in this session if they do not take it up." are pinned in
+  `mustSay`. **Marking is offered only when `plantoir-marking` is in the
+  working folder** (the assistant looks for its `SKILL.md`; the root files
+  list the skills): without it the assistant says nothing about marking
+  and does not mark from the kit, because marking without that skill's
+  rules about names would skip them (751 implementation review M4; #751
+  can land before #750). Nothing on
+  plantoir.app and no new text in the app (Plantoir is not to read as an
+  app that needs an assistant). The greeting sentence is its own piece.
+- **The root files.** One bullet each; the handouts bullet's "a quiz or
+  test for marks" became "a quiz for marks", so a unit test is routed here
+  and a single quiz stays a handout. Changing the managed section asks
+  again any teacher who chose Not Now; #751, #750 and #752 land in one
+  release, so a teacher is asked once.
+
+MEASURED (2026-11-12, `tectonic` 0.17.0): the Marking Guide template
+compiles to 4 letter pages with no overfull box once its "what earns the
+mark" column was narrowed to 4.4 cm (at 4.6 cm the four-column tables ran
+5 pt past the margin), and nicematrix reserves the column letter `V`, so
+the guide's column types are `Q`, `E`, `Y` and `Z`. The example's two
+versions, built from `Quiz.tex` with `mhchem` added, compile to two pages
+each with their solutions laid out the same as the question copy; a
+four-option question whose options run past about 30 characters needs one
+column of options, because two columns ran the options into each other.
+`scripts/test_assessment_kit.py` (13 tests) runs every `kitFormat` case
+(56) through `check_kit.py`. Must-fails: with the "every version answers
+every point" check removed from a copy of `check_kit.py`, the case "a
+version that does not answer every point" fails; with the paper's marks
+comparisons removed, the three paper-marks cases fail; and against the
+first fix's checker, the eight new person-key cases and the swapped
+part-score case fail. NOT MEASURED: a trial with an outside
+assistant actually writing a test from this skill (the plan's two trials),
+deferred to the director.
+
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
 Russell, 2026-10-07/08: Plantoir did things a teacher could reach only by

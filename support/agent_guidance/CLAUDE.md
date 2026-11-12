@@ -20,12 +20,17 @@ matches the task before writing:
   any page "students will print", or a page that should hand out an existing
   PDF: the `plantoir-printing` skill (`.claude/skills/plantoir-printing/SKILL.md`).
 - **Handouts made as a PDF** - "make me a worksheet", a warmup, a review
-  sheet, a quiz or test for marks, an answer key or solutions, anything to
+  sheet, a quiz for marks, an answer key or solutions, anything to
   print and hand out, in any course: the `plantoir-handouts` skill
   (`.claude/skills/plantoir-handouts/SKILL.md`) - offer its house style
   first (a LaTeX source, the PDF and its answer key from one file), where
   the files go, and how every answer is checked. It says when a printable
   page is the better fit.
+- **A unit test, a test with versions or a practice test** - each
+  version's paper and solutions, one marking guide, and a marking kit in
+  a fixed format: the `plantoir-test-authoring` skill
+  (`.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
+  `plantoir-handouts` house style for the paper.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
   parabola beside its parent, two lines meeting), a geometry or
   similar-triangles figure, a number line, a probability tree, a circuit,

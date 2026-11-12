@@ -21,13 +21,20 @@ that matches the task before writing:
   PDF: `.agents/skills/plantoir-printing/SKILL.md` (the same file is at
   `.claude/skills/plantoir-printing/SKILL.md`).
 - **Handouts made as a PDF** - "make me a worksheet", a warmup, a review
-  sheet, a quiz or test for marks, an answer key or solutions, anything to
+  sheet, a quiz for marks, an answer key or solutions, anything to
   print and hand out, in any course: offer the house style first (a LaTeX
   source, the PDF and its answer key from one file), where the files go,
   and how every answer is checked are in
   `.agents/skills/plantoir-handouts/SKILL.md` (the same file is at
   `.claude/skills/plantoir-handouts/SKILL.md`). It says when a printable
   page is the better fit.
+- **A unit test, a test with versions or a practice test** - each
+  version's paper and solutions, one marking guide, and a marking kit in
+  a fixed format: how to write them from only what was
+  taught, and have every answer re-solved, is in
+  `.agents/skills/plantoir-test-authoring/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
+  `plantoir-handouts` house style for the paper.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
   parabola beside its parent, two lines meeting), a geometry or
   similar-triangles figure, a number line, a probability tree, a circuit,
