@@ -27,8 +27,8 @@ matches the task before writing:
   the files go, and how every answer is checked. It says when a printable
   page is the better fit.
 - **A unit test, a test with versions or a practice test** - each
-  version's paper and solutions, one marking guide, and a marking kit an
-  assistant can later mark from: the `plantoir-test-authoring` skill
+  version's paper and solutions, one marking guide, and a marking kit in
+  a fixed format: the `plantoir-test-authoring` skill
   (`.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
   `plantoir-handouts` house style for the paper.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a

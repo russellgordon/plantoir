@@ -131,8 +131,8 @@ A unit test with versions and a kit to mark it from is made with the
 `plantoir-test-authoring` skill
 (`.claude/skills/plantoir-test-authoring/SKILL.md`, the same file is at
 `.agents/skills/plantoir-test-authoring/SKILL.md`), from the plan's
-lessons; copy its PDFs into the plan as below, never a `.tex` file or
-its marking kit. The planning folder is never built into a class website,
+lessons; copy each version's PDF and its solutions' PDF into the plan as
+below, never a `.tex` file, its Marking Guide or its marking kit. The planning folder is never built into a class website,
 so this is the one place under `courses/` a test's PDFs may be copied. Any other quiz, test or practice set is a handout. Make
 it with the
 `plantoir-handouts` skill (`.claude/skills/plantoir-handouts/SKILL.md`,

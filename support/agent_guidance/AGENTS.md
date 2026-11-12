@@ -29,8 +29,8 @@ that matches the task before writing:
   `.claude/skills/plantoir-handouts/SKILL.md`). It says when a printable
   page is the better fit.
 - **A unit test, a test with versions or a practice test** - each
-  version's paper and solutions, one marking guide, and a marking kit an
-  assistant can later mark from: how to write them from only what was
+  version's paper and solutions, one marking guide, and a marking kit in
+  a fixed format: how to write them from only what was
   taught, and have every answer re-solved, is in
   `.agents/skills/plantoir-test-authoring/SKILL.md` (the same file is at
   `.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the

@@ -18,7 +18,9 @@ Every option is optional and may be left out. (On Windows, `python` or `py`
 in place of `python3`; `.agents` works as well as `.claude`.) It prints one
 line per problem, each ending in the rule it breaks in square brackets, and
 exits 1; or one OK line with the counts by category, and exits 0. It prints
-IDs, keys and counts only, never what a marks record says.
+IDs, keys and counts only, never what a marks record says. It reads every
+KEY of both files for anything that looks like a person; it cannot read
+prose, so a name typed inside a value is not seen, and it says so.
 
 The paper is read the way the plantoir-handouts Quiz.tex starter writes it:
 each question's `\\score{T 4}` and the slash totals on the front
@@ -42,7 +44,9 @@ PERSON_WORDS = ["name", "student", "pupil", "learner", "email", "mail", "usernam
                 "surname", "nickname", "handle", "login"]
 # ... these only as the whole key, since "first" and "last" are ordinary
 # words in a topic but a person's name when a key is nothing else ...
-PERSON_WHOLE_KEYS = ["first", "last", "full", "given", "family", "middle"]
+PERSON_WHOLE_KEYS = ["first", "last", "full", "given", "family", "middle", "who", "author",
+                     "owner", "initials", "person", "parent", "guardian", "contact", "kid",
+                     "child", "nom", "prenom"]
 # ... and these are the keys the format itself defines that would otherwise
 # match: a sentence written TO the student about a lost mark.
 DEFINED_EXCEPTIONS = ["studentNote"]
@@ -64,50 +68,85 @@ MARKS_KEYS = ["kit", "identifier", "section", "version", "points", "voided", "ch
               "summary", "byQuestion", "strengths", "focus", "closing", "feedback"]
 MARKS_POINT_KEYS = ["earned", "seen", "note", "studentNote"]
 VOIDED_KEYS = ["reason", "intended"]
-# The marks record's byQuestion, focus and strengths are what a feedback
-# sheet says; plantoir-marking defines what is inside them, so only the
-# person check applies there.
-MARKS_EXTENSION_PLACES = ["byQuestion", "focus", "strengths"]
+# The marks record's byQuestion, focus, strengths and feedback are what a
+# feedback sheet says; plantoir-marking defines what is inside them, so only
+# the person check (walk_every_key, over the whole file) applies there.
 
 
 def key_words(key):
     return [word.lower() for word in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+", key)]
 
 
-def looks_like_a_person(key):
+def looks_like_a_person(key, is_map_key=False):
+    """A field key is read run together, whatever its case or separator, so
+    studentName, first_name and e-mail are all caught. A map key (a topic,
+    a version, a point ID, an option letter) is data the teacher chose, so
+    it is read word by word only: the topic "ionic-names" passes, while
+    "student-name" is still refused."""
     if key in DEFINED_EXCEPTIONS:
         return False
-    run_together = re.sub(r"[^a-z]", "", key.lower())
+    if is_map_key:
+        words = key_words(key)
+        for word in PERSON_WORDS:
+            if word in words:
+                return True
+        return False
+    run_together = re.sub(r"[^a-z]", "", key.lower().replace("\u00e9", "e"))
     for word in PERSON_WORDS:
         if word in run_together:
-            return True
-        if word in key_words(key):
             return True
     return run_together in PERSON_WHOLE_KEYS
 
 
+# Where a key is data rather than a field: a path of keys from the top of
+# the file, "*" standing for any key.
+KIT_MAP_PLACES = [("topics",), ("versions",), ("versions", "*", "answers"),
+                  ("versions", "*", "answers", "*", "misconceptions")]
+MARKS_MAP_PLACES = [("points",), ("voided",), ("feedback",)]
+
+
+def is_map_place(path, map_places):
+    for place in map_places:
+        if len(place) != len(path):
+            continue
+        matches = True
+        index = 0
+        for step in place:
+            if step != "*" and step != path[index]:
+                matches = False
+            index += 1
+        if matches:
+            return True
+    return False
+
+
+def walk_every_key(value, path, map_places, where, problems):
+    """Every key at every depth of a whole file, so no place in it, however
+    free, holds a key for a person. It reads KEYS: a name typed inside a
+    value is not something it can see."""
+    if isinstance(value, dict):
+        map_here = is_map_place(path, map_places)
+        for key in value:
+            if isinstance(key, str) and looks_like_a_person(key, map_here):
+                shown = " -> ".join(path + (key,))
+                problems.append(f"{where}: {shown} is a key that looks like it holds a person; the kit and the marks records never hold a name [forbidden-key]")
+            walk_every_key(value[key], path + (key,), map_places, where, problems)
+    elif isinstance(value, list):
+        for item in value:
+            walk_every_key(item, path + ("*",), map_places, where, problems)
+
+
 def check_keys(value, allowed, where, problems):
-    """The keys of one object: none that looks like a person, none the
-    format does not define. Keys that start with an underscore are notes."""
+    """The keys of one object: none the format does not define. Keys that
+    start with an underscore are notes. (Keys that look like a person are
+    found by walk_every_key, over the whole file.)"""
     if not isinstance(value, dict):
         return
     for key in value:
         if looks_like_a_person(key):
-            problems.append(f"{where} has a key called {key}; the kit and the marks records never hold a name [forbidden-key]")
-        elif not key.startswith("_") and key not in allowed:
+            continue
+        if not key.startswith("_") and key not in allowed:
             problems.append(f"{where} has a key called {key}, which the format does not define [unknown-key]")
-
-
-def check_person_keys_anywhere(value, where, problems):
-    """Inside a place another skill defines: only the person check."""
-    if isinstance(value, dict):
-        for key in value:
-            if looks_like_a_person(key):
-                problems.append(f"{where} has a key called {key}; the kit and the marks records never hold a name [forbidden-key]")
-            check_person_keys_anywhere(value[key], f"{where} -> {key}", problems)
-    elif isinstance(value, list):
-        for item in value:
-            check_person_keys_anywhere(item, where, problems)
 
 
 def load(path, problems):
@@ -159,6 +198,7 @@ def collect_ids(entries, field, label, problems):
 
 def check_kit(kit, problems):
     """Returns the point IDs, the version keys and the kit's counts."""
+    walk_every_key(kit, (), KIT_MAP_PLACES, "answers.json", problems)
     check_keys(kit, KIT_KEYS, "answers.json", problems)
     if type(kit.get("kit")) is not int or kit.get("kit") != KIT_VERSION:
         problems.append(f"kit must be {KIT_VERSION} [kit-version]")
@@ -203,8 +243,6 @@ def check_kit(kit, problems):
     for topic_key in topics:
         if topic_key.startswith("_"):
             continue
-        if looks_like_a_person(topic_key):
-            problems.append(f"topics has a key called {topic_key}; the kit never holds a name [forbidden-key]")
         topic = topics[topic_key]
         check_keys(topic, TOPIC_KEYS, f"topic {topic_key}", problems)
         pages = topic.get("pages") if isinstance(topic, dict) else None
@@ -269,8 +307,6 @@ def check_kit(kit, problems):
         problems.append("versions must be an object with at least one version [required]")
         versions = {}
     for version_key in versions:
-        if looks_like_a_person(version_key):
-            problems.append(f"versions has a key called {version_key}; the kit never holds a name [forbidden-key]")
         version = versions[version_key]
         if not isinstance(version, dict):
             problems.append(f"version {version_key} must be an object [required]")
@@ -293,13 +329,22 @@ def check_kit(kit, problems):
                 problems.append(f"version {version_key}, point {point_id}: answer must be text [every-point-answered]")
                 continue
             check_keys(entry, ANSWER_KEYS, f"version {version_key}, point {point_id}", problems)
-            if not isinstance(entry.get("accept", []), list):
+            accept = entry.get("accept", [])
+            if not isinstance(accept, list):
                 problems.append(f"version {version_key}, point {point_id}: accept must be a list [every-point-answered]")
+            else:
+                for accepted in accept:
+                    if not isinstance(accepted, str):
+                        problems.append(f"version {version_key}, point {point_id}: every accepted answer must be text [every-point-answered]")
             misconceptions = entry.get("misconceptions", {})
             if not isinstance(misconceptions, dict):
                 problems.append(f"version {version_key}, point {point_id}: misconceptions must be an object [every-point-answered]")
-            elif entry["answer"] in misconceptions:
-                problems.append(f"version {version_key}, point {point_id}: the right answer is listed as a misconception [misconception]")
+            else:
+                if entry["answer"] in misconceptions:
+                    problems.append(f"version {version_key}, point {point_id}: the right answer is listed as a misconception [misconception]")
+                for option in misconceptions:
+                    if not is_text(misconceptions[option]):
+                        problems.append(f"version {version_key}, point {point_id}: the misconception for option {option} must be text [misconception]")
         for answered in answers:
             if answered not in point_ids:
                 problems.append(f"version {version_key} answers {answered}, which is not in points [unknown-point]")
@@ -348,9 +393,18 @@ def check_kit(kit, problems):
 
 
 def check_marks(marks, point_ids, version_keys, part_keys, problems):
+    walk_every_key(marks, (), MARKS_MAP_PLACES, "the marks record", problems)
     check_keys(marks, MARKS_KEYS, "the marks record", problems)
-    for place in MARKS_EXTENSION_PLACES:
-        check_person_keys_anywhere(marks.get(place), f"the marks record's {place}", problems)
+    for key in ["summary", "closing"]:
+        if marks.get(key) is not None and not isinstance(marks.get(key), str):
+            problems.append(f"the marks record: {key} must be text or null [marks-text]")
+    checks = marks.get("checks", [])
+    if not isinstance(checks, list):
+        problems.append("the marks record: checks must be a list of text [marks-text]")
+    else:
+        for entry in checks:
+            if not isinstance(entry, str):
+                problems.append("the marks record: every entry in checks must be text [marks-text]")
     if type(marks.get("kit")) is not int or marks.get("kit") != KIT_VERSION:
         problems.append(f"the marks record: kit must be {KIT_VERSION} [marks-kit]")
     identifier = marks.get("identifier")
@@ -451,7 +505,9 @@ def check_paper(version_key, path, version_keys, counts, per_question, problems)
             everything.extend(pairs)
         if as_counts(everything) != without_zeros(counts):
             problems.append(f"Version {version_key}: the marks column adds up to {describe(as_counts(everything))}, the kit has {describe(counts)} [paper-marks]")
-        if len(each) == len(per_question):
+        if len(each) != len(per_question):
+            problems.append(f"Version {version_key}: the marks column has {len(each)} marks for {len(per_question)} questions, so they could not be lined up question by question; give each question its own \\score, or compare the marks with the kit by hand [paper-marks]")
+        else:
             index = 0
             for question_id, question_counts in per_question:
                 if each[index] != question_counts:
@@ -542,6 +598,7 @@ def main(arguments):
         print(f"{len(problems)} problem(s): fix them before the kit is used")
         return 1
     print(f"OK: {', '.join(checked)}; {len(point_ids)} points ({describe(counts)}), versions {', '.join(version_keys)}")
+    print("Only keys were checked for names: a name typed inside a value (a note, what was seen, a sentence) is not something this script can find.")
     return 0
 
 

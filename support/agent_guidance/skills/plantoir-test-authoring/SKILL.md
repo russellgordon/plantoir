@@ -1,6 +1,6 @@
 ---
 name: plantoir-test-authoring
-description: Use when a teacher asks for a unit test, a test with more than one version, a practice test, or a quiz for marks with a marking guide, in any course. Builds the paper for each version and its solutions, one marking guide, a marking kit an assistant can later mark from (answers.json and a marks template, in a fixed format with no place for a name), a checks script where answers can be computed, a coverage table and, when wanted, a practice test, from only what the class was taught, with every answer re-solved by someone other than its writer. Uses the plantoir-handouts house style for the paper. Everything it drafts is for the teacher to review and decide.
+description: Use when a teacher asks for a unit test, a test with more than one version, a practice test, or a quiz for marks with a marking guide, in any course. Builds the paper for each version and its solutions, one marking guide, a marking kit in a fixed format with no place for a name (answers.json and a marks template), a checks script where answers can be computed, a coverage table and, when wanted, a practice test, from only what the class was taught, with every answer re-solved by someone other than its writer. Uses the plantoir-handouts house style for the paper. Everything it drafts is for the teacher to review and decide.
 ---
 
 # Writing a unit test, its solutions and its marking kit
@@ -65,7 +65,8 @@ Everything I draft here (each question, each answer and each mark) is a suggesti
   website is built from**: not into a course's folders, not into `Media`,
   not onto a page. Everything there that is not a page is copied to the
   class website. The one place under `courses/` where copies of the test's
-  PDFs may go is a unit plan's own folder,
+  PDFs (each version's PDF and its solutions' PDF, never the Marking Guide
+  or the kit) may go is a unit plan's own folder,
   `courses/<CODE>/.internal/planning/<unit>/pdfs/`, as the
   `plantoir-unit-planning` skill's section 6 says: that folder is never
   built into a class website. Never a `.tex` file or the kit there. A
@@ -174,9 +175,13 @@ file, if it is missing), one folder per test:
   points in `answers.json`, that the totals on the front and the Marking
   Guide's category table are the kit's counts, and that the guide has a
   row for every point. It reads the marks the way the starters write them
-  (`\score{...}`, the slash totals, `\catrow` and `\totalrow`); if this
-  teacher's paper prints marks another way, it says it cannot read them,
-  and then you compare them by hand and say so in `Coverage.md`.
+  (one `\score{...}` per question, the slash totals, `\catrow` and
+  `\totalrow`). If this teacher's paper prints marks another way (one
+  score for a whole part, say), it says it could not line them up and
+  fails; then compare them by hand and say so in `Coverage.md`. It reads
+  every key of the kit and the marks template for anything that looks like
+  it holds a person, but it reads keys, not prose: a name typed inside a
+  value is not something it can find, so never type one.
 
   (`python` or `py` on Windows, where `python3` may not exist; `.agents/`
   in place of `.claude/` works too.) Fix every line it prints until it
@@ -236,7 +241,8 @@ help mark them onto feedback sheets with the plantoir-marking skill. Do
 not raise it again in this session if they do not take it up. If it is not
 there, say nothing about marking, and do not mark papers from this kit:
 marking follows that skill's rules about students' names, and without them
-it does not happen.
+it does not happen. If the teacher asks about marking, say that it needs
+the plantoir-marking skill, which is not in this folder.
 
 If the teacher asks what you can help with, answer plainly from what this
 skill describes, and claim nothing it does not.

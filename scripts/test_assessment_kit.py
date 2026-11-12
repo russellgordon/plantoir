@@ -101,7 +101,7 @@ class KitFormatCases(unittest.TestCase):
     def test_every_case_is_accepted_or_refused_as_the_contract_says(self):
         rules = assessment()["kitFormat"]
         cases = rules["cases"]
-        self.assertGreaterEqual(len(cases), 40, "the contract lost kit cases")
+        self.assertGreaterEqual(len(cases), 55, "the contract lost kit cases")
         for case in cases:
             with self.subTest(case=case["name"]):
                 kit_path = self.folder / "answers.json"
@@ -109,14 +109,16 @@ class KitFormatCases(unittest.TestCase):
                     kit_path.write_text(json.dumps(apply_case(rules["base"], case)), encoding="utf-8")
                     result = run_checker(kit_path)
                 else:
-                    kit_path.write_text(json.dumps(rules["base"]), encoding="utf-8")
+                    kit = apply_case(rules["base"], {"set": case.get("kitSet", [])})
+                    kit_path.write_text(json.dumps(kit), encoding="utf-8")
                 if case["file"] == "marks":
                     marks_path = self.folder / "marks.json"
                     marks_path.write_text(json.dumps(apply_case(rules["baseMarks"], case)), encoding="utf-8")
                     result = run_checker(kit_path, "--marks", marks_path)
                 elif case["file"] == "paper":
                     paper_path = self.folder / "Version.tex"
-                    paper_path.write_text(replace_text(rules["basePaper"], case), encoding="utf-8")
+                    paper = case.get("paperText", rules["basePaper"])
+                    paper_path.write_text(replace_text(paper, case), encoding="utf-8")
                     result = run_checker(kit_path, "--paper", case["version"], paper_path)
                 elif case["file"] == "guide":
                     guide_path = self.folder / "Marking Guide.tex"
@@ -128,6 +130,7 @@ class KitFormatCases(unittest.TestCase):
                     self.assertTrue(result.stdout.startswith("OK"), output)
                     if "says" in case:
                         self.assertEqual(result.stdout.strip(), case["says"])
+                    self.assertIn("a name typed inside a value", result.stdout)
                 else:
                     self.assertEqual(result.returncode, 1, output)
                     self.assertIn("[" + case["rule"] + "]", output)

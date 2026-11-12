@@ -4176,24 +4176,32 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   in as `topics`, without the per-section host, which #750 adds at marking
   time. Its keys and rules are `assessment.kitFormat.rule`, in words in the
   skill's `templates/Marking Kit/FORMAT.md`.
-- **No key that can hold a name.** A key is refused when its words (split
-  at camelCase, `_`, `-` and spaces, or read run together, whatever the
-  case) include `name`, `student`, `pupil`, `learner`, `email`, `mail`,
-  `username`, `surname`, `nickname`, `handle` or `login`, or when it is
-  only `first`, `last`, `full`, `given`, `family` or `middle`
-  (`kitFormat.personWords`, `personWholeKeys`); the format's own
-  `studentNote` is the one exception. Every object the format defines has
-  a fixed key set and any other key is refused (`unknownKeys`), with
-  underscore notes allowed; inside the marks record's `byQuestion`, `focus`
-  and `strengths`, which #750 defines, only the person check applies.
-  MEASURED: the first version matched whole keys only, and `studentName`,
-  `fullName` and `first_name` all got an OK (751 implementation review M1).
+- **No key that can hold a name.** Every key at every depth of the whole
+  kit and the whole marks record is read. A field key is refused when, read
+  run together whatever its case or separator, it contains `name`,
+  `student`, `pupil`, `learner`, `email`, `mail`, `username`, `surname`,
+  `nickname`, `handle` or `login`, or when it is only one of a short list
+  such as `first`, `last`, `author` or `parent` (`kitFormat.personWords`,
+  `personWholeKeys`); the format's own `studentNote` is the one exception.
+  A map key (a topic, a version, a point ID, an option letter) is the
+  teacher's data and is read word by word only, so the topic `ionic-names`
+  passes. Every object the format defines has a fixed key set and any
+  other key is refused (`unknownKeys`), with underscore notes allowed;
+  inside the marks record's `byQuestion`, `focus`, `strengths` and
+  `feedback`, which #750 defines, only the person check applies. The
+  checker reads keys, never what a value says, and its OK output says so:
+  a name typed inside a sentence is not something it can find. MEASURED:
+  the first version matched whole keys only, and `studentName`, `fullName`
+  and `first_name` all got an OK (751 implementation review M1); the first
+  fix walked only three places, and the same keys inside `checks`,
+  `closing`, `summary`, `feedback`, a note's value, `accept` or a
+  misconception still got an OK (751 fix review F1).
   Russell's schema's `student` became `identifier`, and a category's label
   is `title`. (Plan v2's own example used `name` for a category's label.)
 - **The paper, the guide and the kit agree.** `check_kit.py --paper A
   "Version A.tex" --guide "Marking Guide.tex"` reads each version's
-  `\score{...}` marks column (by category, and question by question when
-  there is one per question) and the slash totals on the front, and the
+  `\score{...}` marks column (by category, and question by question in
+  order) and the slash totals on the front, and the
   guide's `\catrow{key}{out of}` rows, `\totalrow` and a `\pid` for every
   point, and compares them with the kit's point counts. It reads the `.tex`
   itself rather than a machine-readable line the templates would emit,
@@ -4201,7 +4209,13 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   can agree with the kit while the printed marks do not (REJECTED for that
   reason). A paper laid out another way is reported unreadable, never
   passed, and the skill then has the comparison done by hand and recorded
-  in `Coverage.md`. Before this, nothing compared the printed marks with
+  in `Coverage.md`. A paper whose number of `\score` marks is not its
+  number of questions (one score for a whole part) is refused as one that
+  could not be lined up: MEASURED on the first fix, such a paper with two
+  questions' marks swapped passed on its totals alone (751 fix review F2).
+  REJECTED: lining a part's one score up against several questions by
+  running totals, because that same swapped paper lines up too (worked
+  through by hand: K 2, then T 1 and T 2 against B1 and B2 together). Before this, nothing compared the printed marks with
   the kit (751 implementation review M3).
 - **The one script that is not a starting point.** Russell's ruling is that
   shipped scripts and templates are starting points the assistant adapts to
@@ -4247,10 +4261,12 @@ each with their solutions laid out the same as the question copy; a
 four-option question whose options run past about 30 characters needs one
 column of options, because two columns ran the options into each other.
 `scripts/test_assessment_kit.py` (13 tests) runs every `kitFormat` case
-(46) through `check_kit.py`. Must-fails: with the "every version answers
+(56) through `check_kit.py`. Must-fails: with the "every version answers
 every point" check removed from a copy of `check_kit.py`, the case "a
 version that does not answer every point" fails; with the paper's marks
-comparisons removed, the three paper-marks cases fail. NOT MEASURED: a trial with an outside
+comparisons removed, the three paper-marks cases fail; and against the
+first fix's checker, the eight new person-key cases and the swapped
+part-score case fail. NOT MEASURED: a trial with an outside
 assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
 

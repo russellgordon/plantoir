@@ -30,7 +30,10 @@ last, full, given, family or middle. The format's own `studentNote` is the
 one exception. And no object has a key the tables below do not list
 (keys that start with an underscore are notes). A marks record names its
 paper by `identifier` (such as `Student A`), never by a name; whether an
-identifier has the right shape is the marking skill's check. The reason is
+identifier has the right shape is the marking skill's check. Every key at
+every depth of both files is read, the free places included. The checker
+reads keys, never what a value says: a name typed into a note, `seen` or a
+sentence is not something it can find, so never type one. The reason is
 that these files are read by an assistant, and a file with no place for a
 name is one nobody fills with one by accident. Where a title is needed (a
 category's), the key is `title`.
