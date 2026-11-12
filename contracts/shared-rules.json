@@ -24150,17 +24150,21 @@
         ],
         "plantoir-test-authoring": [
           "Please read and decide on all of it before it reaches a student; I draft, you decide.",
-          "**Only what the class was taught.**",
+          "A question on something the class did not do is removed",
           "Never invent a question, scenario or example involving firearms or ammunition",
           "re-solved from scratch by a reviewer who did not write it",
-          "**Versions are genuinely parallel.**",
+          "no number a question gives is reused from one version to another",
           "no file in the kit has a key for a name, ever",
-          "**The template is offered, never applied.**",
+          "use it only after they say yes",
           "If you cannot tell whether they have shown that interest, do not offer it.",
-          "you may mention once, in one sentence, that when the papers are written"
+          "you may mention once, in one sentence, that when the papers are written",
+          "Do not raise it again in this session if they do not take it up.",
+          "If it is not there, say nothing about marking, and do not mark papers from this kit",
+          "the checker refuses any key the format does not define"
         ],
         "plantoir-unit-planning": [
-          "you can also write the unit's test from the plan"
+          "you can also write the unit's test from the plan",
+          "Do not raise it again in this session if they do not take it up."
         ]
       },
       "rootFileCases": {
@@ -33063,7 +33067,7 @@
     "rule": "Tests, marking and report comments (#751, #750, #752): skills an outside assistant follows, written into a working folder like every other (printablePages.agentGuidance). Neither app reads or writes any file they make; the only part either app plays is writing the skills, and the greeting sentence that names them (app-rules.json -> outsideAgents, piece G). #751 adds agentGuidance.testAuthoringSkill and kitFormat; #750 and #752 add their own sub-keys here.",
     "agentGuidance": {
       "testAuthoringSkill": {
-        "rule": "The skill `plantoir-test-authoring` (#751) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant, for a unit test with versions: the teacher decides (a sentence said in the first reply and printed under the Marking Guide's title); FIXED for every teacher: only what the class was taught, checked question by question, no trick wording, versions genuinely parallel (right answers under different letters, no given number reused), every answer re-solved from scratch by a reviewer who did not write it and a second reviewer filling Coverage.md, never inventing a question, scenario or example involving firearms or ammunition (a teacher's own material and curriculum content that requires the subject are left alone), and nothing of the test, its solutions or its kit in courses/; then HOW this teacher writes tests: the course's How I Teach page first, otherwise a few plain questions, and the test shape of the handouts skill's named template (handoutsSkill.offeredTemplate.name) OFFERED only to a teacher who has shown an interest in both things it bridges, never applied unasked. The papers are plantoir-handouts' Quiz.tex starter (usesStyleOf); the guide, kit README, coverage table and checks script are templates the assistant adjusts to the teacher's header, categories, marks scheme and layout, each saying at its top what may change; scripts/check_kit.py is the one file that is not a starting point (it is run from the skill folder, which the app restores). When a kit is finished it may mention marking once; plantoir-unit-planning, when a plan is built, may mention the unit test once (Russell, 2026-11-12: how a teacher finds out, at the moment of need, once, never pressed). The root AGENTS.md and CLAUDE.md sections name it in one bullet each, and their handouts bullet now says 'a quiz for marks' where it said 'a quiz or test for marks'. It is NOT in pageAuthoringSkill.routesTo: a test is not part of a page.",
+        "rule": "The skill `plantoir-test-authoring` (#751) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant, for a unit test with versions: the teacher decides (a sentence said in the first reply and printed under the Marking Guide's title); FIXED for every teacher: only what the class was taught, checked question by question, no trick wording, versions genuinely parallel (right answers under different letters, no given number reused), every answer re-solved from scratch by a reviewer who did not write it and a second reviewer filling Coverage.md, never inventing a question, scenario or example involving firearms or ammunition (a teacher's own material and curriculum content that requires the subject are left alone), and nothing of the test, its solutions or its kit in the pages a class website is built from (the one place under courses/ its PDFs may be copied is a unit plan's .internal/planning/<unit>/pdfs/, never built into a site, as plantoir-unit-planning section 6 says); then HOW this teacher writes tests: the course's How I Teach page first, otherwise a few plain questions, and the test shape of the handouts skill's named template (handoutsSkill.offeredTemplate.name) OFFERED only to a teacher who has shown an interest in both things it bridges, never applied unasked. The papers are plantoir-handouts' Quiz.tex starter (usesStyleOf); the guide, kit README, coverage table and checks script are templates the assistant adjusts to the teacher's header, categories, marks scheme and layout, each saying at its top what may change; scripts/check_kit.py is the one file that is not a starting point (it is run from the skill folder, which the app restores). When a kit is finished it may mention marking once, and ONLY when the plantoir-marking skill is in the working folder (without it, it says nothing about marking and does not mark from the kit, since #751 may land before #750); plantoir-unit-planning, when a plan is built, may mention the unit test once (Russell, 2026-11-12: how a teacher finds out, at the moment of need, once, never pressed). The root AGENTS.md and CLAUDE.md sections name it in one bullet each, and their handouts bullet now says 'a quiz for marks' where it said 'a quiz or test for marks'. It is NOT in pageAuthoringSkill.routesTo: a test is not part of a page.",
         "skill": "plantoir-test-authoring",
         "templates": [
           "templates/Marking Guide.tex",
@@ -33092,19 +33096,19 @@
       }
     },
     "kitFormat": {
-      "rule": "A test's marking kit (#751), read by plantoir-marking (#750): `answers.json` in this format (`version`), described in words in the skill's templates/Marking Kit/FORMAT.md and checked by its scripts/check_kit.py. It is Russell's own marks schema (point IDs such as B1.2, one mark each, shared by every version; a marks record's seen, note, studentNote, voided, checks, summary, byQuestion, strengths, focus, closing and feedback) with what his sheet builder hard-coded (the points and their meanings, each question's skill, the strength concepts, the categories and parts) moved INTO the kit, so the marking skill is course-neutral. Every point is one mark and a category is out of the number of its points; every point names an existing question and category and every question an existing part, with at least one point; a followThrough lists EARLIER points of the SAME question; every version answers every point and nothing else; topics and strengths name only what the kit has. No key at ANY depth of the kit or of a marks record is one of forbiddenKeys (compared without case): a marks record names its paper by `identifier`, which Russell's schema called `student`, renamed so nobody reads it as a place for a name; a category's label is `title`, not `name`. Keys that start with an underscore are notes. A marks record's `earned` is null, 0, 0.5 or 1; whether 0.5 may be used is the teacher's marking settings (#750), not the kit. `cases` apply `remove` (paths to delete) and `set` (path and value) to `base` (kit) or `baseMarks` (a marks record, checked against `base`), and `expect` accepted or refused; a refused case names the `rule` check_kit.py prints in square brackets. scripts/test_assessment_kit.py runs every case through check_kit.py and checks the skill's own worked example passes.",
+      "rule": "A test's marking kit (#751), read by plantoir-marking (#750): `answers.json` in this format (`version`), described in words in the skill's templates/Marking Kit/FORMAT.md and checked by its scripts/check_kit.py. It is Russell's own marks schema (point IDs such as B1.2, one mark each, shared by every version; a marks record's seen, note, studentNote, voided, checks, summary, byQuestion, strengths, focus, closing and feedback) with what his sheet builder hard-coded (the points and their meanings, each question's skill, the strength concepts, the categories and parts) moved INTO the kit, so the marking skill is course-neutral. Every point is one mark and a category is out of the number of its points; every point names an existing question and category and every question an existing part, with at least one point; a followThrough lists EARLIER points of the SAME question; every version answers every point and nothing else; topics and strengths name only what the kit has. No key of the kit or of a marks record looks like it holds a person (personWords, personWholeKeys, personKeysWhy), and no key the format does not define is accepted (unknownKeys): a marks record names its paper by `identifier`, which Russell's schema called `student`, renamed so nobody reads it as a place for a name; a category's label is `title`, not `name`. Keys that start with an underscore are notes. A marks record's `earned` is null, 0, 0.5 or 1; whether 0.5 may be used is the teacher's marking settings (#750), not the kit. `cases` apply `remove` (paths to delete) and `set` (path and value; an index one past a list's end appends) to `base` (file kit) or `baseMarks` (file marks, a marks record checked against `base`), or `replace` (the first occurrence of one text by another) to `basePaper` (file paper, checked as `--paper <version>` against `base`) or `baseGuide` (file guide); `expect` is accepted or refused, a refused case names the `rule` check_kit.py prints in square brackets, and `says` is the whole OK line where a case pins it. scripts/test_assessment_kit.py runs every case through check_kit.py and checks the skill's own worked example passes.",
       "files": [
         "answers.json",
         "marks-template.json",
         "README.md"
       ],
       "version": 1,
-      "forbiddenKeys": [
-        "name",
-        "student",
-        "pupil",
-        "email"
-      ],
+      "personWords": ["name", "student", "pupil", "learner", "email", "mail", "username", "surname", "nickname", "handle", "login"],
+      "personWholeKeys": ["first", "last", "full", "given", "family", "middle"],
+      "definedExceptions": ["studentNote"],
+      "personKeysWhy": "A key is refused when, split into its words (camelCase, snake_case, kebab-case, spaces) or read run together whatever its case, it contains one of personWords (studentName, fullName, first_name, Student, e-mail), or is nothing but one of personWholeKeys (first, Last). The format's own studentNote, a sentence written TO the student, is the one exception. 'first' and 'last' alone are refused only as a whole key, because they are ordinary words in a topic. The first implementation matched whole keys only, and studentName passed with an OK (751 implementation review M1).",
+      "unknownKeys": "Every object the format defines has a fixed set of keys (FORMAT.md's tables), and any other key is refused [unknown-key], so a kit cannot grow a place for a name by inventing one. Keys that start with an underscore are notes and allowed. The marks record's byQuestion, focus and strengths are what a feedback sheet says and are defined by plantoir-marking (#750): inside them only the person check applies. Map keys (version keys, point IDs, option letters, topic keys) are data, checked by reference and by the person check.",
+      "paperAndGuide": "check_kit.py --paper KEY FILE compares a version's .tex with the kit: the \\score{...} marks column, added up by category, must equal the kit's points per category, and when the paper has one \\score per question, question by question in order; the slash totals on the front (a category key, a \\rule blank, then \\,/\\, and the number, as plantoir-handouts' Quiz.tex writes them) must equal the same counts. --guide FILE reads the Marking Guide's \\catrow{key}{out of}{...} rows and \\totalrow{N} and requires a \\pid{ID} for every point. A paper or guide with none of these is refused as unreadable, never passed. The .tex is read rather than a machine-readable line the templates emit, because a line would be typed by hand beside the numbers it describes and could agree with the kit while the printed marks did not (751 implementation review M3). The OK line names what was checked and the counts by category.",
       "base": {
         "kit": 1,
         "test": "Unit 1 Test: Dice Games",
@@ -33187,8 +33191,33 @@
         {"name": "a marks record with a point the kit does not have", "file": "marks", "set": [{"path": ["points", "B1.3"], "value": {"earned": 1, "seen": "", "note": "", "studentNote": ""}}], "expect": "refused", "rule": "marks-points"},
         {"name": "a marks record earning 2", "file": "marks", "set": [{"path": ["points", "A1", "earned"], "value": 2}], "expect": "refused", "rule": "marks-earned"},
         {"name": "a marks record with a student key", "file": "marks", "set": [{"path": ["student"], "value": "Student A"}], "expect": "refused", "rule": "forbidden-key"},
-        {"name": "a marks record on a version the kit does not have", "file": "marks", "set": [{"path": ["version"], "value": "C"}], "expect": "refused", "rule": "marks-version"}
-      ]
+        {"name": "a marks record on a version the kit does not have", "file": "marks", "set": [{"path": ["version"], "value": "C"}], "expect": "refused", "rule": "marks-version"},
+        {"name": "the base kit's OK line names its counts", "file": "kit", "expect": "accepted", "says": "OK: the kit; 3 points (K 1, T 2), versions A, B"},
+        {"name": "a studentName key in a version", "file": "kit", "set": [{"path": ["versions", "A", "studentName"], "value": "Student A"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a first_name key in a question", "file": "kit", "set": [{"path": ["questions", 0, "first_name"], "value": "x"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a Student key at the top of a kit", "file": "kit", "set": [{"path": ["Student"], "value": "A"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "an e-mail key in a note place", "file": "kit", "set": [{"path": ["_e-mail"], "value": "x"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a key called Last", "file": "kit", "set": [{"path": ["points", 0, "Last"], "value": "x"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a fullName key in a marks record", "file": "marks", "set": [{"path": ["fullName"], "value": "x"}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a studentName inside the marks record's focus", "file": "marks", "set": [{"path": ["focus"], "value": [{"title": "Counting", "studentName": "x"}]}], "expect": "refused", "rule": "forbidden-key"},
+        {"name": "a key the format does not define", "file": "kit", "set": [{"path": ["points", 0, "difficulty"], "value": "easy"}], "expect": "refused", "rule": "unknown-key"},
+        {"name": "a marks record key the format does not define", "file": "marks", "set": [{"path": ["points", "A1", "grade"], "value": "B"}], "expect": "refused", "rule": "unknown-key"},
+        {"name": "ordinary keys and a note that hold no person", "file": "kit", "set": [{"path": ["_reviewedOn"], "value": "2027-01-15"}, {"path": ["topics", "first-roll"], "value": {"when": "The first roll.", "pages": [{"title": "Dice", "path": "Concepts/Dice", "anchor": ""}]}}], "expect": "accepted"},
+        {"name": "a point in another category than its part", "file": "kit", "set": [{"path": ["points", 0, "category"], "value": "T"}], "expect": "refused", "rule": "part-category"},
+        {"name": "the right answer listed as a misconception", "file": "kit", "set": [{"path": ["versions", "A", "answers", "A1", "misconceptions", "c"], "value": "x"}], "expect": "refused", "rule": "misconception"},
+        {"name": "a kit version of true", "file": "kit", "set": [{"path": ["kit"], "value": true}], "expect": "refused", "rule": "kit-version"},
+        {"name": "a paper that agrees with the kit", "file": "paper", "version": "A", "expect": "accepted"},
+        {"name": "a paper whose marks column says T 3", "file": "paper", "version": "A", "replace": ["\\score{T 2}", "\\score{T 3}"], "expect": "refused", "rule": "paper-marks"},
+        {"name": "a paper whose questions carry each other's marks", "file": "paper", "version": "A", "replace": ["\\score{K 1} Which", "\\score{K 1, T 1} Which"], "expect": "refused", "rule": "paper-marks"},
+        {"name": "a paper whose front says T 3", "file": "paper", "version": "A", "replace": ["\\,/\\,2}", "\\,/\\,3}"], "expect": "refused", "rule": "paper-totals"},
+        {"name": "a paper with no marks column", "file": "paper", "version": "A", "replace": ["\\score{K 1} Which is more likely?\n\\q{1}\\score{T 2}", "Which is more likely?\n\\q{1}"], "expect": "refused", "rule": "paper-marks"},
+        {"name": "a paper for a version the kit does not have", "file": "paper", "version": "C", "expect": "refused", "rule": "paper-marks"},
+        {"name": "a Marking Guide that agrees with the kit", "file": "guide", "expect": "accepted"},
+        {"name": "a Marking Guide whose table says T 3", "file": "guide", "replace": ["\\catrow{T}{2}", "\\catrow{T}{3}"], "expect": "refused", "rule": "guide-totals"},
+        {"name": "a Marking Guide with no row for a point", "file": "guide", "replace": ["--\\pid{B1.2}", ""], "expect": "refused", "rule": "guide-points"}
+      ],
+      "basePaper": "\\begin{document}\n\\totals{K \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,1 \\quad T \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,2}\n\\q{1}\\score{K 1} Which is more likely?\n\\q{1}\\score{T 2} Two dice are rolled.\n\\end{document}\n",
+      "baseGuide": "\\begin{document}\n\\catrow{K}{1}{Knowledge and Understanding}{A}{\\pid{A1}}\n\\catrow{T}{2}{Thinking}{B}{\\pid{B1.1}--\\pid{B1.2}}\n\\totalrow{3}\n\\end{document}\n"
     }
   }
 }

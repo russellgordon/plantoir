@@ -51,3 +51,7 @@ again from what each paper gives, checks every Part A answer letter differs
 between the versions, every wrong option has a misconception, and no given
 number is reused. Result: OK. C1 and B2.2 are explanations and cannot
 be computed; the re-solve was their check.
+
+`check_kit.py` with `--paper A`, `--paper B` and `--guide`: OK, 16 points
+(K 4, T 6, C 3, A 3). The marks on each paper, the totals on each front and
+the Marking Guide's category table agree with the kit.

@@ -61,10 +61,16 @@ Everything I draft here (each question, each answer and each mark) is a suggesti
   ammunition.** Choose a dice game, a race, a recipe or a trip instead. A
   teacher's own material, and curriculum content that requires the
   subject, are left alone.
-- **The test, its solutions and its kit never go into `courses/`**, never
-  into `Media`, and never onto a page. Everything in a course folder that is
-  not a page is copied to the class website. A practice test may go on the
-  site (section 8); a test's solutions and kit never do.
+- **The test, its solutions and its kit never go into the pages a class
+  website is built from**: not into a course's folders, not into `Media`,
+  not onto a page. Everything there that is not a page is copied to the
+  class website. The one place under `courses/` where copies of the test's
+  PDFs may go is a unit plan's own folder,
+  `courses/<CODE>/.internal/planning/<unit>/pdfs/`, as the
+  `plantoir-unit-planning` skill's section 6 says: that folder is never
+  built into a class website. Never a `.tex` file or the kit there. A
+  practice test may go on the class website (section 8); a test's
+  solutions and kit never do.
 
 ## 3. How this teacher writes tests, in this order
 
@@ -140,9 +146,10 @@ file, if it is missing), one folder per test:
   is a second pair of files with parallel questions, never a switch inside
   one file. The school line of the header is this teacher's own: read
   `print_school_name` from the course's settings as that skill's section 2
-  says, and ask when it is empty. The marks column carries each question's
-  category and marks (`\score{T 4}`), and the front carries the slash
-  totals.
+  says, and ask when it is empty. The starter's marks column carries each
+  question's category and marks (`\score{T 4}`, in this teacher's own
+  categories), and its front carries the slash totals. A teacher who counts
+  no categories has one, such as `M` for Marks.
 - **One Marking Guide for every version**: copy `templates/Marking
   Guide.tex` beside this file. It is filled in with a worked example (an
   invented science test); replace its content with this test's. One row for
@@ -151,16 +158,25 @@ file, if it is missing), one folder per test:
   choice question.
 - **The marking kit**: copy `templates/Marking Kit/` beside this file into
   the test's folder and rewrite it for this test. `FORMAT.md` there is the
-  format, and the `plantoir-marking` skill reads it exactly, so do not
-  invent keys of your own. In short: every point is one mark, its ID the
+  format, which the `plantoir-marking` skill reads when it is in this
+  working folder; the checker refuses any key the format does not define. In short: every point is one mark, its ID the
   same in every version (`B1.2` is the same mark on Version A and Version
   B); every version answers every point; and no file in the kit has a key
   for a name, ever. A paper is named by its identifier (`Student A`) when
-  it is marked. Then check the kit:
+  it is marked. Then check the kit, the papers and the guide against each
+  other:
 
   ```text wrap
-  python3 -B .claude/skills/plantoir-test-authoring/scripts/check_kit.py "<test folder>/Marking Kit/answers.json" --marks "<test folder>/Marking Kit/marks-template.json"
+  python3 -B .claude/skills/plantoir-test-authoring/scripts/check_kit.py "<test folder>/Marking Kit/answers.json" --marks "<test folder>/Marking Kit/marks-template.json" --paper A "<test folder>/Version A.tex" --paper B "<test folder>/Version B.tex" --guide "<test folder>/Marking Guide.tex"
   ```
+
+  It checks that each question's marks on the paper are its number of
+  points in `answers.json`, that the totals on the front and the Marking
+  Guide's category table are the kit's counts, and that the guide has a
+  row for every point. It reads the marks the way the starters write them
+  (`\score{...}`, the slash totals, `\catrow` and `\totalrow`); if this
+  teacher's paper prints marks another way, it says it cannot read them,
+  and then you compare them by hand and say so in `Coverage.md`.
 
   (`python` or `py` on Windows, where `python3` may not exist; `.agents/`
   in place of `.claude/` works too.) Fix every line it prints until it
@@ -208,11 +224,19 @@ the site too is the teacher's call; a test's own solutions never do.
 ## 9. When the kit is finished
 
 Tell the teacher where the folder is, what was checked and by whom, and
-anything still open. Then, when the kit is finished and the teacher has
-looked at it, you may mention once, in one sentence, that when the papers
-are written you can help mark them onto feedback sheets with the
-plantoir-marking skill. Do not raise it again in this session if they do
-not take it up.
+anything still open.
+
+**Marking is another skill's, and only when it is here.** Look for
+`.claude/skills/plantoir-marking/SKILL.md` (or
+`.agents/skills/plantoir-marking/SKILL.md`) in this working folder; the
+root `CLAUDE.md` and `AGENTS.md` list the skills that are here. If it is
+there, when the kit is finished and the teacher has looked at it, you may
+mention once, in one sentence, that when the papers are written you can
+help mark them onto feedback sheets with the plantoir-marking skill. Do
+not raise it again in this session if they do not take it up. If it is not
+there, say nothing about marking, and do not mark papers from this kit:
+marking follows that skill's rules about students' names, and without them
+it does not happen.
 
 If the teacher asks what you can help with, answer plainly from what this
 skill describes, and claim nothing it does not.

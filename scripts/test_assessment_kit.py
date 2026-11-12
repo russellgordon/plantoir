@@ -37,7 +37,8 @@ SKILL = SKILLS / "plantoir-test-authoring"
 SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
 KIT_FOLDER = SKILL / "templates" / "Marking Kit"
 # Words an invented example must never use (the rule: contexts you invent
-# never involve firearms or ammunition).
+# never involve firearms or ammunition). `reload\w*` will also catch an
+# innocent "reload the page" in a future template; reword it if so.
 FIREARMS_WORDS = re.compile(
     r"\b(firearms?|guns?|handguns?|shotguns?|rifles?|pistols?|revolvers?|ammunition|ammo|reload\w*|gunpowder)\b",
     re.IGNORECASE,
@@ -58,6 +59,15 @@ def run_checker(*arguments):
         [sys.executable, "-B", str(checker), *[str(argument) for argument in arguments]],
         capture_output=True, text=True, encoding="utf-8",
     )
+
+
+def replace_text(text, case):
+    """The case's `replace` pair applied once, or the text unchanged."""
+    if "replace" not in case:
+        return text
+    old, new = case["replace"]
+    assert old in text, old
+    return text.replace(old, new, 1)
 
 
 def apply_case(document, case):
@@ -91,7 +101,7 @@ class KitFormatCases(unittest.TestCase):
     def test_every_case_is_accepted_or_refused_as_the_contract_says(self):
         rules = assessment()["kitFormat"]
         cases = rules["cases"]
-        self.assertGreaterEqual(len(cases), 20, "the contract lost kit cases")
+        self.assertGreaterEqual(len(cases), 40, "the contract lost kit cases")
         for case in cases:
             with self.subTest(case=case["name"]):
                 kit_path = self.folder / "answers.json"
@@ -100,21 +110,39 @@ class KitFormatCases(unittest.TestCase):
                     result = run_checker(kit_path)
                 else:
                     kit_path.write_text(json.dumps(rules["base"]), encoding="utf-8")
+                if case["file"] == "marks":
                     marks_path = self.folder / "marks.json"
                     marks_path.write_text(json.dumps(apply_case(rules["baseMarks"], case)), encoding="utf-8")
                     result = run_checker(kit_path, "--marks", marks_path)
+                elif case["file"] == "paper":
+                    paper_path = self.folder / "Version.tex"
+                    paper_path.write_text(replace_text(rules["basePaper"], case), encoding="utf-8")
+                    result = run_checker(kit_path, "--paper", case["version"], paper_path)
+                elif case["file"] == "guide":
+                    guide_path = self.folder / "Marking Guide.tex"
+                    guide_path.write_text(replace_text(rules["baseGuide"], case), encoding="utf-8")
+                    result = run_checker(kit_path, "--guide", guide_path)
                 output = result.stdout + result.stderr
                 if case["expect"] == "accepted":
                     self.assertEqual(result.returncode, 0, output)
                     self.assertTrue(result.stdout.startswith("OK"), output)
+                    if "says" in case:
+                        self.assertEqual(result.stdout.strip(), case["says"])
                 else:
                     self.assertEqual(result.returncode, 1, output)
                     self.assertIn("[" + case["rule"] + "]", output)
 
-    def test_the_forbidden_keys_are_the_checkers(self):
+    def test_the_person_words_are_the_checkers(self):
         source = (SKILL / "scripts" / "check_kit.py").read_text(encoding="utf-8")
-        listed = re.search(r"FORBIDDEN_KEYS = (\[.*?\])", source).group(1)
-        self.assertEqual(json.loads(listed), assessment()["kitFormat"]["forbiddenKeys"])
+        rules = assessment()["kitFormat"]
+        for constant, key in [("PERSON_WORDS", "personWords"), ("PERSON_WHOLE_KEYS", "personWholeKeys"),
+                              ("DEFINED_EXCEPTIONS", "definedExceptions")]:
+            listed = re.search(constant + r" = (\[.*?\])", source, re.DOTALL).group(1)
+            self.assertEqual(json.loads(listed), rules[key], constant)
+
+    def test_the_worked_examples_guide_agrees_with_its_kit(self):
+        result = run_checker(KIT_FOLDER / "answers.json", "--guide", SKILL / "templates" / "Marking Guide.tex")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_the_checker_prints_no_value_from_a_marks_record(self):
         rules = assessment()["kitFormat"]
@@ -176,11 +204,8 @@ class TheSkillsTemplates(unittest.TestCase):
             self.assertEqual(failing.returncode, 1)
             self.assertIn("Version B, B2.1", failing.stdout)
 
-    def test_the_marking_guide_names_every_point_and_says_the_teacher_decides(self):
+    def test_the_marking_guide_says_the_teacher_decides(self):
         guide = (SKILL / "templates" / "Marking Guide.tex").read_text(encoding="utf-8")
-        kit = read_json(KIT_FOLDER / "answers.json")
-        for point in kit["points"]:
-            self.assertIn("\\pid{" + point["id"] + "}", guide, point["id"])
         folded = re.sub(r"\s+", " ", guide)
         self.assertIn("Please read and decide on all of it before it reaches a student; I draft, you decide.", folded)
 

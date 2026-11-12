@@ -4134,7 +4134,12 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   agent filling `Coverage.md`, the assistant never inventing a question,
   scenario or example involving firearms or ammunition (a teacher's own
   material and curriculum content that requires the subject are left
-  alone), and nothing of the test in `courses/`. How the test is SHAPED
+  alone), and nothing of the test in the pages a class website is built
+  from. The one place under `courses/` a test's PDFs may be copied is a
+  unit plan's `.internal/planning/<unit>/pdfs/`, which is never built into
+  a class site; both skills now say so in the same words (751 implementation
+  review M2: the first wording forbade `courses/` outright while the
+  unit-planning skill copied solutions into its plan folder). How the test is SHAPED
   is the teacher's: How I Teach first, then a few plain questions (for an
   Ontario course code, the four achievement chart categories are offered).
   Russell's own shape (marks even across the categories, one part per page,
@@ -4156,12 +4161,33 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   in as `topics`, without the per-section host, which #750 adds at marking
   time. Its keys and rules are `assessment.kitFormat.rule`, in words in the
   skill's `templates/Marking Kit/FORMAT.md`.
-- **No key that can hold a name.** No key at any depth of a kit or a marks
-  record is `name`, `student`, `pupil` or `email`
-  (`kitFormat.forbiddenKeys`). Russell's schema's `student` became
-  `identifier`, and a category's label is `title`, so nobody reads a key as
-  a place for a name. (Plan v2's own example used `name` for a category's
-  label; the checker would have refused it.)
+- **No key that can hold a name.** A key is refused when its words (split
+  at camelCase, `_`, `-` and spaces, or read run together, whatever the
+  case) include `name`, `student`, `pupil`, `learner`, `email`, `mail`,
+  `username`, `surname`, `nickname`, `handle` or `login`, or when it is
+  only `first`, `last`, `full`, `given`, `family` or `middle`
+  (`kitFormat.personWords`, `personWholeKeys`); the format's own
+  `studentNote` is the one exception. Every object the format defines has
+  a fixed key set and any other key is refused (`unknownKeys`), with
+  underscore notes allowed; inside the marks record's `byQuestion`, `focus`
+  and `strengths`, which #750 defines, only the person check applies.
+  MEASURED: the first version matched whole keys only, and `studentName`,
+  `fullName` and `first_name` all got an OK (751 implementation review M1).
+  Russell's schema's `student` became `identifier`, and a category's label
+  is `title`. (Plan v2's own example used `name` for a category's label.)
+- **The paper, the guide and the kit agree.** `check_kit.py --paper A
+  "Version A.tex" --guide "Marking Guide.tex"` reads each version's
+  `\score{...}` marks column (by category, and question by question when
+  there is one per question) and the slash totals on the front, and the
+  guide's `\catrow{key}{out of}` rows, `\totalrow` and a `\pid` for every
+  point, and compares them with the kit's point counts. It reads the `.tex`
+  itself rather than a machine-readable line the templates would emit,
+  because such a line is typed by hand beside the numbers it describes and
+  can agree with the kit while the printed marks do not (REJECTED for that
+  reason). A paper laid out another way is reported unreadable, never
+  passed, and the skill then has the comparison done by hand and recorded
+  in `Coverage.md`. Before this, nothing compared the printed marks with
+  the kit (751 implementation review M3).
 - **The one script that is not a starting point.** Russell's ruling is that
   shipped scripts and templates are starting points the assistant adapts to
   the teacher's header, categories, marks scheme and layout; each template
@@ -4180,8 +4206,14 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
 - **How a teacher finds out (Russell, 2026-11-12).** At the moment of need,
   once, never pressed: `plantoir-unit-planning`, when a plan is built,
   may mention that it can write the unit's test; this skill, when a kit is
-  finished, may mention marking. Each sentence ends "Do not raise it again
-  in this session", and each is pinned in `mustSay`. Nothing on
+  finished, may mention marking. Each offer and its closing "Do not raise
+  it again in this session if they do not take it up." are pinned in
+  `mustSay`. **Marking is offered only when `plantoir-marking` is in the
+  working folder** (the assistant looks for its `SKILL.md`; the root files
+  list the skills): without it the assistant says nothing about marking
+  and does not mark from the kit, because marking without that skill's
+  rules about names would skip them (751 implementation review M4; #751
+  can land before #750). Nothing on
   plantoir.app and no new text in the app (Plantoir is not to read as an
   app that needs an assistant). The greeting sentence is its own piece.
 - **The root files.** One bullet each; the handouts bullet's "a quiz or
@@ -4199,10 +4231,11 @@ versions, built from `Quiz.tex` with `mhchem` added, compile to two pages
 each with their solutions laid out the same as the question copy; a
 four-option question whose options run past about 30 characters needs one
 column of options, because two columns ran the options into each other.
-`scripts/test_assessment_kit.py` (12 tests) runs every `kitFormat` case
-through `check_kit.py`. Must-fail: with the "every version answers every
-point" check removed from a copy of `check_kit.py`, the case "a version that
-does not answer every point" fails. NOT MEASURED: a trial with an outside
+`scripts/test_assessment_kit.py` (13 tests) runs every `kitFormat` case
+(46) through `check_kit.py`. Must-fails: with the "every version answers
+every point" check removed from a copy of `check_kit.py`, the case "a
+version that does not answer every point" fails; with the paper's marks
+comparisons removed, the three paper-marks cases fail. NOT MEASURED: a trial with an outside
 assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
 

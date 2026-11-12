@@ -125,14 +125,15 @@ and no font or script from the internet. The template is laid out the way
 the plan folder is, so its relative links (`../assets/plan.css`,
 `correlation.html`, `../index.html`) work unchanged once copied.
 
-## 6. Assessments go through `plantoir-handouts`
+## 6. Assessments
 
 A unit test with versions and a kit to mark it from is made with the
 `plantoir-test-authoring` skill
 (`.claude/skills/plantoir-test-authoring/SKILL.md`, the same file is at
 `.agents/skills/plantoir-test-authoring/SKILL.md`), from the plan's
 lessons; copy its PDFs into the plan as below, never a `.tex` file or
-its marking kit. Any other quiz, test or practice set is a handout. Make
+its marking kit. The planning folder is never built into a class website,
+so this is the one place under `courses/` a test's PDFs may be copied. Any other quiz, test or practice set is a handout. Make
 it with the
 `plantoir-handouts` skill (`.claude/skills/plantoir-handouts/SKILL.md`,
 the same file is at `.agents/skills/plantoir-handouts/SKILL.md`), in its

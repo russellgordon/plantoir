@@ -2,9 +2,9 @@
 
 A test's `Marking Kit/` folder holds three files: this format's
 `answers.json`, an empty marks record `marks-template.json`, and a
-`README.md` for whoever marks. The `plantoir-marking` skill reads the kit
-to mark papers and build feedback sheets, so the kit is written in this
-format exactly. `answers.json` and `marks-template.json` beside this file
+`README.md` for whoever marks. The `plantoir-marking` skill, when it is in
+the working folder, reads the kit to mark papers and build feedback
+sheets, so the kit is written in this format exactly. `answers.json` and `marks-template.json` beside this file
 are a worked example (an invented Grade 10 science test with two
 versions); copy them and replace every value.
 
@@ -14,13 +14,23 @@ Check a kit before you hand it over:
 python3 -B .claude/skills/plantoir-test-authoring/scripts/check_kit.py "<test folder>/Marking Kit/answers.json" --marks "<test folder>/Marking Kit/marks-template.json"
 ```
 
-It prints `OK` or one line per problem, each ending in the rule it breaks.
+It prints `OK` with the counts by category, or one line per problem, each
+ending in the rule it breaks. Add `--paper A "<test folder>/Version A.tex"`
+for each version and `--guide "<test folder>/Marking Guide.tex"`, and it
+also checks that the marks printed on each paper, the totals on its front
+and the Marking Guide's category table are the kit's counts.
 
 ## No place for a name, anywhere
 
-No key in any kit file, and no key in any marks record, is `name`,
-`student`, `pupil` or `email`, at any depth. A marks record names its
-paper by `identifier` (such as `Student A`), never by a name. The reason is
+No key in any kit file or marks record looks like it holds a person: a key
+whose words include name, student, pupil, learner, email, mail, username,
+surname, nickname, handle or login, whatever the case or separator
+(`studentName`, `first_name`, `e-mail`), or a key that is only first,
+last, full, given, family or middle. The format's own `studentNote` is the
+one exception. And no object has a key the tables below do not list
+(keys that start with an underscore are notes). A marks record names its
+paper by `identifier` (such as `Student A`), never by a name; whether an
+identifier has the right shape is the marking skill's check. The reason is
 that these files are read by an assistant, and a file with no place for a
 name is one nobody fills with one by accident. Where a title is needed (a
 category's), the key is `title`.
@@ -32,7 +42,7 @@ category's), the key is `title`.
 | `kit` | `1`, this format's version. |
 | `test` | The test's title, as printed. |
 | `course` | The course code, in capitals. |
-| `categories` | A list of `{key, title}`: the categories marks are counted in, such as `{"key": "K", "title": "Knowledge and Understanding"}`. The teacher's own, in the teacher's order. |
+| `categories` | A list of `{key, title}`: the categories marks are counted in, such as `{"key": "K", "title": "Knowledge and Understanding"}`. The teacher's own, in the teacher's order. A teacher who counts no categories has one: `{"key": "M", "title": "Marks"}`. |
 | `parts` | A list of `{key, title, category}`: the parts of the paper. `category` is optional, for a part that is all one category. |
 | `questions` | A list of `{id, part, skill, topics}`: every question as students see it. `skill` is a few words on what it tests, for the feedback sheet. `topics` (optional) lists keys of `topics`. |
 | `points` | A list of `{id, question, category, meaning, followThrough}`: every mark. See below. |
@@ -109,8 +119,8 @@ identifier (`Student A.json`), and fills it in. It has every point of
 | `identifier` | The paper's identifier, such as `Student A`. Never a name. |
 | `section`, `version` | The section, and the version written at the top of the paper. |
 | `points` | One entry per point ID: `{earned, seen, note, studentNote}`. `earned` is `null` until marked, then `0` or `1`; `0.5` only where the teacher's marking settings allow a half mark. `seen` is what is on the paper, briefly. `note` is the reason when a mark is withheld or a judgement was made. `studentNote` is one sentence to the student about a lost mark. |
-| `voided` | Points the teacher has removed from the count (a question that did not work), each `{reason}`. |
+| `voided` | Points the teacher has removed from the count (a question that did not work), each `{reason, intended}`. |
 | `checks` | Things for the teacher to look at, each starting with its question. A name seen on a paper is written here only as "NAME VISIBLE page N", never the name. |
-| `summary`, `byQuestion`, `strengths`, `focus`, `closing`, `feedback` | What the feedback sheet says, written by the marker; `plantoir-marking` says how. |
+| `summary`, `byQuestion`, `strengths`, `focus`, `closing`, `feedback` | What the feedback sheet says, written by the marker. `plantoir-marking` (#750) defines what is inside them; the checker only refuses a key there that looks like it holds a person, and a `feedback` key that is not a part. |
 
 Totals are never written: they are counted from `points`.

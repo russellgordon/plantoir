@@ -13,8 +13,9 @@ Read this first, before any paper.
 Papers are named by identifier (`Student A`), never by a name. If a name
 can be seen anywhere on a paper, do not repeat it: write
 "NAME VISIBLE page N" in that paper's `checks` and tell the teacher the
-identifier and the page. Marking itself is the `plantoir-marking` skill's
-work, and its rules come first.
+identifier and the page. Mark only with the `plantoir-marking` skill, and
+its rules come first. If that skill is not in this working folder, do not
+mark papers from this kit.
 
 ## What is here
 

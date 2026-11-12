@@ -8,8 +8,10 @@
 % widths, the order of the sections, the wording of "How to mark", and
 % anything about the look.
 % What must stay: the sentence under the title (the teacher decides, every
-% time), and one row for every point ID in the kit's answers.json, with the
-% same ID, so a marker can go from the guide to the kit and back.
+% time); one row for every point ID in the kit's answers.json, written
+% \pid{ID}, so a marker can go from the guide to the kit and back; and the
+% \catrow and \totalrow macros of the category table, which the kit
+% checker compares with the kit.
 % Never put this file, or its PDF, inside courses/ or on a class website.
 \documentclass[11pt]{article}
 \usepackage[letterpaper, left=0.75in, right=0.75in, top=1.0in, bottom=0.9in,
@@ -57,6 +59,12 @@
 \newcommand{\parttable}[1]{%
   \needspace{6\baselineskip}
   {\large\bfseries\sffamily #1}\par\nopagebreak\smallskip}
+% One row of the category table: \catrow{key}{out of}{title}{part}{points}.
+% The kit checker (check_kit.py --guide) reads the key and the out-of of
+% every \catrow, and the \totalrow, and compares them with answers.json, so
+% keep these two macros even if the table changes its look.
+\newcommand{\catrow}[5]{\vstrut #3 & #4 & #5 & #2 \\}
+\newcommand{\totalrow}[1]{\vstrut \textbf{Total} & & & \textbf{#1} \\}
 \newcolumntype{Q}{>{\vstrut}w{c}{1.2cm}}
 \newcolumntype{E}{>{\raggedright\arraybackslash\vstrut}p{4.4cm}}
 \newcolumntype{Y}{>{\raggedright\arraybackslash\vstrut}p{5.2cm}}
@@ -80,11 +88,11 @@
 \begin{NiceTabular}{lccc}[hvlines]
 \CodeBefore \rowcolor{tablehead}{1} \Body
 \headstrut\textbf{Category} & \textbf{Part} & \textbf{Points} & \textbf{Out of} \\
-\vstrut Knowledge and Understanding & A & \pid{A1}--\pid{A4} & 4 \\
-\vstrut Thinking and Investigation & B & \pid{B1.1}--\pid{B2.2} & 6 \\
-\vstrut Communication & C & \pid{C1.1}--\pid{C1.3} & 3 \\
-\vstrut Application & D & \pid{D1.1}--\pid{D1.3} & 3 \\
-\vstrut \textbf{Total} & & & \textbf{16} \\
+\catrow{K}{4}{Knowledge and Understanding}{A}{\pid{A1}--\pid{A4}}
+\catrow{T}{6}{Thinking and Investigation}{B}{\pid{B1.1}--\pid{B2.2}}
+\catrow{C}{3}{Communication}{C}{\pid{C1.1}--\pid{C1.3}}
+\catrow{A}{3}{Application}{D}{\pid{D1.1}--\pid{D1.3}}
+\totalrow{16}
 \end{NiceTabular}
 \end{center}
 

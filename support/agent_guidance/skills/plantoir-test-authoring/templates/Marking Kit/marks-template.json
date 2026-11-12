@@ -1,5 +1,5 @@
 {
-  "_about": "One marks record, empty. plantoir-marking copies it once per paper, names the copy by the student's identifier, and fills it in. It has every point of answers.json, and no place for a name. FORMAT.md says what each key holds.",
+  "_about": "One marks record, empty. The plantoir-marking skill, when it is in the working folder, copies it once per paper, names the copy by the student's identifier, and fills it in. It has every point of answers.json, and no place for a name. FORMAT.md says what each key holds.",
   "kit": 1,
   "identifier": null,
   "section": null,
