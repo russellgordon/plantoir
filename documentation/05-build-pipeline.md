@@ -2315,7 +2315,9 @@ or by a `verify.sh` older than #746) stamps every site it builds with the
 hash of the toolchain files instead, so `deploy.sh` found the stamp wrong and
 built again on every deploy. `preview.sh` and `setup.sh` now remake such a
 workspace once (`workspace_names_this_toolchain`, reason `toolchainId` in
-"folder set up again"'s `whyWords`), right after the update check. No
+"folder set up again"'s `whyWords`), as the LAST of the remake reasons, so
+any other remake puts the name right as well and a stand-in made for another
+reason (verify.sh's open-addresses workspace) still remakes for that reason. No
 teacher's workspace can lack it: the launchers have set it since 1.9.2.
 Windows has no workspace and nothing to do.
 
