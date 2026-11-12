@@ -238,4 +238,205 @@ public sealed class InstallerRunningWorkTests
         // The assistant's refusal keeps its own words.
         Assert.Contains(UpdateWording.AssistantElsewhereWork, AppUpdates.NotInstalledLine(new[] { "Plantoir.exe", AppUpdates.UpdateNotInstalledArgument })!);
     }
+
+    // MARK: - #700 review: a refusal leaves a record, a copy is marked
+
+    [Fact]
+    public void EveryRefusalWritesItsMarker()
+    {
+        string body = Body(Include, "function RunningWorkBeforeChangingFiles(Updating, Relaunch: Boolean): String;");
+        int refused = body.IndexOf("if Result <> '' then", StringComparison.Ordinal);
+        int marker = body.IndexOf("RunningWorkWriteRefusalMarker(RwReasonOf(Result));", StringComparison.Ordinal);
+        int updating = body.IndexOf("if Updating then", StringComparison.Ordinal);
+        Assert.True(refused >= 0 && marker > refused && updating > marker, "the marker is written for EVERY refusal, hand-run included, before the update-only reopen");
+        Assert.Contains("RunningWorkWriteRefusalMarker('assistant');", Body(Installer, "function InitializeSetup: Boolean;"));
+        Assert.Contains($"RwNotInstalledMarker = '{AppUpdates.NotInstalledMarker}';", Include);
+        Assert.Contains($"RwInstallingMarkerPrefix = '{AppUpdates.InstallingMarkerPrefix}';", Include);
+        Assert.Contains("Result := ExpandConstant('{param:STATEDIR|}');", Body(Include, "function RunningWorkStateFolder: String;"));
+    }
+
+    [Fact]
+    public void TheInstallingMarkerSpansOnlyTheCopy()
+    {
+        string steps = Body(Installer, "procedure CurStepChanged(CurStep: TSetupStep);");
+        int abort = steps.IndexOf("Abort;", StringComparison.Ordinal);
+        int begins = steps.IndexOf("RunningWorkInstallingBegins;", StringComparison.Ordinal);
+        int post = steps.IndexOf("if CurStep = ssPostInstall then", StringComparison.Ordinal);
+        int ends = steps.IndexOf("RunningWorkInstallingEnds;", StringComparison.Ordinal);
+        Assert.True(abort >= 0 && begins > abort && post > begins && ends > post, "written after the last look, removed at ssPostInstall");
+        Assert.Contains("RunningWorkInstalledCleanly;", steps[post..]);
+        Assert.Contains("RunningWorkInstallingEnds;", Body(Installer, "procedure DeinitializeSetup;"));
+    }
+
+    [Fact]
+    public void APlantoirOpenedDuringTheWaitRefusesAtOnceAndNoSecondCopyIsStarted()
+    {
+        string wait = Body(Include, "function RunningWorkRefusal(const AppDir: String; Updating, Silent: Boolean): String;");
+        Assert.Contains("(not RwIn(RwPlantoirAtStart, RwPids[I])) then", wait);
+        Assert.Contains("Result := RwRefusedReopened;", wait);
+        string reopen = Body(Include, "procedure RunningWorkReopenAfterRefusal(const Refusal: String; Relaunch: Boolean; const ReturnTo: String);");
+        Assert.Contains("if (ReturnTo = '') or (Refusal = RwRefusedReopened) then Exit;", reopen);
+        Assert.Contains("if RwPlantoirIsOpen then", reopen);
+    }
+
+    [Fact]
+    public void AFullListOfProcessesIsAskedAgainWithMoreRoom()
+    {
+        string look = Body(Include, "function RwLookUnder(const AppDir: String): Boolean;");
+        Assert.Contains("if Needed < 4 * Room then Break;", look);
+        Assert.Contains("Room := Room * 2;", look);
+        Assert.Contains("if Room >= 131072 then Exit;", look);
+    }
+
+    [Fact]
+    public void TheLogNamesNoCommandLine()
+    {
+        string wait = Body(Include, "function RunningWorkRefusal(const AppDir: String; Updating, Silent: Boolean): String;");
+        foreach (Match log in Regex.Matches(wait, @"Log\((.*)\);"))
+            Assert.DoesNotContain("Line", log.Groups[1].Value);
+    }
+
+    private static string TempFolder()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "plantoir-700-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    [Fact]
+    public void ARefusalMarkerIsSaidOnceWithTheVersionThatWaited()
+    {
+        string folder = TempFolder();
+        try
+        {
+            string marker = Path.Combine(folder, AppUpdates.NotInstalledMarker);
+            var running = new Version(1, 9, 0);
+            File.WriteAllText(marker, "1.9.3\r\nwork\r\n");
+            string? line = AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow);
+            Assert.Equal("the new version was not installed: a course was still being built or deployed when it came to install; it will be offered again (1.9.3 waiting)", line);
+            Assert.False(File.Exists(marker));
+            Assert.Null(AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow));   // once only
+
+            File.WriteAllText(marker, "1.9.3\nassistant\n");
+            Assert.Contains(UpdateWording.AssistantElsewhereWork, AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow)!);
+            File.WriteAllText(marker, "1.9.3\nreopened\n");
+            Assert.Contains("opened again", AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow)!);
+
+            // The version already installed (the update went in later): no line, and gone.
+            File.WriteAllText(marker, "1.9.3\nwork\n");
+            Assert.Null(AppUpdates.ConsumeNotInstalledMarker(folder, new Version(1, 9, 3, 0), DateTime.UtcNow));
+            Assert.False(File.Exists(marker));
+            // Too old to explain anything now.
+            File.WriteAllText(marker, "1.9.3\nwork\n");
+            Assert.Null(AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow + AppUpdates.NotInstalledMarkerLongestAge + TimeSpan.FromHours(1)));
+            Assert.False(File.Exists(marker));
+            // Unreadable.
+            File.WriteAllText(marker, "garbage");
+            Assert.Null(AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow));
+            Assert.False(File.Exists(marker));
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public void TheAppReadsTheMarkerBeforeTheArgument()
+    {
+        string app = File.ReadAllText(Path.Combine(WindowsApp, "Plantoir", "App.xaml.cs"));
+        Assert.Contains("AppUpdates.ConsumeNotInstalledMarker(AppDataRoot.Current, runningNow, DateTime.UtcNow)\n", app.Replace("\r\n", "\n"));
+        Assert.Matches(new Regex(@"ConsumeNotInstalledMarker\([^;]*\)\s*\?\?\s*Plantoir\.Core\.Assist\.AppUpdates\.NotInstalledLine"), app);
+    }
+
+    [Fact]
+    public void AnInstallingMarkerCountsOnlyWhileItsInstallerLives()
+    {
+        string folder = TempFolder();
+        try
+        {
+            string live = Path.Combine(folder, AppUpdates.InstallingMarkerPrefix + "111");
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            DateTime written = File.GetLastWriteTimeUtc(live);
+            Assert.Equal(111, AppUpdates.LiveInstaller(folder, pid => pid == 111 ? written.AddMinutes(-1) : null));
+            Assert.True(File.Exists(live));
+            // The pid now belongs to a process started after the marker: stale, deleted.
+            Assert.Null(AppUpdates.LiveInstaller(folder, pid => written.AddMinutes(5)));
+            Assert.False(File.Exists(live));
+            // The process is gone: stale, deleted.
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            Assert.Null(AppUpdates.LiveInstaller(folder, _ => null));
+            Assert.False(File.Exists(live));
+            // This process, for real: live.
+            string mine = Path.Combine(folder, AppUpdates.InstallingMarkerPrefix + Environment.ProcessId);
+            File.WriteAllText(mine, "x");
+            Assert.Equal(Environment.ProcessId, AppUpdates.LiveInstaller(folder));
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public void TheAppHandsTheInstallerALogAndKeepsTwo()
+    {
+        string args = AppUpdates.InstallerArguments(false, @"C:\P\Plantoir.exe", @"C:\L\installer-1.log", @"C:\S");
+        Assert.Contains("\"/LOG=C:\\L\\installer-1.log\"", args);
+        Assert.Contains("\"/STATEDIR=C:\\S\"", args);
+        Assert.DoesNotContain("/LOG", AppUpdates.InstallerArguments(false));
+        Assert.DoesNotContain("/STATEDIR", AppUpdates.InstallerArguments(false));
+
+        string folder = TempFolder();
+        try
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                string path = Path.Combine(folder, $"installer-2026111{i}-000000.log");
+                File.WriteAllText(path, "x");
+                File.SetLastWriteTimeUtc(path, new DateTime(2026, 11, 10 + i, 0, 0, 0, DateTimeKind.Utc));
+            }
+            File.WriteAllText(Path.Combine(folder, "activity.txt"), "kept");
+            string next = AppUpdates.NextInstallerLog(folder, new DateTime(2026, 11, 20, 1, 2, 3, DateTimeKind.Utc));
+            Assert.Equal(Path.Combine(folder, "installer-20261120-010203.log"), next);
+            Assert.Equal(new[] { "installer-20261113-000000.log" }, Directory.GetFiles(folder, "installer-*.log").Select(Path.GetFileName).ToArray());
+            Assert.True(File.Exists(Path.Combine(folder, "activity.txt")));
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+        Assert.Contains("Updater.InstallerLog = () => Plantoir.Core.Assist.AppUpdates.NextInstallerLog(",
+                        File.ReadAllText(Path.Combine(WindowsApp, "Plantoir", "App.xaml.cs")));
+    }
+
+    // MARK: - The assistant's engine in the bundle (#700 review: 1.9.0 shipped without llama\)
+
+    /// <summary>A PowerShell script without its comments: &lt;# #&gt; blocks and lines starting #.</summary>
+    internal static string PowerShellWithoutComments(string script)
+    {
+        string text = Regex.Replace(script.Replace("\r\n", "\n"), @"<#.*?#>", "", RegexOptions.Singleline);
+        return string.Join("\n", text.Split('\n').Where(line => !line.TrimStart().StartsWith('#')));
+    }
+
+    private static string Publish => PowerShellWithoutComments(File.ReadAllText(Path.Combine(WindowsApp, "publish.ps1")));
+
+    [Fact]
+    public void PublishRefusesABundleWithoutTheAssistantsEngine()
+    {
+        string publish = Publish;
+        Assert.Contains("$AssistantEngineFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama.dll', 'llama-common.dll', 'mtmd.dll',", publish);
+        // Before the build, from Vendor\llama, and again on the published folder.
+        Assert.Contains("$missingVendor = Get-MissingAssistantEngineFiles (Join-Path $PSScriptRoot 'Vendor\\llama')", publish);
+        Assert.Contains("$missingPublished = Get-MissingAssistantEngineFiles (Join-Path $publishDir 'llama')", publish);
+        Assert.Matches(new Regex(@"if \(\$missingPublished\.Count -gt 0\) \{\s*throw "), publish);
+        Assert.Matches(new Regex(@"if \(\$missingVendor\.Count -gt 0\) \{\s*throw "), publish);
+        // The developer's way round it never comes with -Sign.
+        Assert.Matches(new Regex(@"if \(\$Sign -and \$WithoutAssistantEngine\) \{\s*throw "), publish);
+        // And the published check comes before the installer is compiled.
+        Assert.True(publish.IndexOf("$missingPublished = ", StringComparison.Ordinal) < publish.IndexOf("& $iscc ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FetchLlamaRefusesAZipThatIsNotThePinnedOne()
+    {
+        string fetch = PowerShellWithoutComments(File.ReadAllText(Path.Combine(WindowsApp, "Vendor", "fetch-llama.ps1")));
+        Assert.Contains("$ArchiveSize = 34573315", fetch);
+        Assert.Contains("$ArchiveSha256 = \"8e03436cf1b52fb858fcf2985f02d8b8af07b914595777725804353391c14bc1\"", fetch);
+        Assert.Matches(new Regex(@"if \(\$size -ne \$ArchiveSize\) \{\s*throw "), fetch);
+        Assert.Matches(new Regex(@"if \(\$sha -ne \$ArchiveSha256\) \{\s*throw "), fetch);
+        // Checked BEFORE the zip is unpacked.
+        Assert.True(fetch.IndexOf("if ($sha -ne $ArchiveSha256)", StringComparison.Ordinal) < fetch.IndexOf("Expand-Archive", StringComparison.Ordinal));
+    }
 }

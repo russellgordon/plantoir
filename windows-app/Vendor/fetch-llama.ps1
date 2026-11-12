@@ -6,8 +6,10 @@ because WSL2 containerization is a Linux VM without direct GPU access.
 Running llama-server.exe natively with Vulkan enables hardware-accelerated
 inference on Intel (UHD/Iris/Arc), AMD, and NVIDIA GPUs across Windows machines.
 
-The binaries are NOT committed (they are ~35 MB of build output). Run this script
-once before building or running the Windows app.
+The binaries are NOT committed (a 34.6 MB zip, about 100 MB unpacked). Run this
+script once per clone before building or running the Windows app: publish.ps1
+REFUSES to build a release without them (#700; the signed 1.9.0 shipped with no
+llama\ folder because nothing looked).
 #>
 [CmdletBinding()]
 param()
@@ -19,6 +21,13 @@ $ErrorActionPreference = 'Stop'
 $Build = "b10435"
 $Archive = "llama-$Build-bin-win-vulkan-x64.zip"
 $Url = "https://github.com/ggml-org/llama.cpp/releases/download/$Build/$Archive"
+# The zip's size and SHA-256, pinned (#700) as fetch-runtime.ps1 pins its
+# downloads: GitHub's own digest for the release asset, read with
+# `gh release view b10435 --repo ggml-org/llama.cpp --json assets` on
+# 2026-11-12 and matching the zip the 1.9.3 candidate was built from. A
+# mismatch is refused and nothing is installed.
+$ArchiveSize = 34573315
+$ArchiveSha256 = "8e03436cf1b52fb858fcf2985f02d8b8af07b914595777725804353391c14bc1"
 
 $VendorDir = $PSScriptRoot
 $Destination = Join-Path $VendorDir "llama"
@@ -41,6 +50,15 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ArchivePath)) {
         throw "Failed to download $Url"
     }
+    $size = (Get-Item $ArchivePath).Length
+    if ($size -ne $ArchiveSize) {
+        throw "$Archive is $size bytes, not the pinned $ArchiveSize. Nothing was installed."
+    }
+    $sha = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($sha -ne $ArchiveSha256) {
+        throw "$Archive has SHA-256 $sha, not the pinned $ArchiveSha256. Nothing was installed."
+    }
+    Write-Host "[OK] $Archive is the pinned one ($size bytes, SHA-256 $ArchiveSha256)." -ForegroundColor Green
 
     Write-Host "Unpacking..." -ForegroundColor Cyan
     Expand-Archive -Path $ArchivePath -DestinationPath $TempDir -Force

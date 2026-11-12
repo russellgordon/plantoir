@@ -246,6 +246,13 @@ public static class ScheduledRun
         /// </summary>
         public Func<string, int?> CopyingTheFolder { get; init; } = folder =>
             ToolchainReadiness.LiveCopiers(folder, exceptThisProcess: true) is { Count: > 0 } pids ? pids[0] : null;
+
+        /// <summary>
+        /// The process id of a LIVE installer replacing this copy of Plantoir
+        /// now, or null (#700) — read from its <c>installing.&lt;pid&gt;</c>
+        /// marker in the state folder (<see cref="AppUpdates.LiveInstaller"/>).
+        /// </summary>
+        public Func<int?> Installing { get; init; } = () => AppUpdates.LiveInstaller(AppDataRoot.Current);
     }
 
     /// <summary>How the run ended — for the process's exit code and for tests.</summary>
@@ -291,9 +298,25 @@ public static class ScheduledRun
         int? copying;
         int? copier = null;
         bool waited = false, metACopy = false, metTheCourse = false;
+        int? installing = null, installer = null;
+        bool metAnInstall = false;
         while (true)
         {
             inTheWay = null;
+            // #700: an installer is replacing this program and its tools right
+            // now (the run fired during the copy). Wait for it in the same
+            // window, taking nothing, as for a tools copy.
+            installing = world.Installing();
+            if (installing is not null)
+            {
+                metAnInstall = true;
+                installer = installing;
+                copying = null;
+                if (world.Now() - started >= LongestWait) break;
+                waited = true;
+                world.Sleep(LookAgainEvery);
+                continue;
+            }
             copying = world.CopyingTheFolder(job.WorkingFolder);
             if (copying is not null)
             {
@@ -321,6 +344,14 @@ public static class ScheduledRun
         }
 
         int seconds = (int)Math.Round((world.Now() - started).TotalSeconds);
+        if (installing is not null)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
+                $"waited {seconds} s for a new version of Plantoir to finish installing (process {installing}), and stood down",
+                job.CourseCode, job.Section);
+            StandDown(job, world, ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, WrapperCouldNotBeWritten);
+            return Ending.StoodDown;
+        }
         if (copying is not null)
         {
             ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
@@ -338,7 +369,8 @@ public static class ScheduledRun
             return Ending.StoodDown;
         }
         if (waited)
-            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse, WaitedLine(seconds, metTheCourse, metACopy, copier),
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishWaitedForTheCourse,
+                metAnInstall ? WaitedForAnInstallLine(seconds, installer) : WaitedLine(seconds, metTheCourse, metACopy, copier),
                 job.CourseCode, job.Section);
 
         try
@@ -436,6 +468,10 @@ public static class ScheduledRun
     /// — another program's work on the course, a copy of the folder's tools
     /// (#477), or both — and, for a copy, which program.
     /// </summary>
+    /// <summary>The wait line when the run met an installer replacing Plantoir (#700).</summary>
+    internal static string WaitedForAnInstallLine(int seconds, int? installer) =>
+        $"waited {seconds} s for a new version of Plantoir to finish installing (process {installer}), and went ahead";
+
     internal static string WaitedLine(int seconds, bool metTheCourse, bool metACopy, int? copier) =>
         (metTheCourse, metACopy) switch
         {

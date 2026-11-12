@@ -37,6 +37,26 @@ static class StandIn
         FileStream held = null;
         for (int i = 0; i < args.Length; i++)
         {
+            if (args[i] == "--wait-while-installing" && i + 1 < args.Length)
+            {
+                // A scheduled run's wait, in miniature: while the installer's
+                // installing.<pid> marker is in the state folder, wait.
+                string folder = args[++i];
+                var clock = Stopwatch.StartNew();
+                bool saw = false;
+                while (Directory.Exists(folder) && Directory.GetFiles(folder, "installing.*").Length > 0 && clock.Elapsed.TotalSeconds < 60)
+                {
+                    saw = true;
+                    Thread.Sleep(200);
+                }
+                try
+                {
+                    File.AppendAllText(Path.Combine(Path.GetTempPath(), "plantoir-installer-harness", "started.txt"),
+                        "WAITED\t" + (long)clock.Elapsed.TotalMilliseconds + "\tSAW\t" + saw + Environment.NewLine);
+                }
+                catch (Exception) { }
+                return 0;
+            }
             if (args[i] == "--seconds" && i + 1 < args.Length) { seconds = int.Parse(args[++i]); }
             else if (args[i] == "--hold" && i + 1 < args.Length)
             {

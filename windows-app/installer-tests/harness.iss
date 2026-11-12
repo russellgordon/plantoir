@@ -18,6 +18,8 @@
 #ifndef RunningWorkInclude
   #define RunningWorkInclude "..\installer-running-work.iss"
 #endif
+; The version the include writes into its refusal marker.
+#define AppVersion HarnessVersion
 #ifndef RunningWorkWaitSeconds
   #define RunningWorkWaitSeconds 20
 #endif
@@ -81,10 +83,32 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
 begin
   if CurStep = ssInstall then
   begin
     if RunningWorkBeforeChangingFiles(IsUpdate, WantsRelaunch) <> '' then
       Abort;
+    RunningWorkInstallingBegins;
+    // The 'scheduled-during-copy' case: a scheduled-shaped program started
+    // now, while the installing marker is there, and a copy made to last
+    // four seconds (the harness's payload copies in milliseconds).
+    if ExpandConstant('{param:HARNESSSCHEDULED|}') <> '' then
+    begin
+      Exec(ExpandConstant('{param:HARNESSSCHEDULED|}'), '--wait-while-installing "' + RunningWorkStateFolder + '"',
+           '', SW_HIDE, ewNoWait, ResultCode);
+      Sleep(4000);
+    end;
   end;
+  if CurStep = ssPostInstall then
+  begin
+    RunningWorkInstallingEnds;
+    RunningWorkInstalledCleanly;
+  end;
+end;
+
+procedure DeinitializeSetup;
+begin
+  RunningWorkInstallingEnds;
 end;

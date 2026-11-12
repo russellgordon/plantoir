@@ -121,6 +121,19 @@ public sealed class AppUpdater : IDisposable
     /// <summary>The executable a refused update reopens (ruling 12).</summary>
     public string? ReturnTo { get; set; } = Environment.ProcessPath;
 
+    /// <summary>
+    /// The installer's own log for the next install (#700: <c>/LOG=</c>), or
+    /// null for none. The app sets it to <see cref="AppUpdates.NextInstallerLog"/>
+    /// in its Logs folder; left null in tests, so no test prunes a real folder.
+    /// </summary>
+    public Func<string?>? InstallerLog { get; set; }
+
+    /// <summary>A redirected state folder to hand the installer (#700: <c>/STATEDIR=</c>), or null.</summary>
+    public string? InstallerStateFolder { get; set; }
+
+    private string Arguments(bool relaunch) =>
+        AppUpdates.InstallerArguments(relaunch, ReturnTo, InstallerLog?.Invoke(), InstallerStateFolder);
+
     /// <summary>Whether NetSparkle was ever constructed (never for an empty feed).</summary>
     public bool HasEngine => _sparkle is not null;
 
@@ -368,7 +381,7 @@ public sealed class AppUpdater : IDisposable
             $"from {_running} to {PreparedVersion}, " + (askedAgain
                 ? "once the work it was held for had finished, and opening again"
                 : "straight away, and opening again"));
-        _prompts.QuitForInstall(_installerPath, AppUpdates.InstallerArguments(relaunch: true, ReturnTo));
+        _prompts.QuitForInstall(_installerPath, Arguments(relaunch: true));
     }
 
     /// <summary>
@@ -391,7 +404,7 @@ public sealed class AppUpdater : IDisposable
             ActivityTrail.Note(ActivityTrail.Event.UpdateInstalling,
                 $"from {_running} to {PreparedVersion}, as Plantoir quits, without opening again" +
                 (Prepared == AppUpdates.Prepared.PostponedAtInstall && workUnderWay ? $"; {whatIsUnderWay} was still going on" : ""));
-            return (_installerPath, AppUpdates.InstallerArguments(relaunch: false, ReturnTo));
+            return (_installerPath, Arguments(relaunch: false));
         }
         return null;
     }

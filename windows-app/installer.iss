@@ -143,6 +143,9 @@ begin
             '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
     begin
       Result := False;
+      // #700: the refusal leaves its marker, so the trail says so even when
+      // nothing is reopened (and with the version that waited).
+      RunningWorkWriteRefusalMarker('assistant');
       // Ruling 12: the app has already quit, so reopen it and let it say why.
       if ExpandConstant('{param:RETURNTO|}') <> '' then
         Exec(ExpandConstant('{param:RETURNTO|}'), '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode);
@@ -190,6 +193,8 @@ begin
     // with nothing changed.
     if RunningWorkBeforeChangingFiles(IsUpdate, WantsRelaunch) <> '' then
       Abort;
+    // A scheduled run that starts during the copy waits while this is there.
+    RunningWorkInstallingBegins;
     DeleteFile(UpdatedByItselfMarker);
     if not IsUpdate then
     begin
@@ -197,9 +202,21 @@ begin
       Exec('taskkill.exe', '/F /IM llama-server.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
   end;
+  if CurStep = ssPostInstall then
+  begin
+    RunningWorkInstallingEnds;
+    RunningWorkInstalledCleanly;
+  end;
   if (CurStep = ssPostInstall) and IsUpdate then
   begin
     ForceDirectories(ExpandConstant('{localappdata}\Plantoir'));
     SaveStringToFile(UpdatedByItselfMarker, '{#AppVersion}', False);
   end;
+end;
+
+// #700: a failed or cancelled install must not leave the installing marker
+// (ssPostInstall never comes for one). Harmless when it was never written.
+procedure DeinitializeSetup;
+begin
+  RunningWorkInstallingEnds;
 end;

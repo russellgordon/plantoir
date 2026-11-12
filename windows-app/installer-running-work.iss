@@ -69,9 +69,19 @@ const
     'Run this installer again once that has finished.';
   RwRefusedForAssistant =
     'An assistant in another app is using Plantoir, so the new version was not installed.';
+  RwRefusedReopened =
+    'Plantoir was opened again, so the new version was not installed. It will be offered again.';
 
   // What the reopened app is told (AppUpdates.UpdateNotInstalledForWorkArgument).
   RwNotInstalledForWorkArgument = '--update-not-installed-for-work';
+
+  // The markers in the state folder (AppUpdates.NotInstalledMarker and
+  // AppUpdates.InstallingMarkerPrefix).
+  RwNotInstalledMarker = 'update-not-installed.txt';
+  RwInstallingMarkerPrefix = 'installing.';
+
+function RwGetCurrentProcessId: Cardinal;
+  external 'GetCurrentProcessId@kernel32.dll stdcall';
 
 function RwEnumProcesses(lpidProcess: AnsiString; cb: Cardinal; var lpcbNeeded: Cardinal): BOOL;
   external 'K32EnumProcesses@kernel32.dll stdcall';
@@ -98,6 +108,11 @@ var
   RwTriedToEnd: array of Cardinal;
   // Processes already named in the setup log as waited for, so each is named once.
   RwLogged: array of Cardinal;
+  // The Plantoir.exe processes under {app} at the FIRST look of this setup
+  // (the app still quitting, a scheduled run). One that appears after it, on
+  // the update path, is the teacher opening Plantoir again: refused at once.
+  RwPlantoirAtStart: array of Cardinal;
+  RwLookedOnce: Boolean;
 
 function RwByte(const Buffer: AnsiString; Offset: Integer): Cardinal;
 begin
@@ -144,7 +159,7 @@ end;
 function RwLookUnder(const AppDir: String): Boolean;
 var
   Ids: AnsiString;
-  Needed, Count, I, Pid, Size: Cardinal;
+  Needed, Count, I, Pid, Size, Room: Cardinal;
   Handle: THandle;
   Path, Prefix: String;
   N: Integer;
@@ -154,11 +169,25 @@ begin
   SetArrayLength(RwPaths, 0);
   SetArrayLength(RwCommandLines, 0);
   Prefix := Lowercase(AddBackslash(AppDir));
-  Ids := StringOfChar(#0, 4 * 8192);
-  Needed := 0;
-  if not RwEnumProcesses(Ids, 4 * 8192, Needed) then Exit;
+  // K32EnumProcesses cannot say how many processes there are: it fills the
+  // buffer, and a full buffer (Needed = its size) may have left some out. So
+  // a full answer is asked again with twice the room, from 8,192 ids (a busy
+  // PC runs about 300) up to 131,072; still full after that, the list counts
+  // as unreadable, the safe default below. The harness cannot fill 8,192
+  // ids, so this branch is reasoned, not run.
+  Room := 8192;
+  while True do
+  begin
+    Ids := StringOfChar(#0, 4 * Room);
+    Needed := 0;
+    if not RwEnumProcesses(Ids, 4 * Room, Needed) then Exit;
+    if Needed < 4 * Room then Break;
+    if Room >= 131072 then Exit;
+    Room := Room * 2;
+  end;
   Result := True;
   Count := Needed div 4;
+  if Count = 0 then Exit;
   for I := 0 to Count - 1 do
   begin
     Pid := RwDword(Ids, I * 4);
@@ -270,6 +299,16 @@ begin
       Log('Running work: the list of processes could not be read; going ahead without looking');
       Exit;
     end;
+    if not RwLookedOnce then
+    begin
+      RwLookedOnce := True;
+      for I := 0 to GetArrayLength(RwPids) - 1 do
+        if Lowercase(ExtractFileName(RwPaths[I])) = 'plantoir.exe' then
+        begin
+          SetArrayLength(RwPlantoirAtStart, GetArrayLength(RwPlantoirAtStart) + 1);
+          RwPlantoirAtStart[GetArrayLength(RwPlantoirAtStart) - 1] := RwPids[I];
+        end;
+    end;
     Work := 0;
     Ended := 0;
     for I := 0 to GetArrayLength(RwPids) - 1 do
@@ -313,6 +352,17 @@ begin
         end;
         // A hand-run install ends it at ssInstall, as it always has.
       end
+      else if (Name = 'plantoir.exe') and Updating and
+              (not RwHasToken(Line, '--run-scheduled-deploy')) and
+              (not RwIn(RwPlantoirAtStart, RwPids[I])) then
+      begin
+        // The teacher opened Plantoir again while this waited: installing
+        // under them is what must not happen. Refused at once, and nothing
+        // is reopened (one is open).
+        Log(Format('Running work: Plantoir was opened again (pid %d); refusing', [RwPids[I]]));
+        Result := RwRefusedReopened;
+        Exit;
+      end
       else if (Name = 'plantoir.exe') and (not Updating) and
               (not RwHasToken(Line, '--run-scheduled-deploy')) then
       begin
@@ -324,7 +374,9 @@ begin
       begin
         if not RwIn(RwLogged, RwPids[I]) then
         begin
-          Log(Format('Running work: waiting for %s (pid %d): %s', [RwPaths[I], RwPids[I], Line]));
+          // The image and pid only, never the command line: a deploy's can
+          // name an account, and this log is kept in the app's Logs folder.
+          Log(Format('Running work: waiting for %s (pid %d)', [RwPaths[I], RwPids[I]]));
           SetArrayLength(RwLogged, GetArrayLength(RwLogged) + 1);
           RwLogged[GetArrayLength(RwLogged) - 1] := RwPids[I];
         end;
@@ -367,34 +419,124 @@ begin
   end;
 end;
 
+// True when a Plantoir window is already open from {app} (any Plantoir.exe
+// there that is not a scheduled run), so a refusal must not start another.
+function RwPlantoirIsOpen: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if not RwLookUnder(ExpandConstant('{app}')) then Exit;
+  for I := 0 to GetArrayLength(RwPids) - 1 do
+    if (Lowercase(ExtractFileName(RwPaths[I])) = 'plantoir.exe') and
+       (not RwHasToken(RwCommandLines[I], '--run-scheduled-deploy')) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
 // After a refusal on the update path: [Run] never runs after one, so this is
-// the only way back into Plantoir.
+// the only way back into Plantoir. Never when a Plantoir window is already
+// open (the teacher came back; a second copy is the fault #700's review found).
 //   - Refused for work (after a wait of up to ten minutes): reopened only when
-//     the teacher's Install and Reopen asked for it (/RELAUNCH=1), with
-//     --update-not-installed-for-work so the trail says what held it. An
-//     at-quit install (no /RELAUNCH) stays closed: the teacher quit, and a
-//     window appearing minutes later on a classroom screen is a surprise; the
-//     update is offered again at the next launch.
+//     the teacher's Install and Reopen asked for it (/RELAUNCH=1). An at-quit
+//     install (no /RELAUNCH) stays closed: the teacher quit, and a window
+//     appearing minutes later on a classroom screen is a surprise. Either way
+//     the refusal marker (below) puts the line on the trail at the next launch.
 //   - Refused for an outside assistant: within a second, like InitializeSetup's
 //     refusal (ruling 12), so reopened whenever /RETURNTO names the app, with
 //     the argument that refusal has always used.
+//   - Refused because Plantoir was opened again: nothing to reopen.
 procedure RunningWorkReopenAfterRefusal(const Refusal: String; Relaunch: Boolean; const ReturnTo: String);
 var
   ResultCode: Integer;
 begin
-  if ReturnTo = '' then Exit;
+  if (ReturnTo = '') or (Refusal = RwRefusedReopened) then Exit;
+  if RwPlantoirIsOpen then
+  begin
+    Log('Running work: Plantoir is already open; not starting another copy');
+    Exit;
+  end;
   if Refusal = RwRefusedForAssistant then
     Exec(ReturnTo, '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode)
   else if Relaunch then
     Exec(ReturnTo, RwNotInstalledForWorkArgument, '', SW_SHOW, ewNoWait, ResultCode);
 end;
 
+// ---- Markers in the state folder (AppUpdates) --------------------------------
+
+// The app's state folder: /STATEDIR= when the app was started with a
+// redirected one (--state-dir; AppUpdates.InstallerArguments passes it), else
+// {localappdata}\Plantoir, where an installed copy keeps it.
+function RunningWorkStateFolder: String;
+begin
+  Result := ExpandConstant('{param:STATEDIR|}');
+  if Result = '' then Result := ExpandConstant('{localappdata}\Plantoir');
+end;
+
+// A refusal leaves a record (#700 review): an at-quit refusal reopens nothing
+// and setup's own log is only written when the app asked for one, so the next
+// launch reads this, writes "update held while work is under way" with the
+// version that waited, and deletes it (AppUpdates.ConsumeNotInstalledMarker).
+procedure RunningWorkWriteRefusalMarker(const Reason: String);
+begin
+  ForceDirectories(RunningWorkStateFolder);
+  if SaveStringToFile(AddBackslash(RunningWorkStateFolder) + RwNotInstalledMarker,
+                      '{#AppVersion}' + #13#10 + Reason + #13#10, False) then
+    Log('Running work: wrote the refusal marker (' + Reason + ')')
+  else
+    Log('Running work: could not write the refusal marker');
+end;
+
+function RwReasonOf(const Refusal: String): String;
+begin
+  if Refusal = RwRefusedForAssistant then Result := 'assistant'
+  else if Refusal = RwRefusedReopened then Result := 'reopened'
+  else Result := 'work';
+end;
+
+function RwInstallingMarker: String;
+begin
+  Result := AddBackslash(RunningWorkStateFolder) + RwInstallingMarkerPrefix + IntToStr(RwGetCurrentProcessId);
+end;
+
+// At ssInstall, once the last look found nothing: a scheduled run of Plantoir
+// that starts during the copy waits while this is there (ScheduledRun,
+// AppUpdates.LiveInstaller), as it waits for a tools copy. It helps only if
+// the Plantoir.exe that starts is whole: one started while [Files] is
+// replacing it may fail to start at all, which nothing here can prevent.
+procedure RunningWorkInstallingBegins;
+begin
+  ForceDirectories(RunningWorkStateFolder);
+  SaveStringToFile(RwInstallingMarker, IntToStr(RwGetCurrentProcessId) + #13#10 + 'PlantoirSetup' + #13#10, False);
+end;
+
+// At ssPostInstall and in DeinitializeSetup, so a failed or cancelled install
+// cannot leave it (a marker left by a killed setup is stale: its process is
+// gone, and the reader deletes it).
+procedure RunningWorkInstallingEnds;
+begin
+  DeleteFile(RwInstallingMarker);
+end;
+
+// A finished install: an older refusal no longer explains anything.
+procedure RunningWorkInstalledCleanly;
+begin
+  DeleteFile(AddBackslash(RunningWorkStateFolder) + RwNotInstalledMarker);
+end;
+
 // The one call installer.iss makes, from PrepareToInstall and again at the
 // start of CurStepChanged(ssInstall): '' to go ahead, or the refusal (which
-// PrepareToInstall returns, for exit code 7, and ssInstall turns into Abort).
+// PrepareToInstall returns, for exit code 7, and ssInstall turns into Abort,
+// exit code 3). Every refusal, silent or hand-run, leaves the marker.
 function RunningWorkBeforeChangingFiles(Updating, Relaunch: Boolean): String;
 begin
   Result := RunningWorkRefusal(ExpandConstant('{app}'), Updating, WizardSilent);
-  if (Result <> '') and Updating then
-    RunningWorkReopenAfterRefusal(Result, Relaunch, ExpandConstant('{param:RETURNTO|}'));
+  if Result <> '' then
+  begin
+    RunningWorkWriteRefusalMarker(RwReasonOf(Result));
+    if Updating then
+      RunningWorkReopenAfterRefusal(Result, Relaunch, ExpandConstant('{param:RETURNTO|}'));
+  end;
 end;

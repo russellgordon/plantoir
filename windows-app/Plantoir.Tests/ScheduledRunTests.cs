@@ -299,6 +299,7 @@ public class ScheduledRunTests : IDisposable
         CloudflareAccountID = () => "",
         RunWrapper = script => { ran.Add(script); return 0; },
         OutcomeDirectory = Path.Combine(_root, "outcomes"),
+        Installing = () => null,
     };
 
     // ---- #475: classes dated after the next class, on a scheduled deploy ------
@@ -684,6 +685,60 @@ public class ScheduledRunTests : IDisposable
         string line = TrailLineContaining("waited 45 s");
         Assert.Contains("ICS3U/1", line);
         Assert.Contains("waited 45 s for Plantoir to finish getting the working folder ready (process 4242), and went ahead", line);
+    }
+
+    // ---- #700: an installer replacing this program, met by a run that fired during the copy
+
+    [Fact]
+    public void ALiveInstallerIsWaitedForAndTheRunGoesAheadAfter()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        int looks = 0;
+        var world = World(clock, ran);
+        world = new ScheduledRun.World
+        {
+            Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+            RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+            CopyingTheFolder = _ => null,
+            Installing = () => ++looks <= 2 ? 777 : null,
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Single(ran);
+        Assert.Equal(new Clock().Now.AddSeconds(30), clock.Now);
+        Assert.Contains("waited 30 s for a new version of Plantoir to finish installing (process 777), and went ahead",
+                        TrailLineContaining("waited 30 s"));
+    }
+
+    [Fact]
+    public void AnInstallStillRunningAfterTenMinutesStandsDownAndTakesNoLease()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        var world = World(clock, ran);
+        world = new ScheduledRun.World
+        {
+            Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+            RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+            CopyingTheFolder = _ => null,
+            Installing = () => 777,
+        };
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        Assert.Empty(ran);
+        Assert.True(clock.Now - new Clock().Now >= ScheduledRun.LongestWait);
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder)!;
+        Assert.Equal(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, record.Outcome);
+        Assert.Contains("waited 600 s for a new version of Plantoir to finish installing (process 777), and stood down",
+                        File.ReadAllText(_trail));
+        Assert.Empty(Directory.Exists(Activity(folder)) ? Directory.GetFiles(Activity(folder), "*.lease") : []);
     }
 
     [Fact]

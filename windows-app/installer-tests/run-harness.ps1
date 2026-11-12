@@ -59,6 +59,12 @@ $ownerApp = Join-Path $env:LOCALAPPDATA 'Programs\Plantoir'
 $ownerKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A14C3E2D-5F6B-4820-9D7A-83B92A769CE1}}_is1'   # sic: installer.iss's AppId ends in }}, and Inno keeps the second brace
 $updateArgs = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1'
 $handArgs = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+# The installer's markers go to a state folder of the harness's own, NEVER the
+# real %LOCALAPPDATA%\Plantoir (/STATEDIR=, as the app passes a redirected one).
+$stateDir = Join-Path $work 'state'
+$updateArgs += " `"/STATEDIR=$stateDir`""
+$handArgs += " `"/STATEDIR=$stateDir`""
+$refusalMarker = Join-Path $stateDir 'update-not-installed.txt'
 
 # ---- The owner's real install: listed before, compared after ------------------
 function Get-OwnerFingerprint {
@@ -190,7 +196,10 @@ function Install-Version1 {
     New-Item -ItemType Directory -Force (Join-Path $appDir 'Toolchain\scripts\__pycache__') | Out-Null
     Set-Content (Join-Path $appDir 'Toolchain\scripts\__pycache__\build_site.cpython-311.pyc') 'old' -Encoding ascii
     if (Test-Path $record) { Remove-Item $record -Force }
+    if (Test-Path $stateDir) { Remove-Item -LiteralPath $stateDir -Recurse -Force }
 }
+function Get-MarkerReason { if (Test-Path $refusalMarker) { @(Get-Content $refusalMarker)[1] } else { '' } }
+function Test-InstallingLeft { @(Get-ChildItem -Path $stateDir -Filter 'installing.*' -ErrorAction SilentlyContinue).Count -gt 0 }
 function Start-StandIn([string]$relative, [string]$arguments) {
     Start-Process -FilePath (Join-Path $appDir $relative) -ArgumentList $arguments -PassThru -WindowStyle Hidden
 }
@@ -275,7 +284,7 @@ $cases['never-relaunch'] = {
 $cases['late'] = {
     param($setup)
     Install-Version1
-    $first = Start-StandIn 'runtime\python\python.exe' '--seconds 5 -u C:\wf\.toolchain\scripts\build_site.py --course=EXC2O --section=1 --build-only'
+    $first = Start-StandIn 'runtime\python\python.exe' '--seconds 8 -u C:\wf\.toolchain\scripts\build_site.py --course=EXC2O --section=1 --build-only'
     # Started 3 s from now by cmd.exe, which is not under {app}, so only the
     # deploy-shaped node it starts can be seen. (Start-Job took longer than the
     # whole install to start its own PowerShell, on the first run.)
@@ -352,6 +361,47 @@ $cases['ssinstall'] = {
     [PSCustomObject]@{ Pass = [bool](($r.Exit -ne 0) -and $same -and -not $node.HasExited -and $r.Seconds -ge 19); Detail = "exit $($r.Exit) in $($r.Seconds) s; tree byte-identical to version 1: $same; the work still running: $(-not $node.HasExited); the log reached the install step: $atSsInstall" }
 }
 
+# The teacher opens Plantoir again while the installer waits: refused at once,
+# and no second copy started.
+$cases['came-back'] = {
+    param($setup)
+    Install-Version1
+    $before = @(Get-Tree)
+    $node = Start-StandIn 'runtime\node\node.exe' 'C:\builds\x\EXC2O\section1\quartz\bootstrap-cli.mjs build --concurrency 1'
+    $app = Join-Path $appDir 'Plantoir.exe'
+    Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList "/c ping -n 4 127.0.0.1 >nul & `"$app`"" -WindowStyle Hidden | Out-Null
+    $r = Invoke-Version2 $setup "$updateArgs /RELAUNCH=1 $returnTo" 'came-back'
+    Start-Sleep 2
+    $same = ((@(Get-Tree) -join "`n") -eq ($before -join "`n"))
+    $copies = @(Get-Started | Where-Object { $_ -match 'Plantoir\.exe' }).Count
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 7) -and $same -and $r.Seconds -lt 12 -and $copies -eq 1 -and (Get-MarkerReason) -eq 'reopened'); Detail = "exit $($r.Exit) in $($r.Seconds) s; tree byte-identical: $same; Plantoir copies started: $copies (the teacher's only); marker: $(Get-MarkerReason)" }
+}
+
+# Plantoir already open (never quits) and Install and Reopen: refused after the
+# wait, and no second copy started beside the open one.
+$cases['open-at-start'] = {
+    param($setup)
+    Install-Version1
+    $app = Start-StandIn 'Plantoir.exe' '--until-ended'
+    Start-Sleep 1
+    $r = Invoke-Version2 $setup "$updateArgs /RELAUNCH=1 $returnTo" 'open-at-start'
+    Start-Sleep 2
+    $copies = @(Get-Started | Where-Object { $_ -match 'Plantoir\.exe' }).Count
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 7) -and $copies -eq 1 -and -not $app.HasExited -and (Get-MarkerReason) -eq 'work'); Detail = "exit $($r.Exit) in $($r.Seconds) s; Plantoir copies started: $copies; marker: $(Get-MarkerReason)" }
+}
+
+# A scheduled-shaped program started DURING the copy waits for the installing marker.
+$cases['scheduled-during-copy'] = {
+    param($setup)
+    Install-Version1
+    $r = Invoke-Version2 $setup "$updateArgs $returnTo `"/HARNESSSCHEDULED=$standIn`"" 'scheduled-during-copy'
+    for ($i = 0; $i -lt 40 -and -not (Get-Started | Where-Object { $_ -like 'WAITED*' }); $i++) { Start-Sleep -Milliseconds 250 }
+    $waited = @(Get-Started | Where-Object { $_ -like 'WAITED*' }) | Select-Object -First 1
+    $ms = if ($waited) { [int](($waited -split "`t")[1]) } else { -1 }
+    $saw = $waited -match 'SAW\tTrue'
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 0) -and (Test-IsV2) -and $saw -and $ms -ge 3000); Detail = "exit $($r.Exit) in $($r.Seconds) s; the scheduled-shaped run saw the installing marker: $saw and waited $ms ms" }
+}
+
 # ---- Must-fail: break one rule, and the case it protects goes wrong -----------------
 $mustFails = @(
     @{ Name = 'no check at all'; Case = 'serve'
@@ -365,11 +415,21 @@ $mustFails = @(
     @{ Name = 'one look only'; Case = 'late'
        From = "    Sleep(1000);`n  end;"
        To = "    Sleep(1000);`n    if Work > 0 then Exit;`n  end;"
-       Expect = { param($r) $r.Exit -ne 0 -or -not (Test-IsV2) } ; Says = 'work that starts during the wait is not seen' },
+       # Judged by TIME, not by the tree: whether Inno's in-use retries then trip over the late
+       # work depends on when it starts (a first run gave exit 5, a later one exit 0 after retries).
+       Expect = { param($r) $r.Seconds -lt 13 } ; Says = 'the install goes ahead before work that started during the wait has finished' },
     @{ Name = 'no wait (go ahead over work)'; Case = 'build'
        From = "    if Work > 0 then`n    begin`n      if Silent then"
        To = "    if Work > 0 then Exit;`n    if Work > 0 then`n    begin`n      if Silent then"
-       Expect = { param($r) $r.Exit -ne 0 -or -not (Test-IsV2) } ; Says = 'the night''s case C: a build''s held files survive, or the copy aborts' }
+       Expect = { param($r) $r.Exit -ne 0 -or -not (Test-IsV2) } ; Says = 'the night''s case C: a build''s held files survive, or the copy aborts' },
+    @{ Name = 'a reopened Plantoir counted as work'; Case = 'came-back'
+       From = "              (not RwIn(RwPlantoirAtStart, RwPids[I])) then"
+       To = "              (not RwIn(RwPlantoirAtStart, RwPids[I])) and False then"
+       Expect = { param($r) $r.Seconds -ge 19 } ; Says = 'the install waits out the full time under the teacher' },
+    @{ Name = 'no guard against a second copy'; Case = 'open-at-start'
+       From = "  if RwPlantoirIsOpen then"
+       To = "  if False and RwPlantoirIsOpen then"
+       Expect = { param($r) $true } ; Says = 'a second Plantoir is started beside the open one' }
 )
 
 # ---- Run ----------------------------------------------------------------------------
@@ -380,7 +440,13 @@ try {
     if (-not $MustFail) {
         foreach ($name in $names) {
             $outcome = @(& $cases[$name] $setup2 | Where-Object { $_ -is [PSCustomObject] -and $_.PSObject.Properties['Pass'] })[-1]
-            Add-Result $name $outcome.Pass $outcome.Detail
+            # Every case: a refusal leaves the refusal marker, a finished install
+            # none, and no installing marker is ever left behind.
+            $refuses = $name -in @('never', 'never-relaunch', 'assistant', 'ssinstall', 'came-back', 'open-at-start')
+            $marker = Test-Path $refusalMarker
+            $left = Test-InstallingLeft
+            $markersRight = ($marker -eq $refuses) -and -not $left
+            Add-Result $name ($outcome.Pass -and $markersRight) ($outcome.Detail + "; refusal marker: $marker ($(Get-MarkerReason)); installing marker left: $left")
             Remove-Harness
         }
     } else {
@@ -393,7 +459,8 @@ try {
             [IO.File]::WriteAllText($broken, $original.Replace($mf.From, $mf.To))
             $setupBroken = Invoke-Compile '2' $payload2 (Join-Path $work "out-broken-$i") $broken
             $outcome = @(& $cases[$mf.Case] $setupBroken | Where-Object { $_ -is [PSCustomObject] -and $_.PSObject.Properties['Pass'] })[-1]
-            $r = [PSCustomObject]@{ Exit = [int](([regex]::Match($outcome.Detail, 'exit (-?\d+)')).Groups[1].Value) }
+            $r = [PSCustomObject]@{ Exit = [int](([regex]::Match($outcome.Detail, 'exit (-?\d+)')).Groups[1].Value)
+                                    Seconds = [double](([regex]::Match($outcome.Detail, 'in ([\d.]+) s')).Groups[1].Value) }
             $wentWrong = & $mf.Expect $r
             Add-Result "must-fail: $($mf.Name)" ([bool]$wentWrong -and -not $outcome.Pass) "case $($mf.Case) went wrong as expected ($($mf.Says)): $($outcome.Detail)"
             Remove-Harness

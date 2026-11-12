@@ -112,7 +112,7 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-11-12 | Updating Plantoir with a preview open no longer breaks the install: the installer closes the preview, waits up to ten minutes for a build or a deploy to finish, and otherwise leaves the old version exactly as it was and offers the update again. **The 1.9.0 notes' "close any preview… before you install by hand" warning can be dropped** | Windows only (the mac's updater replaces the whole app and has no counterpart) | #700 |
+| 2026-11-12 | Updating Plantoir with a preview open no longer breaks the install: the installer closes the preview, waits up to ten minutes for a build or a deploy to finish, and otherwise leaves the old version exactly as it was and offers the update again. **The 1.9.0 notes' "close any preview… before you install by hand" warning can be dropped ONLY IF the morning's real-installer cases pass** (B, C, C2, D and the hand-run wizard, #700's closing comment); until then keep it | Windows only (the mac's updater replaces the whole app and has no counterpart) | #700 |
 | 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
 | 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
 | 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
@@ -192,7 +192,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    made before 2026-10-22 is refused until the fetch is re-run), and **run
    `windows-app\Vendor\fetch-obsidian-addons.ps1`** — it returns at once when
    the seven add-on files already match the contract's pins, and the build
-   REFUSES a missing or stale copy (#581). Then `az login`, then
+   REFUSES a missing or stale copy (#581), and **run `windows-app\Vendor\fetch-llama.ps1`** — `publish.ps1` refuses a bundle without the assistant's engine, which the signed 1.9.0 shipped without (#700). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **After installing it over the previous
@@ -432,6 +432,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
        powershell -File Vendor\fetch-runtime.ps1
        powershell -File Vendor\fetch-obsidian-addons.ps1
+       powershell -File Vendor\fetch-llama.ps1
        powershell -File publish.ps1 -Sign
 
    One-time tooling on a new machine (the Azure account/identity setup itself
@@ -451,6 +452,14 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    with an RFC 3161 timestamp.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
+
+   **Run `windows-app\Vendor\fetch-llama.ps1` first** (once per clone; it
+   refuses a zip whose size or SHA-256 is not the pinned b10435 one).
+   `publish.ps1` REFUSES to build without the assistant's engine — it checks
+   `Vendor\llama` before the build and the published `llama\` before the
+   installer is compiled — because the signed 1.9.0 shipped with no `llama\`
+   at all (#700). `-WithoutAssistantEngine` is for a developer's bundle and is
+   refused together with `-Sign`.
 
    `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before it publishes
    (#700): without that, the first publish in a fresh clone or worktree
