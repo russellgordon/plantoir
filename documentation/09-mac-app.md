@@ -3735,7 +3735,10 @@ rejected:
   there, its solutions never. The PDF is copied again after every change.
 - **Task cards**: one relation per grid, never "on the same axes", at most
   four graphs per set, discussion pages mirror the cards word for word -
-  carried as the issue wrote them.
+  carried as the issue wrote them. (Since #765 the first two are part of
+  the offered template, "Lessons students can catch up on", because they
+  follow from four empty grids per group at a whiteboard; the third holds
+  for any teacher's cards.)
 
 **Graphs, the key's layout, and table widths and spacing (#715 reopened,
 2026-11-01).** Russell added rules and refinements after the merge (issue
@@ -3884,31 +3887,45 @@ extension, every card serving the idea the teacher wants. When it has
 a summary: exactly what the lesson built, with a picture where it explains
 better. An exercise stays on its lesson's topic unless the teacher asks for
 something else. Whether there are hints is the teacher's choice; when there
-are, a hint points back by a name the student can find and never gives the
-answer or a pointed first step, and a hints sheet on paper is made when the
-teacher wants one. Unconditional, because each is a mechanic of making and
-checking a handout rather than a way of teaching: the four-step review in
-section 7 (build, a separate reviewer re-solving every answer and checking
-every hint, the lead's coherence pass against what the teacher asked, any
-changed question back to the reviewer), the `Adapted from` line (never on
-an assessment), equal unit lengths on a printed graph where width or
-steepness is the point, plain wording a student still learning English can
-follow, and invented contexts never about firearms or ammunition. What
+are, a hint never gives the answer (how much more it gives, a first step
+or a pointer back, is the teacher's), and a hints sheet on paper is made
+when the teacher wants one. Unconditional, because each is a mechanic of
+making and checking a handout rather than a way of teaching: the four-step
+review in section 7 (build, a separate reviewer re-solving every answer and
+checking every hint, the lead's coherence pass against what the teacher
+asked, any changed question back to the reviewer), equal unit lengths on a
+card's printed graph that compares width or steepness, plain wording a
+student still learning English can follow, and invented contexts never
+about firearms or ammunition. House style, which a teacher who takes the
+house style takes with it: the `Adapted from` line under a title, never on
+an assessment unless the teacher's own quizzes carry one, because a source
+line tells students where to look the questions up. What
 belongs to the teacher is how the lesson is RUN: the course's How I Teach
 page comes first, and otherwise the teacher's request. Russell's own shape
 (the warmup as two or three questions whose last is a "movie trailer"
 lead-in, one big idea per class built by a progression of task cards,
 visibly random groups of three or four at vertical whiteboards, the
 exercise following from that day's cards and summary, hints on every
-exercise on the page and on paper, finishing the exercise as the only
-homework) is written as a template that
-is OFFERED, never applied, and only to a teacher who has shown an interest
-in bridging constructivist and Thinking Classrooms practice with a school
-where students often miss class (sports, weather, illness, field trips and
-other school activities): his ruling of 2026-11-12, on the issue. The skill
-says how an assistant tells which case it is in (the page, what the teacher
-asks, what they say about their students) and not to offer it when it
-cannot tell.
+exercise on the page and on paper that point back to a card or a summary
+rather than give a first step, each graph on its own grid and at most four
+per set, finishing the exercise as the only homework) is written as a
+template named "Lessons students can catch up on" that is OFFERED, never
+applied, and only to a teacher who has shown an interest in BOTH halves of
+what it bridges, constructivist and Thinking Classrooms practice and a
+school where students often miss class (sports, weather, illness, field
+trips and other school activities): his ruling of 2026-11-12, on the
+issue. One half without the other is not enough, and after a no it is not
+offered again in that conversation. The skill says how an assistant tells
+which case it is in (the page, what the teacher asks, what they say about
+their students) and not to offer it when it cannot tell. The name is
+`handoutsSkill.offeredTemplate.name`, defined in one sentence of each skill
+that names it, and the handouts test requires it exactly once in each, so
+a rename is the contract value and one sentence per skill; later skills
+(#751, #750) cite the same name. The fix review moved two more rules into
+the template: a hint that never gives a pointed first step and points back
+to a card (a teaching choice, and the card half means nothing without
+cards), and #715's each-graph-on-its-own-grid and four-graph limit (they
+follow from four empty grids per group at a whiteboard).
 
 A hints sheet is the worksheet with each hint under its question, from the
 same source: `Handout.tex` gains `\ifhints`, `\showhints` and `\hint{...}`

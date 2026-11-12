@@ -176,6 +176,8 @@ look the same:
   subtitle line of instructions.
 - A handout that draws on a textbook carries a grey line under its title:
   `Adapted from <book>, <pages>`. An assessment (a quiz or test) never does.
+  A source line on a quiz tells students where to look the questions up,
+  so leave it off unless the teacher's own quizzes carry one.
 - `tasks` columns for short a), b), c) parts side by side. The answer key
   keeps the worksheet's column count. On a quiz or test, a part that runs
   to more than one line hangs under its first word (section 6).
@@ -484,18 +486,12 @@ The same figure goes on a page as a ` ```tikz ` fence:
 
 These rules hold whenever a teacher asks for task cards. How the cards are
 used in class (alone, in pairs, in groups, at desks or at whiteboards) is
-the teacher's (section 13).
+the teacher's (section 13). The rules for cards done at whiteboards with
+four empty grids each are part of the template at the end of section 13.
 
-- A card never says "on the same axes", "on the same grid" or "on one
-  grid": every relation it asks students to plot or sketch goes on its
-  own grid, and comparing is side by side ("put it beside your graph of
-  $y = x^2$ and compare").
-- When groups work at whiteboards with four empty Cartesian-plane
-  templates each, a card set asks a group for **at most four graphs in
-  total**, counting the sketch prompts for a group that finishes early.
 - A table on a card has a full border, as every table does (section 9).
-- Where a card compares width or steepness, a printed graph uses the same
-  unit length on both axes (`x=0.42cm, y=0.42cm` on the `axis`, as the
+- Where a card's graph compares width or steepness, it is printed with the
+  same unit length on both axes (`x=0.42cm, y=0.42cm` on the `axis`, as the
   starter's graph does), so a narrower parabola looks narrower.
 - How the cards are written (one ask each, core before extension) is in
   section 13.
@@ -572,17 +568,20 @@ homework is) belongs to the teacher.
 2. **Otherwise, do what the teacher asks.** Do not bring a lesson structure
    of your own, and do not use the template at the end of this section
    unasked.
-3. **The template is offered, never applied.** Offer it, in one or two
-   sentences, only to a teacher who has shown an interest in what it is
-   for: lessons built from students' own thinking (constructivist
-   practice, Thinking Classrooms, vertical whiteboards, random groups) in a
-   school where students often miss class (sports and team travel, weather
-   days, illness, field trips and other school activities). The interest
-   may be in what they ask, in what they say about their students, or on
-   their How I Teach page. Name it as one teacher's approach, use it only
-   after they say yes, and only where their How I Teach page does not say
-   otherwise. If you cannot tell whether they have shown that interest, do
-   not offer it. Nothing in the template is a rule for anyone else.
+3. **The template is offered, never applied.** The template is the one
+   at the end of this section. Offer it, in one or two sentences, only to
+   a teacher who has shown an interest in both things it bridges:
+   lessons built from students' own thinking (constructivist practice,
+   Thinking Classrooms, vertical whiteboards, random groups), AND the
+   reality of a school where students often miss class (sports and team
+   travel, weather days, illness, field trips and other school
+   activities). One without the other is not enough. The interest may be
+   in what they ask, in what they say about their students, or on their
+   How I Teach page. Say it is one teacher's template, use it only after
+   they say yes, and only where their How I Teach page does not say
+   otherwise. If they say no, do not offer it again in this conversation.
+   If you cannot tell whether they have shown that interest, do not offer
+   it. Nothing in the template is a rule for anyone else.
 
 ### Task cards
 
@@ -610,10 +609,12 @@ and needs nothing from a later lesson.
 
 Whether an exercise has hints is the teacher's choice. When it has them:
 
-- **A hint never gives the answer or a pointed first step.** It points back
-  to where the idea was built, by a name the student can find: a card by
-  its number ("Look back at Card 4."), a worked example, or an earlier
-  summary by its title, never an internal label such as a day number.
+- **A hint never gives the answer.** How much more a hint gives (a first
+  step, a reminder of a method, a pointer to a worked example) is the
+  teacher's; follow their How I Teach page or ask. A hint that names
+  something names it the way the student sees it (a worked example by its
+  title, a page by its title), never by an internal label such as a day
+  number.
 - When the teacher wants the hints on paper, they come as
   `Name - Hints.pdf` beside `Name.pdf` and `Name - Answers.pdf`, from the
   same source (section 3, `\hint`).
@@ -623,11 +624,13 @@ Whether an exercise has hints is the teacher's choice. When it has them:
 When the teacher has not said how long a piece should be, drop what is not
 essential rather than fill the class.
 
-### The template: one teacher's approach, for lessons students can catch up on
+### The offered template
 
-This is how one teacher brings constructivist, Thinking Classrooms practice
-into a school where students are often away. Offer it as that, as "Whose
-way of teaching" says, and never as Plantoir's rule.
+**The template is called "Lessons students can catch up on".** It is one
+teacher's template: how one teacher brings constructivist, Thinking
+Classrooms practice into a school where students are often away. Offer it as that, as "Whose way of teaching"
+says, and never as Plantoir's rule. A teacher who asks for it by its name
+has said yes.
 
 - **Warmup.** Two or three short questions students answer at their desks.
   They touch ideas from the class before; the last one is a small lead-in
@@ -641,10 +644,19 @@ way of teaching" says, and never as Plantoir's rule.
   random, at vertical whiteboards with four empty Cartesian-plane templates
   each. One set of groups for the whole class, never re-grouped part way
   through.
+- **Each graph on its own grid.** A card never says "on the same axes",
+  "on the same grid" or "on one grid": every relation it asks students to
+  plot or sketch goes on its own grid, and comparing is side by side ("put
+  it beside your graph of $y = x^2$ and compare"). A card set asks a group
+  for **at most four graphs in total**, counting the sketch prompts for a
+  group that finishes early.
 - **The exercise follows from that day's cards and summary.**
 - **Every exercise has hints**, on the page and on paper (`Name.pdf`,
   `Name - Hints.pdf` and `Name - Answers.pdf`), so a student who missed the
-  class can work through it alone.
+  class can work through it alone. A hint here never gives a pointed first
+  step: it points back to where the idea was built, a card from the same
+  day by its number ("Look back at Card 4.") or an earlier day's summary by
+  its title.
 - **Finishing the exercise is the only homework.**
 
 ## 14. Wording and contexts

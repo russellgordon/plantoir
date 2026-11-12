@@ -37,9 +37,8 @@
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
 
 % ---------- Hints (the skill's section 13) ----------
-% \hint{...} under a question shows only on the hints sheet. A hint points
-% back to where the idea was built ("Look back at Card 4."); it never gives
-% the answer or a pointed first step.
+% \hint{...} under a question shows only on the hints sheet. A hint never
+% gives the answer; how much more it gives is the teacher's.
 \newif\ifhints
 \ifdefined\showhints \hintstrue \fi
 \newcommand{\hint}[1]{\ifhints\par{\color{gray}\small\sffamily Hint: #1}\par\fi}

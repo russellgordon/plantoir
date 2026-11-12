@@ -8299,12 +8299,14 @@ Since #765 the `plantoir-handouts` skill (section 13) and the
 course's How I Teach page before writing any lesson material, and to run
 the lesson its way; where the page says nothing, the teacher's own request
 decides. Russell's own lesson shape (a two- or three-question warmup whose
-last question is a lead-in, visibly random groups at vertical whiteboards,
-hints on every exercise, the exercise as the only homework) ships as a
-template that is OFFERED, never applied, and only to a teacher who has
-shown an interest in bridging constructivist and Thinking Classrooms
-practice with a school where students often miss class (his ruling on
-#765, 2026-11-12). The unit-planning skill (#707) already took its lesson
+last question is a lead-in, one big idea per class built by a progression
+of task cards, visibly random groups at vertical whiteboards, the exercise
+following from that day's cards and summary, hints on every exercise, the
+exercise as the only homework) ships as a template named "Lessons students
+can catch up on" (`handoutsSkill.offeredTemplate`) that is OFFERED, never
+applied, and only to a teacher who has shown an interest in both
+constructivist and Thinking Classrooms practice and the reality of a
+school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
 shape from the page. Why, and what was rejected:
 `documentation/09-mac-app.md` → "Lesson materials, and whose way of
 teaching (#765, v1.10.0)".

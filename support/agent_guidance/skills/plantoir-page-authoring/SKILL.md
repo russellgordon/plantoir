@@ -702,9 +702,9 @@ of these pages, whether or not anything is printed.
   `courses/<CODE>/How I Teach.md` exists, read it (with Plantoir's tools
   connected, `read_how_i_teach` reads it) and run the lesson its way.
   Otherwise do what the teacher asks. The handouts skill's section 13 ends
-  with one teacher's template for lessons students can catch up on; it is
-  offered only to a teacher who has shown an interest in what it is for,
-  and never applied unasked.
+  with one teacher's template, called "Lessons students can catch up on". It is offered only to a
+  teacher who has shown an interest in both halves of what it is for, as
+  that section says, and never applied unasked.
 - **A Discussion page**, when the lesson has task cards, repeats each
   card's wording word for word, in the cards' order.
 - **A Summary page** states what the lesson built, accurately and
@@ -712,9 +712,8 @@ of these pages, whether or not anything is printed.
 - **An Exercise page** stays on its lesson's topic unless the teacher asks
   for something else. Whether it has hints is the teacher's choice; when it
   has them, each is a folded hint callout under its question
-  (` > [!hint]- Hint `, section 5), pointing back to a card, a worked
-  example or an earlier summary by a name the student can find, never
-  giving the answer or a pointed first step. On a page that prints, a
+  (` > [!hint]- Hint `, section 5). A hint never gives the answer; how much
+  more it gives is the teacher's (the handouts skill's section 13). On a page that prints, a
   folded hint prints opened where it is (`plantoir-printing`); if students
   should get the hints separately on paper, make the exercise as a PDF
   handout with its hints sheet.
