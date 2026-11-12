@@ -32,8 +32,14 @@ public static class DeployCommand
     /// <summary>
     /// The arguments for one section's deploy, to one destination.
     ///
-    /// Netlify passes no target flag at all: it is deploy's default, and every
-    /// course written before Cloudflare existed relies on that.
+    /// Every destination is NAMED, Netlify included (<c>--target netlify</c>),
+    /// since #739 (mac #668). Before that Netlify passed no flag, as the
+    /// launcher's default; but a deploy.ps1 given no destination now reads the
+    /// course's SAVED destinations and deploys every one of them, a leg each,
+    /// so a flagless Netlify leg of a course that also deploys elsewhere would
+    /// run every leg again. Naming it keeps one call, one destination
+    /// (<c>app-rules.json</c> → <c>deployArguments</c>). Anything that is not
+    /// a folder or Cloudflare is Netlify, as an absent <c>deploy_target</c> is.
     /// </summary>
     /// <param name="unattended">
     /// Nobody is at the computer, so any question the publish would ask must
@@ -75,17 +81,21 @@ public static class DeployCommand
             return args;
         }
 
-        if (destination.Type == "cloudflare_pages")
+        if (destination.Type != "cloudflare_pages")
         {
             args.Add("--target");
-            args.Add("cloudflare");
+            args.Add("netlify");
+            return args;
+        }
 
-            string identifier = cloudflareAccountID.Trim();
-            if (!string.IsNullOrEmpty(identifier))
-            {
-                args.Add("--account");
-                args.Add(identifier);
-            }
+        args.Add("--target");
+        args.Add("cloudflare");
+
+        string identifier = cloudflareAccountID.Trim();
+        if (!string.IsNullOrEmpty(identifier))
+        {
+            args.Add("--account");
+            args.Add(identifier);
         }
 
         return args;

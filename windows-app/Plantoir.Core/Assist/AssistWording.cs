@@ -857,6 +857,17 @@ public static partial class AssistWording
         "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
 
     /// <summary>
+    /// The turn asked the model <c>shared-rules.json</c> → <c>assistantLapLimit</c>
+    /// → <c>mostModelRequestsPerTurn</c> times and had not finished (#720, the
+    /// mac's #689). "Nothing was changed" is true because every write ends
+    /// the turn (<c>AssistToolRunner.WriteTools</c>, pinned by
+    /// <c>AssistLapCapTests</c>), so only reads came before a lap. Names no
+    /// number: a teacher cannot act on a limit they cannot see.
+    /// </summary>
+    public const string WentRoundWithoutFinishing =
+        "I've gone round several times without finishing, so nothing was changed. Tell me what you'd like me to do next.";
+
+    /// <summary>
     /// Said on the scheduled card, the schedule dialog and the tool's result
     /// when the section already has a deploy set (#261). <paramref name="moment"/>
     /// is written the way the card writes its own.
@@ -968,13 +979,29 @@ public static partial class AssistWording
         $"Obsidian is already opening {course}. It will be on screen in a moment.";
 
     /// <summary>
-    /// Windows' wording of the contract's <c>obsidianIsNotOnThisMac</c>, which
-    /// names the computer "this Mac" without <c>{machine}</c> - against
-    /// <c>specialNames.platformWording.machine.rule</c>. Held in
-    /// <c>NamedGapLedger</c> until the mac writes it with <c>{machine}</c> (#698).
+    /// The contract's <c>obsidianIsNotOnThisMachine</c> as the contract writes
+    /// it, <c>{machine}</c> and all (mac #698; <c>specialNames.platformWording.machine.usedIn</c>).
     /// </summary>
-    public static readonly string ObsidianIsNotOnThisPc =
-        "Obsidian is not on this PC, so there is nothing to open the page in. Install it from obsidian.md, then ask again.";
+    private const string ObsidianIsNotOnThisMachineContract =
+        "Obsidian is not on this {machine}, so there is nothing to open the page in. Install it from obsidian.md, then ask again.";
+
+    /// <summary>
+    /// Obsidian is not installed, so the window's button is greyed out and the
+    /// verb refuses rather than pressing it. The computer is named with
+    /// <see cref="Plantoir.Core.Models.MachineWord"/>'s "PC" (#720, the mac's #698).
+    /// A method, not a field: the contract carries the placeholder, and
+    /// <c>ContractTests</c> compares string fields verbatim.
+    /// </summary>
+    public static string ObsidianIsNotOnThisMachine() =>
+        Plantoir.Core.Models.MachineWord.Fill(ObsidianIsNotOnThisMachineContract);
+
+    /// <summary>
+    /// The press went ahead but failed before Obsidian was handed anything
+    /// (the add-ons scan, the add-ons pass or the open threw): nothing was
+    /// opened, and the teacher is sent to the section's own button (#720, the mac's #698).
+    /// </summary>
+    public static string OpenInObsidianDidNotOpen(string course, string section) =>
+        $"Something went wrong before Obsidian could open {course} Section {section}, so nothing was opened. Press Open in Obsidian in that section's window to try again.";
 
     /// <summary>What an assistant outside Plantoir is told: the server has no window and no preview to read (#690).</summary>
     public static string OpenInObsidianIsInTheSectionWindow(string course, string section) =>

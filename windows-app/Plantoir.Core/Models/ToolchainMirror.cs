@@ -174,7 +174,152 @@ public static class ToolchainMirror
     /// <c>--state-dir</c> run keeps its own.
     /// </summary>
     internal static string IndexPathFor(string workspacePath) =>
-        AppDataRoot.Combine("toolchain-index", FolderContainers.FolderIdentifier(workspacePath) + ManifestName);
+        Path.Combine(IndexFolder, FolderContainers.FolderIdentifier(workspacePath) + ManifestName);
+
+    /// <summary>The name of the folder the indexes are kept in, beside <c>builds</c>.</summary>
+    public const string IndexFolderName = "toolchain-index";
+
+    /// <summary>
+    /// The folder every index lives in, and the one the app prunes once a
+    /// launch (#735). Public so the suite can compare it with the REAL folder:
+    /// under <c>dotnet test</c> <see cref="AppDataRoot"/> is redirected to a
+    /// scratch folder, and the test that proves a prune there never reaches
+    /// the teacher's own indexes has to be able to fail.
+    /// </summary>
+    public static string IndexFolder => AppDataRoot.Combine(IndexFolderName);
+
+    /// <summary>How long an index may go unused before the prune removes it (#735, mac #683).</summary>
+    public static readonly TimeSpan UnusedIndexLimit = TimeSpan.FromDays(90);
+
+    /// <summary>How old a leftover temporary index must be before the prune removes it.</summary>
+    public static readonly TimeSpan LeftoverTemporaryLimit = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Marks an index USED (#735, the Windows half of mac #683): its write time
+    /// set to now. Called by every pass right after it READS the index,
+    /// whether or not the pass then rewrites it, because a pass with nothing
+    /// to change never rewrites it, and a folder opened every day would
+    /// otherwise look unused after ninety. NTFS last-access times are not a
+    /// substitute: Windows updates them lazily, or not at all where they are
+    /// turned off. Best effort; it never creates a file that is not there.
+    /// </summary>
+    internal static void MarkIndexUsed(string indexPath, DateTime nowUtc)
+    {
+        try
+        {
+            if (File.Exists(indexPath)) File.SetLastWriteTimeUtc(indexPath, nowUtc);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Removes, from <paramref name="indexFolder"/> and nothing below it,
+    /// every <c>*.hashes</c> unused for more than <see cref="UnusedIndexLimit"/>
+    /// and every leftover <c>*.hashes.&lt;pid&gt;.tmp</c> (the shape
+    /// <see cref="WriteFingerprints"/> uses, left only by an interrupted write)
+    /// older than <see cref="LeftoverTemporaryLimit"/>. Plain files only: a
+    /// folder, a link or any other name is left alone. The folder is an
+    /// argument with NO default, so a caller has to say which one it means;
+    /// the app passes <see cref="IndexFolder"/> once a launch. Best effort;
+    /// answers how many files it removed.
+    ///
+    /// <para><b>An index the app still knows is never removed by age</b>
+    /// (<paramref name="keep"/>: the ids of the folders the settings name, see
+    /// <see cref="IndexIdsToKeep"/>). Before 1.9.3 nothing marked an index
+    /// used, and a pass with nothing to change never rewrote it, so on the
+    /// first 1.9.3 launch an index's write time is the date of its folder's
+    /// last toolchain CHANGE, not of its last use. A folder opened every day
+    /// and last changed more than ninety days ago would otherwise lose its
+    /// index to a prune racing the window's first pass, and pay a full read
+    /// of every copy (about 100 s cold on the i5-8365U) the morning after the
+    /// update. Null means the known folders could not be read: nothing is
+    /// removed by age that launch. A known folder that is GONE is the builds
+    /// sweep's to remove. Leftover temporary files go by age whatever their
+    /// name.</para>
+    ///
+    /// <para>A wrongly removed index costs one pass that reads every copy
+    /// once; a dead one costs up to the manifest's size. The race with a pass
+    /// reading the same index (removed between its read and its mark) ends
+    /// the same way: the next pass reads in full and writes it again.</para>
+    /// </summary>
+    public static int PruneIndexes(string indexFolder, DateTime nowUtc, IReadOnlySet<string>? keep)
+    {
+        int removed = 0;
+        IEnumerable<string> files;
+        try { files = Directory.EnumerateFiles(indexFolder, "*", SearchOption.TopDirectoryOnly).ToList(); }
+        catch { return 0; }
+        foreach (string file in files)
+        {
+            try
+            {
+                string name = Path.GetFileName(file);
+                TimeSpan limit;
+                if (name.EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (keep is null || keep.Contains(name[..^ManifestName.Length])) continue;
+                    limit = UnusedIndexLimit;
+                }
+                else if (IsLeftoverTemporary(name)) limit = LeftoverTemporaryLimit;
+                else continue;
+                var info = new FileInfo(file);
+                if ((info.Attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) continue;
+                if (nowUtc - info.LastWriteTimeUtc <= limit) continue;
+                info.Delete();
+                removed++;
+            }
+            catch { }
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// The index ids (<see cref="FolderContainers.FolderIdentifier"/>) of every
+    /// working folder the settings at <paramref name="settingsPath"/> name:
+    /// the last working folder, the remembered windows and Open Recent, the
+    /// same folders <see cref="Assist.MachineWork.KnownFolders"/> reads plus
+    /// the recent list, and WITHOUT dropping one that is not there just now
+    /// (a USB stick that is out; a folder truly gone is the builds sweep's).
+    /// Read here rather than through <see cref="AppSettings.Load"/>, which
+    /// answers fresh defaults for a file it cannot read, so that "cannot be
+    /// read" is told apart from "names nothing": null when the file is
+    /// missing or cannot be read or parsed. Case-insensitive.
+    /// </summary>
+    public static IReadOnlySet<string>? IndexIdsToKeep(string settingsPath)
+    {
+        AppSettings? settings;
+        try
+        {
+            if (!File.Exists(settingsPath)) return null;
+            settings = Newtonsoft.Json.JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(settingsPath));
+        }
+        catch { return null; }
+        if (settings is null) return null;
+
+        var folders = new List<string?> { settings.WorkspacePath };
+        foreach (var window in settings.RememberedWindows ?? new()) folders.Add(window?.Path);
+        foreach (string folder in settings.RecentWorkingFolders ?? new()) folders.Add(folder);
+
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string? folder in folders)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) continue;
+            try { ids.Add(FolderContainers.FolderIdentifier(folder)); }
+            catch { }
+        }
+        return ids;
+    }
+
+    /// <summary><c>&lt;id&gt;.hashes.&lt;pid&gt;.tmp</c>: what <see cref="WriteFingerprints"/> writes first.</summary>
+    private static bool IsLeftoverTemporary(string name)
+    {
+        if (!name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)) return false;
+        string withoutTmp = name[..^".tmp".Length];
+        int dot = withoutTmp.LastIndexOf('.');
+        if (dot <= 0) return false;
+        string pid = withoutTmp[(dot + 1)..];
+        return pid.Length > 0 && pid.All(char.IsAsciiDigit)
+            && withoutTmp[..dot].EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Reads a manifest or index; null when there is none or it cannot be read.
     /// A line that does not parse is skipped: that file is simply read, as before #559.</summary>
@@ -297,8 +442,11 @@ public static class ToolchainMirror
         string toolchainRoot = Path.Combine(workspacePath, ".toolchain");
         string? indexPath = null;
         try { indexPath = IndexPathFor(workspacePath); } catch { }
-        var pass = new MirrorPass(ReadFingerprints(Path.Combine(bundledRoot, ManifestName)),
-                                  indexPath is null ? null : ReadFingerprints(indexPath));
+        var applied = indexPath is null ? null : ReadFingerprints(indexPath);
+        // #735: marked used at READ time, whether or not this pass rewrites it,
+        // so the launch prune never takes the index of a folder still opened.
+        if (applied is not null) MarkIndexUsed(indexPath!, DateTime.UtcNow);
+        var pass = new MirrorPass(ReadFingerprints(Path.Combine(bundledRoot, ManifestName)), applied);
         var result = default(CopyResult);
         foreach (string name in RecipeRootFiles)
             result += SyncFile(Path.Combine(bundledRoot, name), Path.Combine(toolchainRoot, name), null, pass, name);

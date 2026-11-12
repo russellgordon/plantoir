@@ -576,9 +576,14 @@ that question incomplete exactly when an address was taken (#684 review L1).
 
 **Windows** already binds its native preview to `127.0.0.1`
 (`windows-app/Vendor/fetch-runtime.ps1`, commit 2d32ca9e5, 2026-08-19, which
-rewrites both of Quartz's bind sites in `handlers.js`). Its guard passes when
-only ONE of the two was rewritten, so a drifted websocket line would stay open
-without anyone noticing; that is a `windows` issue (#684's).
+rewrites both of Quartz's bind sites in `handlers.js`). Since #730 the rewrite
+(`Set-QuartzLoopbackBinds`) requires BOTH sites, each exactly once, and the
+runtime fetch refuses, naming the site, when either is missing; until then a
+guard that passed on any `127.0.0.1` in the file would have let a respelled
+websocket line stay open on every interface unnoticed.
+`FetchRuntimeLoopbackGuardTests` pins it, and the listening addresses were
+measured on a real preview (`documentation/12-windows-app.md` → "wrangler
+4.156.0, a brand-new site's files asked again, and the loopback guard").
 
 ### Staying up to date
 
@@ -2500,8 +2505,9 @@ all XNU compares).
     `--reset-token` (or `--logout`) clears it. A SAVED token (Netlify's or
     Cloudflare's) is cleared on its own only when the service answers 400,
     401 or 403 in its own words (a web filter's block page is not a
-    refusal); with no answer the mac launcher keeps it and stops (#716,
-    `token_check_answer`; `deploy.ps1`'s half is #705) —
+    refusal); with no answer the launcher keeps it and stops (#716,
+    `token_check_answer`; `deploy.ps1`'s `Get-TokenCheckAnswer` since 1.9.3,
+    #705; the cases are `contracts/app-rules.json` → `savedTokenCheck`) —
     `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
@@ -2822,14 +2828,29 @@ the runtime) and `PLANTOIR_TRAIL_DIR` (always, `ActivityTrail.CurrentLogDirector
 `ScriptRunner.Run`, `plantoir-mcp`'s `LauncherRunner` (its run and its
 `--stop` sweep), `PreviewStopper`, and the scheduled publish's wrapper
 (`ScheduledRun.WrapperStartInfo`), whose `Start-Process` children inherit it.
-The wrapper is handed ONLY the trail: which runtime a task uses is a separate
-question (#702). `windows-app/test_launcher_rules.ps1` section 6 runs the five
+Since #702 (Windows 1.9.3) the wrapper gets BOTH variables, like every other
+start; until then it was handed only the trail, so it fell back to
+`%LOCALAPPDATA%\Programs\Plantoir\runtime` and a task registered from a
+Debug build ran that build's code with the INSTALLED copy's Python and
+wrangler (on the PC where it was found, 1.9.0's Python 3.11.9 against the
+Debug build's 3.14.10). For an installed copy the two folders are one, so a
+teacher sees no change. A task registered by an older app keeps its
+`<Command>`, the installed `Plantoir.exe`, which rewrites the wrapper at run
+time and starts it through `WrapperStartInfo`, so it is covered without
+being registered again; the pre-v1.2.0 tasks that run a `.ps1` straight from
+Task Scheduler never pass through the app and are deliberately left alone.
+`windows-app/test_launcher_rules.ps1` section 6 runs the five
 contract cases through each launcher's real function, with `LOCALAPPDATA` and
 the current folder (PowerShell's and the process's) inside a scratch folder,
 plus two Windows-only rows for `C:state` and `\state\Logs`;
 `LauncherEnvironmentTests` pins the override, the contract's variable name,
-the wrapper, and - by scanning the product for every process started with
-`-File` - that no launcher start site is missing it.
+the wrapper (through a seam that takes the environment, since the test host
+carries no runtime), and - by scanning the product, comments removed, for
+every process started with `-File` - that no launcher start site is missing
+a USE of it (a mention in a comment no longer counts: the wrapper passed the
+old scan on its doc comment). `ScheduledWrapperRunTests.TheBuildAndTheDeployRunOnTheRuntimeTheWrapperWasHanded`
+runs the generated wrapper against stub launchers and reads the runtime
+each `Start-Process` child saw.
 
 ## A note on line endings
 
@@ -3042,7 +3063,8 @@ deployed"; three things belong here, beside the launchers themselves:
   interpreter, and any failure records nothing and publishes anyway
   ([`07-deployment.md`](07-deployment.md) → "The published-pages record
   (#379)"; `scripts/test_published_pages_record.py` cuts the function out of
-  the launcher and runs it). `deploy.ps1`'s folder branch owes the same.
+  the launcher and runs it). `deploy.ps1`'s folder branch does the same in
+  `Record-PublishedPages`.
 - **It fails CLOSED.** A settings file that exists and cannot be read refuses.
   A settings file that is absent is left to the course-folder check further
   down, which already says that in its own words.

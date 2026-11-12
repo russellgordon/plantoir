@@ -668,6 +668,14 @@ that finished while the teacher was on section 2 showed "Done" on return.
   console opens where the outcome is. That applies to every console, the
   preview's included, which is harmless: a console that has just appeared has
   nothing the teacher has scrolled back to.
+- A deploy's question (the alert, and the credential sheet) on a run shared
+  across windows is shown in EVERY window showing the section:
+  `TaskProgressView.swift` binds both to `runner.isAwaitingInput`
+  (`awaitingInputBinding`, `awaitingCredentialBinding`, the `.sheet` at
+  ~:370). Answering one clears `isAwaitingInput`, which closes the other, so
+  nothing is sent twice. Know-only, read on Windows for #728 (2026-11-11):
+  Windows lets one view ask and hands the question on if that view leaves
+  (`documentation/12-windows-app.md` → "A section's deploy outlives its view").
 
 **What stays per window, and why.** A preview being built is still stopped
 when its section is left. Its port lease, its web view and #232's ⌘Q record
@@ -863,12 +871,20 @@ answer to the alert. Nothing for a tick or for opening the tab.
 the alert, Show, the tab, the table, the marker; the fence put right, a
 preview, the row and the marker gone.
 
-**What Windows owes** (the `windows` issue): a store keyed like #706's, the
+**What Windows owed** (#734, v1.9.3, landed): a store keyed like #706's, the
 Website | Problems switch with WebView2 kept mounted, a check-box list sortable
 by kind, the Segoe Fluent warning glyph on the section row (one, as above), the
 alert with Show and the repair, the answers file, `rowState`/`sectionMarker`/
 `alert` cases, and the trail event. The record, its rows and their words are
-free: Windows runs the same Python.
+free: Windows runs the same Python. How Windows built it, and the three places
+it differs on purpose (the warning's id names the COURSE as well as the
+section, the rows are made only when the tab first shows, and the covered web
+view is collapsed as well as covered), are doc 12's "A section's Problems tab,
+its marker and its alert (#734)". **One behaviour read off this side's code,
+not recorded anywhere before:** a preview or deploy started while the Problems
+tab shows does NOT switch back to Website — the tab is a top layer and nothing
+sets the tab back but Show, the switch, or the record losing its rows. Windows
+matches it; doc 12 says so.
 
 **Tests.** `SectionProblemsTests` (13, with #731's): the three case lists, the lists and
 words pinned key by key, rule 1 over every word, the marker read from its
@@ -923,9 +939,11 @@ carries and every key a `sectionProblems` kind. The message is filled in ONE
 pass over its template (`FixWithAssistant.fill`), so a row whose words carry
 `{section}` — TeX is braces everywhere — goes over as written.
 
-**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). On
-Windows the door runs `wt.exe -d <folder> cmd /k …` when Windows Terminal is
-there, and `wt` splits its command line at EVERY `;`, inside quotes too,
+**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). When
+this was written Windows' Claude door ran `wt.exe -d <folder> cmd /k …` when
+Windows Terminal was there (since Windows 1.9.3 neither of its doors puts
+Windows Terminal in front: documentation/12-windows-app.md → "What the outside
+doors hand to Windows, and how"), and `wt` splits its command line at EVERY `;`, inside quotes too,
 because it reads the arguments after the quotes are removed
 (microsoft/terminal #13264; the documented escape is `\;`). A message with a
 semicolon opens cut short, with its tail as a second tab. The first draft used
@@ -946,7 +964,8 @@ the course's name at 80 (`courseNameMaxCharacters`, review L2 — before it, a
 absolute. Characters are Swift's (grapheme clusters, `fixWith.charactersAre`);
 Windows counts UTF-16 units, which can be more, and keeps the whole command
 line under 8,191 of those, with the rest of 6,500's room as the margin. Why
-6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
+6,500: Windows hands the message to `cmd /k` (since its 1.9.3 only for an npm
+`.cmd` shim; an `.exe` is started directly), whose command line is 8,191
 characters, and the rest of that line (the terminal, the assistant's path, the
 configuration's) needs room. Measured with the contract's cases: ten 400-character
 rows on ordinary pages make 5,659 characters; long page names (286
@@ -987,7 +1006,17 @@ the same `buttonCases` and `greetingCases`, the trail event, and the message
 through `wt.exe`/`cmd /k`. The message has no `;` for `wt` to split at. A `%`
 the record's prompts already drop, but a page's name can carry one. `^` and
 `!` need checking in its quoting. Measure the whole command line in UTF-16
-units against 8,191.
+units against 8,191. **Done in Windows 1.9.3 (#736)**, and reading the door
+for `%`, `^` and `!` found that 1.9.0's Claude door handed the course's name to
+cmd outside quotes: both Windows doors now start an `.exe` with nothing in
+front and an npm shim through `cmd /v:off /s /k` with every `%` neutralised,
+and Windows Terminal is no longer in front of either (it was measured
+expanding `%NAME%`). The message is the mac's, character for character; what
+was measured and rejected is documentation/12-windows-app.md → "Fix with
+Claude… and Fix with Codex…" and "What the outside doors hand to Windows, and
+how". Windows also proposed `fixWith.notEnabledHelp`, the sentence a greyed
+button gives to assistive technology, which the mac owes as an accessibility
+hint.
 
 **Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
 with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
@@ -9497,12 +9526,21 @@ their indexes go by age.
   ever open again.
 
 **Windows** has the same index (`ToolchainMirror.IndexPathFor` →
-`AppDataRoot\toolchain-index\<id>.hashes`) and the same leak; its issue
-carries the mark, the 90 days, the `.tmp` sweep, removal with its own builds
-sweep (`DiscardBuildsForMissingWorkingFolders`), and the one trap there:
-its `ToolchainFingerprintTests` write to the real `AppDataRoot`, so a prune
-must not run in that test host. NTFS last-access times are unreliable too,
-so it must mark the file explicitly.
+`AppDataRoot\toolchain-index\<id>.hashes`) and had the same leak until
+Windows 1.9.3 (#735), which matches all of this: the mark at read time, the
+90 days, the `.tmp` sweep, and removal with its own builds sweep
+(`DiscardBuildsForMissingWorkingFolders`). It adds one rule: an index whose
+folder the settings still name is never removed by age, because before the
+mark existed an index's write time was its folder's last toolchain CHANGE,
+not its last use, and the launch prune could otherwise take the index of a
+folder opened every day before that day's first pass marks it. The mac has
+the same first-launch case after #683 and pays it in about a second (the
+0.95 s full read above), so it needs nothing; on the i5-8365U the same read
+of `.toolchain\support` is about 100 s cold, which is why Windows keeps
+known folders. The trap this paragraph used to
+name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
+already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
+→ "Pruning the index (#735)" has the Windows details.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 

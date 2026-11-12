@@ -19,6 +19,25 @@ namespace Plantoir.Views;
 public sealed partial class TaskProgressView : UserControl
 {
     private readonly System.Collections.Generic.List<ScriptRunner> _registered = new();
+
+    /// <summary>
+    /// Each registered runner's handler, so it can be let go (#728). A
+    /// section's deploy runner is SHARED by every view of the section now
+    /// (<c>SectionRuns</c>), and a handler left on it would keep a view taken
+    /// off screen alive and raising dialogs for good. Hooked on Loaded,
+    /// unhooked on Unloaded.
+    /// </summary>
+    private readonly System.Collections.Generic.Dictionary<ScriptRunner, System.ComponentModel.PropertyChangedEventHandler> _hooked = new();
+
+    // One asker per question (#728): QuestionAskers in Core holds who is
+    // asking, hands a question on when its asker leaves, and decides what a
+    // closing dialog does — so the rule is tested without a window.
+
+    private ScriptRunner? _askingFor;
+
+    /// <summary>The question dialog this view has up, so leaving can close it before handing the question on.</summary>
+    private ContentDialog? _openQuestion;
+    private bool _leaving;
     private ScriptRunner? _runner;
     private MultiDestinationDeployRunner? _multiRunner;
     private string _title = "";
@@ -34,7 +53,70 @@ public sealed partial class TaskProgressView : UserControl
         // timer keeps moving even when the script itself is momentarily quiet.
         _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _tick.Tick += (_, _) => { if (_runner is { } r && (r.IsRunning || r.IsBetweenPhases)) Render(); };
-        Unloaded += (_, _) => _tick.Stop();
+        Loaded += (_, _) =>
+        {
+            _leaving = false;
+            foreach (var runner in _registered) Hook(runner);
+            QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
+            QuestionAskers.LeftUnanswered += AskIfStillWaiting;
+            // A question asked while no view showed the section is asked now.
+            foreach (var runner in _registered)
+                if (runner.IsAwaitingInput) _ = AskQuestion(runner);
+        };
+        Unloaded += (_, _) => LetGo();
+    }
+
+    /// <summary>
+    /// Let go of every runner and hand on a question this view has up — on
+    /// Unloaded, and from a closing window (#728), so safe twice.
+    /// </summary>
+    internal void LetGo()
+    {
+        {
+            _tick.Stop();
+            _leaving = true;
+            QuestionAskers.LeftUnanswered -= AskIfStillWaiting;
+            foreach (var (runner, handler) in _hooked) runner.PropertyChanged -= handler;
+            _hooked.Clear();
+            // Leaving with a question up — a window closing, or the assistant
+            // changing the selection under a credential dialog: close this
+            // view's dialog (it sits on the window, not in the view, so it
+            // would otherwise stay up) and hand the question on rather than
+            // cancel it. The dialog's own ending then sends nothing (_leaving).
+            //
+            // With a dialog UP, the hand-on waits until that dialog has
+            // CLOSED (AskQuestion's finally → QuestionAskers.Done): the next
+            // view is usually in this same window, and WinUI refuses a second
+            // ContentDialog while the first is still closing — handed on at
+            // once, the next ShowAsync threw and nobody asked again (#728's
+            // third review). With none up yet, it is handed on at once.
+            if (_askingFor is { } asked)
+            {
+                if (_openQuestion is { } open)
+                {
+                    QuestionAskers.HandOnWhenDone(asked, this);
+                    try { open.Hide(); } catch { }
+                }
+                else
+                {
+                    _askingFor = null;
+                    QuestionAskers.HandOn(asked, this);
+                }
+            }
+        }
+    }
+
+    private void AskIfStillWaiting(ScriptRunner runner)
+    {
+        if (_registered.Contains(runner) && runner.IsAwaitingInput) _ = AskQuestion(runner);
+    }
+
+    private void Hook(ScriptRunner runner)
+    {
+        if (_hooked.ContainsKey(runner)) return;
+        System.ComponentModel.PropertyChangedEventHandler handler = (sender, e) => RunnerChanged((ScriptRunner)sender!, e);
+        _hooked[runner] = handler;
+        runner.PropertyChanged += handler;
     }
 
     private void EnsureTicking(bool on)
@@ -52,7 +134,11 @@ public sealed partial class TaskProgressView : UserControl
     {
         if (_registered.Contains(runner)) return;
         _registered.Add(runner);
-        runner.PropertyChanged += (sender, e) => RunnerChanged((ScriptRunner)sender!, e);
+        if (_leaving) return;   // hooked when this view is loaded again
+        Hook(runner);
+        // A runner met already waiting — a deploy that asked while nobody was
+        // looking at its section (#728) — is asked now, not never.
+        if (runner.IsAwaitingInput) _ = AskQuestion(runner);
     }
 
     public Action? OnCancel { get; set; }
@@ -128,6 +214,15 @@ public sealed partial class TaskProgressView : UserControl
     {
         if (e.PropertyName == nameof(ScriptRunner.IsAwaitingInput) && runner.IsAwaitingInput)
             _ = AskQuestion(runner);
+        // The question went away under its dialog — the deploy was cancelled
+        // from another window, or it ended: close the stale dialog. Its ending
+        // sends nothing, because the runner no longer waits (WhatToDo).
+        if (e.PropertyName is nameof(ScriptRunner.IsAwaitingInput) or nameof(ScriptRunner.IsRunning)
+            && (!runner.IsAwaitingInput || !runner.IsRunning)
+            && ReferenceEquals(_askingFor, runner) && _openQuestion is { } stale)
+        {
+            try { stale.Hide(); } catch { }
+        }
         if (e.PropertyName == nameof(ScriptRunner.LastExitCode) && !runner.IsRunning
             && ReferenceEquals(runner, _runner))
             AutoExpandOnUnexplainedFailure();
@@ -394,10 +489,21 @@ public sealed partial class TaskProgressView : UserControl
 
     private async System.Threading.Tasks.Task AskQuestion(ScriptRunner runner)
     {
-        if (_questionDialogShowing || XamlRoot is null) return;
+        if (_questionDialogShowing || XamlRoot is null || _leaving) return;
+        if (!QuestionAskers.TryClaim(runner, this)) return;   // another view is asking it
         _questionDialogShowing = true;
+        _askingFor = runner;
+        bool askAgain = false;
         try
         {
+            // Another dialog up in this window (a question handed on as it
+            // closes, a folder problem, a refusal): wait for it — WinUI shows
+            // one ContentDialog at a time and throws for a second.
+            for (int waited = 0; Plantoir.Services.DialogGate.IsOpen(XamlRoot) && waited < 150; waited++)
+            {
+                await System.Threading.Tasks.Task.Delay(200);
+                if (_leaving || !runner.IsAwaitingInput || XamlRoot is null) return;
+            }
             var req = Plantoir.Core.Scripting.CredentialRequests.MatchPrompt(runner.PendingQuestion);
             bool richDialogShown = false;
             if (req is not null)
@@ -451,9 +557,13 @@ public sealed partial class TaskProgressView : UserControl
                     };
                     inputControl.Loaded += (_, _) => inputControl.Focus(FocusState.Programmatic);
                     richDialogShown = true;
+                    _openQuestion = dialog;
                     var result = await dialog.ShowAsync();
-                    if (result == ContentDialogResult.Primary) runner.SendLine(getAnswer());
-                    else runner.CancelPendingQuestion();
+                    switch (QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput))
+                    {
+                        case QuestionAskers.Answer.Send: runner.SendLine(getAnswer()); break;
+                        case QuestionAskers.Answer.Cancel: runner.CancelPendingQuestion(); break;
+                    }
                 }
                 catch (Exception ex) when (!richDialogShown)
                 {
@@ -487,12 +597,40 @@ public sealed partial class TaskProgressView : UserControl
                     XamlRoot = XamlRoot,
                 };
                 answerBox.Loaded += (_, _) => { answerBox.Focus(FocusState.Programmatic); answerBox.SelectAll(); };
+                _openQuestion = dialog;
                 var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.Primary) runner.SendLine(answerBox.Text);
-                else runner.CancelPendingQuestion();   // the script's own clean-up runs
+                // Cancel lets the script's own clean-up run; a dialog closed
+                // because this view left sends nothing — the question was
+                // handed on.
+                switch (QuestionAskers.WhatToDo(result == ContentDialogResult.Primary, _leaving, runner.IsAwaitingInput))
+                {
+                    case QuestionAskers.Answer.Send: runner.SendLine(answerBox.Text); break;
+                    case QuestionAskers.Answer.Cancel: runner.CancelPendingQuestion(); break;
+                }
             }
         }
-        finally { _questionDialogShowing = false; }
+        catch (Exception ex)
+        {
+            // A dialog that could not be shown (another one opened in the same
+            // beat, say) must not leave the deploy waiting with nobody asking:
+            // ask again shortly, if this view is still here and it still waits.
+            App.LogDiagnostic($"The question dialog could not be shown: {ex.Message}");
+            askAgain = !_leaving && runner.IsAwaitingInput;
+        }
+        finally
+        {
+            _questionDialogShowing = false;
+            _openQuestion = null;
+            if (ReferenceEquals(_askingFor, runner)) _askingFor = null;
+            // Lets the claim go and, if this view left with the dialog up,
+            // hands the question on NOW — after the dialog has closed.
+            QuestionAskers.Done(runner, this);
+        }
+        if (askAgain)
+        {
+            await System.Threading.Tasks.Task.Delay(500);
+            if (!_leaving && runner.IsAwaitingInput) _ = AskQuestion(runner);
+        }
     }
 
     // ---- Details disclosure ----------------------------------------------

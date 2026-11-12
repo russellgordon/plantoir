@@ -156,17 +156,8 @@ internal sealed class TickTable
                 Enter();
                 return;
             }
-            if (args.Key != Windows.System.VirtualKey.Space) return;
             if (RowWithTheFocus() is not { } row) return;
-            // A held Space repeats; it ticks once, never flickering the box.
-            if (args.KeyStatus.WasKeyDown)
-            {
-                args.Handled = true;
-                return;
-            }
-            args.Handled = true;
-            row.Box.IsChecked = row.Box.IsChecked != true;
-            List.SelectedItem = row.Item;
+            TickWithSpace(args, List, row.Item, row.Box);
         };
 
         Panel = new StackPanel { Spacing = 4 };
@@ -193,8 +184,47 @@ internal sealed class TickTable
                              new[] { AssistWording.MenuPickDateColumn }, new[] { PageTableLayout.PickDate }, offers);
     }
 
-    private static void Status(Row row) =>
-        AutomationProperties.SetItemStatus(row.Item, row.Box.IsChecked == true ? TickedStatus : NotTickedStatus);
+    private static void Status(Row row) => Status(row.Item, row.Box);
+
+    // ---- The tick rules, shared with the Problems table (#734) -------------
+    //
+    // ONE copy of them, so the section's Problems table (SectionProblemsView)
+    // ticks exactly as Publish Pages…, Hide Pages… and the question about
+    // classes dated later do. That table is not built by this class — its
+    // first column is a box with no title, one cell carries a button, and its
+    // headers sort — so these are the rules alone, not the builder.
+
+    /// <summary>The row tells Narrator whether its box is ticked (<c>ItemStatus</c>).</summary>
+    internal static void Status(ListViewItem item, CheckBox box) =>
+        AutomationProperties.SetItemStatus(item, box.IsChecked == true ? TickedStatus : NotTickedStatus);
+
+    /// <summary>
+    /// Space on its way DOWN ticks <paramref name="box"/> once, and a held
+    /// Space's repeats are swallowed (<c>KeyStatus.WasKeyDown</c>), so holding
+    /// it never flickers the box. The row is selected, as a click on it would.
+    /// Anything but Space is left alone.
+    /// </summary>
+    internal static void TickWithSpace(Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args, ListView list, ListViewItem item, CheckBox box)
+    {
+        if (args.Key != Windows.System.VirtualKey.Space) return;
+        args.Handled = true;
+        if (args.KeyStatus.WasKeyDown) return;
+        box.IsChecked = box.IsChecked != true;
+        list.SelectedItem = item;
+    }
+
+    /// <summary>The item the keyboard focus is in, else the selected item — and only one the list is showing.</summary>
+    internal static ListViewItem? ItemWithTheFocus(ListView list)
+    {
+        var showing = list.Items.OfType<ListViewItem>().ToHashSet();
+        if (list.XamlRoot is { } root && Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) is DependencyObject focused)
+        {
+            for (var node = focused; node is not null; node = VisualTreeHelper.GetParent(node))
+                if (node is ListViewItem item && showing.Contains(item))
+                    return item;
+        }
+        return list.SelectedItem is ListViewItem selected && showing.Contains(selected) ? selected : null;
+    }
 
     private Grid Columns()
     {
@@ -207,19 +237,8 @@ internal sealed class TickTable
     }
 
     /// <summary>The row the keyboard focus is in, else the selected row — and only a row the table is showing.</summary>
-    private Row? RowWithTheFocus()
-    {
-        var showing = List.Items.OfType<ListViewItem>().ToHashSet();
-        if (List.XamlRoot is { } root && Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) is DependencyObject focused)
-        {
-            for (var node = focused; node is not null; node = VisualTreeHelper.GetParent(node))
-                if (node is ListViewItem item && showing.Contains(item))
-                    return _rows.FirstOrDefault(row => ReferenceEquals(row.Item, item));
-        }
-        return List.SelectedItem is ListViewItem selected && showing.Contains(selected)
-            ? _rows.FirstOrDefault(row => ReferenceEquals(row.Item, selected))
-            : null;
-    }
+    private Row? RowWithTheFocus() =>
+        ItemWithTheFocus(List) is { } item ? _rows.FirstOrDefault(row => ReferenceEquals(row.Item, item)) : null;
 
     /// <summary>Shows the rows <paramref name="shown"/> keeps, in their order, banded by their shown position. Ticks are kept.</summary>
     public void ShowOnly(Func<Row, bool> shown)

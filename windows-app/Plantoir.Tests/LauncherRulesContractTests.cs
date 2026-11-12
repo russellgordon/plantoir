@@ -71,6 +71,15 @@ public class LauncherRulesContractTests
     /// rebuild lines are pinned the same way; every other line in deploy.ps1
     /// that meant a deploy moved to "deploy" with them, and
     /// scripts/test_deploy_words.py now reads deploy.ps1 for the old phrases.
+    ///
+    /// <para>Since #749 (mac #746) deploy.sh prints each failure line TWICE —
+    /// once after its toolchain rebuild and once after its preview rebuild —
+    /// while deploy.ps1 has ONE rebuild block that says whichever reason
+    /// applied, so each line once. deploy.sh's copies are therefore taken
+    /// <c>Distinct().Single()</c> (it still fails if they ever differ), and
+    /// deploy.ps1's stay <c>Single()</c>. The start of each line is lifted by
+    /// the mac's <c>liftedSentence</c> rule (everything before the first ASCII
+    /// letter or digit goes), so deploy.sh's 🔁 goes as its ❌ always did.</para>
     /// </summary>
     [Theory]
     [InlineData("Rebuilding it before it is deployed")]
@@ -78,17 +87,25 @@ public class LauncherRulesContractTests
     [InlineData("before deploying it: it needed an answer")]
     [InlineData("Could not rebuild this site before deploying it.")]
     [InlineData("The rebuilt site has not appeared")]
+    [InlineData("has been updated since this site was built")]
+    [InlineData("building it again before it is deployed")]
     public void TheRebuildLinesAreDeploySHsWordForWord(string anchor)
     {
-        string Echoed(string file, string prefix) =>
+        IEnumerable<string> Echoed(string file, string prefix) =>
             File.ReadAllLines(Path.Combine(ContractLoader.RepositoryRoot, file))
                 .Select(line => line.Trim())
                 .Where(line => line.StartsWith(prefix, StringComparison.Ordinal) && line.Contains(anchor, StringComparison.Ordinal))
-                .Select(line => line[(line.IndexOf('"') + 1)..line.LastIndexOf('"')].Trim().TrimStart('❌', ' ').Replace("…", "..."))
-                .Single();
-        string shLine = Echoed("deploy.sh", "echo ");
-        string psLine = Echoed("deploy.ps1", "Write-Host ");
+                .Select(line => Lifted(line[(line.IndexOf('"') + 1)..line.LastIndexOf('"')]).Replace("…", "..."));
+        string shLine = Echoed("deploy.sh", "echo ").Distinct().Single();
+        string psLine = Echoed("deploy.ps1", "Write-Host ").Single();
         Assert.Equal(shLine, psLine);
+    }
+
+    private static string Lifted(string line)
+    {
+        int start = 0;
+        while (start < line.Length && !char.IsAsciiLetterOrDigit(line[start])) start++;
+        return line[start..].Trim();
     }
 
     // ---- #467: the block both launchers carry ---------------------------------

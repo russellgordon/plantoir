@@ -344,7 +344,7 @@ public sealed class AssistToolRunner
     {
         string section = _section.ToString();
         string course = ShownCourseCode?.Invoke() ?? _courseCode;
-        if (!ObsidianIsInstalled()) return AssistWording.ObsidianIsNotOnThisPc;
+        if (!ObsidianIsInstalled()) return AssistWording.ObsidianIsNotOnThisMachine();
         OpenInObsidianPress press;
         // A fault is a press that opened nothing - never "no window", which
         // would send the teacher looking for a window that is right there.
@@ -359,12 +359,11 @@ public sealed class AssistToolRunner
             OpenInObsidianPress.Opened => AssistWording.OpenedTheSectionPageNotFound(course, section),
             OpenInObsidianPress.WaitingForAnAnswer => AssistWording.ObsidianOpensAfterTheQuestion(course, section),
             OpenInObsidianPress.AlreadyOpening => AssistWording.ObsidianIsAlreadyOpening(course),
-            // The contract has no sentence for a press that failed: mac #698
-            // asks for a `wording` key and a scenario
-            // `given.obsidianPress: "didNotOpen"`. This one is the least wrong: every clause of it
-            // is true - the button is in Plantoir, pressing it is the way, and
-            // nothing was opened - where "no window" and "opened" are not.
-            OpenInObsidianPress.DidNotOpen => AssistWording.OpenInObsidianIsInTheSectionWindow(course, section),
+            // The press failed before Obsidian was handed anything: the
+            // contract's own sentence since mac #698 (#720). Until then this
+            // answered openInObsidianIsInTheSectionWindow, which is written
+            // for an assistant in another app.
+            OpenInObsidianPress.DidNotOpen => AssistWording.OpenInObsidianDidNotOpen(course, section),
             _ => AssistWording.OpenInObsidianFoundNoWindow(course, section),
         };
     }

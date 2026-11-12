@@ -18,10 +18,12 @@ namespace Plantoir.Core.Assist;
 /// the links checklist's answer, it is hidden from the course's fingerprint and
 /// never published.</para>
 ///
-/// <para>Written by the app only, never the build: when a class is unticked at
-/// Deploy or at Section ▸ Publish Pages…, when Keep All and Deploy is pressed,
-/// when a class is published by naming its date, and when a class dated later
-/// is published from the links checklist. Removed on rollover, with the
+/// <para>Written by the app only, never the build: when a class is left ticked
+/// at Deploy and Deploy Ticked is pressed (#726), when a class is published by
+/// naming its date, and when a class dated later is published from the links
+/// checklist. Never from Section ▸ Publish Pages…, which asks nothing: a class
+/// published there for a preview check must still be asked about at Deploy
+/// (<c>file-formats.json</c> → <c>laterClassesKept.writtenBy</c>). Removed on rollover, with the
 /// checklist's answer (<see cref="LinksChecklist.ReleasePublishedPages"/>).
 /// A record that cannot be read or written costs the question once more,
 /// nothing else.</para>

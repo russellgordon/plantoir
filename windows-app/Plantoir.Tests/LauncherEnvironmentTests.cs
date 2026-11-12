@@ -68,16 +68,50 @@ public class LauncherEnvironmentTests
         Assert.Equal(name, LauncherEnvironment.TrailVariable);
     }
 
+    /// <summary>
+    /// #702: the scheduled publish's wrapper is handed the runtime of the app
+    /// running the task, not only the trail, so a task registered from a Debug
+    /// build no longer falls back to the INSTALLED copy's runtime. Through the
+    /// seam, because the test host carries no runtime of its own
+    /// (<see cref="NativeRuntime.Directory"/> is null here), so a check through
+    /// the plain overload would pass with the runtime never handed at all.
+    /// </summary>
     [Fact]
-    public void TheScheduledPublishsWrapperIsHandedTheTrailButNotTheRuntime()
+    public void TheScheduledPublishsWrapperIsHandedTheRuntimeAndTheTrail()
     {
+        var info = ScheduledRun.WrapperStartInfo(@"C:\scheduled\x.ps1",
+            LauncherEnvironment.Variables(@"C:\the registering app\runtime", @"C:\state\Logs"));
+
+        Assert.Equal(@"C:\the registering app\runtime", info.EnvironmentVariables[LauncherEnvironment.RuntimeVariable]);
+        Assert.Equal(@"C:\state\Logs", info.EnvironmentVariables[LauncherEnvironment.TrailVariable]);
+        Assert.Contains("-File", info.ArgumentList);
+    }
+
+    /// <summary>
+    /// The plain overload, the one <c>RunWrapperForReal</c> calls, hands the
+    /// seam <see cref="LauncherEnvironment.Current"/>: read from the code with
+    /// comments taken out, because the test host has no runtime to tell a
+    /// handed one from a missing one. And the trail, which it CAN tell.
+    /// </summary>
+    [Fact]
+    public void TheWrapperThatRunsIsHandedTheLauncherEnvironmentOfThisApp()
+    {
+        string code = CodeOnly(File.ReadAllText(Path.Combine(RepoRoot, "windows-app", "Plantoir.Core", "Assist", "ScheduledRun.cs")));
+        Assert.Matches(new Regex(@"ProcessStartInfo\s+WrapperStartInfo\(string\s+script\)\s*=>\s*WrapperStartInfo\(script,\s*LauncherEnvironment\.Current\)\s*;"), code);
+        Assert.Matches(new Regex(@"var\s+info\s*=\s*WrapperStartInfo\(script\)\s*;"), code);
+
         var info = ScheduledRun.WrapperStartInfo(@"C:\scheduled\x.ps1");
         Assert.Equal(ActivityTrail.CurrentLogDirectory, info.EnvironmentVariables[LauncherEnvironment.TrailVariable]);
-        // Deliberately not: which runtime a task uses is #702's question.
-        string? handedRuntime = info.EnvironmentVariables.ContainsKey(LauncherEnvironment.RuntimeVariable)
-            ? info.EnvironmentVariables[LauncherEnvironment.RuntimeVariable] : null;
-        Assert.Equal(Environment.GetEnvironmentVariable(LauncherEnvironment.RuntimeVariable), handedRuntime);
-        Assert.Contains("-File", info.ArgumentList);
+    }
+
+    /// <summary>C# with its comments removed: every <c>//</c> to the end of
+    /// its line (doc comments included) and every <c>/* */</c> block. Crude
+    /// about a <c>//</c> inside a string, which only ever removes code, so a
+    /// guard cannot pass on a mention.</summary>
+    private static string CodeOnly(string source)
+    {
+        string withoutBlocks = Regex.Replace(source, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        return Regex.Replace(withoutBlocks, @"//[^\n]*", "");
     }
 
     /// <summary>
@@ -86,11 +120,17 @@ public class LauncherEnvironmentTests
     /// scheduled publish's wrapper) hands it <see cref="LauncherEnvironment"/>.
     /// DISCOVERED rather than listed, so a fifth start site cannot be added
     /// without it.
+    ///
+    /// <para>Read with comments taken out, and asking for a USE of it
+    /// (<c>Apply(</c>, <c>Current</c> or <c>Variables(</c>) rather than its
+    /// name: until #702 the scheduled wrapper's start passed this scan on the
+    /// word in its doc comment while handing only the trail.</para>
     /// </summary>
     [Fact]
     public void EveryPlaceThatStartsALauncherHandsItTheLauncherEnvironment()
     {
         var starts = new Regex(@"new ProcessStartInfo|ConPtyProcess\.Start\(");
+        var handsIt = new Regex(@"LauncherEnvironment\s*\.\s*(Apply\s*\(|Current\b|Variables\s*\()");
         int found = 0;
         var missing = new List<string>();
         foreach (string project in new[] { "Plantoir", "Plantoir.Core", "Plantoir.Mcp" })
@@ -100,14 +140,14 @@ public class LauncherEnvironmentTests
             {
                 if (file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar) ||
                     file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)) continue;
-                string[] lines = File.ReadAllLines(file);
+                string[] lines = CodeOnly(File.ReadAllText(file)).Split('\n');
                 for (int i = 0; i < lines.Length; i++)
                 {
                     if (!starts.IsMatch(lines[i])) continue;
                     string window = string.Join("\n", lines[Math.Max(0, i - 25)..Math.Min(lines.Length, i + 25)]);
                     if (!window.Contains("\"-File") && !window.Contains("-File \"") && !window.Contains("WrapperRunArguments")) continue;
                     found++;
-                    if (!window.Contains("LauncherEnvironment"))
+                    if (!handsIt.IsMatch(window))
                         missing.Add($"{Path.GetRelativePath(RepoRoot, file)}:{i + 1}");
                 }
             }

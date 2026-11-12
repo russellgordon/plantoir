@@ -102,6 +102,16 @@ public static class ActivityTrail
         /// worse than none.
         /// </summary>
         AssistantRepeatedTheRequestBack,
+        /// <summary>
+        /// One teacher action asked the model
+        /// <c>assistantLapLimit.mostModelRequestsPerTurn</c> times without
+        /// finishing (#720, the mac's #689): the turn was stopped, nothing more
+        /// ran, and it was taken back out of the conversation. Carries course,
+        /// section, the count and the tool it last chose in words — never the
+        /// sentence and never argument values. Not "answer was cut off": every
+        /// answer in the turn finished, and none was the last.
+        /// </summary>
+        AssistantWentRoundWithoutFinishing,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -636,6 +646,16 @@ public static class ActivityTrail
         /// </summary>
         CloudflareAccountIdChangedInSettings,
         /// <summary>
+        /// The Deploy button (or the in-app assistant pressing it) was refused
+        /// because the Cloudflare Account ID is missing or not a whole ID (#739,
+        /// the mac's #668): by KIND, never the ID
+        /// (<see cref="Plantoir.Core.Models.PublishingDestinations.AccountIdRefusalTrailLine"/>).
+        /// Since a new course starts on Cloudflare Pages, this is the refusal
+        /// every new teacher meets at their first deploy. A windowless MCP
+        /// deploy refuses with the same sentence and writes no line.
+        /// </summary>
+        DeployRefusedForTheCloudflareAccountId,
+        /// <summary>
         /// Help ▸ Plantoir Help (or F1) opened the support page in the browser
         /// (#491). A teacher who looked for help just before something went
         /// wrong is a teacher whose report should say so.
@@ -741,6 +761,24 @@ public static class ActivityTrail
         /// says whether it was the network, the disk or the download.
         /// </summary>
         SwiftCouldNotBeGotReady,
+        /// <summary>
+        /// A section's set of problems CHANGED (#734, the mac's #717): written
+        /// once per alert key, by <see cref="Plantoir.Core.Models.SectionProblems"/>
+        /// when the app first reads the record — counts and the kinds' names,
+        /// never a page — and, as a second line of the same event, the answer
+        /// the teacher gave the alert (Show, the repair, or Not Now).
+        /// </summary>
+        ProblemsChanged,
+        /// <summary>
+        /// Fix with Claude… or Fix with Codex… on a section's Problems tab
+        /// opened its door (#736, the mac's #717 part two): which assistant,
+        /// how many problems went and their KINDS, how many the message
+        /// names and how many were left out — never a page or a row's words
+        /// (<see cref="Plantoir.Core.Assist.FixWithAssistant.TrailLine"/>).
+        /// Written after the door's own "assistant opened" line; a door that
+        /// did not open writes nothing here.
+        /// </summary>
+        AskedAnAssistantToFixProblems,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -774,6 +812,7 @@ public static class ActivityTrail
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
         Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",
+        Event.AssistantWentRoundWithoutFinishing => "assistant went round without finishing",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",
@@ -862,6 +901,7 @@ public static class ActivityTrail
         Event.LaterClassesWentOut => "deployed with classes dated after the next class",
         Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
         Event.CloudflareAccountIdChangedInSettings => "Cloudflare account ID changed in Settings",
+        Event.DeployRefusedForTheCloudflareAccountId => "deploy refused for the Cloudflare Account ID",
         Event.PlantoirHelpOpened => "opened Plantoir Help",
         Event.PreviewPageOpenedInBrowser => "preview page opened in the web browser",
         Event.GuidanceFileAskedAbout => "asked before adding guidance to a file",
@@ -876,6 +916,8 @@ public static class ActivityTrail
         Event.PageOpenedInObsidian => "page opened in Obsidian",
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
+        Event.ProblemsChanged => "problems changed",
+        Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

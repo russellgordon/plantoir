@@ -299,6 +299,7 @@ public class ScheduledRunTests : IDisposable
         CloudflareAccountID = () => "",
         RunWrapper = script => { ran.Add(script); return 0; },
         OutcomeDirectory = Path.Combine(_root, "outcomes"),
+        Installing = () => null,
     };
 
     // ---- #475: classes dated after the next class, on a scheduled deploy ------
@@ -686,6 +687,52 @@ public class ScheduledRunTests : IDisposable
         Assert.Contains("waited 45 s for Plantoir to finish getting the working folder ready (process 4242), and went ahead", line);
     }
 
+    // ---- #700: an installer replacing this program, met by a run that fired during the copy
+
+    [Fact]
+    public void ARunThatMeetsAnInstallerStandsDownAtOnceAndSaysWhy()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        var world = World(clock, ran);
+        int copyLooks = 0;
+        world = new ScheduledRun.World
+        {
+            Now = world.Now, Sleep = world.Sleep, CloudflareAccountID = world.CloudflareAccountID,
+            RunWrapper = world.RunWrapper, OutcomeDirectory = world.OutcomeDirectory,
+            CopyingTheFolder = _ => { copyLooks++; return null; },
+            Installing = () => 777,
+        };
+
+        Assert.Equal(ScheduledRun.Ending.StoodDown, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+
+        // At once: no wait, nothing else looked at, no build, no lease.
+        Assert.Equal(new Clock().Now, clock.Now);
+        Assert.Equal(0, copyLooks);
+        Assert.Empty(ran);
+        Assert.Empty(Directory.Exists(Activity(folder)) ? Directory.GetFiles(Activity(folder), "*.lease") : []);
+        // Recorded and turned off the way every stood-down run is.
+        var record = ScheduledPublishOutcome.ReadFrom(Path.Combine(_root, "outcomes"), "ICS3U", 1, folder)!;
+        Assert.Equal(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow, record.Outcome);
+        Assert.Equal(ScheduledRun.WrapperCouldNotBeWritten, record.Destination);
+        Assert.DoesNotContain(name, _scheduler.Tasks.Keys);
+        Assert.Contains("ICS3U/1", TrailLineContaining("a new version of Plantoir was being installed"));
+        Assert.Contains("did not run: a new version of Plantoir was being installed (process 777), so it stood down at once and left the site as it was",
+                        File.ReadAllText(_trail));
+    }
+
+    [Fact]
+    public void NoInstallerMeansTheRunGoesAhead()
+    {
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var ran = new List<string>();
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), World(clock, ran)));
+        Assert.Single(ran);
+    }
     [Fact]
     public void AWaitForTheCourseAndForACopyNamesTheCopysProcessInOneLine()
     {

@@ -186,7 +186,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    made before 2026-10-22 is refused until the fetch is re-run), and **run
    `windows-app\Vendor\fetch-obsidian-addons.ps1`** — it returns at once when
    the seven add-on files already match the contract's pins, and the build
-   REFUSES a missing or stale copy (#581). Then `az login`, then
+   REFUSES a missing or stale copy (#581), and **run `windows-app\Vendor\fetch-llama.ps1`** — `publish.ps1` refuses a bundle without the assistant's engine, which the signed 1.9.0 shipped without (#700). Then `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`). **After installing it over the previous
@@ -195,7 +195,9 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `startup.log`'s `tools copy finished` says `0 read in full`; if not,
    compare one file's ticks in `{app}\Toolchain\.hashes` with its
    `LastWriteTimeUtc.Ticks` (`documentation/12-windows-app.md` → "What the
-   director must check at the cut"). **Then build and sign the Windows update feed
+   director must check at the cut"). **Run the installer harness and measure
+   one upgrade over the previous Windows release** (#700, checklist step 3a).
+   **Then build and sign the Windows update feed
    from that exact installer, and commit it** ("The update feed (Windows)",
    below) — the `cut-release` skill does not do this for you, and a Windows
    release whose feed was not rebuilt is one no installed copy is offered.
@@ -304,15 +306,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > second half is still yours: open the file and check each entry's issue is
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
-   > a deliberate decision. Never cut over one. **For this cut the ledger is
-   > deliberately NOT empty**: it holds two entries against mac #698 (v1.9.1,
-   > #690's `obsidianIsNotOnThisMac` and its scenario), and since v1.9.1 is
-   > later than 1.8.7 `EveryEntryIsOwedByAMilestoneLaterThanThisBuild` passes
-   > with them in it. Mac #698 landed on 2026-10-31 (the key renamed
-   > `obsidianIsNotOnThisMachine`, with `{machine}`), so a Windows v1.9.1 cut
-   > needs both entries DELETED, with the regenerated contract taken, before
-   > it — at 1.9.1 the rule above turns them red. The boundary and the reasoning
-   > are in `contracts/README.md` → "Named gaps".
+   > a deliberate decision. Never cut over one. **The ledger is empty again
+   > since #736 and #739 (2026-11-11)**, which wrote the two activity-trail
+   > events #734 had held open for v1.9.3 ("asked an assistant to fix problems"
+   > and "deploy refused for the Cloudflare Account ID") and deleted their
+   > entries; before them it was empty since #720. The boundary and
+   > the reasoning are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries
    > the whole toolchain recipe (Dockerfile, `scripts/`, `patches/`, `contracts/`,
@@ -329,7 +328,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > ran here before. They need no Docker, so they cover the shared Python and
    > say nothing about the image. It DISCOVERS them rather than listing them,
    > so no number is kept in step by hand; this said "all fifteen" when there
-   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.)
+   > were fifteen, on 2026-09-07, and there are eighteen as of 2026-09-09.
+   > Since #764 they run on the bundled runtime's own Python whenever a
+   > runtime is fetched, so on the build PC they test the interpreter that
+   > ships.)
 
    **Revisit the npm audit** (#667). Read verify.sh's line about the image's
    npm packages. A SKIP there means nothing was checked, so run verify.sh
@@ -408,12 +410,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > on each run.
    >
    > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
-   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline,
-   > about 20 s, no credentials: it proves the wait for Cloudflare's
-   > production address against a stub, so a real run's Cloudflare lines can
-   > be trusted. On the mac, since #740, it also proves that a `--first-publish`
-   > run retries a brand-new site's files for up to 60 s before failing one
-   > (about 25 s in all). The run's Result block counts the retries.
+   > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline, no
+   > credentials, about 25 s on the mac and about 30 s on Windows: it proves
+   > the wait for Cloudflare's production address against a stub, so a real
+   > run's Cloudflare lines can be trusted, and (since #740 on the mac, #743
+   > on Windows) that a first-publish run retries a brand-new site's files
+   > for up to 60 s before failing one. The run's Result block counts the
+   > retries. It reads 13 passed, 0 failed on both.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
    before its `vendor` folder — #503; when a BASE pin changed — Node, Python,
@@ -423,6 +426,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
        powershell -File Vendor\fetch-runtime.ps1
        powershell -File Vendor\fetch-obsidian-addons.ps1
+       powershell -File Vendor\fetch-llama.ps1
        powershell -File publish.ps1 -Sign
 
    One-time tooling on a new machine (the Azure account/identity setup itself
@@ -442,6 +446,50 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    with an RFC 3161 timestamp.
 
    Output: **`dist/PlantoirSetup.exe`** (and portable `dist/Plantoir-win-x64.zip`) + SHA-256.
+
+   **Run `windows-app\Vendor\fetch-llama.ps1` first** (once per clone; it
+   refuses a zip whose size or SHA-256 is not the pinned b10435 one).
+   `publish.ps1` REFUSES to build without the assistant's engine — it checks
+   `Vendor\llama` before the build and the published `llama\` before the
+   installer is compiled — because the signed 1.9.0 shipped with no `llama\`
+   at all (#700). `-WithoutAssistantEngine` is for a developer's bundle and is
+   refused together with `-Sign`.
+
+   `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before it publishes
+   (#700): without that, the first publish in a fresh clone or worktree
+   stopped after about 108 s with `NETSDK1004 … Plantoir.Mcp\obj\project.assets.json
+   not found`, because the app's project publishes the server through an
+   `<MSBuild>` task that does not restore.
+
+   **3a. Prove the installer's running-work check, and measure one real
+   upgrade (#700), every Windows cut.**
+
+   - **The harness**, from the repository root, `/VERYSILENT` throughout, no
+     sound, about five minutes:
+
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1
+         powershell -NoProfile -ExecutionPolicy Bypass -File windows-app\installer-tests\run-harness.ps1 -MustFail
+
+     Both must end `… passed, 0 failed` (exit 0) and print "PASS the real
+     Plantoir untouched". It compiles `installer-running-work.iss` — the file
+     `installer.iss` includes — into a harness installer with its OWN AppId
+     and folder, so it never installs, upgrades or uninstalls the real
+     Plantoir. No suite runs it (`windows-app/installer-tests/README.md` says
+     why); a change to `installer.iss` or the include is not done until it
+     has passed.
+   - **A measured upgrade over the PREVIOUS Windows release**, with the
+     candidate installer and the app's own at-quit arguments
+     (`AppUpdates.InstallerArguments(relaunch: false, ReturnTo)`), on a
+     quiet machine and again with a preview serving and with a build
+     running: exit 0, the emptied runtime folders exactly the candidate's
+     (no file of the old version), and the runtime checks the release's
+     issues name. `documentation/12-windows-app.md` → "The installer waits
+     for work that is still running (#700)" lists the cases and their pass
+     lines; the 1.9.3 one is the first, and how it was done (backup, a
+     throwaway working folder, restoring the signed release afterwards) is
+     in #700's closing comment. The update path is the PREVIOUS version's
+     app code running THIS version's installer, so it is the one thing no
+     test of the new app can stand in for.
 
 4. **Build the signed macOS bundle**, with **Xcode 26.6** — the release
    Xcode until a deliberate piece moves it (#613):

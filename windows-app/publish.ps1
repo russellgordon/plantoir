@@ -3,6 +3,7 @@ Builds the Windows release bundle: publish, optionally sign, package.
 
     powershell -File publish.ps1              # unsigned bundle (local testing)
     powershell -File publish.ps1 -Sign        # signed bundle (real releases)
+    powershell -File publish.ps1 -WithoutAssistantEngine   # a developer's bundle with no llama\ (never with -Sign)
 
 Output lands in windows-app\dist\PlantoirSetup.exe and Plantoir-win-x64.zip
 with SHA-256 printed for the release notes. The version comes from ONE place:
@@ -17,6 +18,9 @@ untimestamped signature stops validating when the certificate does.
 #>
 param(
     [switch]$Sign,
+    # A developer's build with no assistant engine (no Vendor\llama). Refused
+    # together with -Sign: a signed bundle without llama\ is what 1.9.0 shipped.
+    [switch]$WithoutAssistantEngine,
     [string]$SigningEndpoint = "https://eus.codesigning.azure.net",
     [string]$SigningAccount  = "plantoir-signing",
     [string]$SigningProfile  = "plantoir-public",
@@ -25,6 +29,37 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+
+# ---- The assistant's engine (llama\): refused when missing ----------------
+# The signed 1.9.0 shipped with NO llama\ folder: Plantoir.csproj includes
+# Vendor\llama only when it exists, and nothing else looked, so a build on a
+# clone where windows-app\Vendor\fetch-llama.ps1 had never run produced an
+# installer with no assistant engine, and an upgrade hid it (Inno never
+# deletes an older install's llama\ files). Measured 2026-11-12 (#700).
+# What llama-server.exe loads, read from its imports and llama.cpp's backend
+# loader: its -impl DLL, llama, llama-common, mtmd, ggml, ggml-base, LLVM's
+# OpenMP runtime (libomp140.x86_64.dll, which ggml-base and every CPU backend
+# import), and at least the Vulkan backend and the generic CPU one (the app
+# runs it with --n-gpu-layers 999 and falls back to the CPU). The import tables
+# were read from the PE headers of b10435's files (#700 third review).
+$AssistantEngineFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama.dll', 'llama-common.dll', 'mtmd.dll',
+                          'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'ggml-cpu-x64.dll', 'libomp140.x86_64.dll')
+function Get-MissingAssistantEngineFiles([string]$folder) {
+    $missing = @()
+    foreach ($name in $AssistantEngineFiles) {
+        if (-not (Test-Path -LiteralPath (Join-Path $folder $name))) { $missing += $name }
+    }
+    ,$missing
+}
+if ($Sign -and $WithoutAssistantEngine) {
+    throw "-WithoutAssistantEngine is for a developer's build only and is refused with -Sign: a signed release must carry the assistant's engine."
+}
+if (-not $WithoutAssistantEngine) {
+    $missingVendor = Get-MissingAssistantEngineFiles (Join-Path $PSScriptRoot 'Vendor\llama')
+    if ($missingVendor.Count -gt 0) {
+        throw "windows-app\Vendor\llama is missing $($missingVendor -join ', '). Run windows-app\Vendor\fetch-llama.ps1 first (or pass -WithoutAssistantEngine for a developer's build that is never released)."
+    }
+}
 
 # ---- Signing preflight: fail in seconds, not after a minutes-long build ----
 if ($Sign) {
@@ -48,6 +83,14 @@ if (-not $version) { throw "No <Version> found in Plantoir.csproj" }
 Write-Host "Publishing Plantoir $version" -ForegroundColor Green
 
 # ---- Publish ----------------------------------------------------------------
+# Restore the MCP server for win-x64 first. Plantoir.csproj publishes it from
+# an <MSBuild> task after its own build (PublishMcpBesideApp), and that task
+# does not restore, so on a fresh clone or worktree the first publish stopped
+# with NETSDK1004 "Assets file ...\Plantoir.Mcp\obj\project.assets.json not
+# found" (measured 2026-11-12, #700). A restore that is already done costs
+# a second or two.
+dotnet restore Plantoir.Mcp\Plantoir.Mcp.csproj -r win-x64
+if ($LASTEXITCODE -ne 0) { throw "dotnet restore (Plantoir.Mcp) failed" }
 dotnet publish Plantoir\Plantoir.csproj -c Release -r win-x64
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 $publishDir = "Plantoir\bin\Release\net9.0-windows10.0.19041.0\win-x64\publish"
@@ -73,6 +116,16 @@ $mcpExe = "Plantoir.Mcp\bin\Release\net9.0\win-x64\publish\plantoir-mcp.exe"
 if (-not (Test-Path $mcpExe)) { throw "plantoir-mcp.exe not found at $mcpExe" }
 Copy-Item $mcpExe $publishDir -Force
 Write-Host "Bundled plantoir-mcp.exe ($('{0:N1} MB' -f ((Get-Item $mcpExe).Length / 1MB)))" -ForegroundColor Green
+
+# The published folder itself, before anything is signed or packaged: the
+# build's Condition="Exists(...)" would leave llama\ out without a word.
+if (-not $WithoutAssistantEngine) {
+    $missingPublished = Get-MissingAssistantEngineFiles (Join-Path $publishDir 'llama')
+    if ($missingPublished.Count -gt 0) {
+        throw "The published folder's llama\ is missing $($missingPublished -join ', '), so the installer would have no assistant engine. Run windows-app\Vendor\fetch-llama.ps1 and publish again."
+    }
+    Write-Host "The assistant's engine is in the published folder (llama\, $($AssistantEngineFiles.Count) files checked)." -ForegroundColor Green
+}
 
 # ---- Sign (our own binaries; third-party DLLs carry their makers' signatures)
 if ($Sign) {

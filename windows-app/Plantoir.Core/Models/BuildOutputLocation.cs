@@ -59,6 +59,41 @@ public static class BuildOutputLocation
     }
 
     /// <summary>
+    /// Where the LAUNCHERS wrote this working folder's builds — and so where
+    /// anything a build leaves for the app to read (a section's
+    /// <c>.problems.json</c>, #734) is: <c>$env:LOCALAPPDATA\Plantoir\builds\{folder id}</c>,
+    /// computed exactly as <c>Enter-NativeRuntime</c> in <c>preview.ps1</c>,
+    /// <c>deploy.ps1</c> and <c>setup.ps1</c> computes it.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why a second function beside <see cref="BuildsRootFor"/>.</b>
+    /// The two agree for every teacher. They part under <c>--state-dir</c>
+    /// (#664): <see cref="BuildsRootFor"/> follows <see cref="AppDataRoot"/>,
+    /// which the flag redirects, while the launchers compute the root from
+    /// the REAL <c>LOCALAPPDATA</c> and are not told about the redirect (only
+    /// their trail lines follow it, #682). And <c>PLANTOIR_BUILD_ROOT</c>,
+    /// which <see cref="BuildsRootFor"/> honours, is OVERWRITTEN by every
+    /// launcher before the Python reads it — so it never moves where a build
+    /// is written, and this function ignores it.</para>
+    ///
+    /// <para><b>Read-only by intent.</b> It names where a build's records ARE;
+    /// nothing should write or delete through it. The readers that still use
+    /// <see cref="BuildsRootFor"/> — <see cref="BuildFreshness"/> (Deploy's
+    /// rebuild question), <c>PreviewedPageSource.ListPathFor</c> (#690's page
+    /// list for Open in Obsidian) and <c>AssistWorkspace.LegacyMarkerHomes</c>
+    /// — read the redirected root under <c>--state-dir</c> and find nothing
+    /// there. Left as they are, deliberately, and said in
+    /// documentation/12-windows-app.md → "Which builds root the Problems tab
+    /// reads": nothing proves any of them wrong for a teacher, and each one's
+    /// "found nothing" is a safe answer (a rebuild, an empty page list, a
+    /// marker not moved).</para>
+    /// </remarks>
+    public static string WhereTheLaunchersBuild(string workingFolderPath)
+    {
+        return Path.Combine(AppDataRoot.AsTheLaunchersSeeIt, "builds", FolderContainers.FolderIdentifier(workingFolderPath));
+    }
+
+    /// <summary>
     /// Where a course's built sites are kept:
     /// <c>…\builds\{id}\{COURSE}</c>.
     /// </summary>
@@ -238,13 +273,25 @@ public static class BuildOutputLocation
     /// not on this computer just now reads its attributes locally and is
     /// simply present. Anything but those two codes is "may still exist" and
     /// is kept. Erring toward litter is the safe direction.</para>
+    ///
+    /// <para><b>The folder's toolchain index goes with its builds</b> (#735,
+    /// the Windows half of mac #683): <c>&lt;indexFolder&gt;\&lt;entry's
+    /// name&gt;.hashes</c>, named by the builds folder's OWN name, which is the
+    /// same <see cref="FolderContainers.FolderIdentifier"/>. Never by hashing
+    /// the recorded path again: that resolves through a folder that no longer
+    /// exists. The index folder defaults to <c>toolchain-index</c> BESIDE the
+    /// builds parent, which in the app is <see cref="ToolchainMirror.IndexFolder"/>,
+    /// so a test that passes its own builds parent never reaches the real
+    /// one.</para>
     /// </summary>
     public static IReadOnlyList<string> DiscardBuildsForMissingWorkingFolders(
         string? buildsParent = null, string? homeDirectory = null,
-        Func<string, bool>? workingFolderMayStillExist = null)
+        Func<string, bool>? workingFolderMayStillExist = null, string? indexFolder = null)
     {
         var swept = new List<string>();
         string parent = buildsParent ?? BuildsParent;
+        string indexes = indexFolder ?? Path.Combine(
+            Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(parent)) ?? parent, ToolchainMirror.IndexFolderName);
         string home = (homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var mayExist = workingFolderMayStillExist ?? WorkingFolderMayStillExist;
@@ -266,6 +313,12 @@ public static class BuildOutputLocation
             // by the next launch. Litter, not an error.
             try { CourseRestorer.DeleteTree(entry); swept.Add(entry); }
             catch (Exception) { }
+            try
+            {
+                string index = Path.Combine(indexes, Path.GetFileName(entry) + ToolchainMirror.ManifestName);
+                if (File.Exists(index)) File.Delete(index);
+            }
+            catch (Exception) { /* by age, at the next launch's prune */ }
         }
         return swept;
     }

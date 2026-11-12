@@ -210,7 +210,7 @@
     "builtWithToolchain" : {
       "file" : ".built-with-toolchain",
       "issue" : "#746",
-      "note" : "Which toolchain built the site, so a change to the toolchain reaches a site whose pages have not changed. build_site.py reads the toolchain's name when a build STARTS and writes it here only when the site is that build's (beside renaming .build-started; a preview or a failed build leaves it alone). The name is PLANTOIR_TOOLCHAIN_ID when the launcher sets it - the mac's launchers make every workspace with its image's tag, teaching-quartz:src-<hash of the recipe> - and otherwise toolchain_paths' hash of the scripts, support, contracts and the Quartz scaffold's sources (Windows, native). A deploy builds first when the file is missing, empty, or names another toolchain: deploy.sh compares it with its own $IMAGE and runs preview.sh --build-only (which remakes an out-of-date workspace); deploy.py compares it with its own toolchain in ensure_base_url_and_rebuild, the one place both destinations decide to rebuild, so a deploy builds at most once. BuildFreshness in the apps does NOT read it: the deploy itself decides, so every caller - the window, the assistant, a scheduled deploy, the command line - is covered by one check. Measured 2026-11-01: a site redeployed under 1.9.1 served 1.9.0's stylesheet without it. Every site built before 1.9.2 has no file, and is built once on its next deploy.",
+      "note" : "Which toolchain built the site, so a change to the toolchain reaches a site whose pages have not changed. build_site.py reads the toolchain's name when a build STARTS and writes it here only when the site is that build's (beside renaming .build-started; a preview or a failed build leaves it alone). The name is PLANTOIR_TOOLCHAIN_ID when the launcher sets it - the mac's launchers make every workspace with its image's tag, teaching-quartz:src-<hash of the recipe> - and otherwise toolchain_paths' hash of the scripts, support, contracts, the Quartz scaffold's sources and the bundled runtime's manifest.json, leaving out support's example_content, example_course and skeletons, which only course setup reads (Windows, native; since #749 remembered in the build root against a stat fingerprint of the same files: a cold first read took 1.63 s on 337 files, a remembered one 0.01 s). A deploy builds first when the file is missing, empty, or names another toolchain: deploy.sh compares it with its own $IMAGE and runs preview.sh --build-only (which remakes an out-of-date workspace); deploy.ps1's folder publish asks toolchain_paths.site_was_built_by_this_toolchain and builds first on anything but a plain yes (#749); deploy.py compares it with its own toolchain in ensure_base_url_and_rebuild, the one place both destinations decide to rebuild, so a deploy builds at most once. BuildFreshness in the apps does NOT read it: the deploy itself decides, so every caller - the window, the assistant, a scheduled deploy, the command line - is covered by one check. Measured 2026-11-01: a site redeployed under 1.9.1 served 1.9.0's stylesheet without it. Every site built before 1.9.2 has no file, and is built once on its next deploy.",
       "where" : "Beside .build-started: .merged_output/section<N>/, the folder that holds public/. One line, the toolchain's name."
     },
     "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site.",
@@ -2852,6 +2852,8 @@
       "where" : "Under the table on the section's Problems tab, Claude's first.",
       "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
       "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
+      "notEnabledHelp" : "Tick a problem this section still has to hand it over.",
+      "notEnabledHelpWhy" : "Proposed from Windows with #736 (2026-11-11): while the buttons cannot be pressed, Windows gives each this as its help text, which Narrator reads with the button, because a greyed button alone tells somebody who cannot see it nothing about why. The mac owes the same sentence as the buttons' accessibility hint while they are disabled.",
       "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
       "atTheClick" : "The same refusal Revise With ▸ makes at the click (a Claude or Codex session already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
       "opensAt" : "The working folder, as both doors always do: that is where the skills and the guidance are. The message names each page by its place from there, courses/<COURSE>/<page>.md.",
@@ -2869,7 +2871,7 @@
         "closingDeploy" : "When you are done, deploy Section {section} to Cloudflare again so its Problems tab clears.",
         "closingBoth" : "When you are done, preview Section {section} and then deploy it to Cloudflare again so its Problems tab clears."
       },
-      "fixGreetingIsOneLine" : "Windows hands the message to cmd /k, which cannot carry a newline, so rows are numbered on one line (1) … · 2) …) rather than set one per line (plan review, MED 9), and with no semicolon anywhere (replaceInTheMessageWhy).",
+      "fixGreetingIsOneLine" : "A command line cannot carry a newline (Windows starts an npm shim through cmd /k, and the mac's script is one line per command), so rows are numbered on one line (1) … · 2) …) rather than set one per line (plan review, MED 9), and with no semicolon anywhere (replaceInTheMessageWhy).",
       "fixGreetingMustSay" : [
         "the course, by code, and its name when that differs, and whether a preview or a deploy found the problems, and of which section",
         "each handed row's prompt, verbatim, numbered",
@@ -2894,7 +2896,7 @@
           ","
         ]
       ],
-      "replaceInTheMessageWhy" : "A double quote would end the argument's quoting (greetingCarriesNoDoubleQuotes). A semicolon would split it: Windows Terminal reads its command line after the quotes are removed and treats EVERY ; as the start of a new tab's command, inside quotes too (microsoft/terminal #13264; the documented escape is \\;), so the message would open cut short and its tail as a second tab (717b review H1). No piece of fixGreeting has a semicolon, and any a row brings - a TeX error, a sentence - is written as a comma. Each replacement keeps the length.",
+      "replaceInTheMessageWhy" : "A double quote would end the argument's quoting (greetingCarriesNoDoubleQuotes). A semicolon would split it wherever Windows Terminal reads the command line: it treats EVERY ; as the start of a new tab's command, inside quotes too (microsoft/terminal #13264; the documented escape is \\;), so the message would open cut short and its tail as a second tab (717b review H1). Since Windows 1.9.3 (#736) neither Windows door puts Windows Terminal in front of the program, so the replacement is no longer load-bearing there; it is kept because the message is the same on both platforms. No piece of fixGreeting has a semicolon, and any a row brings - a TeX error, a sentence - is written as a comma. Each replacement keeps the length.",
       "skillForKind" : {
         "figuresCouldNotBeDrawn" : "plantoir-math-graphs",
         "geogebraSketchesNotReady" : "plantoir-math-graphs",
@@ -3305,7 +3307,7 @@
       "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
       "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)"
     ],
-    "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent — the Claude door. Its Codex door (#210) starts cmd.exe /s /k directly, because Windows Terminal's own parsing (a ; starts a new tab, and it re-joins arguments with its own quoting) would be a third escaping layer on top of TOML and cmd that no test can run without opening a window. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
+    "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file. Since 1.9.3 (#736) both its doors start the program DIRECTLY when it is an .exe - by argument vector, with no command interpreter and no Windows Terminal in front, in a console window of its own (Windows Terminal anyway where it is the default terminal) - and through cmd.exe /v:off /s /k when it is an npm .cmd shim, with cmd's metacharacters escaped per parse and every % followed by a quote. Until 1.9.3 the Claude door ran wt.exe -d <folder> cmd /k with a hand-joined line, which left the greeting, and the course's name in it, outside cmd's quotes; and Windows Terminal itself was measured expanding %NAME% and re-joining arguments with its own quoting, which is why it is no longer in front of either door (documentation/12-windows-app.md -> 'What the outside doors hand to Windows, and how'). The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
     "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",
     "menuItemWhy" : "Each agent's menuItem is the item's title INSIDE Revise With ▸ — in the menu bar's Course and Section menus and, since the HIG sweep (#457 item 4, 2026-10-08), in every course and section row's context menu as well, so one command has one name everywhere (HIG: stable command names). Until the sweep the row's context menu showed it at the top level as 'Revise with Claude…' / 'Revise with Codex…' while the menu bar said Revise With ▸ Claude…, and this key held the context menu's words. 'Revise with Claude' is still the command's name in a SENTENCE (shared-rules.json -> workspaceWait's agent names, the support page); only the menu item's title moved. Windows draws its own menu, so it chooses where the item sits, but the item's words are these.",
@@ -3349,7 +3351,7 @@
         "Serving Quartz on 127.0.0.1 INSIDE the workspace: Docker's forward connects to the workspace's own address, so the preview would stop answering at all (the reason Windows' loopback rewrite is native-only).",
         "Remaking in deploy.sh too: it serves nothing, so an open address costs it nothing, and a scheduled publish keeps its warm builder. Measured (#684 review L2): a folder that only deploys keeps an old workspace's open forwards - lsof shows `ssh ... *:<port> (LISTEN)` - but with nothing serving, a request from the network gets an empty reply (curl exit 52) and no page; the next setup or preview makes it again on 127.0.0.1."
       ],
-      "why" : "GitHub #684, found by #667's audit; Russell's decision 2026-10-31: localhost only. A preview is for the Mac that runs it; published on every interface, a running preview and its live-reload connection were open to anyone on the same network. Windows already binds its native preview to 127.0.0.1 (windows-app/Vendor/fetch-runtime.ps1, commit 2d32ca9e5, 2026-08-19, which rewrites both of Quartz's bind sites in handlers.js), so this key is what both platforms do."
+      "why" : "GitHub #684, found by #667's audit; Russell's decision 2026-10-31: localhost only. A preview is for the Mac that runs it; published on every interface, a running preview and its live-reload connection were open to anyone on the same network. Windows already binds its native preview to 127.0.0.1 (windows-app/Vendor/fetch-runtime.ps1, commit 2d32ca9e5, 2026-08-19, which rewrites both of Quartz's bind sites in handlers.js and, since #730, refuses to make a runtime unless both were rewritten), so this key is what both platforms do."
     },
     "containerPorts" : [
       8081,
@@ -6147,6 +6149,548 @@
         }
       ],
       "why" : "Each case holds whether Cloudflare Pages is the primary destination or an additional one; with Netlify or a folder alone the Account ID is not asked about at all. Before #668 the window refused Create with no Account ID; with Cloudflare the default that would stop every new teacher at their first course, before they had seen a page. The sentence stays on screen, orange, beside Open Settings…, with accountIDCanWait under it. Rejected: defaulting to Cloudflare only when Settings already has an ID — a first-time teacher has none, so that gives Netlify to exactly the teachers #668 is for, and it makes the default depend on the state of the machine the tests run on."
+    }
+  },
+  "savedDestinations" : {
+    "cases" : [
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          }
+        ],
+        "name" : "a course that names no destination deploys to Netlify, as before",
+        "settings" : {
+          "course_code" : "ICS3U"
+        },
+        "why" : "Every course made before #668 names none, and an absent key means Netlify everywhere it is read."
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          }
+        ],
+        "name" : "an empty destination is Netlify",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : ""
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          }
+        ],
+        "name" : "a destination of null is Netlify",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : null
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          }
+        ],
+        "name" : "a Cloudflare course deploys to Cloudflare",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : "cloudflare_pages"
+        },
+        "why" : "The point of #668 at the command line: every new course is Cloudflare's, and a typed deploy must not quietly send it to Netlify."
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--to-folder",
+              "C:/Sites/ics3u"
+            ],
+            "kind" : "local_folder"
+          }
+        ],
+        "name" : "a folder course deploys to its folder",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_folder_path" : "C:/Sites/ics3u",
+          "deploy_target" : "local_folder"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "local_folder",
+            "refusal" : "ICS3U deploys to a folder on this computer, but no folder is chosen in its settings."
+          }
+        ],
+        "name" : "a folder course with no folder refuses",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : "local_folder"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "local_folder",
+            "refusal" : "ICS3U deploys to a folder on this computer, but no folder is chosen in its settings."
+          }
+        ],
+        "name" : "a folder course with an empty folder refuses",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_folder_path" : "",
+          "deploy_target" : "local_folder"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "github_pages",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: github_pages."
+          }
+        ],
+        "name" : "a destination Plantoir does not know refuses",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : "github_pages"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "Netlify",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: Netlify."
+          }
+        ],
+        "name" : "the kind is read exactly as written",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : "Netlify"
+        },
+        "why" : "The app writes the three kinds in lower case; anything else is not one of them, in either launcher."
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "5",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: 5."
+          }
+        ],
+        "name" : "a destination that is not text is read as written",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_target" : 5
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          },
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          },
+          {
+            "flags" : [
+              "--to-folder",
+              "D:/Published/ics3u"
+            ],
+            "kind" : "local_folder"
+          }
+        ],
+        "name" : "every destination is a leg of its own, the main one first",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : "cloudflare_pages"
+            },
+            {
+              "path" : "D:/Published/ics3u",
+              "type" : "local_folder"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "netlify"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          },
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          }
+        ],
+        "name" : "an additional entry with no kind is passed over",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "path" : "D:/x"
+            },
+            {
+              "type" : ""
+            },
+            "netlify",
+            {
+              "type" : "netlify"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "cloudflare_pages"
+        },
+        "why" : "Only an object with a non-empty text type is a destination; deploy.sh's Python and plutil readers both pass the rest over."
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          },
+          {
+            "kind" : "local_folder",
+            "refusal" : "ICS3U deploys to a folder on this computer, but no folder is chosen in its settings."
+          },
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          }
+        ],
+        "name" : "an additional folder with no folder is a refused leg, and the others still run",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : "local_folder"
+            },
+            {
+              "type" : "cloudflare_pages"
+            }
+          ],
+          "course_code" : "ICS3U"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          }
+        ],
+        "name" : "additional destinations that are not a list are none",
+        "settings" : {
+          "additional_deploy_targets" : {
+            "type" : "netlify"
+          },
+          "course_code" : "ICS3U",
+          "deploy_target" : "cloudflare_pages"
+        }
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--to-folder",
+              "C:/Sites/a b"
+            ],
+            "kind" : "local_folder"
+          }
+        ],
+        "name" : "a tab in a folder becomes a space",
+        "settings" : {
+          "course_code" : "ICS3U",
+          "deploy_folder_path" : "C:/Sites/a\tb",
+          "deploy_target" : "local_folder"
+        },
+        "why" : "deploy.sh carries each leg as one tab-separated line, so a tab or a line break in a path becomes a space there; deploy.ps1 does the same rather than differ on a folder nobody should have."
+      },
+      {
+        "expectUnreadable" : true,
+        "name" : "settings that cannot be read refuse rather than fall back to Netlify",
+        "settingsText" : "{ this is not JSON",
+        "why" : "Falling back is exactly the silent wrong-host deploy this exists to stop."
+      },
+      {
+        "expectUnreadable" : true,
+        "name" : "settings that are not an object refuse",
+        "settingsText" : "[\"netlify\"]"
+      },
+      {
+        "expectUnreadable" : true,
+        "name" : "empty settings refuse",
+        "settingsText" : ""
+      }
+    ],
+    "course" : "ICS3U",
+    "note" : "GitHub #739 items 7 and 8 (Windows) and #668 (mac). A deploy given neither --target nor --to-folder reads the course's course_config.json and deploys where it says, as the app's Deploy button does: deploy_target absent, empty, null or \"netlify\" is --target netlify, \"cloudflare_pages\" is --target cloudflare, \"local_folder\" is --to-folder deploy_folder_path, and each additional_deploy_targets entry (an object with a non-empty text type) is a leg of its own after the main one. One destination: the launcher sets it and prints sentences.oneDestination. More than one: it runs ITSELF once per leg with every flag as typed plus that leg's flags, prints sentences.eachLeg before each, keeps going after a leg that fails or is refused (sentences.legRefused), and exits with the first failing leg's code. --reset-token looks only at the first. A settings file that is there and cannot be read refuses with sentences.couldNotRead and never falls back to Netlify; an absent one is left to the course-folder check. A typed --target or --to-folder wins and the file is not read. Because a flagless call now deploys every leg, the app names every leg it runs, Netlify included (deployArguments). Proposed from Windows on 2026-11-11: deploy.ps1's Get-SavedDestinations runs every case (windows-app/test_launcher_rules.ps1), and scripts/test_deploy_sh_destination.py is asked to (GitHub issue, label mac). {course}, {section}, {where} and {kind} are filled; {where} comes from sentences.where, and a kind not listed there reads as Netlify's word.",
+    "sentences" : {
+      "couldNotRead" : [
+        "Plantoir could not read where {course} deploys from its settings.",
+        "Nothing was deployed. Choose one with --target netlify or --target cloudflare."
+      ],
+      "eachLeg" : "Deploying {course} section {section} to {where}, as its settings say.",
+      "legRefused" : "{refusal} Nothing was deployed there.",
+      "noFolder" : "{course} deploys to a folder on this computer, but no folder is chosen in its settings.",
+      "oneDestination" : "Deploying to {where}, as {course}'s settings say.",
+      "onlyDestinationRefused" : "{refusal} Nothing was deployed.",
+      "unknownKind" : "{course}'s settings name a destination Plantoir does not know: {kind}.",
+      "where" : {
+        "cloudflare_pages" : "Cloudflare Pages",
+        "local_folder" : "a folder on this computer",
+        "netlify" : "Netlify"
+      }
+    }
+  },
+  "savedTokenCheck" : {
+    "cases" : [
+      {
+        "body" : "{\"success\":false,\"errors\":[{\"code\":1000,\"message\":\"Invalid API Token\"}],\"messages\":[],\"result\":null}",
+        "expect" : "refused",
+        "name" : "Cloudflare 401 with its own refusal is refused",
+        "service" : "cloudflare",
+        "status" : 401,
+        "why" : "Measured 2026-11-01: forty characters of nonsense get 401, code 1000. The one answer that may clear a saved token and its account."
+      },
+      {
+        "body" : "{\"success\":false,\"errors\":[{\"code\":6003,\"message\":\"Invalid request headers\",\"error_chain\":[{\"code\":6111,\"message\":\"Invalid format for Authorization header\"}]}],\"messages\":[],\"result\":null}",
+        "expect" : "refused",
+        "name" : "Cloudflare 400 for a malformed token is refused",
+        "service" : "cloudflare",
+        "status" : 400,
+        "why" : "Measured 2026-11-01: a three-character token gets 400, code 6003. A saved token that can never be accepted must not be kept for ever behind a sentence about the connection."
+      },
+      {
+        "body" : "{\"success\":false,\"errors\":[{\"code\":1000,\"message\":\"Invalid API Token\"}],\"messages\":[],\"result\":null}",
+        "expect" : "refused",
+        "name" : "Cloudflare 403 with its own refusal is refused",
+        "service" : "cloudflare",
+        "status" : 403
+      },
+      {
+        "body" : "{\"success\": false}",
+        "expect" : "refused",
+        "name" : "Cloudflare refusal written with a space after the colon is refused",
+        "service" : "cloudflare",
+        "status" : 401
+      },
+      {
+        "body" : "{\"success\":\tfalse}",
+        "expect" : "refused",
+        "name" : "Cloudflare refusal written with a tab after the colon is refused",
+        "service" : "cloudflare",
+        "status" : 401,
+        "why" : "The patterns' one allowance for spacing is a space or a tab, written as the characters themselves so grep -E and .NET read the bracket the same way."
+      },
+      {
+        "body" : "{\"result\":{\"id\":\"0123\",\"status\":\"active\"},\"success\":true,\"errors\":[],\"messages\":[{\"code\":10000,\"message\":\"This API Token is valid and active\",\"type\":null}]}",
+        "expect" : "accepted",
+        "name" : "Cloudflare yes is accepted",
+        "service" : "cloudflare",
+        "status" : 200
+      },
+      {
+        "body" : "",
+        "expect" : "unheard",
+        "name" : "nothing answered keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 0,
+        "why" : "Status 0 is no answer at all: offline, a timeout, a name that did not resolve, a closed port. curl writes it as 000."
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a Cloudflare 429 keeps the token",
+        "service" : "cloudflare",
+        "status" : 429
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a Cloudflare 500 keeps the token",
+        "service" : "cloudflare",
+        "status" : 500
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a Cloudflare 503 keeps the token",
+        "service" : "cloudflare",
+        "status" : 503
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a captive portal's redirect keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 302,
+        "why" : "Redirects are not followed, so the portal is heard as itself rather than as its own 200 page."
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a captive portal's 200 page keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 200,
+        "why" : "A 2xx counts as yes only when the body says so."
+      },
+      {
+        "body" : "<html><body>Blocked by the school's web filter</body></html>",
+        "expect" : "unheard",
+        "name" : "a web filter's 401 keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 401
+      },
+      {
+        "body" : "<html><body>Blocked by the school's web filter</body></html>",
+        "expect" : "unheard",
+        "name" : "a web filter's 403 keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 403,
+        "why" : "A school web filter, or a firewall challenging a VPN, answers 403 with a page of its own; a token must not be cleared on the word of something that never asked the service."
+      },
+      {
+        "body" : "{\"success\":false,\"errors\":[{\"code\":1000,\"message\":\"Invalid API Token\"}],\"messages\":[],\"result\":null}",
+        "expect" : "unheard",
+        "name" : "a refusal that is not one of the three statuses keeps the Cloudflare token",
+        "service" : "cloudflare",
+        "status" : 404
+      },
+      {
+        "body" : "{\"SUCCESS\":FALSE}",
+        "expect" : "unheard",
+        "name" : "the word in another case is not Cloudflare's refusal",
+        "service" : "cloudflare",
+        "status" : 401,
+        "why" : "Matched case-sensitively, as grep -E matches. PowerShell's -match is case-insensitive, which is why deploy.ps1 calls the regex itself."
+      },
+      {
+        "body" : "{\"code\":401,\"message\":\"Access Denied\"}",
+        "expect" : "refused",
+        "name" : "Netlify 401 with its own refusal is refused",
+        "service" : "netlify",
+        "status" : 401,
+        "why" : "Measured 2026-11-01 with a made-up token."
+      },
+      {
+        "body" : "{\"code\":403,\"message\":\"Access Denied\"}",
+        "expect" : "refused",
+        "name" : "Netlify 403 with its own refusal is refused",
+        "service" : "netlify",
+        "status" : 403
+      },
+      {
+        "body" : "{\"id\":\"5f0c0a0b0c0d0e0f\",\"full_name\":\"A Teacher\"}",
+        "expect" : "accepted",
+        "name" : "Netlify's account is accepted",
+        "service" : "netlify",
+        "status" : 200,
+        "why" : "Netlify's yes is the account, which carries \"id\"."
+      },
+      {
+        "body" : "",
+        "expect" : "unheard",
+        "name" : "nothing answered keeps the Netlify token",
+        "service" : "netlify",
+        "status" : 0
+      },
+      {
+        "body" : "",
+        "expect" : "unheard",
+        "name" : "a Netlify 502 keeps the token",
+        "service" : "netlify",
+        "status" : 502
+      },
+      {
+        "body" : "",
+        "expect" : "unheard",
+        "name" : "a Netlify 503 keeps the token",
+        "service" : "netlify",
+        "status" : 503
+      },
+      {
+        "body" : "<html><body>Blocked by the school's web filter</body></html>",
+        "expect" : "unheard",
+        "name" : "a web filter's 401 keeps the Netlify token",
+        "service" : "netlify",
+        "status" : 401
+      },
+      {
+        "body" : "<html><body>Blocked by the school's web filter</body></html>",
+        "expect" : "unheard",
+        "name" : "a web filter's 403 keeps the Netlify token",
+        "service" : "netlify",
+        "status" : 403
+      },
+      {
+        "body" : "<html><body>Sign in to the school Wi-Fi to continue</body></html>",
+        "expect" : "unheard",
+        "name" : "a captive portal's 200 page keeps the Netlify token",
+        "service" : "netlify",
+        "status" : 200
+      }
+    ],
+    "note" : "GitHub #705 (Windows) and #716 (mac). A SAVED publishing token is checked before a deploy, and the check's answer is one of three words: accepted, refused, unheard. Only refused may clear the token (and, for Cloudflare, the remembered account); unheard keeps it, prints the two lines failureExplanations cases 13 and 14 lift, and stops the deploy with exit 1. refused means HTTP 400, 401 or 403 AND a body matching the service's refusedWhenTheBodyMatches; accepted means a 2xx AND a body matching acceptedWhenTheBodyMatches; everything else is unheard, status 0 (nothing answered) included. The PASTE checks are deliberately not this rule: a refused paste is not saved. Proposed from Windows on 2026-11-11 so the two launchers stop holding the rule in two tables; deploy.ps1's Get-TokenCheckAnswer runs every case (windows-app/test_launcher_rules.ps1), and deploy.sh's token_check_answer is asked to (GitHub issue, label mac). documentation/07-deployment.md -> \"A token Cloudflare refuses (#695), and a saved one is cleared only on a refusal (#716)\".",
+    "patternDialect" : "Each pattern is read by grep -E on the mac and by .NET's Regex on Windows, so it uses only what the two read IDENTICALLY: literal characters, bracket expressions of literal characters and ASCII ranges, and *. No \\s, no \\d, no escape inside a bracket (POSIX takes a backslash there literally), and no POSIX class: .NET reads [[:space:]] as a set of the characters [ : s p a c e, matching wrongly with no error. The spacing allowance is a bracket holding a real space and a real TAB character (the JSON \\t). Matched case-sensitively.",
+    "refusalStatuses" : [
+      400,
+      401,
+      403
+    ],
+    "services" : {
+      "cloudflare" : {
+        "acceptedWhenTheBodyMatches" : "\"success\":[ \t]*true",
+        "refusedWhenTheBodyMatches" : "\"success\":[ \t]*false",
+        "url" : "https://api.cloudflare.com/client/v4/user/tokens/verify"
+      },
+      "netlify" : {
+        "acceptedWhenTheBodyMatches" : "\"id\"[ \t]*:",
+        "refusedWhenTheBodyMatches" : "\"code\":[ \t]*4[0-9][0-9]",
+        "url" : "https://api.netlify.com/api/v1/user"
+      }
     }
   }
 }

@@ -421,10 +421,12 @@ public sealed class CourseConfiguration
     /// they are offered — shared by the primary picker and the
     /// additional-targets list, so "one of each type" has a single place
     /// that defines what a "type" even is. Mirrors the mac's
-    /// `CourseConfiguration.knownDeployTargetTypes`.
+    /// `CourseConfiguration.knownDeployTargetTypes`. Cloudflare Pages first
+    /// since #739 (the mac's #668), the recommended choice
+    /// (<c>publishingDestinations.pickerOrder</c>, <see cref="PublishingDestinations"/>).
     /// </summary>
     public static readonly IReadOnlyList<string> KnownDeployTargetTypes =
-        new[] { "netlify", "cloudflare_pages", "local_folder" };
+        new[] { "cloudflare_pages", "netlify", "local_folder" };
 
     /// <summary>
     /// Removes <paramref name="type"/> from <paramref name="targets"/> if

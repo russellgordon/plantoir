@@ -336,41 +336,197 @@ BUILT_WITH_TOOLCHAIN_MARKER = ".built-with-toolchain"
 # packages, which are pinned by the recipe rather than read from it.
 _NOT_THE_TOOLCHAIN = {"__pycache__", "node_modules"}
 
+# Folders of support/ that no BUILD or DEPLOY reads, only course SETUP: the
+# ready-made courses (example_content, example_course) and the generated
+# skeletons. Read by setup_course.py when a course is made or pre-populated,
+# and by nothing build_site.py, deploy.py or site_said.py imports (#749's
+# review, by grep of every SUPPORT_DIR reader). Left out of the identity
+# because they are most of support/ by count - measured on a Lenovo 20QES70500,
+# 9,829 of support's 12,655 files are example_content alone, 91.9 s of a
+# 105.8 s cold read - and a change to them cannot change a built site. Top
+# level of support/ only; the same names anywhere else are hashed.
+_SUPPORT_NOT_BUILT_FROM = {"example_content", "example_course", "skeletons"}
 
-def _hash_of_the_toolchain_files() -> str:
-    """A hash of every file under the scripts, support, contracts and the
-    Quartz scaffold's own sources, by relative path and content. Measured in
-    the container on 2026-11-01: 12,911 files in 0.3 s."""
-    import hashlib
-    digest = hashlib.sha256()
-    roots = (
+
+# The bundled runtime's own record of what it carries (Windows: <runtime>\
+# manifest.json, written by fetch-runtime.ps1 and naming every pin - node,
+# python, quartz, wrangler, the emoji font, the vendored engines). Beside the
+# Quartz scaffold, as VENDOR_DIR is. Part of the identity because the four
+# roots below do not cover the runtime: Quartz's ROOT files (quartz.layout.ts,
+# where several patches land), node_modules and the vendored engines are not
+# hashed, so a runtime-only change (#764's Python, a Quartz patch re-applied,
+# an engine bumped) would otherwise leave every site "built by this version".
+# documentation/05-build-pipeline.md -> "Which toolchain built a site (#746)"
+# -> "Windows". The container has no such file, and the mac names its
+# toolchain through PLANTOIR_TOOLCHAIN_ID anyway, so nothing changes there.
+RUNTIME_MANIFEST_NAME = "manifest.json"
+
+# Where the toolchain's id is remembered between runs, inside the folder
+# PLANTOIR_BUILD_ROOT names (Windows only: %LOCALAPPDATA%\Plantoir\builds\<id>).
+TOOLCHAIN_ID_CACHE_NAME = ".toolchain-id.cache"
+
+# A file changed this close to "now" is not trusted to a stat fingerprint
+# (git's racy-entry rule): an edit in the same clock tick and to the same size
+# would leave size and mtime as they were, and the cached id would be wrong.
+_RACY_SECONDS = 2
+
+
+def _toolchain_roots():
+    return (
         ("scripts", SCRIPTS_DIR),
         ("support", SUPPORT_DIR),
         ("contracts", CONTRACTS_DIR),
         ("quartz", QUARTZ_DIR / "quartz"),
     )
-    for label, root in roots:
+
+
+def _the_toolchain_files():
+    """Every file the identity covers, as (label, relative path, full path,
+    size, mtime in ns), sorted by label and path. Stat only - nothing is read,
+    so a OneDrive file that is only in the cloud is not downloaded by asking.
+    os.scandir and DirEntry.stat, because on Windows the directory listing
+    already carries the size and the time: measured on a Lenovo 20QES70500
+    (i5-8365U, Windows 11 26200), 13,029 files, 0.34 s against os.walk and
+    os.stat's 0.94 s (both before support's setup-only folders were left
+    out, which leaves a few hundred)."""
+    found = []
+    for label, root in _toolchain_roots():
         if not root.is_dir():
             continue
-        for folder, subfolders, files in os.walk(root):
-            kept_subfolders = []
-            for name in sorted(subfolders):
-                if name in _NOT_THE_TOOLCHAIN or name.startswith("."):
+        pending = [(str(root), "")]
+        while pending:
+            folder, prefix = pending.pop()
+            try:
+                with os.scandir(folder) as listing:
+                    entries = list(listing)
+            except OSError:
+                continue
+            for entry in entries:
+                name = entry.name
+                if name.startswith("."):
                     continue
-                kept_subfolders.append(name)
-            subfolders[:] = kept_subfolders
-            for name in sorted(files):
-                if name.startswith(".") or name.endswith(".pyc"):
-                    continue
-                path = Path(folder) / name
-                relative = path.relative_to(root).as_posix()
                 try:
-                    content = path.read_bytes()
+                    if entry.is_dir(follow_symlinks=False):
+                        if name in _NOT_THE_TOOLCHAIN:
+                            continue
+                        if label == "support" and prefix == "" and name in _SUPPORT_NOT_BUILT_FROM:
+                            continue
+                        pending.append((entry.path, prefix + name + "/"))
+                        continue
+                    if entry.is_dir():
+                        # A link to a folder is not followed, as os.walk did not.
+                        continue
+                    if name.endswith(".pyc"):
+                        continue
+                    status = entry.stat(follow_symlinks=True)
                 except OSError:
                     continue
-                digest.update(f"{label}/{relative}\0".encode("utf-8"))
-                digest.update(hashlib.sha256(content).digest())
+                found.append((label, prefix + name, entry.path, status.st_size, status.st_mtime_ns))
+    manifest = QUARTZ_DIR.parent / RUNTIME_MANIFEST_NAME
+    try:
+        status = manifest.stat()
+        if manifest.is_file():
+            found.append(("runtime", RUNTIME_MANIFEST_NAME, str(manifest), status.st_size, status.st_mtime_ns))
+    except OSError:
+        pass
+    order = {"scripts": 0, "support": 1, "contracts": 2, "quartz": 3, "runtime": 4}
+    found.sort(key=lambda item: (order[item[0]], item[1]))
+    return found
+
+
+def _fingerprint_of(files) -> str:
+    """Names, sizes and times only - what says, without reading anything,
+    that nothing has changed since the id was last worked out. The roots'
+    absolute paths are in it too, because the scripts can come from either
+    .toolchain or the working folder itself (deploy.ps1's Enter-NativeRuntime)."""
+    import hashlib
+    digest = hashlib.sha256()
+    for label, root in _toolchain_roots():
+        digest.update(f"root {label} {root}\n".encode("utf-8", "surrogateescape"))
+    digest.update(f"root runtime {QUARTZ_DIR.parent / RUNTIME_MANIFEST_NAME}\n".encode("utf-8", "surrogateescape"))
+    for label, relative, _path, size, mtime in files:
+        digest.update(f"{label}/{relative}\0{size}\0{mtime}\n".encode("utf-8", "surrogateescape"))
+    return "v1-" + digest.hexdigest()
+
+
+def _hash_of_the_contents(files) -> str:
+    """The identity itself: every file by relative path and CONTENT."""
+    import hashlib
+    digest = hashlib.sha256()
+    for label, relative, path, _size, _mtime in files:
+        try:
+            with open(path, "rb") as handle:
+                content = handle.read()
+        except OSError:
+            continue
+        digest.update(f"{label}/{relative}\0".encode("utf-8", "surrogateescape"))
+        digest.update(hashlib.sha256(content).digest())
     return "files-" + digest.hexdigest()[:16]
+
+
+def _toolchain_id_cache():
+    """Where the id is remembered, or None. Only when PLANTOIR_BUILD_ROOT is
+    set - the native Windows run - so the container never reads or writes one."""
+    build_root = os.environ.get("PLANTOIR_BUILD_ROOT", "").strip()
+    if not build_root:
+        return None
+    return Path(build_root) / TOOLCHAIN_ID_CACHE_NAME
+
+
+def _read_cached_id(cache: Path, fingerprint: str):
+    try:
+        lines = cache.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    if len(lines) != 2 or lines[0] != fingerprint or not lines[1].startswith("files-"):
+        return None
+    return lines[1]
+
+
+def _remember_id(cache: Path, fingerprint: str, identity: str, files) -> None:
+    """Written whole through a file of this process's own and moved into
+    place. Any failure is ignored - another process reading the cache can
+    refuse the move on Windows - and the id is simply worked out next time."""
+    import time
+    racy_since = time.time_ns() - _RACY_SECONDS * 1_000_000_000
+    for _label, _relative, _path, _size, mtime in files:
+        if mtime >= racy_since:
+            return
+    temporary = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(fingerprint + "\n" + identity + "\n", encoding="utf-8")
+        os.replace(temporary, cache)
+    except OSError:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+
+
+def _hash_of_the_toolchain_files() -> str:
+    """A hash of every file under the scripts, support, contracts and the
+    Quartz scaffold's own sources, by relative path and content, and of the
+    bundled runtime's manifest when there is one; support's setup-only
+    folders are left out (_SUPPORT_NOT_BUILT_FROM). Measured in the container
+    on 2026-11-01: 12,911 files in 0.3 s. Measured natively on Windows on
+    2026-11-11 (Lenovo 20QES70500, i5-8365U, Windows 11 26200, Defender on):
+    with those folders, 13,029 files and 131 s on a cold first read; without
+    them, 337-499 files, 1.63 s on a first read and 0.13 s warm - and where
+    PLANTOIR_BUILD_ROOT is set the id is remembered against a stat-only
+    fingerprint of the same files and only worked out again when that
+    changes (a hit: 0.01 s)."""
+    files = _the_toolchain_files()
+    cache = _toolchain_id_cache()
+    if cache is None:
+        return _hash_of_the_contents(files)
+    fingerprint = _fingerprint_of(files)
+    remembered = _read_cached_id(cache, fingerprint)
+    if remembered is not None:
+        return remembered
+    identity = _hash_of_the_contents(files)
+    _remember_id(cache, fingerprint, identity, files)
+    return identity
 
 
 def current_toolchain_id() -> str:

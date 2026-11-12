@@ -124,7 +124,7 @@ public class AssistScenarioTests : IDisposable
 
         // A scenario this app owes is held open by name: it must still FAIL,
         // and the day it passes this says to delete its ledger entry. (None
-        // is held today: #475's three landed with #489's 2C.)
+        // is held today: #690's "on a Mac without Obsidian" went with #720.)
         // Each case is its own test here, so the ledger's "it now passes"
         // direction is checked case by case rather than through GapsIn.
         if (NamedGapLedger.Holding(NamedGapLedger.AssistScenarios, scenarioName) is { } owed)
@@ -212,7 +212,8 @@ public class AssistScenarioTests : IDisposable
             Class("Unit 2, Day 4", Iso(PinnedToday.AddDays(1)), published: true);
             Class("Unit 2, Day 5", Iso(PinnedToday.AddDays(3)), published: true);
         }
-        // `given.laterClassesKeptAll`: Keep All and Deploy, answered before.
+        // `given.laterClassesKeptAll`: the question answered in the window
+        // before, with every class left ticked (Deploy Ticked keeps them all).
         if (given?["laterClassesKeptAll"]?.GetValue<bool>() == true)
         {
             var course = Workspace.DiscoverCourses(_folder).Single(found => found.Code == Course);
@@ -221,7 +222,7 @@ public class AssistScenarioTests : IDisposable
         }
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory())
             { Surface = surface, Today = () => PinnedToday });
-        var model = new ScriptedModel(given?["modelReply"] as JsonObject);
+        var model = new ScriptedModel(given?["modelReply"] as JsonObject, given?["modelReplyAnswers"]?.ToString());
         // The contract's LOCAL schemas, as the window's own narrowed surface
         // declares them (#440 scenario "an empty add_next_class from the model
         // runs"): with no schemas the agent's course gate binds nothing to an
@@ -271,6 +272,8 @@ public class AssistScenarioTests : IDisposable
                     "notInTheList" => new OpenInObsidianPress.Opened(new PreviewedPageSource.FellBack(PreviewedPageSource.Fallback.NotInTheList)),
                     "waitingForAnAnswer" => new OpenInObsidianPress.WaitingForAnAnswer(),
                     "alreadyOpening" => new OpenInObsidianPress.AlreadyOpening(),
+                    // #720 (the mac's #698): the press went ahead and handed Obsidian nothing.
+                    "didNotOpen" => new OpenInObsidianPress.DidNotOpen(),
                     var other => throw new InvalidOperationException($"{scenarioName}: obsidianPress {other}"),
                 };
                 return Task.FromResult(press);
@@ -711,13 +714,17 @@ public class AssistScenarioTests : IDisposable
         JsonNode.Parse(File.ReadAllText(ContractLoader.GetContractPath("assist-wording.json")))!
             ["wording"]!.AsObject());
 
-    /// <summary>"wording.deployed" to the real sentence, placeholders filled in.</summary>
+    /// <summary>
+    /// "wording.deployed" to the real sentence, placeholders filled in —
+    /// <c>{machine}</c> as this app says it (#720; the mac's
+    /// <c>sentence(named:)</c> fills it with <c>MachineWord.filling</c>).
+    /// </summary>
     private static string Sentence(string named)
     {
         string key = named.StartsWith("wording.", StringComparison.Ordinal) ? named["wording.".Length..] : named;
         var found = AllWording.Value[key]
             ?? throw new InvalidOperationException($"No sentence called {key} in assist-wording.json");
-        return found.GetValue<string>()
+        return MachineWord.Fill(found.GetValue<string>())
             .Replace("{course}", Course, StringComparison.Ordinal)
             .Replace("{section}", SectionNumber.ToString(), StringComparison.Ordinal)
             .Replace("{page}", PageInTheSentence.Value ?? "Unit 1, Day 1", StringComparison.Ordinal);
@@ -822,12 +829,32 @@ public class AssistScenarioTests : IDisposable
     /// course) or <c>content</c>. Every later request is answered with plain
     /// text, as the mac's runner does since #610 (#690): a hand-back that
     /// stopped ending the turn would otherwise ask again for ever.
+    ///
+    /// <para>When <c>given.modelReplyAnswers</c> is <c>"everyRequest"</c>
+    /// (#689, #720) the reply answers EVERY request up to a FUSE well past
+    /// <c>assistantLapLimit.mostModelRequestsPerTurn</c> — three times it, plus
+    /// two, as the mac serves — and plain text after, so an agent without the
+    /// cap fails on the count rather than hanging.</para>
     /// </summary>
     private sealed class ScriptedModel : IChatModel
     {
         private readonly JsonObject? _reply;
+        private readonly int _answered;
 
-        public ScriptedModel(JsonObject? modelReply = null) => _reply = modelReply;
+        public ScriptedModel(JsonObject? modelReply = null, string? answers = null)
+        {
+            _reply = modelReply;
+            _answered = answers switch
+            {
+                null => 1,
+                "everyRequest" => Fuse,
+                var other => throw new InvalidOperationException($"modelReplyAnswers {other}"),
+            };
+        }
+
+        /// <summary>How many requests an <c>everyRequest</c> reply answers before plain text.</summary>
+        private static int Fuse =>
+            ContractLoader.LoadJson("shared-rules.json")["assistantLapLimit"]!["mostModelRequestsPerTurn"]!.GetValue<int>() * 3 + 2;
 
         /// <summary>
         /// How many requests reached the engine over the whole conversation —
@@ -840,11 +867,11 @@ public class AssistScenarioTests : IDisposable
         {
             Requests++;
             if (_reply is null) return Task.FromResult<ModelReply?>(null);
-            // The scripted reply answers the FIRST request only; every later
-            // one is plain text, as the mac's runner does since #610: a
-            // hand-back regression would otherwise loop for ever, since the
-            // agent has no lap cap.
-            if (Requests > 1)
+            // The scripted reply answers the FIRST request only (or, for
+            // everyRequest, up to the fuse); every later one is plain text, as
+            // the mac's runner does since #610: a suite must not depend on the
+            // cap it checks, so a hand-back regression fails on the count.
+            if (Requests > _answered)
                 return Task.FromResult<ModelReply?>(new ModelReply(
                     new JsonObject { ["role"] = "assistant", ["content"] = "Here it is." }, "stop"));
 

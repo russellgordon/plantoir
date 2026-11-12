@@ -47,8 +47,12 @@ public class ReferenceInterfaceTests
             CourseConfiguration.FromDictionary(JObject.Parse("""{"course_code":"ICS3U","kept_for_reference":true}""")));
         var findings = new[] { new SiteHealthFinding("mediaFolderMissing", "The Media folder is not there.", "", true, "ICS3U-2025", 1) };
         Assert.Null(SiteHealthRepair.OutcomeOfRepairing(findings, course));
-        Assert.Contains("repairIsOffered: !ReferenceCourse.IsKeptForReference(_course)",
+        // #734: no repair on the alert about new problems, nor in the
+        // Problems tab's rows, on a course kept for reference.
+        Assert.Contains("var repairable = ReferenceCourse.IsKeptForReference(_course)",
             Source("Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        Assert.Contains("bool repairsOffered = !ReferenceCourse.IsKeptForReference(_course);",
+            Source("Plantoir", "Views", "SectionProblemsView.cs"));
     }
 
     [Fact]

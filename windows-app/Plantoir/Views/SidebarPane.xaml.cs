@@ -140,23 +140,83 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
             if (_publishStopped == value) return;
             _publishStopped = value;
             Raise(nameof(PublishStopped));
-            Raise(nameof(WarningVisibility));
-            Raise(nameof(WarningTooltip));
+            RaiseTheWarning();
         }
     }
 
+    private bool _hasProblems;
+    /// <summary>
+    /// Whether this section's OWN Problems record has a row (#734,
+    /// <c>sectionProblems.sectionMarker</c>): read from memory
+    /// (<see cref="Plantoir.Core.Models.SectionProblems.HasMarker"/>) on every
+    /// reconcile and whenever the store says a record changed — never from
+    /// disk while the tree draws.
+    /// </summary>
+    public bool HasProblems
+    {
+        get => _hasProblems;
+        set
+        {
+            if (_hasProblems == value) return;
+            _hasProblems = value;
+            Raise(nameof(HasProblems));
+            RaiseTheWarning();
+        }
+    }
+
+    /// <summary>The course a section row belongs to, for the warning's id; empty on any other row.</summary>
+    public string CourseCode { get; init; } = "";
+
+    /// <summary>The section a section row is; 0 on any other row.</summary>
+    public int SectionNumber { get; init; }
+
+    private void RaiseTheWarning()
+    {
+        Raise(nameof(WarningVisibility));
+        Raise(nameof(WarningTooltip));
+        Raise(nameof(WarningId));
+    }
+
     public string WarningGlyph => Glyphs.Warning;
+
+    /// <summary>
+    /// ONE warning glyph for both reasons (#734, <c>sectionMarker.rule</c>;
+    /// #717 plan review, MED 7): a stopped scheduled deploy, and problems the
+    /// section's last build found. Two near-identical glyphs with two meanings
+    /// was rejected on the mac and is not copied here.
+    /// </summary>
     public Visibility WarningVisibility =>
-        PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
-    // The mac's sentence (SidebarView.stoppedPublishTooltip), word for word
-    // since #441 (v1.4.4). It names no date deliberately: the badge can stand
-    // for days if nobody dismisses it, and a hover that said "on Tuesday"
-    // would have to be right about WHICH Tuesday; the section's own notice
-    // carries the date in full.
-    public string WarningTooltip => PublishStopped is not null
-        ? "A deploy that was set to happen on its own did not get through. " +
-          "Open this section to see what happened."
-        : "";
+        PublishStopped is not null || HasProblems ? Visibility.Visible : Visibility.Collapsed;
+
+    // The stopped deploy's sentence is the mac's (SidebarView.stoppedPublishTooltip),
+    // word for word since #441 (v1.4.4). It names no date deliberately: the
+    // badge can stand for days if nobody dismisses it, and a hover that said
+    // "on Tuesday" would have to be right about WHICH Tuesday; the section's
+    // own notice carries the date in full. Then markerHelp, when the section's
+    // last build found problems — each sentence that applies, in that order.
+    public const string StoppedPublishWarning =
+        "A deploy that was set to happen on its own did not get through. " +
+        "Open this section to see what happened.";
+
+    /// <summary>
+    /// What the warning says — its tooltip, its Name and the ROW's help text,
+    /// so Narrator says it on the row (a tooltip on a child icon is not read).
+    /// </summary>
+    public string WarningTooltip => string.Join(" ", new[]
+    {
+        PublishStopped is not null ? StoppedPublishWarning : "",
+        HasProblems ? Plantoir.Core.Models.SectionProblemsWording.MarkerHelp : "",
+    }.Where(sentence => sentence.Length > 0));
+
+    /// <summary>
+    /// The warning's automation id, unique across the window: the course is
+    /// in it as well as the section (review change 3), and it names the
+    /// stopped deploy when that applies, so a test that finds that one still
+    /// does (the mac's <c>stoppedPublishBadge-</c> / <c>problemsBadge-</c>).
+    /// </summary>
+    public string WarningId => PublishStopped is not null
+        ? $"stoppedPublishBadge-{CourseCode}-section{SectionNumber}"
+        : $"problemsBadge-{CourseCode}-section{SectionNumber}";
 }
 
 public sealed partial class SidebarPane : UserControl
@@ -306,6 +366,25 @@ public sealed partial class SidebarPane : UserControl
             if (args.PropertyName is nameof(WorkspaceViewModel.Selection))
                 RefreshMinusButton(_window.CurrentSituation());
         };
+    }
+
+    /// <summary>
+    /// The store read a record again (#734): every section row's warning is
+    /// set from memory, without rebuilding the tree or reading anything.
+    /// </summary>
+    public void RefreshProblemMarkers()
+    {
+        string? folder = Workspace.WorkspacePath;
+        void Walk(IEnumerable<SidebarRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                if (row.SectionNumber > 0 && row.CourseCode.Length > 0)
+                    row.HasProblems = SectionProblems.HasMarker(folder, row.CourseCode, row.SectionNumber);
+                Walk(row.Children);
+            }
+        }
+        Walk(_roots);
     }
 
     // ---- Building the tree ----------------------------------------------
@@ -795,6 +874,8 @@ public sealed partial class SidebarPane : UserControl
                     Glyph = DocumentGlyph,
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
+                    CourseCode = course.Code,
+                    SectionNumber = number,
                 };
             row.Menu = ReferenceCourse.IsKeptForReference(course) ? ReferenceSectionMenu(course, number) : SectionMenu(course, number);
             // Re-read on EVERY pass, not only when the row is first created —
@@ -820,6 +901,10 @@ public sealed partial class SidebarPane : UserControl
                 outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
                     ? result.When
                     : null;
+            // #734: the section's OWN Problems record has a row — from the
+            // store's memory, never the disk; the store reads the files at the
+            // moments one can have changed and says so (OnProblemsChanged).
+            row.HasProblems = SectionProblems.HasMarker(Workspace.WorkspacePath, course.Code, number);
             desired.Add(row);
         }
         ApplyDesiredOrder(courseRow.Children, desired);
@@ -1019,9 +1104,7 @@ public sealed partial class SidebarPane : UserControl
         if (RefusedWhileRevised(folder, course)) return;
         if (ClaudeCodeLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
-        _ = ShowError("Claude didn’t open",
-            $"Plantoir couldn’t start a Claude session for {course.Code}. " +
-            "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
+        _ = ShowError(OutsideDoorWording.ClaudeDidNotOpenTitle, OutsideDoorWording.ClaudeCouldNotStart(course.Code));
     }
 
     /// <summary>Revise With ▸ Codex…: the second outside door (#210, mac #205).</summary>
@@ -1031,9 +1114,7 @@ public sealed partial class SidebarPane : UserControl
         if (RefusedWhileRevised(folder, course)) return;
         if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
-        _ = ShowError("Codex didn’t open",
-            $"Plantoir couldn’t start a Codex session for {course.Code}. " +
-            "If Codex was updated or moved recently, restarting Plantoir may be enough.");
+        _ = ShowError(OutsideDoorWording.CodexDidNotOpenTitle, OutsideDoorWording.CodexCouldNotStart(course.Code));
     }
 
     private MenuFlyout BackupMenu(BackupItem item)
@@ -1206,6 +1287,15 @@ public sealed partial class SidebarPane : UserControl
         // #547: its own line, never glued into DialogOpening — that is "the
         // first sentence" #400 and SharedRuleContractTests read.
         body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = ScheduledDeploy.OnBatterySleepsSooner });
+        // #739 (the mac's #668): a deploy that happens on its own is the
+        // easiest one to forget the cost of, so the SAVED settings' Netlify
+        // destination says so here.
+        if (PublishingDestinations.ScheduleNote(course.Configuration) is { } netlifyNote)
+        {
+            var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Text = netlifyNote, Opacity = 0.8 };
+            AutomationProperties.SetAutomationId(note, "netlifyScheduleNote");
+            body.Children.Add(note);
+        }
         if (unsavedSomewhere)
             body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = SavedSettings.SchedulingUsesSavedSettings });
         body.Children.Add(day);
@@ -1336,18 +1426,14 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>
     /// The click-time half of the hold (#468): a door, or the local window,
     /// refused while any assistant holds the course — since a session can
-    /// start between the menu opening and the click. Each cause in its own
-    /// words: a Claude or Codex session (<c>finishTheClaudeSessionFirst</c>),
-    /// or this app's own window, whose hold is the same and whose sentence is
-    /// the one this refusal always said.
+    /// start between the menu opening and the click. The words are
+    /// <see cref="OutsideDoorWording.RefusedWhileRevised"/>'s, which the
+    /// Problems tab's Fix with… buttons make too (#736).
     /// </summary>
     private bool RefusedWhileRevised(string folder, Course course)
     {
-        if (!CourseActivity.IsAssisting(folder, course.Code)) return false;
-        _ = ShowError(AssistWording.CourseIsAlreadyBeingRevised(course.Code),
-            CourseActivity.IsRevisedElsewhere(folder, course.Code)
-                ? AssistWording.FinishTheClaudeSessionFirst
-                : WindowHoldWording.FinishInThatWindowFirst);
+        if (OutsideDoorWording.RefusedWhileRevised(folder, course.Code) is not { } refusal) return false;
+        _ = ShowError(refusal.Title, refusal.Message);
         return true;
     }
 

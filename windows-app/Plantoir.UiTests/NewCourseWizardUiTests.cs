@@ -176,6 +176,13 @@ public class NewCourseWizardUiTests
 
         var written = JsonNode.Parse(File.ReadAllText(configPath))!;
         Assert.Equal(FreshCode, written["course_code"]!.ToString());
+        // #739 item 1: the dialog WRITES the new-course default, untouched by
+        // the teacher — read from the contract, not from the app's constant,
+        // so a drift on either side fails here. This run's settings hold no
+        // Account ID, so Create having been available at all is item 2: a
+        // missing ID no longer refuses it.
+        Assert.Equal(EndToEnd.Contract("app-rules.json")["publishingDestinations"]!["newCourseDefault"]!.ToString(),
+                     written["deploy_target"]?.ToString());
 
         Assert.True(Directory.Exists(Path.Combine(courseDir, "section1")),
                     "the launcher never made section1 — the app's own configuration file is all that exists");

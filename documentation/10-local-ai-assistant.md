@@ -1948,13 +1948,23 @@ laps.
   turns do.
 - **Ten or more.** No turn needs it, and every lap past six is a wait the
   teacher sits through for an answer that is not coming.
-- **Not winding back** (what Windows did until it adopts this): it leaves the
-  six repeats in the history, the #215 fault.
+- **Not winding back** (what Windows did until #720, 2026-11-10): it leaves
+  the six repeats in the history, the #215 fault.
 
-**Windows** has capped its loop at 6 (`MostStepsPerTurn`) since its agent was
-written, with a literal sentence, no trail line and no wind-back; the issue
-opened with this piece asks it to read the number from the contract, say the
-contract's sentence, wind back, write the event, and run the scenario.
+**Windows** capped its loop at 6 (`MostStepsPerTurn`) from the day its agent
+was written, with a literal sentence, no trail line and no wind-back. Since
+[#720](https://github.com/russellgordon/plantoir/issues/720) (2026-11-10) it
+matches: the number is pinned to this contract key
+(`AssistLapCapTests.TheCapIsTheContractsNumber`), the teacher reads
+`AssistWording.WentRoundWithoutFinishing`, the turn is wound back, the trail
+records the event, and the scenario runs through a fuse read from the
+contract. Two things differ by construction, and the mac need only know them:
+the count lives in `AssistAgent.Run`'s loop (its one `_model.Ask`, entered from
+`Say` and `Approve`), and "nothing was changed" rests on Windows' per-NAME rule
+— a write ends the turn because it is in `AssistToolRunner.WriteTools` — so a
+test now pins that every write a lap can run is in that list. How, and the
+must-fails, are in `12-windows-app.md` → "The lap cap on Windows (#720, the
+mac's #689)".
 
 ### Step 4 — The app presses its own buttons
 
@@ -7421,8 +7431,10 @@ doors hold their course, so the mac's Codex door names it too, and since #468
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
-(`ArgvQuote`, the rule Rust's and Node's parsers read back), then cmd's
-metacharacters (`ForCmd`), which follows cmd's OWN quote toggling — cmd knows
+(`ArgvQuote`, the rule Rust's and Node's parsers read back), then — since
+Windows 1.9.3 (#736) only for npm's `codex.cmd`, an `.exe` being started with
+no cmd at all — cmd's metacharacters (`ForCmd`, now `OutsideDoor.ForCmd`, the
+one builder both doors use), which follows cmd's OWN quote toggling — cmd knows
 nothing of `\"`, so after a TOML `\"` the rest of a path is unquoted to cmd and
 `&`, `|`, `<`, `>`, `(`, `)` and `^` there get a caret. A `codex.cmd` (npm's
 shim, which re-parses `%*`) is escaped for TWO cmd parses; a `codex.exe` for
@@ -7434,13 +7446,19 @@ exactly and that `args` still parses as a list of two strings. Measured
 must-fails: escaping for one cmd parse where the shim needs two cut the argv
 off after the first override; a TOML `"` left unescaped failed the fixture.
 
-**Rejected: `wt.exe`**, which the Claude door uses. Windows Terminal parses its
-own command line — `;` starts a new tab, and it re-joins arguments with its own
-quoting — a third layer no unit test can drive without opening a window. The
-door starts `cmd.exe /s /k "…"` directly; on Windows 11 the console it opens is
-Windows Terminal anyway when that is the default terminal. **Not handled**: a
-`%NAME%` inside a folder or server path is expanded by cmd's first parse when a
-variable of that name exists; cmd offers no escape for `%` on a command line.
+**Rejected: `wt.exe`**, which the Claude door used until Windows 1.9.3.
+Windows Terminal parses its own command line — `;` starts a new tab, it
+re-joins arguments with its own quoting, and (measured with #736) it expands
+`%NAME%`. The door started `cmd.exe /s /k "…"` directly; since 1.9.3 a
+`codex.exe` is started with nothing in front, and a `codex.cmd` through
+`cmd.exe /v:off /s /k "…"`. On Windows 11 the console it opens is Windows
+Terminal anyway when that is the default terminal. **Handled since 1.9.3**
+(#736): a `%NAME%` inside a folder, a server path or the greeting was expanded
+by cmd's first parse when a variable of that name existed; cmd offers no escape
+for `%` on a command line, so every `%` is now followed by a quote, which no
+variable's name begins with. The Claude door's own fault, and why both doors
+are built by `OutsideDoor` now: documentation/12-windows-app.md → "What the
+outside doors hand to Windows, and how".
 
 **The trail**: `started Claude Code for <CODE>` (the Claude door shipped
 recording nothing) and `started Codex for <CODE>`, both `assistant opened`.
@@ -7907,14 +7925,19 @@ served through a fuse.
 by the APP pressing the section window's own Open in Obsidian
 (`MainWindow.PressOpenInObsidianFor`, the shape of its `deploy_section`
 hand-back), the eight fixed shapes are in `AssistCardCommand.FixedShapes`, and
-nine of the ten scenarios run; the tenth, "on a Mac without Obsidian", is held
+nine of the ten scenarios ran; the tenth, "on a Mac without Obsidian", was held
 in `NamedGapLedger` because `wording.obsidianIsNotOnThisMac` named "this Mac"
 without `{machine}` (mac #698), so Windows says "this PC". #698 (2026-10-31)
 renamed the key `obsidianIsNotOnThisMachine`, gave it the placeholder and
 renamed the scenario "open in Obsidian where Obsidian is not installed
 presses nothing (#610)", and added `openInObsidianDidNotOpen` with a scenario
-for Windows' `DidNotOpen`; the `windows` issue opened with it lists the ledger
-entries and the Windows-only member to delete. How the press
+for Windows' `DidNotOpen`. **Windows took both with #720 (2026-11-10)**: the
+two ledger entries and `AssistWording.ObsidianIsNotOnThisPc` are deleted,
+`ObsidianIsNotOnThisMachine()` fills `{machine}` with "PC" through
+`MachineWord`, `DidNotOpen` answers `openInObsidianDidNotOpen` (in place of
+`openInObsidianIsInTheSectionWindow`), and all eleven scenarios run. Unlike
+the mac's, Windows' route really does produce `DidNotOpen` (a scan or open
+that throws, and the runner's own `catch`). How the press
 reports early on Windows, where a question is an awaited dialog, is in
 `12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
@@ -7934,6 +7957,23 @@ launch argument the teacher sees in their terminal, not something either
 assistant is shown as a tool. `test_tool_surface_digest.py` and the hasher
 gave the same digests before and after (local 13 `46b96562…`, MCP 38
 `89641d12…`), so no routing re-measurement was owed.
+
+**On Windows (1.9.3, #736)** the same, through `ClaudeCodeLauncher.Open(…,
+greeting)` and `CodexLauncher.Open(…, greeting)`, and it changed how BOTH
+doors start, Revise With ▸ included: an `.exe` with nothing in front, an npm
+`.cmd` shim through `cmd /v:off /s /k`, no Windows Terminal (1.9.0's Claude
+door had handed the course's name to cmd outside quotes).
+`12-windows-app.md` → "What the outside doors hand to Windows, and how".
+No tool or tool description moved there either.
+
+**Windows' plain Revise With ▸ greeting cuts the course's name at 80
+characters** (`fixWith.courseNameMaxCharacters`, with an ellipsis, the same
+cut Fix with… makes; since 1.9.3, #736's third review). A long imported name
+otherwise pushed the command line past cmd's limit, and the door refused with
+its could-not-start sentence, which tells the teacher a restart may help when
+it will not. The mac's greeting does not cut the name and need not: its shell
+script has no such limit. It may match, for one greeting on both platforms.
+Test: `OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`.
 
 ## Telling an outside assistant how the course is taught (#209)
 

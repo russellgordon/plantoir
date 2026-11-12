@@ -145,7 +145,9 @@ container branch left to fall back to.
 **The runtime travels beside the executable.** `NativeRuntime` resolves
 `<the folder Plantoir.exe is in>\runtime` — so a Debug build uses the copy
 under `bin\`, not an installed one — and `ScriptRunner` passes it to every
-launcher child as `PLANTOIR_RUNTIME`. A launcher run by hand honours that
+launcher child as `PLANTOIR_RUNTIME` (through `LauncherEnvironment`, which
+the scheduled deploy's wrapper also takes since #702, so a task registered
+from a Debug build no longer runs the installed copy's runtime). A launcher run by hand honours that
 variable first and only then falls back to
 `%LOCALAPPDATA%\Programs\Plantoir\runtime`, which is where the installer puts
 it. Either way the folder is recognised by a `manifest.json` INSIDE it, and it
@@ -249,6 +251,22 @@ inside the app into a NUL-riddled string that authenticates nothing — and the
 teacher is asked for a token that is already stored, with nothing to say so.
 Write through the launcher's own `CredApi`, and never advise `cmdkey` in a
 support note.
+
+**A saved token is cleared only when the service says no (#705, 1.9.3).**
+`deploy.ps1` checks a saved Netlify or Cloudflare token with
+`Get-SavedTokenAnswer`: `accepted`, `refused` (400, 401 or 403 whose body is
+the service's own refusal) or `unheard` (everything else, no answer
+included). Only `refused` deletes the credential (and Cloudflare's account);
+`unheard` keeps it and stops with the two "could not reach" lines. Until then
+any exception from the check deleted it, so a flaky school network or a
+captive portal cost a teacher their token. The request is made with
+`System.Net.Http.HttpClient`, not `Invoke-WebRequest`: on Windows PowerShell
+5.1 a 4xx throws there and the body, which is what tells a refusal from a
+web filter's block page, is hard to get back. Redirects are not followed;
+the system proxy is used as before (a 407 is `unheard` — reasoned, not
+measured). The rule and its cases are `contracts/app-rules.json` →
+`savedTokenCheck`; the why is
+[07 → "A token Cloudflare refuses (#695)…"](07-deployment.md).
 
 ---
 
@@ -550,6 +568,658 @@ follow edits](05-build-pipeline.md#a-running-preview-does-not-follow-edits-671).
 
 ---
 
+## A section's deploy outlives its view (#728, the mac's #706)
+
+**The fault, found by reading rather than driven.** `MainWindow.ShowDetailForSelection`
+builds a fresh `SectionDetailView` for every selection, and the deploy runner and
+"preparing" were that view's fields. Clicking another section and back left the
+deploy running unseen in the old object while the new one showed a blank console
+with Deploy enabled — the button never asked `CourseActivity.IsPublishingSection`,
+and `IsSectionBusy` read only the view on screen. A press then reached
+`deploy.ps1`'s "already being deployed" refusal, or, during the build leg, started a
+second build (the mac measured that killing the first, "failed (exit 1) after
+17.5s", on an Apple M4 Pro, #706). The rule both apps now follow is
+`shared-rules.json` → `returningToASectionMidDeploy`.
+
+**A second fault that is Windows' own.** The deploy handed its BUILD lease to the
+view's preview build claim (`_buildWork = deployBuild`), and `Unloaded` →
+`StopPreview` → `ReleaseLease` → `ReleaseBuildClaim` gives that claim back. So
+leaving a section mid-deploy deleted the deploy's on-disk `building` lease while
+the build still ran: an outside assistant's `deploy_section`, or a scheduled run,
+was then told the course was free to build. The mac never had it — its claims are
+held by `claimAPublish` with a `defer` inside `deployAndWait`, so they live as long
+as the function. Observed by reading `SectionDetailView.xaml.cs` on `dev`
+a8b7a65d6 (the handover at the deploy, the release in the teardown region); not
+driven. Now the deploy's claims are the RUN's (`SectionDeployRun.Hold` /
+`EndPublish`), and `StopPreview` lets go of the preview's alone. The
+`ReleaseBuildClaim()` just before the handover stays: it lets go of the PREVIOUS
+build claim — a preview's, or the assistant's rebuild — not the deploy's.
+
+**The shape** (Core, so the rule is unit-tested):
+
+- `SectionKey` (`Models/SectionKey.cs`): folder through `WorkingFolder.Resolved`
+  and compared case-insensitively, course case-insensitive, section. Built
+  canonical, so `C:\Work\` and `c:\work` are one key. `PerSectionStore<T>` beside
+  it creates an entry on first ask and never replaces or removes one. `SectionKey`
+  keys #734's Problems store too (`SectionProblems`, below; a dictionary of its
+  own, since nothing there is an object a running task holds).
+- `SectionDeployRun` (`Scripting/SectionDeployRun.cs`): the runner, `IsPreparing`,
+  `IsAsking` (the question about classes dated later is up in SOME window), the
+  `Folder` Cancel aims at, the deploy's claims, and the ending: `Endings`,
+  `EndingShown`, `PreviewLastStartedAt`, a waiting `Ending` (findings and the links
+  checklist's marker) taken read-and-clear by exactly one view. `SectionRuns.Deploy`
+  makes one, from a view, on the interface thread; `SectionRuns.Find` never does.
+- `SectionDeployRun.UnderWay(run, folder, course, section)` is preparing ∨ running ∨
+  asking ∨ the in-process publish record. The Deploy button (and so Section ▸
+  Deploy… and its key, which read the button), `DeployAsync`'s first check,
+  `DeployWillBeRefused`, `MainWindow.IsSectionBusy` (now given the caller's folder,
+  so a section not on screen still answers) and the Preview button, the links
+  checklist offered on appearing, today's-class re-check and the folder-repair
+  check all read it.
+
+**Why `IsAsking` is on the run** (the plan review's finding, Opus 5.5). With it on
+the view, a second window on the same section (File ▸ New Window) could put the
+question again while the first was up, back the course up and hide classes, and
+only then be refused by the "another deploy began while the question was up"
+check — a refusal after a change, which `classesDatedLater.order` forbids. Now the
+second window's Deploy is greyed and its press returns before anything.
+`SectionRunsTests.AQuestionUpInOneWindow_MakesTheSectionUnderWayInEveryWindow`.
+
+**Threading and lifetime.** Every Plantoir window is created on the one interface
+thread (`App.OpenWindow`), so the run's notifications are raised synchronously and
+reach every view on the thread it lives on. The deploy task — `DeployAsync` of the
+view that was pressed — keeps that view object alive until it ends, exactly as
+before; what changed is that every other view of the section binds to the same run.
+`DeployAsync` takes the run ONCE, from the folder it has just checked, and uses only
+that object (the mac's plan review H1: a window re-pointed at another folder
+mid-await must not split one deploy across two runs). `IsPreparing` is cleared in
+the `finally`. The view hooks the run and its runner on `Loaded` and lets go on
+`Unloaded`; so does `TaskProgressView` for every runner it registered — otherwise a
+view taken off screen stays subscribed to a shared runner for good. A window closed
+mid-deploy: `MainWindow.Closed` calls the section view's `LetGoAsTheWindowCloses()`
+(its `Unloaded` work, and the progress panel's `LetGo()`), so it lets go
+explicitly, not on whether WinUI raises `Unloaded` when a Window closes (nothing
+here measured that; the implementation review's finding). Called on the view
+rather than by setting `DetailHost.Content = null`, so the closing window's tree
+is not changed under it; both are idempotent. The deploy runs on; another window
+on the folder shows it. The last window, or quitting: unchanged — the quit question counts the
+`CourseActivity` record the run still writes. The in-app assistant's deploy goes
+through `MainWindow.DeployForAsync` → the view's `DeployAsync`, so it is the
+section's run and the assistant still awaits its outcome. A scheduled run, an
+outside assistant or a command line is another PROCESS and is not in the run: not
+greyed (`knownLimits`), refused in words by the work leases or the launcher.
+
+**The ending, shown once.** After the deploy: `run.EndPublish()`, THEN
+`run.NoteEnded(...)`, because the runner's own `IsRunning=false` arrives before the
+publish record ends — a view redrawing on it would leave Deploy greyed. Live views
+handle `Endings` by taking what the deploy left (links checklist, then folder
+problems) and calling `RefreshChrome`; the view that started a deploy and was left
+only deposits. A view appearing first notes `EndingToHideOnAppearing()` (an ending
+another view has shown), then takes. The console goes to the deploy when
+`IsShown(hidden, the view's own preview start)` says so: always while under way;
+afterwards only for an ending this view did not hide, and never over a preview of
+the section that started after the deploy did — a returning view has no preview
+start of its own, so the section's `PreviewLastStartedAt`, which both preview starts
+record, decides (the mac's M1 and L3).
+
+**One asker per question.** A deploy's credential question on a shared runner would
+otherwise be raised in every window showing the section, each sending its own answer
+to one prompt. `QuestionAskers` (Core) holds which view is asking each runner's
+question; the first view asks. A view taken off screen with the dialog up — a window
+closing, or the assistant changing the selection under a credential dialog
+(`MainWindow.DeployForAsync`, `AskAboutClassesDatedLaterFor`) — closes its own dialog
+(`_openQuestion.Hide()`: the dialog sits on the window, not in the view) and hands
+the question on rather than cancelling it — but only once that dialog has CLOSED:
+`QuestionAskers.HandOnWhenDone` marks it, and the dialog's own `finally`, after its
+`ShowAsync` has returned, calls `QuestionAskers.Done`, which lets the claim go and
+tells the next live view to ask. Handed on at once (the first build of this fix),
+the next view was usually in the SAME window, met WinUI's one-ContentDialog rule
+while the first was still closing, threw, and nobody asked again, so the deploy
+waited for ever (#728's third review, found by reading). NOT driven through the
+window, and why: the only question a deploy asks is a publishing credential, which
+needs a Netlify or Cloudflare destination with no saved credential, and answering it
+would reach that service; and in the same window only the in-app assistant changes
+the selection under an open dialog (a click on the sidebar is held by the modal
+dialog), which needs the local model. `QuestionAskersTests` pins the order instead. A view asking also waits
+while any other dialog is up in its window (`DialogGate.IsOpen`), asks again
+shortly if `ShowAsync` throws all the same, and a dialog whose question went away —
+the deploy cancelled from another window, or ended — is closed. A dialog
+that closes after its view left sends nothing, whichever button it reports
+(`QuestionAskers.WhatToDo`), so the left view and the new asker can never both reach
+the one prompt (`QuestionAskersTests`; the hide itself is pinned by a source scan and
+was not driven through a window). A question that
+arrived while nobody showed the section is asked when a view registers the runner.
+For the mac: its `TaskProgressView` binds the alert and the credential sheet to
+`runner.isAwaitingInput` (`awaitingInputBinding`, `awaitingCredentialBinding`), so
+two windows on one section both present it; answering one clears `isAwaitingInput`
+and the other is dismissed by its binding (reported to the director, who files it).
+
+**`theAssistantWithNoWindow`.** The contract's case is a deploy recorded with no
+run (the mac's `AssistSiteWork`). Windows never reaches it: `AssistWindow.MainWindowForBuilds`
+opens a section window, so the in-app assistant's deploy IS the section's run and is
+shown on return. `SectionRunsTests.ReturningToASectionMidDeploy` simulates the
+state — a publish record with no run — to pin the rule only.
+
+**Kept, deliberately.** A preview being built still stops when its section is left
+(its port lease, its web view and the quit record belong to the window). No trail
+line for navigation (`rejected`): the fix REMOVES lines — the second "started
+deploy.ps1" and the launcher's refusal no longer happen.
+
+**Rejected on this side.** Leaving the deploy's claim in `_buildWork` and skipping
+its release on `Unloaded`: a view would still own a claim that outlives it.
+Removing finished runs, or making the store observable: a reader would watch an
+object nothing writes (the mac's reason). Making a run from `IsSectionBusy`: a
+caller off the interface thread would bind the runner to the wrong context — `Find`
+never creates.
+
+**Tests.** `SectionRunsTests` (the key, the store, `UnderWay`, `IsAsking`, the
+ending's order, take-and-clear, shown once, a later preview, and the eleven contract
+cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing never
+deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
+the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
+test `ReturningToASectionMidDeployUiTests`.
+
+---
+
+## A section's Problems tab, its marker and its alert (#734, the mac's #717)
+
+**What it replaced.** Every build that met a folder problem put ALL of them in
+one `ContentDialog` (`FolderProblemsDialog.Findings`, queued by
+`FolderProblemQueue`), mid-build; the teacher dismissed it and nothing kept it,
+and a build the window did not watch (a scheduled deploy, the MCP server, a
+terminal) left only the overnight record. The record the build now writes
+(`<builds root>\<COURSE>\section<N>\.problems.json`, doc 05 → "A section's record
+of its problems") is the one list on Windows too: a tab, one warning on the
+sidebar row, and one alert only when a build found something NEW. The rulings
+and the mac's half are doc 09 → "A section's Problems tab, its marker and its
+alert (#717)"; this is what Windows built, and where it differs.
+
+**Core** (so the rules are unit-tested; Windows has no view tests):
+
+- `SectionProblemsRecord` reads the file tolerantly (a missing or broken file,
+  or another version, is no record, never an exception), with its rows and the
+  `PLANTOIR_PROBLEMS:` marker (`SectionProblemsMarker.Parse`, from the prefix
+  onward). `BuildMachineLines.Record` hands the marker back as `Read.Problems`,
+  and `ScriptRunner` raises `ProblemsMarker` and the app-wide
+  `SectionProblems.NoteMarker`, so a deploy that outlived its view and the
+  in-app assistant's build are seen too. `plantoir-mcp`'s `LauncherRunner`
+  ignores it (machinery, `transcriptStripping.machineLines`).
+- `SectionProblemsRules`: `State` (`rowState`: of the other sections' records
+  that show the page, the LATEST decides; no row of the same KIND on the page,
+  not merely no row with this id; `clearsAcrossSections`, `notAboutThePage`,
+  `siteSaidComplete` for a kind the site says), `HasMarker`, `AlertIsDue`,
+  `TrailLine` and `AnswerLine` — the mac's words, with the `{course}/{section} · `
+  front that `ActivityTrail.Note` writes on every line here.
+- `SectionProblemsWording`: the 19 `words` as constants named by key, the 16
+  kinds' labels and scopes, and a one-pass `Fill` (a brace inside a course name
+  or a TeX error is never read as a placeholder). Close and Not Now are
+  `SiteHealthRepair.CloseTitle`'s.
+- `ProblemsAcknowledgements`: `%LOCALAPPDATA%\Plantoir\problems-acknowledged\<folder id>.json`
+  (under `AppDataRoot`, so `--state-dir` and the unit suite keep their own),
+  `answered` and `noted` per `"<course lowercased>/<section>"`, 20 each, written
+  atomically; the mac's JSON shape.
+- `SectionProblems` (static, keyed by `SectionKey`): the records READ, the tab
+  each section shows and the rows unticked (session only). `ReloadAsync` reads on
+  a worker and keeps on the caller's thread; a file whose size and time have not
+  moved is not parsed again, so an activation costs a stat per section; it raises
+  `Changed(folder, course)` only when something moved. The "problems changed"
+  line is written there, once per alert key (remembered in `noted`, so a
+  relaunch does not write it again). `ClaimTheAlert` lets one view in the app
+  hold a section's alert, so two windows on one section raise it once.
+
+**Where the records are read from: one builds-root rule, not a Problems-only
+exception.** Under `--state-dir` the app's builds root moves and the launchers'
+does not (#664): `BuildOutputLocation.BuildsRootFor` follows `AppDataRoot`,
+while `Enter-NativeRuntime` in `preview.ps1`, `deploy.ps1` and `setup.ps1`
+computes `Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)` and
+then OVERWRITES `PLANTOIR_BUILD_ROOT` with it — so that variable, which
+`BuildsRootFor` honours, never moves where a build is written. The question
+"where did the launchers write this section's build records" now has one named
+answer, `BuildOutputLocation.WhereTheLaunchersBuild` (over
+`AppDataRoot.AsTheLaunchersSeeIt`, so `RealStateTripwireTests`' one-place rule
+holds), which ignores both, and
+the store reads through it (`SectionProblemsStoreTests.TheRecordsAreWhereTheLaunchersBuild`
+also reads the three launchers for that expression). It is read-only by
+intent. **The other readers were left on `BuildsRootFor`, deliberately:**
+`BuildFreshness` (Deploy's "does it need a rebuild"), `PreviewedPageSource.ListPathFor`
+(#690's page list for Open in Obsidian) and `AssistWorkspace.LegacyMarkerHomes`
+read the redirected root under `--state-dir` and find nothing — a rebuild, an
+empty list, a marker not moved, each a safe answer, and none different for a
+teacher, whose two roots are the same folder. Nothing proves any of them wrong
+today, so none was moved. Rejected: seeding records into the redirected root in
+the UI tests (it loses the mid-build path through the window), and moving
+`BuildsRootFor` itself (it would change `CourseArchiver`'s discard under
+`--state-dir`, which DOES write).
+
+**When a record is read** — never while anything draws: a marker from any run
+(`MainWindow` reloads that course for its folder), the section view's `Loaded`,
+its own preview's `ProblemsMarker`, a deploy's ending (`TakeWhatTheDeployLeft`),
+the courses loading (`WorkspaceViewModel.Courses`), the scheduled-run watcher,
+and window activation. **`Activated` fires on deactivation too, and on every
+return of focus** (a dialog of the window's own closing raises it): the
+deactivated state is ignored, as before, and the read is throttled to once in
+three seconds (`MainWindow.ReadTheProblems(throttled: true)`). The view asks
+for the alert on activation whether or not anything moved, so one that could
+not get on screen is asked again.
+
+**The sidebar.** ONE warning `FontIcon` per row, as on the mac: shown for a
+stopped scheduled deploy OR `SectionProblems.HasMarker` (memory, read on every
+reconcile and on `Changed` through `SidebarPane.RefreshProblemMarkers`); its
+tooltip, its Name and the ROW's `HelpText` say each sentence that applies
+(Narrator reads the row, not a tooltip on a child icon). **Its id names the
+course as well as the section** — `problemsBadge-<COURSE>-section<N>`, or
+`stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies —
+because two courses' Section 1 rows are in one tree (the mac's id has the
+section only; it has one window per section). The old fixed id
+`scheduledPublishWarning` had no reader.
+
+**Website | Problems.** A `SelectorBar` in its own row under the notices, shown
+only while the section's OWN record has rows; with none the section looks as it
+always has and the tab falls back to Website. Not in the toolbar (every item
+always present — the mac's reason too), and not a `TabView`, which would move
+the web view between containers. `SectionProblemsView` (code-only) is the LAST
+child of the content grid, opaque, over the console and the site. **What is
+under it is COLLAPSED as well as covered** (`BaseLayer` and `Preview` in
+`RefreshChrome`), so the covered page and console leave the Tab order and the UI
+Automation tree; the `WebView2` is never removed from the tree and its source is
+never reset. **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200, the laptop's own display at 150 %, 2026-11-11,
+`ProblemsTabUiTests.TheCoveredPageKeepsItsPageAndItsScroll`): a 250-paragraph
+front page scrolled to 60.0 % read 60.0 % after Problems and back, three rounds
+of three, with the same page loaded and the same Back state; while Problems
+showed, `previewWebView` was absent from the UI Automation tree and twelve Tab
+presses never reached it. The covered-but-not-collapsed variant was not
+measured: the Tab-order rule needs the collapse anyway, and the collapse kept
+the scroll. **A collapsed `SelectorBar`'s items stay in the UI Automation tree,
+marked off screen** (measured): a test that asks whether the bar is shown must
+read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
+(selection followed focus on the last run; one earlier run moved the focus
+only, so the UI test accepts either and says which).
+
+**The table.** Include (a box; ticked means included, every row starts ticked,
+for the session), Kind, Page (or Whole section / Whole course), Problem (the
+row's item, or `fixedInTheSource` in secondary text; the whole sentence and
+detail as the row's tooltip AND its `HelpText`), First found, Last found. Sorted
+by Kind; Kind, Page, First found and Last found sort, as on the mac (header
+buttons; the sorted one carries an arrow and `ItemStatus` "sorted ascending" /
+"sorted descending" — a plain button has no `SortDirection`, which belongs to a
+table's column header, and a `ListView` exposes none; that is the limit). The
+tick rules are `TickTable`'s, called rather than copied (`TickTable.TickWithSpace`,
+`Status`, `ItemWithTheFocus`, extracted for this; the later-classes, Publish
+Pages… and Start of Year tables use the same three): Space on its way down, a
+held Space's repeats swallowed, the row's `ItemStatus` ticked / not ticked. The
+builder was NOT generalised — this table's first column is a box with no title,
+its Problem cell carries a button and its headers sort — which is a deviation
+from the plan, made so the three existing tables' builder did not change. A
+fixable row carries its repair inline (`SiteHealthRepair.ButtonTitle`), never on
+a course kept for reference, its outcome shown as the alert's is. Every box and
+button is named for its row ("Include: Media folder, Whole course", "Put the
+Media folder back: Media folder, Whole course"), with the problem's own words
+added when two rows share a kind and a page. A page or course name carrying
+`%`, `&`, `|`, `<`, `>`, `^`, `"`, `;` or a newline is shown as written
+(`SectionProblemsContractTests.AnAwkwardPageNameIsShownAsWritten`, and the
+seeded UI test); handing such text to a terminal is #736's, below ("What the
+outside doors hand to Windows, and how").
+
+**300 rows, measured** (same PC, `ProblemsTabUiTests.ThreeHundredRowsShowInTime`):
+every row's `ListViewItem` (its box, cells and button) is BUILT up front when the
+tab FIRST shows — 413–522 ms for 300 — but the list's panel lays out and puts in
+the UI Automation tree only the rows near the view: 6–27 were listed before
+scrolling, measured, and the rest arrive as the list scrolls (the 300th is
+there at the bottom). So a screen reader moving down the list reaches every
+row, as the list brings it in; nothing is cut off, and nothing is listed that
+is not near the view. The first
+version made them whenever the record was read, so opening a section on its
+Website tab paid the half second; now it does not (the section opened in
+299–341 ms either way, click and title included), and Problems shows 562–625 ms
+after its click. Not virtualised further: 300 problems is far past any record
+seen, and the cost is paid once per record.
+
+**The alert.** ONE `ContentDialog` (`FolderProblemsDialog.NewProblems`): the
+title counts the new problems, the message is the new problem's own sentence
+when there is one, then `alertMessage`, then how many went; Show (the default:
+selects Problems), the repair as the second button when a NEW row has one, Not
+Now. No check box (#731). Raised when `AlertIsDue` holds and nothing else of
+this view's is up (today's-class question, the links checklist, a health
+dialog) — it stays due in the store, so `ShowDialogSafelyAsync`, the outcome
+dialog, today's-class question and the checklist each ask again as they close;
+one that could not get on screen asks again two seconds later. An answer is
+written only when the teacher gave one — but **a dialog that outlives its VIEW is
+still the teacher's answer**: the view is rebuilt under an open dialog whenever
+the courses reload (`ShowDetailForSelection` on `Courses`), the `ContentDialog`
+stays on the window, and the first version dropped the answer as "the view went
+away", so the next view raised the same alert again (found by the full UI run,
+2026-11-11, `ProblemsTabUiTests.OpeningOntoAnUnansweredRecordRaisesTheAlert_AndAnAnsweredOneDoesNot`).
+Only a dialog the WINDOW took down as it closed (`LetGoAsTheWindowCloses`)
+leaves it due. The answers file is read ONCE per working folder, on the worker
+that reads the records, and kept in memory (`SectionProblems`): the interface
+thread — which the waiting checklist asks every 300 ms — never reads the disk
+for it, and an answer the file could not keep still holds until the app
+closes. Every change is written through; a relaunch reads the file. **Only
+this app writes the file**, and the cache is never re-read: `Write` puts the
+whole in-memory copy back, so a second process writing it (a second copy of
+Plantoir on the same folder, say) would have its answers overwritten by the
+next write here and not seen here until a relaunch — at worst one alert raised
+again, never one lost for good, since both copies remember their own.
+
+**The links checklist FOLLOWS the alert** — the mac's order, which the contract
+writes as "The links checklist (#379) follows it": today's-class question,
+then the alert, then the checklist (`SectionProblemsRules.TheChecklistWaits`).
+It reads the record first (the marker came before the checklist's, but the
+read is asynchronous) and waits while the alert is on screen here (as long as
+the teacher reads it) or due but not up here (at most ten seconds: held by
+another window, or unable to get on screen). **The first version could
+deadlock** (implementation review, finding 1): the checklist set the flag the
+alert waits behind BEFORE its wait, so opening a section onto a record with a
+link into a hidden page and a waiting checklist — the ordinary way in after a
+scheduled, MCP or terminal build — showed neither. Now one flag guards
+re-entry and another, set only as the checklist goes on screen, is what the
+alert waits behind; the bound makes any future ordering fail open. **With
+nothing in front of it and no alert due — read from memory — it goes up in the
+SAME turn that offered it**, as in 1.9.0 (`TheChecklistGoesAtOnce`): the
+second version always took at least one turn (a hop to a worker, the alert
+queued, a 300 ms tick), which put it beside the window's activation work, and
+`LinksChecklistUiTests` then failed 1–2 runs in 3 against 3 of 3 on `dev`
+(third review) — the dialog went up with its buttons unnamed, because
+`LinksChecklistDialog.TagButtons` ran once, on `Opened`, before the template's
+buttons were in the tree. It now tries again after layout and logs when it
+cannot. A view rebuilt while the checklist waits hands the offer to the
+section's next view (`ChecklistsWaiting`).
+`ProblemsTabUiTests.TheAlertComesFirstAndTheLinksChecklistFollowsIt`.
+
+**The record and its writer.** Windows refuses `os.replace` (and .NET's
+overwriting move) while ANY other handle has the file open — measured on this
+PC, Python 3.14.10, with and without delete sharing — and the app reads the
+record whenever the window comes to the front. A refused replace was not
+silent — every caller of `section_problems._write` prints a "Could not keep the
+list of problems…" line to the console and the build goes on — but that build's
+record was lost, and nobody reads a console for it. The app's read now
+shares read, write and delete (`SectionProblemsRecord.OpenShared`, so an
+archive can still remove the folder) and holds the file only for the read;
+the shared Python tries a refused replace again, ten times 50 ms apart
+(`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`; it
+costs the mac nothing, where a replace is never refused). An eleventh refusal
+is what it was before: the temporary file is removed, the caller prints its
+"Could not keep…" line, the build goes on, and the previous record stays. Rejected: relying
+on delete sharing alone, which the review proposed and the measurement
+refuted. `NoteHealthFindings`,
+`FolderProblemQueue` and the held #333 finding are gone: on Windows the
+checklist was already decided by its marker, so routing the finding had nothing
+left to do once no dialog showed it. The overnight record is still TAKEN
+(`ScheduledHealthFindings.Take`), so it does not pile up and its trail lines are
+written, with no dialog of its own.
+
+**Measured, the alert's timing:** 172.8 s after Preview on the FIRST build in a
+brand-new working folder (the UI test's; that build makes the workspace, and
+another agent's suites shared the CPU) — not comparable with the mac's ~5 s on
+an M4 Pro, and not measured on a warm folder here.
+
+**Focus, decided** (review change 3): after Show, the first row of the table
+(posted at low priority, after the dialog's own focus restore, so it never lands
+under the tab); after a choice of tab on the bar, it stays on the bar; after a
+repair's outcome closes, that problem's row (it stays until the next build), or
+the table; when the last row clears with the focus inside the table, Preview.
+After Not Now, wherever the dialog gives it back — on the Website tab, which is
+what shows.
+
+**A preview or deploy started while Problems shows does NOT switch back to
+Website** — matching the mac, read off its code (the tab is a top layer, and
+nothing sets it back but Show, the switch, or the record losing its rows); the
+mac had not recorded it. The Preview button's face still changes, and the tab
+goes by itself when a clean build empties the record.
+
+**Cases met and not drawn differently:** a problem whose page has since been
+deleted or renamed stays as its build named it until the section's next build
+(the record is the last build's; the row has no link to follow); a build that is
+now stale is read the same way, which is what the intro says ("What the last
+preview or deploy … found"); two windows on one section share the tab and the
+ticks (the store's), and the alert is raised in one (`ClaimTheAlert`).
+
+**The trail.** "problems changed" (`ActivityTrail.Event.ProblemsChanged`): the
+change line once per alert key, from the store, and the answer line
+(`Show`, `the repair`, `Not Now`) from the view. Nothing for a tick or the tab.
+"asked an assistant to fix problems" (#736) was held in `NamedGapLedger` for
+v1.9.3 when this landed; "deploy refused for the Cloudflare Account ID" (#739)
+was too, and is written since #739 ("A new course starts on Cloudflare Pages
+(#739)" below).
+
+**Tests.** `SectionProblemsContractTests` (the 12 `rowState`, 4 `sectionMarker`
+and 6 `alert` cases, the lists, words and kinds pinned, rule 1, the trail line,
+the marker, the record, awkward names), `SectionProblemsStoreTests` (the
+canonical key, a course read whole, no re-read of an unmoved file, answers and
+the trail line across a relaunch, 20 kept, ticks and the tab, one alert per
+section, where the launchers build), `SectionProblemsSourceTests` (one alert
+from the record, the old dialog gone, no box, the web view kept mounted, no disk
+search in the table, the sidebar from memory, the moments of reading, the
+checklist after the alert, a due alert asked again), and the UI tests
+`ProblemsTabUiTests` (five: a real preview with a missing Media folder — alert,
+Show, focus, names, Space, sort state, the warning, the covered page out of the
+Tab order, the inline repair and a clean build; a shared page fixed in another
+section; opening onto an unanswered record and an answered one, with the
+keyboard; 300 rows; the covered page's scroll).
+
+**What cannot be judged here:** the layout at 100 %, 125 % or 200 %, or on a
+large external monitor (the laptop's own display is the only one); the Problem
+column's trimming at the window's narrowest beside a wide sidebar; the
+secondary "fixed in the source" text's contrast in dark mode; the warning
+glyph's size beside the clock at other DPI; and what Narrator SAYS (#713's
+listen, before the cut).
+
+### Fix with Claude… and Fix with Codex… (#736, the mac's #717 part two)
+
+Two buttons under the Problems table, Claude's first (`fixWithClaudeButton`,
+`fixWithCodexButton`, titles from `fixWith.buttons`), hand the ticked rows that
+are still this section's problem to the SAME doors as Revise With ▸, with the
+contract's message in place of the plain greeting. `FixWithAssistant` (Core) is
+the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
+`Buttons`, `GreetingFor`, `TrailLine`, every word a constant pinned key by key
+(`FixWithAssistantContractTests`, which runs the 8 `buttonCases` and 10
+`greetingCases`). A button is HIDDEN when its assistant is not on this PC or
+the course is kept for reference, and GREYED when nothing ticked is handed
+over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
+(proposed from Windows; the mac owes the same as an accessibility hint).
+Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
+`MainWindow.Activated` off the interface thread — never while the tab draws,
+and false until the first answer, so a tab that draws first shows its buttons
+a moment later through `Changed`. A press makes Revise With's refusal first
+(`OutsideDoorWording.RefusedWhileRevised`, now the one place both callers read,
+with the doors' `didNotOpenTitle` and `couldNotStart`), opens the door, and
+only then writes "asked an assistant to fix problems" — counts and kinds,
+never a page — after the door's own "assistant opened" line.
+
+Characters are counted as Swift counts them (`StringInfo` text elements), and
+the door supplies a second bound (`ClaudeCodeLauncher.Fits`,
+`CodexLauncher.Fits`): the WHOLE command line, as `OutsideDoor.LineLength`
+computes it with this PC's real program path and the configuration's real
+path, in UTF-16 units under 8,191; when it bites first, rows go from the end
+with the `more` clause. Measured with the longest `greetingCases` message by
+`OutsideDoorTests.TheLongestMessagesCommandLineFits`; the numbers are in the
+closing comment on #736.
+
+### What the outside doors hand to Windows, and how (#736, fixing 1.9.0)
+
+**Everything a door hands over is hostile text**: the course's name (a course
+imported from somebody else's zip carries its own), page names, and what a
+build said about them. **Until 1.9.3 the Claude door handed the course's name
+to the command interpreter unquoted.** It joined the program, its flags and
+the quoted greeting by hand and ran the line as `cmd /k` (behind
+`wt.exe -d <folder>` when Windows Terminal was there). With more than two
+quotes on the line and no `/s`, cmd strips the first and the last, which left
+the greeting outside quotes, so cmd read the course's name as part of the
+command; and without Windows Terminal the greeting did not even arrive as one
+argument (`OutsideDoorTests.TheOldLineDidNotCarryTheName` keeps the old
+builder as the must-fail). The Codex door, through `cmd.exe /s /k` with
+carets, was safe from cmd's operators but expanded `%NAME%`.
+
+**Now both doors start through `OutsideDoor.StartInfo`:**
+
+- **An `.exe` (`claude.exe`, `codex.exe`) is started directly**, its command
+  line the standard quoting of each argument (`ScriptRunner.QuotedArgument`,
+  merged with #749's third review), with no command interpreter and no Windows
+  Terminal in front, through ShellExecute so it gets a console window of its
+  own. Nothing parses the line but the program, so `& | < > ^ ! %` are ordinary
+  characters, and a folder at a drive root needs nothing special (the folder is
+  the process's working directory, not an argument). On Windows 11, where
+  Windows Terminal is the default terminal, the window is Windows Terminal
+  anyway. One thing changed for a teacher: the window closes when the session
+  ends, where `cmd /k` left a prompt behind.
+- **An npm shim (`claude.cmd`, `codex.cmd`) goes through
+  `cmd.exe /v:off /s /k "…"`**, with no Windows Terminal in front, because a
+  batch file cannot run without cmd. `/s` strips exactly the outer quotes;
+  `/v:off` makes `!` ordinary even where the registry turns delayed expansion
+  on (its must-fail, `/v:on`, turned 19 of the shim cases red); cmd's
+  metacharacters get a caret wherever cmd reads them unquoted, once per parse
+  and twice for the shim's `%*`; and every run of `%` is followed by a quote,
+  written `"%"` unless a quote follows already, because cmd has NO escape for
+  `%` on a command line and none inside quotes, but reads a variable's name
+  from the character after the `%`, and no variable's name begins with a
+  quote. The program's own parser reads `a"%"b` as `a%b`; backslashes just
+  before the added quote are doubled so they still read as themselves (a TeX
+  `\%`; without the doubling three cases go red). `%` is handled on the OUTER
+  parse only: the text a batch file's `%*` becomes is not read for variables
+  again (without the `%` handling, 24 cases go red). A line break, which a
+  command line cannot carry, becomes a space on this path only.
+
+**Rejected: `wt.exe` with an argument vector.** Measured on this PC (Windows
+Terminal from the Store, 2026-11-11) with a stub program started as
+`wt.exe -d <folder> -- <stub> …` from an argument list, so that no cmd was
+anywhere: Windows Terminal EXPANDED `%OS%` and `%PATH%` in the line it was
+given, re-joined the arguments with its own quoting, which LOST an escaped
+quote (the message arrived as several arguments) and a trailing backslash, and
+it splits at every `;`. `& | < > ^ !` were inert. The expansion has no escape
+at all, so keeping Windows Terminal in front would have meant changing the
+message's text on Windows only, which doc 09 records as rejected for `;` ("the
+mac would send a different message"). Starting the program directly removes
+the layer instead, so that decision still holds: the message on Windows is the
+mac's, character for character.
+
+**Not applied: `replaceInTheMessage` to Revise With's plain greeting.** It was
+asked for while planning #736, for Windows Terminal's `;`; with Windows
+Terminal no longer in front a `;` in a course's name is an ordinary character
+on every path (cmd reads `;` as a separator only outside quotes, and the shim
+path quotes it). The plain greeting still replaces `"`
+(`greetingCarriesNoDoubleQuotes`), as the mac's does.
+
+**Proven** (`OutsideDoorTests`, 78 cases): eighteen hostile names — `&`, `|`,
+`>`, `<`, `^`, `%OS%`, `%PATH%`, `%%`, a lone `%`, runs of `%`, `!x!`, `;`, a
+double quote, a trailing backslash, a newline, `\%` with parentheses and
+apostrophes, and non-ASCII text with an emoji — in Revise With's greeting,
+Fix with's message (course AND page names) and the Codex door's TOML values,
+in a working folder whose own name carries `& ^ %OS% !x! ( ) ; '` and an emoji,
+each through the REAL `StartInfo` into a stub `.exe` and a stub `.cmd` in npm's
+cmd-shim shape, which write down their argument vector. Each arrives as the
+one argument it was (a newline as a space through the shim). The tests start
+the same program with the same command line through CreateProcess with no
+window, where a teacher's start uses ShellExecute, so the suite never takes
+the desktop; ShellExecute itself is proven by `FixWithButtonsUiTests`, which
+points both doors at stubs first on the driven app's PATH and presses each
+button for a course whose name carries cmd's metacharacters, `%OS%`, `!x!`, `;`
+and a double quote. The stub `.exe` is compiled at test time with the C#
+compiler .NET Framework 4.8 puts on every Windows 11, so no project was added
+to the solution for it.
+
+**Control characters are cleaned before any quoting** (`OutsideDoor.Clean`,
+the security review's finding 1). Every C0 control but tab, and DEL, becomes a
+space in every argument AND the working folder, in both shapes and both start
+modes. The one that mattered is the NUL (U+0000): CreateProcess and
+ShellExecute both END the command line at it, so through the shim's
+`/s /k "…"` wrapper the NUL dropped the wrapper's closing quote, `/s` then
+stripped the message's OPENING quote instead, and an `&` the message carried
+— left un-careted by `ForCmd` because it sat inside the message's quotes —
+ran a second command (the reviewer got a marker file in 20 of 20 shim runs;
+`OutsideDoorTests.ANulInTheMessageRunsNoSecondCommandThroughTheShim` is the
+must-fail). Through an `.exe` a NUL only truncated. A course name is read from
+`course_config.json` by Newtonsoft, which keeps `\u0000`, and nothing in Core
+sanitised it. **Left as they are:** C1 controls (U+0080–U+009F), the
+line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
+splits a command line (measured) and they are characters a name might carry.
+Whether a control character belongs in a course name at all — it also reaches
+the sidebar, the title and the trail — is the follow-up
+`issue-control-characters-in-course-name`, not this piece.
+
+**The caret set includes `(` and `)`**, and an OLD npm shim shape proves it:
+`cmd-shim`'s older form runs `%*` INSIDE an `IF (…) ELSE (…)` block, where an
+un-careted `)` in the arguments closes the block early. `OutsideDoorTests`
+runs the hostile set through both the modern shape (where `%*` is on the final
+`endLocal & … & "%_prog%" … %*` line) and the old one; removing `(` and `)`
+from the caret set turns the old-shape cases red (18 of them, measured), while
+the modern ones stay green — which is why the parens needed a shape that
+exercises them.
+
+**A door refuses over cmd's command-line limit rather than start into a silent
+"too long".** The bound is NOT a flat 8,191 for a shim: inside an npm shim
+`%*` is expanded again into a longer line carrying the shim's own text (its
+script path, `%dp0%`, `title %COMSPEC%`), and cmd's 8,191 applies to THAT
+line. Measured (third review, 2026-11-12) with stub shims whose script path is
+short: the longest outer line that arrived whole was 8,087 (modern shape) /
+8,160 (old) from a 61-character shim folder, and 7,908 / 7,981 from a
+240-character one — a loss of about the shim folder's length. So
+`OutsideDoor.LimitFor` is `8,191 − (shim folder length) − 128` for a batch
+target (the 128, `ShimExpansionAllowance`, covers the worst measured shape
+plus npm's real script path, which is ~40 characters longer than the stub's
+`cli.js`) and a flat 8,191 for an `.exe`. `WithinCommandLineLimit` checks the
+outer line against that, and **Fix with…'s `fits` is this same function**, so
+it drops rows to the real bound rather than to 8,191. A door `Open` returns
+false over the bound and writes no "assistant opened" line; the teacher sees
+the door's own "couldn't start" sentence. Revise With ▸'s plain greeting no
+longer reaches the bound — it caps the course name (below) — so the guard is a
+backstop there and the live path for an over-long Fix with… message.
+
+**Revise With ▸ caps the course name in its greeting** at
+`fixWith.courseNameMaxCharacters` (80, with an ellipsis), the same cut Fix
+with… uses (`FixWithAssistant.CutToCharacters`). Only the name handed in is
+cut, never the greeting's wording. Before this a long imported name (a course
+from someone else's zip) pushed the command line past the bound and gave the
+could-not-start sentence, which says restarting may help — misleading, since
+restarting changes nothing. Now the door opens with the name cut.
+
+### What a teacher sees in place of Windows Terminal (#736)
+
+Since neither door puts `wt.exe` in front, what opens is whatever Windows
+starts for the program:
+
+- **An `.exe` door** (`claude.exe`, `codex.exe` — the common case) is launched
+  with ShellExecute, which gives a console program its own window. On Windows
+  11, where Windows Terminal is the default terminal, that window IS Windows
+  Terminal; on a PC set to the classic console, it is a console window. Either
+  way its title is the program's, and **it closes when the session ends** —
+  the one change a returning teacher may notice, since the old `cmd /k` left a
+  prompt behind after Claude exited.
+- **A shim door** (`claude.cmd`, `codex.cmd`) opens through `cmd /v:off /s /k`,
+  so cmd stays at a prompt after the session, as before.
+- **A door that fails to start is now honest.** On the `.exe` path ShellExecute
+  returns success and the window closes before a teacher could read an error,
+  so `OutsideDoor.Start` watches the process for a short grace (≈400 ms) and,
+  if it has exited non-zero by then, reports the door as NOT opened: the
+  could-not-start sentence shows and no "assistant opened" line is written.
+  A program that stays open past the grace reads as opened. **Rejected:** a
+  multi-second wait (it freezes the click for every successful open) and an
+  off-thread watch (the result has to come back synchronously to drive the
+  sentence). Measured: a stub exiting 1 at once is caught; one that stays is
+  not (`OutsideDoorTests.AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor`).
+
+**A known limit (npm's shim `node` fallback, unchanged from 1.9.0).** When
+`claude.cmd`/`codex.cmd` cannot find its bundled `node.exe` it falls back to
+bare `node`, which cmd resolves against the current directory before PATH — and
+the door opens AT the teacher's working folder. A `node.exe` dropped into that
+folder could run instead of the real Node. It is npm's shim, not Plantoir's
+code; the smallest fix would be to open the door with a neutral working
+directory and name the folder another way, but both doors are meant to open at
+the working folder (the skills and guidance are there), so that is a product
+decision rather than a one-line change. Recorded here, and in the security
+draft, as a known limit.
+
+**"Open in Terminal" takes its folder as an argument, not spliced into a
+command** (same review, finding 5): `OutsideTerminal` (Core) returns the launch
+as data — `wt.exe` with the folder as `-d`'s own argument, the classic-console
+fallback with the folder as the start info's working directory and no
+`-Command`. The old fallback ran `powershell -Command "Set-Location '{path}'"`,
+which a `'` in a course's name broke out of, and `wt -d "{path}"` split at a
+`;`. `OutsideTerminalTests` pins it for a folder named with `'`, `;`, `&` and a
+trailing `\`.
+
+---
+
 ## Scheduled deploys
 
 There is no `launchd`. `TaskScheduling` registers a task with **Task Scheduler**
@@ -690,13 +1360,161 @@ problem — **nobody answers a question at 6 a.m.**
 ## Publishing: the destination is an argument
 
 `deploy_target` in `course_config.json` is read by the **app**, which turns it
-into a `--target` flag. **`deploy.ps1` and `deploy.py` read no key to
-choose a destination** — they default to Netlify and change destination
-only on `--target`. (`deploy.sh` reads it since #668 when it is given no
-destination; `deploy.ps1` matching it is the #668 `windows` issue.) (`build_site.py` does read
-it, but for working out a site's domain, not for deciding where to publish.) Anything driving a launcher directly must pass the flag itself;
-see [deployment](07-deployment.md), where the failure that sentence caused is
-recorded.
+into a flag for every leg it runs — `--target netlify` included since 1.9.3
+(#739 item 8, `DeployCommand.Arguments`; `contracts/app-rules.json` →
+`deployArguments`). **`deploy.ps1` reads it too since 1.9.3, but only when it
+is given no destination** (#739 item 7, as `deploy.sh` since #668): one saved
+destination is set and named ("Deploying to Cloudflare Pages, as ICS3U's
+settings say."), several run `deploy.ps1` once per leg in a `powershell.exe`
+of its own, settings that cannot be read refuse, and a typed `--target` or
+`--to-folder` wins (`Get-SavedDestinations`; `savedDestinations`).
+**`deploy.py` still reads no key**: it defaults to Netlify and changes only
+on `--target`. (`build_site.py` reads it for a site's domain, not to choose
+where to publish.) Anything driving `deploy.ps1` directly that means ONE
+destination must name it, or every saved leg is deployed; see
+[deployment](07-deployment.md) → "Choosing a destination (#668)".
+
+**A folder path reaches the launcher as it was saved (#749's reviews).** A
+saved folder with a space AND a trailing backslash (`C:\Sites\pub one\`,
+which `DeployFolderProblem` accepts) was mangled twice over: the app's
+`ScriptRunner` wrapped an argument with a space in quotes and escaped nothing,
+and `deploy.ps1`'s own legs went through Windows PowerShell 5.1, which does the
+same — either way the last backslash escaped the closing quote and the
+launcher read `C:\Sites\pub one"`. `ScriptRunner.QuotedArgument` now follows
+the Windows rule (quote an argument with a space, tab or quote, or an empty
+one; double the backslashes before an escaped quote and before the closing
+quote) for EVERY launcher the app runs, and `ScriptRunnerQuotingTests` round-
+trips twelve shapes through a real `powershell.exe -File`; `deploy.ps1`
+doubles the trailing backslashes of a spaced argument it hands a leg (see the
+comment in its leg loop, and `test_launcher_rules.ps1` section 10).
+`Plantoir.Mcp` uses `ProcessStartInfo.ArgumentList` and was never affected;
+`PtyDriver`'s own joiner has the same naive rule but is fed only the
+harness's `cmd.exe /c "<runner>.cmd"`.
+
+### A new course starts on Cloudflare Pages (#739)
+
+The Windows half of the mac's #668, items 1 to 6 of #739; the why, the dated
+figures and what was rejected are in [07](07-deployment.md) → "Choosing a
+destination (#668)", and the rules are `contracts/app-rules.json` →
+`publishingDestinations`. On Windows:
+
+- **The rules are one Core class**, `PublishingDestinations`
+  (`Plantoir.Core/Models`): the default, the absent-key meaning, the order
+  (`PickerOrder`, which is `CourseConfiguration.KnownDeployTargetTypes`, now
+  Cloudflare, Netlify, folder), the five sentences, when each note shows,
+  `WizardCreateRefusal`, `DeployRefusalOpensSettings`, the trail line
+  (`AccountIdRefusalTrailLine`) and the Cloudflare notice as ordered runs
+  (`CloudflareNotice`). `PublishingDestinationsContractTests` runs all three
+  case lists against it and pins the sentences; the views only draw what it
+  returns. The 25 MB sentence moved there from the view (it is not a contract
+  sentence) so the block's ORDER is testable.
+- **The new-course dialog** (`NewCourseDialog`) starts `_deployTarget` at
+  `NewCourseDefault` and always writes it; its Deploying header carries
+  `wizardCaption` (automation id `wizardDeployingCaption`); its
+  `PublishingChoiceView` is built with `accountIdMayWait: true`, so
+  `Problem` (what holds Create back) is `WizardCreateRefusal` for the ID: a
+  missing one waits, one that cannot be an ID refuses.
+- **`PublishingChoiceView`** (both the dialog and Course Settings): the
+  picker lists `PickerOrder`, an absent or unknown saved value showing as
+  Netlify; `cloudflareCaption` heads the Cloudflare block, primary
+  (`cloudflareCaption`) or additional (`additionalCloudflareCaption`);
+  `netlifyNote` sits under the picker when Netlify is the primary or no
+  destination is saved (`netlifyNote`), and under the "Also deploy to
+  Netlify" switch when it is additional (`additionalNetlifyNote`). **The
+  notice is ONE `TextBlock` of runs**: the ID's sentence in the caution
+  colour, `accountIDCanWait` in the secondary colour (the dialog, a missing
+  ID), then the 25 MB note in the caution colour. Its automation id is
+  `cloudflareAccountProblem` while the ID has a problem and `cloudflareSizeNote`
+  when it has none (the additional block: the same with `additional…`), as
+  the mac names its single `Text`; its Name is the whole block, so Narrator
+  reads it in that order. The additional Cloudflare block gained the 25 MB
+  note it never had, as the mac's shared `CloudflareDetailFields` shows it.
+- **Course Settings is unchanged in what it refuses**: a changed destination
+  to Cloudflare with no ID still holds Save back, and never says it can wait.
+- **Schedule a deploy** (`SidebarPane.AskWhenToDeploy`) adds
+  `netlifyScheduleNote` (`netlifyScheduleNote`) when the SAVED settings deploy
+  to Netlify, primary or additional, absent key included
+  (`PublishingDestinations.ScheduleNote`).
+- **The Deploy button's refusal** (`SectionDetailView.DeployAsync`, the one
+  path the button and the in-app assistant share) keeps its title, "This
+  section can't be deployed yet" (the mac's alert is "Cannot Deploy Yet"),
+  and gains **Open Settings…** as its primary button when the sentence is the
+  Account ID's; OK stays the default button, so Enter and Escape both leave.
+  It is the same `ContentDialog` as before, through `ShowDialogSafelyAsync`,
+  so `DialogTitleScanTests`' census does not move; Settings is opened from the
+  dialog's ANSWER, after it has closed, and is a window of its own, so
+  nothing outlives a view rebuilt under it. Focus: OK returns it to the
+  Deploy button (ContentDialog's own return); Open Settings… activates the
+  Settings window on Deploying.
+- **The headless deploy no longer refuses every Cloudflare section.**
+  `AssistWorkspace.Deploy` (`plantoir-mcp`'s `deploy_section`, and Plantoir's
+  own assistant with no window to press in) refused EVERY Cloudflare
+  destination from 2026-08-13 until #739, saved ID or not, with a sentence
+  of its own ("…needs the account ID Plantoir stores. Deploy this section
+  from Plantoir instead."). The reason given was that a Pages token cannot
+  list its account and "only the app can pass" the ID; but the ID has always
+  been in `AppSettings`, which this process reads (`CurrentCloudflareAccountId`,
+  already serving `schedule_deploy`), and the mac never had the refusal. With
+  Cloudflare every new course's default it would have let an outside
+  assistant schedule a new course's deploy but never deploy it. It now
+  refuses exactly when the window does (`MultiDestinationDeployRunner.RefusalReason`,
+  the same sentence; a folder not chosen included) and otherwise hands each
+  Cloudflare leg `--account <id>` as the window's Deploy and the scheduled
+  run do, plus the `--non-interactive` it always passed. Nothing is left to
+  answer headless: a missing saved token makes `deploy.ps1
+  --non-interactive` exit 3 (`deployNeedsAnAnswer`), and a section never
+  deployed there is still refused first. It writes no trail line, as the
+  contract's event `why` says of this path and as the mac's
+  `AssistSiteWork.deploy` does. Proven against a stub launcher only
+  (`HeadlessCloudflareDeployTests`: every `deployWithoutAnAccountID` case,
+  each leg's arguments equal to the window's but for `--non-interactive`, a
+  made-up ID); no real Cloudflare deploy was run through `plantoir-mcp`.
+  `AssistWorkspace.CloudflareAccountIdOverrideForTests` is held per async
+  flow now, so two test classes setting it cannot race.
+  **What the run prints is redacted before it leaves the process**
+  (`LauncherRunner.OutputCapture`): progress lines and the kept tail both
+  reach an outside assistant's conversation, and a failing wrangler call
+  names its resource, `/accounts/<id>/pages/…`, which no rule caught. A new
+  rule, `accountPath`, and its case in `shared-rules.json` →
+  `problemReportRedaction` (proposed from Windows; the mac's
+  `LogRedactor.swift` lacks it, so its suite goes red until it adds it, the
+  `mac` issue). On the window's side the console is the teacher's own; what
+  it writes to disk already went through `LogRedactor` (the run transcripts,
+  `ProblemReportStore.SaveRunTranscript`, and the trail), so the new rule
+  covers them too. A scheduled Cloudflare leg's output goes to a temporary
+  file in `scheduledolder-problems` that the wrapper deletes after reading
+  one marker from it; it is not redacted, and does not outlive the run.
+- **The trail.** `ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId`
+  ("deploy refused for the Cloudflare Account ID"), written from that
+  refusal before the dialog goes up, by kind, never the ID: "ICS3U/1 · deploy
+  refused: no Cloudflare Account ID is saved in Settings" or "…is not a whole
+  ID". A folder refused first writes nothing; so does an MCP client's deploy
+  and a refused schedule (the event's `why`).
+
+**Proven.** `PublishingDestinationsContractTests` (the default
+and the absent key read from a file, the order and the additional list, the
+five sentences, `netlifyNoteCases` for both notes and for the schedule note,
+`wizardAccountID.cases` with the block's order and colours, and
+`deployWithoutAnAccountID.cases` for the refusal, Open Settings…, the line and
+that the line never carries the ID, and a source check that OK stays the
+refusal's default button). `HeadlessCloudflareDeployTests` runs every
+`deployWithoutAnAccountID` case through the headless deploy (above). Through the window,
+`PublishingDestinationsUiTests` (the refusal's Open Settings… and its trail
+line; a folder refused first with neither; the sentences in the dialog;
+Course Settings and Schedule a deploy for a course with no destination saved),
+`SettingsUiTests.TheWizardLetsAMissingIdWaitAndFollowsTheIdTypedInSettings`
+and `NewCourseWizardUiTests.TheCreateButtonReallyMakesACourse` (which reads
+the written `deploy_target`). Window tests pick a destination by its type
+through `DeployPicker`, never by position: index 1 meant Cloudflare before
+#739 and Netlify after.
+
+**Rejected.** *Leaving the 25 MB note a TextBlock of its own beside the
+problem line* — the mac's review found two orange warnings on a first
+course were one too many. *A second dialog for Open Settings…* — one
+`ContentDialog` per window, and the refusal already is one. *Writing the trail
+line in `MultiDestinationDeployRunner.RefusalReason`* — that is also the MCP
+server's and the assistant's refusal, and the event is for a window that was
+open.
 
 ---
 
@@ -817,6 +1635,10 @@ the evening before by UI-suite runs that had all been started with
   `--state-dir`, so it hands over the redirected folder) and a scheduled
   publish's wrapper and legs. It moves the trail ONLY: the launchers still
   build into the real builds root. No current UI test triggers a refusal.
+  (The wrapper was handed only this variable until #702; since Windows
+  1.9.3 it is handed `PLANTOIR_RUNTIME` as well, which changes which runtime
+  a task builds with, not where anything is written. Doc 03 → "Where a
+  launcher's own trail lines go" has the reasoning and what older tasks do.)
 
 **What a driven run must not touch**, and what now checks it: the real trail,
 settings, startup log, scheduled-deploy wrappers and pending sentinels, and
@@ -1385,8 +2207,9 @@ the 2026-10-23 full run and passed alone).
 Until bundle 11 the suite drove no Preview and no Deploy, so course import,
 courses kept for reference, Copy a Page, preview and publishing had never been
 proven through the window. Russell lifted the rule against it — "I don't care
-if you have real build folders. We need to test this. End to end." — and five
-classes now run the real launchers:
+if you have real build folders. We need to test this. End to end." — and these
+classes run the real launchers (five at the time; more have joined since,
+`LaterClassesAtDeployUiTests` among them):
 
 | Class | What it drives | What it reads back |
 |---|---|---|
@@ -1395,6 +2218,7 @@ classes now run the real launchers:
 | `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
 | `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
 | `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+| `ReturningToASectionMidDeployUiTests` (#728) | Deploy of a two-section course to a folder, padded with 1,200 plain pages so the deploy outlasts leaving and coming back; section 2 and back mid-deploy; Section ▸ Deploy… and Ctrl+Shift+D tried while greyed; away while it ends, back twice | the "Deploying …-S1" progress and Cancel on return, Deploy and the menu item unavailable (asserted, since Invoke on a greyed button throws), "Done" once and then the ordinary state, and the trail: ONE "started deploy.ps1 UIBACK 1", no "already being deployed" |
 
 **What a test that runs a launcher owes, and where it is done.** The launchers
 build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
@@ -1420,6 +2244,27 @@ behaviour without a desktop.) Rejected: redirecting `LOCALAPPDATA` for the app's
 launchers would build under the state folder — it would have stopped the
 tests exercising the real path the ruling asked for, and node and npm resolve
 caches from the same variable.
+
+**A fixture with a folder problem now meets an alert (#734).** A preview of a
+course missing its `Media` folder or its front page, or with a page whose
+settings cannot be read, writes the section's Problems record and raises the
+alert about new problems mid-build. `DrivenApp.WaitAnsweringDialogs` answers it
+with its Close button (Not Now, which is recorded as the answer) like any other
+ordinary dialog, and takes `except:` a title it must leave for the test to
+read (`ProblemsTabUiTests`). A test that SEEDS a record writes it where the
+launchers would, under `RealBuildsRoot`, which `Dispose` deletes. And a
+collapsed `SelectorBar`'s items are still in the tree, off screen: ask
+`IsOffscreen`, not presence (`ProblemsTabUiTests.Showing`).
+
+**A test may press an outside door, at a STUB (#736).** `FixWithButtonsUiTests`
+puts a folder holding a stub `claude.exe` and an npm-shaped `codex.cmd` first
+on the TEST process's PATH before `DrivenApp` launches the app — ShellExecute
+hands the app this process's environment, and both doors search PATH first —
+and names the file the stub writes in `PLANTOIR_PROBE_OUTPUT`. A press then
+opens a console window for a moment, the stub writes down its argument vector
+and exits (the `.cmd` ends with `exit`, so the door's `cmd /k` closes too), and
+no real assistant starts. Restore both variables in `finally`. Never press a
+door without a stub first on PATH: it would start the real Claude or Codex.
 
 **Still never done from a test:** scheduling a deploy (it registers a REAL
 Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
@@ -2152,7 +2997,7 @@ as work happens:
 WSL2 and the whole image/container model on 2026-08-19 (`GUI-IMPROVEMENTS.md`
 entry 290) in favour of a **native runtime**: `windows-app/Vendor/fetch-runtime.ps1`
 fetches pinned, portable pieces — Node 22.23.4 (zip, no installer; Node 20
-until #675), Python 3.11
+until #675), Python 3.14.10 (3.11.9 until #764, below)
 (the embeddable distribution plus `python-frontmatter==1.3.0`,
 `PyYAML==6.0.3` and `Pillow==12.3.0`, pinned there since 2026-09-19 and held
 against `contracts/toolchain.json` → `pins` by
@@ -2552,7 +3397,7 @@ Windows figures are the v1.1.0 release assets.
 | | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
 |---|---|---|---|
 | Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
-| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 22.23.4, Python 3.14.10 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
 | Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine), and since 2026-10-15 (#503) the Paged.js and function-plot tarballs and the Debian Latin Modern package, with the files kept from each checked again; `get-pip.py` deliberately not (below) |
@@ -2573,7 +3418,9 @@ the same day.)
    file) on a mismatch. The pins were measured on the build PC (i5-8365U,
    Windows 11 26200), not copied: Node's equals nodejs.org's own
    `SHASUMS256.txt` for v20.18.1 (and, since #675, for v22.23.4); the Python zip's `python.exe` and
-   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   `python311.dll` were byte-identical to the runtime that had shipped (3.11.9;
+   since #764 the pin is python.org's published SHA-256 for the 3.14.10 zip,
+   and the wheels are hashed too); the font
    equals the shipped font. Proven by running the script's own `Fetch` (lifted
    out of the file by its syntax tree, against a `file://` copy): the right pin
    keeps the file, one wrong hex digit refuses it and leaves nothing behind.
@@ -3339,8 +4186,10 @@ produce. So the fixture stopped inventing them: `RealTools` dispatches to the
 real `PlantoirTools` against a course in a temp folder, which is the shape
 `AssistFixture.makeRunner` has had on the mac since the scenario suite shipped.
 (Since #690 a scripted `given.modelReply` answers the first request only, as
-the mac's runner does since #610, and the ten Open in Obsidian cases' keys are
-read — "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".)
+the mac's runner does since #610 — or, since #720, every request up to a fuse
+when `given.modelReplyAnswers` is `everyRequest` — and the Open in Obsidian
+cases' keys are read, eleven of them since #720 — "The assistant's Open in
+Obsidian on Windows (#690, the mac's #610)".)
 
 Five things about it are decisions rather than details.
 
@@ -4111,8 +4960,11 @@ that is why the two are separate commits in that order.
 The fix is structural, and two notes rather than one:
 
 - `_folderThisSectionWorksIn` — written where a folder is DECIDED: the two
-  preview starts, and the deploy only AFTER its own preview stop, so that stop
-  still names the preview's folder. Read by every stop.
+  preview starts. Read by every stop. (The deploy wrote it too, only AFTER its
+  own preview stop, until #728 moved the deploy's folder to its run —
+  `SectionDeployRun.Folder`, noted at the same point — because a deploy
+  outlives the view and Cancel from a view that came back must still aim at
+  it; "A section's deploy outlives its view" above.)
 - `_folderThisSectionRegisteredIn` — written once, `readonly`, at
   construction, and read only by `ReleaseLease`'s folder-keyed sweep. Kept
   apart from the work folder because a deploy starting in the one render pass
@@ -4384,19 +5236,26 @@ stayed in the ledger against #360. It was built in parity bundle 6a —
 `AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
 and `NamedGapLedger` was empty from bundle 9, but for a few hours on
 2026-10-16 when mac #524's sixteen plan-table sentences were held against #548
-until #548 landed them — and since 2026-10-28 it holds two entries against
+until #548 landed them — and from 2026-10-28 it held two entries against
 mac #698 (v1.9.1): `wording.obsidianIsNotOnThisMac` and its scenario, #690.
 Mac #698 landed on 2026-10-31: the key is now `obsidianIsNotOnThisMachine`,
 carrying `{machine}`, and the scenario is "open in Obsidian where Obsidian is
-not installed presses nothing (#610)", so both entries are deleted with the
-commit that takes the regenerated contract — the `windows` issue opened with
-#698 lists them.)
+not installed presses nothing (#610)"; #720 deleted both entries on
+2026-11-10 with the commit that took the regenerated contract, so it is empty
+again.)
 
 ---
 
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)
 
 ## The links checklist on Windows (#392, #399, #405)
+
+**Since #734 it FOLLOWS the alert about new problems** (`sectionProblems.alert`):
+`PresentTheLinksChecklistAsync` reads the section's Problems record first and
+waits while that alert is due or up, as it already waited behind today's-class
+question (#406). The #333 finding is no longer held for it: no dialog shows
+findings any more, and the checklist was always decided by its own marker here.
+See "A section's Problems tab, its marker and its alert (#734)".
 
 The mac's sheet (documentation/09-mac-app.md → "The links checklist (#379)") is,
 on this side, split in two, and only the first half is built.
@@ -5612,9 +6471,9 @@ the whole table).
   never assumed).
   - It lives at `AppDataRoot\toolchain-index\<FolderContainers.FolderIdentifier>.hashes`,
     so the teacher never sees it, it does not travel with a copied folder,
-    and a `--state-dir` run keeps its own. Like `builds\<id>`, one index
-    (about 2 MB) accumulates per folder id and nothing deletes it; accepted,
-    since a working folder is rarely abandoned and the cost is a file.
+    and a `--state-dir` run keeps its own. One index (up to about 2 MB)
+    accumulates per folder id; until #735 (Windows 1.9.3) nothing deleted
+    one. "Pruning the index (#735)" below says what removes them now.
   - It is written whole (a temporary file, then a rename), and only when the
     pass failed nothing and the index changed.
 - **The comparison** (`MirrorPass`). Length and time equal → identical, as
@@ -5647,6 +6506,78 @@ the whole table).
   script in place).
 - **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
   so they take exactly the pre-#559 path.
+
+#### Pruning the index (#735, Windows 1.9.3; the mac's #683)
+
+The mac's reasoning, the race and what was rejected are in
+`documentation/09-mac-app.md` → "Pruning the index (#683)"; Windows matches
+it, plus one rule the mac does not have (an index the settings still name is
+never removed by age, below). What is different here, and what to know:
+
+- **Every pass marks its folder's index USED** (`ToolchainMirror.MarkIndexUsed`,
+  the write time set to now) right after `RefreshToolchain` READS it, whether
+  or not the pass rewrites it. A pass with nothing to change never rewrites
+  the index, so without the mark a folder opened every day would look unused
+  after ninety. Not the last-access time: on this PC
+  `fsutil behavior query disablelastaccess` answers 2 (system managed,
+  enabled), but NTFS updates it lazily (up to an hour late) and a volume can
+  have it turned off, so it is not something to depend on. Nothing else reads
+  the index's own time.
+- **Once a launch**, in `App.OnLaunched` straight after the builds sweep and
+  inside `Task.Run`, so off the UI thread, `ToolchainMirror.PruneIndexes(folder, nowUtc, keep)`
+  removes every `*.hashes` unused for more than 90 days and every
+  `<id>.hashes.<pid>.tmp` (`WriteFingerprints`' temporary file, left only by
+  an interrupted write) more than a day old. Plain files at the top of the
+  folder only: a folder, a link, a file under a subfolder or any other name is
+  left alone. The folder is an argument with NO default
+  (`ThePruneHasNoDefaultFolder` checks by reflection), and the app passes
+  `ToolchainMirror.IndexFolder`. It writes a line to `startup.log` when it
+  removed something, and no trail line: a teacher cannot see a cache.
+- **An index the app still knows is never removed by AGE** (the final
+  sweep's case). `keep` is `ToolchainMirror.IndexIdsToKeep(AppSettings.DefaultPath)`:
+  the index ids of every folder the settings name (the last working folder,
+  the remembered windows and Open Recent, kept even when the folder is not
+  there just now). The reason: before 1.9.3 nothing marked an index used, and
+  a pass with nothing to change never rewrote it, so on the first 1.9.3
+  launch an index's write time is the date of its folder's last toolchain
+  CHANGE, not its last use. A teacher who opens a folder every day and
+  installs 1.9.3 more than 90 days after that change would otherwise have
+  the launch prune, racing the window's first mirror pass, remove the index
+  before the pass marks it, and pay a full read of every copy that morning
+  (about 100 s cold for `.toolchain\support` on the i5-8365U, measured by
+  #749's review). The same holds on any later launch for a folder the
+  settings name but nobody has opened for 90 days. The settings are read
+  directly rather than through `AppSettings.Load`, which answers fresh
+  defaults for a file it cannot read: when the file is missing or cannot be
+  read, `keep` is null and NO index is removed by age that launch (a
+  `startup.log` line says so). Leftover temporary files go by age either
+  way. A known folder that is gone is the builds sweep's to remove, below.
+  Tests: `AKnownFoldersIndexIsKeptHoweverOld`,
+  `UnreadableSettingsKeepEveryIndexButNotOldTemporaries`,
+  `TheKeepSetIsEveryFolderTheSettingsName`.
+- **The builds sweep takes the index with the builds.**
+  `BuildOutputLocation.DiscardBuildsForMissingWorkingFolders` deletes
+  `toolchain-index\<entry's name>.hashes` when it deletes `builds\<entry>`,
+  by the entry's NAME, never by hashing the recorded path again (that resolves
+  through a folder that no longer exists). The index folder defaults to
+  `toolchain-index` BESIDE the builds parent it was given, which in the app is
+  `ToolchainMirror.IndexFolder`, so a test passing its own builds parent never
+  reaches the real one (`AGoneFoldersIndexGoesWithItsBuilds`).
+- **The trap the issue named is already closed.** #735 said
+  `ToolchainFingerprintTests` write to the REAL `AppDataRoot`. They no longer
+  do: since #285 `TestAppDataRedirect` redirects `AppDataRoot` to a scratch
+  folder for the whole test process, before any test. So, as on the mac, a
+  test compares the folder the app prunes with the REAL one, built from the
+  system's own answer for `%LOCALAPPDATA%` rather than from `AppDataRoot`, so
+  that it can fail (`APruneUnderTheSuiteNeverReachesTheRealIndexFolder`). The
+  prune itself is tested only against a temporary folder, and the suite never
+  runs `OnLaunched`.
+- **Measured** on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro
+  26200), 2026-11-11, read only: the real `toolchain-index` holds 2 indexes of
+  2,011,308 bytes and 12,932 lines each (a full index, the manifest's size),
+  both last written 2026-10-31, both with a builds folder; one names a working
+  folder that exists, the other's builds folder carries no marker. Nothing the
+  prune would remove yet. Nothing here was timed: the prune lists one folder.
 
 **A test of the mirror must never depend on two writes landing in different
 clock ticks (#673).** Equal length plus times within 2 ms is the fast path,
@@ -6737,8 +7668,9 @@ a change; a question after the stop would make Cancel cost the teacher the
 preview they were reading. The saved-settings notice and its "deployed using
 the saved settings" line moved AFTER the question (the plan review's M4): a
 Cancel must not leave either behind. A second Deploy press while the question
-is up returns at once (`_isAskingAboutLaterClasses`; `_isPreparingDeploy` is
-still false at that point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
+is up returns at once (`SectionDeployRun.IsAsking` since #728, on the run so
+a second window's press returns too; `IsPreparing` is still false at that
+point). `ClassesDatedLaterAtDeployTests.TheWindowsDeploy_AsksAfterItsRefusals_AndBeforeItClaimsOrStopsAnything`
 reads that order from the source, as `ReferenceRefusalTests` already did for the
 reference refusal — the window cannot be built in a unit test.
 
@@ -6753,8 +7685,9 @@ record says so (`LaterClassesAtADeploy.WillBeRefused`) and the runner skips its
 stop: stopping the preview for a deploy that never starts would cost the
 teacher the page they were reading (2C's implementation review, L-1;
 `ClassesDatedLaterAtDeployTests.ADeployTheWindowWillRefuse_KeepsThePreview_AndLetsTheRefusalSpeak`).
-`IsSectionBusy` counts a deploy being prepared (`_isPreparingDeploy`) as well
-as one running. One check comes BEFORE that reading: a window already asking
+`IsSectionBusy` counts a deploy being prepared as well as one running — since
+#728 by asking the section's run, by the caller's folder
+(`SectionDeployRun.UnderWay`). One check comes BEFORE that reading: a window already asking
 this question, or with any dialog up, answers `CannotAsk`, refused with
 `deployWaitsForAnOpenQuestion` and nothing stopped
 (`classesDatedLater.whenTheWindowIsBusy`). `DeployWillBeRefused()` also counts
@@ -6768,10 +7701,22 @@ sentence from the seam — was rejected: the window's dialog would never be
 shown, and the window and the assistant would word the same refusal from two
 places.
 
-**The answer, in the window.** Every flagged class is listed ticked, and two
-buttons always sit beside Cancel: Hide Ticked and Deploy (the default) and
-Keep All and Deploy. Hide Ticked records the unticked as kept, then hides the
-ticked with Hide Pages…'s OWN call through this window's `plantoir-mcp`
+**The answer, in the window — a tick means it GOES OUT (#726, the mac's
+#694).** Every flagged class is listed ticked, and ONE button sits beside
+Cancel: Deploy Ticked (`AssistWording.DeployTickedButton`, the default,
+Return). Russell's two rulings on #694 (2026-10-25): a ticked box always means
+included, in this sheet and every checklist in the app; and unticking a class
+means it is not deployed AND it is unpublished, so the preview is left in the
+state the deployed site will be in (a deploy-time-only exclusion was rejected
+for letting the two drift apart). Until #726 this sheet said the opposite —
+"Hide classes dated later?", ticked meant HIDE, with Hide Ticked and Deploy
+and Keep All and Deploy beside Cancel; Keep All went because, with every row
+ticked to go out, it only repeated Return. The split is
+`ClassesDatedLater.AnswerAtDeploy` (ticked → kept at its date, unticked →
+hidden), so the direction is unit-tested rather than read off the view
+(`ClassesDatedLaterAtDeployTests.TickedIsKept_UntickedIsHidden`). Deploy
+Ticked records the ticked as kept, then hides the unticked with Hide Pages…'s
+OWN call through this window's `plantoir-mcp`
 (`MainWindow.HideClassesForTheDeploy` → `SectionVerbs.Perform`) — so it is
 backed up as `_menu-section<N>`, Section ▸ Undo Last Change takes it back, and
 pages only those classes link to go with them — with NO preview either side:
@@ -6779,7 +7724,8 @@ pages only those classes link to go with them — with NO preview either side:
 restart (the plan review's M1; a hide that failed would otherwise leave the
 teacher with no preview for a deploy that never happened). Its "ran from a
 menu" line names Hide Pages…, whose call it is, with "N classes dated later,
-at Deploy" as its counts — the mac's own line. A ticked class still visible
+unticked at Deploy" as its counts (`ClassesDatedLater.UntickedAtDeployCounts`)
+— the mac's own words since #694. An unticked class still visible
 afterwards stops the deploy, and the teacher is shown what the hide said. The
 "asked about…" line is written AFTER the hide, so a hide that left a class
 visible is recorded as cancelled rather than as hidden (the mac writes it
@@ -6823,21 +7769,34 @@ tests pin to a morning — with a second's slack; both are local time.
 `ScheduledRunTests` runs it both ways, and with an earlier night's success
 record that must not count.
 
-**Section ▸ Publish Pages…** asks about the ticked classes after the choice
-and before the plan, in the same dialog (a `LaterClasses` stage): the ticked
-are left out and stay hidden ("Leave N Hidden and Continue", or "Publish Them
-All" with none ticked), the unticked are kept, and with nothing left nothing is
-published and the dialog closes.
+**Section ▸ Publish Pages… never asks (#726, the mac's #694).** It goes
+straight from the choice to its plan, publishes what is ticked, and writes
+nothing to `LaterClassesKept` or the trail about classes dated later. Publishing
+changes only the local preview, and a teacher publishes next week's classes
+precisely to check them there; the old `LaterClasses` stage took the teacher's
+tick and turned it into "leave hidden", so Return undid the publish they had
+asked for. Recording a class as kept from there would also let it skip the
+Deploy question. The stage, `ClassesDatedLater.FlaggedIfPublishing` and the
+sentences `laterClassesAtPublish`, `leaveOutAndContinueButton` and
+`publishThemAllButton` went with it. **What that costs, knowingly:** a class
+published there for a preview check goes online at the next SCHEDULED deploy
+unasked, because no launcher reads this rule (`classesDatedLater.neverAskedFrom`,
+measured on the mac on 2026-11-01). The scheduled deploy is unchanged here;
+whether it should hold such a class back is #727, Russell's decision.
 
 **Testing it**: unit — `FutureDatedClassesContractTests` (24 cases, the
 record's shape, the rollover undo), the four `assist-cases.json` scenarios
 (green; the three ledgered ones left the ledger), `ClassesDatedLaterAtDeployTests`
 (an open dialog not waited on, no window, the hide with no preview, the server's
-hold, what is kept, the window's order), `ScheduledRunTests` (both ways), the
-wording walk (17 keys declared). Through the window: `LaterClassesAtDeployUiTests`
-— Cancel deploys nothing and leaves the preview serving; Hide Ticked hides one
-class, keeps the unticked one and deploys to a folder; Keep All and Deploy, then
-a second Deploy that asks nothing.
+hold, what is kept, the window's order; since #726 also the tick's direction,
+the one button, Publish Pages… asking nothing, the contract asking at Deploy
+only, and the hide's counts), `ScheduledRunTests` (both ways), the
+wording walk. Through the window: `LaterClassesAtDeployUiTests`
+— Cancel deploys nothing and leaves the preview serving; Deploy Ticked with one
+class unticked hides it, keeps the ticked one and deploys to a folder; Return
+with every class ticked keeps them all, then a second Deploy that asks nothing;
+and Publish Pages… on a hidden class dated later publishes it with no question
+and no kept record, after which Deploy asks about it.
 
 REJECTED, with the reason:
 - **Asking before the window's refusals, or after the assistant's stop**: see
@@ -7997,7 +8956,22 @@ be the "nothing skipped" run `RELEASING.md` asks for (the #568
 implementation review). It also times each Netlify and Cloudflare publish and counts the
 bytes sent on the interface the default route uses (route metric plus
 interface metric: sorting on the route's alone read a Wi-Fi counter that
-never moved beside the wired adapter).
+never moved beside the wired adapter). Since #743 and #719 a `-FirstPublish`
+run asks a brand-new site again for a file before failing it, and every
+Cloudflare leg fails if wrangler handed it to Workers: "wrangler 4.156.0, a
+brand-new site's files asked again, and the loopback guard", below.
+
+**Since 1.9.3 (#749, #739)** every Netlify call names `--target netlify`
+(a flagless call would deploy every saved leg), the plain run has two
+offline folder steps before the credentialed legs — one stylesheet in the
+folder's `.toolchain` edited to stand for a new version of Plantoir, after
+which a folder publish with no page changed must build again and ship the
+rule, and the next must not build (the timings go in the Result block); and
+a deploy with nothing typed over two saved folders, both written, then a
+first leg that fails while the second is still written and the run exits 1
+— and `Set-Destination` writes an additional folder's `path`, the key the
+app and the launchers read (it wrote `folder_path`, which nothing read while
+the harness passed every flag itself).
 
 Two runs, 2026-10-22, a scratch course (`PYT1O`: two runnable pages, one
 with a YouTube frame, and the borrowed page). The FIRST, from a fresh state
@@ -8010,7 +8984,9 @@ run, onto the same sites: **140 passed, 0 failed, 8 skipped** (the eight
 were the Swift program, once per host and folder, then reported as skips;
 these totals are from BEFORE the change above, which turns those eight into
 asserted passes, so a clean run should now read 148 passed, 0 failed,
-0 skipped — the next release run re-measures it); publishes of 10–12 s to
+0 skipped — the next release run re-measures it; the checks have grown
+since, and on 2026-11-10 (#719) the `-FirstPublish` run read 170 passed,
+0 failed, 0 skipped and the plain run 168 passed, 0 failed, 0 skipped); publishes of 10–12 s to
 Netlify ("7 file", 182–239 KiB sent) and 20–29 s to Cloudflare ("Uploaded 7
 files (46 already uploaded)", 400–709 KiB) on Ethernet.
 
@@ -8162,7 +9138,10 @@ On scratch copies, not committed: a wait that returns `$true` at once
 failed **4 of the 8**, the mac's figure (07 → "`./verify-deploy.sh
 --self-test`"); comparing the front page only failed "only the static files moved (same front page)", the
 case that must fail without the mark; dropping the `\s*` failed the `\r\n`
-case and the unmarked-page case.
+case and the unmarked-page case. (That was the whole self-test until #743,
+which added the mac's five #740 cases against a second stub: it now reads
+13 passed, 0 failed in about 30 s — "wrangler 4.156.0, a brand-new site's
+files asked again, and the loopback guard", below.)
 
 The must-fail count was 3, not the mac's 4, until review found why:
 `Measure-Case` hid the call's Ok lines and returned only its result and its
@@ -8910,9 +9889,9 @@ dispatcher, with the generator's samples. No ledger entry, no contract edit.
 
 ### 1. The picker and the later-classes question are tables
 
-`Views/TickTable` draws all three: Publish Pages… and Hide Pages…'s first stage
-(Page, Folder, Date) and #475's question at Publish Pages… and at Deploy (Page,
-Date). One builder, so the three cannot drift. A `ListView` with
+`Views/TickTable` draws them all: Publish Pages… and Hide Pages…'s first stage
+(Page, Folder, Date) and #475's question at Deploy (Page, Date; it was also
+asked at Publish Pages… until #726). One builder, so they cannot drift. A `ListView` with
 `SelectionMode = Single` — there has to BE a selected row for Space to tick —
 1-epx border, a plain header (the mac's picker does not sort, so neither does
 this), each row a `CheckBox` whose content IS the title (trimmed, the whole
@@ -8952,8 +9931,9 @@ two steps of one flow look alike). Ids: the boxes keep `sectionVerbPage<i>` and
 - Return with a row selected reaches Continue — when Continue is live —
   because a `ListView` keeps Return for itself (measured for #548), so the
   table catches it. At Deploy, a plain `ContentDialog`, Return records "the
-  main button" and hides the dialog, and the answer is read as Hide Ticked and
-  Deploy. Escape needs nothing: it reaches the dialog.
+  main button" and hides the dialog, and the answer is read as the main
+  button — Deploy Ticked since #726 (Hide Ticked and Deploy before it).
+  Escape needs nothing: it reaches the dialog.
 - **Narrator** hears each row's state: `AutomationProperties.ItemStatus`
   "ticked" / "not ticked", set on every change (the plan review's amendment 1).
   A box is named by its title — "title — folder" for two pages of one title —
@@ -9149,8 +10129,9 @@ before the button texts are cleared): Working clears both buttons,
 ContentDialog's "NoneVisible" state collapses that row, and holding the host
 alone still shrank the box by the row (MEASURED: 422 → 342). `SetContent`
 clears the hold for every other stage, so the plan and the answer fit their
-own content. It applies after Choose and after the question about classes
-dated later too (grow-only Working, as the mac; the test asserts the picker's
+own content. It applies after Choose (and applied after Publish Pages…'s
+question about classes dated later, until #726 removed that question)
+(grow-only Working, as the mac; the test asserts the picker's
 417 held at Working as well as the plan's), and to the three page items only
 (gated as `SizeTheHost` is), so Re-date and Make Room are untouched. The hold
 is CLAMPED to what the window leaves room for — the window's height less what
@@ -10148,7 +11129,8 @@ is no longer needed for the browser checks). Quartz's `npm ls --all` is
 EBADENGINE), and so is the TikZ engine's (251 lines). The contract's
 triangle through `plantoir-figures.mjs` is the same 1,540 bytes, SHA-256
 `8c68b085…6827b37`, as on 20.18.1. wrangler 4.80.0 answers `--version` on
-it. `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
+it (4.156.0 since #719: "wrangler 4.156.0, a brand-new site's files asked
+again, and the loopback guard", below). `NODE_OPTIONS=--disable-warning=DEP0040` silences `require('punycode')`,
 which warns without it.
 
 **A Node bump is a full re-fetch, and the script now says so.** Until #675
@@ -10168,7 +11150,14 @@ and matches it with a regex, because Windows PowerShell 5.1's `ConvertTo-Json`
 writes `"node":  "20.18.1"` with two spaces and a BOM, so a `Contains` of the
 spaced text would be wrong either way. Proven against four hand-made
 manifests: Node 20 refused, 22.23.4 accepted, 22.23.45 refused, no
-`geogebra` key refused.
+`geogebra` key refused. Since #719 it names `_PlantoirRuntimeWrangler` the
+same way (regex, held to `pins` → `wrangler` by the same test), so a runtime
+still on wrangler 4.80.0 stops the build: "windows-app\Vendor\runtime does
+not carry wrangler 4.156.0 (its manifest.json names another). Delete
+windows-app\Vendor\runtime, re-run windows-app\Vendor\fetch-runtime.ps1 (a
+full fetch, about 600 MB) and build again." Proven 2026-11-11: the 4.80.0
+runtime's own manifest refused with that line, the 4.156.0 one built, and
+the test failed with the project file's value changed to 4.80.0.
 
 A second fix the re-fetch found: the scaffold bake (`setup_course`'s two
 `ensure_…` calls) prints a check mark, and with the script's output sent to a
@@ -10329,6 +11318,12 @@ GitHub published all six on 2026-10-27, after the list's `reviewed`
 undici and satori in the image, so verify.sh's next online run should see the
 same six.
 
+(The wrangler half of what follows is history since #699 and #719: wrangler
+4.156.0 bundles undici 7.30.1, its tree has no advisory, and the wrangler
+entries in `npmAudit.accepted` were deleted as stale. Windows' audit on
+4.156.0 is in "wrangler 4.156.0, a brand-new site's files asked again, and
+the loopback guard", below.)
+
 **All six were then accepted, on evidence** (`research/npm-audit/2026-10-28.md`
 has what was read and measured; `npmAudit.accepted` carries each reason, and
 `reviewed` is 2026-10-28). The fact that decides the undici five:
@@ -10348,16 +11343,343 @@ stale=0 failed=0 unreachable=0`, exit 0. Offline (the registry pointed at a
 closed port) the script said SKIPPED and exited 2, with all five trees
 unreachable.
 
-**The installer does not close a running Node.** `CloseApplicationsFilter`
-names `*Plantoir*`, `*plantoir-mcp*` and `*llama-server*`, not `node.exe`,
-and `[InstallDelete]` now empties `{app}\runtime\node`. So a preview, or a
-scheduled deploy, still running from the old version at install time holds
-`{app}\runtime\node\node.exe` open, Restart Manager is not asked to close it,
-and the install can leave `runtime\node` half deleted. The filter is left as
-it is in this piece (the implementation review raised it; widening what a
-hand-run install closes is its own change, #700, not a side effect of a Node bump).
-Until then: stop any preview and let a scheduled deploy finish before
-installing by hand.
+**The installer did not close a running Node** (true of 1.9.0; fixed in
+1.9.3 by #700). `CloseApplicationsFilter` names `*Plantoir*`,
+`*plantoir-mcp*` and `*llama-server*`, not `node.exe`, and `[InstallDelete]`
+empties `{app}\runtime\node`. So a preview, or a scheduled deploy, still
+running from the old version at install time holds
+`{app}\runtime\node\node.exe` open, and the install can leave `runtime\node`
+half deleted — measured on 2026-11-12 it did worse (exit 5, a broken
+install). The filter was left as it was; what replaced the advice "stop any
+preview and let a scheduled deploy finish before installing by hand" is
+"The installer waits for work that is still running (#700)", at the end of
+this page.
+
+## wrangler 4.156.0, a brand-new site's files asked again, and the loopback guard (#719, #743, #730)
+
+Three pieces of the runtime and its publishing harness, done together
+because the credentialed run that judges the first needs the second. The
+mac's reasoning is not repeated: [02 → wrangler 4.156.0
+(#699)](02-docker-image.md), [07 → "A brand-new site's files, asked again
+(#740)"](07-deployment.md) and [03 → "Every preview address is this Mac's
+own (#684)"](03-launcher-scripts.md). This is what Windows does
+differently, and what it measured (2026-11-10/11, Lenovo 20QES70500, Intel
+Core i5-8365U, 16 GB, Windows 11 Pro 26200, wired Ethernet, Ontario; another
+agent's test suites were running in a second worktree for part of it).
+
+**wrangler 4.80.0 → 4.156.0** (#719). `fetch-runtime.ps1`'s
+`$WranglerVersion = "4.156.0"` is the contract's `windowsRuntimeContains`
+(one space), so `TheWindowsRuntimeRecipeCarriesTheSamePins` turned green;
+`Wrangler_StaysBelowVersionThatNeedsNode22` was deleted with the contract's
+`mustStayBelow`, and `TheRuntimesNodeSatisfiesWranglersEngines` stays. A
+base pin changed, so the fetch refuses an existing runtime (delete it and
+re-run): a fresh fetch took **223 s** (the 4.80.0 one the same evening 322 s).
+`wrangler --version` 4.156.0, `engines.node` `>=22.0.0`. `runtime\wrangler`
+is 177 MB on disk (158 MB on 4.80.0); its installed lockfile holds 91
+packages (89), none dropped, most moved (sharp 0.34.5 → 0.35.5, ws 8.18.0 →
+8.21.0, undici 7.24.4 → 7.30.1, miniflare 4.20260401.0 → 5.20261023.3-beta).
+
+**The installer now empties `{app}\runtime\wrangler`** (`installer.iss` →
+`[InstallDelete]`, the plan review's H1). The prefix install hoists every
+dependency into `runtime\wrangler\node_modules`, and Inno never removes a
+file the new version does not carry, so an install over 1.9.0 would have
+kept 4.80.0's files beside 4.156.0's in the same package folders, for Node
+to resolve and for the audit to find. (Proved on 2026-11-12 by #700's
+measured install over 1.9.0 on a quiet machine: `runtime\wrangler`
+1,666/1,666 files and nothing old, the audit exit 0 with `blocking=0`, and
+`--version` 4.156.0; "The installer waits for work that is still running
+(#700)" below.) What that measurement had to run:
+`windows-app\audit-runtime.ps1 -Runtime "<{app}>\runtime"` (expect exit 0,
+`blocking=0`, `stale=0`) and `"<{app}>\runtime\node\node.exe"
+"<{app}>\runtime\wrangler\node_modules\wrangler\bin\wrangler.js" --version`
+(expect 4.156.0), and look for files under `runtime\wrangler\node_modules`
+dated before the install.
+
+**The audit** (`windows-app\audit-runtime.ps1`): on 4.156.0 exit 0, `COUNTS
+audited=5 advisories=54 accepted=54 blocking=0 reported=0 stale=0` — the
+mac's numbers for the image exactly, so the installed tree adds no advisory
+the image's does not. On the 4.80.0 runtime kept aside, the same script with
+the new accepted list: exit 1, **14 blocking** (sharp, undici, ws) and 21
+reported, every one in the wrangler tree — the must-fail #719 predicted.
+
+**The Workers delegation, tested for real.** wrangler 4.108+ hands a NEW
+static project to Workers when it believes an agent drives it. On Windows
+`deploy.py` runs natively, so the harness's own `CLAUDECODE` and `AI_AGENT`
+(it ran under Claude Code) reached wrangler while it made a first upload
+to a project `ensure_pages_project` had just created. `verify-deploy.ps1` →
+`Check-NoDelegation` (the mac's `check_no_delegation`) fails a Cloudflare
+leg whose log says "now part of Cloudflare Workers", and the run records
+which of `CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID` and `GEMINI_CLI` it
+carried (names only). Every leg stayed on Pages: `--branch=main` and the
+API-made project hold here too. `Measure-Deploy`'s count no longer needs
+"(N already uploaded)", which a first-ever upload does not print (the mac's
+#712). The transcript is `research/wrangler/2026-11-10-windows-first-upload.md`.
+
+**A brand-new site's files, asked again** (#743). `Get-CheckedResponse` is
+`fetch_headers`, `Measure-NewSiteRetries` is `measure_new_site_retries`,
+and `Check-Engine` calls the first for exactly the fetches the mac
+switched (the engine's files, the worker's CSP, Swift's thread and program,
+COEP on the engine folders, KaTeX's stylesheet and face) and the second at
+its end, with its own retry log per call. On a `-FirstPublish` run only, an
+answer that is not HTTP 200 (plus COEP `require-corp` for the COEP checks)
+is asked again every 5 s until a 60 s deadline fixed at the first ask
+(`VERIFY_DEPLOY_NS_POLL`, `VERIFY_DEPLOY_NS_WAIT`); each retry prints an
+`[again]` line (ASCII, not the mac's arrow: the file is BOM-less UTF-8 that
+Windows PowerShell 5.1 reads as ANSI), and the Result block carries one line
+per site. A plain run, and the `http://localhost:` preview on any run, ask
+once. `Check-PageLinks` is not retried, as on the mac. `Get-Response` moved
+up beside `Get-CheckedResponse`, unchanged, because `-SelfTest` runs before
+the helpers.
+
+`-SelfTest` gained the mac's five cases against its second stub, `files.py`,
+copied byte for byte: **13 passed, 0 failed, 0 skipped**, ten runs in a row,
+29–31 s each. The never-served case asserts 2–5 retries and the count case
+the total the log holds (it read "3 file(s) needed asking again, 8 retries
+in all, at most 4 for one file, the longest 4 s"). Must-fail on a scratch
+copy with the retry taken out (`break` in place of the first-publish test):
+**9 passed, 4 failed**, the plain-run case passing either way — the mac's
+figure. The credentialed `-FirstPublish` run said "no file needed asking
+again" for both new sites on every leg, so, as on the mac, the retry has yet
+to be seen firing live.
+
+**How a red `-FirstPublish` check is read.** A per-file check that is red
+after its 60 s is a failure. A page-link 404 on a brand-new site
+(`Check-PageLinks`, not retried — the mac's 2026-10-31 run had one, doc 07)
+is checked once by hand a few minutes later and recorded as such, red in
+the run and "200 by hand at <time>" beside it; a run is never re-run until
+it is green.
+
+**The loopback guard** (#730). The rewrite is now `Set-QuartzLoopbackBinds`,
+between BEGIN/END markers above the fetch's `try`: it requires
+`server.listen(argv.port)` and `new WebSocketServer({ port: argv.wsPort })`
+each EXACTLY once and refuses, naming "the preview server" or "the
+live-reload websocket", when either is not; the guard it replaced passed on
+any `127.0.0.1` in the file. It also reads and writes `handlers.js` as UTF-8
+with no BOM. The old `Get-Content -Raw` read it as ANSI and `Set-Content
+-Encoding utf8` wrote a BOM, so the "Get started" bullets at lines 217-219
+were mojibake (`â€¢`) in every runtime made until now; the new fetch's file
+differs from upstream Quartz v4.5.0's in lines 442-443 only (`diff`), with
+no BOM. `FetchRuntimeLoopbackGuardTests` (5) lift the function and run it
+through powershell.exe on a fixture of Quartz's own two lines and a bullet
+line: both rewritten with every other byte kept, one site missing either
+way, neither, and a site twice. Must-fail with the old guard between the
+markers: all 5 red (the one-site and twice cases because the old guard
+passes them, the both-sites case on the bytes, neither-site because the old
+message names no site). REJECTED: "at least once" (a second bind site in a
+new Quartz is a change to look at, not to rewrite blind), and a regex over
+the whole file for `127.0.0.1` (what failed).
+
+**Measured on a real preview** (2026-11-11, `preview.bat ICS3U 1` in
+`C:\Users\lenov\Desktop\plantoir-deploy-verify`, with `PLANTOIR_RUNTIME` set
+by hand to the new runtime — unset, the launcher would have used the
+INSTALLED 1.9.0 runtime): `Get-NetTCPConnection -State Listen -LocalPort
+8081,9081` listed `127.0.0.1:8081` and `127.0.0.1:9081`, both owned by the
+one `node`, and nothing on `0.0.0.0` or `::`. `curl.exe` got 200 from
+`127.0.0.1:8081` and `localhost:8081`; from the PC's LAN address
+(192.168.2.21) on 8081 and 9081, and from `[::1]:8081`, it was refused
+(exit 7). `preview.bat ICS3U 1 --stop` stopped 3 processes and left no
+listener and no `node` naming the folder.
+
+**Cancel during a Cloudflare upload, on 4.156.0** (2026-11-11). The app's
+Cancel is `ScriptRunner.CancelByUser`: a `\x03` written into the pseudo
+console, then a kill two seconds later if anything is still running. That
+was reproduced with a scratch copy of PtyDriver whose only change is a reply
+that writes `\x03`, running the launcher the way the app does
+(`powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File
+deploy.ps1 ICS3U 1 --target cloudflare`, `PLANTOIR_RUNTIME` the new
+runtime), and firing on the line under wrangler's banner, the moment
+`pages deploy` began. Node's exit codes were logged by a `--require`
+preload in `NODE_OPTIONS`. **wrangler 4.156.0 exited 0**, as both versions
+did on the mac (#699), and so did the launcher, 42 s after it started and
+with nothing printed after the banner: no "Deploy complete", no traceback.
+So nothing moves `STATUSES_OF_A_PROGRAM_STOPPED_BY_A_CANCEL` (130, -2,
+0xC000013A) or the Cancel wording, which the app chooses from its own
+`WasCancelled`, set before the `\x03`, not from the exit code. The window's
+sentence itself was not looked at in this piece. Through `deploy.bat`
+instead (how `verify-deploy.ps1` and a teacher at a command line run it),
+wrangler also exited 0 but `cmd.exe` then stopped at "Terminate batch job
+(Y/N)?" and waited until it was killed; the app never goes through `cmd`.
+
+**#714 on Windows** (Debian's Brotli in the image): the runtime's Node
+reports `process.versions.brotli` 1.1.0 and `process.versions.openssl`
+3.5.9 (Node 22.23.4). But Pillow 12.3.0's FreeType DOES carry a Brotli
+decoder of its own: `ImageFont.truetype` loads a WOFF2 font
+(`KaTeX_AMS-Regular.woff2`), which FreeType can only do when built with
+Brotli, although no `*brotli*` file and no Brotli string is in any Pillow
+`.pyd` (it is linked in statically). Its version cannot be read from the
+binary. And the runtime's Python 3.11.9 reported `ssl.OPENSSL_VERSION`
+"OpenSSL 3.0.13 30 Jan 2024", the TLS under every Netlify publish and
+`deploy.py`'s Cloudflare API calls on Windows. Nothing was changed
+here: the OpenSSL half was #764 (v1.9.3), which moved the runtime to Python
+3.14.10 and OpenSSL 3.5.9 (next section), and Pillow's Brotli is #766,
+which asks for its version on both platforms.
+
+## Python 3.14.10 in the runtime: a supported OpenSSL (#764, Windows 1.9.3)
+
+Written 2026-11-11 for [#764](https://github.com/russellgordon/plantoir/issues/764).
+Measured on the Windows test PC (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11
+Pro 26200, wired Ethernet). The contract half is `contracts/toolchain.json` →
+`windowsPython` (version, `windowsRuntimeContains`, `opensslAtLeast`, why,
+measured, rejected). The mac owes nothing; what it must KNOW is in
+[02 → "The shared scripts run on two Pythons"](02-docker-image.md).
+
+**Why.** Python's own OpenSSL is the TLS under every Netlify publish and every
+Cloudflare API call `deploy.py` makes here (wrangler uses Node's, 3.5.9). The
+runtime carried Python 3.11.9, the last 3.11 with Windows binaries, whose
+OpenSSL is 3.0.13 (30 Jan 2024). OpenSSL says "Versions 3.0, 1.1.1 and 1.0.2
+are no longer supported" (openssl-library.org → release strategy). Its last
+public 3.0 is 3.0.22 (25 Aug 2026), and about 44 CVEs were fixed in 3.0.x
+after 3.0.13. No 3.11 patch release can move it: 3.11.10 to 3.11.18 are
+source only. The exposure was outbound only, to Netlify and Cloudflare, at
+deploy: Python serves nothing.
+
+**The candidates.** Each python.org embeddable amd64 zip was checked against
+its published hash and run with `-I`. `ssl.OPENSSL_VERSION`, and each tag's
+`PCbuild/get_externals.bat` agrees:
+
+| Python | OpenSSL | Windows binaries still coming? | win_amd64 wheels for all three pins |
+|---|---|---|---|
+| 3.11.9 (was) | 3.0.13 | no | yes |
+| 3.12.10 | 3.0.16 | no (3.12.11 on are source only) | yes |
+| 3.13.17 | 3.5.9 | no: 3.13.18 (25 Oct 2026) is source only | yes |
+| **3.14.10** | **3.5.9** | **yes, while 3.14 is in bugfix (to about 2027-10)** | **yes (cp314)** |
+| 3.15.2 | 3.5.9 | yes | **no**: PyYAML 6.0.3 has no cp315 wheel (`pip --only-binary` refuses) |
+
+3.14.10 is the only line with all three, so the next OpenSSL fix arrives as a
+3.14.x. Its zip is 12,619,664 bytes (3.11.9's: 11,249,023), and `python.exe`,
+`python314.dll` and `libssl-3.dll` are Authenticode-signed by the Python
+Software Foundation. **Before 3.14 goes source-only (about 2027-10) the
+runtime must move again**, to a line that still has Windows binaries, or this
+returns. That needs a PyYAML wheel for that line, and PyYAML is the pin that
+decides what `publish: no` means (08 → "Whether students see a page").
+
+**What landed.**
+- `fetch-runtime.ps1`: `$PythonVersion   = "3.14.10"`. The zip is checked by
+  hash AND size. The three wheels are pinned by version AND SHA-256 (PyPI's
+  own, for the cp314 win_amd64 files) and installed with `--only-binary :all:
+  --require-hashes --no-deps`: a missing wheel refuses instead of building
+  from source. Until #764 they were exact versions with no hash. 3.14's
+  `get-pip.py` installs pip only; 3.11's also installed setuptools, wheel and
+  packaging, which nothing here imports.
+- `Assert-PythonOpenssl` refuses a Python whose OpenSSL is below
+  `opensslAtLeast` (3.5.9). It reads the number in `ssl.OPENSSL_VERSION`. Its
+  first version read `ssl.OPENSSL_VERSION_INFO[:3]` instead, and refused
+  3.14.10 on its first run. For OpenSSL 3 that tuple is (major, minor, 0,
+  patch, status), so 3.5.9 is `(3, 5, 0, 9, 0)` and its first three read 3.5.0.
+- `Plantoir.csproj` → `CheckNativeRuntimeManifest`: `_PlantoirRuntimePython`
+  stops the build on a runtime whose manifest names another Python. The
+  fetch already refuses to replace a base pin in place. Measured: a manifest
+  edited to 3.11.9 gives "does not carry Python 3.14.10".
+- `installer.iss` → `[InstallDelete]` empties `{app}\runtime\python`. Python
+  3.14 loads only `python314._pth`, and a cp311 `.pyd` is not a cp314 one.
+  But an upgrade would otherwise keep `python311.*`, setuptools, wheel,
+  packaging, the cp311 `.pyd`s and a second pip `dist-info` beside the new
+  tree. A preview build or scheduled deploy running `python.exe` at install
+  time is #700's exposure, the same as `runtime\node`'s: measured
+  2026-11-12, a build that had exited before `[Files]` reached `python.exe`
+  still left `python311.dll` and its loaded cp311 `.pyd`s beside 3.14, at
+  exit 0. Since 1.9.3 the installer waits for it first ("The installer waits
+  for work that is still running (#700)", below).
+- `PythonToolchainTests` runs the shared `scripts/test_*.py` on the
+  RUNTIME's Python whenever a runtime is fetched (this checkout's, or
+  `PLANTOIR_RUNTIME`'s), and on PATH's `python` only when none is.
+  `TheSharedTestsRunOnTheRuntimesPythonWhenOneIsFetched` prints which, with
+  its version and OpenSSL. Until #764 they ran on PATH's interpreter (3.14.7
+  on this PC) while teachers ran 3.11.9. The runtime's `._pth` replaces
+  `sys.path`: the script's own folder is not on it and `PYTHONPATH` is
+  ignored. So, run plainly, 50 of 93 files failed with
+  `ModuleNotFoundError`. (`PYTHONIOENCODING`, `PYTHONDONTWRITEBYTECODE` and
+  `PYTHONUTF8` ARE honoured there, measured on 3.14.10, although
+  `sys.flags.ignore_environment` reads 1.) That happened on 3.11.9 and 3.14.10
+  alike. A shim (`runpy.run_path` with the working directory, `scripts\`,
+  first on `sys.path`, plus `-B -X utf8`) does what the product's entry
+  scripts do for themselves. With it, 93/93 pass on both (273 s and 293 s).
+- `RuntimePythonTests`. It holds the recipe, the build, the installer and a
+  fetched runtime to the contract. A runtime that is fetched and differs
+  FAILS; only no runtime skips, because the build's guard never runs for
+  `dotnet test`. It runs the OpenSSL floor as written against stand-ins
+  (3.0.13, 3.0.22 and 3.5.8 refused; 3.5.9, 3.5.10 and 3.10.0 accepted) and
+  against the real runtime. It also parses every `scripts/` and `support/` file
+  as Python 3.11, the image's. That parse rejects `type X = …`, `def f[T]`,
+  `class C[T]` and `except A, B:`, each a test case. It does NOT see PEP 701
+  quote reuse in an f-string, or a stdlib function added after 3.11.
+- `verify-deploy.ps1` records the runtime's Python and OpenSSL in its
+  Measured block.
+
+**Revalidated, against 3.11.9.**
+- Identical: libyaml (`CSafeLoader`), the YAML 1.1 readings of
+  no/off/yes/on, Pillow's freetype, webp, jpeg and zlib (raqm absent on both),
+  37 certificates in the default context (Windows store), TLS to
+  api.netlify.com and api.cloudflare.com, and `zoneinfo` absent on both.
+  Build_site's fallback to local time is the path both take.
+- 140 `.py` files compile with no `SyntaxWarning`.
+- One MPM2D folder (made by `setup.ps1` through PtyDriver) was built with
+  `preview.ps1 --build-only` on each runtime in turn: 429 files each, the
+  same names. 370 are byte-identical, `og-image.png` (Pillow) among them. The
+  other 59 differ only in the build's own `<time datetime>` and the
+  sitemap's dates. Built from two different folders, every page also differs
+  in base64 of the build path (the builds id). That is not Python.
+- A preview through `preview.ps1 --non-interactive` serves 200 on both. A
+  file count taken the moment the preview says "Started a Quartz server" is
+  NOT a finished site (276 of 429 on one run), so compare `--build-only`
+  output.
+- **Coloured tracebacks.** Python 3.13+ colours a traceback on a console, and
+  under ConPTY that console is the app's.
+  - A forced `RuntimeError` in `build_site.py`'s `main` was run through
+    PtyDriver (`--bytes-log`, as the app runs launchers). ConPTY sent 36 SGR
+    colour codes on 3.14.10, against 1 (its own reset) on 3.11.9.
+  - Fed back through `TranscriptBuilder`, the transcript carried no escape
+    character on either, and the same lines, plus 3.13's caret lines
+    (`~~~~^^`).
+  - `FailureExplainer` explained neither, as before. The app needs no change.
+  - PtyDriver's `--raw-log` strips control sequences itself, so it cannot
+    show this. Read `--bytes-log`.
+- **Backups.** The one Python deflate in `scripts/` is the setup wizard's
+  automatic course zip (`setup_course.backup_existing_course_dir`), and
+  3.14's Windows build links zlib-ng, so its compressed bytes differ. It is
+  left out of every byte comparison. A backup made on 3.14.10 (244 files,
+  1,855,118 bytes) passes `testzip` on 3.11.9 and on 3.14. Extracted by .NET's
+  `ZipFile`, all 244 files equal the course. `CourseRestorer.RestoreBackup`
+  does not read these zips at all: the app lists `<timestamp>.zip` wizard
+  zips as neither backups nor archives (`BackupItem`), and its own backups
+  are made by .NET.
+- Sizes: `runtime\python` 61 MB -> 56 MB; the whole runtime about 775 MB ->
+  764 MB (du). A full fetch took 248 s.
+
+**Publishing, on 3.14.10** (2026-11-11). Each run records the runtime's
+Python and OpenSSL in its Measured block: "3.14.10, OpenSSL 3.5.9 29 Sep 2026".
+- `verify-deploy.ps1 -SelfTest`: 13 passed, 0 failed, 0 skipped, 39 s.
+- Plain `verify-deploy.ps1`: 169 passed, 0 failed, 0 skipped, 1,082 s.
+- `-FirstPublish`: 169 passed, 0 failed, 0 skipped, 816 s. It created
+  `ics3u-s1-2026-vdywiqvtbm` on Netlify and on Cloudflare Pages, and no file
+  needed asking again.
+- `audit-runtime.ps1`: 5 trees, 55 advisories, 54 accepted, and 1 blocking:
+  GHSA-h895-cgqg-jf52 (toml, in Quartz's tree, high). It was new in the
+  advisory database that day and is identical on the 3.11.9 runtime, so it
+  is not this piece's. Python's part of the audit, the comparator, ran on
+  3.14.10. [#767](https://github.com/russellgordon/plantoir/issues/767)
+  accepted it on the existing `toml` entry (`npmAudit.accepted`, whose
+  reason already names prototype pollution from the teacher's own TOML).
+  After that the audit reads `COUNTS audited=5 advisories=55 accepted=55
+  blocking=0 reported=0 stale=0` (exit 0). The 54s in the #719 section above
+  and in 02 are that day's count.
+
+**Rejected.** 3.13.17, 3.12.10 and 3.15.2, for the reasons in the table.
+python-build-standalone 3.11.18 (OpenSSL 3.5.9 and the image's minor, but a
+third-party builder in the chain that holds teachers' tokens, unsigned
+binaries, 49 MB to download and 156 MB unpacked, and a different layout).
+Sending `deploy.py`'s HTTP through Node, which rewrites the shared publishing
+path on both platforms for one platform's packaging, and Python would still
+carry 3.0.13 for its other TLS. Moving the image too: its OpenSSL is current,
+and a base bump rebuilds every Mac. Staying, which the owner ruled out on
+2026-11-10.
+
+**The fallback, measured and kept.** If a 3.14.x ever cannot be taken, 3.14.10's
+`libssl-3.dll` and `libcrypto-3.dll` copied into 3.11.9 report "OpenSSL
+3.5.9 29 Sep 2026" and complete TLS to Netlify. OpenSSL 3.x keeps its ABI,
+which makes this the lowest-risk splice. It was not chosen: python.org never
+built or tested that pairing, and 3.11.9 stays nine releases behind on
+CPython's own security fixes.
 
 ## Open in Obsidian opens the page the preview shows on Windows (#681, the mac's #518)
 
@@ -10519,18 +11841,20 @@ So Windows has a fifth outcome, `OpenInObsidianPress.DidNotOpen` — from the
 route, from `SidebarPane`'s `Finishing` for a course kept for reference (which
 used to report `Opened` from a `finally` even when the route threw before
 opening), from `AssistantsObsidianPress`, and from the runner's own `catch` —
-and the reply is `wording.openInObsidianIsInTheSectionWindow`: the least wrong
-sentence there is, because each of its clauses is true (opening a page in
-Obsidian happens in Plantoir; open the section there and press Open in
-Obsidian; nothing was opened). It reads a little oddly from the in-app
-assistant, which is IN Plantoir. The contract has no sentence for a press that
-failed, and that gap is the mac's to fill, since Windows cannot regenerate
-`assist-wording.json`: mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-asks for a `wording` key and a scenario `given.obsidianPress: "didNotOpen"`
-— landed 2026-10-31 as `wording.openInObsidianDidNotOpen` and the scenario
-"open in Obsidian whose press failed before Obsidian was handed anything says
-nothing was opened (#698)", which this app switches to with the regenerated
-contract. `AFailedPressIsAnsweredWithoutAFalseSentence` and
+and since [#720](https://github.com/russellgordon/plantoir/issues/720)
+(2026-11-10) the reply is the contract's `wording.openInObsidianDidNotOpen`
+(`AssistWording.OpenInObsidianDidNotOpen`), which says nothing was opened and
+sends the teacher to that section's own button. Until then it was
+`wording.openInObsidianIsInTheSectionWindow`, chosen as the least wrong
+sentence the contract had — each of its clauses is true — but written for an
+assistant in another app, so it read oddly from the in-app one. The contract
+had no sentence for a press that failed and Windows cannot regenerate
+`assist-wording.json`, so mac [#698](https://github.com/russellgordon/plantoir/issues/698)
+added the key and the scenario "open in Obsidian whose press failed before
+Obsidian was handed anything says nothing was opened (#698)"
+(`given.obsidianPress: "didNotOpen"`) on 2026-10-31, and #720 took them.
+`AFailedPressIsAnsweredWithoutAFalseSentence` (a press that reports
+`DidNotOpen` and one that throws), the scenario and
 `TheReferenceRouteReportsDidNotOpenWhenItThrows` pin it.
 
 **Two divergences from the mac, chosen here (the mac should KNOW):**
@@ -10598,25 +11922,449 @@ the eight `cardPhrasings.matches` shapes are in `AssistCardCommand.FixedShapes`;
 `.nearMisses` and `.recordedOnly`. Putting it on Windows' list would be a fresh
 measurement on this tier under the same pre-registered rule.
 
-**`wording.obsidianIsNotOnThisMac` is held open, not said.** It names "this Mac"
-without `{machine}`, against `specialNames.platformWording.machine.rule`, and
-Windows cannot regenerate `assist-wording.json`. Windows says
-`AssistWording.ObsidianIsNotOnThisPc` ("…not on this PC…", listed in
-`ContractTests.WindowsOnlyWording`), and `NamedGapLedger` holds the key and the
+**`wording.obsidianIsNotOnThisMachine` is said with `{machine}` filled**
+(since [#720](https://github.com/russellgordon/plantoir/issues/720),
+2026-11-10). `AssistWording.ObsidianIsNotOnThisMachine()` is a METHOD that
+fills the contract's sentence through `MachineWord` ("…not on this PC…"); it
+is not a field because `ContractTests` compares string fields verbatim and the
+contract's copy carries the placeholder. `MachineWordContractTests` says it
+from `specialNames.platformWording.machine.usedIn`. From 2026-10-28 to #720
+the key was `wording.obsidianIsNotOnThisMac`, which named "this Mac" without
+`{machine}`: Windows said `AssistWording.ObsidianIsNotOnThisPc` (in
+`ContractTests.WindowsOnlyWording`) and `NamedGapLedger` held the key and the
 scenario "open in Obsidian on a Mac without Obsidian presses nothing (#610)"
-against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-(v1.9.1), which asks for `{machine}` in that sentence. **Landed on the mac
-2026-10-31:** the key is `wording.obsidianIsNotOnThisMachine` (recorded in
-`specialNames.platformWording.machine.usedIn`) and the
-scenario is renamed "open in Obsidian where Obsidian is not installed presses
-nothing (#610)"; the mac also added `wording.openInObsidianDidNotOpen` and a
-`given.obsidianPress: "didNotOpen"` scenario for `DidNotOpen` (below). Until
-Windows takes the regenerated contract, the paragraph above describes this
-app as it stands.
+against mac [#698](https://github.com/russellgordon/plantoir/issues/698),
+which renamed the key, gave it the placeholder and renamed the scenario "open
+in Obsidian where Obsidian is not installed presses nothing (#610)" on
+2026-10-31. #720 deleted the member, the row and both entries.
 
-**The scenario runner** implements `given.obsidianPress`, `given.obsidianPage`
-(fills `{page}` through an async-local the static `Sentence()` reads),
+**The scenario runner** implements `given.obsidianPress` (`didNotOpen`
+included since #720), `given.obsidianPage` (fills `{page}` through an
+async-local the static `Sentence()` reads, which also fills `{machine}` with
+`MachineWord` since #720, as the mac's `sentence(named:)` does),
 `given.obsidianInstalled`, `given.keptForReference` and the event
 `openInObsidian`; `surface: "mcp"` leaves the seam unset so the real server's
 refusal answers. And, as the mac's runner since #610, a scripted `modelReply`
-answers the FIRST request only and plain text after it.
+answers the FIRST request only and plain text after it — unless
+`given.modelReplyAnswers` is `everyRequest` (#720, below).
+
+## The lap cap on Windows (#720, the mac's #689)
+
+One teacher action asks the model at most `shared-rules.json` →
+`assistantLapLimit.mostModelRequestsPerTurn` (6) times. The rule, why six and
+what was rejected are in `10-local-ai-assistant.md` → "A turn asks the model at
+most six times (#689)"; this is how Windows keeps it.
+
+- **Where the count lives.** `AssistAgent.Run`'s loop, `MostStepsPerTurn`
+  (`internal`, pinned to the contract key by
+  `AssistLapCapTests.TheCapIsTheContractsNumber`). One step is one request:
+  the loop's `_model.Ask` is the only place the agent asks the model, and the
+  loop is entered from `Say` and `Approve` only, so both actions start the
+  count again (`EachSentenceStartsTheCountAgain`: two turns of three reads and
+  an answer, eight requests, no cap). The name stayed `MostStepsPerTurn`,
+  because issue #720 and the earlier write-ups name it that way and a rename
+  would make them wrong; its comment says it counts requests.
+- **At the cap** (`WentRoundWithoutFinishing`) the seventh request is never
+  sent and the sixth chosen tool has run. The turn is wound back out of
+  `_messages` (`WindTheTurnBack`), while the lines already returned keep every
+  `tools` line. The trail gets "assistant went round without finishing", and
+  its line is `AssistAgent.WentRoundWithoutFinishingLine`, the mac's words: the
+  count, the last tool in words, stopped, taken back. It never carries the
+  teacher's sentence or an argument value. The teacher reads
+  `AssistWording.WentRoundWithoutFinishing`. The literal it replaced had curly
+  apostrophes and no "nothing was changed". A turn that answers on the sixth
+  request is answered (`ATurnThatAnswersOnTheSixthRequestIsAnswered`). After
+  Go, `Approve` already moved `_turnBeganAt` past the approved result and
+  emptied `_sentThisTurn`/`_typedThisTurn`, so a wind-back can never erase a
+  call that ran; no approved call laps today, because every write is handed
+  back.
+- **Why "nothing was changed" is true here — and the test that comes first.**
+  The mac decides per outcome (`shouldContinue`). Windows decides by name: a
+  call ends the turn when it is in `AssistToolRunner.WriteTools` (or is
+  `check_section` / `read_remembered_timetable`). A write missing from that
+  list would lap, and the sentence would be false. So
+  `EveryWriteALapCanRunIsAWriteTool` takes every tool a LAP can run —
+  `ForTheLocalModel` (the model's choices; anything else is refused unoffered),
+  `DeploysToStudents` and `PlanTwins`' writes (what Go runs) — and requires
+  every one the server does not annotate `ReadOnly` to be in the list.
+  `EveryWriteToolNamesAServedWrite` checks the other way: every entry is a
+  served, non-ReadOnly tool, which catches the `roll_over_course` misspelling
+  this list once carried. A card's DIRECT run (`RunCommand` → `RunTool`)
+  never laps. A card held for approval reaches `Run()` only through `Approve`,
+  with a tool already in scope. That is why `explain_publishing`, a card that
+  is not annotated ReadOnly and writes nothing, is outside the test's scope.
+  Both tests held with the list unchanged. `check_section` still ends the turn
+  here and laps on the mac, a known difference that is unchanged. The
+  contract's scenario uses `list_pages`, which laps on both.
+- **The scenario runner** serves `given.modelReplyAnswers: "everyRequest"`
+  through a fuse READ from the contract (6 × 3 + 2 = 20, as the mac serves),
+  then plain text. Without the cap, the case fails rather than hanging. The
+  case's sentence matches no fixed phrasing on Windows either: it reaches the
+  model six times.
+- **Must-fails** (copy and restore, i5-8365U, with another worktree's suites
+  running on the same CPU):
+  - loop bound raised to 100: `AModelThatLoopsIsStoppedAfterSixSteps`, the
+    wind-back test, the trail test and the scenario fail.
+  - `WindTheTurnBack()` removed: the wind-back test fails.
+  - the `Note` removed: the trail test and
+    `ActivityTrailWiringTests.EveryDeclaredEventIsReferencedSomewhereInProductCode`
+    fail.
+  - the fuse set to 1: the scenario fails.
+  - `publish_pages` dropped from `WriteTools` and `roll_over_course` added:
+    both write-tools tests fail, each naming its tool.
+
+## The installer waits for work that is still running (#700, Windows 1.9.3)
+
+**What it does now.** Before the installer changes ANY file, it looks for
+processes whose executable is under `{app}` (`windows-app/installer-running-work.iss`,
+included by `installer.iss` and called from `PrepareToInstall`, then again at
+the start of `CurStepChanged(ssInstall)`; Inno calls `PrepareToInstall` before
+its own Restart Manager check and before `[InstallDelete]` and `[Files]`, and
+the harness's logs show the order). Then:
+
+| Found under `{app}` | Updater (`/PLANTOIRUPDATE=1`) | Hand-run |
+|---|---|---|
+| a preview's server: `node.exe` whose command line has `bootstrap-cli.mjs` and the whole token `--serve` | **ended**, with its children (`taskkill /F /T /PID`) | ended |
+| `llama-server.exe` | ended (the app that started it has quit) | left to the `taskkill` at `ssInstall`, as before |
+| `plantoir-mcp.exe` | **refused at once**, as `InitializeSetup` already refuses (one may be publishing in a folder the app never opened, and it serves for days) | left to the `taskkill` at `ssInstall`, as before |
+| `Plantoir.exe` | waited for when there at the first look (the app still quitting) or a scheduled run; **one opened after the first look refuses at once** | waited for only with `--run-scheduled-deploy`; a window is Restart Manager's to close, as before |
+| anything else (a build's `python.exe` or `node.exe`, a deploy's `python.exe`, wrangler's `node.exe`) | **waited for, never ended** | the same |
+
+A silent install waits up to **ten minutes** (`RunningWorkWaitSeconds`, 600)
+and then REFUSES: `PrepareToInstall` returns its sentence, setup ends with
+**exit code 7** ("the Preparing to Install stage determined that Setup cannot
+proceed", Inno's Setup Exit Codes page; 8 only when a restart is asked for, which
+this never does), and neither `[InstallDelete]` nor `[Files]` has run. A
+hand-run wizard asks instead, through `SuppressibleMsgBox` with Retry and
+Cancel (Cancel is the default under `/SUPPRESSMSGBOXES`), with no time limit.
+The second look, at `ssInstall`, refuses by `Abort`: exit **3** (measured on the harness; Inno's "fatal error preparing to move to the next phase"), still with nothing changed, because `[InstallDelete]` runs after it.
+The look repeats every second, so what was ended is seen gone and work that
+STARTS during the wait (a scheduled deploy firing) is seen and waited for too.
+
+**The hand-run wizard does not ask about a preview it has just closed.** For
+**5 s** after it ends something (`RunningWorkGraceAfterEndingMs`), the
+hand-run path looks again every second instead of showing the box; after
+that, work still there is asked about as before. The fault this closes was
+measured on the real 1.9.3 candidate (round three, W-preview, below): the look
+that ended a preview's `node.exe` counted its `build_site.py` python as work in
+the same pass, and 0.2 s after the ending the wizard showed "Plantoir is still
+building or deploying a course… Retry / Cancel", false for a preview; the
+python left by itself 0.3 s later. The silent path never had this, because it
+already looks again before deciding anything (B2: nothing running 1.24 s after
+the ending). Five seconds is about four times the longest exit measured, and
+costs a teacher with a real build beside the preview only that delay before
+the same box. Rejected: not counting a preview server's PARENT as work — the
+parent is the same `python.exe` image as a deploy's, and telling them apart
+means reading a process tree the safe defaults above deliberately do not
+trust; a timer on what was ended is the smaller rule. The harness takes this
+path under `/VERYSILENT /SUPPRESSMSGBOXES` with one `#define`
+(`RunningWorkSilent=False`, never set by `installer.iss`), so the box answers
+its default, Cancel, unseen and unheard, and a box that would have been shown
+is a refusal in its log.
+
+**The rule that tells a preview from a build.** `--serve` as a whole token,
+the separator `preview.ps1` (`Test-IsServing`) and `scripts/stop_preview.py`
+already use: `build_site.py` starts a preview's Quartz as `node
+<output>\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port N
+--wsPort M` and a build's without `--serve`. The installer also requires the
+image to be `node.exe` and the command line to name `bootstrap-cli.mjs`, so
+wrangler's node (`wrangler.js pages deploy …`) can never match. A preview that
+is still building its pages already carries `--serve`, so it is ended too: the
+installer cannot tell it from one being read, and the app's own gate holds an
+update for a preview it is BUILDING (`appUpdates.mayNotInstallWhile`), so the
+installer meets one only when the app did not know of it. The preview's
+`build_site.py` (its parent, under `{app}\runtime\python`) is not ended: it
+is waited for, and it exits within a second of its server, because its only
+remaining job was `subprocess.run` of that server and its sync watcher is a
+daemon thread (`_start_public_sync_watcher`).
+
+**Why ten minutes.** The longest work measured on this PC in this page: a
+Swift course getting ready plus its build, 263 s; full rebuilds 63–129 s; a
+Cloudflare deploy waits up to 120 s for its address after its build; a
+scheduled deploy waits up to ten minutes for a busy course before it starts.
+The updater's own gate holds an update for every piece of work the app knows
+about, so the installer meets only what it did not know about (a launcher
+typed at the command line, a folder the app does not have open, a scheduled
+run that fired after the gate). Longer would keep a teacher who chose Install
+and Reopen without Plantoir for longer; shorter would refuse a real deploy
+that was about to finish. Either way a refusal costs nothing but the update
+being offered again.
+
+**How processes are found, and why not WMI.** `K32EnumProcesses`, then for
+each `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` and
+`QueryFullProcessImageNameW`, and for those under `{app}`
+`NtQueryInformationProcess(ProcessCommandLineInformation)` — `external`
+declarations in the Pascal, no helper program. Kernel calls cannot hang the
+way a WMI query does when the WMI service is slow or broken, and Inno's
+Pascal has no thread to put a timeout on a COM call. `wmic` is gone from
+current Windows, and starting PowerShell from an installer costs seconds and
+can be blocked by policy. Setup is a 32-bit process (Inno 6.7.3 ships only
+`Setup.e32`); the harness proves the command line of a 64-bit process reads
+correctly from it. No elevation is needed for the teacher's own processes,
+which are the only ones a per-user `{app}` can hold. **The safe defaults**: a
+process whose path cannot be read cannot be under this per-user folder and is
+skipped; a `node.exe` whose command line cannot be read counts as WORK, never
+as a preview (waiting is safe, killing is not); and if the list of processes
+cannot be had at all, the install goes ahead without looking, as every
+installer before 1.9.3 did — refusing every install on a machine where one
+call fails would be a fault of its own.
+
+**After a refusal on the update path.** `[Run]` never runs, so the include
+starts Plantoir itself, and only when the teacher's Install and Reopen asked
+for it (`/RELAUNCH=1` with `/RETURNTO`): with `--update-not-installed-for-work`,
+which the 1.9.3 app writes as "update held while work is under way — the new
+version was not installed: a course was still being built or deployed when it
+came to install; it will be offered again" (`AppUpdates.NotInstalledLine`).
+A NEW argument rather than `--update-not-installed`, because the app the
+installer reopens after a refusal is the OLD one: 1.9.0 knows only the old
+argument and would write "helping an assistant in another app had started",
+false for this refusal; given the new one it writes no line at all (rule 5: no
+line is better than a wrong one). An at-quit install (no `/RELAUNCH`) refused
+for work stays closed: the teacher quit, and a window appearing up to ten
+minutes later on a classroom screen is a surprise; the update is offered
+again at the next launch. The `plantoir-mcp` refusal keeps ruling 12's
+behaviour (reopen whenever `/RETURNTO` is given, with `--update-not-installed`),
+because it happens within a second of the quit. **Nothing is ever started when
+a Plantoir window is already open** from `{app}` (`RwPlantoirIsOpen`).
+
+**The teacher opens Plantoir again during the wait** (the implementation
+review's finding): a `Plantoir.exe` under `{app}` that was not there at the
+installer's FIRST look, and is not a scheduled run, refuses the update AT
+ONCE (reason `reopened`) and nothing is reopened. Installing under a teacher
+who has come back is what must not happen, and without this the new window
+counted as work for the whole ten minutes and a second copy was started at
+the refusal. The copies there at the first look (the app still quitting) are
+waited for as before.
+
+**A refusal leaves a record.** The updater passes no `/LOG` in 1.9.0, and an
+at-quit refusal reopens nothing, so the old app's last trail line, "update
+installing … as Plantoir quits, without opening again", would stand
+uncorrected. So EVERY refusal — at quit, Install and Reopen, a hand-run
+Cancel, `InitializeSetup`'s outside-assistant one — writes
+`update-not-installed.txt` in the state folder (`/STATEDIR=` when the app
+runs with a redirected one, else `{localappdata}\Plantoir`): the version that
+waited, and why (`work`, `assistant`, `reopened`). The next launch reads it
+(`AppUpdates.ConsumeNotInstalledMarker`), writes `update held while work is
+under way` with that reason and "(1.9.3 waiting)", and deletes it; a marker
+older than 14 days, one that does not read, or one naming a version this copy
+already is, is deleted with no line. A finished install deletes it too. The
+argument passed on reopening is read only when no marker is there. The
+event's `carries` in `shared-rules.json` was widened to say so. **From 1.9.3
+on the app also passes `/LOG=`** to `installer-<UTC time>.log` in its Logs
+folder, keeping that one and the one before (`AppUpdates.NextInstallerLog`);
+this helps updates FROM 1.9.3 only. The log holds paths and the image names
+it waited for, never a command line (a deploy's can name an account), and it
+is not in the problem report; if it ever joins it, `LogRedactor`'s rules
+apply.
+
+**What cannot be closed, and what is partly closed now.** The last look is at
+`ssInstall`, milliseconds before `[InstallDelete]`. Work that starts AFTER
+it, during the three to five minutes `[Files]` takes, is not seen by the
+installer. A scheduled deploy firing then is the likely one. At `ssInstall`,
+after its last look, the installer writes `installing.<its pid>` in the state
+folder, and removes it at `ssPostInstall` and in `DeinitializeSetup` (so a
+failed or cancelled install cannot leave it). **A scheduled run that finds a
+live one stands down AT ONCE** — `Program.Main` asks before it loads anything
+a run does not need (no notification is posted, since that loads more of the
+files being replaced), and `ScheduledRun.Execute` checks it first: the run is
+recorded and turned off the way every stood-down run is
+(`CouldNotRunAsSetNow`, the contract's own `wrapperCouldNotBeWritten`
+sentence, so the section's band says it did not run and to deploy it or
+schedule another), and the trail says "did not run: a new version of
+Plantoir was being installed (process P), so it stood down at once and left
+the site as it was". It does NOT wait. The first build of this piece waited,
+and the third review found the fault in that: while the run lives it holds
+`Plantoir.exe`'s own image, so when `[Files]` reached that file the copy
+failed "in use", the silent install aborted, and the rollback after
+`[InstallDelete]` left the broken install of case B. The harness shows both
+sides (`scheduled-during-copy`, `scheduled-that-waits-breaks-it`).
+
+A marker is stale, deleted and counted for nothing (`AppUpdates.LiveInstaller`),
+when it is older than an hour (`[Files]` takes 3 to 5 minutes; the whole
+1.9.0 → 1.9.3 install took 277 s), its process is gone, its pid now belongs
+to a process started after the marker was written, or that process cannot be
+read at all. The last was the third review's finding: as the ordinary user,
+`Process.GetProcessById(pid).HasExited` throws access-denied for a SYSTEM
+process, and the first build read that as "cannot tell: assume live", so a
+setup killed (or a power cut) between `ssInstall` and `DeinitializeSetup`,
+followed by Windows giving the pid to a SYSTEM process, would have held back
+every scheduled deploy for ever. Setup runs as the teacher, so its own process
+can always be read: unreadable means it is not the installer.
+
+**The 1.9.0 → 1.9.3 upgrade itself is NOT protected against this.** The
+scheduled run that fires during that copy is 1.9.0's code, which knows
+nothing of the marker; it starts, holds `Plantoir.exe`, and the install can
+end as case B did (exit 5, a broken install). Only upgrades FROM 1.9.3 on are
+protected. How likely: a scheduled deploy is one minute, and the copy is 3 to
+5 minutes, so it needs a deploy set inside that window on the night or
+morning the teacher updates. So the 1.9.3 release notes keep ONE "before you
+update" line: let a scheduled deploy that is about to run finish first.
+
+**It helps only if the `Plantoir.exe` that starts is whole:** one started
+while `[Files]` is replacing it may fail to start at all, and the task records
+nothing, which nothing here prevents; and a launcher typed by hand at that
+moment still runs a half-copied runtime. Pausing Plantoir's scheduled tasks
+for the install was rejected (plan, 2026-11-11): a task the installer
+disabled stays disabled if setup dies part way, which is worse than one
+missed run. Why the marker is in the state folder and not beside the
+tools-copy markers in `<working folder>\courses\.internal\activity`: the
+installer does not know which working folders exist, and a scheduled run
+reads the same state folder as the app that set it. This is case E of the
+morning measurement below.
+**The assistant's engine in the bundle.** The signed 1.9.0 installer carries
+no `llama\` folder: the night's measurement found that a clean install of it
+has no assistant engine, and the owner's PC had one only because an older
+install had left its files (Inno never deletes them). Nothing looked:
+`Plantoir.csproj` includes `Vendor\llama` only when it exists, `publish.ps1`
+signed `llama-server.exe` only if present, and `RELEASING.md` never named
+`fetch-llama.ps1`. Since #700 `publish.ps1` REFUSES — before the build, from
+`Vendor\llama`, and again on the published `llama\` before the installer is
+compiled — when any of `llama-server.exe` and what it loads is missing
+(`llama-server-impl.dll`, `llama.dll`, `llama-common.dll`, `mtmd.dll`,
+`ggml.dll`, `ggml-base.dll`, and `libomp140.x86_64.dll` (LLVM's OpenMP runtime, which `ggml-base` and every CPU backend import; added after the third review), read from the binaries' PE import tables, plus
+`ggml-vulkan.dll` and `ggml-cpu-x64.dll`, the two backends the app relies on:
+Vulkan first, the CPU after). `-WithoutAssistantEngine` builds without it for
+a developer and is refused with `-Sign`. `fetch-llama.ps1` now pins the zip:
+34,573,315 bytes, SHA-256 `8e03436c…391c14bc1`, GitHub's own digest for the
+b10435 asset (read with `gh release view`, 2026-11-12) and the zip the 1.9.3
+candidate was built from; a mismatch is refused before anything is unpacked.
+Fetched on this PC with the pin: 52 files, 100,842,336 bytes. Both refusals
+were run (no `Vendor\llama`; `-Sign -WithoutAssistantEngine`) and stopped in
+seconds.
+
+**Rejected.**
+- **Restart Manager** (`CloseApplicationsFilter` naming `node.exe` and
+  `python.exe`): the updater passes `/NOCLOSEAPPLICATIONS` (bundle-8 ruling 8,
+  so Restart Manager does not close `plantoir-mcp` or a scheduled run), and the
+  1.9.0 → 1.9.3 update runs 1.9.0's app code with those arguments, so a filter
+  in the new installer protects no update at all. On a hand-run install it would
+  close a deploy's node part way, which is the next rejection.
+- **Killing a build or a deploy.** A deploy cut part way is the one thing a
+  teacher cannot get back (a site half uploaded, a Cloudflare project left
+  between versions); a build is cheap to redo but cannot be told from a
+  deploy's build by its processes. Waiting costs at most ten minutes.
+- **`CloseApplications=force`** on a hand-run install: it closes without
+  asking, the same objection.
+- **Refusing on an open preview.** `appUpdates.mayNotInstallWhile` (shared
+  with the mac) says an open preview does not hold an update, and a preview
+  never ends by itself, so every update over an open preview would be refused
+  after ten minutes. Ending its server keeps the shared rule unchanged.
+- **WMI**, `wmic` and PowerShell, above.
+- **Fixing it in the app** (stop previews before starting the installer,
+  `UpdatePrompts.QuitForInstallAfterTheCopy`): it protects only updates FROM
+  1.9.3 on, and the 1.9.0 → 1.9.3 one is the update that is happening now.
+
+**The app side (item 8 of the brief), left as it is.** `DecideAtQuit` installs
+at quit for `PostponedAtInstall` even with work under way — the contract's
+`appUpdates.atQuit` case "held by the updater's own last look, work under
+way", shared with the mac. With the installer now waiting for that work, or
+refusing with nothing changed, that install no longer breaks anything, so the
+shared case stands and nothing changed in the app except the new argument's
+trail line.
+
+**Also in this piece.** `[InstallDelete]` empties
+`{app}\Toolchain\scripts\__pycache__`: on the quiet upgrade below, its 12
+`.pyc` files (4 `cpython-311`, 2 `-312`, 6 `-314`) were the only files left
+that 1.9.3 does not carry; no other `__pycache__` under `{app}\Toolchain`
+existed. And `publish.ps1` restores `Plantoir.Mcp` for `win-x64` before
+publishing: on a fresh worktree the first `publish.ps1` stopped after 108 s
+with `NETSDK1004` (the app's project publishes the server through an
+`<MSBuild>` task that does not restore); measured here, a Release `win-x64`
+build of `Plantoir.Mcp` with `--no-restore` gives that error on a fresh
+worktree and succeeds after `dotnet restore Plantoir.Mcp -r win-x64`.
+
+### What was measured on the real installer (2026-11-11/12)
+
+Lenovo 20QES70500 (Intel Core i5-8365U, 8 logical cores, 16 GB, Windows 11
+Pro 26200), the signed 1.9.0 installed, an UNSIGNED 1.9.3 candidate built from
+`dev` 80dd8cd3d (277,877,826 bytes), every run `/VERYSILENT /SUPPRESSMSGBOXES`
+with the 1.9.0 app's own at-quit arguments, a throwaway working folder (EXC2O),
+and the signed 1.9.0 restored afterwards from a hash-checked backup. The
+candidate did NOT yet carry this fix:
+
+| Case | Result |
+|---|---|
+| A, nothing running | exit 0 in 277 s; all five emptied folders exactly the candidate's (node 2,032, python 1,275, wrangler 1,666, geogebra 117, tikz 5,448 files); audit exit 0 `blocking=0`; wrangler 4.156.0; Python 3.14.10 with OpenSSL 3.5.9; the only leftovers the 12 `.pyc` above |
+| B, a preview serving | **exit 5 after 29 s**: at `runtime\node\node.exe`, "in use" four times, then "Defaulting to Abort for suppressed message box", rollback; left node 1 file, python 23, wrangler 0, `llama\` deleted, a 1.9.3 `Plantoir.exe` under a 1.9.0 uninstall key. **A broken install.** The preview kept serving |
+| C, a build running | exit 0 in 178 s, but `python311.dll` and a cp311 `.pyd` held by the interpreter survived `[InstallDelete]`; the build itself failed ("python311.zip" gone under it) |
+| C2, a folder deploy's build | exit 0 in 186 s; build and deploy succeeded, destination whole (336 files); five cp311 files left |
+
+**Rounds two and three (2026-11-12), with the fix.** Same PC and method; an
+UNSIGNED candidate built from `dev` 50c9c4db3 (277,906,644 bytes, SHA-256
+`377ee4e7…0607c9`), each case from a clean signed 1.9.0, the app always
+launched with `--state-dir` (it otherwise processes the owner's scheduled
+records at start-up), the signed 1.9.0 and the owner's state restored and
+compared byte for byte at the end of each round:
+
+| Case | Result |
+|---|---|
+| A2, nothing running | **0**, 240 s; all five folders exact, nothing outside them the candidate does not carry; `llama\` 0 → 52 files |
+| B2, a preview serving | **0**, 169.8 s; the server ended, nothing running 1.24 s later; tree exact; the app starts |
+| C3, a full-rebuild build | **0**, 261.7 s; waited 94.2 s (and saw the build's Quartz `node.exe` start during the wait); the build finished; no cp311 |
+| C2b, a folder deploy's build | **0**, 252.7 s; waited 94.2 s; build and deploy exit 0, destination whole |
+| R, a build made endless (its python suspended), at-quit | **7**, 603.2 s; listing identical; nothing reopened; marker `work` |
+| R2a, the same with `/RELAUNCH=1` | **7**, 608.5 s; listing identical; 1.9.0 reopened once with `--update-not-installed-for-work` |
+| R2b, Plantoir opened by hand 31 s into the wait | **7**, 31.7 s (0.6 s after it opened); one Plantoir only; marker `reopened` |
+| W, hand-run wizard, a build running | box after 1.5 s; Cancel refused with nothing changed; Retry while running asked again; Retry after the build finished installed (213 s) |
+| W, hand-run wizard, a preview serving | **FAIL** on that candidate: the false box above, 0.2 s after the ending. Closed by the 5 s grace; the harness's `hand-preview` case reproduces it (its must-fail) and passes with the fix. Not re-measured on a real installer |
+| D, Install and Reopen with a preview open | **0**, 135.7 s; 1.9.0 quit in 1.8 s and ended its own preview, so no serving node outlived it; 1.9.3 reopened on the folder |
+| E1, a 1.9.0 scheduled run firing as the copy starts | **5**, 9.9 s, a broken install (runtime folders empty): KNOWN, 1.9.0 → 1.9.3 is not protected (above); the release notes' line stays |
+| E2, a 1.9.3 scheduled run firing during the copy | **0**, 151.1 s; it stood down at once; setup met `WinRT.Runtime.dll` in use once (1 s retry). The stood-down run is lost: job and task gone, the section reads "could not run as set" |
+| X, a Cloudflare (wrangler) deploy mid-install | **0**, 164 s; wrangler's node waited for; the deploy completed and the live site served it |
+| #764 items 5 to 7 | pass: the refresh removes the old bytecode before any preview; preview then deploy from 1.9.3; a task registered under 1.9.0 deployed after the upgrade |
+
+### What the harness proves (`windows-app/installer-tests/`)
+
+`run-harness.ps1` compiles the SAME include into a harness installer with its
+own AppId, installs version 1 per-user in a temp folder, starts few-KB
+stand-ins from it in each shape, runs version 2 with the updater's arguments
+(wait shortened to 20 s by a `#define`), and fingerprints the real Plantoir's
+folder (42,764 files) and uninstall key before and after (unchanged in every
+run). Not part of `dotnet test`: it installs a program, takes minutes, and two
+runs at once would share its folder (its README). `RELEASING.md` step 3a runs
+it at every Windows cut. Results, this PC, 2026-11-12:
+
+| Case | Shape (stand-ins started from the harness's `{app}`) | Exit, time |
+|---|---|---|
+| serve | `python.exe … build_site.py` holding `python311.dll`, waiting on `node.exe …\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081` | **0**, 2.4 s; the server ended, its python gone by itself; tree exactly version 2 |
+| build | python (9 s, holding `python311.dll`) and node `bootstrap-cli.mjs build` (7 s) | **0**, 9.1 s; both exited by themselves; no `python311.*`; `__pycache__` gone |
+| never | node `bootstrap-cli.mjs build` that never ends, at-quit | **7**, 21.2 s (20 s wait); version-1 tree byte-identical; the work untouched; nothing reopened; marker `work` |
+| never-relaunch | wrangler-shaped node that never ends, `/RELAUNCH=1` | **7**, 21.3 s; tree byte-identical; Plantoir started once with `--update-not-installed-for-work`; marker `work` |
+| late | python (8 s); 3 s in, a wrangler-shaped node (12 s, holding a wrangler file) started by `cmd.exe` | **0**, 16.3 s; the late node named in the log and waited for |
+| quitting-app | `Plantoir.exe` there at the first look, exiting after 4 s | **0**, 4.1 s |
+| assistant | `plantoir-mcp.exe` serving | **7**, 1.0 s; Plantoir started with `--update-not-installed`; marker `assistant` |
+| llama | `llama-server.exe` | **0**, 2.3 s; the engine ended |
+| hand-scheduled | hand-run silent, `Plantoir.exe --run-scheduled-deploy …` for 6 s | **0**, 6.1 s |
+| ssinstall | PrepareToInstall made to answer `''`, so only the `ssInstall` look runs; node that never ends | **3**, 21.5 s (Inno's code for an Abort at `ssInstall`); tree byte-identical; marker `work` |
+| came-back | node that never ends; 3 s in, `Plantoir.exe` opened (by `cmd.exe`), `/RELAUNCH=1` | **7**, 3.9 s; no second copy; marker `reopened` |
+| open-at-start | `Plantoir.exe` open and never quitting, `/RELAUNCH=1` | **7**, 21.1 s; no second copy started beside it; marker `work` |
+| scheduled-during-copy | a scheduled run of the harness's OWN `{app}\Plantoir.exe` started at `ssInstall`, standing down when it sees `installing.<pid>` | **0**, 2.6 s; it stood down at once, the copy completed |
+| scheduled-that-waits-breaks-it (must-fail) | the same run behaving as the first build did: WAITING while the marker is there | **5**, 6.6 s: the copy of `Plantoir.exe` met it "in use" four times, the hidden box defaulted to Abort, rollback (case B in miniature) |
+| hand-preview | the hand-run path (`RunningWorkSilent=False`), the serve shape with its python outliving the ended server by 2 s (`--linger-ms 2000`) | **0**, 3.5 s; no box asked; the python gone by itself; tree exactly version 2 |
+| hand-build-and-preview | the hand-run path, the same preview plus a build node that never ends | **7**, 6.1 s; the server ended, the box asked after the 5 s grace (Cancel, its suppressed default); the build untouched; tree byte-identical; marker `work` |
+
+Every case also checks the markers: a refusal leaves `update-not-installed.txt`
+with its reason, a finished install leaves none, and no `installing.*` is ever
+left behind (all held). All 14 in 234 s; with the two `hand-*` cases
+(2026-11-12, the grace above), **17 passed, 0 failed** (16 cases and the
+untouched check). Must-fails (`-MustFail`, each
+compiled from an edited COPY of the include): the check made to answer `''`
+→ serve **exit 5** and a part-replaced tree (the night's case B, reproduced);
+the preview rule never matching → serve refused, exit 7; one look only → the
+late case installed before the late work had ended (judged by time: whether
+Inno's in-use retries then trip over it depends on timing, exit 5 on one run
+and 0 after retries on another); the wait removed → build exit 5; a reopened
+Plantoir counted as work → came-back waited the full 21.5 s; the second-copy
+guard removed → open-at-start started a second Plantoir; the hand-run grace set
+to 0 → hand-preview refused, exit 7 (round three's W-preview, reproduced); and the scheduled run that waits (above) → exit 5. Every run: "the real
+Plantoir untouched" (42,764 files and its uninstall key, the same fingerprint
+before and after). Source must-fails, each red and restored: the
+`PrepareToInstall` call, the `ssInstall` look, the `__pycache__` line, the
+`#include`.
+**Not proven by the harness, and measured on the real candidate** (rounds two
+and three, above): B, C and C2 with the fix; D; E; a Cloudflare deploy during
+an install; and the hand-run wizard's box as a teacher SEES it (the harness
+proves when it is asked, not what the window shows).
+
+**For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
+KNOW about #700").

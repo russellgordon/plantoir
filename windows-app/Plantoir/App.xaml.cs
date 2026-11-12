@@ -168,9 +168,18 @@ public partial class App : Application
         }
         catch (Exception ex) { LogDiagnostic($"app updated: {ex.Message}"); }
 
-        // Ruling 12: installer.iss refused the update and reopened us.
-        if (Plantoir.Core.Assist.AppUpdates.NotInstalledLine(Environment.GetCommandLineArgs()) is { } notInstalled)
-            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UpdateHeldWhileWorkIsUnderWay, notInstalled);
+        // The installer refused the update (#700): its marker in the state
+        // folder says why and which version waited, whether or not it reopened
+        // us (an at-quit refusal does not). Without one, ruling 12's argument.
+        try
+        {
+            var runningNow = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0);
+            string? notInstalled = Plantoir.Core.Assist.AppUpdates.ConsumeNotInstalledMarker(AppDataRoot.Current, runningNow, DateTime.UtcNow)
+                                   ?? Plantoir.Core.Assist.AppUpdates.NotInstalledLine(Environment.GetCommandLineArgs());
+            if (notInstalled is not null)
+                Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UpdateHeldWhileWorkIsUnderWay, notInstalled);
+        }
+        catch (Exception ex) { LogDiagnostic($"update not installed: {ex.Message}"); }
 
 #if DEBUG
         const bool developmentBuild = true;
@@ -206,6 +215,11 @@ public partial class App : Application
                 () => Settings.LastUpdateCheckUtc,
                 when => { Settings.LastUpdateCheckUtc = when; try { Settings.Save(); } catch { } });
             Updater.Diagnostic = LogDiagnostic;
+            // #700: setup's own log beside the trail (two kept), and a
+            // redirected state folder for its markers.
+            Updater.InstallerLog = () => Plantoir.Core.Assist.AppUpdates.NextInstallerLog(
+                Plantoir.Core.Scripting.ActivityTrail.CurrentLogDirectory, DateTime.UtcNow);
+            if (AppDataRoot.IsRedirected) Updater.InstallerStateFolder = AppDataRoot.Current;
             if (int.TryParse(testFirstLook, out int firstLookSeconds) && firstLookSeconds > 0)
                 Updater.FirstLook = TimeSpan.FromSeconds(firstLookSeconds);
             // Started below, once the first window is up (#465) - not here.
@@ -225,6 +239,25 @@ public partial class App : Application
             if (swept.Count > 0) LogDiagnostic($"Swept {swept.Count} builds folder(s) whose working folder is gone");
         }
         catch (Exception ex) { LogDiagnostic($"builds sweep: {ex.Message}"); }
+
+        // #735 (mac #683): toolchain indexes unused for ninety days, and
+        // leftover temporary ones, once a launch and off the UI thread. Never,
+        // by age, the index of a folder the settings still name: before 1.9.3
+        // an index's time was its last CHANGE, not its last use. Silent like
+        // the sweep above: a teacher cannot see a cache being pruned.
+        string indexFolder = ToolchainMirror.IndexFolder;
+        string settingsPath = AppSettings.DefaultPath;
+        _ = System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                var keep = ToolchainMirror.IndexIdsToKeep(settingsPath);
+                if (keep is null) LogDiagnostic("The settings could not be read, so no mirror index is removed for its age this launch");
+                int pruned = ToolchainMirror.PruneIndexes(indexFolder, DateTime.UtcNow, keep);
+                if (pruned > 0) LogDiagnostic($"Pruned {pruned} mirror index file(s) unused for 90 days or left over");
+            }
+            catch (Exception ex) { LogDiagnostic($"index prune: {ex.Message}"); }
+        });
 
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();

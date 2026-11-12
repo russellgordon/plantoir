@@ -259,6 +259,14 @@ public sealed class LauncherRunner : ILauncherRunner
             // console applies it).
             if (read.WasMachineLine || Plantoir.Core.Scripting.TranscriptBuilder.IsMachineLine(line)) return;
 
+            // Redacted BEFORE it is kept or reported (#739): both leave this
+            // process for an outside assistant's conversation, and since the
+            // headless deploy passes --account, a failing wrangler call prints
+            // the Account ID inside its resource path
+            // (problemReportRedaction → accountPath). The same rules as every
+            // file the app writes.
+            line = Plantoir.Core.Scripting.LogRedactor.Redacting(line);
+
             lock (_gate)
             {
                 _tail.Enqueue(line);
