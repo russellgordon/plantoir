@@ -184,6 +184,7 @@ final class PlanningTabTests: XCTestCase {
             "emptyDescription": PlanningWording.emptyDescription,
             "cannotShowTitle": PlanningWording.cannotShowTitle,
             "cannotShowDescription": PlanningWording.cannotShowDescription,
+            "revertOnPlanning": PlanningWording.revertOnPlanning,
         ]
         XCTAssertEqual(Set(words.keys), Set(mine.keys), "every word in the contract has a constant, and only those")
         for (key, value) in mine {
@@ -350,6 +351,15 @@ final class PlanningTabTests: XCTestCase {
         let page: String = try PlanningTabTests.readSource("QuartzTeachers/Views/CourseSettings/CourseDetailView.swift")
         XCTAssertFalse(page.contains("TabView {"))
         XCTAssertFalse(page.contains("TabView("))
+        // The page's own wiring, which no drawn test reaches without a
+        // window model (708 fix review 2, L5): the switch goes through the
+        // binding that clears Undo, Planning publishes its own Save, and
+        // Open in Obsidian is on the page's toolbar.
+        XCTAssertTrue(page.contains("selection: tabBinding,"), "the tabs switch through tabBinding")
+        XCTAssertFalse(page.contains("selection: $selectedTab"), "never around it")
+        XCTAssertTrue(page.contains(".focusedSceneValue(\\.courseSettingsMenu, planningCommands)"), "Planning publishes its Save")
+        XCTAssertTrue(page.contains("CourseDetailTabs.planningCommands(course: course, session: settingsSession, showSettings:"))
+        XCTAssertTrue(page.contains("accessibilityIdentifier(\"openCourseInObsidianButton\")"), "Open in Obsidian is on the page")
         let main: String = try PlanningTabTests.readSource("QuartzTeachers/Views/MainWindowView.swift")
         XCTAssertTrue(main.contains("CourseDetailView(course: course)"))
         XCTAssertFalse(main.contains("CourseSettingsView(course: course)"), "the course branch uses the tabbed page")

@@ -7,6 +7,10 @@ struct CourseSettingsView: View {
 
     // MARK: - Stored properties
 
+    /// What the form says after a Save, for three seconds; the Planning tab
+    /// says the same after ⌘S there (#708).
+    static let savedConfirmation: String = "Saved ✓"
+
     let course: Course
 
     /// What the form says and remembers beyond the settings themselves (its
@@ -406,7 +410,7 @@ struct CourseSettingsView: View {
                         .accessibilityIdentifier("saveHeldBackReason")
                 }
                 if didJustSave {
-                    Text("Saved ✓")
+                    Text(CourseSettingsView.savedConfirmation)
                         .foregroundStyle(.secondary)
                         .font(.callout)
                         .accessibilityIdentifier("savedConfirmation")

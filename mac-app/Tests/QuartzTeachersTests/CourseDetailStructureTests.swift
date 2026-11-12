@@ -23,7 +23,9 @@ import XCTest
 /// sees the footer change. `testASwitchClearsUndo` fails when the
 /// `removeAllActions()` line in `CourseDetailTabs.choose` is deleted, and
 /// `testADraftSurvivesASwitchAndSaveOnPlanningWritesIt` when
-/// `planningCommands`' `perform` stops calling the form's Save.
+/// `planningCommands`' `perform` stops calling the form's Save, and
+/// `testASaveOnPlanningThatFailsTakesTheTeacherToSettings` when it stops
+/// calling `showSettings` after `afterASave` says so.
 @MainActor
 final class CourseDetailStructureTests: XCTestCase {
 
@@ -255,10 +257,21 @@ final class CourseDetailStructureTests: XCTestCase {
         XCTAssertTrue(course.configuration.hasUnsavedChanges)
 
         // Course ▸ Save on the Planning tab.
-        let commands: CourseSettingsCommands = CourseDetailTabs.planningCommands(course: course, session: session)
+        var sentToSettings: Int = 0
+        let commands: CourseSettingsCommands = CourseDetailTabs.planningCommands(
+            course: course, session: session, showSettings: {
+                sentToSettings += 1
+            }
+        )
         XCTAssertTrue(commands.maySave)
         XCTAssertFalse(commands.mayRevert, "Revert is not offered out of sight")
+        XCTAssertEqual(commands.revertNote, PlanningWording.revertOnPlanning, "and says why")
         commands.perform(.saveCourseSettings)
+        // Read at once, before anything waits: "Saved ✓" fades on a clock
+        // of its own (708 fix review 2, L4).
+        XCTAssertTrue(session.didJustSave, "the Planning tab says Saved")
+        XCTAssertNil(session.saveProblem, "the Save on Planning reported no problem")
+        XCTAssertEqual(sentToSettings, 0, "a Save that worked stays on Planning")
         let saved: CourseConfiguration = try CourseConfiguration(contentsOf: course.configFileURL)
         XCTAssertEqual(saved.courseName, "Typed on Settings", "Save on Planning wrote what was typed on Settings")
         XCTAssertFalse(course.configuration.hasUnsavedChanges)
@@ -271,7 +284,52 @@ final class CourseDetailStructureTests: XCTestCase {
             return back != nil
         })
         XCTAssertEqual(back?.stringValue, "Typed on Settings")
-        XCTAssertNil(session.saveProblem, "the Save on Planning reported no problem")
-        XCTAssertTrue(session.didJustSave, "and its Saved mark is the session's, there on return")
+    }
+
+    /// `unitPlanning.tab.saveOnPlanning.cases`, through the rule.
+    func testWhatASaveOnPlanningDoesIsTheContracts() throws {
+        let unitPlanning: [String: Any] = try SharedRulesContractTests.section("unitPlanning")
+        let tab: [String: Any] = try XCTUnwrap(unitPlanning["tab"] as? [String: Any])
+        let block: [String: Any] = try XCTUnwrap(tab["saveOnPlanning"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let session: CourseSettingsSession = CourseSettingsSession()
+            if try XCTUnwrap(testCase["problem"] as? Bool) {
+                session.saveProblem = "a reason"
+            }
+            if try XCTUnwrap(testCase["notice"] as? Bool) {
+                session.saveNotice = SettingsSaveNotice(sentences: ["a notice"], sectionsToPreviewAgain: [])
+            }
+            XCTAssertEqual(CourseDetailTabs.afterASave(session).rawValue, testCase["expect"] as? String, name)
+        }
+    }
+
+    /// A Save on Planning that fails is never silent: the page goes to
+    /// Settings, where the form's own sentence is (708 fix review 2, L3).
+    /// The course's folder is made read-only, so the write fails at once.
+    func testASaveOnPlanningThatFailsTakesTheTeacherToSettings() throws {
+        let course: Course = try CourseSettingsGestureScript.makeCourse(in: try XCTUnwrap(rootURL))
+        course.configuration.courseName = "Typed on Settings"
+        let session: CourseSettingsSession = CourseSettingsSession()
+        let folder: String = course.directoryURL.path
+        let file: String = course.configFileURL.path
+        try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: file)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file)
+        }
+        var sentToSettings: Int = 0
+        let commands: CourseSettingsCommands = CourseDetailTabs.planningCommands(
+            course: course, session: session, showSettings: {
+                sentToSettings += 1
+            }
+        )
+        commands.perform(.saveCourseSettings)
+        XCTAssertNotNil(session.saveProblem, "the write failed and the form has its sentence")
+        XCTAssertFalse(session.didJustSave)
+        XCTAssertEqual(sentToSettings, 1, "and the teacher is taken to Settings to read it")
     }
 }

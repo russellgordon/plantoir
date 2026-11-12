@@ -441,6 +441,7 @@ nonisolated enum PlanningWording {
     static let emptyDescription: String =
         "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, "
         + "assessment drafts and a curriculum correlation. Once it is built, the plan shows here."
+    static let revertOnPlanning: String = "Revert works on the Settings tab, where the changes are shown."
     static let cannotShowTitle: String = "Unit Plans Can’t Be Shown"
     static let cannotShowDescription: String =
         "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."

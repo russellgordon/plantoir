@@ -16,18 +16,25 @@ import SwiftUI
 /// page owns, so coming back to Settings shows the form exactly as it was
 /// left, with nothing focused.
 ///
-/// **Undo is cleared on every switch** (`CourseDetailTabs.choose`): the
-/// window has one undo manager, and actions a field registered would
-/// otherwise stay on it after the field is gone, so ⌘Z on Planning would
-/// undo typing in a box that is not on screen (fix review, M1). ⌘Z on
-/// Settings undoes what was typed since the teacher last came to it; on
-/// Planning there is nothing to undo, since a plan cannot be edited there.
+/// **Undo is cleared on every switch** (`CourseDetailTabs.choose`), as a
+/// guard. Measured (708 fix review 2, L1): with the form removed, the footer
+/// box's own Undo leaves with it, so the clear is not what makes Undo safe
+/// today; it is kept so a control added to the form later cannot leave an
+/// action behind that ⌘Z on Planning would run on something not on screen
+/// (fix review, M1, measured on the layered shape). The window's undo
+/// manager has no other user (a grep for `registerUndo` and `undoManager`
+/// finds none), so the clear costs the teacher nothing outside this page.
+/// ⌘Z on Settings undoes what was typed since the teacher last came to it;
+/// on Planning there is nothing to undo.
 ///
 /// **⌘S on Planning saves the settings as the teacher left them**, the same
 /// Save as the form's (`CourseDetailTabs.planningCommands`): only edits made
 /// on Settings can be there, because nothing on Planning edits a setting.
-/// Revert is not offered on Planning: it would discard edits the teacher
-/// cannot see.
+/// It is never silent: a Save that worked says the form's "Saved ✓" on the
+/// Planning tab; one refused, failed or with something to say takes the
+/// teacher to Settings, where the form shows its own sentence by the field.
+/// Revert is dimmed on Planning, with a line under it saying why: it would
+/// discard edits the teacher cannot see.
 ///
 /// **No assistant, no tab.** With neither installed the page is exactly what
 /// it was before #708: no tabs and no word about planning (Russell,
@@ -87,6 +94,14 @@ struct CourseDetailView: View {
         )
     }
 
+    /// Course ▸ Save and Revert while Planning shows.
+    var planningCommands: CourseSettingsCommands {
+        let tabs: Binding<CourseDetailTab> = tabBinding
+        return CourseDetailTabs.planningCommands(course: course, session: settingsSession, showSettings: {
+            tabs.wrappedValue = .settings
+        })
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -106,10 +121,18 @@ struct CourseDetailView: View {
                     PlanningTabView(course: course, folder: folder, model: planning)
                         .navigationTitle(course.displayCode)
                         .navigationSubtitle(course.configuration.courseName)
-                        .focusedSceneValue(
-                            \.courseSettingsMenu,
-                            CourseDetailTabs.planningCommands(course: course, session: settingsSession)
-                        )
+                        .overlay(alignment: .bottomTrailing) {
+                            // ⌘S here said so, in the form's words, for as
+                            // long as the form would (708 fix review 2, L3).
+                            if settingsSession.didJustSave {
+                                Text(CourseSettingsView.savedConfirmation)
+                                    .padding(8)
+                                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                                    .padding(12)
+                                    .accessibilityIdentifier("planningSavedConfirmation")
+                            }
+                        }
+                        .focusedSceneValue(\.courseSettingsMenu, planningCommands)
                 }
             }
         }
@@ -166,8 +189,9 @@ enum CourseDetailTabs {
     // MARK: - Functions
 
     /// Moves to `chosen`, clearing the window's undo actions first when it
-    /// is a change: an action left by a field that is about to leave the
-    /// window would act on something not on screen (708 fix review, M1).
+    /// is a change. A guard: the form's own controls take their Undo with
+    /// them when they leave (measured, 708 fix review 2, L1), and this keeps
+    /// a control added later from leaving an action behind.
     static func choose(_ chosen: CourseDetailTab, current: inout CourseDetailTab, undoManager: UndoManager?) {
         if chosen == current {
             return
@@ -176,19 +200,52 @@ enum CourseDetailTabs {
         current = chosen
     }
 
+    /// What the Planning tab does after a Save run there
+    /// (`unitPlanning.tab.saveOnPlanningCases`).
+    enum AfterASave: String {
+        /// Saved, with nothing more to say: the tab says the form's
+        /// `savedConfirmation` for as long as the form would.
+        case staysOnPlanning
+        /// Refused, failed, or saved with something to say (a preview
+        /// running, another window's change replaced): the page goes to
+        /// Settings, where the form shows its own sentence beside the field.
+        case showsSettings
+    }
+
+    /// The rule, from what the form's Save left in the session. Never
+    /// silent: a Save that said nothing on Planning would leave a refused
+    /// or failed Save unseen (708 fix review 2, L3).
+    static func afterASave(_ session: CourseSettingsSession) -> AfterASave {
+        if session.saveProblem != nil || session.saveNotice != nil {
+            return .showsSettings
+        }
+        return .staysOnPlanning
+    }
+
     /// Course ▸ Save on the Planning tab: the settings form's own Save, run
-    /// on the page's session, so its notices are there when the teacher
-    /// comes back. The form's Save reads only the course, the session and
-    /// app-wide settings, nothing SwiftUI keeps for a drawn view. Revert is
-    /// not offered here: it would throw away edits the teacher cannot see.
-    static func planningCommands(course: Course, session: CourseSettingsSession) -> CourseSettingsCommands {
+    /// on the page's session, so its sentences are the form's. The form's
+    /// Save reads only the course, the session and app-wide settings,
+    /// nothing SwiftUI keeps for a drawn view. It is offered whenever there
+    /// is something unsaved, held back or not, so a held-back Save is
+    /// pressed, refused with the form's own reason, and shown on Settings
+    /// rather than dimmed with none (`afterASave`). Revert is dimmed here
+    /// with `PlanningWording.revertOnPlanning` under it: it would throw away
+    /// edits the teacher cannot see.
+    static func planningCommands(
+        course: Course, session: CourseSettingsSession, showSettings: @escaping () -> Void
+    ) -> CourseSettingsCommands {
         let form: CourseSettingsView = CourseSettingsView(course: course, session: session)
         return CourseSettingsCommands(
-            maySave: form.saveIsEnabled,
+            maySave: course.configuration.hasUnsavedChanges,
             mayRevert: false,
+            revertNote: PlanningWording.revertOnPlanning,
             perform: { (item: SubjectMenuRules.Item) in
-                if item == .saveCourseSettings {
-                    form.performSettingsMenuItem(item)
+                if item != .saveCourseSettings || !course.configuration.hasUnsavedChanges {
+                    return
+                }
+                form.save()
+                if afterASave(session) == .showsSettings {
+                    showSettings()
                 }
             }
         )

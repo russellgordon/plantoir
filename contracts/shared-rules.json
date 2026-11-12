@@ -33692,10 +33692,20 @@
         "reload": "Reload",
         "emptyTitle": "No Unit Plans Yet",
         "emptyDescription": "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, assessment drafts and a curriculum correlation. Once it is built, the plan shows here.",
+        "revertOnPlanning": "Revert works on the Settings tab, where the changes are shown.",
         "cannotShowTitle": "Unit Plans Can’t Be Shown",
         "cannotShowDescription": "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."
       },
       "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. Nothing here says sharing: #709 adds it.",
+      "saveOnPlanning": {
+        "rule": "Course > Save on the Planning tab is the settings form's own Save, offered whenever the course has unsaved changes (held back or not), and never silent (708 fix review 2, L3). After it runs: saved with nothing more to say, the Planning tab shows the form's own confirmation (the mac's 'Saved ✓') for as long as the form would; refused (a held-back Save, with the form's reason), failed (a write error), or saved with a notice to read (a preview or deploy of the course running, another window's change replaced), the page goes to the Settings tab, where the form shows its own sentence beside the field. Revert is dimmed on Planning with words.revertOnPlanning under it, which VoiceOver reads with the menu.",
+        "cases": [
+          {"name": "saved, nothing more to say", "problem": false, "notice": false, "expect": "staysOnPlanning"},
+          {"name": "refused or failed: the form's reason", "problem": true, "notice": false, "expect": "showsSettings"},
+          {"name": "saved, with a notice to read", "problem": false, "notice": true, "expect": "showsSettings"},
+          {"name": "both", "problem": true, "notice": true, "expect": "showsSettings"}
+        ]
+      },
       "followsThePage": {
         "rule": "The popup follows the page the plan is showing, so a link from one unit's plan to another's leaves the popup naming the unit on screen (708 implementation review L4): `page` is a path inside the planning folder; the planning folder's own index.html is allPlans when offered; a page anywhere in a unit's folder is unit:<folder> when that unit is offered; anything else (a unit not offered, a file at the top that is not index.html) is null, and the popup keeps what it showed. Choosing an entry always loads its page, even the one the popup already names.",
         "cases": [

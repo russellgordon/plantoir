@@ -4172,30 +4172,52 @@ Preview Again or leaving the course), `saveProblem`, `howITeachProblem`,
 `unitWordNotice`, `didJustSave` and `heldBackWasNoted` (#373, once per visit
 to the course). The add-folder field is a popover, which closes when the
 teacher clicks the tabs, and the rename sheet is window-modal, so neither can
-hold a half-typed name across a switch. Coming back to Settings shows the form
-as it was left, with nothing focused (measured: the first responder is the
-window). Open in Obsidian moved from the form's toolbar to the page's, so it
+hold a half-typed name across a switch. Coming back to Settings shows every
+setting and the form's notices as they were left, with nothing focused
+(measured: the first responder is the window). A switch DOES drop what only a
+drawn view keeps (708 fix review 2, L2): where the form was scrolled to, which
+row of a list was selected, an open explanation, and the note under a folder
+list after an add, a removal or a rename (`StringListEditorView.notice`:
+"a folder was created", "a removed folder is still on disk", "renamed, links
+rewritten"). Those notes said what had just happened, and what happened is
+in the list itself and on the trail; keeping them across a switch would mean
+one session entry per list, kept for a sentence that has already been read. Open in Obsidian moved from the form's toolbar to the page's, so it
 is there on both tabs, and the page sets the window's title on Planning.
 
 **Undo is cleared on every switch** (`CourseDetailTabs.choose`, before the
-tab changes). The window has one undo manager, and an action a field
-registered stays on it after the field leaves: the fix review measured ⌘Z on
-the Planning tab undoing typing in the hidden footer box, leaving the box and
-the setting disagreeing. So ⌘Z on Settings undoes what was typed since the
-teacher last came to Settings, and on Planning there is nothing to undo.
+tab changes), as a guard. The first fix review measured ⌘Z on the Planning
+tab undoing typing in the hidden footer box, on the LAYERED shape, where the
+box never left the window. MEASURED on this shape (708 fix review 2, L1):
+with the form removed, the footer box's own Undo leaves with it, so the clear
+is not what makes Undo safe now. It is kept so a control added to the form
+later cannot leave an action behind for ⌘Z on Planning to run. The window's
+undo manager has no other user (`git grep registerUndo` and `undoManager`
+find none in the app), so nothing outside this page is lost. ⌘Z on Settings
+undoes what was typed since the teacher last came to Settings, and on
+Planning there is nothing to undo.
 REJECTED: an undo scope per tab (SwiftUI offers no per-view undo manager on
 macOS, and a second manager would still have to drop the gone field's
 actions).
 
 **Course ▸ Save on Planning saves the settings as the teacher left them**
 (`CourseDetailTabs.planningCommands`): the form's own Save, run with the
-page's session, so its notices are there on return. Only edits made on
-Settings can be in it, since nothing on Planning edits a setting. Revert is
-not offered on Planning (708 fix review L1): it would discard edits the
-teacher cannot see. `CourseDetailStructureTests` draws the real form in a
-window never put on screen and checks the tree with Planning showing (no
-editable field, box or table), the footer case, Undo, and that a draft typed
-on Settings survives the switch and Save on Planning writes it.
+page's session. Only edits made on Settings can be in it, since nothing on
+Planning edits a setting. **It is never silent** (708 fix review 2, L3;
+`unitPlanning.tab.saveOnPlanning`): it is offered whenever there is something
+unsaved, held back or not; a Save that worked shows the form's own "Saved ✓"
+on the Planning tab for as long as the form would; one refused (a held-back
+Save, with the form's reason), failed (a write error) or saved with a notice
+to read takes the teacher to Settings, where the form shows its sentence
+beside the field (`CourseDetailTabs.afterASave`). Revert is dimmed on
+Planning, with `words.revertOnPlanning` as a line under it in the Course menu,
+which VoiceOver reads: it would discard edits the teacher cannot see.
+`CourseDetailStructureTests` draws the real form in a window never put on
+screen and checks the tree with Planning showing (no editable field, box or
+table), the footer case, Undo, that a draft typed on Settings survives the
+switch and Save on Planning writes it and says Saved, that a Save that fails
+there goes to Settings (the course folder made read-only), and every
+`saveOnPlanning` case. None waits on a clock: "Saved ✓" is read straight
+after the Save, before its fade could run.
 
 The tab chosen is the view's `@State`, because
 nothing outside the page selects Planning; `.id(code)` makes it Settings
