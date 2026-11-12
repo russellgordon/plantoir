@@ -26,7 +26,7 @@ need to read those to use Plantoir.
 
 ---
 
-## Version 1.9.4
+## Version 1.10.0
 
 Mac first. The Windows app follows in its own update.
 
@@ -48,6 +48,37 @@ Mac first. The Windows app follows in its own update.
 - **GeoGebra sketches show that they are loading.** While GeoGebra itself
   is still arriving, the sketch's box says so, inside the box, instead of
   standing empty. ([#756](https://github.com/russellgordon/plantoir/issues/756))
+- **Better guidance for an assistant writing your pages and handouts.**
+  The notes Claude Code or Codex read before writing a page or a printed
+  handout are brought up to date: copyable text that wraps, lettered parts
+  that line up on quizzes and tests, and a settled shape for a lesson page.
+  ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
+
+## Version 1.11.0
+
+Small fixes and conveniences. Mac first where it says so.
+
+- **See, change or remove a saved Netlify or Cloudflare token** in
+  Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
+- **Vimeo videos embed like YouTube ones**, from a plain link, with a
+  privacy-friendly player. ([#692](https://github.com/russellgordon/plantoir/issues/692))
+- **A plain explanation when Cloudflare will not make another site**
+  because a free account has reached its limit of 100. ([#723](https://github.com/russellgordon/plantoir/issues/723))
+- **The assistant:** "Open my website" opens it rather than deploying it
+  ([#688](https://github.com/russellgordon/plantoir/issues/688)), and a course that could not be opened in Obsidian is
+  reported as such ([#721](https://github.com/russellgordon/plantoir/issues/721)).
+- **Mac fixes:**
+  - the first Preview after the Mac wakes from sleep should start promptly
+    ([#517](https://github.com/russellgordon/plantoir/issues/517));
+  - menu-bar commands such as Publish Pages… should always work the first
+    time ([#523](https://github.com/russellgordon/plantoir/issues/523));
+  - the backups size in the sidebar should no longer get cut off
+    ([#516](https://github.com/russellgordon/plantoir/issues/516)).
+- **plantoir.app:** correcting what it says about scheduled publishing when
+  your computer is closed or asleep at the scheduled time ([#509](https://github.com/russellgordon/plantoir/issues/509)).
+- Behind the scenes: old build folders are cleared away
+  ([#722](https://github.com/russellgordon/plantoir/issues/722)), and a handful of checks that the Mac and Windows apps behave
+  the same way.
 
 ## Version 2.0
 
@@ -82,13 +113,6 @@ Mac first. The Windows app follows in its own update.
 - **A live circuit simulator** with real schematic symbols, for physics and
   Technological Education. Lower priority than the rest.
   ([#487](https://github.com/russellgordon/plantoir/issues/487))
-- **Mac fixes:**
-  - the first Preview after the Mac wakes from sleep should start promptly
-    ([#517](https://github.com/russellgordon/plantoir/issues/517));
-  - menu-bar commands such as Publish Pages… should always work the first
-    time ([#523](https://github.com/russellgordon/plantoir/issues/523));
-  - the backups size in the sidebar should no longer get cut off
-    ([#516](https://github.com/russellgordon/plantoir/issues/516)).
 - **Changing a scheduled publish time — being decided.** Either both apps
   let you change the time directly, as Windows does today, or both ask you to
   cancel and schedule again
@@ -96,12 +120,8 @@ Mac first. The Windows app follows in its own update.
   a course you keep for reference will stop publishing on a schedule, as it
   does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
 - **plantoir.app updates:** showing off the newer features
-  ([#486](https://github.com/russellgordon/plantoir/issues/486)), and
-  correcting what it says about scheduled publishing when your computer is
-  closed or asleep at the scheduled time
-  ([#509](https://github.com/russellgordon/plantoir/issues/509)).
-- Behind the scenes: a handful of checks that the Mac and Windows apps
-  behave the same way, and fixes to how plantoir.app's pictures are made.
+  ([#486](https://github.com/russellgordon/plantoir/issues/486)).
+- Behind the scenes: fixes to how plantoir.app's pictures are made.
 
 ---
 ## Version 2.2
