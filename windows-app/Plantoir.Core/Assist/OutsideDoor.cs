@@ -120,29 +120,55 @@ public static class OutsideDoor
     }
 
     /// <summary>
+    /// What a shim's own expansion may add beyond its folder's length: inside
+    /// an npm shim <c>%*</c> is expanded again into a longer line carrying the
+    /// shim's own text (its script's path, <c>%dp0%</c>, <c>title %COMSPEC%</c>),
+    /// and cmd's 8,191 applies to THAT line. Measured 2026-11-12 with stub shims
+    /// whose script path is short (<c>cli.js</c>): the longest outer line that
+    /// arrived whole was 8,087 (modern shape) and 8,160 (old) from a 61-character
+    /// shim folder, 7,908 and 7,981 from a 240-character one — a loss of one
+    /// folder length plus 43 (modern) or minus 30 (old). npm's real script path
+    /// (<c>node_modules\@anthropic-ai\claude-code\cli.js</c>,
+    /// <c>node_modules\@openai\codex\bin\codex.js</c>) is up to about 40
+    /// characters longer, so 128 covers the worst measured shape with that room
+    /// and more.
+    /// </summary>
+    public const int ShimExpansionAllowance = 128;
+
+    /// <summary>
+    /// The longest outer line (<see cref="LineLength"/>) this program can be
+    /// handed: cmd's 8,191 for an <c>.exe</c>, and for a shim 8,191 less its
+    /// folder's length and <see cref="ShimExpansionAllowance"/>, because cmd
+    /// fails on the line the shim expands to, not on the one Plantoir builds.
+    /// </summary>
+    public static int LimitFor(string program) =>
+        IsBatch(program)
+            ? FixWithAssistant.CommandLineMaxUtf16 - (Path.GetDirectoryName(program)?.Length ?? 0) - ShimExpansionAllowance
+            : FixWithAssistant.CommandLineMaxUtf16;
+
+    /// <summary>
     /// Whether this door's whole command line, as <see cref="StartInfo"/> would
-    /// build it, is within cmd's limit in UTF-16 units
-    /// (<see cref="FixWithAssistant.CommandLineMaxUtf16"/>). Over it, the shim
-    /// path fails SILENTLY — cmd says the line is too long and leaves a prompt
-    /// — so a door refuses rather than start into that (Revise With ▸'s plain
-    /// greeting has no cap on the course's name; Fix with… drops rows to fit
-    /// through its own bound). Checked for both shapes so the behaviour does
-    /// not change when a teacher's <c>claude</c> is an <c>.exe</c> on one PC
-    /// and a <c>.cmd</c> on another.
+    /// build it, is within <see cref="LimitFor"/>. Over it the shim path fails
+    /// SILENTLY — cmd says the line is too long and leaves a prompt — so a door
+    /// refuses rather than start into that, and Fix with…'s <c>fits</c> uses
+    /// this SAME function, so rows are dropped to the real bound.
     /// </summary>
     public static bool WithinCommandLineLimit(string program, IReadOnlyList<string> arguments) =>
-        LineLength(program, arguments) <= FixWithAssistant.CommandLineMaxUtf16;
+        LineLength(program, arguments) <= LimitFor(program);
 
     /// <summary>
     /// Starts it. False when nothing started, so the caller says
-    /// <c>couldNotStart</c>. For an <c>.exe</c> (never a shim, which is
-    /// <c>cmd /k</c> and stays), it also watches BRIEFLY: ShellExecute returns
-    /// success and the window closes before a teacher could read an error, so
-    /// a program gone within the grace with a non-zero code is reported as a
-    /// door that did NOT open. Rejected: a multi-second wait (it freezes the
-    /// click) and an off-thread watch (Open is synchronous and its result is
-    /// what shows the could-not-start sentence); a short synchronous grace
-    /// catches the common instant failure without a visible freeze.
+    /// <c>couldNotStart</c>. When the program started is NOT cmd (an
+    /// <c>.exe</c> door), it also watches BRIEFLY: ShellExecute returns success
+    /// and the window closes before a teacher could read an error, so a program
+    /// gone within the grace with a non-zero code is reported as a door that did
+    /// NOT open. A shim's start is cmd, under <c>/k</c>, which never exits by
+    /// itself, so it is not watched at all (watching would only freeze the
+    /// click). What the watch cannot see: a program that exits 0 at once, one
+    /// that fails after the grace, and anything behind a shim. Rejected: a
+    /// multi-second wait (it freezes every successful click) and an off-thread
+    /// watch (Open is synchronous and its result is what shows the
+    /// could-not-start sentence).
     /// </summary>
     public static bool Start(ProcessStartInfo info, TimeSpan? watchFor = null)
     {
@@ -150,6 +176,7 @@ public static class OutsideDoor
         {
             var process = Process.Start(info);
             if (process is null) return false;
+            if (string.Equals(info.FileName, Cmd, StringComparison.OrdinalIgnoreCase)) { process.Dispose(); return true; }
             try
             {
                 int grace = (int)(watchFor ?? TimeSpan.FromMilliseconds(400)).TotalMilliseconds;

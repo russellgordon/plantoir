@@ -332,6 +332,8 @@ public static class FixWithAssistant
     public static int Characters(string text) => new StringInfo(text).LengthInTextElements;
 
     /// <summary>Cut to at most <paramref name="most"/> characters, the last of them an ellipsis.</summary>
+    internal static string CutToCharacters(string text, int most) => Cut(text, most);
+
     private static string Cut(string text, int most)
     {
         var info = new StringInfo(text);

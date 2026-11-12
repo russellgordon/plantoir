@@ -157,21 +157,94 @@ public class OutsideDoorTests : IDisposable
 
     /// <summary>
     /// An <c>.exe</c> that fails at once is a door that did NOT open:
-    /// <see cref="OutsideDoor.Start"/> watches briefly and returns false. One
-    /// that stays returns true. No window: these run with no shell and no
-    /// console.
+    /// <see cref="OutsideDoor.Start"/> watches briefly and returns false; one
+    /// that stays returns true. cmd (a shim's start, under <c>/k</c>) is not
+    /// watched at all, so it costs the click nothing. No window: stub
+    /// programs started with no shell and no console.
     /// </summary>
     [Fact]
-    public void AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor()
+    public void AnExeThatExitsNonZeroAtOnceIsNotAnOpenDoor_AndCmdIsNotWatched()
     {
-        Assert.False(OutsideDoor.Start(NoWindow("/c exit 1")));
-        Assert.True(OutsideDoor.Start(NoWindow("/c exit 0")));
-        // One that stays past the grace reads as open (it finishes on its own).
-        Assert.True(OutsideDoor.Start(NoWindow("/c ping -n 3 127.0.0.1 >nul"), TimeSpan.FromMilliseconds(250)));
+        Assert.False(OutsideDoor.Start(NoWindowExe(StubProgramCollection.ExitOneExe)));
+        Assert.True(OutsideDoor.Start(NoWindowExe(StubProgramCollection.StayExe), TimeSpan.FromMilliseconds(250)));
+        var clock = Stopwatch.StartNew();
+        Assert.True(OutsideDoor.Start(NoWindow("/c ping -n 3 127.0.0.1 >nul")));
+        Assert.True(clock.ElapsedMilliseconds < 300, $"cmd was watched: {clock.ElapsedMilliseconds} ms");
     }
+
+    private static ProcessStartInfo NoWindowExe(string exe) =>
+        new(exe) { UseShellExecute = false, CreateNoWindow = true };
 
     private static ProcessStartInfo NoWindow(string arguments) =>
         new(OutsideDoor.Cmd, arguments) { UseShellExecute = false, CreateNoWindow = true };
+
+    /// <summary>
+    /// The shim's own expansion is inside the bound (third review, finding 1):
+    /// for both shim shapes, from a shallow and a 240-character shim folder,
+    /// the longest outer line <see cref="OutsideDoor.WithinCommandLineLimit"/>
+    /// allows arrives whole, and one character more is refused, so a shim line
+    /// between the real failure point and 8,191 can no longer open a window on
+    /// cmd's "too long". Must-fail: compare a shim against plain 8,191.
+    /// </summary>
+    [Fact]
+    public void TheLongestShimLineAllowedArrivesWhole_AndOneMoreIsRefused()
+    {
+        foreach (bool old in new[] { false, true })
+        foreach (int depth in new[] { 1, 180 })
+        {
+            string shim = StubShimIn(new string('d', depth), "claude.cmd", old);
+            int most = OutsideDoor.LimitFor(shim);
+            var longest = WithLineLength(shim, most);
+            Assert.Equal(most, OutsideDoor.LineLength(shim, longest));
+            Assert.True(OutsideDoor.WithinCommandLineLimit(shim, longest));
+            var received = Run(OutsideDoor.StartInfo(shim, longest, _folder, keepOpen: false));
+            Assert.True(received.Skip(1).SequenceEqual(longest), $"old={old} depth={depth}: the longest allowed line did not arrive whole");
+            Assert.False(OutsideDoor.WithinCommandLineLimit(shim, WithLineLength(shim, most + 1)));
+            Assert.False(OutsideDoor.WithinCommandLineLimit(shim, WithLineLength(shim, FixWithAssistant.CommandLineMaxUtf16 - 1)),
+                         "a shim line just under 8,191 is refused");
+        }
+        // An .exe keeps cmd's whole 8,191.
+        Assert.Equal(FixWithAssistant.CommandLineMaxUtf16, OutsideDoor.LimitFor(@"C:\x\claude.exe"));
+    }
+
+    /// <summary>Fix with's rows are dropped to the SAME bound: the door's <c>fits</c> is <see cref="OutsideDoor.WithinCommandLineLimit"/>.</summary>
+    [Fact]
+    public void FixWithDropsRowsToTheShimsRealBound()
+    {
+        string shim = StubShimIn(new string('d', 180), "claude.cmd", oldShape: false);
+        var rows = Enumerable.Range(1, 10).Select(n => new SectionProblemRow
+        {
+            Id = "r" + n, Kind = "printPdfNotFound", Page = $"Unit {n}/" + new string('\u00e9', 280),
+            Prompt = "x, " + new string('\u6570', 390),
+        }).ToList();
+        string config = @"C:\cfg\mcp-ICS3U.json";
+        var greeting = FixWithAssistant.GreetingFor(rows, "ICS3U", "", 1, "preview",
+            message => OutsideDoor.WithinCommandLineLimit(shim, ClaudeCodeLauncher.Arguments(config, message)))!;
+        var sent = ClaudeCodeLauncher.Arguments(config, greeting.Text);
+        Assert.True(OutsideDoor.LineLength(shim, sent) <= OutsideDoor.LimitFor(shim));
+        Assert.True(greeting.RowsNotNamed > 0, "the bound bit");
+        var received = Run(OutsideDoor.StartInfo(shim, sent, _folder, keepOpen: false));
+        Assert.True(received.Skip(1).SequenceEqual(sent), "the message did not arrive whole");
+    }
+
+    /// <summary>Arguments whose outer line (as <see cref="OutsideDoor.LineLength"/> counts it) is about <paramref name="length"/>.</summary>
+    private static IReadOnlyList<string> WithLineLength(string program, int length)
+    {
+        var sent = new List<string> { "--mcp-config", @"C:\cfg\mcp-ICS3U.json", "--strict-mcp-config", "x y" };
+        int now = OutsideDoor.LineLength(program, sent);
+        sent[3] = "x y" + new string('m', Math.Max(0, length - now));
+        return sent;
+    }
+
+    private string StubShimIn(string sub, string name, bool oldShape)
+    {
+        string original = StubShim(name, oldShape);
+        string folder = Directory.CreateDirectory(Path.Combine(_scratch, sub)).FullName;
+        File.Copy(Path.Combine(Path.GetDirectoryName(original)!, "node.exe"), Path.Combine(folder, "node.exe"), overwrite: true);
+        string shim = Path.Combine(folder, name);
+        File.Copy(original, shim, overwrite: true);
+        return shim;
+    }
 
     /// <summary>
     /// The must-fail: 1.9.0's Claude door, as it joined its line when Windows
@@ -333,33 +406,48 @@ public sealed class StubProgramCollection
     public const string Name = "the outside doors' stub program";
     public const string OutputVariable = "PLANTOIR_PROBE_OUTPUT";
 
-    private static readonly Lazy<string> Probe = new(Compile);
+    private static readonly Lazy<string> Folder = new(MakeFolder);
+    private static readonly Lazy<string> Probe = new(() => Compile("probe", ProbeSource));
+    private static readonly Lazy<string> ExitOne = new(() => Compile("exitone", "class P { static int Main() { return 1; } }"));
+    private static readonly Lazy<string> Stay = new(() => Compile("stay", "class P { static int Main() { System.Threading.Thread.Sleep(3000); return 0; } }"));
 
     public static string ProbeExe => Probe.Value;
 
-    private static string Compile()
+    /// <summary>A stub that exits 1 at once.</summary>
+    public static string ExitOneExe => ExitOne.Value;
+
+    /// <summary>A stub that stays three seconds and exits 0.</summary>
+    public static string StayExe => Stay.Value;
+
+    private const string ProbeSource =
+        "using System; using System.IO; using System.Text;\n" +
+        "class Probe { static int Main(string[] args) {\n" +
+        "    string output = Environment.GetEnvironmentVariable(\"PLANTOIR_PROBE_OUTPUT\");\n" +
+        "    var text = new StringBuilder();\n" +
+        "    text.Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(Environment.CurrentDirectory))).Append(\"\\n\");\n" +
+        "    foreach (string argument in args) text.Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(argument))).Append(\"\\n\");\n" +
+        "    File.WriteAllText(output, text.ToString());\n" +
+        "    return 0; } }\n";
+
+    private static string MakeFolder()
     {
-        string csc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                                  "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
-        if (!File.Exists(csc)) throw new InvalidOperationException($"No C# compiler at {csc}; .NET Framework 4.8 is part of Windows 11.");
         // Clean up any probe folders a crash before this left behind, and the
-        // one this run makes when the process ends — the stub compiler used to
+        // one this run makes when the process ends: the stub compiler used to
         // leave a plantoir-probe-* folder in %TEMP% per run.
         foreach (string old in SafeEnumerate(Path.GetTempPath(), "plantoir-probe*"))
             try { Directory.Delete(old, recursive: true); } catch { }
         string folder = Directory.CreateTempSubdirectory("plantoir-probe").FullName;
         AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { Directory.Delete(folder, recursive: true); } catch { } };
-        string source = Path.Combine(folder, "probe.cs"), exe = Path.Combine(folder, "probe.exe");
-        File.WriteAllText(source, """
-            using System; using System.IO; using System.Text;
-            class Probe { static int Main(string[] args) {
-                string output = Environment.GetEnvironmentVariable("PLANTOIR_PROBE_OUTPUT");
-                var text = new StringBuilder();
-                text.Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(Environment.CurrentDirectory))).Append("\n");
-                foreach (string argument in args) text.Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(argument))).Append("\n");
-                File.WriteAllText(output, text.ToString());
-                return 0; } }
-            """);
+        return folder;
+    }
+
+    private static string Compile(string name, string code)
+    {
+        string csc = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                                  "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe");
+        if (!File.Exists(csc)) throw new InvalidOperationException($"No C# compiler at {csc}; .NET Framework 4.8 is part of Windows 11.");
+        string source = Path.Combine(Folder.Value, name + ".cs"), exe = Path.Combine(Folder.Value, name + ".exe");
+        File.WriteAllText(source, code);
         var info = new ProcessStartInfo(csc, $"-nologo -out:\"{exe}\" \"{source}\"")
         {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,

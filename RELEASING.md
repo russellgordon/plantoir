@@ -118,7 +118,7 @@ version line. A list that survives its own release is worse than no list.
 | 2026-11-11 | A new course starts on Cloudflare Pages, listed first and called the usual choice; Netlify’s free-plan note wherever Netlify is chosen and in Schedule a deploy; a course can be created before the Cloudflare Account ID is in Settings, and the first deploy’s refusal offers Open Settings… | Windows (mac since 1.9.1, #668) | #739 (items 1 to 6) |
 | 2026-11-11 | A section's Problems tab on Windows: every problem the last preview or deploy found, one row each with a tick, sortable, the repair in the row; one warning on the section in the sidebar until its own next build is clean; and ONE alert, only when a build found something new, offering Show. **It replaces the dialog that listed every folder problem on every build**, so the notes must say that dialog is gone | Windows (the mac since v1.9.1, #717) | [#734](https://github.com/russellgordon/plantoir/issues/734) |
 | 2026-11-11 | Fix with Claude… and Fix with Codex… under the Problems table: the ticked problems handed to the assistant the teacher already has, with a message naming each problem, its page and what to read first | Windows (the mac since v1.9.1, #717 part two) | [#736](https://github.com/russellgordon/plantoir/issues/736) |
-| 2026-11-11 | **A fix the notes must carry, in a teacher's words and without technical detail:** a problem with how a course's name was passed to Claude and Codex (Revise With ▸ as well as the new buttons) was fixed, so a course named with symbols such as `&` or `%` now reaches the assistant exactly as it was written. Say it plainly; do not describe how it could be misused. The session window now closes when the assistant is quit, where it used to leave a prompt behind | Windows only (the mac's door was read and does not have the fault) | [#736](https://github.com/russellgordon/plantoir/issues/736) |
+| 2026-11-11 | **A fix the notes must carry, in a teacher's words and without technical detail:** a problem with how a course's name was passed to Claude and Codex (Revise With ▸ as well as the new buttons) was fixed, so a course named with symbols such as `&` or `%` now reaches the assistant exactly as it was written. Say it plainly; do not describe how it could be misused. When the assistant is installed as a program (the common case) its window now closes by itself when the session ends, where it used to leave a prompt behind, and if the assistant cannot start, Plantoir says so instead of a window flashing away | Windows only (the mac's door was read and does not have the fault) | [#736](https://github.com/russellgordon/plantoir/issues/736) |
 
 
 ## Warnings the release notes MUST carry
@@ -312,10 +312,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    > open. An entry whose milestone IS this release means the work is owed
    > NOW — build it, or move the issue (and the entry) to a later milestone as
    > a deliberate decision. Never cut over one. **The ledger is empty again
-   > since #720 (2026-11-10)**: the two entries #690 held against mac #698
-   > (v1.9.1, `obsidianIsNotOnThisMac` and its scenario) went with the commit
-   > that took the regenerated contract (`obsidianIsNotOnThisMachine`, with
-   > `{machine}`), so they cannot turn the catch-up cut red. The boundary and
+   > since #736 and #739 (2026-11-11)**, which wrote the two activity-trail
+   > events #734 had held open for v1.9.3 ("asked an assistant to fix problems"
+   > and "deploy refused for the Cloudflare Account ID") and deleted their
+   > entries; before them it was empty since #720. The boundary and
    > the reasoning are in `contracts/README.md` → "Named gaps".
 
    > The hand smoke is **not optional, and not a formality**. The bundle carries

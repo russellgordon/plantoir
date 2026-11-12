@@ -108,8 +108,7 @@ public static class CodexLauncher
     public static Func<string, bool>? Fits(string workspacePath, string courseCode)
     {
         if (FindCodex() is not { } codex || ClaudeCodeLauncher.FindServer() is not { } server) return null;
-        return message => OutsideDoor.LineLength(codex, Arguments(server, workspacePath, courseCode, message))
-                          <= FixWithAssistant.CommandLineMaxUtf16;
+        return message => OutsideDoor.WithinCommandLineLimit(codex, Arguments(server, workspacePath, courseCode, message));
     }
 
     /// <summary>

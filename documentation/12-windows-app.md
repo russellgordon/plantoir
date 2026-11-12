@@ -1146,14 +1146,32 @@ from the caret set turns the old-shape cases red (18 of them, measured), while
 the modern ones stay green — which is why the parens needed a shape that
 exercises them.
 
-**Over cmd's 8,191-character command line, a door refuses rather than start.**
-The shim path fails there silently — cmd says the line is too long and leaves
-a prompt — so `OutsideDoor.WithinCommandLineLimit`, checked for both shapes,
-makes the door's `Open` return false before starting, and no "assistant
-opened" line is written. Revise With ▸'s plain greeting has no cap on the
-course's name, which is what can reach the limit; Fix with… stays under it by
-dropping rows through its own bound. The teacher sees the door's own
-"couldn't start" sentence, the same as any other failure to start.
+**A door refuses over cmd's command-line limit rather than start into a silent
+"too long".** The bound is NOT a flat 8,191 for a shim: inside an npm shim
+`%*` is expanded again into a longer line carrying the shim's own text (its
+script path, `%dp0%`, `title %COMSPEC%`), and cmd's 8,191 applies to THAT
+line. Measured (third review, 2026-11-12) with stub shims whose script path is
+short: the longest outer line that arrived whole was 8,087 (modern shape) /
+8,160 (old) from a 61-character shim folder, and 7,908 / 7,981 from a
+240-character one — a loss of about the shim folder's length. So
+`OutsideDoor.LimitFor` is `8,191 − (shim folder length) − 128` for a batch
+target (the 128, `ShimExpansionAllowance`, covers the worst measured shape
+plus npm's real script path, which is ~40 characters longer than the stub's
+`cli.js`) and a flat 8,191 for an `.exe`. `WithinCommandLineLimit` checks the
+outer line against that, and **Fix with…'s `fits` is this same function**, so
+it drops rows to the real bound rather than to 8,191. A door `Open` returns
+false over the bound and writes no "assistant opened" line; the teacher sees
+the door's own "couldn't start" sentence. Revise With ▸'s plain greeting no
+longer reaches the bound — it caps the course name (below) — so the guard is a
+backstop there and the live path for an over-long Fix with… message.
+
+**Revise With ▸ caps the course name in its greeting** at
+`fixWith.courseNameMaxCharacters` (80, with an ellipsis), the same cut Fix
+with… uses (`FixWithAssistant.CutToCharacters`). Only the name handed in is
+cut, never the greeting's wording. Before this a long imported name (a course
+from someone else's zip) pushed the command line past the bound and gave the
+could-not-start sentence, which says restarting may help — misleading, since
+restarting changes nothing. Now the door opens with the name cut.
 
 ### What a teacher sees in place of Windows Terminal (#736)
 

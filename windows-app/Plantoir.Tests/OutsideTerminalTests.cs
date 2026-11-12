@@ -19,7 +19,9 @@ public class OutsideTerminalTests
     {
         var wt = OutsideTerminal.WindowsTerminal(path);
         Assert.Equal("wt.exe", wt.File);
-        Assert.Equal(new[] { "-d", path }, wt.Arguments);   // the folder, whole and alone
+        Assert.Equal(new[] { "-d", "." }, wt.Arguments);
+        Assert.Equal(path, wt.WorkingDirectory);
+        Assert.DoesNotContain(wt.Arguments, a => a.Contains(path));   // never on a command line
         Assert.False(wt.UseShellExecute);
 
         var fallback = OutsideTerminal.Fallback(path);

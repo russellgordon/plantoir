@@ -196,7 +196,7 @@ public static class ClaudeCodeLauncher
     {
         if (FindClaude() is not { } claude) return null;
         string config = ConfigPath(courseCode);
-        return message => OutsideDoor.LineLength(claude, Arguments(config, message)) <= FixWithAssistant.CommandLineMaxUtf16;
+        return message => OutsideDoor.WithinCommandLineLimit(claude, Arguments(config, message));
     }
 
     /// <summary>Where <see cref="WriteConfig"/> writes a course's connection.</summary>
@@ -225,8 +225,13 @@ public static class ClaudeCodeLauncher
     {
         var text = new StringBuilder();
         text.Append($"I'm a teacher working on {courseCode}");
-        if (!string.IsNullOrWhiteSpace(courseName) && courseName != courseCode)
-            text.Append($" ({courseName})");
+        // Cut by Fix with…'s own rule (fixWith.courseNameMaxCharacters, 80, with
+        // …), so a long imported name cannot carry the greeting past the
+        // command line's bound and turn into a could-not-start. Only the name
+        // handed in changes, never the sentence (#736, third review).
+        string named = FixWithAssistant.CutToCharacters(courseName.Trim(), FixWithAssistant.CourseNameMaxCharacters);
+        if (named.Length > 0 && named != courseCode)
+            text.Append($" ({named})");
         text.Append(" in Plantoir. Use the plantoir tools for anything to do with this course. ");
         text.Append("Start by listing its sections so we both know what's there. ");
         // app-rules.json → outsideAgents.greetingHowITeachSentence, verbatim
