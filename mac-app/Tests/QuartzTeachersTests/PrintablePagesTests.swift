@@ -770,6 +770,57 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #751: the test-authoring skill travels the same way, with every file
+    /// `assessment.agentGuidance.testAuthoringSkill.templates` lists, and
+    /// both root files name it. Each skill in `mentionedBy` names it, the
+    /// skill names the handouts skill whose style it uses, and it stays out
+    /// of the page routing table, since a test is not part of a page. The
+    /// root files' handouts bullet no longer offers a test for marks.
+    func testTheTestAuthoringSkillIsWrittenWithItsTemplatesAndBothRootFilesNameIt() throws {
+        let assessment: [String: Any] = try SharedRulesContractTests.section("assessment")
+        let agentGuidance: [String: Any] = try XCTUnwrap(assessment["agentGuidance"] as? [String: Any])
+        let guidance: [String: Any] = try XCTUnwrap(agentGuidance["testAuthoringSkill"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        let templates: [String] = try XCTUnwrap(guidance["templates"] as? [String])
+        let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let usesStyleOf: String = try XCTUnwrap(guidance["usesStyleOf"] as? String)
+        let kitChecker: String = try XCTUnwrap(guidance["kitChecker"] as? String)
+        XCTAssertTrue(templates.contains(kitChecker), "the kit checker is written with the skill")
+        let pageAuthoring: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["pageAuthoringSkill"] as? [String: Any])
+        let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
+        XCTAssertFalse(routesTo.contains(skillName), "a test is not part of a page")
+        XCTAssertFalse(templates.isEmpty)
+        XCTAssertFalse(mentionedBy.isEmpty)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            let skill: String = try String(
+                contentsOf: skillFolder.appendingPathComponent("SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("This working folder holds courses for Plantoir"), home)
+            XCTAssertTrue(skill.contains("`\(usesStyleOf)`"), "\(home): the skill must name \(usesStyleOf)")
+            XCTAssertTrue(skill.contains("handouts.json"), home)
+            XCTAssertTrue(skill.contains("read_how_i_teach"), home)
+            XCTAssertTrue(skill.contains(kitChecker), "\(home): the skill must say how to run \(kitChecker)")
+            for file in templates {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: skillFolder.appendingPathComponent(file).path),
+                              "\(home): \(file) must be written beside the skill")
+            }
+            for mentioning in mentionedBy {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
+                XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+            XCTAssertFalse(text.contains("a quiz or test for marks"), "\(name): a unit test is no longer the handouts skill's")
+        }
+    }
+
     /// #758: every phrase `printablePages.agentGuidance.mustSay` pins is in
     /// its skill as written into both homes, matched with white space folded
     /// as the contract's rule says, and every key names a skill that is

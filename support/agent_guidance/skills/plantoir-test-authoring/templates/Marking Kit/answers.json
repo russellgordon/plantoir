@@ -1,0 +1,116 @@
+{
+  "_about": "A worked example of a marking kit, for an invented Grade 10 science unit test with two versions. Copy it and replace every value with the test you are writing. The format is in FORMAT.md beside this file; keys that start with an underscore are notes and are ignored.",
+  "kit": 1,
+  "test": "Unit 2 Test: Chemical Reactions",
+  "course": "SNC2D",
+  "categories": [
+    {"key": "K", "title": "Knowledge and Understanding"},
+    {"key": "T", "title": "Thinking and Investigation"},
+    {"key": "C", "title": "Communication"},
+    {"key": "A", "title": "Application"}
+  ],
+  "parts": [
+    {"key": "A", "title": "Part A: Knowledge and Understanding", "category": "K"},
+    {"key": "B", "title": "Part B: Thinking and Investigation", "category": "T"},
+    {"key": "C", "title": "Part C: Communication", "category": "C"},
+    {"key": "D", "title": "Part D: Application", "category": "A"}
+  ],
+  "questions": [
+    {"id": "A1", "part": "A", "skill": "Writing the formula of an ionic compound from its name", "topics": ["formulas"]},
+    {"id": "A2", "part": "A", "skill": "Mass in a closed container", "topics": ["conservation-of-mass"]},
+    {"id": "A3", "part": "A", "skill": "Naming the type of a reaction", "topics": ["reaction-types"]},
+    {"id": "A4", "part": "A", "skill": "Comparing two solutions by pH", "topics": ["ph"]},
+    {"id": "B1", "part": "B", "skill": "Balancing a combustion equation", "topics": ["balancing"]},
+    {"id": "B2", "part": "B", "skill": "Mass when a gas escapes", "topics": ["conservation-of-mass"]},
+    {"id": "C1", "part": "C", "skill": "Explaining physical and chemical change", "topics": ["evidence"]},
+    {"id": "D1", "part": "D", "skill": "Predicting and writing a single displacement", "topics": ["reaction-types", "formulas", "balancing"]}
+  ],
+  "points": [
+    {"id": "A1", "question": "A1", "category": "K", "meaning": "question 1"},
+    {"id": "A2", "question": "A2", "category": "K", "meaning": "question 2"},
+    {"id": "A3", "question": "A3", "category": "K", "meaning": "question 3"},
+    {"id": "A4", "question": "A4", "category": "K", "meaning": "question 4"},
+    {"id": "B1.1", "question": "B1", "category": "T", "meaning": "carbon balanced"},
+    {"id": "B1.2", "question": "B1", "category": "T", "meaning": "hydrogen balanced"},
+    {"id": "B1.3", "question": "B1", "category": "T", "meaning": "oxygen balanced", "followThrough": ["B1.1", "B1.2"]},
+    {"id": "B1.4", "question": "B1", "category": "T", "meaning": "the smallest whole numbers"},
+    {"id": "B2.1", "question": "B2", "category": "T", "meaning": "the mass of gas that escaped"},
+    {"id": "B2.2", "question": "B2", "category": "T", "meaning": "why mass seems to be lost"},
+    {"id": "C1.1", "question": "C1", "category": "C", "meaning": "a physical change, because no new substance forms"},
+    {"id": "C1.2", "question": "C1", "category": "C", "meaning": "a first piece of evidence of a chemical change"},
+    {"id": "C1.3", "question": "C1", "category": "C", "meaning": "a second, different piece of evidence"},
+    {"id": "D1.1", "question": "D1", "category": "A", "meaning": "the type of reaction"},
+    {"id": "D1.2", "question": "D1", "category": "A", "meaning": "the formulas of both products"},
+    {"id": "D1.3", "question": "D1", "category": "A", "meaning": "the equation balanced", "followThrough": ["D1.2"]}
+  ],
+  "versions": {
+    "A": {
+      "source": "Version A.tex",
+      "solutions": "Version A - Solutions.tex",
+      "answers": {
+        "A1": {"answer": "b", "accept": [], "misconceptions": {"a": "one chloride ion for each calcium ion, so the charges do not balance", "c": "the subscript is written on the metal instead of the non-metal", "d": "the symbol for calcium is read as C, which is carbon"}},
+        "A2": {"answer": "a", "accept": [], "misconceptions": {"b": "a gas forming is read as mass lost, although the flask is sealed", "c": "a solid forming is read as mass gained", "d": "mass in a closed container is thought to depend on which reaction it is"}},
+        "A3": {"answer": "d", "accept": [], "misconceptions": {"a": "two reactants are read as two substances joining", "b": "two products are read as one substance breaking apart", "c": "one ion moving is read as an element replacing another, although both reactants are compounds"}},
+        "A4": {"answer": "c", "accept": [], "misconceptions": {"a": "a larger pH number is read as more acidic", "b": "any pH number is read as basic", "d": "the pH scale is read as linear, so a difference of 2 is read as 2 times"}},
+        "B1.1": {"answer": "2 C2H6 and 4 CO2: 4 carbon atoms on each side", "accept": []},
+        "B1.2": {"answer": "2 C2H6 and 6 H2O: 12 hydrogen atoms on each side", "accept": []},
+        "B1.3": {"answer": "7 O2: 14 oxygen atoms on each side", "accept": ["3.5 O2 before doubling, if the doubling is then shown"]},
+        "B1.4": {"answer": "2 C2H6 + 7 O2 -> 4 CO2 + 6 H2O", "accept": []},
+        "B2.1": {"answer": "2.99 g", "accept": ["2.99"]},
+        "B2.2": {"answer": "Mass is conserved; the carbon dioxide is a gas and left the open dish, so its mass was not weighed.", "accept": ["any wording that says the gas escaped and mass is not destroyed"]},
+        "C1.1": {"answer": "The classmate is not right: melting ice is a physical change, because the water is still water and no new substance forms.", "accept": []},
+        "C1.2": {"answer": "A gas forms that was not there before.", "accept": ["a colour change that is not just mixing", "a precipitate forms", "heat or light is given off", "a new smell", "the change is hard to reverse"]},
+        "C1.3": {"answer": "A different piece of evidence from the list in C1.2.", "accept": []},
+        "D1.1": {"answer": "single displacement", "accept": ["single replacement"]},
+        "D1.2": {"answer": "ZnSO4 and Cu", "accept": []},
+        "D1.3": {"answer": "Zn + CuSO4 -> ZnSO4 + Cu", "accept": []}
+      }
+    },
+    "B": {
+      "source": "Version B.tex",
+      "solutions": "Version B - Solutions.tex",
+      "answers": {
+        "A1": {"answer": "d", "accept": [], "misconceptions": {"a": "one bromide ion for each magnesium ion, so the charges do not balance", "b": "the subscript is written on the metal instead of the non-metal", "c": "the symbol for magnesium is read as Mn, which is manganese"}},
+        "A2": {"answer": "b", "accept": [], "misconceptions": {"a": "a gas forming is read as mass lost, although the flask is sealed", "c": "a solid forming is read as mass gained", "d": "mass in a closed container is thought to depend on which reaction it is"}},
+        "A3": {"answer": "a", "accept": [], "misconceptions": {"b": "two reactants are read as two substances joining", "c": "two products are read as one substance breaking apart", "d": "one ion moving is read as an element replacing another, although both reactants are compounds"}},
+        "A4": {"answer": "b", "accept": [], "misconceptions": {"a": "the pH scale is read as linear, so a difference of 3 is read as 3 times", "c": "a larger pH number is read as more acidic", "d": "any pH number is read as basic"}},
+        "B1.1": {"answer": "2 C4H10 and 8 CO2: 8 carbon atoms on each side", "accept": []},
+        "B1.2": {"answer": "2 C4H10 and 10 H2O: 20 hydrogen atoms on each side", "accept": []},
+        "B1.3": {"answer": "13 O2: 26 oxygen atoms on each side", "accept": ["6.5 O2 before doubling, if the doubling is then shown"]},
+        "B1.4": {"answer": "2 C4H10 + 13 O2 -> 8 CO2 + 10 H2O", "accept": []},
+        "B2.1": {"answer": "2.73 g", "accept": ["2.73"]},
+        "B2.2": {"answer": "Mass is conserved; the carbon dioxide is a gas and left the open dish, so its mass was not weighed.", "accept": ["any wording that says the gas escaped and mass is not destroyed"]},
+        "C1.1": {"answer": "The classmate is not right: boiling water is a physical change, because the bubbles are water vapour and no new substance forms.", "accept": []},
+        "C1.2": {"answer": "A gas forms that is a new substance.", "accept": ["a colour change that is not just mixing", "a precipitate forms", "heat or light is given off", "a new smell", "the change is hard to reverse"]},
+        "C1.3": {"answer": "A different piece of evidence from the list in C1.2.", "accept": []},
+        "D1.1": {"answer": "single displacement", "accept": ["single replacement"]},
+        "D1.2": {"answer": "MgSO4 and Fe", "accept": []},
+        "D1.3": {"answer": "Mg + FeSO4 -> MgSO4 + Fe", "accept": []}
+      }
+    }
+  },
+  "strengths": [
+    {"sentence": "Writing formulas and balancing chemical equations", "halves": [
+      {"points": ["A1", "D1.2"], "sentence": "Writing the formula of a compound from its name"},
+      {"points": ["B1.1", "B1.2", "B1.3", "B1.4", "D1.3"], "sentence": "Balancing a chemical equation"}
+    ]},
+    {"sentence": "Conservation of mass, in a sealed container and an open one", "halves": [
+      {"points": ["A2", "B2.1", "B2.2"], "sentence": null}
+    ]},
+    {"sentence": "Recognising types of reaction and using pH", "halves": [
+      {"points": ["A3", "D1.1"], "sentence": "Recognising the type of a reaction"},
+      {"points": ["A4"], "sentence": "Comparing solutions by pH"}
+    ]},
+    {"sentence": "Explaining the difference between physical and chemical change", "halves": [
+      {"points": ["C1.1", "C1.2", "C1.3"], "sentence": null}
+    ]}
+  ],
+  "topics": {
+    "formulas": {"when": "Writing a formula from a name: the ions' charges, and the subscripts that balance them.", "pages": [{"title": "Chemical Formulas and Names", "path": "Concepts/Chemical-Formulas-and-Names", "anchor": "building-the-formula-from-the-charges"}]},
+    "balancing": {"when": "Balancing an equation by counting atoms, with oxygen and hydrogen last.", "pages": [{"title": "Balancing Equations", "path": "Concepts/Balancing-Equations", "anchor": "a-method-that-always-terminates"}, {"title": "Balancing Practice", "path": "Exercises/Balancing-Practice", "anchor": ""}]},
+    "conservation-of-mass": {"when": "Why mass is the same before and after a reaction, and where it goes when a gas escapes.", "pages": [{"title": "Balancing Equations", "path": "Concepts/Balancing-Equations", "anchor": "what-an-unbalanced-equation-is-claiming"}]},
+    "reaction-types": {"when": "The five families of reaction, and how to tell them apart from the equation.", "pages": [{"title": "Types of Chemical Reactions", "path": "Concepts/Types-of-Chemical-Reactions", "anchor": "the-five-patterns"}]},
+    "ph": {"when": "What a pH number means, and why one step on the scale is ten times.", "pages": [{"title": "Acids and Bases", "path": "Concepts/Acids-and-Bases", "anchor": "ph-is-a-scale-of-concentration-and-it-is-not-linear"}]},
+    "evidence": {"when": "What counts as evidence that a new substance formed.", "pages": [{"title": "Evidence of a Chemical Change", "path": "Investigations/Evidence-of-a-Chemical-Change", "anchor": ""}]}
+  }
+}
