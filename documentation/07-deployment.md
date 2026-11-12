@@ -1042,15 +1042,15 @@ cannot arise), each leg is `powershell.exe -File deploy.ps1 <course>
 `DeployCommand.Arguments` names `--target netlify` too; `verify-deploy.ps1`
 names its Netlify calls and runs a no-flag deploy over two saved folders
 (both written; then a first leg that fails, and the run still writes the
-second and ends with exit 1). The rules, sentences and eighteen cases are
-proposed from Windows as `contracts/app-rules.json` → `savedDestinations`,
+second and ends with exit 1). The rules, sentences and eighteen cases were
+proposed from Windows (four more were added from the mac by #771) as `contracts/app-rules.json` → `savedDestinations`,
 run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. `deploy.py`
 is unchanged (it does one destination per call). The new-course default, its
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.
 
 **The mac runs every case too, since #771.** `deploy.sh` carries
-`the_saved_destinations`, `destination_words`,
+`the_saved_destinations` (with its `the_saved_setting`), `destination_words`,
 `flags_for_the_saved_destination` and `the_one_saved_destination` between `# BEGIN saved_destinations` and
 `# END saved_destinations`, and `test_deploy_sh_destination.py`'s
 `TheSavedDestinationsAreTheContracts` cuts them out and runs every case
@@ -1097,17 +1097,35 @@ space (`tr -d` then `head -c 1`) and refuses unless it is `{`. Measured on
 the fixed functions: white space, a tab, a comment, a comment before an
 object, and a UTF-8 byte-order mark all refuse, and an object after blank
 lines still reads. The same check refuses an XML or binary property list,
-which the Python reader refused already, so no difference between the
-readers is left there. A byte-order mark now refuses on a Mac where
-`deploy.ps1` may read it; Plantoir never writes one, and that difference is
-in the safe direction. Second, a kind holding a tab or a line break became
-two legs, and the second could deploy (`"cloudflare_pages\nnetlify"` refused
-one leg and deployed to Netlify on the next); a kind's tabs and line breaks
-now become spaces, as a path's do, in both readers, so it is one kind
-Plantoir does not know. Third, an additional entry whose `type` is a number
+which the Python reader refused already. Second, a kind holding a tab or a
+line break became two legs, and the second could deploy
+(`"cloudflare_pages\nnetlify"` refused one leg and deployed to Netlify on
+the next); a kind's tabs, carriage returns and line breaks now become
+spaces, as a path's do, in both readers, so it is one kind Plantoir does not
+know. A line break at the END of a value needed more: a command substitution
+drops every trailing line break, the value's own included, so under `plutil`
+a kind of only `"\n"` read as empty and deployed to Netlify. The reader
+(`the_saved_setting`) writes an `x` after `plutil`'s output and takes it off
+again, so the value's own line break survives to become a space. A carriage
+return is now a space in both readers too, as `deploy.ps1` has always made
+it in a path; before, deploy.sh kept it, so the two launchers would have
+refused a kind of `"netlify\r"` in different words. Third, an additional entry whose `type` is a number
 or `true` was a refused leg under `plutil` and passed over by the Python
 reader and `deploy.ps1`; the `plutil` reader now asks `plutil -type` and
-reads only a `string`.
+reads only a `string` (`-type` is in macOS 12 and later, and Plantoir needs
+15).
+
+**Where the readers still differ, accepted.** Measured on the fixed
+functions. `plutil` reads, and the Python reader and `deploy.ps1` refuse, a
+file that starts with `{` but is not strict JSON: an old-style property list
+(`{ deploy_target = cloudflare_pages; }`), a comment inside the object, and a
+trailing comma. Each deploys where the file says, so none is a wrong-host
+deploy, and Plantoir writes none of them. The other way round, `deploy.ps1`
+reads a file with a UTF-8 byte-order mark (`ReadAllText` strips it) and a
+UTF-16 file, and both mac readers refuse them (the Python reader's
+`json.load` under `utf-8` always did, and `build_site.py`'s preflight
+decodes strictly too). Every Plantoir writer writes UTF-8 without a mark, so
+that difference is in the safe direction. Neither is given a second check.
 
 **Why.** Netlify moved new accounts to a credit-based plan, and the free one
 is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
