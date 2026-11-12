@@ -2056,15 +2056,22 @@ course folder (it would sync, Obsidian would show it, and #768's walk would
 read every build as a change).
 
 **Order of writing.** The page (a temporary file, then `os.replace`), then
-`about.json` (likewise), then what EARLIER builds left, removed one by one by
-name: their `map-<id>.html` and any half-written temporary, never the page
-`about.json` names at that moment and never a newer build's file (build ids
-sort in the order their builds started). A write that fails removes its own
-temporary (the review measured a half page left by a full disk). When a newer
-build of the same section has written its record first, the older build
-leaves it standing and removes its own page, so two builds at once cannot
-leave `about.json` naming a removed page (the review's L2, measured by
-interleaving). A reader still treats a named page that is missing as no map. A course whose curriculum has gone gets `"maps": []`,
+`about.json` (likewise), then every other build's `map-<id>.html` and
+half-written temporaries, removed one by one by name, never the page
+`about.json` names at that moment. A write that fails removes its own
+temporary (the review measured a half page left by a full disk). **Which map
+belongs is decided by `.build-id`, never by the clock.** `.build-id` is
+written as each build starts, so it names the last build to start, and that
+build's map is the one that belongs: only it writes its record and tidies. A
+build that no longer owns `.build-id` when it comes to write (another build
+of the section started after it) leaves `about.json` and the other build's
+files alone and removes only its own page, checked right before the record's
+rename. Rejected, after the fix review's M1: ordering the ids, which come
+from a clock. A build whose clock was 30 s behind the last one's deleted its
+own map, kept the old one, printed nothing and read as out of date for every
+build until the clock caught up (measured; now a test). The same check closes
+the review's L1, where two overlapping builds left `about.json` naming a page
+that was gone. A reader still treats a named page that is missing as no map. A course whose curriculum has gone gets `"maps": []`,
 `"page": null`, and its last page removed, so a stale map never outlives the
 curriculum.
 
@@ -2084,10 +2091,13 @@ contract it cannot read) into one ⚠️ line, `coverageTab.consoleWords.couldNo
 which names no tab (no app shows one until 793b) and gives only the system's
 words for the error, never a path. **The rule for every reader**
 (`coverageTab.mapOfThisBuild`, `coverage_tab_map_state`): the map is THIS
-build's only when `about.json`'s `buildId` equals the build's own id, the one
-its `PLANTOIR_PROBLEMS:` line carries and `.build-id` holds; any other id means
-the step ran and made nothing, and the map shown is an earlier build's, which
-the tab must say. A
+build's only when `about.json`'s `buildId` equals the build's own id, which
+`.build-id` holds. Any other id gives `anotherBuild`, one word that claims
+nothing about earlier or later (the fix review's L2: with two overlapping
+builds, the earlier build's `PLANTOIR_PROBLEMS:` line carries its own id while
+the map is the later build's). Asked with `.build-id`, `anotherBuild` means the
+build that started last made no map, and the tab shows the map it has with
+its own date and says it could not be made again. A
 successful map prints NOTHING, which the plan first proposed as a 🗺️ line and
 the plan review's M4 rejected: on its own, 793a would have named a tab no app
 has yet, under the site's own 🗺️ line with different numbers for the same

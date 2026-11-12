@@ -9282,19 +9282,17 @@ def coverage_tab_page(maps: list, course_display: str, section_number, build_id:
 """
 
 
-# A build id as _new_build_id makes it: the UTC second it started and eight
-# hex characters, so two ids compare in the order their builds started.
-_BUILD_ID_SHAPE = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{8}")
-
-
-def _older_than(other_id: str, build_id: str) -> bool:
-    """Whether `other_id` names a build that started before `build_id`, or is
-    not a build id at all (a stray file by the map's name)."""
-    if not _BUILD_ID_SHAPE.fullmatch(other_id):
-        return True
-    if not _BUILD_ID_SHAPE.fullmatch(str(build_id)):
-        return False
-    return other_id < str(build_id)
+def _the_build_that_started_last(host_output_dir: Path) -> str | None:
+    """The id in the section's `.build-id`, which every build writes as it
+    STARTS (`_note_the_build_id`), so it names the build that started last;
+    None when it cannot be read. Ids are compared for equality only, never
+    ordered: they come from a clock, and a clock can be set back (the fix
+    review's M1)."""
+    try:
+        text = (Path(host_output_dir) / BUILD_ID_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
 
 
 def _read_coverage_tab_record(folder: Path) -> dict | None:
@@ -9309,13 +9307,12 @@ def _read_coverage_tab_record(folder: Path) -> dict | None:
 
 def _tidy_the_coverage_tab_folder(folder: Path, build_id: str) -> None:
     """
-    Removes, one by one by name, what this build or an earlier one left that
-    nothing names: every `map-<id>.html` and every half-written temporary
-    (`.map-<id>.html.<pid>.tmp`, `.about.json.<id>.tmp`) whose build started
-    BEFORE this one, except the page `about.json` names as it stands now. A
-    newer build's files are never touched, so two builds of one section at
-    once cannot leave `about.json` naming a page that was removed (the
-    implementation review's L1 and L2).
+    Run only by the build that owns `.build-id` (the last to start), after
+    its record: removes, one by one by name, every other build's
+    `map-<id>.html` and half-written temporary (`.map-<id>.html.<pid>.tmp`,
+    `.about.json.<id>.tmp`), whatever its id, except the page `about.json`
+    names as it stands now (the implementation review's L1 and L2, and the
+    fix review's M1: no order by the clock).
     """
     record = _read_coverage_tab_record(folder)
     named = record.get("page") if record else None
@@ -9335,11 +9332,10 @@ def _tidy_the_coverage_tab_folder(folder: Path, build_id: str) -> None:
             other_id = name[len(f".{COVERAGE_TAB_RECORD}."):-len(".tmp")]
         if other_id is None or other_id == str(build_id):
             continue
-        if _older_than(other_id, build_id):
-            try:
-                os.remove(folder / name)
-            except OSError:
-                pass
+        try:
+            os.remove(folder / name)
+        except OSError:
+            pass
 
 
 def _write_text_by_rename(folder: Path, final_name: str, temporary_name: str, text: str) -> None:
@@ -9364,11 +9360,12 @@ def coverage_tab_map_state(host_output_dir: Path, build_id: str | None) -> str:
     caller knows of (shared-rules.json -> coverageTab.mapOfThisBuild):
     `none` when there is no usable map (no record, one that cannot be read,
     another version, no page named, or the named page not there),
-    `thisBuild` when the record's buildId is `build_id`, and `older` when it
-    is any other build's: that build ran its map step and the map was not
-    made again, so the map shown is an earlier build's, with its own date.
-    The build's id is the one its PLANTOIR_PROBLEMS: line carries, and the
-    section's `.build-id`.
+    `thisBuild` when the record's buildId is `build_id`, and `anotherBuild`
+    when it is any other build's: the map was made by a different build,
+    with its own date, and nothing says whether that build is earlier or
+    later (ids are compared for equality only). Asked with the section's
+    `.build-id`, `anotherBuild` means the build that started last made no
+    map: it failed, or it is still running.
     """
     folder = coverage_tab_folder(host_output_dir)
     record = _read_coverage_tab_record(folder)
@@ -9381,7 +9378,7 @@ def coverage_tab_map_state(host_output_dir: Path, build_id: str | None) -> str:
         return "none"
     if build_id is not None and record.get("buildId") == build_id:
         return "thisBuild"
-    return "older"
+    return "anotherBuild"
 
 
 def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Path,
@@ -9397,9 +9394,11 @@ def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Pa
     builds left removed, so a reader of `about.json` always finds the page it
     names (file-formats.json -> coverageTabMap.orderOfWriting). A course with
     no curriculum folder holding an expectation page gets `"maps": []`, no
-    page, and every older page removed. When a NEWER build of the section has
-    already written its record (two builds at once), this build's page is
-    removed and that record left as it is. Returns the record on disk.
+    page, and every other page removed. A build that no longer owns the
+    section's `.build-id` when it comes to write (another build of the
+    section started after it) leaves `about.json` and that build's map alone
+    and removes only its own page: the map that belongs is the one the last
+    build to start makes. Returns the record on disk.
     Raises on failure; the build's call is `make_the_coverage_tab`, which
     never lets it stop a build.
     """
@@ -9469,18 +9468,22 @@ def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Pa
         "maps": record_maps,
     }
 
-    # A newer build of this section got here first: its record stands, and
-    # this build's page, which nothing will name, goes.
-    standing_record = _read_coverage_tab_record(folder)
-    if standing_record is not None:
-        standing_id = str(standing_record.get("buildId") or "")
-        if standing_id != str(build_id) and not _older_than(standing_id, build_id):
-            if page_name is not None:
-                try:
-                    os.remove(folder / page_name)
-                except OSError:
-                    pass
-            return standing_record
+    # Another build of this section started after this one (its id is in
+    # .build-id now): the map that belongs is that build's, so this build
+    # leaves the record and that build's files alone and takes its own page
+    # away, unless the record names it. Checked as late as possible, right
+    # before the record is renamed into place. With no readable .build-id,
+    # this build writes: nothing is ordered by the clock.
+    owner = _the_build_that_started_last(host_output_dir)
+    if owner is not None and owner != str(build_id):
+        standing_record = _read_coverage_tab_record(folder)
+        named = standing_record.get("page") if standing_record else None
+        if page_name is not None and page_name != named:
+            try:
+                os.remove(folder / page_name)
+            except OSError:
+                pass
+        return standing_record
 
     text = json.dumps(record, ensure_ascii=False, indent=1) + "\n"
     _write_text_by_rename(folder, COVERAGE_TAB_RECORD, f".{COVERAGE_TAB_RECORD}.{build_id}.tmp", text)

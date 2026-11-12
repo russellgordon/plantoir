@@ -844,48 +844,15 @@ class WhetherTheMapIsThisBuilds(unittest.TestCase):
                                     .replace("{reason}", "No space left on device")])
             self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", first["page"]]),
                              "no half-written temporary is left behind")
-            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, second_id), "older")
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, second_id), "anotherBuild")
             self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, BUILD_ID), "thisBuild")
 
 
 class TwoBuildsAndLeftovers(unittest.TestCase):
-    """The implementation review's L1 and L2."""
+    """The implementation review's L1 and L2 (and TheBuildThatStartedLastOwnsTheMap)."""
 
     def setUp(self):
         use_the_repository_contracts()
-
-    def test_an_earlier_builds_temporaries_go_and_a_newer_builds_stay(self):
-        with tempfile.TemporaryDirectory() as temp:
-            course = the_anti_drift_course(temp)
-            folder = build_site.coverage_tab_folder(course.host_output_dir)
-            earlier = [".map-20200101T000000Z-00000000.html.123.tmp",
-                       ".about.json.20200101T000000Z-00000000.tmp"]
-            newer = [".map-20991231T000000Z-ffffffff.html.456.tmp",
-                     ".about.json.20991231T000000Z-ffffffff.tmp",
-                     "map-20991231T000000Z-ffffffff.html"]
-            for name in earlier + newer:
-                write(folder / name, "left behind")
-            record = course.write_tab()
-            names = set(os.listdir(folder))
-            for name in earlier:
-                self.assertNotIn(name, names)
-            for name in newer:
-                self.assertIn(name, names)
-            self.assertIn(record["page"], names)
-
-    def test_a_newer_builds_record_stands_and_this_builds_page_goes(self):
-        with tempfile.TemporaryDirectory() as temp:
-            course = the_anti_drift_course(temp)
-            folder = build_site.coverage_tab_folder(course.host_output_dir)
-            newer_page = "map-20991231T000000Z-ffffffff.html"
-            write(folder / newer_page, "the newer build's page")
-            newer_record = {"version": 1, "buildId": "20991231T000000Z-ffffffff", "page": newer_page}
-            write(folder / "about.json", json.dumps(newer_record))
-            answer = course.write_tab()
-            self.assertEqual(answer, newer_record)
-            self.assertEqual(sorted(os.listdir(folder)), ["about.json", newer_page])
-            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir,
-                                                               "20991231T000000Z-ffffffff"), "thisBuild")
 
     def test_the_page_about_json_names_is_never_removed(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -898,6 +865,66 @@ class TwoBuildsAndLeftovers(unittest.TestCase):
             # As if this build's record had been overtaken, right before the tidy.
             build_site._tidy_the_coverage_tab_folder(folder, BUILD_ID)
             self.assertTrue((folder / older_page).is_file())
+
+
+class TheBuildThatStartedLastOwnsTheMap(unittest.TestCase):
+    """Never ordered by the clock (the fix review's M1): the map that belongs
+    is the one made by the build `.build-id` names, the last to start."""
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def build(self, course: Course, build_id: str, note_it: bool = True):
+        if note_it:
+            build_site._note_the_build_id(course.host_output_dir, build_id)
+        return build_site.write_coverage_tab(
+            course.host_output_dir, course.content_root, course.course_dir, "COURSE", "COURSE", 1,
+            build_id, "preview", course.plan, course.class_folders, course.graded_folders, True,
+            course.taught, {}, True, schemes=schemes())
+
+    def test_a_build_whose_clock_is_30_seconds_behind_the_last_one_keeps_its_own_map(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            first = "20261112T100000Z-aaaaaaaa"
+            behind = "20261112T095930Z-bbbbbbbb"
+            self.build(course, first)
+            record = self.build(course, behind)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            self.assertEqual(record["buildId"], behind)
+            self.assertEqual(json.loads((folder / "about.json").read_text(encoding="utf-8"))["buildId"], behind)
+            self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", f"map-{behind}.html"]))
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, behind), "thisBuild")
+
+    def test_a_build_that_no_longer_owns_build_id_leaves_the_others_map_alone(self):
+        # Two overlapping builds: B started after A and finished first. A,
+        # finishing last, must not write over B's record or remove B's page.
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            a_id = "20261112T100000Z-aaaaaaaa"
+            b_id = "20261112T100001Z-bbbbbbbb"
+            build_site._note_the_build_id(course.host_output_dir, a_id)
+            build_site._note_the_build_id(course.host_output_dir, b_id)
+            b_record = self.build(course, b_id, note_it=False)
+            a_answer = self.build(course, a_id, note_it=False)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            self.assertEqual(a_answer, b_record)
+            self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", f"map-{b_id}.html"]))
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, b_id), "thisBuild")
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, a_id), "anotherBuild")
+
+    def test_the_owner_removes_every_other_builds_leftovers_whatever_their_ids(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            leftovers = [".map-20200101T000000Z-00000000.html.123.tmp",
+                         ".about.json.20200101T000000Z-00000000.tmp",
+                         ".map-20991231T000000Z-ffffffff.html.456.tmp",
+                         ".about.json.20991231T000000Z-ffffffff.tmp",
+                         "map-20991231T000000Z-ffffffff.html", "map-old.html"]
+            for name in leftovers:
+                write(folder / name, "left behind")
+            record = self.build(course, BUILD_ID)
+            self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", record["page"]]))
 
 
 class TheConsoleLine(unittest.TestCase):
