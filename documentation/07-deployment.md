@@ -1042,14 +1042,90 @@ cannot arise), each leg is `powershell.exe -File deploy.ps1 <course>
 `DeployCommand.Arguments` names `--target netlify` too; `verify-deploy.ps1`
 names its Netlify calls and runs a no-flag deploy over two saved folders
 (both written; then a first leg that fails, and the run still writes the
-second and ends with exit 1). The rules, sentences and eighteen cases are
-proposed from Windows as `contracts/app-rules.json` → `savedDestinations`,
-run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`; the mac's
-`test_deploy_sh_destination.py` is asked to read them too (the `mac` issue
-for #739). `deploy.py` is unchanged (it does one destination per call). The
-new-course default, its sentences and every case are
-`contracts/app-rules.json` → `publishingDestinations`; the Swift is
-`PublishingDestinations`.
+second and ends with exit 1). The rules, sentences and eighteen cases were
+proposed from Windows (four more were added from the mac by #771) as `contracts/app-rules.json` → `savedDestinations`,
+run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. `deploy.py`
+is unchanged (it does one destination per call). The new-course default, its
+sentences and every case are `contracts/app-rules.json` →
+`publishingDestinations`; the Swift is `PublishingDestinations`.
+
+**The mac runs every case too, since #771.** `deploy.sh` carries
+`the_saved_destinations` (with its `the_saved_setting`), `destination_words`,
+`flags_for_the_saved_destination` and `the_one_saved_destination` between `# BEGIN saved_destinations` and
+`# END saved_destinations`, and `test_deploy_sh_destination.py`'s
+`TheSavedDestinationsAreTheContracts` cuts them out and runs every case
+through the launcher's own reading loop twice on a Mac: once with `plutil`
+on PATH, and once with a PATH holding only a `python3` and `tr`, so the
+Python reader is the one used. On any other bash (Windows' Git Bash, under
+`PythonToolchainTests`) it runs the Python reader only. The same class pins
+every `sentences` template to a printed line of the #668 block (the
+placeholders written as the launcher writes them, and the cross or target
+taken off the front), checks the block prints no other sentence, and pins
+`sentences.where` to `destination_words`, including Netlify's word for a
+kind it does not list. A run with ONE saved destination does not run a leg
+with the flags; it sets `TARGET` or `TO_FOLDER` through
+`the_one_saved_destination`. The review of #771 found that path untested (a
+copy whose Cloudflare line set Netlify passed every test while saying
+"Cloudflare Pages"), so every leg the contract accepts is also put through
+that function and must come out as its flags say. Function-level rather than
+one launcher run per case: the eight whole-launcher tests above already cover
+the loop that runs the legs, and a launcher run per case would cost minutes.
+
+**The contract found a mac fault, and #771 fixed it.** Measured on macOS
+26.6 with the functions cut from `deploy.sh`: the Python reader passed 18 of
+18 cases and the `plutil` reader 17 of 18. Settings of `["netlify"]` are a
+JSON array, which `plutil -convert json` converts with exit 0; every
+`-extract` on it then fails, which reads as a course naming no destination,
+so the course DEPLOYED TO NETLIFY. That is the silent wrong-host deploy the
+block exists to stop, and the Python reader and `deploy.ps1` already refused
+it. The `plutil` reader now converts the file to JSON on stdout and requires
+its first character to be `{`, since `plutil` writes the converted JSON with
+no leading space (measured: leading whitespace in the file is dropped). It
+gave 18 of 18. The other shapes `plutil` was measured on refused already: a
+top-level string, number or `null` and an empty file fail to convert, and a
+`deploy_target` of `null` converts but its `-extract` fails, which reads as
+Netlify, as the contract says.
+
+**The review of #771 found three more, and they are fixed with a contract
+case each.** Measured with `plutil -convert json -o -` on macOS 26.6: a file
+of one line break, of only white space, or of only a comment converts to `{}`
+with exit 0, so it passed the check above and deployed to Netlify, which the
+Python reader and `deploy.ps1` refuse. An editor that saves an emptied file
+usually adds a final line break, so this is no rarer than `["netlify"]`. The
+reader now first checks the FILE's own first character other than white
+space (`tr -d` then `head -c 1`) and refuses unless it is `{`. Measured on
+the fixed functions: white space, a tab, a comment, a comment before an
+object, and a UTF-8 byte-order mark all refuse, and an object after blank
+lines still reads. The same check refuses an XML or binary property list,
+which the Python reader refused already. Second, a kind holding a tab or a
+line break became two legs, and the second could deploy
+(`"cloudflare_pages\nnetlify"` refused one leg and deployed to Netlify on
+the next); a kind's tabs, carriage returns and line breaks now become
+spaces, as a path's do, in both readers, so it is one kind Plantoir does not
+know. A line break at the END of a value needed more: a command substitution
+drops every trailing line break, the value's own included, so under `plutil`
+a kind of only `"\n"` read as empty and deployed to Netlify. The reader
+(`the_saved_setting`) writes an `x` after `plutil`'s output and takes it off
+again, so the value's own line break survives to become a space. A carriage
+return is now a space in both readers too, as `deploy.ps1` has always made
+it in a path; before, deploy.sh kept it, so the two launchers would have
+refused a kind of `"netlify\r"` in different words. Third, an additional entry whose `type` is a number
+or `true` was a refused leg under `plutil` and passed over by the Python
+reader and `deploy.ps1`; the `plutil` reader now asks `plutil -type` and
+reads only a `string` (`-type` is in macOS 12 and later, and Plantoir needs
+15).
+
+**Where the readers still differ, accepted.** Measured on the fixed
+functions. `plutil` reads, and the Python reader and `deploy.ps1` refuse, a
+file that starts with `{` but is not strict JSON: an old-style property list
+(`{ deploy_target = cloudflare_pages; }`), a comment inside the object, and a
+trailing comma. Each deploys where the file says, so none is a wrong-host
+deploy, and Plantoir writes none of them. The other way round, `deploy.ps1`
+reads a file with a UTF-8 byte-order mark (`ReadAllText` strips it) and a
+UTF-16 file, and both mac readers refuse them (the Python reader's
+`json.load` under `utf-8` always did, and `build_site.py`'s preflight
+decodes strictly too). Every Plantoir writer writes UTF-8 without a mark, so
+that difference is in the safe direction. Neither is given a second check.
 
 **Why.** Netlify moved new accounts to a credit-based plan, and the free one
 is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
@@ -1084,12 +1160,15 @@ in so many words. The 100-project cap, which a teacher who rolls over many
 sections a year could reach in about seven years, is #723.
 
 **What the teacher is told.** No figures in the app — the hosts change them;
-the dated figures are here and on plantoir.app's deploying page. Every
+the dated figures are here and on plantoir.app's deploying page. The one
+figure kept is Cloudflare's 25 MB per file, in `cloudflareSizeNote`, because
+that limit is the fact the sentence exists to state. Every
 sentence says DEPLOY for what spends the allowance, because in Plantoir
 publishing marks a page and costs nothing. `netlifyNote` sits under Netlify
 wherever it is configured (primary or additional, the new-course window and
 Course Settings, and an absent key counts as Netlify); `cloudflareCaption`
-sits wherever Cloudflare is; `netlifyScheduleNote` is in Schedule a deploy
+sits wherever Cloudflare is, and `cloudflareSizeNote` under it in the
+Cloudflare fields; `netlifyScheduleNote` is in Schedule a deploy
 when the SAVED settings deploy to Netlify; the window's section caption is
 `wizardCaption`.
 
@@ -1119,6 +1198,11 @@ cases (`wizardAccountID`, `deployWithoutAnAccountID`, six cases with
 with no ID would have met two orange warnings on their first course: the
 ID's sentence and the fixed 25 MB fact. When both apply they are one block,
 the ID's sentence first, then "it can wait", then the 25 MB note, as one block (#668 second fixes round).
+The 25 MB note is `publishingDestinations.sentences.cloudflareSizeNote`
+since #775 (Russell, 2026-11-12): until then each app typed its own copy,
+which no test compared, so a drift would have passed both suites. The
+alternative, leaving two copies because the sentence states a fact rather
+than a rule, was rejected for that reason.
 
 **What was rejected, and why.**
 - *Letting the launcher ask for the ID at the first deploy.* The plan's first
@@ -1344,7 +1428,7 @@ file alone and clears nothing. **The rule is data since 1.9.3:**
 `contracts/app-rules.json` → `savedTokenCheck` — each service's URL, the two
 body patterns, and 25 cases — proposed from Windows so the two launchers stop
 holding it in two tables. The patterns are written so `grep -E` and .NET read
-them IDENTICALLY: `[[:space:]]`, deploy.sh's spelling, is a POSIX class that
+them IDENTICALLY: `[[:space:]]`, deploy.sh's old spelling, is a POSIX class that
 .NET reads as a set of the characters `[ : s p a c e`, matching wrongly with
 no error (measured: with it, two cases fail); a bracket of a real space and
 a real tab reads the same in both. `windows-app/test_launcher_rules.ps1`
@@ -1356,8 +1440,29 @@ not followed, the Bearer header sent) and a closed port, and runs the real
 closed port: the token is kept, the two lines are said, exit 1. The app's
 `FailureExplainer` lifts all four cases (`TokenRefusedMarker`,
 `SavedTokenUnheardMarker`). deploy.sh's own pattern was already fixed on the
-mac (#716), so #705's "check the mac" needs no issue; reading the contract's
-cases there is the `mac` issue for #705.
+mac (#716), so #705's "check the mac" needed no issue.
+
+**The mac runs the 25 cases too, since #771.** `deploy.sh` names the two
+addresses and four patterns once, between `# BEGIN saved_token_check_rules`
+and `# END saved_token_check_rules` (`CLOUDFLARE_TOKEN_CHECK_URL`,
+`CLOUDFLARE_TOKEN_ACCEPTED` and so on), spelled as the contract spells them:
+`$'…'` quoting makes the `\t` a real TAB, because `grep -E` reads a backslash
+inside a bracket literally. Both saved-token checks pass those names to
+`token_check_answer`, which is also between markers.
+`test_deploy_token_refusal.py`'s `TheSavedTokenRuleIsTheContracts` checks
+that the six values, as bash expands them, are `savedTokenCheck.services`
+byte for byte, that the two call sites pass them, and runs every case
+through the cut-out `token_check_answer` with `curl` stubbed (status 0 is
+curl's `000`, with the exit code a timeout gives). Measured before the
+change: deploy.sh's old `[[:space:]]` patterns gave 25 of 25 in `grep -E`
+too, so no answer a teacher sees moved; what changed is that there is one
+table. REJECTED: reading the patterns from `.toolchain/contracts` at run
+time, because a Mac has no host `python3` to read JSON with, and a `plutil`
+read of a nested key costs a process per deploy and fails in a way the rest
+of the launcher does not; and keeping `[[:space:]]`, which also takes CR, VT
+and FF (`grep -E` reads line by line, so never LF), so the test could compare
+only behaviour and never the text. The paste checks keep their own
+`[[:space:]]` patterns, deliberately, as above: they are not this rule.
 
 ### Asking once, and the subshell that ate the question (2026-09-09)
 
@@ -1464,6 +1569,8 @@ unhelpful error — so `deploy.py` checks sizes *before* uploading anything and
 names the offending files, suggesting a shorter or compressed video, or
 Netlify for that section. Ordinary course material is nowhere near it;
 long-form video is, which is why most teachers embed from YouTube or Vimeo.
+Both apps say so under Cloudflare Pages in one sentence,
+`publishingDestinations.sentences.cloudflareSizeNote` (#775).
 
 Cloudflare's free plan limits builds to 500 a month, but that does not apply
 here: a Direct Upload deployment records `deployment_trigger.type: ad_hoc`

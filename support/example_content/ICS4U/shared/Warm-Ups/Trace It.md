@@ -60,7 +60,7 @@ call, and they simply never meet.
 > is the most literal thing it ever prints — the same frame, over and
 > over. It begins:
 >
-> ```text wrap
+> ```text nowrap
 > Traceback (most recent call last):
 >   File "/home/student/power.py", line 7, in <module>
 >     print(power(2, -1))

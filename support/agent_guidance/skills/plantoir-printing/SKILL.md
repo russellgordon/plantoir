@@ -126,7 +126,9 @@ key "3. a) 7x - 2y  b) 7a - 11b".
   continues onto the next page with its numbers counting on.
 - A text block prints wrapped whether or not it says `wrap`. Still write
   ` ```text wrap ` (the `plantoir-page-authoring` skill, section 9), so it
-  wraps on screen too.
+  wraps on screen too. A ` ```text nowrap ` block (a drawing, columns lined
+  up with spaces) wraps on paper as well, so a line longer than the printed
+  line breaks there; keep such a block narrow on a page that prints.
 - A checklist (`- [ ]` outside a quiz) prints its boxes as the student
   ticked them on their own computer, each tick drawn in ink - not as the
   page's `[ ]` and `[x]`. A worksheet meant to come back blank should use

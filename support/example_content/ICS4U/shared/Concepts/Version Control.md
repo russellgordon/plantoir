@@ -33,7 +33,7 @@ A commit is the unit that matters. It is not "everything I did today";
 it is one coherent change with a sentence attached. History from a
 project that does this well reads like a story:
 
-```text wrap
+```text nowrap
 a3f21c8  Refuse holds for members with an expired card
 7d9e004  Add tests for the empty hold list
 1b6cf52  Fix: dequeue on an empty queue returned the wrong thing

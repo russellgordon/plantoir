@@ -32,7 +32,9 @@ one rule about lifting them:
 `deploy.ps1`'s half of #716 is Windows' #705 (1.9.3): it prints the same
 "could not reach" lines, which the drift check below pins to the contract,
 and its three-word rule runs against `contracts/app-rules.json` ->
-`savedTokenCheck.cases` in `windows-app/test_launcher_rules.ps1`.
+`savedTokenCheck.cases` in `windows-app/test_launcher_rules.ps1`. Since #771
+the last class here runs the same cases through deploy.sh's
+`token_check_answer`, and pins its addresses and patterns to the contract's.
 
 Both launchers are read with encoding="utf-8" (deploy.sh's ❌ and em dashes
 would not survive a Windows code page) and line by line with the ending
@@ -71,6 +73,7 @@ sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
 os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts"))
 
 import contracts  # noqa: E402
+import test_deploy_non_interactive as launcher_harness  # noqa: E402
 
 # The words that find each pair of lines. They are the launchers' own, and the
 # Swift explainer matches on the same ones (FailureExplainer.tokenRefusedMarker
@@ -314,6 +317,123 @@ class ASavedTokenIsClearedOnlyWhenTheServiceSaysNo(unittest.TestCase):
 
     def test_netlify_an_accepted_token_is_used(self):
         self.assert_used("netlify", "200", '{"id":"someone"}')
+
+
+def _cut_from_deploy_sh(name: str) -> str:
+    """The text deploy.sh carries between `# BEGIN name` and `# END name`."""
+    text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+    begin = f"# BEGIN {name}\n"
+    end = f"# END {name}\n"
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise AssertionError(f"deploy.sh no longer carries {name} between its markers")
+    return text[text.index(begin) + len(begin):text.index(end)]
+
+
+# Each service's four values, as deploy.sh names them.
+THE_LAUNCHERS_NAMES = {
+    "cloudflare": {
+        "url": "CLOUDFLARE_TOKEN_CHECK_URL",
+        "acceptedWhenTheBodyMatches": "CLOUDFLARE_TOKEN_ACCEPTED",
+        "refusedWhenTheBodyMatches": "CLOUDFLARE_TOKEN_REFUSED",
+    },
+    "netlify": {
+        "url": "NETLIFY_TOKEN_CHECK_URL",
+        "acceptedWhenTheBodyMatches": "NETLIFY_TOKEN_ACCEPTED",
+        "refusedWhenTheBodyMatches": "NETLIFY_TOKEN_REFUSED",
+    },
+}
+
+# The token each call site passes, after the URL.
+THE_LAUNCHERS_TOKENS = {"cloudflare": "CF_TOKEN", "netlify": "TOKEN"}
+
+
+class TheSavedTokenRuleIsTheContracts(unittest.TestCase):
+    """GitHub #771: deploy.sh runs `contracts/app-rules.json` ->
+    `savedTokenCheck`, the cases Windows proposed (#705) and deploy.ps1 runs.
+
+    The function and the six values are CUT from deploy.sh and run in a bash
+    of their own, with `curl` replaced by a stub that answers with the case's
+    status and body. Function-level rather than a whole launcher per case:
+    the class above already runs the call sites end to end, and 25 launcher
+    runs would cost minutes.
+    """
+
+    def setUp(self):
+        # Not the `bash` on PATH: on Windows that is the WSL launcher (see
+        # test_deploy_non_interactive). Git Bash runs these there.
+        self.shell = launcher_harness._a_bash_that_can_run_deploy_sh()
+        if self.shell is None:
+            self.skipTest("no bash on this machine that can run deploy.sh's definitions")
+
+    def _bash(self, script: str, *arguments, environment=None):
+        result = subprocess.run(
+            self.shell + ["-c", script, "_", *arguments],
+            capture_output=True, timeout=60, env=environment,
+        )
+        return result.returncode, result.stdout.decode("utf-8", "replace")
+
+    def test_the_launchers_addresses_and_patterns_are_the_contracts(self):
+        """MUST-FAIL before #771, whose patterns were written [[:space:]]:
+        right in grep, and read by .NET as a set of letters."""
+        services = contracts.section("app-rules", "savedTokenCheck", "services")
+        self.assertEqual(sorted(services), sorted(THE_LAUNCHERS_NAMES))
+        rules = _cut_from_deploy_sh("saved_token_check_rules")
+        for service, names in THE_LAUNCHERS_NAMES.items():
+            for key, variable in names.items():
+                with self.subTest(service=service, key=key):
+                    # NUL-ended, so a trailing TAB or space would show.
+                    code, said = self._bash(rules + f'\nprintf "%s\\0" "${variable}"\n')
+                    self.assertEqual(code, 0, said)
+                    self.assertEqual(said, services[service][key] + "\0")
+
+    def test_each_saved_token_check_passes_its_services_values(self):
+        """The values above are what the two checks hand token_check_answer,
+        not six names that nothing reads."""
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        calls = []
+        for line in text.split("\n"):
+            if "token_check_answer " in line and "#" not in line.split("token_check_answer")[0]:
+                calls.append(line.strip())
+        self.assertEqual(len(calls), 2, calls)
+        for service, names in THE_LAUNCHERS_NAMES.items():
+            with self.subTest(service=service):
+                expected = (
+                    f'token_check_answer "${names["url"]}" "${THE_LAUNCHERS_TOKENS[service]}" '
+                    f'"${names["acceptedWhenTheBodyMatches"]}" "${names["refusedWhenTheBodyMatches"]}")'
+                )
+                found = False
+                for call in calls:
+                    if expected in call:
+                        found = True
+                self.assertTrue(found, f"no call passes {expected}; the calls are {calls}")
+
+    def test_every_case_is_answered_as_the_contract_says(self):
+        rule = contracts.section("app-rules", "savedTokenCheck")
+        self.assertEqual(sorted(rule["refusalStatuses"]), [400, 401, 403])
+        script = (
+            _cut_from_deploy_sh("saved_token_check_rules")
+            + _cut_from_deploy_sh("token_check_answer")
+            # The stub the class above uses: 000 when nothing answered, with
+            # the exit code a timeout gives.
+            + "curl() {\n"
+            "  printf '%s\\n%s' \"${FAKE_BODY:-}\" \"${FAKE_STATUS:-000}\"\n"
+            "  [[ \"${FAKE_STATUS:-000}\" != 000 ]] || return 28\n"
+            "}\n"
+            'case "$1" in\n'
+            '  cloudflare) token_check_answer "$CLOUDFLARE_TOKEN_CHECK_URL" a-token '
+            '"$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED" ;;\n'
+            '  netlify) token_check_answer "$NETLIFY_TOKEN_CHECK_URL" a-token '
+            '"$NETLIFY_TOKEN_ACCEPTED" "$NETLIFY_TOKEN_REFUSED" ;;\n'
+            "esac\n"
+        )
+        self.assertTrue(rule["cases"], "the contract carries no cases to run")
+        for case in rule["cases"]:
+            with self.subTest(case=case["name"]):
+                status = "000" if case["status"] == 0 else str(case["status"])
+                environment = dict(os.environ, FAKE_STATUS=status, FAKE_BODY=case["body"])
+                code, said = self._bash(script, case["service"], environment=environment)
+                self.assertEqual(code, 0, said)
+                self.assertEqual(said.strip(), case["expect"])
 
 
 if __name__ == "__main__":

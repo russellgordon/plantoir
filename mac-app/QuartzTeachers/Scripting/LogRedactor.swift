@@ -101,6 +101,17 @@ nonisolated enum LogRedactor {
             pattern: #"(?i)(account\s*id\s*[:=]?\s*)[A-Za-z0-9]{16,}"#,
             replacement: "$1" + removedAccount
         ),
+        // The ID inside a Cloudflare API path (#773, proposed from Windows
+        // with #739). A failing wrangler call names the resource it asked
+        // for, and every Pages resource is /accounts/<id>/pages/…, so the ID
+        // arrives with no label and no flag beside it. The two rules above
+        // do not see it, and at 32 characters the long-secret rule does not
+        // either.
+        RedactionRule(
+            name: "accountPath",
+            pattern: #"(?i)(/accounts/)[A-Za-z0-9]{16,}"#,
+            replacement: "$1" + removedAccount
+        ),
     ]
 
     // MARK: - Functions

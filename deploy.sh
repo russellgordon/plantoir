@@ -930,26 +930,62 @@ fi
 # a VALUE in nested JSON. A settings file that is there and cannot be read
 # REFUSES rather than falling back to Netlify: falling back is exactly the
 # silent wrong-host deploy this exists to stop.
-# scripts/test_deploy_sh_destination.py pins it.
+# The rule is contracts/app-rules.json -> savedDestinations, whose cases
+# scripts/test_deploy_sh_destination.py runs through the functions
+# between the markers below, with each reader (#771). Keep the markers.
+# BEGIN saved_destinations
+# One value from the settings as plutil reads it, on one line: a tab, a
+# carriage return or a line break in it becomes a space, AT ITS END TOO. A
+# command substitution drops every line break at the end, the value's own
+# included, so the x is written after plutil's output and taken off again;
+# without it a kind of only a line break read as empty, which is Netlify
+# (#771 review). An absent or null key, or a failed read, is empty.
+the_saved_setting() {
+  local value
+  value="$(plutil -extract "$1" raw -o - "$2" 2>/dev/null && printf x)" || value=""
+  if [[ "$value" == *x ]]; then
+    value="${value%x}"
+    value="${value%$'\n'}"
+  fi
+  printf '%s' "$value" | tr '\t\r\n' '   '
+}
+
 the_saved_destinations() {
   local config="$1" reader primary folder count index kind path
   # macOS: plutil reads JSON and is on every Mac, Command Line Tools or not —
   # the rule this script keeps for the reference-course check above (no host
   # python3; #668 review M1). A file it cannot parse fails, and the caller
   # refuses; a key that is absent, or null, reads as empty.
+  # The settings must be an OBJECT, as the Python reader below requires. An
+  # array such as ["netlify"] converts cleanly, every -extract on it fails,
+  # and it used to read as a course naming no destination, so it deployed to
+  # Netlify (#771, found by the contract's case). plutil writes the converted
+  # JSON with no leading space, so a first character of { is an object.
+  # The file's OWN first character is checked first: plutil reads a file of
+  # only a line break, white space or a comment as an empty object, and an
+  # XML or binary property list is not JSON at all (#771 review).
+  # A tab, a carriage return or a line break in a kind becomes a space, as in
+  # a path (the_saved_setting), so a kind is always one leg: split, it was
+  # two, and the second deployed.
   if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o /dev/null "$config" 2>/dev/null || return 1
-    primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
-    folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
-    printf '%s\t%s\n' "${primary:-netlify}" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
-    count="$(plutil -extract additional_deploy_targets raw -o - "$config" 2>/dev/null || true)"
+    [[ "$(LC_ALL=C tr -d ' \t\r\n' < "$config" 2>/dev/null | head -c 1)" == "{" ]] || return 1
+    [[ "$(plutil -convert json -o - "$config" 2>/dev/null)" == "{"* ]] || return 1
+    primary="$(the_saved_setting deploy_target "$config")"
+    folder="$(the_saved_setting deploy_folder_path "$config")"
+    printf '%s\t%s\n' "${primary:-netlify}" "$folder"
+    count="$(the_saved_setting additional_deploy_targets "$config")"
     [[ "$count" =~ ^[0-9]+$ ]] || count=0
     index=0
     while [[ "$index" -lt "$count" ]]; do
-      kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
-      path="$(plutil -extract "additional_deploy_targets.${index}.path" raw -o - "$config" 2>/dev/null || true)"
+      kind=""
+      # Only a TEXT type names a destination, as the Python reader and
+      # deploy.ps1 read it; a number or true is passed over, not refused.
+      if [[ "$(plutil -type "additional_deploy_targets.${index}.type" "$config" 2>/dev/null)" == "string" ]]; then
+        kind="$(the_saved_setting "additional_deploy_targets.${index}.type" "$config")"
+      fi
+      path="$(the_saved_setting "additional_deploy_targets.${index}.path" "$config")"
       if [[ -n "$kind" ]]; then
-        printf '%s\t%s\n' "$kind" "$(printf '%s' "$path" | tr '\t\n' '  ')"
+        printf '%s\t%s\n' "$kind" "$path"
       fi
       index=$((index + 1))
     done
@@ -968,8 +1004,10 @@ def text(value):
     if value is None:
         return ""
     return value if isinstance(value, str) else json.dumps(value)
+def one_line(value):
+    return value.replace("\t", " ").replace("\r", " ").replace("\n", " ")
 def one(kind, path):
-    print((text(kind) or "netlify") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
+    print(one_line(text(kind) or "netlify") + "\t" + one_line(text(path)))
 one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
 extras = settings.get("additional_deploy_targets")
 if isinstance(extras, list):
@@ -1010,6 +1048,19 @@ flags_for_the_saved_destination() {
       return 1 ;;
   esac
 }
+
+# The destination a run with ONE saved destination deploys to, set from the
+# kind flags_for_the_saved_destination has accepted. It must agree with
+# those flags, which are what a leg of several is run with; the contract's
+# cases are run through both (#771 review).
+the_one_saved_destination() {
+  case "$1" in
+    cloudflare_pages) TARGET="cloudflare" ;;
+    local_folder) TO_FOLDER="$2" ;;
+    *) TARGET="netlify" ;;
+  esac
+}
+# END saved_destinations
 
 if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
   if ! _saved_destinations="$(the_saved_destinations "$_course_config" 2>/dev/null)" \
@@ -1063,11 +1114,7 @@ if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]
     echo ""
     exit 1
   fi
-  case "$_kind" in
-    cloudflare_pages) TARGET="cloudflare" ;;
-    local_folder) TO_FOLDER="$_path" ;;
-    *) TARGET="netlify" ;;
-  esac
+  the_one_saved_destination "$_kind" "$_path"
   echo "🎯 Deploying to $(destination_words "$_kind"), as ${COURSE_CODE}'s settings say."
 fi
 
@@ -1680,6 +1727,25 @@ validate_cf_token() {
 # $1 the URL, $2 the token, $3 (optional) an extended regular expression the
 # answer's body must match before a 2xx counts as accepted, $4 (optional) one
 # it must match before a 400/401/403 counts as refused.
+#
+# The addresses and the four patterns are contracts/app-rules.json ->
+# savedTokenCheck.services, written here as the contract spells them (#771).
+# deploy.ps1 reads the same patterns with .NET, which takes a POSIX class
+# such as [[:space:]] as a set of letters, so the shared spelling is a
+# bracket holding a real space and a real TAB ($'…' makes the \t a TAB, and
+# grep -E takes a backslash inside a bracket literally). They stay literals
+# because a Mac has no host python3 to read the contract with at run time;
+# scripts/test_deploy_token_refusal.py pins them to the contract and runs
+# every case through token_check_answer, both cut from between the markers.
+# BEGIN saved_token_check_rules
+CLOUDFLARE_TOKEN_CHECK_URL='https://api.cloudflare.com/client/v4/user/tokens/verify'
+CLOUDFLARE_TOKEN_ACCEPTED=$'"success":[ \t]*true'
+CLOUDFLARE_TOKEN_REFUSED=$'"success":[ \t]*false'
+NETLIFY_TOKEN_CHECK_URL='https://api.netlify.com/api/v1/user'
+NETLIFY_TOKEN_ACCEPTED=$'"id"[ \t]*:'
+NETLIFY_TOKEN_REFUSED=$'"code":[ \t]*4[0-9][0-9]'
+# END saved_token_check_rules
+# BEGIN token_check_answer
 token_check_answer() {
   local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
   local answer code body
@@ -1714,6 +1780,7 @@ token_check_answer() {
       ;;
   esac
 }
+# END token_check_answer
 
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
@@ -1878,7 +1945,7 @@ if [[ "$TARGET" == "cloudflare" ]]; then
     # (GitHub #716, above token_check_answer). The run stops there rather than
     # carrying on, because the upload needs the same connection and would only
     # fail later with a less useful message.
-    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true' '"success":[[:space:]]*false')" in
+    case "$(token_check_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$CF_TOKEN" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" in
       accepted)
         ;;
       refused)
@@ -1990,7 +2057,7 @@ if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
 if [[ -n "$TOKEN" ]]; then
   # Cleared only when Netlify SAYS no, as Cloudflare's is (GitHub #716).
-  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN" '"id"[[:space:]]*:' '"code":[[:space:]]*4[0-9][0-9]')" in
+  case "$(token_check_answer "$NETLIFY_TOKEN_CHECK_URL" "$TOKEN" "$NETLIFY_TOKEN_ACCEPTED" "$NETLIFY_TOKEN_REFUSED")" in
     accepted)
       ;;
     refused)

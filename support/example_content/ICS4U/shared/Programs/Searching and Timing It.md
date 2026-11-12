@@ -132,7 +132,7 @@ for size in [1000, 10000, 100000]:
     print(f"{size:>10}  {linear_time:>12.8f}  {binary_time:>12.8f}")
 ```
 
-```text wrap
+```text nowrap
 Agreed on 1000 of 1000 random lookups.
 Missing card: linear -1, binary -1
 

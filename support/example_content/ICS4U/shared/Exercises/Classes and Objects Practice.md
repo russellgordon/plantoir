@@ -237,7 +237,7 @@ class is responsible for which fact.
 
 > [!success]- Answer 8
 > A defensible set of cards:
-> ```text wrap
+> ```text nowrap
 > Attendee    | knows name, contact for emergencies
 >             | signs in and out
 >             | collaborates with: Activity

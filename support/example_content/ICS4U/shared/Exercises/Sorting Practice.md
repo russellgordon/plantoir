@@ -180,7 +180,7 @@ times = [64, 25, 12, 22, 11]
 > lets a `Queue` hold names one day and objects the next.
 
 > [!success]- Answer 8
-> ```text wrap
+> ```text nowrap
 > with >   [('Nadia', 1), ('Ali', 1), ('Rowan', 2), ('Bea', 2)]
 > with >=  [('Ali', 1), ('Nadia', 1), ('Bea', 2), ('Rowan', 2)]
 > ```
@@ -192,7 +192,7 @@ times = [64, 25, 12, 22, 11]
 > person.
 
 > [!success]- Answer 9
-> ```text wrap
+> ```text nowrap
 >  items    sorted   shuffled   reversed
 >    100        99       2988       4950
 >    200       199       9446      19900

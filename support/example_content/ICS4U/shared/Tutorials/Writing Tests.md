@@ -40,7 +40,7 @@ print("All checks passed.")
 
 Run it. The third claim is a lie:
 
-```text wrap
+```text nowrap
 Traceback (most recent call last):
   File "/home/student/check_bookings.py", line 5, in <module>
     assert spaces_left(10, 12) == 0

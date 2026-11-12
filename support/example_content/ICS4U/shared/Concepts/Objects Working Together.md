@@ -85,7 +85,7 @@ Before writing any of that, professionals sketch one index card per
 class — Class, Responsibilities, Collaborators. It takes ten minutes
 and saves an afternoon:
 
-```text wrap
+```text nowrap
 +--------------------------------------------------+
 | Booking                                          |
 +---------------------------+----------------------+

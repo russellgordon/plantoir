@@ -184,7 +184,23 @@ nonisolated enum FixWithAssistant {
     static let closingBoth: String =
         "When you are done, preview Section {section} and then deploy it to Cloudflare again so its Problems tab clears."
 
+    /// What a button that cannot be pressed tells VoiceOver
+    /// (`fixWith.notEnabledHelp`, proposed from Windows with #736; #776).
+    /// A dimmed button alone says nothing about why it is dimmed, and the
+    /// reason here is not obvious: a ticked row already fixed in the source
+    /// is left out, so a table of ticked rows can still leave both greyed.
+    static let notEnabledHelp: String = "Tick a problem this section still has to hand it over."
+
     // MARK: - Functions
+
+    /// The accessibility hint both buttons carry: `notEnabledHelp` while
+    /// nothing is handed over, and nothing at all while a press would work.
+    static func buttonHint(hasRows: Bool) -> String {
+        if hasRows {
+            return ""
+        }
+        return notEnabledHelp
+    }
 
     /// `fixWith.buttonCases` → `shown`: the door exists on this Mac and the
     /// course is not kept for reference. Hidden, never greyed, when the

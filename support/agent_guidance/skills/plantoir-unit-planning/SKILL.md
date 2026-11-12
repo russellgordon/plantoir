@@ -179,7 +179,7 @@ and the gaps.
 
 ## 9. The planning folder: where everything goes
 
-```text wrap
+```text nowrap
 courses/<CODE>/.internal/planning/
   index.html          the course's list of plans, one card per unit (from template/index.html)
   robots.txt          two lines that ask search engines to stay away (from template/robots.txt)

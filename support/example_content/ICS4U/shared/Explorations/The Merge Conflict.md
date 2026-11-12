@@ -66,7 +66,7 @@ def fee_owing(days_out):
 Read those markers slowly, because they are not damage and they are not
 an error message. They are a sentence:
 
-```text wrap
+```text nowrap
 <<<<<<< HEAD        everything below this line is what YOU had
 =======             the divider
 >>>>>>> rounding    everything above this line came from that branch
