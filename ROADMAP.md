@@ -71,6 +71,8 @@ Small fixes and conveniences. Mac first where it says so.
   this the first free way to work with a capable assistant beside Plantoir.
   (What GitHub offers can change; check GitHub Education when you sign up.)
   ([#783](https://github.com/russellgordon/plantoir/issues/783))
+- **GitHub Pages as a place to deploy your class site**, beside Netlify,
+  Cloudflare Pages and a folder. ([#669](https://github.com/russellgordon/plantoir/issues/669))
 - **See, change or remove a saved Netlify or Cloudflare token** in
   Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
 - **Vimeo videos embed like YouTube ones**, from a plain link, with a
