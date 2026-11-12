@@ -156,7 +156,9 @@ struct MainWindowView: View {
                     }
                     .id(code)
                 } else {
-                    CourseSettingsView(course: course)
+                    // Settings, and Planning beside it while Claude Code or
+                    // Codex is installed (#708).
+                    CourseDetailView(course: course)
                         .id(code)
                 }
             } else {

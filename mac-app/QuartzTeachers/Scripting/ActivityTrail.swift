@@ -293,6 +293,13 @@ nonisolated enum ActivityTrail {
         /// "assistant opened" line, so a report of "it fixed the wrong thing"
         /// can tell what it was asked to fix.
         case askedAnAssistantToFixProblems = "asked an assistant to fix problems"
+        /// Plan a Unit with Claude… or Plan a Unit with Codex… on a course's
+        /// empty Planning tab opened its door with the planning message
+        /// (#708, `PlanAUnit`): the course and which assistant, nothing
+        /// typed and nothing from a plan. Written once the door has opened,
+        /// beside the door's own "assistant opened" line, which cannot say
+        /// what the session was asked to do. Looking at a plan writes nothing.
+        case askedAnAssistantToPlanAUnit = "asked an assistant to plan a unit"
         /// A folder a feature depends on was put back, at the teacher's
         /// request — or, since #584, something the build put right in the
         /// teacher's own files by itself (`BuildRepairReport`: a front page's
