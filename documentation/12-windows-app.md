@@ -809,8 +809,8 @@ tooltip, its Name and the ROW's `HelpText` say each sentence that applies
 (Narrator reads the row, not a tooltip on a child icon). **Its id names the
 course as well as the section** — `problemsBadge-<COURSE>-section<N>`, or
 `stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies —
-because two courses' Section 1 rows are in one tree (the mac's id has the
-section only; it has one window per section). The old fixed id
+because two courses' Section 1 rows are in one tree. The mac uses the same
+form since #772; its sidebar is one list of every course too. The old fixed id
 `scheduledPublishWarning` had no reader.
 
 **Website | Problems.** A `SelectorBar` in its own row under the notices, shown

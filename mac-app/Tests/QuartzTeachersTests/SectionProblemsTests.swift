@@ -343,6 +343,30 @@ final class SectionProblemsTests: XCTestCase {
                        "one warning glyph on a row")
     }
 
+    /// #772: the warning's identifier names the course as well as the
+    /// section, in Windows' form (#734), because the sidebar is one list of
+    /// every course and two courses' Section 1 rows shared an identifier.
+    func testTheWarningsIdentifierNamesTheCourse() throws {
+        XCTAssertEqual(
+            SidebarView.warningIdentifier(courseCode: "MPM2D", sectionNumber: 1, stoppedPublish: false),
+            "problemsBadge-MPM2D-section1"
+        )
+        XCTAssertEqual(
+            SidebarView.warningIdentifier(courseCode: "MPM2D", sectionNumber: 1, stoppedPublish: true),
+            "stoppedPublishBadge-MPM2D-section1"
+        )
+        XCTAssertNotEqual(
+            SidebarView.warningIdentifier(courseCode: "MPM2D", sectionNumber: 1, stoppedPublish: false),
+            SidebarView.warningIdentifier(courseCode: "SCH3U", sectionNumber: 1, stoppedPublish: false),
+            "two courses' Section 1 warnings are told apart"
+        )
+        let sidebar: String = try readSource("QuartzTeachers/Views/SidebarView.swift")
+        let label: String = try body(of: "func sectionRowLabel(", in: sidebar)
+        XCTAssertTrue(label.contains("SidebarView.warningIdentifier("), "the row takes its identifier from the rule")
+        XCTAssertFalse(sidebar.contains("\"problemsBadge-section"), "no identifier names the section alone")
+        XCTAssertFalse(sidebar.contains("\"stoppedPublishBadge-section"), "no identifier names the section alone")
+    }
+
     /// #731 (implementation review H1): the add-ons offer's "Don't ask
     /// again" is presented from a view of its own, so it never reaches the
     /// Problems alert — where ticking it silently turned the offer off.
