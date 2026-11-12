@@ -22,7 +22,7 @@ else is happening.
 
 ## Today's board
 
-```text
+```text wrap
 diff --git a/signin.py b/signin.py
 index f6347a3..b6d4e42 100644
 --- a/signin.py
@@ -61,7 +61,7 @@ print(find_member(sheet, "Rowan"))
 print(find_member(sheet, "Bea"))
 ```
 
-```text
+```text wrap
 2
 -1
 ```

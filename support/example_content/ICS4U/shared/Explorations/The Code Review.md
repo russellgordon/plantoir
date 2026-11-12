@@ -49,7 +49,7 @@ The protocol is the point of this class. It is what keeps a review
 about the code and not about the person, and every team runs it the
 same way so that nobody has to guess whether today is a harsh day.
 
-```text
+```text wrap
 1. The author says nothing for the first three minutes. Nothing.
 2. The reviewer states what the code does, in their own words.
    If they cannot, that is the first finding, and it is about the

@@ -54,7 +54,7 @@ print(tutoring.set_people(-4))
 print(tutoring)
 ```
 
-```text
+```text wrap
 Room 2: math tutoring, 12 people
 True
 False
@@ -78,7 +78,7 @@ tutoring._people = -4
 print(tutoring)
 ```
 
-```text
+```text wrap
 Room 2: math tutoring, -4 people
 ```
 

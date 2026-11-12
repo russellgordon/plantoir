@@ -61,7 +61,7 @@ print(tuesday.add(Booking("Room 2", "chess club", 8, 18)))
 print(tuesday)
 ```
 
-```text
+```text wrap
 True
 True
 False
@@ -85,7 +85,7 @@ Before writing any of that, professionals sketch one index card per
 class — Class, Responsibilities, Collaborators. It takes ten minutes
 and saves an afternoon:
 
-```text
+```text wrap
 +--------------------------------------------------+
 | Booking                                          |
 +---------------------------+----------------------+

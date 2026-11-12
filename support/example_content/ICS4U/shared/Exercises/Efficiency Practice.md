@@ -130,7 +130,7 @@ actually evidence of.
 > for n in [8, 1000, 1000000]:
 >     print(n, halvings(n))
 > ```
-> ```text
+> ```text wrap
 > 8 3
 > 1000 9
 > 1000000 19
@@ -156,7 +156,7 @@ actually evidence of.
 >       comparisons_to_find(data, 999),
 >       comparisons_to_find(data, -1))
 > ```
-> ```text
+> ```text wrap
 > 1 1000 1000
 > ```
 > First item: 1, the best case. Last item and absent item: 1 000, the
@@ -167,7 +167,7 @@ actually evidence of.
 
 > [!success]- Answer 6
 > Measured on one laptop, seconds for one call:
-> ```text
+> ```text wrap
 >  items       slow       fast
 >   1000   0.006302   0.000027
 >   2000   0.025519   0.000061

@@ -730,6 +730,56 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #758: every phrase `printablePages.agentGuidance.mustSay` pins is in
+    /// its skill as written into both homes, matched with white space folded
+    /// as the contract's rule says, and every key names a skill that is
+    /// written. Later pieces add their phrases to the contract, not here.
+    func testEverySkillSaysWhatTheContractSaysItMust() throws {
+        let mustSay: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["mustSay"] as? [String: Any])
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        var pinnedSkills: Int = 0
+        for (skillName, value) in mustSay {
+            if skillName == "rule" {
+                continue
+            }
+            let phrases: [String] = try XCTUnwrap(value as? [String], "\(skillName) must be a list of phrases")
+            XCTAssertFalse(phrases.isEmpty, skillName)
+            pinnedSkills += 1
+            for home in [".claude", ".agents"] {
+                let file: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md")
+                guard FileManager.default.fileExists(atPath: file.path) else {
+                    XCTFail("\(home): mustSay names \(skillName), and no such skill is written")
+                    continue
+                }
+                let skill: String = try String(contentsOf: file, encoding: .utf8)
+                let folded: String = PrintablePagesTests.foldingWhiteSpace(in: skill)
+                let foldedWithoutQuoteMarks: String = PrintablePagesTests.foldingWhiteSpaceAndQuoteMarks(in: skill)
+                for phrase in phrases {
+                    let wanted: String = PrintablePagesTests.foldingWhiteSpace(in: phrase)
+                    let found: Bool = folded.contains(wanted) || foldedWithoutQuoteMarks.contains(wanted)
+                    XCTAssertTrue(found, "\(home): \(skillName) must say \(phrase)")
+                }
+            }
+        }
+        XCTAssertGreaterThan(pinnedSkills, 0, "mustSay pins no skill at all")
+    }
+
+    /// Every run of white space, a line break included, as one space
+    /// (`mustSay.rule`), so re-wrapping a paragraph never breaks a pin.
+    private static func foldingWhiteSpace(in text: String) -> String {
+        return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    /// The same, with the `>` marks that begin a callout's or a quote's lines
+    /// dropped as well, so a sentence wrapped inside `> ` lines is found.
+    private static func foldingWhiteSpaceAndQuoteMarks(in text: String) -> String {
+        let joined: String = text.replacingOccurrences(
+            of: "\\s*\\n[ \\t]*(?:>[ \\t]*)*", with: " ", options: .regularExpression)
+        return foldingWhiteSpace(in: joined)
+    }
+
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
         let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"

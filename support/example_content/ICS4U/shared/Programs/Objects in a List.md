@@ -111,7 +111,7 @@ show(roster)
 print(f"Total hours: {total_hours(roster)}")
 ```
 
-```text
+```text wrap
 Homework club roster
   Nadia (Grade 12): 4.5 h
   Rowan (Grade 11): 1.5 h
@@ -191,7 +191,7 @@ actually in the data.
    as `name,grade,hours`, and a matching `load_roster(filename)` that
    builds `Volunteer` objects back out of those lines. Saving the
    roster above produces exactly:
-   ```text
+   ```text wrap
    Nadia,12,4.5
    Rowan,11,1.5
    Ali,12,6

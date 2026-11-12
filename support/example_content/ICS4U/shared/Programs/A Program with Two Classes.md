@@ -132,7 +132,7 @@ print(f"  {priya}")
 print(f"  {sam}")
 ```
 
-```text
+```text wrap
 Saturday, 9:00 a.m.
   cordless drill (on the shelf)
   step ladder (on the shelf)

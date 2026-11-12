@@ -54,7 +54,7 @@ print(f"Nadia has served {nadia.hours} hours so far.")
 print(f"Rowan is in grade {rowan.grade}.")
 ```
 
-```text
+```text wrap
 Nadia (Grade 12): 4.5 h
 Rowan (Grade 11): 1.5 h
 Nadia has served 4.5 hours so far.

@@ -19,7 +19,7 @@ name.
 
 The volunteers' sheet, saved beside the program as `donations.csv`:
 
-```text
+```text wrap
 item,quantity
 pasta,4
 soup,6
@@ -107,7 +107,7 @@ with open("summary.txt") as file:
         print(f"  {line.rstrip()}")
 ```
 
-```text
+```text wrap
 Donation drive summary
   beans    5
   oats     7
@@ -196,7 +196,7 @@ the point of output leaves the data alone and fixes the report.
    week *and* item, using a dictionary whose values are themselves
    dictionaries. With weeks 1, 2, and 3 on the sheet above, the result
    prints as:
-   ```text
+   ```text wrap
    Week 1: {'pasta': 4, 'soup': 6}
    Week 2: {'rice': 2, 'soup': 3, 'beans': 5}
    Week 3: {'pasta': 1, 'soup': 2, 'oats': 7, 'rice': 4}

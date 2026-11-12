@@ -32,7 +32,7 @@ worked before still works afterwards**, and that you can prove it.
 
 ## The bug report you are handed
 
-```text
+```text wrap
 From: the music room
 Every Monday the notices print fine. This Monday it stopped
 partway through and showed a wall of red text. Nothing printed
@@ -41,7 +41,7 @@ for anyone after the cello. Nothing has changed at our end.
 
 Here is the wall of red text:
 
-```text
+```text wrap
 Traceback (most recent call last):
   File "/loans/signout.py", line 23, in <module>
     main()

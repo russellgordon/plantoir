@@ -1037,9 +1037,17 @@ the linter.
 
    If you touched the Example Course (`support/example_course/`, EXC2O),
    also run `lint_skeletons.py` with no family named: EXC2O has no
-   manifest, so it gets only the two rules a copied template sentence can
-   break — the class website never called "published" (#443) and the
-   heading marks (#444).
+   manifest, so it gets only three rules — the class website never called
+   "published" (#443), the heading marks (#444) and text blocks that wrap
+   (#758).
+
+   **Every text block wraps (#758).** A fenced block of plain text on a
+   page (a terminal session, program output, an error message, a prompt or
+   commit message for students to copy) opens with ```` ```text wrap ````,
+   never a bare ```` ```text ````, inside a callout or a list item too. Code
+   fences (```` ```python ````, ```` ```swift ```` ...) never wrap. Both
+   linters refuse a bare text fence; the `plantoir-page-authoring` skill
+   (section 9) states the same rule for a teacher's own pages.
 
    **Two things the linter reads the way the site does (#313).** A link
    written inside code — a fence of either character, a fence inside a

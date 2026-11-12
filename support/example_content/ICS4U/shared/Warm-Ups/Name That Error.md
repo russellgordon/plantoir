@@ -14,7 +14,7 @@ frame that is wrong.
 
 ## The board today
 
-```text
+```text wrap
 Traceback (most recent call last):
   File "/home/student/main.py", line 4, in <module>
     weekly_summary(weeks_sessions)

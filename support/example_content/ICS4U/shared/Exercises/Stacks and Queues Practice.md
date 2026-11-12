@@ -59,7 +59,7 @@ and that difference is usually a promise to a person.
 ## Answers
 
 > [!success]- Answer 1
-> ```text
+> ```text wrap
 > Bea
 > Nadia
 > ['Rowan']
@@ -132,7 +132,7 @@ and that difference is usually a promise to a person.
 > print(undo.pop(), undo.pop(), undo.pop())
 > print(undo.is_empty())
 > ```
-> ```text
+> ```text wrap
 > deleted Bea 2
 > deleted Bea added Sam None
 > True
@@ -156,7 +156,7 @@ and that difference is usually a promise to a person.
 >             open_brackets.pop()
 >     return len(open_brackets) == 0
 > ```
-> ```text
+> ```text wrap
 > '(a + (b * c))': True
 > '(a + b))': False
 > '((a + b)': False
@@ -182,7 +182,7 @@ and that difference is usually a promise to a person.
 >
 > print(reversed_text("holds"))
 > ```
-> ```text
+> ```text wrap
 > sdloh
 > ```
 > Reversal is what a stack *is*: things come out in the opposite order
@@ -221,7 +221,7 @@ and that difference is usually a promise to a person.
 > print(history.size(), history.pop(), history.pop(), history.pop(),
 >       history.pop())
 > ```
-> ```text
+> ```text wrap
 > 3 four three two None
 > ```
 > `"one"` is gone: a bounded undo history forgets its oldest entry,
@@ -250,7 +250,7 @@ and that difference is usually a promise to a person.
 >     served.append(holds.dequeue())
 > print(served)
 > ```
-> ```text
+> ```text wrap
 > 2 -1
 > ['Nadia', 'Rowan', 'Bea', 'Ali']
 > ```

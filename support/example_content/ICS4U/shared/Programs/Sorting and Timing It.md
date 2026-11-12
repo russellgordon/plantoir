@@ -108,7 +108,7 @@ for size in [500, 1000, 2000, 4000]:
     print(f"{size:>8}  {ours:>16.6f}  {theirs:>15.6f}")
 ```
 
-```text
+```text wrap
 Lap times as recorded: [64.2, 58.9, 71.0, 60.4, 58.9, 66.7, 55.3, 69.1]
 Sorted:                [55.3, 58.9, 58.9, 60.4, 64.2, 66.7, 69.1, 71.0]
 Names as recorded:     ['Rowan', 'bea', 'Ali', 'Nadia', 'Sam']
@@ -137,7 +137,7 @@ The `while` loop slides bigger items one place to the right, opening a
 gap, and `values[gap + 1] = held` drops the card into it.
 
 > [!example]- One pass at a time, on the first five lap times
-> ```text
+> ```text wrap
 > start    [64.2, 58.9, 71.0, 60.4, 58.9]
 > pass 1: hold  58.9 -> [58.9, 64.2, 71.0, 60.4, 58.9]
 > pass 2: hold  71.0 -> [58.9, 64.2, 71.0, 60.4, 58.9]

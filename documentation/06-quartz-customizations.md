@@ -4028,7 +4028,8 @@ WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
   for byte the twin's, the class on no other page but the skill's example,
   and `index.css`'s screen-only rule with 80 rows and alt text, and (#759)
   the rule that raises the copy button inside an isolated block. **6n** builds
-  the page-authoring skill's ```text wrap example.
+  the page-authoring skill's ```text wrap example, and since #758 requires
+  exactly two wrappers on it (the error message and the commit message).
 - `browser-checks/text_wrap.mjs` (Chrome for Testing, beside the sidebar
   check): at 1512 px light, dark and 390 px - FIRST that the block is
   wrapped and its `code` does not scroll; the two unflagged blocks scroll a
@@ -4168,6 +4169,58 @@ changed, for what two declarations answer. Writing the clipboard another
 way: the write was never the fault. In the check, reading the Mac's
 pasteboard (`pbpaste`): it would make the gate depend on, and overwrite,
 whatever the person at the Mac copied.
+
+### P8. The guidance makes it the rule (#758, v1.10.0)
+
+Russell, 2026-11-10: "make every text block fence wrap", "Not code blocks,
+just text blocks", and prompts and commit messages always in a text block,
+even beside a screenshot: "Otherwise they'll just try to copy-paste from the
+screenshots and the text will get mangled." The site is unchanged. Without
+the word a block still scrolls, as #653 ruled; what changed is what an
+assistant is told to write and what the ready-made courses hold.
+
+- **The skills.** `plantoir-page-authoring` section 9 says every text block
+  on a page is written ```text wrap, never a bare ```text (inside a callout
+  and a list item too), and that a prompt for an AI assistant or a commit
+  message is always given in one. Its example gains a second block, a commit
+  message, inside the SAME ````markdown fence, so 6n's one claim still
+  matches one example and 6o still finds the wrapper on one example page;
+  6n now counts two wrappers there, so the commit-message block cannot be
+  deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
+  `plantoir-printing` says a text block prints wrapped either way and still
+  asks for the flag, so it wraps on screen.
+- **The pins.** The binding sentences are listed in `contracts/shared-rules.json`
+  → `printablePages.agentGuidance.mustSay` (skill name to phrases), which
+  `PrintablePagesTests.testEverySkillSaysWhatTheContractSaysItMust` walks in
+  both written homes, with white space folded so re-wrapping a paragraph
+  never breaks a pin. It is the registry for every skill's pins; later
+  pieces add phrases there rather than literal checks in each platform's
+  test. Each phrase was measured absent from the skill before the change
+  (the 707 branch, `393e8cfbd`) and present after.
+- **The example content.** Measured on the 707 branch: **122** bare
+  ```text fences in **41** files, all in ICS4U (120 in 39) and MCMPR11 (2 in
+  2), of which 62 open inside a callout (`> ```text`) and 2 inside a list
+  item. The plan counted 58, with a search anchored at column 0 that missed
+  every callout. All were converted on the opening line only; closers are
+  bare. Most are terminal sessions and program output (tracebacks with
+  `^^^` markers under a line): a line wraps only when it is longer than the
+  window, so the markers stay under their characters at ordinary widths.
+  `lint_payload.py` and `lint_skeletons.py` (skeletons and EXC2O) refuse a
+  bare text fence, and both run the rule's own accept and refuse cases
+  first. verify.sh builds the EXC2O fixture, not ICS4U, so no gate reads
+  the converted pages; the linters are run by hand.
+
+**Rejected.** Wrapping every text block by default in the build: that
+reverses #653's ruling and is a change to every site, where Russell asked
+for a writing rule. A second ````markdown example for the commit message:
+it would match 6n's `text wrap` claim twice and put the wrapper on a second
+example page, which 6o refuses. Literal `contains` checks in each
+platform's test (the older pattern): the sentence would be typed twice, once
+per language. Leaving the example content alone: the page-authoring skill
+tells an assistant to follow a folder's existing pages, and those would
+contradict it. "A command to type" among the things that go
+in a text block (the plan's first wording): section 9 says to name the
+language (`bash`) for a command, so the two would disagree.
 
 ## Q. GeoGebra sketches (#578, v1.9.0)
 

@@ -43,7 +43,7 @@ print(f"binary search: {elapsed:.6f} seconds")
 
 On the machine this was written on:
 
-```text
+```text wrap
 linear search: 0.003578 seconds
 binary search: 0.000005 seconds
 ```
@@ -87,7 +87,7 @@ print(f"binary search, 100 runs: {binary:.4f} seconds")
 print(f"linear took {linear / binary:.0f} times as long")
 ```
 
-```text
+```text wrap
 linear search, 100 runs: 0.3656 seconds
 binary search, 100 runs: 0.0001 seconds
 linear took 3468 times as long

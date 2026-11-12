@@ -100,6 +100,58 @@ HEADING_MARK_MUST_BE_REFUSED = [
 ]
 
 
+# Every text block on a course page wraps (#758, Russell 2026-11-10): a fence
+# whose first word is `text` carries `wrap` as a later word, so a long line
+# wraps instead of scrolling sideways (textFenceWrapping in
+# contracts/shared-rules.json says how the site reads the words). Code fences
+# are left alone, because code is read by column. A fence inside a callout
+# (`> ```text`) or a list item counts, since it is a text block on the page; a
+# fence shown inside another fence (a ````markdown example) is not one.
+FENCE_LINE = re.compile(r"^((?:[ \t]*>)*)[ \t]*(`{3,}|~{3,})(.*)$")
+TEXT_FENCE_MUST_BE_ACCEPTED = [
+    "```text wrap\nA long line.\n```\n",
+    "> [!example]- Output\n> ```text wrap\n> A long line.\n> ```\n",
+    "```python\nprint('text')\n```\n",
+    "````markdown\n```text\nshown as an example, not a block on the page\n```\n````\n",
+    "```text title wrap\nA long line.\n```\n",
+]
+TEXT_FENCE_MUST_BE_REFUSED = [
+    "```text\nA long line.\n```\n",
+    "> [!example]- Output\n> ```text\n> A long line.\n> ```\n",
+    "1. A step:\n\n   ```text\n   A long line.\n   ```\n",
+    "```text wrapped\nA long line.\n```\n",
+]
+
+
+def text_fences_that_do_not_wrap(text: str) -> list:
+    """The 1-based line numbers of text fences on the page that do not say `wrap`."""
+    unwrapped = []
+    open_run = None
+    for number, line in enumerate(text.split("\n"), start=1):
+        found = FENCE_LINE.match(line.rstrip("\r"))
+        if not found:
+            continue
+        run = found.group(2)
+        info = found.group(3)
+        if open_run is None:
+            if run[0] == "`" and "`" in info:
+                continue
+            words = info.split()
+            if words and words[0] == "text" and "wrap" not in words[1:]:
+                unwrapped.append(number)
+            open_run = run
+        elif run[0] == open_run[0] and len(run) >= len(open_run) and info.strip() == "":
+            open_run = None
+    return unwrapped
+
+
+def text_fence_problems(rel: str, text: str) -> list:
+    problems = []
+    for number in text_fences_that_do_not_wrap(text):
+        problems.append(f"{rel}:{number}: a text block that does not wrap - write ```text wrap (#758)")
+    return problems
+
+
 def heading_marks_missing(text: str) -> list:
     """The 1-based line numbers carrying the sentence's markless form ("Every  (level N)" / "and  (level N)")."""
     lines = []
@@ -118,6 +170,12 @@ def check_the_checks() -> list:
     for sentence in HEADING_MARK_MUST_BE_REFUSED:
         if not heading_marks_missing(sentence):
             failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    for page in TEXT_FENCE_MUST_BE_ACCEPTED:
+        if text_fences_that_do_not_wrap(page):
+            failures.append(f"refused a text fence it must accept: {page!r}")
+    for page in TEXT_FENCE_MUST_BE_REFUSED:
+        if not text_fences_that_do_not_wrap(page):
+            failures.append(f"accepted a text fence it must refuse: {page!r}")
     failures.extend(lint_runnable.check_the_checks())
     return failures
 
@@ -244,6 +302,7 @@ def lint(course_code: str) -> int:
         is_curriculum = curriculum_folder and rel.startswith(f"shared/{curriculum_folder}/")
 
         problems.extend(heading_mark_problem(rel, text))
+        problems.extend(text_fence_problems(rel, text))
         problems.extend(lint_runnable.page_problems(rel, text))
 
         # A filename Windows cannot create is a course Windows teachers

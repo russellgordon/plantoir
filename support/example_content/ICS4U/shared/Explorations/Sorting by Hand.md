@@ -32,7 +32,7 @@ put them face down in a row on the desk.
 
 These are not suggestions. The whole measurement depends on them.
 
-```text
+```text wrap
 1. Only two cards may be face up at any moment.
 2. To compare two cards, turn them both up, then turn them both
    back down. That counts as ONE comparison.

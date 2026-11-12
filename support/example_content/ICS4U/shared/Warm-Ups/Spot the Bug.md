@@ -54,7 +54,7 @@ print(binary_search(marks, 99))
 
 It prints `2` and then dies:
 
-```text
+```text wrap
 Traceback (most recent call last):
   File "/home/student/search.py", line 17, in <module>
     print(binary_search(marks, 99))

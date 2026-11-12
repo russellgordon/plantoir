@@ -124,6 +124,9 @@ key "3. a) 7x - 2y  b) 7a - 11b".
   the instructions line of a LaTeX worksheet does.
 - Code prints in a thin box, black, with its line numbers; a long program
   continues onto the next page with its numbers counting on.
+- A text block prints wrapped whether or not it says `wrap`. Still write
+  ` ```text wrap ` (the `plantoir-page-authoring` skill, section 9), so it
+  wraps on screen too.
 - A checklist (`- [ ]` outside a quiz) prints its boxes as the student
   ticked them on their own computer, each tick drawn in ink - not as the
   page's `[ ]` and `[x]`. A worksheet meant to come back blank should use

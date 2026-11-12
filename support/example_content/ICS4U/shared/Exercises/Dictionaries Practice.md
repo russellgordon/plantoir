@@ -74,7 +74,7 @@ work below is one of two patterns: tally, or look up safely.
 ## Answers
 
 > [!success]- Answer 1
-> ```text
+> ```text wrap
 > 3
 > False
 > 0
@@ -89,7 +89,7 @@ work below is one of two patterns: tally, or look up safely.
 
 > [!success]- Answer 2
 > It crashes for any item the food bank has never received:
-> ```text
+> ```text wrap
 > KeyError: 'flour'
 > ```
 > — which is exactly the case the question is about. Ask safely:
@@ -105,7 +105,7 @@ work below is one of two patterns: tally, or look up safely.
 > [!success]- Answer 3
 > It groups the pairs by name, returning a dictionary from each name
 > to the list of every value recorded for it.
-> ```text
+> ```text wrap
 > {'Nadia': [2, 2.5], 'Rowan': [1.5]}
 > ```
 > The tell is `result[name] = []` followed by `.append` — the tally
@@ -129,7 +129,7 @@ work below is one of two patterns: tally, or look up safely.
 > sign_ins = ["Nadia", "Rowan", "Nadia", "Bea", "Nadia", "Rowan"]
 > print(tally(sign_ins))
 > ```
-> ```text
+> ```text wrap
 > {'Nadia': 3, 'Rowan': 2, 'Bea': 1}
 > ```
 
@@ -149,7 +149,7 @@ work below is one of two patterns: tally, or look up safely.
 > print(most_frequent(tally(sign_ins)))
 > print(most_frequent({}))
 > ```
-> ```text
+> ```text wrap
 > Nadia
 > None
 > ```
@@ -174,7 +174,7 @@ work below is one of two patterns: tally, or look up safely.
 >
 > print(invert({"Nadia": 12, "Rowan": 11, "Ali": 12, "Bea": 10}))
 > ```
-> ```text
+> ```text wrap
 > {12: ['Nadia', 'Ali'], 11: ['Rowan'], 10: ['Bea']}
 > ```
 > The values must be lists because keys are unique and values are not:
@@ -201,7 +201,7 @@ work below is one of two patterns: tally, or look up safely.
 > print(combine(week1, week2))
 > print(week1)
 > ```
-> ```text
+> ```text wrap
 > {'pasta': 4, 'soup': 9, 'rice': 2}
 > {'pasta': 4, 'soup': 6}
 > ```
@@ -220,7 +220,7 @@ work below is one of two patterns: tally, or look up safely.
 >         total = total + attendance[day][activity]
 >     print(f"{day}: {total}")
 > ```
-> ```text
+> ```text wrap
 > 35
 > Monday: 32
 > Tuesday: 24

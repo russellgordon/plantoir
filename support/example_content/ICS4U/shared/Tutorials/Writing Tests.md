@@ -40,7 +40,7 @@ print("All checks passed.")
 
 Run it. The third claim is a lie:
 
-```text
+```text wrap
 Traceback (most recent call last):
   File "/home/student/check_bookings.py", line 5, in <module>
     assert spaces_left(10, 12) == 0
@@ -92,7 +92,7 @@ Three rules and you can write these: the file name starts with
 method whose name starts with `test_` is a separate test. Run it
 with `python3 -m unittest test_bookings -v`:
 
-```text
+```text wrap
 test_exactly_full (test_bookings.TestSpacesLeft.test_exactly_full) ... ok
 test_ordinary_session (test_bookings.TestSpacesLeft.test_ordinary_session) ... ok
 test_overbooked_never_goes_negative (test_bookings.TestSpacesLeft.test_overbooked_never_goes_negative) ... FAIL
@@ -129,7 +129,7 @@ def spaces_left(capacity, booked):
 
 Run the same tests again, unchanged:
 
-```text
+```text wrap
 ...
 ----------------------------------------------------------------------
 Ran 3 tests in 0.000s
