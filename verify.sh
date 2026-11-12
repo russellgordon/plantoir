@@ -3912,6 +3912,14 @@ PROGRESSFIXTURE
 printf '\n- [[Progress Fixture]]\n' >> "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
+# Whether the course had its link before this run: a brand-new working copy
+# has none, and that is the run where the launcher's clear used to take the
+# saved copy planted above (#789). Said in the check after the build.
+if [[ -L "courses/EXC2O/.merged_output" ]]; then
+  GEOGEBRA_LINK_BEFORE="a course already linked"
+else
+  GEOGEBRA_LINK_BEFORE="a course with no link yet"
+fi
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
 echo "   (full rebuild ensures the Quartz scaffold comes from the dev-test image)"
@@ -3923,6 +3931,17 @@ if script -q /tmp/verify_main_build.log ./preview.sh EXC2O 1 --image "$DEV_TEST_
   pass "preview.sh completed against $DEV_TEST_IMAGE"
 else
   fail "preview.sh exited non-zero"
+fi
+# The geogebra.org sketch's saved copy planted in stage 4 is still where the
+# build keeps it. The launcher links the course before it builds, and that
+# link used to clear the copy with the built sites whenever the course had
+# no link yet, which is every first run in a new working copy; the build then
+# asked geogebra.org for a sketch it does not have, and 6i-g failed for a
+# reason it could not name (#789, buildOutputLocation.keptCopiesSurviveTheClear).
+if [[ -n "$GEOGEBRA_SEED_KEY" && -f "$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.ggb" && -f "$GEOGEBRA_CACHE_DIR/$GEOGEBRA_SEED_KEY.json" ]]; then
+  pass "the saved copy of a geogebra.org sketch survived the launcher linking $GEOGEBRA_LINK_BEFORE (#789)"
+else
+  fail "the saved copy of a geogebra.org sketch planted before the build is gone after the launcher linked $GEOGEBRA_LINK_BEFORE (#789)"
 fi
 # The workspace that run made publishes every address on this Mac only
 # (#684): eight bindings, each [127.0.0.1]. A workspace made before #684
