@@ -7982,7 +7982,12 @@ sentence, after the reference-courses sentence: in a course with no unit
 plan, an instruction to say in the first reply that the assistant can help
 plan a unit (every session, until a plan exists: Russell, 2026-11-12); once
 plans exist, an instruction to remind the teacher which units have one and
-where they are kept, without describing them. The words, bounds and cases are
+that they are on the course's Planning tab, without describing them (since
+#708; until then it named the `.internal/planning` folder). The empty
+Planning tab's Plan a Unit with Claude… and Plan a Unit with Codex… open the
+same doors with a message of their own, `outsideAgents.planAUnit`, which
+replaces the greeting as Fix with's does (`documentation/09-mac-app.md` →
+"The course page's Planning tab (#708)"). The words, bounds and cases are
 `app-rules.json` → `outsideAgents.greetingUnitPlans` and
 `greetingUnitPlansCases`; the plans are read from each unit's `plan.json`
 (`shared-rules.json` → `unitPlanning.planFile`). Fix with Claude… and Fix

@@ -2714,7 +2714,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   handouts are kept), and the unit-planning skill a folder,
   `courses/<CODE>/.internal/planning/`, whose `plan.json` files the mac
   reads for the Revise doors' greeting (Windows owes that reader: the
-  `windows` issue for #707); the app neither reads handouts.json nor needs to, and a backup,
+  `windows` issue for #707) and shows on the course page's Planning tab
+  (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
+  page's Planning tab (#708)"); the app neither reads handouts.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes
