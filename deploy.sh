@@ -930,15 +930,23 @@ fi
 # a VALUE in nested JSON. A settings file that is there and cannot be read
 # REFUSES rather than falling back to Netlify: falling back is exactly the
 # silent wrong-host deploy this exists to stop.
-# scripts/test_deploy_sh_destination.py pins it.
+# The rule is contracts/app-rules.json -> savedDestinations, whose cases
+# scripts/test_deploy_sh_destination.py runs through the three functions
+# between the markers below, with each reader (#771). Keep the markers.
+# BEGIN saved_destinations
 the_saved_destinations() {
   local config="$1" reader primary folder count index kind path
   # macOS: plutil reads JSON and is on every Mac, Command Line Tools or not —
   # the rule this script keeps for the reference-course check above (no host
   # python3; #668 review M1). A file it cannot parse fails, and the caller
   # refuses; a key that is absent, or null, reads as empty.
+  # The settings must be an OBJECT, as the Python reader below requires. An
+  # array such as ["netlify"] converts cleanly, every -extract on it fails,
+  # and it used to read as a course naming no destination, so it deployed to
+  # Netlify (#771, found by the contract's case). plutil writes the converted
+  # JSON with no leading space, so a first character of { is an object.
   if command -v plutil >/dev/null 2>&1; then
-    plutil -convert json -o /dev/null "$config" 2>/dev/null || return 1
+    [[ "$(plutil -convert json -o - "$config" 2>/dev/null)" == "{"* ]] || return 1
     primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
     folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
     printf '%s\t%s\n' "${primary:-netlify}" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
@@ -1010,6 +1018,7 @@ flags_for_the_saved_destination() {
       return 1 ;;
   esac
 }
+# END saved_destinations
 
 if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
   if ! _saved_destinations="$(the_saved_destinations "$_course_config" 2>/dev/null)" \
@@ -1680,6 +1689,25 @@ validate_cf_token() {
 # $1 the URL, $2 the token, $3 (optional) an extended regular expression the
 # answer's body must match before a 2xx counts as accepted, $4 (optional) one
 # it must match before a 400/401/403 counts as refused.
+#
+# The addresses and the four patterns are contracts/app-rules.json ->
+# savedTokenCheck.services, written here as the contract spells them (#771).
+# deploy.ps1 reads the same patterns with .NET, which takes a POSIX class
+# such as [[:space:]] as a set of letters, so the shared spelling is a
+# bracket holding a real space and a real TAB ($'…' makes the \t a TAB, and
+# grep -E takes a backslash inside a bracket literally). They stay literals
+# because a Mac has no host python3 to read the contract with at run time;
+# scripts/test_deploy_token_refusal.py pins them to the contract and runs
+# every case through token_check_answer, both cut from between the markers.
+# BEGIN saved_token_check_rules
+CLOUDFLARE_TOKEN_CHECK_URL='https://api.cloudflare.com/client/v4/user/tokens/verify'
+CLOUDFLARE_TOKEN_ACCEPTED=$'"success":[ \t]*true'
+CLOUDFLARE_TOKEN_REFUSED=$'"success":[ \t]*false'
+NETLIFY_TOKEN_CHECK_URL='https://api.netlify.com/api/v1/user'
+NETLIFY_TOKEN_ACCEPTED=$'"id"[ \t]*:'
+NETLIFY_TOKEN_REFUSED=$'"code":[ \t]*4[0-9][0-9]'
+# END saved_token_check_rules
+# BEGIN token_check_answer
 token_check_answer() {
   local url="${1:-}" token="${2:-}" body_must_say="${3:-}" refusal_must_say="${4:-}"
   local answer code body
@@ -1714,6 +1742,7 @@ token_check_answer() {
       ;;
   esac
 }
+# END token_check_answer
 
 # Best-effort account lookup, so that in the common case a teacher pastes a
 # token and nothing else — the account ID is a 32-character hex string buried
@@ -1878,7 +1907,7 @@ if [[ "$TARGET" == "cloudflare" ]]; then
     # (GitHub #716, above token_check_answer). The run stops there rather than
     # carrying on, because the upload needs the same connection and would only
     # fail later with a less useful message.
-    case "$(token_check_answer https://api.cloudflare.com/client/v4/user/tokens/verify "$CF_TOKEN" '"success":[[:space:]]*true' '"success":[[:space:]]*false')" in
+    case "$(token_check_answer "$CLOUDFLARE_TOKEN_CHECK_URL" "$CF_TOKEN" "$CLOUDFLARE_TOKEN_ACCEPTED" "$CLOUDFLARE_TOKEN_REFUSED")" in
       accepted)
         ;;
       refused)
@@ -1990,7 +2019,7 @@ if [[ "$TARGET" == "netlify" ]]; then
 TOKEN="$(get_token_keychain || true)"
 if [[ -n "$TOKEN" ]]; then
   # Cleared only when Netlify SAYS no, as Cloudflare's is (GitHub #716).
-  case "$(token_check_answer https://api.netlify.com/api/v1/user "$TOKEN" '"id"[[:space:]]*:' '"code":[[:space:]]*4[0-9][0-9]')" in
+  case "$(token_check_answer "$NETLIFY_TOKEN_CHECK_URL" "$TOKEN" "$NETLIFY_TOKEN_ACCEPTED" "$NETLIFY_TOKEN_REFUSED")" in
     accepted)
       ;;
     refused)
