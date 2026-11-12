@@ -176,7 +176,7 @@ final class UnitPlansTests: XCTestCase {
     func testTheUnitPlanSentenceFollowsTheContract() throws {
         let block: [String: Any] = try XCTUnwrap(try greetingRules()["greetingUnitPlansCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 16)
+        XCTAssertGreaterThanOrEqual(cases.count, 18)
 
         let previousStore: ProblemReportStore = ActivityTrail.store
         defer {

@@ -3312,10 +3312,10 @@
       "joinedAs" : "One name alone; two as 'A and B'; three to mostUnitsNamed as 'A, B and C'; past mostUnitsNamed, the first mostUnitsNamed joined by ', ' and then more, with {n} the rest.",
       "more" : ", and {n} more",
       "mostUnitsNamed" : 6,
-      "nameForm" : "'{unit}: {title}' when both are there, or whichever one is, each on one line: every run of white space in it (a line break, a tab, several spaces) is one space, and the ends are trimmed, so the greeting and the trail stay one line (707a review M1) (shared-rules.json -> unitPlanning.planFile: at least one is). A name longer than unitNameMaxCharacters is cut to that many with the last one an ellipsis (…), counted as fixWith.charactersAre says.",
+      "nameForm" : "'{unit}: {title}' when both are there, or whichever one is, each on one line: every run of white space in it (a line break, a tab, several spaces) is one space, white space being Unicode's White_Space property as Swift's Character.isWhitespace and .NET's char.IsWhiteSpace read it, and the ends are trimmed, so the greeting and the trail stay one line (707a review M1) (shared-rules.json -> unitPlanning.planFile: at least one is). A name longer than unitNameMaxCharacters is cut to that many with the last one an ellipsis (…), counted as fixWith.charactersAre says.",
       "none" : "In your first reply, also tell me in one sentence that you can help me plan a unit for this course, from a calendar across my sections to a plan page with lesson cards and assessment drafts, and that I start by asking you to plan one.",
       "one" : "In your first reply, also remind me in one sentence that this course has a unit plan for {units}, kept in courses/{course}/.internal/planning, and do not describe what is in it.",
-      "order" : "Up to mostUnitsNamed plans: dated plans first, by firstClass; then the undated ones; a tie by folder name. More than mostUnitsNamed: the plans covering today first (by firstClass), then the upcoming ones soonest first, then the past ones most recent first (by lastClass), then the undated, a tie by folder name, so the ones named are the ones that matter now (707a review M2). A plan with only one of its two days is read as starting and ending on that day; today is the case's today.",
+      "order" : "Up to mostUnitsNamed plans: dated plans first, by firstClass; then the undated ones; a tie by folder name. More than mostUnitsNamed: the plans covering today first (by firstClass), then the upcoming ones soonest first, then the past ones most recent first (by lastClass), then the undated, a tie by folder name, so the ones named are the ones that matter now (707a review M2). A plan with only one of its two days is read as starting and ending on that day; today is the teacher's own calendar day, in the computer's time zone (in a case, the case's today).",
       "some" : "In your first reply, also remind me in one sentence that this course has unit plans for {units}, kept in courses/{course}/.internal/planning, and do not describe what is in them.",
       "trail" : {
         "none" : "told about unit planning",
@@ -3718,6 +3718,84 @@
             {
               "file" : "{\"unit\": \"Unit 1\", \"firstClass\": \"2026-02-01\", \"lastClass\": \"2026-02-28\"}",
               "folder" : "unit-1"
+            }
+          ],
+          "referenceCourse" : false,
+          "today" : "2026-05-15"
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has unit plans for Unit 1, Unit 2, Unit 3, Unit 4, Unit 5 and Unit 6, kept in courses/SNC2D/.internal/planning, and do not describe what is in them.",
+            "trail" : " · reminded of 6 unit plans"
+          },
+          "name" : "six plans, one covering today: all named, in date order",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 6\", \"firstClass\": \"2026-07-01\", \"lastClass\": \"2026-07-28\"}",
+              "folder" : "unit-6"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 5\", \"firstClass\": \"2026-06-01\", \"lastClass\": \"2026-06-28\"}",
+              "folder" : "unit-5"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 4\", \"firstClass\": \"2026-05-01\", \"lastClass\": \"2026-05-28\"}",
+              "folder" : "unit-4"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"firstClass\": \"2026-04-01\", \"lastClass\": \"2026-04-28\"}",
+              "folder" : "unit-3"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 2\", \"firstClass\": \"2026-03-01\", \"lastClass\": \"2026-03-28\"}",
+              "folder" : "unit-2"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 1\", \"firstClass\": \"2026-02-01\", \"lastClass\": \"2026-02-28\"}",
+              "folder" : "unit-1"
+            }
+          ],
+          "referenceCourse" : false,
+          "today" : "2026-05-15"
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has unit plans for Unit 4, Unit 5, Unit 7, Unit 3, Unit 2, Unit 1, and 1 more, kept in courses/SNC2D/.internal/planning, and do not describe what is in them.",
+            "trail" : " · reminded of 7 unit plans"
+          },
+          "name" : "seven plans, one undated: the undated last, after the past",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 5\", \"firstClass\": \"2026-06-01\", \"lastClass\": \"2026-06-28\"}",
+              "folder" : "unit-5"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 4\", \"firstClass\": \"2026-05-01\", \"lastClass\": \"2026-05-28\"}",
+              "folder" : "unit-4"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"firstClass\": \"2026-04-01\", \"lastClass\": \"2026-04-28\"}",
+              "folder" : "unit-3"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 2\", \"firstClass\": \"2026-03-01\", \"lastClass\": \"2026-03-28\"}",
+              "folder" : "unit-2"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 1\", \"firstClass\": \"2026-02-01\", \"lastClass\": \"2026-02-28\"}",
+              "folder" : "unit-1"
+            },
+            {
+              "file" : "{\"title\": \"Exam Review\"}",
+              "folder" : "review"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 7\", \"firstClass\": \"2026-08-01\", \"lastClass\": \"2026-08-28\"}",
+              "folder" : "unit-7"
             }
           ],
           "referenceCourse" : false,

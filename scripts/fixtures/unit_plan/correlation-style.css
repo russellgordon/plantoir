@@ -1,5 +1,5 @@
 
-/* Layout: same set as the thread plan. Question table first, then marks by expectation, then marks by concept with bars to one scale, then gaps. */
+/* Layout: same set as the unit plan page. Question table first, then marks by expectation, then marks by concept with bars to one scale, then gaps. */
 :root{
   --bg:#f7f6f2; --fg:#1f2a2e; --muted:#5c6a70; --rule:#d9d6cc; --panel:#ffffff;
   --accent:#0f5f6b; --accent-soft:#dcecee; --assess:#8a4b0a; --assess-soft:#f6e6cf;

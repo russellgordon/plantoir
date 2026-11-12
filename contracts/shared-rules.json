@@ -32691,7 +32691,7 @@
         "sections": "a list of text: the calendar's columns, by the names the plan uses",
         "updated": "a day written yyyy-mm-dd: when the plan last changed"
       },
-      "rules": "Every key is optional, but unit and title are not BOTH empty (after each is put on one line: every run of white space, a line break or a tab included, becomes one space, and the ends are trimmed). A key that is present and not null has its type: text, a real day in exactly the form yyyy-mm-dd (2026-11-31 is not a day), a list whose every item is text. A file that is not a JSON object, or that breaks a rule, is UNREADABLE: left out of what the app names, and counted (the trail says how many). Unknown keys are ignored, so a later release can add one. A plan is read only from a folder whose name is a unit slug (slugRules) and not one of neverSlugs; any other folder, and a unit folder with no plan.json, is not a plan and is not counted.",
+      "rules": "Every key is optional, but unit and title are not BOTH empty (after each is put on one line: every run of white space, a line break or a tab included, becomes one space, white space being Unicode's White_Space property as Swift's Character.isWhitespace and .NET's char.IsWhiteSpace read it (not Python's str.split, which also splits on U+001C to U+001F), and the ends are trimmed). A key that is present and not null has its type: text, a real day in exactly the form yyyy-mm-dd (2027-04-31 is not a day), a list whose every item is text. A file that is not a JSON object, or that breaks a rule, is UNREADABLE: left out of what the app names, and counted (the trail says how many). Unknown keys are ignored, so a later release can add one. A plan is read only from a folder whose name is a unit slug (slugRules) and not one of neverSlugs; any other folder, and a unit folder with no plan.json, is not a plan and is not counted.",
       "example": {
         "unit": "Unit 3",
         "title": "Chemical Reactions",
@@ -32777,13 +32777,13 @@
         {
           "name": "a day that does not exist",
           "folder": "unit-8",
-          "file": "{\"unit\": \"Unit 8\", \"firstClass\": \"2026-11-31\"}",
+          "file": "{\"unit\": \"Unit 8\", \"firstClass\": \"2027-04-31\"}",
           "expect": "unreadable"
         },
         {
           "name": "a day in another form",
           "folder": "unit-9",
-          "file": "{\"unit\": \"Unit 9\", \"lastClass\": \"Nov 27\"}",
+          "file": "{\"unit\": \"Unit 9\", \"lastClass\": \"Apr 23\"}",
           "expect": "unreadable"
         },
         {
