@@ -3868,6 +3868,67 @@ which is not in the repository and, if it was in a working folder's
 `.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
 (`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
 
+**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+settled on 2026-11-10 while building a day's resources (a warmup, task
+cards, a summary, an exercise). The handouts skill gains section 13,
+"Lesson materials", and section 14, "Wording and contexts"; the
+page-authoring skill gains section 22, "Lesson pages", which points at them
+so the rules are written once (its "Do not" and "Check it" became 23 and
+24, and the unit-planning skill's one reference to "section 22" moved with
+them). What holds for every teacher: one big idea per class, built by task
+cards with one ask each, core before extension; a summary of exactly what
+the cards built, with a picture where it explains better; an exercise on
+the day's topic that needs nothing from a later day; hints, whenever there
+are any, that point back to a card or a summary by name and never give the
+answer or a pointed first step; plain wording for students learning
+English, contexts anyone can picture, and invented contexts never about
+firearms or ammunition; equal unit lengths on a card's graph where width or
+steepness is the point; the `Adapted from` line, never on an assessment;
+and the four-step review in section 7 (build, a separate reviewer
+re-solving every answer and checking every hint, the lead's coherence pass,
+any changed question back to the reviewer). What belongs to the teacher is
+how the lesson is RUN: the course's How I Teach page comes first, and
+otherwise the teacher's request. Russell's own shape (the warmup as two or
+three questions whose last is a "movie trailer" lead-in, visibly random
+groups of three or four at vertical whiteboards, hints on every exercise,
+finishing the exercise as the only homework) is written as a template that
+is OFFERED, never applied, and only to a teacher who has shown an interest
+in bridging constructivist and Thinking Classrooms practice with a school
+where students often miss class (sports, weather, illness, field trips and
+other school activities): his ruling of 2026-11-12, on the issue. The skill
+says how an assistant tells which case it is in (the page, what the teacher
+asks, what they say about their students) and not to offer it when it
+cannot tell.
+
+A hints sheet is the worksheet with each hint under its question, from the
+same source: `Handout.tex` gains `\ifhints`, `\showhints` and `\hint{...}`
+(grey, small sans, "Hint:"), its title gains "--- Hints", its question 3
+carries one, and a third two-line wrapper ships as
+`starters/Handout - Hints.tex`. Compiled with `tectonic` in all three
+outputs and rendered at 80 dpi: one page each, the hint only on the hints
+sheet, no overfull or underfull box (the one log warning, shellesc's "Shell
+escape disabled", is the base starter's too). The wrapper is
+`handoutsSkill.hintsStarter`, deliberately NOT one of `starters`, because
+both platforms' handouts tests assert every listed starter defines
+`\showanswers` and the wrapper defines `\showhints`; `\hint` joins
+`starterMacros`. The binding sentences, the template's "offered, never
+applied" among them, are in `mustSay`.
+
+REJECTED: every rule as a fixed rule (a teacher who does not run Thinking
+Classrooms would be told to by Plantoir); the template as the default where
+the How I Teach page says nothing (the first plan: most courses have no
+such page, so it would have applied to nearly everyone, which the plan
+review's HIGH 4 caught and Russell's ruling settled); shipping none of it
+(most of it is good practice anywhere, and the issue asked for it); a
+hints-only sheet (every question's text would need a switch, a third
+structure to keep in step); the hints wrapper in `starters` (it turns the
+Windows suite red); writing the lesson rules in both skills (page-authoring
+points at the handouts skill instead); "no winter sports or sports played
+in one region" for every class (one school's context; it is kept only for a
+class with many students learning English or from many countries); and a
+`> [!hint]- Hint` pin in `mustSay` (the phrase was already in the
+page-authoring skill, so it proved nothing).
+
 Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
 refinement) now carries these rules - the centred box for a column with a
 negative value, matched decimal places without `\phantom`, no padding in

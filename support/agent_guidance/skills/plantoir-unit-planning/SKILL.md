@@ -23,7 +23,7 @@ and a file written here is lost). Copy from it instead.
   archive and a restore.
 - **Its look is fixed.** The plan page and the correlation page are built
   from `template/` beside this file, with its stylesheets and fonts. They
-  are plain HTML pages, not course pages, so section 22 of
+  are plain HTML pages, not course pages, so section 23 of
   `plantoir-page-authoring` (no raw HTML, no `<style>`) does not apply to
   them; it applies to the class website.
 - **Opening it.** The teacher opens

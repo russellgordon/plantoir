@@ -3,7 +3,9 @@
 % defines \showanswers) for the answer key. Copy BOTH files to where the
 % teacher keeps handouts, rename them to the handout's name, and change the
 % \input line in the answers file to match. Fill in the three lines marked
-% "Fill in" below.
+% "Fill in" below. An exercise with hints adds a third wrapper,
+% "Handout - Hints.tex" (which defines \showhints): the worksheet with each
+% hint under its question (the skill's sections 3 and 13).
 \documentclass[11pt]{article}
 \usepackage[letterpaper, left=0.75in, right=0.75in, top=1.05in, bottom=0.9in,
             headheight=14pt, headsep=0.3in]{geometry}
@@ -34,6 +36,14 @@
 \newcommand{\onlyq}[1]{\ifanswers\else #1\fi}
 \newcommand{\onlya}[1]{\ifanswers #1\fi}
 
+% ---------- Hints (the skill's section 13) ----------
+% \hint{...} under a question shows only on the hints sheet. A hint points
+% back to where the idea was built ("Look back at Card 4."); it never gives
+% the answer or a pointed first step.
+\newif\ifhints
+\ifdefined\showhints \hintstrue \fi
+\newcommand{\hint}[1]{\ifhints\par{\color{gray}\small\sffamily Hint: #1}\par\fi}
+
 % A blank students write on, in a question (the skill's section 4): an
 % invisible strut makes its line about two lines tall, so a wrapped prompt
 % still leaves a full line of writing room above the blank. \fillin{answer}
@@ -43,9 +53,11 @@
 
 \ifanswers
   \newcommand{\doctitle}{\handouttitle\ --- Answers}
+\else\ifhints
+  \newcommand{\doctitle}{\handouttitle\ --- Hints}
 \else
   \newcommand{\doctitle}{\handouttitle}
-\fi
+\fi\fi
 
 % ---------- Header and footer (matches pages printed from the class website) ----------
 \pagestyle{fancy}
@@ -177,6 +189,7 @@ Evaluate $3x + 2$ when $x = 4$.
 \end{center}
 
 \q[9]{3} \onlyq{Complete the table of values for $y = x - 3$.}\onlya{$y = x - 3$:}
+\hint{Look back at the worked example at the top of this sheet.}
 
 % A table: full border, a shaded heading row, each column set by its own
 % values - x has no negative value, so it is a centred C column; y has

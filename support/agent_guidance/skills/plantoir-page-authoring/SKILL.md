@@ -689,7 +689,38 @@ Add a bullet for a page that belongs there; leave the others alone.
 Plantoir adds its own entries when it builds the site (the curriculum
 coverage map, and My Progress from 1.8.2) - do not add those by hand.
 
-## 22. Do not
+## 22. Lesson pages: warmups, discussions, summaries, exercises
+
+A day's pages often come as a set: a Warmup, a Discussion of the task
+cards, a Summary and an Exercise. The rules for what each holds are written
+once, in the `plantoir-handouts` skill, sections 13 and 14
+(`.claude/skills/plantoir-handouts/SKILL.md`, the same file is at
+`.agents/skills/plantoir-handouts/SKILL.md`); read them before writing any
+of these pages, whether or not anything is printed.
+
+- **The course's How I Teach page comes first.** If
+  `courses/<CODE>/How I Teach.md` exists, read it (with Plantoir's tools
+  connected, `read_how_i_teach` reads it) and run the lesson its way.
+  Otherwise do what the teacher asks. The handouts skill's section 13 ends
+  with one teacher's template for lessons students can catch up on; it is
+  offered only to a teacher who has shown an interest in what it is for,
+  and never applied unasked.
+- **A Discussion page** repeats each card's wording word for word, in the
+  cards' order.
+- **A Summary page** states what the core cards built, accurately and
+  completely, and nothing the cards did not reach.
+- **An Exercise page** stays on the day's topic. When it has hints, each is
+  a folded hint callout under its question (` > [!hint]- Hint `, section 5),
+  pointing back to a card by its number or an earlier day's summary by its
+  title, never giving the answer or a first step. On a page that prints, a
+  folded hint prints opened where it is (`plantoir-printing`); if students
+  should get the hints separately on paper, make the exercise as a PDF
+  handout with its hints sheet.
+- **Wording** is plain English (the handouts skill's section 14): short
+  sentences, the thing named, no idioms, and say what the student sees,
+  then what to do.
+
+## 23. Do not
 
 - Do not write raw HTML for something Markdown already does (headings,
   lists, bold, tables, pictures): the site's styles and printing rely on
@@ -708,7 +739,7 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   are kept, and `plantoir-unit-planning`'s `.internal/planning/`, where a
   course's unit plans are kept.)
 
-## 23. Check it
+## 24. Check it
 
 Preview the section in Plantoir and open the page: every callout should be
 a coloured box, every diagram drawn, every formula typeset, and every link
