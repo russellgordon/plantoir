@@ -6681,6 +6681,7 @@
     "sentences" : {
       "accountIDCanWait" : "You can create the course without it and preview it as usual. It is needed before the first deploy.",
       "cloudflareCaption" : "Recommended. Free, with no limit on visitors.",
+      "cloudflareSizeNote" : "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely.",
       "netlifyNote" : "A note about Netlify’s free plan: Netlify accounts made since September 2025 get a fixed monthly allowance, and every deploy of every section uses part of it. When the allowance runs out, Netlify pauses every site on the account until the next month. Cloudflare Pages’ free plan has no limit on visitors, which is why Plantoir suggests it. If your Netlify account is older than that, or you deploy only now and then, Netlify works well.",
       "netlifyScheduleNote" : "This course deploys to Netlify. On Netlify’s free plan every deploy uses part of a monthly allowance, and when it runs out Netlify pauses every site on the account until the next month.",
       "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
@@ -7034,10 +7035,97 @@
         "expectUnreadable" : true,
         "name" : "empty settings refuse",
         "settingsText" : ""
+      },
+      {
+        "expectUnreadable" : true,
+        "name" : "a file of one line break refuses",
+        "settingsText" : "\n",
+        "why" : "An editor that saves an emptied file usually adds a final line break. plutil reads such a file, or one of only white space or a comment, as an empty object, which would read as Netlify (#771 review)."
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "cloudflare_pages netlify",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: cloudflare_pages netlify."
+          },
+          {
+            "kind" : "local_folder C:/x",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: local_folder C:/x."
+          }
+        ],
+        "name" : "a kind with a line break or a tab in it is one kind Plantoir does not know",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : "local_folder\tC:/x"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "cloudflare_pages\nnetlify"
+        },
+        "why" : "deploy.sh carries each leg as one tab-separated line, so a tab or a line break in a kind becomes a space, as one in a path does; split, it was two legs, and the second deployed (#771 review)."
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          },
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          }
+        ],
+        "name" : "an additional entry whose type is not text is passed over",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : 5
+            },
+            {
+              "type" : true
+            },
+            {
+              "type" : "cloudflare_pages"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "netlify"
+        },
+        "why" : "Only an object with a non-empty TEXT type is a destination. The main deploy_target is different: a non-text one is read as written, and refuses."
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : " ",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know:  ."
+          },
+          {
+            "kind" : "netlify ",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: netlify ."
+          }
+        ],
+        "name" : "a kind that ends in a line break or a carriage return is still a kind Plantoir does not know",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : "netlify\r"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "\n"
+        },
+        "why" : "A kind of only a line break names no destination, so it must not read as an empty one, which is Netlify. A carriage return becomes a space like a tab or a line break, in a kind and in a path, in both launchers (#771 review)."
       }
     ],
     "course" : "ICS3U",
-    "note" : "GitHub #739 items 7 and 8 (Windows) and #668 (mac). A deploy given neither --target nor --to-folder reads the course's course_config.json and deploys where it says, as the app's Deploy button does: deploy_target absent, empty, null or \"netlify\" is --target netlify, \"cloudflare_pages\" is --target cloudflare, \"local_folder\" is --to-folder deploy_folder_path, and each additional_deploy_targets entry (an object with a non-empty text type) is a leg of its own after the main one. One destination: the launcher sets it and prints sentences.oneDestination. More than one: it runs ITSELF once per leg with every flag as typed plus that leg's flags, prints sentences.eachLeg before each, keeps going after a leg that fails or is refused (sentences.legRefused), and exits with the first failing leg's code. --reset-token looks only at the first. A settings file that is there and cannot be read refuses with sentences.couldNotRead and never falls back to Netlify; an absent one is left to the course-folder check. A typed --target or --to-folder wins and the file is not read. Because a flagless call now deploys every leg, the app names every leg it runs, Netlify included (deployArguments). Proposed from Windows on 2026-11-11: deploy.ps1's Get-SavedDestinations runs every case (windows-app/test_launcher_rules.ps1), and scripts/test_deploy_sh_destination.py is asked to (GitHub issue, label mac). {course}, {section}, {where} and {kind} are filled; {where} comes from sentences.where, and a kind not listed there reads as Netlify's word.",
+    "note" : "GitHub #739 items 7 and 8 (Windows) and #668 (mac). A deploy given neither --target nor --to-folder reads the course's course_config.json and deploys where it says, as the app's Deploy button does: deploy_target absent, empty, null or \"netlify\" is --target netlify, \"cloudflare_pages\" is --target cloudflare, \"local_folder\" is --to-folder deploy_folder_path, and each additional_deploy_targets entry (an object with a non-empty text type) is a leg of its own after the main one. One destination: the launcher sets it and prints sentences.oneDestination. More than one: it runs ITSELF once per leg with every flag as typed plus that leg's flags, prints sentences.eachLeg before each, keeps going after a leg that fails or is refused (sentences.legRefused), and exits with the first failing leg's code. --reset-token looks only at the first. A settings file that is there and cannot be read refuses with sentences.couldNotRead and never falls back to Netlify; an absent one is left to the course-folder check. A typed --target or --to-folder wins and the file is not read. Because a flagless call now deploys every leg, the app names every leg it runs, Netlify included (deployArguments). Proposed from Windows on 2026-11-11: deploy.ps1's Get-SavedDestinations runs every case (windows-app/test_launcher_rules.ps1), and since #771 scripts/test_deploy_sh_destination.py runs every case against deploy.sh, through both of its readers (plutil and a Python). A tab, a carriage return or a line break in a kind or a path, at its end included, becomes a space, so each leg is one line (#771). {course}, {section}, {where} and {kind} are filled; {where} comes from sentences.where, and a kind not listed there reads as Netlify's word.",
     "sentences" : {
       "couldNotRead" : [
         "Plantoir could not read where {course} deploys from its settings.",
@@ -7244,7 +7332,7 @@
         "status" : 200
       }
     ],
-    "note" : "GitHub #705 (Windows) and #716 (mac). A SAVED publishing token is checked before a deploy, and the check's answer is one of three words: accepted, refused, unheard. Only refused may clear the token (and, for Cloudflare, the remembered account); unheard keeps it, prints the two lines failureExplanations cases 13 and 14 lift, and stops the deploy with exit 1. refused means HTTP 400, 401 or 403 AND a body matching the service's refusedWhenTheBodyMatches; accepted means a 2xx AND a body matching acceptedWhenTheBodyMatches; everything else is unheard, status 0 (nothing answered) included. The PASTE checks are deliberately not this rule: a refused paste is not saved. Proposed from Windows on 2026-11-11 so the two launchers stop holding the rule in two tables; deploy.ps1's Get-TokenCheckAnswer runs every case (windows-app/test_launcher_rules.ps1), and deploy.sh's token_check_answer is asked to (GitHub issue, label mac). documentation/07-deployment.md -> \"A token Cloudflare refuses (#695), and a saved one is cleared only on a refusal (#716)\".",
+    "note" : "GitHub #705 (Windows) and #716 (mac). A SAVED publishing token is checked before a deploy, and the check's answer is one of three words: accepted, refused, unheard. Only refused may clear the token (and, for Cloudflare, the remembered account); unheard keeps it, prints the two lines failureExplanations cases 13 and 14 lift, and stops the deploy with exit 1. refused means HTTP 400, 401 or 403 AND a body matching the service's refusedWhenTheBodyMatches; accepted means a 2xx AND a body matching acceptedWhenTheBodyMatches; everything else is unheard, status 0 (nothing answered) included. The PASTE checks are deliberately not this rule: a refused paste is not saved. Proposed from Windows on 2026-11-11 so the two launchers stop holding the rule in two tables; deploy.ps1's Get-TokenCheckAnswer runs every case (windows-app/test_launcher_rules.ps1), and since #771 scripts/test_deploy_token_refusal.py runs every case through deploy.sh's token_check_answer, and checks deploy.sh's addresses and patterns are these. documentation/07-deployment.md -> \"A token Cloudflare refuses (#695), and a saved one is cleared only on a refusal (#716)\".",
     "patternDialect" : "Each pattern is read by grep -E on the mac and by .NET's Regex on Windows, so it uses only what the two read IDENTICALLY: literal characters, bracket expressions of literal characters and ASCII ranges, and *. No \\s, no \\d, no escape inside a bracket (POSIX takes a backslash there literally), and no POSIX class: .NET reads [[:space:]] as a set of the characters [ : s p a c e, matching wrongly with no error. The spacing allowance is a bracket holding a real space and a real TAB character (the JSON \\t). Matched case-sensitively.",
     "refusalStatuses" : [
       400,
