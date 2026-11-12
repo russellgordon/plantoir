@@ -44,6 +44,9 @@ atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+# Set before anything first imports toolchain_paths (contracts does, and
+# test_deploy_non_interactive reaches it through deploy.py), which reads it
+# once, at import.
 os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts"))
 
 import contracts  # noqa: E402
@@ -333,6 +336,34 @@ class TheSavedDestinationsAreTheContracts(unittest.TestCase):
             os.symlink(python, os.path.join(tools, "python3"))
             os.symlink(shutil.which("tr"), os.path.join(tools, "tr"))
             self._run_every_case(path=tools)
+
+    def test_one_destination_deploys_with_the_flags_the_contract_checks(self):
+        """With ONE saved destination the launcher does not run a leg with
+        the flags; it sets TARGET or TO_FOLDER through
+        the_one_saved_destination. Every leg the contract accepts, set that
+        way, must be what its flags say (#771 review M1)."""
+        text = _the_launchers_text()
+        block = _cut_from_deploy_sh("saved_destinations")
+        self.assertEqual(text.count('the_one_saved_destination "$_kind" "$_path"'), 1,
+                         "the one-destination run no longer sets its destination through the block's function")
+        script = (block + '\nTARGET=unset\nTO_FOLDER=\n'
+                  'the_one_saved_destination "$1" "$2"\nprintf "%s\\t%s" "$TARGET" "$TO_FOLDER"\n')
+        checked = 0
+        for case in self.rule["cases"]:
+            for leg in case.get("expectLegs", []):
+                if "flags" not in leg:
+                    continue
+                flag, value = leg["flags"]
+                path = value if flag == "--to-folder" else ""
+                expected = (value, "") if flag == "--target" else ("unset", value)
+                with self.subTest(case=case["name"], kind=leg["kind"]):
+                    result = subprocess.run(
+                        self.shell + ["-c", script, "_", leg["kind"], path],
+                        capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+                    )
+                    self.assertEqual(tuple(result.stdout.split("\t")), expected)
+                checked += 1
+        self.assertTrue(checked, "the contract carries no accepted leg to check")
 
     def test_the_sentences_are_the_contracts(self):
         """Every sentence in savedDestinations.sentences is a line the block
