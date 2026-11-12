@@ -92,7 +92,7 @@ honest about how much Python will help you.
 > than a mysterious failure.
 
 > [!success]- Answer 2
-> ```text
+> ```text wrap
 > Nadia: 2 h
 > Nadia: 2 h
 > None
@@ -168,7 +168,7 @@ honest about how much Python will help you.
 > print(card.top_up(5))
 > print(card)
 > ```
-> ```text
+> ```text wrap
 > Bea: 3 visits left
 > True True True False
 > Bea: 0 visits left
@@ -204,7 +204,7 @@ honest about how much Python will help you.
 > b = Booking("Hall", 24)
 > print(b.people(), b.set_people(40), b.people())
 > ```
-> ```text
+> ```text wrap
 > 24 False 24
 > ```
 > The refused change leaves the booking exactly as it was — no
@@ -222,7 +222,7 @@ honest about how much Python will help you.
 >         half = self.hours / 2
 >         return Shift(self.volunteer, half), Shift(self.volunteer, half)
 > ```
-> ```text
+> ```text wrap
 > True
 > Ali: 2.5 h | Ali: 2.5 h
 > ```
@@ -245,7 +245,7 @@ honest about how much Python will help you.
 > c = Card()
 > print(c._Card__pin)
 > ```
-> ```text
+> ```text wrap
 > 1234
 > ```
 > Asking for `c.__pin` instead raises

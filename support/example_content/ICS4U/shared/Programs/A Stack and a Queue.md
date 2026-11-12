@@ -120,7 +120,7 @@ print(f"  empty now? {holds.is_empty()}")
 print(f"  asking an empty queue for its front gives {holds.front()}")
 ```
 
-```text
+```text wrap
 Three people ask for the study guide, in this order.
   waiting: 1, next up: Nadia
   waiting: 2, next up: Nadia

@@ -56,7 +56,7 @@ class Session:
 Blocks marked `text` are for things that are not Python — terminal
 sessions, tracebacks, and the diffs all over [[Read the Diff]]:
 
-```text
+```text wrap
 $ git status
 On branch main
 nothing to commit, working tree clean

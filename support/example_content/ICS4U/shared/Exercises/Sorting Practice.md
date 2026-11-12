@@ -57,7 +57,7 @@ times = [64, 25, 12, 22, 11]
 ## Answers
 
 > [!success]- Answer 1
-> ```text
+> ```text wrap
 > compare 0,1: [25, 64, 12, 22, 11]
 > compare 1,2: [25, 12, 64, 22, 11]
 > compare 2,3: [25, 12, 22, 64, 11]
@@ -70,7 +70,7 @@ times = [64, 25, 12, 22, 11]
 > in their final places.
 
 > [!success]- Answer 2
-> ```text
+> ```text wrap
 > pass 1: [25, 64, 12, 22, 11]
 > pass 2: [12, 25, 64, 22, 11]
 > pass 3: [12, 22, 25, 64, 11]
@@ -85,7 +85,7 @@ times = [64, 25, 12, 22, 11]
 > [!success]- Answer 3
 > The inner loop runs to `len(values) - 1`, so `values[position + 1]`
 > reads one past the end:
-> ```text
+> ```text wrap
 > IndexError: list index out of range
 > ```
 > Two corrections: the inner range must be
@@ -112,7 +112,7 @@ times = [64, 25, 12, 22, 11]
 > print(insertion_sort([]))
 > print(insertion_sort([7]))
 > ```
-> ```text
+> ```text wrap
 > [11, 12, 22, 25, 64]
 > []
 > [7]
@@ -137,7 +137,7 @@ times = [64, 25, 12, 22, 11]
 >
 > print(selection_sort([64, 25, 12, 22, 11]))
 > ```
-> ```text
+> ```text wrap
 > [11, 12, 22, 25, 64]
 > ```
 > Selection sort makes far fewer *swaps* — at most one per position —
@@ -148,7 +148,7 @@ times = [64, 25, 12, 22, 11]
 > algorithms with the same $O(n^2)$ can still have.
 
 > [!success]- Answer 6
-> ```text
+> ```text wrap
 > ['Ali', 'Rowan', 'Sam', 'bea', 'nadia']
 > ```
 > Every capital letter sorts before every lowercase one, because `>`
@@ -158,7 +158,7 @@ times = [64, 25, 12, 22, 11]
 > ```python
 > while gap >= 0 and values[gap].lower() > held.lower():
 > ```
-> ```text
+> ```text wrap
 > ['Ali', 'bea', 'nadia', 'Rowan', 'Sam']
 > ```
 > Real name sorting is harder still — accents, prefixes such as "de",
@@ -169,7 +169,7 @@ times = [64, 25, 12, 22, 11]
 > ```python
 >         while gap >= 0 and volunteers[gap].hours > held.hours:
 > ```
-> ```text
+> ```text wrap
 > Rowan (1.5 h)
 > Bea (2 h)
 > Nadia (4.5 h)
@@ -180,7 +180,7 @@ times = [64, 25, 12, 22, 11]
 > lets a `Queue` hold names one day and objects the next.
 
 > [!success]- Answer 8
-> ```text
+> ```text nowrap
 > with >   [('Nadia', 1), ('Ali', 1), ('Rowan', 2), ('Bea', 2)]
 > with >=  [('Ali', 1), ('Nadia', 1), ('Bea', 2), ('Rowan', 2)]
 > ```
@@ -192,7 +192,7 @@ times = [64, 25, 12, 22, 11]
 > person.
 
 > [!success]- Answer 9
-> ```text
+> ```text nowrap
 >  items    sorted   shuffled   reversed
 >    100        99       2988       4950
 >    200       199       9446      19900

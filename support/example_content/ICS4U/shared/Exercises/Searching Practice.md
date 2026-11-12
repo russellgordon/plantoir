@@ -56,7 +56,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 ## Answers
 
 > [!success]- Answer 1
-> ```text
+> ```text wrap
 > step 1: low=0 high=8 middle=4 value=167
 > step 2: low=5 high=8 middle=6 value=203
 > ```
@@ -66,7 +66,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 > most four comparisons, because $2^4 > 9$.
 
 > [!success]- Answer 2
-> ```text
+> ```text wrap
 > step 1: low=0 high=8 middle=4 value=167
 > step 2: low=0 high=3 middle=1 value=118
 > step 3: low=2 high=3 middle=2 value=134
@@ -103,7 +103,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 > print(linear_search(cards, 102), linear_search(cards, 240),
 >       linear_search(cards, 1))
 > ```
-> ```text
+> ```text wrap
 > 0 8 -1
 > ```
 > "Precondition: none" is worth writing down. It is the reason this
@@ -129,7 +129,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 >             high = middle - 1
 >     return -1
 > ```
-> ```text
+> ```text wrap
 > 0 8 -1
 > ```
 > `low <= high` rather than `<` because a region of exactly one item
@@ -160,7 +160,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 > print(find_by_card(members, 118))
 > print(find_by_card(members, 999))
 > ```
-> ```text
+> ```text wrap
 > Rowan (118)
 > None
 > ```
@@ -184,7 +184,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 >
 > print(all_positions([2, 5, 2, 9, 2], 2))
 > ```
-> ```text
+> ```text wrap
 > [0, 2, 4]
 > ```
 > Note that this cannot return early: proving there are no more
@@ -197,7 +197,7 @@ cards = [102, 118, 134, 155, 167, 189, 203, 221, 240]
 > shuffled = [155, 102, 240, 118, 203, 134, 189, 167, 221]
 > print(binary_search(shuffled, 240), linear_search(shuffled, 240))
 > ```
-> ```text
+> ```text wrap
 > -1 2
 > ```
 > The card is at index 2. Binary search reports that it does not

@@ -60,7 +60,7 @@ call, and they simply never meet.
 > is the most literal thing it ever prints — the same frame, over and
 > over. It begins:
 >
-> ```text
+> ```text nowrap
 > Traceback (most recent call last):
 >   File "/home/student/power.py", line 7, in <module>
 >     print(power(2, -1))
@@ -76,7 +76,7 @@ call, and they simply never meet.
 > Roughly a thousand identical frames follow, and Python has the
 > decency to summarise them rather than print every one:
 >
-> ```text
+> ```text wrap
 >   [Previous line repeated 996 more times]
 > RecursionError: maximum recursion depth exceeded
 > ```

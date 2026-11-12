@@ -66,7 +66,7 @@ call get closer to it. Write those two lines first, every time.
 ## Answers
 
 > [!success]- Answer 1
-> ```text
+> ```text wrap
 > 10
 > ```
 > It adds the whole numbers from `n` down to 1 — here
@@ -77,7 +77,7 @@ call get closer to it. Write those two lines first, every time.
 > [!success]- Answer 2
 > There is no base case, so nothing ever stops the calls. It counts
 > down past zero for ever until the call stack runs out:
-> ```text
+> ```text wrap
 > RecursionError: maximum recursion depth exceeded
 > ```
 > Raising the limit with `sys.setrecursionlimit` is the wrong fix
@@ -113,7 +113,7 @@ call get closer to it. Write those two lines first, every time.
 >
 > print(sum_to(5), sum_to(0), sum_to(100))
 > ```
-> ```text
+> ```text wrap
 > 15 0 5050
 > ```
 > `sum_to(100)` builds a stack a hundred frames deep — fine. Try
@@ -133,7 +133,7 @@ call get closer to it. Write those two lines first, every time.
 >
 > countdown(3)
 > ```
-> ```text
+> ```text wrap
 > 3
 > 2
 > 1
@@ -158,7 +158,7 @@ call get closer to it. Write those two lines first, every time.
 > print(total_of([1, [2, 3, [4]], 5]))
 > print(total_of([]))
 > ```
-> ```text
+> ```text wrap
 > 15
 > 0
 > ```
@@ -179,7 +179,7 @@ call get closer to it. Write those two lines first, every time.
 >
 > print(backwards("holds"))
 > ```
-> ```text
+> ```text wrap
 > sdloh
 > ```
 > `len(text) <= 1` handles both the empty string and a single
@@ -199,7 +199,7 @@ call get closer to it. Write those two lines first, every time.
 >
 > print(power(2, 10), power(5, 0), power(3, 3))
 > ```
-> ```text
+> ```text wrap
 > 1024 1 27
 > ```
 > Anything to the power of zero is 1, which is the base case doing
@@ -219,7 +219,7 @@ call get closer to it. Write those two lines first, every time.
 > for n in [5, 10, 20, 25]:
 >     print(n, fib_with_count(n))
 > ```
-> ```text
+> ```text wrap
 > 5 (5, 15)
 > 10 (55, 177)
 > 20 (6765, 21891)
@@ -248,7 +248,7 @@ call get closer to it. Write those two lines first, every time.
 > for n in range(10):
 >     print(fib_loop(n), end=" ")
 > ```
-> ```text
+> ```text wrap
 > 0 1 1 2 3 5 8 13 21 34
 > ```
 > Recursion is the right tool when the *data* is nested. Fibonacci is

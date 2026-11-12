@@ -24101,6 +24101,17 @@
           "plantoir-page-authoring"
         ]
       },
+      "mustSay": {
+        "rule": "#758 (2026-11-12). The sentences a skill must keep saying, as data both suites read: each key is a skill folder under support/agent_guidance/skills, and each value the phrases its SKILL.md must contain, as written into BOTH homes (.claude/skills and .agents/skills) by AgentGuidance.write. A phrase is matched after the file is read as UTF-8 and, in the phrase and in the file alike, every run of white space (a line break included) is folded to one space, so re-wrapping a paragraph never breaks a pin; a phrase inside a callout or quote also matches when the file is folded with the `>` markers that begin each of its lines dropped as well (a line break, then white space and `>` marks, becomes one space), so a sentence wrapped inside `> ` lines is found too. Either form matching is a match. A phrase is a sentence or part of one, never a whole section, and it pins a RULE, not a heading. Every phrase was absent from the skill it pins before the piece that added it (a phrase already present proves nothing), and every key must name a skill folder that exists, so a misspelled key fails rather than passing on nothing. This is the registry for every skill, not only printing's: it sits under printablePages.agentGuidance because that is where the guidance root (rootFiles, folders, source) lives, and later pieces add their skills' phrases here rather than typing literal checks into each platform's test.",
+        "plantoir-page-authoring": [
+          "**Every text block on a page wraps, unless its meaning depends on characters lining up.**",
+          "Never a bare `text`: an unwrapped block is always deliberate.",
+          "**Anything students copy goes in a text block.**"
+        ],
+        "plantoir-printing": [
+          "A text block prints wrapped whether or not it says `wrap`."
+        ]
+      },
       "rootFileCases": {
         "rule": "`existing` is the file as found (null: no file), with {start} and {end} standing for sectionStart and sectionEnd; the section's words are \"NEW\". `declined` is the Not Now on record for this file: \"thisSection\" (for these very words), \"earlierSection\" (for words that have since changed) or null. `expect` is write, replace, unchanged, ask or leave; `result` is the file afterwards - for ask, the file after the teacher says Add.",
         "cases": [
@@ -27646,6 +27657,20 @@
             "wraps": false
           },
           {
+            "name": "nowrap, the mark for a block whose meaning depends on alignment (#758): not the word, so it scrolls exactly as a bare text block does",
+            "fence": "text nowrap",
+            "lang": "text",
+            "meta": "nowrap",
+            "wraps": false
+          },
+          {
+            "name": "no wrap, two words: wrap is a later word, so it wraps (the linters refuse it as ambiguous, #758)",
+            "fence": "text no wrap",
+            "lang": "text",
+            "meta": "no wrap",
+            "wraps": true
+          },
+          {
             "name": "two spaces",
             "fence": "text  wrap",
             "lang": "text",
@@ -27784,6 +27809,15 @@
       "Obsidian ignores the extra word, so the editor shows the block unwrapped (not measured in Obsidian; the info string's first word is the language there too).",
       "The page's copy button sits over the first row's right end on hover, as it does over a scrolling block: 30.8 px tall over 25.6 px rows, it reaches 2 px into the second row's box, above its letters (measured 2026-11-10 at 1512 and 390 px, WebKit and Chromium)."
     ],
+    "agentGuidance": {
+      "rule": "#758 (2026-11-12). The guidance makes the flag the rule rather than an option, with one exemption Russell ruled the same day: the `plantoir-page-authoring` skill (section 9) says every text block on a page, inside a callout and a list item too, is written ```text wrap, UNLESS its meaning depends on characters lining up (a drawing made of characters, a table or columns lined up with spaces, a traceback whose ^^^ or ~~~ markers sit under the code they point at), which is written ```text nowrap and scrolls sideways; never a bare ```text, so an unwrapped block is always deliberate. Anything students copy (a prompt for an AI assistant, a commit message) is always in a `text wrap` block, even beside a screenshot of the same words. `nowrap` is not the word `wrap` (fence.cases), so the site builds it exactly as a bare ```text: measured 2026-11-12 through the image's locked rehype-pretty-code 0.14.0 and shiki 1.26.2 (Quartz 4.5.0's package-lock), the HTML of ```text nowrap is byte for byte that of ```text; `no wrap` as two words wraps, and the linters refuse it. The skill's example holds two wrapped blocks and one nowrap drawing, which verify.sh 6n counts (two wrappers, three text blocks). `plantoir-printing` says a text block prints wrapped either way, nowrap included. Code fences are untouched. The ready-made example content follows it: every bare text fence in support/example_content (122 in 41 files, ICS4U and MCMPR11, 62 of them inside callouts and 2 in list items) was converted, 24 of them (all ICS4U: 5 drawings, 10 tables or aligned traces, 9 tracebacks) to nowrap and the rest to wrap, and lint_payload.py and lint_skeletons.py refuse a bare text fence, both words, or `no wrap`. The site's behaviour is unchanged: without the word a block still scrolls, as `rule` says.",
+      "skill": "plantoir-page-authoring",
+      "alsoIn": [
+        "plantoir-printing"
+      ],
+      "examples": "support/example_content: every text fence is written ```text wrap (lint_payload.py; lint_skeletons.py for the skeletons and EXC2O)",
+      "why": "Russell, 2026-11-10: \"make every text block fence wrap\", then \"Make that a standing instruction when putting text blocks into tutorials - always wrap lines\", \"Not code blocks, just text blocks\", and for prompts and commit messages beside a screenshot: \"Otherwise they'll just try to copy-paste from the screenshots and the text will get mangled.\" Russell, 2026-11-12, on #758: blocks whose meaning depends on alignment stay unwrapped, and an unwrapped block must always be deliberate. REJECTED: for the mark, a comment line inside the block (it is copied with the block), a different language word such as `text-art` or `txt` (it changes data-language and what Obsidian shows, and `txt` was already a case that is not text), a list of exempt files in the linter (the mark would not travel when a page is copied), and `aligned` (it does not read as the opposite of `wrap`); wrapping every text block by default in the build (it changes #653's ruling that without the word nothing changes, a site behaviour rather than a writing rule); a second skill example for the commit message (it would match verify.sh 6n's text wrap claim twice and put the wrapper on two example pages, which 6o refuses); leaving the example content alone (the skill tells an assistant to copy a course's neighbouring pages, and they would contradict it)."
+    },
     "rejected": [
       "The number inline with a text-indent hang (the issue's sketch, and print.scss's handout approach): an unbreakable line (a URL) moves whole to its second row and leaves the first holding only its number (measured at 390 px).",
       "An SVG data-URI ellipsis repeated as a background: no web font, a colour of its own per theme, and a repeat period that is a guess at the line-height.",

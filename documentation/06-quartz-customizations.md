@@ -4028,7 +4028,8 @@ WebKit (playwright-core 1.63.0, WebKit 26.6, kept in the scratchpad only):
   for byte the twin's, the class on no other page but the skill's example,
   and `index.css`'s screen-only rule with 80 rows and alt text, and (#759)
   the rule that raises the copy button inside an isolated block. **6n** builds
-  the page-authoring skill's ```text wrap example.
+  the page-authoring skill's ```text wrap example, and since #758 requires
+  exactly two wrappers on it (the error message and the commit message).
 - `browser-checks/text_wrap.mjs` (Chrome for Testing, beside the sidebar
   check): at 1512 px light, dark and 390 px - FIRST that the block is
   wrapped and its `code` does not scroll; the two unflagged blocks scroll a
@@ -4168,6 +4169,112 @@ changed, for what two declarations answer. Writing the clipboard another
 way: the write was never the fault. In the check, reading the Mac's
 pasteboard (`pbpaste`): it would make the gate depend on, and overwrite,
 whatever the person at the Mac copied.
+
+### P8. The guidance makes it the rule (#758, v1.10.0)
+
+Russell, 2026-11-10: "make every text block fence wrap", "Not code blocks,
+just text blocks", and prompts and commit messages always in a text block,
+even beside a screenshot: "Otherwise they'll just try to copy-paste from the
+screenshots and the text will get mangled." The site is unchanged. Without
+the word a block still scrolls, as #653 ruled; what changed is what an
+assistant is told to write and what the ready-made courses hold.
+
+- **The skills.** `plantoir-page-authoring` section 9 says every text block
+  on a page is written ```text wrap (inside a callout and a list item too),
+  unless its meaning depends on characters lining up, when it is written
+  ```text nowrap; never a bare ```text; and that a prompt for an AI
+  assistant or a commit message is always given in a wrapped one. Its
+  example gains a commit-message block and a nowrap drawing (a queue in
+  boxes) inside the SAME ````markdown fence, so 6n's one claim still
+  matches one example and 6o still finds the wrapper on one example page;
+  6n now requires two wrappers and three text blocks there, so neither new
+  block can be deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
+  `plantoir-printing` says a text block prints wrapped either way and still
+  asks for the flag, so it wraps on screen.
+- **The pins.** The binding sentences are listed in `contracts/shared-rules.json`
+  → `printablePages.agentGuidance.mustSay` (skill name to phrases), which
+  `PrintablePagesTests.testEverySkillSaysWhatTheContractSaysItMust` walks in
+  both written homes, with white space folded so re-wrapping a paragraph
+  never breaks a pin. It is the registry for every skill's pins; later
+  pieces add phrases there rather than literal checks in each platform's
+  test. Each phrase was measured absent from the skill before the change
+  (the 707 branch, `393e8cfbd`) and present after.
+- **The example content.** Measured on the 707 branch: **122** bare
+  ```text fences in **41** files, all in ICS4U (120 in 39) and MCMPR11 (2 in
+  2), of which 62 open inside a callout (`> ```text`) and 2 inside a list
+  item. The plan counted 58, with a search anchored at column 0 that missed
+  every callout. All were converted on the opening line only; closers are
+  bare. Most are terminal sessions and program output (tracebacks with
+  `^^^` markers under a line). A line wraps only when it is longer than the
+  window. Whether the markers, and the drawings made of characters (CRC
+  cards, a stack and a queue, `git log --graph`, aligned tables of output),
+  keep their shape was NOT measured: no converted page was previewed. On a
+  phone a block holds about 40 characters a row at 390 px (an estimate, not
+  measured; a block inside a callout holds fewer), so longer lines wrap and
+  a drawing breaks apart. Read by hand on 2026-11-12, the ICS4U blocks that
+  depend on their columns are: five drawings made of characters (the CRC
+  cards in Concepts/Objects Working Together and Exercises/Classes and
+  Objects Practice, the stack and queue in Concepts/Stacks and Queues,
+  `git log --graph` in Tutorials/Using Version Control, and the aligned
+  conflict markers in Explorations/The Merge Conflict, 51 to 70 characters
+  wide); ten tables or aligned columns of program output (in Programs/
+  Sorting and Timing It, Searching and Timing It and Using a Dictionary,
+  Exercises/Efficiency Practice and Sorting Practice, and Concepts/Choosing
+  a Data Structure, Recursion and Version Control, 28 to 71 wide); nine
+  tracebacks with `^^^` or `~~~` markers under a line (20 to 49 wide); and
+  four blocks of `unittest` output whose 70-character rule lines wrap.
+  MCMPR11, the other payloads, the Example Course and the skeletons hold
+  none. **Russell ruled on 2026-11-12 (his comment on #758):** a drawing
+  made of characters, a table or columns lined up with spaces, and a
+  traceback whose markers sit under the code they point at stay UNWRAPPED
+  and scroll sideways; anything students copy wraps; an unwrapped block is
+  always deliberate. So the 24 drawings, tables and tracebacks are written
+  ```text nowrap. The four `unittest` blocks stay `wrap`: their meaning
+  does not depend on alignment, and a wrapped rule line of `=====` is ugly
+  rather than wrong (one of them, in Concepts/Testing and Regression, also
+  holds a traceback and is nowrap for that). The other 98 blocks were read
+  again against the rule: diffs and `git status` output depend only on
+  their first column, and no other block depends on alignment. The
+  unit-planning skill's folder tree, read raw by an assistant and never
+  built, is marked nowrap too, as the rule says.
+
+  **The mark is the word `nowrap`.** It is not the word `wrap`, so
+  `wrapsText` leaves the block alone and it scrolls as before; and
+  rehype-pretty-code ignores a bare word in the meta. Measured 2026-11-12
+  outside the container, with the image's locked rehype-pretty-code 0.14.0,
+  shiki 1.26.2, unified 11.0.5, remark-parse 11.0.0, remark-gfm 4.0.1 and
+  remark-rehype 11.1.1 (Quartz 4.5.0's package-lock): ```text nowrap builds
+  byte for byte the HTML of ```text, and the parser gives `lang` "text" and
+  `meta` "nowrap". Obsidian reads the first word as the language and
+  ignores the rest, as it does `wrap`. `no wrap` as two words holds the
+  word `wrap` and so WRAPS; both linters refuse it, and a fence that says
+  both. `fence.cases` gains both. What verify.sh must show for the mark:
+  `check_runner_rules_against_the_site.py` passes the two new cases
+  (`text nowrap` not wrapped, `text no wrap` wrapped) through the image's
+  parser and `textWrapRule.ts`; 6n finds two wrappers and three text
+  blocks on the skill's example page, the drawing among them; 6o still
+  finds the wrapper on that one example page only. REJECTED for the mark:
+  a comment line inside the block (it is copied with the block); another
+  language word such as `text-art` or `txt` (it changes `data-language`
+  and what Obsidian shows); a list of exempt files in the linter (the mark
+  would not travel when a page is copied); `aligned` (it does not read as
+  the opposite of `wrap`).
+  `lint_payload.py` and `lint_skeletons.py` (skeletons and EXC2O) refuse a
+  bare text fence, and both run the rule's own accept and refuse cases
+  first. verify.sh builds the EXC2O fixture, not ICS4U, so no gate reads
+  the converted pages; the linters are run by hand.
+
+**Rejected.** Wrapping every text block by default in the build: that
+reverses #653's ruling and is a change to every site, where Russell asked
+for a writing rule. A second ````markdown example for the commit message:
+it would match 6n's `text wrap` claim twice and put the wrapper on a second
+example page, which 6o refuses. Literal `contains` checks in each
+platform's test (the older pattern): the sentence would be typed twice, once
+per language. Leaving the example content alone: the page-authoring skill
+tells an assistant to follow a folder's existing pages, and those would
+contradict it. "A command to type" among the things that go
+in a text block (the plan's first wording): section 9 says to name the
+language (`bash`) for a command, so the two would disagree.
 
 ## Q. GeoGebra sketches (#578, v1.9.0)
 

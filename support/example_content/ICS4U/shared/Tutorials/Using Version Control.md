@@ -38,7 +38,7 @@ Then it is the whole point.
 
 Edit a file, and ask git what it sees:
 
-```text
+```text wrap
 $ git status
 On branch main
 Changes not staged for commit:
@@ -54,7 +54,7 @@ documentation than most of what is written about git.
 
 Now look at exactly what you changed:
 
-```text
+```text wrap
 $ git diff
 diff --git a/signout.py b/signout.py
 index 9e9b862..7a8d1d7 100644
@@ -77,7 +77,7 @@ is context. Reading these is a routine of its own —
 
 Stage it, and check again:
 
-```text
+```text wrap
 $ git add signout.py
 $ git status
 On branch main
@@ -88,7 +88,7 @@ Changes to be committed:
 
 Commit it, with a message that says *why*:
 
-```text
+```text wrap
 $ git commit -m "Stop spaces_left going negative when a session is overbooked"
 [main 878055a] Stop spaces_left going negative when a session is overbooked
  1 file changed, 5 insertions(+), 2 deletions(-)
@@ -96,7 +96,7 @@ $ git commit -m "Stop spaces_left going negative when a session is overbooked"
 
 And look at what the project remembers:
 
-```text
+```text wrap
 $ git log --oneline
 878055a Stop spaces_left going negative when a session is overbooked
 62729ab Add spaces_left
@@ -122,7 +122,7 @@ line has a name too — you will see `main` in some projects and
 `master` in others, and which one a project uses depends on when and
 how it was created, so check rather than assume.
 
-```text
+```text wrap
 $ git switch -c waitlist
 Switched to a new branch 'waitlist'
 ```
@@ -131,7 +131,7 @@ Now commits go onto `waitlist` and the shared branch is untouched.
 Work, commit as often as you like, and when the feature is finished,
 switch back and merge it in:
 
-```text
+```text wrap
 $ git switch main
 Switched to branch 'main'
 $ git merge waitlist
@@ -147,7 +147,7 @@ teammate reworded the *same* docstring on the shared branch. Both
 changes are reasonable. Neither is wrong. A conflict happens when two
 branches changed the *same lines*, and git does not guess:
 
-```text
+```text wrap
 $ git merge waitlist
 Auto-merging signout.py
 CONFLICT (content): Merge conflict in signout.py
@@ -156,7 +156,7 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 Open the file. Git has written both versions into it, with markers:
 
-```text
+```text wrap
 def spaces_left(capacity, booked):
 <<<<<<< HEAD
     """Return the number of free spaces left in a session (never below 0)."""
@@ -175,7 +175,7 @@ Resolving means editing the file until it says what you want —
 keeping one side, keeping the other, or writing something better than
 both — and **deleting all three marker lines**. Then:
 
-```text
+```text wrap
 $ git add signout.py
 $ git commit -m "Merge branch 'waitlist'"
 $ git status
@@ -186,7 +186,7 @@ nothing to commit, working tree clean
 `git log --oneline --graph` will now show the two lines of work
 joining back up:
 
-```text
+```text nowrap
 *   7345dea Merge branch 'waitlist'
 |\  
 | * 3d7f92b Reword the docstring for the waitlist work

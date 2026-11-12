@@ -3461,7 +3461,12 @@ callouts (every kind, folding with `-` and `+`), Mermaid (labels quoted),
 tables (`\|` in a cell), maths (`$$` on lines of their own, two prices in a
 paragraph read as maths, `\$`), code (a fenced block with its language, line
 numbers, no ligatures, inline code; code students run is routed to
-`plantoir-runnable-code`), checklists students tick, a full section on My Progress
+`plantoir-runnable-code`; since #758 every text block is written
+```` ```text wrap ````, or ```` ```text nowrap ```` when its meaning depends
+on characters lining up (Russell, 2026-11-12), and a prompt or commit
+message students copy is always given in a wrapped one, even beside a
+screenshot, its phrases pinned in
+`printablePages.agentGuidance.mustSay` - doc 06 → P8), checklists students tick, a full section on My Progress
 ("from Plantoir 1.8.2", Russell's ruling of 2026-10-19: what the student
 sees, when the page appears, and a complete page whose items count - the
 three default headings or the course's `success_criteria_headings`, task

@@ -17,7 +17,7 @@ which item is allowed out next.
 
 ## A promise about which one comes out next
 
-```text
+```text nowrap
 STACK - last in, first out          QUEUE - first in, first out
 
    push        pop                    enqueue              dequeue
@@ -50,7 +50,7 @@ history.append("deleted Bea")
 print(history.pop())                  # pop - takes the last one
 ```
 
-```text
+```text wrap
 deleted Bea
 ```
 
@@ -62,7 +62,7 @@ line.append("Bea")
 print(line.pop(0))                    # dequeue - takes the first one
 ```
 
-```text
+```text wrap
 Nadia
 ```
 
@@ -115,7 +115,7 @@ def is_balanced(text):
     return len(open_brackets) == 0
 ```
 
-```text
+```text wrap
 '(a + (b * c))': True
 '(a + b))': False
 '((a + b)': False

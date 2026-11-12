@@ -44,7 +44,7 @@ the same line.
 
 Commit separately, then merge. This is what actually comes back:
 
-```text
+```text wrap
 Auto-merging signout.py
 CONFLICT (content): Merge conflict in signout.py
 Automatic merge failed; fix conflicts and then commit the result.
@@ -52,7 +52,7 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 And this is what is now sitting in the file:
 
-```text
+```text wrap
 def fee_owing(days_out):
     if days_out <= 14:
         return 0.00
@@ -66,7 +66,7 @@ def fee_owing(days_out):
 Read those markers slowly, because they are not damage and they are not
 an error message. They are a sentence:
 
-```text
+```text nowrap
 <<<<<<< HEAD        everything below this line is what YOU had
 =======             the divider
 >>>>>>> rounding    everything above this line came from that branch

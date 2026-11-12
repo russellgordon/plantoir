@@ -28,7 +28,7 @@ print("Ali" in hours)
 print(hours.get("Ali", 0))
 ```
 
-```text
+```text wrap
 4.5
 False
 0
@@ -75,7 +75,7 @@ for item in signatures:
 print(counts)
 ```
 
-```text
+```text wrap
 {'soup': 3, 'pasta': 1, 'rice': 1}
 ```
 
@@ -93,7 +93,7 @@ print(hours["Ali"])
 ```
 
 > [!example]- What Python says when the key is not there
-> ```text
+> ```text nowrap
 > Traceback (most recent call last):
 >   File "hours.py", line 2, in <module>
 >     print(hours["Ali"])
