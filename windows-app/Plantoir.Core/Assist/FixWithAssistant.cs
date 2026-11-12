@@ -216,7 +216,11 @@ public static class FixWithAssistant
         if (rows.Count == 0) return null;
         var greeting = Compose(rows, courseCode, courseName, sectionNumber, occasion, MostRowsInThePrompt);
         while (fits is not null && !fits(greeting.Text) && greeting.RowsNamed > 1)
-            greeting = Compose(rows, courseCode, courseName, sectionNumber, occasion, greeting.RowsNamed - 1);
+        {
+            var fewer = Compose(rows, courseCode, courseName, sectionNumber, occasion, greeting.RowsNamed - 1);
+            if (fewer.RowsNamed >= greeting.RowsNamed) break;
+            greeting = fewer;
+        }
         return greeting;
     }
 
