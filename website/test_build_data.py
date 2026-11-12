@@ -18,6 +18,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import build  # noqa: E402
+import update_feeds  # noqa: E402
+import windows_feed  # noqa: E402
+
+
+def expected_pin(site_version: str, platform_version: str):
+    """The version a download card is pinned to, or None (#500).
+
+    A platform whose bundle is at (or, mid-cut, above) the site's version line
+    has its asset in the newest release; one below it does not, and its card
+    points at its own version, the last release its installer joined."""
+    if windows_feed.version_key(platform_version) >= windows_feed.version_key(site_version):
+        return None
+    return platform_version
 
 
 def make_support(root: Path, payloads: dict, catalogue: list) -> Path:
@@ -182,34 +195,60 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
+    def test_the_expected_pin_follows_the_platform_version(self):
+        # #500: the rule, without the real files. A platform whose bundle
+        # carries the site's version ships in the newest release, so its card
+        # is unpinned; one that lags is pinned to its own version, which is
+        # the last release its installer joined.
+        self.assertIsNone(expected_pin("1.9.3", "1.9.3"))
+        self.assertEqual(expected_pin("1.9.3", "1.9.0"), "1.9.0")
+        self.assertEqual(expected_pin("1.10.0", "1.9.3"), "1.9.3")
+        # A bundle raised ahead of the site's version line is a cut in
+        # progress for that platform: it is shipping, so it is not pinned.
+        self.assertIsNone(expected_pin("1.9.3", "1.9.4"))
+
     def test_the_cards_are_pinned_exactly_where_the_newest_release_lacks_an_installer(self):
-        # Windows was pinned to 1.1.0 from v1.2.0 until PlantoirSetup.exe
-        # joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3
-        # cut (2026-10-04) until its installer joined v1.4.3 (2026-10-07), and
-        # to 1.4.3 for the mac-first v1.4.4 cut until it joined v1.4.4 (2026-10-08).
-        # The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut
-        # (2026-10-08) until Plantoir-macOS.dmg joined v1.4.5 the same day.
-        # Windows is pinned to 1.4.5 for the mac-only v1.5.0, v1.6.0 and
-        # v1.7.0 cuts (2026-10-09), and v1.7.1 (2026-10-11), until PlantoirSetup.exe joins a release
-        # again. A release that lacks an installer pins that card, and this
-        # test changes with it (the downloads_note in site.json says when).
+        # #500: this test used to compare the Windows pin with a literal
+        # ("1.4.5", then "1.7.1", ... "1.9.0") that had to be edited at every
+        # mac-only cut and every Windows catch-up, and failed in between. The
+        # expectation now comes from the data a cut already moves:
+        #   - each platform's version (<Version> in Plantoir.csproj,
+        #     MARKETING_VERSION in mac-app/project.yml), raised only in the
+        #     cut that attaches that platform's asset (RELEASING.md, "Two
+        #     platforms, one version series");
+        #   - the update feeds, whose items name the release each installer
+        #     was uploaded to — the proof that a pinned card points at a
+        #     release that HAS the asset, rather than at a 404.
+        # The history of which card was pinned when is in site.json's
+        # downloads_note.
         site = build.read_json(build.WEBSITE / "site.json")
-        pins: dict = {}
+        versions = {
+            "Windows": windows_feed.csproj_version(),
+            "macOS": update_feeds.marketing_version(build.REPO / "mac-app" / "project.yml"),
+        }
+        feeds = {
+            "Windows": build.WEBSITE / "updates" / "windows.xml",
+            "macOS": build.WEBSITE / "updates" / "macos.xml",
+        }
+        seen: set = set()
         for entry in site["downloads"]:
-            pins[entry["platform"]] = entry.get("pinned")
-        self.assertIsNone(pins["macOS"])
-        # PlantoirSetup.exe joined v1.7.2 on 2026-10-16; the mac-only v1.8.0
-        # cut (2026-10-17), the mac-only v1.8.1 cut (2026-10-18), the mac-only
-        # v1.8.2 cut (2026-10-19) and the mac-only v1.8.3 cut (2026-10-19) pin
-        # Windows to 1.7.2 until its 1.8 installer joins a release, and that
-        # cut unpins it again.
-        # PlantoirSetup.exe joined v1.8.5 on 2026-10-22 (the Windows catch-up),
-        # which unpinned it again.
-        # Windows was pinned to 1.8.6 for the mac-only v1.8.7 cut (2026-10-23)
-        # until PlantoirSetup.exe joined v1.8.7 later that day, which unpinned it.
-        # Windows is pinned to 1.9.0 for the mac-only v1.9.1 cut (2026-11-01)
-        # until its 1.9.1 installer joins that release, which unpins it again.
-        self.assertEqual(pins["Windows"], "1.9.0")
+            platform = entry["platform"]
+            seen.add(platform)
+            with self.subTest(platform=platform):
+                self.assertIsNotNone(versions[platform])
+                pin = entry.get("pinned")
+                self.assertEqual(pin, expected_pin(site["version"], versions[platform]),
+                                 f"{platform} is at {versions[platform]} and the site at {site['version']}")
+                if pin is None:
+                    continue
+                self.assertLess(windows_feed.version_key(pin), windows_feed.version_key(site["version"]))
+                wanted = f"/releases/download/v{pin}/{entry['asset']}"
+                addresses: list = []
+                for item in update_feeds.items_of(feeds[platform]):
+                    addresses.append(item["url"])
+                self.assertTrue(any(address.endswith(wanted) for address in addresses),
+                                f"no {platform} feed item downloads {wanted}: the pinned card would 404")
+        self.assertEqual(seen, {"Windows", "macOS"})
 
 
 class ShortcutTests(unittest.TestCase):

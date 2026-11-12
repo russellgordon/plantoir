@@ -112,14 +112,6 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
-| 2026-11-12 | Updating Plantoir with a preview open no longer breaks the install: the installer closes the preview, waits up to ten minutes for a build or a deploy to finish, and otherwise leaves the old version exactly as it was and offers the update again. **The 1.9.0 notes' "close any preview… before you install by hand" warning can be dropped ONLY IF the morning's real-installer cases pass** (B, C, C2, D and the hand-run wizard, #700's closing comment); until then keep it | Windows only (the mac's updater replaces the whole app and has no counterpart) | #700 |
-| 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
-| 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
-| 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
-| 2026-11-11 | A new course starts on Cloudflare Pages, listed first and called the usual choice; Netlify’s free-plan note wherever Netlify is chosen and in Schedule a deploy; a course can be created before the Cloudflare Account ID is in Settings, and the first deploy’s refusal offers Open Settings… | Windows (mac since 1.9.1, #668) | #739 (items 1 to 6) |
-| 2026-11-11 | A section's Problems tab on Windows: every problem the last preview or deploy found, one row each with a tick, sortable, the repair in the row; one warning on the section in the sidebar until its own next build is clean; and ONE alert, only when a build found something new, offering Show. **It replaces the dialog that listed every folder problem on every build**, so the notes must say that dialog is gone | Windows (the mac since v1.9.1, #717) | [#734](https://github.com/russellgordon/plantoir/issues/734) |
-| 2026-11-11 | Fix with Claude… and Fix with Codex… under the Problems table: the ticked problems handed to the assistant the teacher already has, with a message naming each problem, its page and what to read first | Windows (the mac since v1.9.1, #717 part two) | [#736](https://github.com/russellgordon/plantoir/issues/736) |
-| 2026-11-11 | **A fix the notes must carry, in a teacher's words and without technical detail:** a problem with how a course's name was passed to Claude and Codex (Revise With ▸ as well as the new buttons) was fixed, so a course named with symbols such as `&` or `%` now reaches the assistant exactly as it was written. Say it plainly; do not describe how it could be misused. When the assistant is installed as a program (the common case) its window now closes by itself when the session ends, where it used to leave a prompt behind, and if the assistant cannot start, Plantoir says so instead of a window flashing away | Windows only (the mac's door was read and does not have the fault) | [#736](https://github.com/russellgordon/plantoir/issues/736) |
 
 
 ## Warnings the release notes MUST carry
@@ -134,7 +126,6 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
-| 2026-11-12 | **Windows 1.9.3, before you update: if a deploy is scheduled to run in the next few minutes, let it finish first.** (Plain words for the notes: "If you have a deploy set to run on its own in the next few minutes, wait until it has run before you update.") | #700: the 1.9.0 → 1.9.3 update runs 1.9.0's scheduled-deploy code, which does not know the new installer's marker, so a scheduled deploy firing during the 3 to 5 minute copy holds Plantoir.exe and the install can fail part way, leaving a broken install (case B, measured 2026-11-12). Updates from 1.9.3 on are protected. Keep the 1.9.0 notes' "close any preview first" line too unless the morning's real-installer cases pass (the row above). |
 
 ## Trim the roadmap
 
