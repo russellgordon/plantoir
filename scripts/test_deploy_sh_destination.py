@@ -266,6 +266,15 @@ class TheSavedDestinationsAreTheContracts(unittest.TestCase):
         self.shell = launcher_harness._a_bash_that_can_run_deploy_sh()
         if self.shell is None:
             self.skipTest("no bash on this machine that can run deploy.sh's definitions")
+        if not shutil.which("plutil"):
+            # The class above's rule: off a Mac the Python reader is the only
+            # one, and a bash that has no Python cannot read the settings.
+            probe = subprocess.run(
+                self.shell + ["-c", "command -v python3 || command -v python"],
+                capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+            )
+            if probe.returncode != 0 or not probe.stdout.strip():
+                self.skipTest("the bash that runs the launcher has no python to read the settings with")
         self.rule = contracts.section("app-rules", "savedDestinations")
 
     def _legs(self, case, path=None) -> list:
