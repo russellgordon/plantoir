@@ -247,17 +247,42 @@ SAY_BUILT_BY_AN_EARLIER_VERSION = (
     "again before it is deployed…"
 )
 
+# What a deploy says when something in the course changed after the build
+# that made the site started (#768), or when that build is dated later than
+# now. deploy.sh says the same, word for word.
+SAY_SOMETHING_CHANGED_SINCE_THE_BUILD = (
+    " Something in this course has changed since its site was last built, "
+    "so the site is being built again before it is deployed…"
+)
+SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW = (
+    " This site's last build is dated later than now, so this computer's clock "
+    "has changed since and the site is being built again before it is deployed…"
+)
+
+# Set by deploy.sh on the docker exec that runs this script, once it has asked
+# the pages question itself on the host (#768). In the container that answer
+# would read the course over the mount with a SECOND clock, the VM's, which can
+# fall behind the Mac's after a sleep, so the backstop is skipped rather than
+# allowed to disagree. Windows' deploy.ps1 never sets it, so there this script
+# is the one that asks.
+PAGES_ALREADY_ASKED_VARIABLE = "PLANTOIR_PAGES_ALREADY_ASKED"
+
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
     If quartz.config.ts in internal build dir has a baseUrl that does not match target_domain,
     rebuild for production using build_site.py so OpenGraph and Twitter meta tags reflect
     the deployed site domain. Otherwise rebuild if an earlier version of Plantoir built
-    the site (#746, its `.built-with-toolchain` stamp) - at most one rebuild either way.
+    the site (#746, its `.built-with-toolchain` stamp), or if anything in the course
+    changed since the build that made it started (#768) - at most one rebuild either way.
     """
     clean_target = clean_base_url(target_domain)
 
-    internal_dir = Path(f"/tmp/quartz-builds/{course_code}/section{section}")
+    # The build's own folder, where build_site.py writes it: WORK_DIR, which is
+    # /tmp/quartz-builds in the container and builds\<id>\work on Windows
+    # (#768). A literal /tmp path never matched on Windows, so every Netlify
+    # and Cloudflare deploy there rebuilt.
+    internal_dir = toolchain_paths.WORK_DIR / course_code / f"section{section}"
     config_paths = [p / "quartz.config.ts" for p in [section_dir, internal_dir] if (p / "quartz.config.ts").is_file()]
 
     needs_rebuild = False
@@ -282,7 +307,9 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
     if needs_rebuild:
         print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
         rebuild_for_production(course_code, section, host_os)
-    elif not toolchain_paths.site_was_built_by_this_toolchain(section_dir):
+        return
+    reason = why_this_deploy_builds_first(course_code, section_dir)
+    if reason == toolchain_paths.REASON_TOOLCHAIN:
         # #746: the pages had not changed, so nothing else asked for a build,
         # and the site was the one an older Plantoir built - 1.9.1's
         # stylesheet never reached a site redeployed under it. Here, at the
@@ -290,6 +317,33 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
         # builds at most once.
         print(SAY_BUILT_BY_AN_EARLIER_VERSION)
         rebuild_for_production(course_code, section, host_os)
+    elif reason == toolchain_paths.REASON_CLOCK:
+        print(SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW)
+        rebuild_for_production(course_code, section, host_os)
+    elif reason == toolchain_paths.REASON_PAGES:
+        # #768: a page, a picture, a setting, a deleted or renamed page.
+        # Without this a deploy typed at a command line sent the last build.
+        print(SAY_SOMETHING_CHANGED_SINCE_THE_BUILD)
+        rebuild_for_production(course_code, section, host_os)
+
+
+def why_this_deploy_builds_first(course_code: str, section_dir: Path):
+    """toolchain_paths.why_build_before_deploying for this course, with the
+    pages half left out when deploy.sh has already asked it on the host."""
+    if os.environ.get(PAGES_ALREADY_ASKED_VARIABLE, "").strip() == "1":
+        if toolchain_paths.site_was_built_by_this_toolchain(section_dir):
+            return None
+        return toolchain_paths.REASON_TOOLCHAIN
+    course_dir = toolchain_paths.COURSES_DIR / course_code
+    reason = toolchain_paths.why_build_before_deploying(course_dir, section_dir)
+    if reason == toolchain_paths.REASON_NEVER_BUILT:
+        # main() refuses a section with no built site, so this is one whose
+        # files have no front page. It is deployed as it stands, as before
+        # #768 and as deploy.sh does, unless an earlier version built it.
+        if toolchain_paths.site_was_built_by_this_toolchain(section_dir):
+            return None
+        return toolchain_paths.REASON_TOOLCHAIN
+    return reason
 
 # ---------- Teacher profile (unchanged) ----------
 COURSES_ROOT = toolchain_paths.COURSES_DIR

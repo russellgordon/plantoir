@@ -1328,10 +1328,84 @@ site_was_built_by_this_toolchain() {
 }
 # END site_was_built_by_this_toolchain
 
-# Not for --reset-token, which deploys nothing and exits further down.
-if [[ "$RESET_TOKEN" != "true" ]] && ! site_was_built_by_this_toolchain "${SECTION_DIR_HOST}" "$IMAGE"; then
-  echo "🔁 Plantoir has been updated since this site was built, so it is"
-  echo "   building it again before it is deployed…"
+# -------------------- Has anything changed since it was built? (#768) --
+# A deploy reuses the last build only when nothing has changed since it was
+# built, and builds again otherwise, however it was started: Deploy pressed
+# in the app, a deploy set for later, or this script typed at a command line
+# (Russell, 2026-11-12). Until #768 only the apps asked about the PAGES, so
+# `./deploy.sh ICS3U 1` after an edit sent the last build and said it had
+# succeeded, and after a page was DELETED the page stayed on the site (#741).
+# The rule and its cases: contracts/app-rules.json ->
+# buildFreshness.reuseTheLastBuild, which toolchain_paths.py explains part by
+# part. scripts/test_build_freshness_reuse.py cuts this definition out and
+# runs every case against it.
+#
+# Prints `clock` or `pages` when the course asks for a build, and nothing
+# (exit 1) when it does not, or when the site has no front page (refused
+# above, or a site deployed as it stands, as before #768):
+#   * the reference is the start of the build that made the site
+#     (.build-started), or its front page when that is earlier or there is
+#     no marker — compared with `find -newer`, not `[ -nt ]`, because the
+#     mac's /bin/bash 3.2 compares whole seconds and find the nanoseconds;
+#   * a reference later than now is `clock`;
+#   * the course folder itself, and every entry under it whose name does not
+#     start with "." (a hidden folder is skipped whole, by its NAME, so a
+#     working folder under a hidden folder is still read), modified (-newer)
+#     or changed (-cnewer, which no copy can set back) after the reference,
+#     is `pages`. Folders count: a deletion or a rename shows only there.
+# BEGIN pages_or_clock_ask_for_a_build
+pages_or_clock_ask_for_a_build() {
+  local course="$1" section="$2" front since now changed
+  front="$section/public/index.html"
+  [[ -f "$front" ]] || return 1
+  since="$front"
+  if [[ -f "$section/.build-started" ]] && [[ -z "$(find "$section/.build-started" -newer "$front" 2>/dev/null)" ]]; then
+    since="$section/.build-started"
+  fi
+  now="$(mktemp "${TMPDIR:-/tmp}/plantoir-now.XXXXXX" 2>/dev/null)" || now=""
+  if [[ -n "$now" ]]; then
+    changed="$(find "$since" -newer "$now" 2>/dev/null)"
+    rm -f -- "$now"
+    if [[ -n "$changed" ]]; then
+      echo clock
+      return 0
+    fi
+  fi
+  changed="$(find "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  if [[ -z "$changed" ]]; then
+    changed="$(find "$course" -mindepth 1 -name '.*' -prune -o \( -newer "$since" -o -cnewer "$since" \) -print -quit 2>/dev/null)"
+  fi
+  [[ -n "$changed" ]] || return 1
+  echo pages
+}
+# END pages_or_clock_ask_for_a_build
+
+# Toolchain first: its rebuild covers a page change as well, so one build at
+# most, and its words are the more surprising. Not for --reset-token, which
+# deploys nothing and exits further down.
+_REBUILD_FOR=""
+if [[ "$RESET_TOKEN" != "true" ]]; then
+  if ! site_was_built_by_this_toolchain "${SECTION_DIR_HOST}" "$IMAGE"; then
+    _REBUILD_FOR="toolchain"
+  else
+    _REBUILD_FOR="$(pages_or_clock_ask_for_a_build "${COURSE_DIR_HOST}" "${SECTION_DIR_HOST}")" || _REBUILD_FOR=""
+  fi
+fi
+if [[ -n "$_REBUILD_FOR" ]]; then
+  # The words differ by reason; none of the new ones holds an anchor
+  # windows-app's LauncherRulesContractTests reads (its toolchain pair is
+  # matched once, so it is written once, here).
+  case "$_REBUILD_FOR" in
+    toolchain)
+      echo "🔁 Plantoir has been updated since this site was built, so it is"
+      echo "   building it again before it is deployed…" ;;
+    clock)
+      echo "🔁 This site's last build is dated later than now, so this computer's clock"
+      echo "   has changed since and the site is being built again before it is deployed…" ;;
+    *)
+      echo "🔁 Something in this course has changed since its site was last built,"
+      echo "   so the site is being built again before it is deployed…" ;;
+  esac
   _TOOLCHAIN_EXTRA=()
   if [[ "$NON_INTERACTIVE" == "true" ]]; then _TOOLCHAIN_EXTRA+=(--non-interactive); fi
   # The same image this run compares with, or the build would stamp another.
@@ -1347,6 +1421,18 @@ if [[ "$RESET_TOKEN" != "true" ]] && ! site_was_built_by_this_toolchain "${SECTI
     echo "❌ Could not rebuild this site before deploying it."
     exit 1
   fi
+  # Written here, after the build succeeded, so a deploy typed in Terminal
+  # is on the trail too: "why was this morning's deploy slow?" (#748 part 2).
+  # contracts/shared-rules.json -> activityTrail.mustRecord."site built again
+  # before deploying", one line per reason.
+  case "$_REBUILD_FOR" in
+    toolchain)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — Plantoir had been updated since it was last built" ;;
+    clock)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — its last build was dated later than now, so the computer's clock had changed" ;;
+    *)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — something in the course had changed since it was last built" ;;
+  esac
 fi
 
 # -------------------- Is this site a preview's? ------------------------
@@ -1558,6 +1644,8 @@ if [[ -n "$TO_FOLDER" ]]; then
       echo "❌ The rebuilt site has not appeared. Nothing was deployed."
       exit 1
     fi
+    # The same event as the rebuild above, in this reason's words (#768).
+    note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — the last build was made by a preview"
   fi
 
   echo "📦 Deploying ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
@@ -4357,6 +4445,7 @@ docker exec $_EXEC_TTY \
   -e TEAM_SLUG="${TEAM_SLUG}" \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
+  -e PLANTOIR_PAGES_ALREADY_ASKED=1 \
   "$CONTAINER_NAME" \
   sh -lc '
     tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;

@@ -576,3 +576,140 @@ def note_the_toolchain_that_built(section_dir: Path, toolchain_id: str) -> None:
                 leftover.unlink()
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Has anything in the course changed since its site was built? (#768, #741)
+#
+# A deploy reuses the last build of a section only when nothing has changed
+# since it was built, and builds again otherwise, however it was started:
+# Deploy pressed in the app, a deploy set for later, or deploy.sh / deploy.bat
+# typed at a command line (Russell, 2026-11-12). The rule and its cases are
+# contracts/app-rules.json -> buildFreshness.reuseTheLastBuild, and four
+# readers answer it: this function (deploy.py, and Windows' deploy.ps1),
+# deploy.sh's pages_or_clock_ask_for_a_build, each app's BuildFreshness, and
+# the scheduled deploy's shell. They must agree, so each runs the same cases.
+#
+# What counts, and why each part is there:
+#   * FOLDERS as well as files, and the course folder itself. A folder's time
+#     changes when something inside it is created, removed or renamed, and
+#     nothing else shows a DELETED page (#741: a page removed in Obsidian
+#     stayed on the site after a command-line deploy) or a renamed one.
+#   * Hidden entries (a name starting with ".") are left out with everything
+#     under them: the built site's link, .obsidian's settings, .trash, the
+#     publish records. Judged by the NAME of each entry below the course, never
+#     by the whole path, so a working folder kept under a hidden folder of its
+#     own is still read.
+#   * The later of each entry's modification time and its change time.
+#     A file copied in with its old time kept (a restore from a backup, a sync
+#     service that keeps the other computer's time, `cp -p`) is caught only by
+#     the change time, which no copy can set. On Windows Python's st_ctime is
+#     the CREATION time, and the creation time is used deliberately rather
+#     than Windows' own change time: a build there hard-links the course's
+#     Media into its build folder, and making a hard link changes a file's
+#     change time, so every deploy would build again.
+#   * "Changed" means strictly LATER than the reference, the start of the
+#     build that made the site (.build-started, #265), or the site's front
+#     page when that is earlier or there is no marker.
+#   * A reference later than NOW means build. A clock that was ahead when the
+#     site was built (set by hand, or corrected later) would otherwise hide
+#     every change made since.
+# Every part errs toward building: a needless build costs a minute, a reused
+# stale one publishes last week's site and reports success.
+# ---------------------------------------------------------------------------
+BUILD_STARTED_MARKER_NAME = ".build-started"
+
+# The reasons, as the contract and the trail name them.
+REASON_NEVER_BUILT = "neverBuilt"
+REASON_TOOLCHAIN = "toolchain"
+REASON_CLOCK = "clock"
+REASON_PAGES = "pages"
+
+
+def _the_later_change_ns(status) -> int:
+    """The later of an entry's modification time and its change time (on
+    Windows, its creation time), in nanoseconds."""
+    modified = status.st_mtime_ns
+    if os.name == "nt":
+        changed = getattr(status, "st_birthtime_ns", None)
+        if changed is None:
+            changed = status.st_ctime_ns
+    else:
+        changed = status.st_ctime_ns
+    if changed > modified:
+        return changed
+    return modified
+
+
+def reference_time_ns(section_dir: Path):
+    """The time a course is compared with: the earlier of the build's start
+    and the site's front page, the front page alone with no marker, or None
+    when the site has no front page."""
+    try:
+        front_page = os.stat(Path(section_dir) / "public" / "index.html").st_mtime_ns
+    except OSError:
+        return None
+    try:
+        started = os.stat(Path(section_dir) / BUILD_STARTED_MARKER_NAME).st_mtime_ns
+    except OSError:
+        return front_page
+    if started < front_page:
+        return started
+    return front_page
+
+
+def something_in_the_course_is_newer(course_dir: Path, reference_ns: int) -> bool:
+    """True when the course folder itself, or any entry under it that is not
+    hidden, changed strictly after reference_ns. Stops at the first one."""
+    course_dir = Path(course_dir)
+    try:
+        if _the_later_change_ns(os.stat(course_dir)) > reference_ns:
+            return True
+    except OSError:
+        return False
+    for folder, folder_names, file_names in os.walk(course_dir):
+        kept_folders = []
+        for name in folder_names:
+            if not name.startswith("."):
+                kept_folders.append(name)
+        # In place, so os.walk does not go into a hidden folder.
+        folder_names[:] = kept_folders
+        for name in kept_folders + file_names:
+            if name.startswith("."):
+                continue
+            try:
+                status = os.stat(os.path.join(folder, name), follow_symlinks=False)
+            except OSError:
+                continue
+            if _the_later_change_ns(status) > reference_ns:
+                return True
+    return False
+
+
+def why_the_pages_ask_for_a_build(course_dir: Path, section_dir: Path, now_ns=None):
+    """neverBuilt, clock, pages, or None when nothing in the course changed
+    since the build that made the site started."""
+    reference = reference_time_ns(section_dir)
+    if reference is None:
+        return REASON_NEVER_BUILT
+    if now_ns is None:
+        import time
+        now_ns = time.time_ns()
+    if reference > now_ns:
+        return REASON_CLOCK
+    if something_in_the_course_is_newer(course_dir, reference):
+        return REASON_PAGES
+    return None
+
+
+def why_build_before_deploying(course_dir: Path, section_dir: Path, toolchain_id=None, now_ns=None):
+    """Why a deploy must build the section's site first, or None to reuse it.
+
+    The toolchain is asked first: its rebuild covers a page change too, and
+    it is the more surprising of the two, so its words are the ones said."""
+    reason = why_the_pages_ask_for_a_build(course_dir, section_dir, now_ns=now_ns)
+    if reason == REASON_NEVER_BUILT:
+        return reason
+    if not site_was_built_by_this_toolchain(section_dir, toolchain_id):
+        return REASON_TOOLCHAIN
+    return reason
