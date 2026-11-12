@@ -997,10 +997,12 @@ enum ScheduledDeploy {
         // does not start with "." — folders as well as files, modified or
         // changed — exactly `BuildFreshness.newestChangeDate` (#768, #741):
         // only a folder's time shows a deleted or renamed page, and only the
-        // change time shows a file copied in with its old time kept.
-        lines.append("    elif [ -n \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
+        // change time shows a file copied in with its old time kept. `-H`
+        // reads a course folder that is itself a link through it, as the
+        // build does; without it find stops at the link (the #768 review's M3).
+        lines.append("    elif [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -maxdepth 0"
             + " \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print 2>/dev/null)\" ]"
-            + " || [ -n \"$(/usr/bin/find \(shellQuoted(courseDirectoryPath)) -mindepth 1 -name '.*' -prune"
+            + " || [ -n \"$(/usr/bin/find -H \(shellQuoted(courseDirectoryPath)) -mindepth 1 -name '.*' -prune"
             + " -o \\( -newer \"$FRESH_SINCE\" -o -cnewer \"$FRESH_SINCE\" \\) -print -quit 2>/dev/null)\" ]; then")
         lines.append("      BUILD_WHY=\(BuildFreshness.RebuildReason.pages.rawValue)")
         lines.append("    else")

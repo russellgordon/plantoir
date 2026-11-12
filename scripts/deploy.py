@@ -317,6 +317,10 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
         # builds at most once.
         print(SAY_BUILT_BY_AN_EARLIER_VERSION)
         rebuild_for_production(course_code, section, host_os)
+    elif reason == toolchain_paths.REASON_PREVIEW:
+        # main() has rebuilt a preview's site already; this is the backstop.
+        print(" Preview build detected (live-reload client) — rebuilding for production…")
+        rebuild_for_production(course_code, section, host_os)
     elif reason == toolchain_paths.REASON_CLOCK:
         print(SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW)
         rebuild_for_production(course_code, section, host_os)

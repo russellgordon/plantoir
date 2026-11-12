@@ -621,6 +621,7 @@ BUILD_STARTED_MARKER_NAME = ".build-started"
 
 # The reasons, as the contract and the trail name them.
 REASON_NEVER_BUILT = "neverBuilt"
+REASON_PREVIEW = "preview"
 REASON_TOOLCHAIN = "toolchain"
 REASON_CLOCK = "clock"
 REASON_PAGES = "pages"
@@ -702,14 +703,44 @@ def why_the_pages_ask_for_a_build(course_dir: Path, section_dir: Path, now_ns=No
     return None
 
 
+def site_carries_preview_client(public_dir: Path) -> bool:
+    """True when any page under public/ carries a preview's live-reload
+    client: contracts/app-rules.json -> buildFreshness.previewBuild, the
+    pattern deploy.py and deploy.sh read too. Pages are read as bytes, whole;
+    a page that cannot be read is passed over, as the launchers pass it over."""
+    import re
+    import contracts  # here, not at the top: contracts imports this module
+    signature = contracts.section("app-rules", "buildFreshness", "previewBuild", "signature")
+    between = b""
+    for character in signature["between"]:
+        between += re.escape(character.encode("utf-8"))
+    pattern = re.compile(
+        re.escape(signature["scriptTag"].encode("utf-8"))
+        + b"[" + between + b"]*"
+        + re.escape(signature["client"].encode("utf-8"))
+    )
+    for page in Path(public_dir).rglob("*.html"):
+        try:
+            if pattern.search(page.read_bytes()):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def why_build_before_deploying(course_dir: Path, section_dir: Path, toolchain_id=None, now_ns=None):
     """Why a deploy must build the section's site first, or None to reuse it.
 
-    The toolchain is asked first: its rebuild covers a page change too, and
-    it is the more surprising of the two, so its words are the ones said."""
+    A preview's site first: it is not a site to deploy, and a preview never
+    stamps its site, so a section only ever previewed would otherwise be said
+    to be an earlier version's (the #768 review's M1). Then the toolchain: its
+    rebuild covers a page change too, and it is the more surprising of the
+    two, so its words are the ones said. Then the pages and the clock."""
     reason = why_the_pages_ask_for_a_build(course_dir, section_dir, now_ns=now_ns)
     if reason == REASON_NEVER_BUILT:
         return reason
+    if site_carries_preview_client(Path(section_dir) / "public"):
+        return REASON_PREVIEW
     if not site_was_built_by_this_toolchain(section_dir, toolchain_id):
         return REASON_TOOLCHAIN
     return reason

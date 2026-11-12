@@ -74,8 +74,28 @@ final class ReuseTheLastBuildTests: XCTestCase {
         return try XCTUnwrap(expectation["because"] as? String)
     }
 
+    /// APFS keeps times to the nanosecond, so 20 ms gives every step its
+    /// own time here (Windows' runner widens it: freshness_cases.py).
     private func pause() {
         Thread.sleep(forTimeInterval: 0.02)
+    }
+
+    /// A front page as a preview writes it, from the contract's own sample.
+    static func previewPage() throws -> String {
+        let contracts: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts", isDirectory: true)
+        let appRules: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(
+                with: try Data(contentsOf: contracts.appendingPathComponent("app-rules.json"))
+            ) as? [String: Any]
+        )
+        let freshness: [String: Any] = try XCTUnwrap(appRules["buildFreshness"] as? [String: Any])
+        let preview: [String: Any] = try XCTUnwrap(freshness["previewBuild"] as? [String: Any])
+        let signature: [String: Any] = try XCTUnwrap(preview["signature"] as? [String: Any])
+        let client: String = try XCTUnwrap(signature["asQuartzWritesIt"] as? String)
+        return "<html><body>" + client + "</body></html>\n"
     }
 
     private func write(_ text: String, to url: URL) throws {
@@ -152,7 +172,17 @@ final class ReuseTheLastBuildTests: XCTestCase {
         }
         let courseURL: URL = workingFolder.appendingPathComponent("courses/C", isDirectory: true)
         let fileManager: FileManager = FileManager.default
-        try fileManager.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        if testCase["courseFolderIsALink"] as? Bool == true {
+            // The course kept somewhere else, and linked into courses/.
+            let keptURL: URL = caseURL.appendingPathComponent("kept-elsewhere/C", isDirectory: true)
+            try fileManager.createDirectory(at: keptURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: courseURL.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try fileManager.createSymbolicLink(at: courseURL, withDestinationURL: keptURL)
+        } else {
+            try fileManager.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        }
         let buildsURL: URL = caseURL.appendingPathComponent("builds/C", isDirectory: true)
         try fileManager.createDirectory(at: buildsURL, withIntermediateDirectories: true)
         try fileManager.createSymbolicLink(
@@ -179,7 +209,10 @@ final class ReuseTheLastBuildTests: XCTestCase {
         let frontPage: URL = sectionURL.appendingPathComponent("public/index.html")
         let marker: URL = sectionURL.appendingPathComponent(BuildFreshness.buildStartedMarkerName)
         let order: String = testCase["startedMarker"] as? String ?? "beforeTheSite"
-        let page: String = "<html><body>Welcome</body></html>\n"
+        var page: String = "<html><body>Welcome</body></html>\n"
+        if testCase["previewClient"] as? Bool == true {
+            page = try ReuseTheLastBuildTests.previewPage()
+        }
         let started: String = "This build started when this file was made.\n"
         if order == "beforeTheSite" {
             let atTheStart: [[String: Any]] = changes(of: testCase, when: "atTheBuildStart")
@@ -238,6 +271,30 @@ final class ReuseTheLastBuildTests: XCTestCase {
             let reason: BuildFreshness.RebuildReason? = BuildFreshness.whyRebuild(course: built.course, sectionNumber: 1)
             XCTAssertEqual(reason?.rawValue, try ReuseTheLastBuildTests.expectedInTheApps(testCase), name)
         }
+    }
+
+    /// Hidden is judged by the NAME (#768 review, L1): a page carrying the
+    /// Finder hidden flag, as a Windows file's hidden attribute arrives on a
+    /// shared drive, is still a page the launchers read, so a change to it
+    /// builds. `.skipsHiddenFiles` skipped it.
+    func testAPageWithTheFinderHiddenFlagIsStillRead() throws {
+        let rule: [String: Any] = try ReuseTheLastBuildTests.rule()
+        let theCourse: [String] = try XCTUnwrap(rule["theCourse"] as? [String])
+        let built: (workingFolder: URL, course: Course) = try build(["name": "hidden flag", "expect": "reuse"], theCourse: theCourse)
+        let page: URL = built.course.directoryURL.appendingPathComponent("notes/day-1.md")
+        XCTAssertEqual(chflags(page.path, UInt32(UF_HIDDEN)), 0)
+        let section: URL = built.course.directoryURL.appendingPathComponent(".merged_output/section1")
+        pause()
+        try setModificationDate(Date(), of: section.appendingPathComponent(BuildFreshness.buildStartedMarkerName))
+        pause()
+        try setModificationDate(Date(), of: section.appendingPathComponent("public/index.html"))
+        XCTAssertNil(BuildFreshness.whyRebuild(course: built.course, sectionNumber: 1), "nothing changed yet")
+        pause()
+        let handle: FileHandle = try FileHandle(forWritingTo: page)
+        handle.seekToEndOfFile()
+        handle.write(Data("\nedited\n".utf8))
+        try handle.close()
+        XCTAssertEqual(BuildFreshness.whyRebuild(course: built.course, sectionNumber: 1), .pages)
     }
 
     /// Every reason the contract names that the app can give is a reason the

@@ -2195,7 +2195,7 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
 since it was built, and builds again otherwise, however it was started.**
 Russell's ruling, 2026-11-12, on #768: Deploy pressed in the app, a deploy
 set for later, and `deploy.sh`, `deploy.ps1` or `deploy.bat` typed at a
-command line, on either platform. The rule and its 26 cases are
+command line, on either platform. The rule and its 28 cases are
 `contracts/app-rules.json` → `buildFreshness.reuseTheLastBuild`; this
 section is the reasoning.
 
@@ -2253,7 +2253,14 @@ build costs a minute, a reused stale one publishes last week's site.
    the review). Both shell readers now use `-mindepth 1 -name '.*' -prune`.
 5. **A reference later than now means build** (the clock guard). A clock
    that was ahead when the site was built, set by hand or corrected later,
-   would otherwise hide every change made since.
+   would otherwise hide a change made since. **It holds only while the build
+   is still dated later than now** (the implementation review's M2, measured:
+   a build dated 2 s ahead, then an edit; asked at once every reader said
+   `clock`, asked 2.5 s later every reader reused). A page edited while the
+   clock is behind the build's date carries that wrong clock's times, so once
+   real time passes the build's date no time-based reader can see it. A
+   deploy, or Deploy pressed, while the build is still dated ahead rebuilds
+   and closes the window. Recorded in `knownLimits` as a decision.
 6. **Changed means strictly later.** A save at the very instant the build
    started reads as built, as before.
 
@@ -2268,12 +2275,32 @@ marker-against-page test moved to `find` too.
 | Reader | Where | Reads the stamp |
 |---|---|---|
 | `toolchain_paths.why_build_before_deploying` | deploy.py (both platforms), deploy.ps1 (owed) | yes |
-| `pages_or_clock_ask_for_a_build` with `site_was_built_by_this_toolchain` | deploy.sh, every destination | yes |
+| `why_this_deploy_builds_first` (`site_carries_preview_client`, `site_was_built_by_this_toolchain`, `pages_or_clock_ask_for_a_build`) | deploy.sh, every destination | yes |
 | `BuildFreshness.whyRebuild` | the Deploy button, the windowless assistant and MCP deploys | no |
 | `ScheduledDeploy.oneShotCommand`'s shell | a deploy set for later | no |
 
-The toolchain is asked first: its rebuild covers a changed page as well, so
-there is one build at most, and its words are the more surprising.
+Every reader asks about a preview's site first: it is not a site to deploy
+whatever else is true, and a preview never stamps its site or leaves a start
+marker, so until the implementation review (M1) a section only ever
+previewed and then typed into `deploy.sh` was said, on the console and on
+the trail, to have been built by an earlier version. Then the toolchain: its
+rebuild covers a changed page as well, so there is one build at most, and
+its words are the more surprising.
+
+**A course folder that is itself a link is read through it** (the review's
+M3): the build follows it, so every reader must. BSD `find` given a link
+stops at it, and `FileManager`'s enumerator does not descend into one, so
+deploy.sh, the scheduled shell and the app all reused after an edit behind
+it while deploy.py built. Both shell readers use `find -H`, and the app
+walks `resolvingSymlinksInPath()` of the course folder. **A link INSIDE the
+course is still not followed by any reader** (`knownLimits`): a section
+folder kept elsewhere and linked in reads as built after a change behind
+it, while the build follows it. `Media` is not such a link: it is a real
+folder of the course, and the link `content/Media` exists only in the
+build's own folder, so a changed picture is seen where it is. The app's walk
+judges hidden by the name, as the others do; `.skipsHiddenFiles` also skipped
+an entry carrying the Finder hidden flag, which a Windows file's hidden
+attribute becomes on a shared drive (L1).
 `deploy.sh` asks **before** `link_course_build_output` moves a built site
 out of a course that still holds one, because the move puts a link in the
 course folder and changes its time while nothing students see has changed;
@@ -2356,10 +2383,11 @@ from the image on every build.
 
 ### Known extra builds, each once
 
-- The first time a hidden folder or file is made at the top of a course
-  (`.publish_state`, `.netlify_sites`, `.cloudflare_sites`, `.DS_Store`),
-  and the first deploy after a built site is moved out of a course that
-  still held one: the course folder's own time changes.
+- A hidden file or folder created, removed or replaced in ANY folder of the
+  course (`.publish_state`, `.netlify_sites` or `.cloudflare_sites` at the
+  top the first time, a `.DS_Store` Finder writes in `notes/`, an editor's
+  swap file), and the first deploy after a built site is moved out of a
+  course that still held one: that folder's own time changes.
 - A Finder tag, a quarantine flag, a sync service's own marks, or macOS
   noting when a file was last opened: each changes a change time.
 - Preflight's rewrite of `course_config.json` when it discovers a new item

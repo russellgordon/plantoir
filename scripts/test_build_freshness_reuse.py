@@ -56,6 +56,7 @@ import toolchain_paths  # noqa: E402
 THIS_TOOLCHAIN = "teaching-quartz:src-1a2b3c4d"
 ANOTHER_TOOLCHAIN = "teaching-quartz:src-9fd16022"
 CONTRACT = freshness_cases.the_contract(REPOSITORY_ROOT)
+PREVIEW_PAGE = freshness_cases.preview_page_of(REPOSITORY_ROOT)
 ON_WINDOWS = sys.platform == "win32"
 
 
@@ -172,7 +173,7 @@ class TheSharedAnswerIsTheContracts(unittest.TestCase):
                     self.skipTest("knownLimitOn windows: " + case["name"])
                 with tempfile.TemporaryDirectory() as tmp:
                     course, section = freshness_cases.build(
-                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN)
+                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN, PREVIEW_PAGE)
                     reason = toolchain_paths.why_build_before_deploying(
                         course, section, toolchain_id=THIS_TOOLCHAIN)
                 expect, because = freshness_cases.expected(case, reads_the_stamp=True)
@@ -182,14 +183,17 @@ class TheSharedAnswerIsTheContracts(unittest.TestCase):
                     self.assertEqual(reason, because)
 
     def test_the_pages_alone_against_the_cases_the_apps_read(self):
-        """The half the apps also answer, with the stamp left unread."""
+        """The half the apps also answer, with the stamp left unread. A
+        preview's site is asked separately (site_carries_preview_client)."""
         for case in CONTRACT["cases"]:
             with self.subTest(case=case["name"]):
                 if _skipped_here(case):
                     self.skipTest("knownLimitOn windows: " + case["name"])
+                if freshness_cases.expected(case, reads_the_stamp=False)[1] == "preview":
+                    continue
                 with tempfile.TemporaryDirectory() as tmp:
                     course, section = freshness_cases.build(
-                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN)
+                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN, PREVIEW_PAGE)
                     reason = toolchain_paths.why_the_pages_ask_for_a_build(course, section)
                 expect, because = freshness_cases.expected(case, reads_the_stamp=False)
                 if expect == "reuse":
@@ -208,18 +212,21 @@ class DeploySHAsksTheSameQuestion(unittest.TestCase):
     BASH = "/bin/bash" if os.path.exists("/bin/bash") else "bash"
 
     def _ask(self, course: Path, section: Path, pages_only: bool) -> str:
+        launcher = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        pattern = re.search(r"^LIVE_RELOAD_CLIENT_PATTERN=.*$", launcher, re.MULTILINE).group(0)
+        carries = re.search(r"^site_carries_preview_client\(\) \{\n.*?^\}\n", launcher,
+                            re.MULTILINE | re.DOTALL).group(0)
         script = (
             "set -euo pipefail\n"
+            + pattern + "\n" + carries
             + _cut_out("site_was_built_by_this_toolchain")
             + _cut_out("pages_or_clock_ask_for_a_build")
+            + _cut_out("why_this_deploy_builds_first")
         )
         if pages_only:
             script += 'pages_or_clock_ask_for_a_build "$1" "$2" || echo none\n'
         else:
-            script += (
-                'if ! site_was_built_by_this_toolchain "$2" "$3"; then echo toolchain; exit 0; fi\n'
-                'pages_or_clock_ask_for_a_build "$1" "$2" || echo none\n'
-            )
+            script += 'why_this_deploy_builds_first "$1" "$2" "$3" || echo none\n'
         result = subprocess.run(
             [self.BASH, "-c", script, "_", str(course), str(section), THIS_TOOLCHAIN],
             capture_output=True, timeout=60,
@@ -233,7 +240,7 @@ class DeploySHAsksTheSameQuestion(unittest.TestCase):
             with self.subTest(case=case["name"]):
                 with tempfile.TemporaryDirectory() as tmp:
                     course, section = freshness_cases.build(
-                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN)
+                        Path(tmp), case, CONTRACT["theCourse"], THIS_TOOLCHAIN, ANOTHER_TOOLCHAIN, PREVIEW_PAGE)
                     if case.get("typedByHand") == "refused":
                         # Refused before the question is asked; the question
                         # itself says nothing about a site with no front page.
@@ -405,11 +412,18 @@ class AHandTypedDeployBuildsOnlyWhenSomethingChanged(unittest.TestCase):
         self.assertNotIn(self._trail_line("pages"), trail)
 
     def test_a_previews_site_says_so_on_the_trail(self):
-        self._built(page=PREVIEW_CLIENT_PAGE)
+        """What a real preview leaves: its front page with the client, and no
+        toolchain stamp and no start marker, since a preview writes neither
+        (the #768 review's M1: this said an earlier version had built it)."""
+        (self.section / "public" / "index.html").write_text(PREVIEW_CLIENT_PAGE, encoding="utf-8")
+        time.sleep(0.02)
         code, output, asked, page, trail = self._deploy()
         self.assertEqual(code, 0, output)
         self.assertEqual(asked.count("--build-only"), 1, output)
+        self.assertIn("This site was built by a preview", output)
+        self.assertNotIn("Plantoir has been updated", output)
         self.assertEqual(trail.count(self._trail_line("preview")), 1, trail)
+        self.assertNotIn(self._trail_line("toolchain"), trail)
 
     def test_a_failed_build_writes_no_line(self):
         self._built()

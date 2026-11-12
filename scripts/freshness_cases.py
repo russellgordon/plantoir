@@ -17,9 +17,13 @@ import shutil
 import time
 from pathlib import Path
 
-# Long enough that each step has its own time on APFS and NTFS, whose times
-# are kept to the nanosecond and to 100 ns.
-PAUSE_SECONDS = 0.02
+# Long enough that each step has its own time. APFS keeps times to the
+# nanosecond and the mac's clock moves that finely, so 20 ms is ample there.
+# NTFS keeps times to 100 ns, but Windows stamps a file from a system time
+# that moves in ticks of up to 15.6 ms, so two steps 20 ms apart can sit one
+# tick apart with little to spare; 50 ms there is three ticks (the #768
+# review's L4).
+PAUSE_SECONDS = 0.05 if os.name == "nt" else 0.02
 
 COURSE_CODE = "C"
 
@@ -82,13 +86,23 @@ def _changes(case: dict, when: str):
     return found
 
 
-def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another_stamp: str):
-    """Makes the case under root. Returns (course folder, section folder)."""
+def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another_stamp: str,
+          preview_page: str = ""):
+    """Makes the case under root. Returns (course folder, section folder).
+    `preview_page` is the front page a case with `previewClient` gets: the
+    contract's previewBuild.signature.asQuartzWritesIt (`preview_page_of`)."""
     working_folder = root / "work"
     if case.get("workingFolderUnderAHiddenFolder"):
         working_folder = root / ".kept-out-of-sight" / "work"
     course = working_folder / "courses" / COURSE_CODE
-    course.mkdir(parents=True)
+    if case.get("courseFolderIsALink"):
+        # The course kept somewhere else, and linked into courses/.
+        kept = root / "kept-elsewhere" / COURSE_CODE
+        kept.mkdir(parents=True)
+        course.parent.mkdir(parents=True)
+        os.symlink(kept, course, target_is_directory=True)
+    else:
+        course.mkdir(parents=True)
     # The built sites live outside the course, behind a hidden link, as the
     # launchers keep them (contracts/shared-rules.json -> buildOutputLocation).
     builds = root / "builds" / COURSE_CODE
@@ -119,6 +133,11 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
     front_page = public / "index.html"
     marker = section / ".build-started"
     order = case.get("startedMarker", "beforeTheSite")
+    page = "<html><body>Welcome</body></html>\n"
+    if case.get("previewClient"):
+        if not preview_page:
+            raise ValueError("a previewClient case needs the preview's page")
+        page = preview_page
 
     if order == "beforeTheSite":
         at_the_start = _changes(case, "atTheBuildStart")
@@ -132,9 +151,9 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
         for change in _changes(case, "whileItBuilt"):
             _apply(course, change)
         _pause()
-        _write(front_page, "<html><body>Welcome</body></html>\n")
+        _write(front_page, page)
     elif order == "afterTheSite":
-        _write(front_page, "<html><body>Welcome</body></html>\n")
+        _write(front_page, page)
         _pause()
         for change in _changes(case, "whileItBuilt"):
             _apply(course, change)
@@ -144,7 +163,7 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
         for change in _changes(case, "whileItBuilt"):
             _apply(course, change)
         _pause()
-        _write(front_page, "<html><body>Welcome</body></html>\n")
+        _write(front_page, page)
 
     stamp = case.get("stamp", "this")
     if stamp == "this":
@@ -162,6 +181,13 @@ def build(root: Path, case: dict, the_course: list, stamp_for_this: str, another
     for change in _changes(case, "afterTheBuild"):
         _apply(course, change)
     return course, section
+
+
+def preview_page_of(repository_root: Path) -> str:
+    """A front page as a preview writes it: the contract's own sample."""
+    with open(repository_root / "contracts" / "app-rules.json", encoding="utf-8") as handle:
+        signature = json.load(handle)["buildFreshness"]["previewBuild"]["signature"]
+    return "<html><body>" + signature["asQuartzWritesIt"] + "</body></html>\n"
 
 
 def expected(case: dict, reads_the_stamp: bool):

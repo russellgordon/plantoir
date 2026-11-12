@@ -631,7 +631,7 @@
           "datedLaterThanNow" : true,
           "expect" : "build",
           "name" : "the build is dated later than now, and a page edited since",
-          "why" : "A clock that was ahead when the site was built would otherwise hide every change made since."
+          "why" : "While the build is still dated later than now, a clock that was ahead when the site was built would hide a change made since. Once real time passes the build's date the guard no longer fires (knownLimits)."
         },
         {
           "because" : "pages",
@@ -653,6 +653,29 @@
           ],
           "expect" : "reuse",
           "name" : "a course with nothing in it"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "courseFolderIsALink" : true,
+          "expect" : "build",
+          "name" : "the course folder is a link to a folder kept elsewhere, and a page edited",
+          "why" : "The build reads through the link, so every reader must: a reader that stops at the link reads every change behind it as built (the #768 review's M3; BSD find without -H, and FileManager's enumerator, stopped there)."
+        },
+        {
+          "because" : "preview",
+          "expect" : "build",
+          "name" : "only ever previewed: no toolchain stamp, no start marker, and the preview's client in the front page",
+          "previewClient" : true,
+          "stamp" : "missing",
+          "startedMarker" : "absent",
+          "why" : "A preview never stamps its site or leaves a start marker, so a reader that asks the toolchain first said an earlier version had built it, on the console and on the trail (the #768 review's M1). A preview's site is not a site to deploy, whatever else is true, so it is asked first."
         },
         {
           "because" : "toolchain",
@@ -690,25 +713,26 @@
           "why" : "Russell's ruling is about reusing a build. A deploy typed at a command line for a section never built still refuses with its 'Built site not found' words, which failureExplanations matches on both platforms; the apps build it first, as before."
         }
       ],
-      "casesShape" : "Every case starts from the same course unless it gives `course`: the files in `theCourse` (folders made as their paths need), and the hidden link .merged_output to the folder outside the course that holds section1, as the launchers keep built sites. The course and the built section are made in this order on the real clock, with a pause between each step so each has its own time: the course; the changes `beforeTheBuildStarted`; then for `startedMarker` beforeTheSite (the default) the start marker, the changes `whileItBuilt`, the front page; for afterTheSite the front page, the changes `whileItBuilt`, the start marker; for absent the changes `whileItBuilt`, then the front page; then the changes `afterTheBuild`. `atTheBuildStart` edits the file just before the marker is written and then gives the marker exactly the file's modification time. `datedLaterThanNow` moves the marker and the front page one hour ahead, keeping their order, before the `afterTheBuild` changes. `site` notBuilt makes no front page and no marker. `stamp` is this (the default: the reader's own toolchain), another, or missing. A change `do`es one of: edit (add a line to the file where it is), delete, rename (to `to`), replaceKeepingItsOldTime (a new copy written beside it, given the old file's modification time, and moved over it), overwriteKeepingItsOldTime (rewritten in place, then given back its old modification time), createKeepingAnOldTime (a new file dated a year ago). `expect` is reuse or build, and `because` the reason when it builds. `inTheApps` replaces both for the readers that do not read the stamp. `typedByHand` refused: deploy.sh refuses before it asks. `knownLimitOn` names a platform whose readers skip the case, with `knownLimits` saying why.",
+      "casesShape" : "Every case starts from the same course unless it gives `course`: the files in `theCourse` (folders made as their paths need), and the hidden link .merged_output to the folder outside the course that holds section1, as the launchers keep built sites. The course and the built section are made in this order on the real clock, with a pause between each step so each has its own time: the course; the changes `beforeTheBuildStarted`; then for `startedMarker` beforeTheSite (the default) the start marker, the changes `whileItBuilt`, the front page; for afterTheSite the front page, the changes `whileItBuilt`, the start marker; for absent the changes `whileItBuilt`, then the front page; then the changes `afterTheBuild`. `atTheBuildStart` edits the file just before the marker is written and then gives the marker exactly the file's modification time. `datedLaterThanNow` moves the marker and the front page one hour ahead, keeping their order, before the `afterTheBuild` changes. `site` notBuilt makes no front page and no marker. `previewClient` writes a preview's front page (`previewBuild.signature.asQuartzWritesIt` in a body). `courseFolderIsALink` makes the course in a folder elsewhere and links courses/C to it. `stamp` is this (the default: the reader's own toolchain), another, or missing. A change `do`es one of: edit (add a line to the file where it is), delete, rename (to `to`), replaceKeepingItsOldTime (a new copy written beside it, given the old file's modification time, and moved over it), overwriteKeepingItsOldTime (rewritten in place, then given back its old modification time), createKeepingAnOldTime (a new file dated a year ago). `expect` is reuse or build, and `because` the reason when it builds. `inTheApps` replaces both for the readers that do not read the stamp. `typedByHand` refused: deploy.sh refuses before it asks. `knownLimitOn` names a platform whose readers skip the case, with `knownLimits` saying why.",
       "issue" : "#768, with #748 parts 1 to 3 and #741",
       "knownLimits" : [
         "A file system that keeps times to the second (HFS+) or two seconds (exFAT) can date a save made in the same second as the build's start no later than the start, and it then reads as built. The working folder has to be in the home folder on a Mac (#221), which is APFS there; on Windows an exFAT drive is possible.",
-        "Anything that changes a file's metadata without changing what students see costs one build that was not needed: a Finder tag, a quarantine flag, a sync service's own marks, macOS noting when a file was last opened. So does a hidden folder or file being created at the top of the course the first time (.publish_state, .netlify_sites, .cloudflare_sites, .DS_Store), because the course folder's own time changes. Each errs toward building, once.",
-        "A symlinked folder inside the course is not followed, by any reader.",
+        "Anything that changes a file's metadata without changing what students see costs one build that was not needed: a Finder tag, a quarantine flag, a sync service's own marks, macOS noting when a file was last opened. So does a hidden file or folder being created, removed or replaced in ANY folder of the course (.publish_state, .netlify_sites or .cloudflare_sites at the top the first time, a .DS_Store Finder writes, an editor's swap file), because that folder's own time changes. Each errs toward building, once.",
+        "A symbolic link INSIDE the course is not followed, by any reader: a folder linked in from elsewhere (a section folder kept outside the course, say) changes behind its link and reads as built, while the build follows it. The course folder ITSELF being a link is followed (`courseFolderIsALink`). Media is a link only inside the BUILD's own folder (content/Media points at the course's Media, a real folder of the course), so every reader sees a changed picture where it really is.",
+        "The clock guard holds only while the build is still dated later than now. A page edited while the clock is behind the build's date and deployed after real time has passed that date is sent as last built, by every reader: both its times were stamped by the same wrong clock. A deploy, or Deploy pressed, while the build is still dated ahead rebuilds and closes the window.",
         "On Windows a file overwritten in place and given back its old modification time is not seen (`knownLimitOn`): the creation time is read there in place of Windows' change time, which every build changes for the course's pictures by hard-linking them (`rejected`). A reader on Windows skips that case by name and says so.",
         "A deploy typed at a command line for a section that has never been built still refuses (`typedByHand`).",
         "On Netlify and Cloudflare a build deploy.py makes for a preview's site or for a new address writes no trail line on a Mac: it runs in the website builder, which cannot reach the trail. deploy.sh asks the pages question before it, so on a Mac that build is never for the pages."
       ],
       "measured" : "The cost of the question, nothing changed so every entry is read (the worst case). SPH3U's example course (320 files) copied 1, 10 and 60 times, warm, APFS, Apple M4 Pro, macOS 26.6: see documentation/05-build-pipeline.md -> 'A deploy asks for itself whether anything changed (#768)' for the numbers, inside the website builder too.",
-      "readers" : "Four readers answer the pages half and each runs every case: toolchain_paths.why_build_before_deploying (deploy.py, and Windows' deploy.ps1; it reads the stamp too), deploy.sh's pages_or_clock_ask_for_a_build with its site_was_built_by_this_toolchain (scripts/test_build_freshness_reuse.py), BuildFreshness.whyRebuild in each app, and the scheduled deploy's shell (ScheduledDeploy.oneShotCommand on the mac). The apps' readers do not read the stamp (builtWithToolchain.note) and take `inTheApps` where a case gives it. A preview's build is `previewBuild`, which every reader asks as well, and a new address is deploy.py's own question (Netlify and Cloudflare); neither is repeated here.",
+      "readers" : "Four readers answer the pages half and each runs every case: toolchain_paths.why_build_before_deploying (deploy.py, and Windows' deploy.ps1; it reads the stamp too), deploy.sh's pages_or_clock_ask_for_a_build with its site_was_built_by_this_toolchain (scripts/test_build_freshness_reuse.py), BuildFreshness.whyRebuild in each app, and the scheduled deploy's shell (ScheduledDeploy.oneShotCommand on the mac). The apps' readers do not read the stamp (builtWithToolchain.note) and take `inTheApps` where a case gives it. A preview's build is `previewBuild`, which every reader asks as well; one case here (only ever previewed) pins that it is asked BEFORE the toolchain. A new address is deploy.py's own question (Netlify and Cloudflare) and is not repeated here.",
       "reasons" : {
         "address" : "deploy.py only: the build carries another site address than the destination's.",
         "clock" : "The build that made the site is dated later than now.",
         "frontPageUnreadable" : "The apps only: the site's front page cannot be read, so the site is rebuilt rather than trusted.",
         "neverBuilt" : "There is no built site. The apps build; a deploy typed by hand refuses.",
         "pages" : "Something in the course, a folder, or the course folder itself changed after the build that made the site started.",
-        "preview" : "The site is a preview's build (`previewBuild`).",
+        "preview" : "The site is a preview's build (`previewBuild`). Asked first by every reader, before the toolchain, since #768's review: a preview never stamps its site.",
         "toolchain" : "The launchers only: the site's stamp is missing or names another toolchain (`builtWithToolchain`)."
       },
       "rejected" : [

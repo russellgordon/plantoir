@@ -297,22 +297,48 @@ enum BuildFreshness {
     /// entry's NAME (`.skipsHiddenFiles`), so a working folder kept under a
     /// hidden folder is still read. `newestContentDate` stays as it was, for
     /// the links checklist (#379), which asks something else.
+    ///
+    /// Two details the #768 review measured. A course folder that is itself a
+    /// symbolic link is read THROUGH it, as the build reads it: the enumerator
+    /// does not descend into a link it is handed, so every change behind one
+    /// read as built. And hidden is judged by the name alone, never by
+    /// `.skipsHiddenFiles`, which also skips an entry carrying the Finder
+    /// hidden flag (a Windows file's hidden attribute on a shared drive
+    /// arrives as that flag), while the launchers and the scheduled shell
+    /// read such a page.
     static func newestChangeDate(course: Course) -> Date? {
         let fileManager: FileManager = FileManager.default
-        let keys: [URLResourceKey] = [.contentModificationDateKey, .attributeModificationDateKey]
+        let keys: [URLResourceKey] = [
+            .contentModificationDateKey, .attributeModificationDateKey, .isDirectoryKey, .isSymbolicLinkKey,
+        ]
+        // A fresh URL for the course folder, through any link: a URL keeps
+        // the resource values it was asked for before, and this one must be
+        // read now. Used for the walk only, so the spelling it ends up with
+        // (FolderIdentity's concern) matters to nothing else.
+        let courseFolder: URL = URL(
+            fileURLWithPath: course.directoryURL.resolvingSymlinksInPath().path, isDirectory: true
+        )
         guard let enumerator = fileManager.enumerator(
-            at: course.directoryURL,
+            at: courseFolder,
             includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
+            options: []
         ) else {
             return nil
         }
 
-        // A fresh URL for the course folder: a URL keeps the resource values
-        // it was asked for before, and this one must be read now.
-        let courseFolder: URL = URL(fileURLWithPath: course.directoryURL.path, isDirectory: true)
         var newestDate: Date? = latestChangeDate(of: courseFolder)
         for case let entryURL as URL in enumerator {
+            if entryURL.lastPathComponent.hasPrefix(".") {
+                // Hidden, with everything under it. Only a real folder is
+                // skipped: asked of a file or a link, `skipDescendants` skips
+                // the rest of the folder the walk is in (measured: every
+                // page after `.merged_output` went unread).
+                let kind = try? entryURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                if kind?.isDirectory == true && kind?.isSymbolicLink != true {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
             guard let date = latestChangeDate(of: entryURL) else {
                 continue
             }

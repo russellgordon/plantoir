@@ -1323,6 +1323,10 @@ site_was_built_by_this_toolchain() {
 #     working folder under a hidden folder is still read), modified (-newer)
 #     or changed (-cnewer, which no copy can set back) after the reference,
 #     is `pages`. Folders count: a deletion or a rename shows only there.
+#   * `find -H`: a course folder that is itself a link is read through it,
+#     as the build reads it. Without it find stops at the link and every
+#     change behind it reads as built (the #768 review's M3). A link INSIDE
+#     the course is still not followed, by any reader.
 # BEGIN pages_or_clock_ask_for_a_build
 pages_or_clock_ask_for_a_build() {
   local course="$1" section="$2" front since now changed
@@ -1341,18 +1345,56 @@ pages_or_clock_ask_for_a_build() {
       return 0
     fi
   fi
-  changed="$(find "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
+  changed="$(find -H "$course" -maxdepth 0 \( -newer "$since" -o -cnewer "$since" \) -print 2>/dev/null)"
   if [[ -z "$changed" ]]; then
-    changed="$(find "$course" -mindepth 1 -name '.*' -prune -o \( -newer "$since" -o -cnewer "$since" \) -print -quit 2>/dev/null)"
+    changed="$(find -H "$course" -mindepth 1 -name '.*' -prune -o \( -newer "$since" -o -cnewer "$since" \) -print -quit 2>/dev/null)"
   fi
   [[ -n "$changed" ]] || return 1
   echo pages
 }
 # END pages_or_clock_ask_for_a_build
 
-# Toolchain first: its rebuild covers a page change as well, so one build at
-# most, and its words are the more surprising. Not for --reset-token, which
-# deploys nothing and exits further down.
+# -------------------- Is this site a preview's? ------------------------
+# Serve mode bakes a live-reload client into every page it builds, and a site
+# that carries it must never be published (the reasons are where it is used,
+# below). The rule is contracts/app-rules.json -> buildFreshness.previewBuild,
+# read by five other checkers too, and scripts/test_preview_build_detection.py
+# cuts THIS definition out of the launcher and runs it against every case.
+#
+# What is looked for is the client's script TAG followed by its first
+# statement, with only whitespace between (#291). The bare address
+# "ws://localhost:" was the rule until 2026-09-26, and any page whose note
+# MENTIONS it carries that too: one networking lesson, measured in a
+# production build, carried it 20 times on 7 lines (title, meta tags,
+# breadcrumb, heading, prose, code), so a folder publish of that course
+# refused every time and every other publish rebuilt. A page's own words
+# cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
+# attributes alike.
+#
+# Two details are load-bearing:
+#   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
+#              each page is read as one record rather than line by line.
+#   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
+#              with a byte that is not UTF-8 anywhere BEFORE the client (in
+#              practice nearly the whole page, since Quartz writes the client
+#              at the end of <body>; measured: exit 1, and 0 under LC_ALL=C;
+#              a bad byte after the client does not cause it), and a preview's page read as clean is a
+#              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
+#              worth a publishing-path change" when the miss needed the byte on
+#              the same line and erred safe; -z made it whole-file and unsafe,
+#              so that choice is reversed.
+# A basic regex, not -E: the pattern holds a literal "(".
+LIVE_RELOAD_CLIENT_PATTERN=$'<script type="application/javascript">[[:space:]]*const socket = new WebSocket(\'ws://localhost:'
+site_carries_preview_client() {
+  LC_ALL=C grep -rzqs --include='*.html' -- "$LIVE_RELOAD_CLIENT_PATTERN" "$1" 2>/dev/null
+}
+
+# A preview's site first: it is not a site to deploy whatever else is true,
+# and a preview never stamps its site, so a section only ever previewed would
+# otherwise read as "Plantoir had been updated" (the #768 review's M1). Then
+# the toolchain: its rebuild covers a page change as well, so one build at
+# most, and its words are the more surprising. Then the pages and the clock.
+# Not for --reset-token, which deploys nothing and exits further down.
 #
 # Asked HERE, before link_course_build_output below moves a built site out of
 # a course that still holds one: the move puts a link in the course folder,
@@ -1360,15 +1402,29 @@ pages_or_clock_ask_for_a_build() {
 # answer is acted on after the preflight, which refuses a section with no
 # built site first. The paths are spelled out because COURSE_DIR_HOST and the
 # rest are set only after the move.
+#
+# Prints the reason, or nothing (exit 1) to reuse the build. Its arguments are
+# the course folder, the section's build folder and the image this run uses.
+# scripts/test_build_freshness_reuse.py cuts this out with the three questions
+# it calls and runs every case against it.
+# BEGIN why_this_deploy_builds_first
+why_this_deploy_builds_first() {
+  local why
+  if [[ -f "$2/public/index.html" ]] && site_carries_preview_client "$2/public"; then
+    why="preview"
+  elif ! site_was_built_by_this_toolchain "$2" "$3"; then
+    why="toolchain"
+  else
+    why="$(pages_or_clock_ask_for_a_build "$1" "$2")" || return 1
+  fi
+  printf '%s\n' "$why"
+}
+# END why_this_deploy_builds_first
 _REBUILD_FOR=""
 if [[ "$RESET_TOKEN" != "true" ]]; then
   _ASKED_COURSE="$(pwd)/courses/${COURSE_CODE}"
   _ASKED_SECTION="${_ASKED_COURSE}/.merged_output/section${SECTION_NUM}"
-  if ! site_was_built_by_this_toolchain "${_ASKED_SECTION}" "$IMAGE"; then
-    _REBUILD_FOR="toolchain"
-  else
-    _REBUILD_FOR="$(pages_or_clock_ask_for_a_build "${_ASKED_COURSE}" "${_ASKED_SECTION}")" || _REBUILD_FOR=""
-  fi
+  _REBUILD_FOR="$(why_this_deploy_builds_first "${_ASKED_COURSE}" "${_ASKED_SECTION}" "$IMAGE")" || _REBUILD_FOR=""
 fi
 # Settled before the paths below are read: MERGED_DIR_HOST and everything
 # under it resolve THROUGH the link, and a course still holding a real
@@ -1445,6 +1501,11 @@ if [[ -n "$_REBUILD_FOR" ]]; then
   # windows-app's LauncherRulesContractTests reads (its toolchain pair is
   # matched once, so it is written once, here).
   case "$_REBUILD_FOR" in
+    preview)
+      # The folder deploy's own preview words below, letter for letter, so
+      # Windows' anchor still finds one line.
+      echo "🔁 This site was built by a preview, which adds live updating"
+      echo "   that students' browsers would ask about. Rebuilding it before it is deployed…" ;;
     toolchain)
       echo "🔁 Plantoir has been updated since this site was built, so it is"
       echo "   building it again before it is deployed…" ;;
@@ -1475,6 +1536,8 @@ if [[ -n "$_REBUILD_FOR" ]]; then
   # contracts/shared-rules.json -> activityTrail.mustRecord."site built again
   # before deploying", one line per reason.
   case "$_REBUILD_FOR" in
+    preview)
+      note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — the last build was made by a preview" ;;
     toolchain)
       note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — Plantoir had been updated since it was last built" ;;
     clock)
@@ -1483,41 +1546,6 @@ if [[ -n "$_REBUILD_FOR" ]]; then
       note_on_the_trail "${COURSE_CODE}/${SECTION_NUM} · built the website again before deploying it — something in the course had changed since it was last built" ;;
   esac
 fi
-
-# -------------------- Is this site a preview's? ------------------------
-# Serve mode bakes a live-reload client into every page it builds, and a site
-# that carries it must never be published (the reasons are where it is used,
-# below). The rule is contracts/app-rules.json -> buildFreshness.previewBuild,
-# read by five other checkers too, and scripts/test_preview_build_detection.py
-# cuts THIS definition out of the launcher and runs it against every case.
-#
-# What is looked for is the client's script TAG followed by its first
-# statement, with only whitespace between (#291). The bare address
-# "ws://localhost:" was the rule until 2026-09-26, and any page whose note
-# MENTIONS it carries that too: one networking lesson, measured in a
-# production build, carried it 20 times on 7 lines (title, meta tags,
-# breadcrumb, heading, prose, code), so a folder publish of that course
-# refused every time and every other publish rebuilt. A page's own words
-# cannot produce the tag, because Quartz writes "<" as "&lt;" in text and in
-# attributes alike.
-#
-# Two details are load-bearing:
-#   -z         Quartz puts the tag and the statement on DIFFERENT lines, so
-#              each page is read as one record rather than line by line.
-#   LC_ALL=C   Under a UTF-8 locale BSD grep -z misses the client in a file
-#              with a byte that is not UTF-8 anywhere BEFORE the client (in
-#              practice nearly the whole page, since Quartz writes the client
-#              at the end of <body>; measured: exit 1, and 0 under LC_ALL=C;
-#              a bad byte after the client does not cause it), and a preview's page read as clean is a
-#              preview PUBLISHED. #136 judged LC_ALL=C here "correct, but not
-#              worth a publishing-path change" when the miss needed the byte on
-#              the same line and erred safe; -z made it whole-file and unsafe,
-#              so that choice is reversed.
-# A basic regex, not -E: the pattern holds a literal "(".
-LIVE_RELOAD_CLIENT_PATTERN=$'<script type="application/javascript">[[:space:]]*const socket = new WebSocket(\'ws://localhost:'
-site_carries_preview_client() {
-  LC_ALL=C grep -rzqs --include='*.html' -- "$LIVE_RELOAD_CLIENT_PATTERN" "$1" 2>/dev/null
-}
 
 # -------------------- Publish to a local folder ------------------------
 # The built site already sits on the host (the working folder is
