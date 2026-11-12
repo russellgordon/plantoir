@@ -1104,9 +1104,7 @@ public sealed partial class SidebarPane : UserControl
         if (RefusedWhileRevised(folder, course)) return;
         if (ClaudeCodeLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
-        _ = ShowError("Claude didn’t open",
-            $"Plantoir couldn’t start a Claude session for {course.Code}. " +
-            "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
+        _ = ShowError(OutsideDoorWording.ClaudeDidNotOpenTitle, OutsideDoorWording.ClaudeCouldNotStart(course.Code));
     }
 
     /// <summary>Revise With ▸ Codex…: the second outside door (#210, mac #205).</summary>
@@ -1116,9 +1114,7 @@ public sealed partial class SidebarPane : UserControl
         if (RefusedWhileRevised(folder, course)) return;
         if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
-        _ = ShowError("Codex didn’t open",
-            $"Plantoir couldn’t start a Codex session for {course.Code}. " +
-            "If Codex was updated or moved recently, restarting Plantoir may be enough.");
+        _ = ShowError(OutsideDoorWording.CodexDidNotOpenTitle, OutsideDoorWording.CodexCouldNotStart(course.Code));
     }
 
     private MenuFlyout BackupMenu(BackupItem item)
@@ -1421,18 +1417,14 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>
     /// The click-time half of the hold (#468): a door, or the local window,
     /// refused while any assistant holds the course — since a session can
-    /// start between the menu opening and the click. Each cause in its own
-    /// words: a Claude or Codex session (<c>finishTheClaudeSessionFirst</c>),
-    /// or this app's own window, whose hold is the same and whose sentence is
-    /// the one this refusal always said.
+    /// start between the menu opening and the click. The words are
+    /// <see cref="OutsideDoorWording.RefusedWhileRevised"/>'s, which the
+    /// Problems tab's Fix with… buttons make too (#736).
     /// </summary>
     private bool RefusedWhileRevised(string folder, Course course)
     {
-        if (!CourseActivity.IsAssisting(folder, course.Code)) return false;
-        _ = ShowError(AssistWording.CourseIsAlreadyBeingRevised(course.Code),
-            CourseActivity.IsRevisedElsewhere(folder, course.Code)
-                ? AssistWording.FinishTheClaudeSessionFirst
-                : WindowHoldWording.FinishInThatWindowFirst);
+        if (OutsideDoorWording.RefusedWhileRevised(folder, course.Code) is not { } refusal) return false;
+        _ = ShowError(refusal.Title, refusal.Message);
         return true;
     }
 

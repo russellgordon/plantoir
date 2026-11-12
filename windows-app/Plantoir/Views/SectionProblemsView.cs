@@ -38,9 +38,14 @@ namespace Plantoir.Views;
 /// first column is a box with no title, its Problem cell carries a button, and
 /// its headers sort.</para>
 ///
-/// <para>Fix with Claude… and Fix with Codex… go UNDER the table (#736, a
-/// later piece): <see cref="Footer"/> is where they go, and
-/// <see cref="TickedRowIds"/> is what they hand over.</para>
+/// <para>Fix with Claude… and Fix with Codex… sit UNDER the table, Claude's
+/// first (#736, <c>fixWith.where</c>), in <see cref="Footer"/>: each shown
+/// only while its assistant is installed (<see cref="OutsideAssistantPresence"/>,
+/// asked at launch and when the window comes to the front, never while this
+/// draws) and never on a course kept for reference, and both enabled while a
+/// ticked row is still this section's problem (<see cref="FixWithAssistant.Buttons"/>).
+/// A press is the section view's (<c>fix</c>), which makes Revise With's
+/// refusal first and opens the door.</para>
 /// </remarks>
 internal sealed class SectionProblemsView : UserControl
 {
@@ -66,6 +71,8 @@ internal sealed class SectionProblemsView : UserControl
     private readonly int _sectionNumber;
     private readonly Func<string?> _folder;
     private readonly Action<SectionProblemRow> _repair;
+    private readonly Button _fixWithClaude;
+    private readonly Button _fixWithCodex;
     private readonly TextBlock _intro;
     private readonly Grid _header;
     private readonly ListView _list;
@@ -82,7 +89,8 @@ internal sealed class SectionProblemsView : UserControl
     /// <summary>How long the last build of the rows took, and how many — for the measurement under <c>--state-dir</c>.</summary>
     internal (int Rows, double Milliseconds) LastBuild { get; private set; }
 
-    internal SectionProblemsView(Course course, int sectionNumber, Func<string?> folder, Action<SectionProblemRow> repair)
+    internal SectionProblemsView(Course course, int sectionNumber, Func<string?> folder, Action<SectionProblemRow> repair,
+                                 Action<FixWithAssistant.Assistant> fix)
     {
         _course = course;
         _sectionNumber = sectionNumber;
@@ -127,6 +135,15 @@ internal sealed class SectionProblemsView : UserControl
         };
 
         Footer = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
+        _fixWithClaude = FixButton(FixWithAssistant.Assistant.Claude, "fixWithClaudeButton", fix);
+        _fixWithCodex = FixButton(FixWithAssistant.Assistant.Codex, "fixWithCodexButton", fix);
+        Footer.Children.Add(_fixWithClaude);
+        Footer.Children.Add(_fixWithCodex);
+        TicksChanged += ShowTheFixButtons;
+        // Static, so subscribed only while shown: a subscription left behind
+        // would root this view for the life of the process.
+        Loaded += (_, _) => { OutsideAssistantPresence.Changed += PresenceChanged; ShowTheFixButtons(); };
+        Unloaded += (_, _) => OutsideAssistantPresence.Changed -= PresenceChanged;
 
         var layout = new Grid { Padding = new Thickness(16, 12, 16, 12), RowSpacing = 6 };
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -199,6 +216,7 @@ internal sealed class SectionProblemsView : UserControl
             _rows.Add(MakeRow(problem, state, order, kind, page, said, rowName, repairsOffered));
         }
         Sort();
+        ShowTheFixButtons();
         LastBuild = (record.Rows.Count, clock.Elapsed.TotalMilliseconds);
         // For a test run ONLY (--state-dir): how many rows were built, and how
         // long that took — the 300-row measurement reads it (review change 4).
@@ -283,6 +301,48 @@ internal sealed class SectionProblemsView : UserControl
         SectionProblems.SetTicked(box.IsChecked == true, rowId, _folder(), _course.Code, _sectionNumber);
         TickTable.Status(item, box);
         TicksChanged?.Invoke();
+    }
+
+    // ---- Fix with Claude… / Fix with Codex… (#736) ------------------------------
+
+    private Button FixButton(FixWithAssistant.Assistant assistant, string automationId, Action<FixWithAssistant.Assistant> fix)
+    {
+        string title = FixWithAssistant.TitleOf(assistant);
+        var button = new Button { Content = title, Visibility = Visibility.Collapsed, IsEnabled = false };
+        AutomationProperties.SetName(button, title);
+        AutomationProperties.SetAutomationId(button, automationId);
+        button.Click += (_, _) => fix(assistant);
+        return button;
+    }
+
+    /// <summary>What a press would hand over now, from the record shown and the ticks the store holds.</summary>
+    internal FixWithAssistant.Handover? CurrentHandover() =>
+        _shownRecord is { } record
+            ? FixWithAssistant.HandoverOf(record, _shownOthers,
+                id => SectionProblems.IsTicked(id, _folder(), _course.Code, _sectionNumber))
+            : null;
+
+    private void PresenceChanged() => DispatcherQueue?.TryEnqueue(ShowTheFixButtons);
+
+    /// <summary>
+    /// Shown, hidden, enabled: <c>fixWith.buttonCases</c>. A button that
+    /// cannot be pressed says why to assistive technology
+    /// (<see cref="FixWithAssistant.NotEnabledHelp"/>), since a
+    /// greyed button alone tells a Narrator user nothing.
+    /// </summary>
+    private void ShowTheFixButtons()
+    {
+        var handover = CurrentHandover();
+        var state = handover is null
+            ? new FixWithAssistant.ButtonState(false, false, false)
+            : FixWithAssistant.Buttons(OutsideAssistantPresence.ClaudeIsInstalled, OutsideAssistantPresence.CodexIsInstalled,
+                                       ReferenceCourse.IsKeptForReference(_course), handover);
+        foreach (var (button, shown) in new[] { (_fixWithClaude, state.ClaudeShown), (_fixWithCodex, state.CodexShown) })
+        {
+            button.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+            button.IsEnabled = state.Enabled;
+            AutomationProperties.SetHelpText(button, state.Enabled ? "" : FixWithAssistant.NotEnabledHelp);
+        }
     }
 
     // ---- Sorting ------------------------------------------------------------
