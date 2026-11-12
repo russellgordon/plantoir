@@ -44,11 +44,14 @@ support files ──────┘                        │                  
    was building is older than that page: the next Publish called the site up
    to date and sent the same old build. Measured: a file created from inside
    the Colima container on a bind mount is stamped by the host's clock, the
-   same clock as the teacher's Save. Readers: `BuildFreshness.needsRebuild`
+   same clock as the teacher's Save. Readers: `BuildFreshness.whyRebuild`
    and the scheduled publish's shell (both compare with the EARLIER of the two
    times); Windows' `BuildFreshness.NeedsRebuild` makes the same choice since
    #272 (2026-09-30; its scheduled wrapper builds unconditionally, so it has no
-   second reader). The reasoning and what was
+   second reader). Since #768 the launchers read it too
+   (`toolchain_paths.why_build_before_deploying`, deploy.sh's
+   `pages_or_clock_ask_for_a_build`): see "A deploy asks for itself whether
+   anything changed (#768)" below. The reasoning and what was
    rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
    the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
 
@@ -2040,13 +2043,14 @@ DESTINATION leg, through `deploy.sh`: a build that stops for a question is
 recorded as `neededAnAnswer` and a build that fails as `didNotFinish`, naming
 the destination, rather than as `buildNeededAnAnswer` / `buildDidNotFinish`.
 The advice those outcomes carry (deploy it yourself) still recovers.
-Changing the wrapper would not reach the runs that meet this: wrappers are
-written when a deploy is SCHEDULED, so every one set before 1.9.2 keeps its
-old text, and #136 already rejected a launcher exit code of its own for the
-rerun. Also: the scheduled runner does not refresh a folder's launchers, so a
-run before Plantoir 1.9.2 has opened the folder once still uses 1.9.1's
-`deploy.sh`, which has no stamp check. (`ScheduledDeploy.swift`'s comments
-say the same.)
+#136 already rejected a launcher exit code of its own for the rerun.
+(Corrected with #768: this said the wrapper is written when a deploy is
+SCHEDULED, so every one set before 1.9.2 kept its old text. Since #323 the
+`--run-scheduled-deploy` process writes it afresh at the run.) What does
+stay old is the folder's own launchers: the scheduled runner does not
+refresh them, so a run before a newer Plantoir has opened the folder once
+uses the `preview.sh` and `deploy.sh` last mirrored there. That is #748
+part 4, its own piece after #768.
 
 ### Rejected
 
@@ -2161,8 +2165,10 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   nanosecond. Not measured: a working folder IN OneDrive (none exists on this
   PC, and copying one there would upload it); the stat walk does not read
   files, so it should not depend on that.
-- **Not owed on Windows:** an image or workspace check (it has neither), and
-  no change to `BuildFreshness.NeedsRebuild` (the "Rejected" above).
+- **Not owed on Windows:** an image or workspace check (it has neither).
+  `BuildFreshness.NeedsRebuild` still does not read the stamp (the
+  "Rejected" above), but since #768 it owes the course folder's own time,
+  the creation time and the clock guard: see the next section.
 - **Netlify and Cloudflare** go through `deploy.py`'s
   `ensure_base_url_and_rebuild`, which looks for the workspace's
   `quartz.config.ts` at the literal `/tmp/quartz-builds/…`. Windows never
@@ -2179,7 +2185,207 @@ does not build uploads the old site. Closed in 1.9.3 (#749):
   window deploy (the assistant always builds, the scheduled wrapper asks its
   shell twin) — or deploy.py asking the same question itself; and a decision
   on whether the command line should keep the mac's "deploy publishes what
-  was built" shape.
+  was built" shape. **Done in #768:** deploy.py asks the question itself,
+  and Russell ruled the command line reuses a build only when nothing has
+  changed, on both platforms. See the next section.
+
+## A deploy asks for itself whether anything changed (#768)
+
+**A deploy reuses the last build of a section only when nothing has changed
+since it was built, and builds again otherwise, however it was started.**
+Russell's ruling, 2026-11-12, on #768: Deploy pressed in the app, a deploy
+set for later, and `deploy.sh`, `deploy.ps1` or `deploy.bat` typed at a
+command line, on either platform. The rule and its 26 cases are
+`contracts/app-rules.json` → `buildFreshness.reuseTheLastBuild`; this
+section is the reasoning.
+
+### What was wrong
+
+- **On the mac, the command line sent the last build.** Only the apps
+  asked about the pages (`BuildFreshness`). `deploy.sh` asked about the
+  toolchain (#746) and a preview's build, so `./deploy.sh ICS3U 1` after an
+  edit deployed the previous build and said it had succeeded.
+- **After a DELETED page, it kept the page (#741).** Seen at the v1.9.1
+  gate: a page and its `.ggb` removed from a course, `deploy.sh` run, and the
+  first Netlify redeploy still served the page.
+- **On Windows every Netlify and Cloudflare deploy rebuilt.** `deploy.py`
+  looked for the build's `quartz.config.ts` under the literal
+  `/tmp/quartz-builds`, and Windows builds into `builds\<id>\work`, so the
+  address check never found it: 55 to 66 s per deploy on a Lenovo
+  20QES70500. Windows was safe from the mac's fault only because of this
+  one, which is why the path fix alone was rejected (#749's review).
+
+### The rule, part by part
+
+Each part is in every reader, and each one errs toward building: a needless
+build costs a minute, a reused stale one publishes last week's site.
+
+1. **The reference** is the start of the build that made the site
+   (`.build-started`, #265), or its front page when that is earlier or there
+   is no marker. Unchanged.
+2. **Folders count, and the course folder itself.** A folder's time changes
+   when an entry in it is created, removed or renamed, and nothing else shows
+   a deletion or a rename. The plan counted files only; its review measured
+   (APFS) that a files-only check reuses after a page deleted in a subfolder,
+   a page deleted or renamed at the top of the course, a folder renamed, and
+   a page moved into `.trash`, which is how Obsidian deletes. The apps
+   already counted folders, by accident of `FileManager.enumerator` and
+   `Directory.EnumerateFileSystemEntries`; neither counted the course folder,
+   so a page deleted at the TOP of a course reached them too.
+3. **The later of the modification time and the change time.** A file copied
+   in with its old modification time kept is invisible to every reader of
+   modification times, folders or not: a restore from a backup moved into
+   place, a Finder copy, `cp -p`, `rsync --inplace`, a sync service writing
+   another computer's time. The change time cannot be set by any copy. On
+   the mac: `-cnewer` in shell, `st_ctime_ns` in Python,
+   `.attributeModificationDateKey` in Swift. **On Windows the CREATION time
+   is read instead** (`st_birthtime_ns`, Python 3.12 and later), not Windows'
+   own change time: a build there hard-links the course's Media into its
+   build folder (`_ensure_media_symlink`), and making a hard link changes
+   each picture's change time, so every deploy would build again. The cost:
+   a file overwritten in place and given back its old time is not seen on
+   Windows (`knownLimitOn` in the contract).
+4. **Hidden entries are skipped by their NAME**, with everything under them:
+   `.merged_output`, `.obsidian`, `.trash`, `.publish_state`, the site
+   markers. The scheduled shell used `-not -path '*/.*'`, which matches the
+   whole path, so in a working folder kept under a hidden folder of its own
+   every entry was skipped and the answer was always "reuse" (measured by
+   the review). Both shell readers now use `-mindepth 1 -name '.*' -prune`.
+5. **A reference later than now means build** (the clock guard). A clock
+   that was ahead when the site was built, set by hand or corrected later,
+   would otherwise hide every change made since.
+6. **Changed means strictly later.** A save at the very instant the build
+   started reads as built, as before.
+
+`[ -nt ]` is not used for any of it: the mac's `/bin/bash` is 3.2, whose
+`-nt` compares whole seconds (measured 2026-11-12, two files 50 ms apart:
+not newer), so a marker a fraction of a second after the page read as not
+newer. `find -newer` compares to the nanosecond. The scheduled shell's
+marker-against-page test moved to `find` too.
+
+### Who asks, and in what order
+
+| Reader | Where | Reads the stamp |
+|---|---|---|
+| `toolchain_paths.why_build_before_deploying` | deploy.py (both platforms), deploy.ps1 (owed) | yes |
+| `pages_or_clock_ask_for_a_build` with `site_was_built_by_this_toolchain` | deploy.sh, every destination | yes |
+| `BuildFreshness.whyRebuild` | the Deploy button, the windowless assistant and MCP deploys | no |
+| `ScheduledDeploy.oneShotCommand`'s shell | a deploy set for later | no |
+
+The toolchain is asked first: its rebuild covers a changed page as well, so
+there is one build at most, and its words are the more surprising.
+`deploy.sh` asks **before** `link_course_build_output` moves a built site
+out of a course that still holds one, because the move puts a link in the
+course folder and changes its time while nothing students see has changed;
+the answer is acted on after the preflight, which refuses a section never
+built first, as before. A deploy given no destination runs once per saved
+leg (#668): each leg asks, the first builds, the rest reuse.
+
+**deploy.py on the mac is a backstop that is not asked.** `deploy.sh` has
+asked on the host, and passes `PLANTOIR_PAGES_ALREADY_ASKED=1` on its
+`docker exec`, so deploy.py asks only the toolchain and the address there.
+The walk itself is cheap inside the website builder (below); the reason is
+the second clock. Colima's VM keeps its own time, which can fall behind the
+Mac's after a sleep, and the clock guard and the page times would then be
+read against it. On Windows deploy.py runs natively and asks everything.
+
+### The trail
+
+One event, `site built again before deploying`, with one line per reason
+(`activityTrail.mustRecord`, `whyWords`). The words say what the reason WAS
+(the review's H3: `needsRebuild` was true for a first build, a preview's
+build and an unreadable front page as well as a changed page, and the plan
+would have written "something in the course had changed" for all four).
+The toolchain line is Russell's, approved on #748. Writers, one line per
+build: `deploy.sh` through `note_on_the_trail` after `preview.sh
+--build-only` returned 0 (toolchain, pages, clock, and preview for a folder
+deploy that rebuilt a preview's site), so a deploy typed in Terminal is
+recorded; `MultiDestinationDeployRunner` for the app's own build first,
+with `BuildFreshness.whyRebuild`'s reason; the scheduled wrapper prints
+`PLANTOIR_BUILT_BEFORE_DEPLOYING: <reason> <course>/<section>` and the app
+writes the line from the run's log (`BuiltBeforeDeployingReport`). deploy.sh
+does not print the marker, or a run the app watched would be written twice.
+deploy.py writes nothing: on a Mac it cannot reach the trail, and there it
+builds only for an address or a preview's site.
+
+### A workspace that does not name its toolchain (#748 part 3)
+
+A workspace made without `PLANTOIR_TOOLCHAIN_ID=<its image's tag>` (by hand,
+or by a `verify.sh` older than #746) stamps every site it builds with the
+hash of the toolchain files instead, so `deploy.sh` found the stamp wrong and
+built again on every deploy. `preview.sh` and `setup.sh` now remake such a
+workspace once (`workspace_names_this_toolchain`, reason `toolchainId` in
+"folder set up again"'s `whyWords`), right after the update check. No
+teacher's workspace can lack it: the launchers have set it since 1.9.2.
+Windows has no workspace and nothing to do.
+
+### What was measured
+
+On an Apple M4 Pro, macOS 26.6, APFS, warm, the worst case (nothing changed,
+so every entry is read), SPH3U's example course copied 1, 10 and 60 times
+(335, 3,350 and 20,100 files and folders), best of five:
+
+| Entries | Python, host | `find`, host | Python in the website builder, over the courses mount |
+|---|---|---|---|
+| 335 | 0.9 ms | 4 ms | 3.5 ms |
+| 3,350 | 10.0 ms | 12 ms | 35.4 ms |
+| 20,100 | 68.4 ms | 59 ms | 304.1 ms |
+
+The website builder was Colima's VM (Ubuntu 24.04, kernel 6.8, aarch64),
+the walk run in a throwaway container from `quartz-teacher:dev-test`. A
+file's modification and change times read through the mount are the host's,
+to the nanosecond (measured on one file), so the change time can be trusted
+there. Against a rebuild of a minute the question costs nothing; on Windows,
+under Defender, it is owed as a measurement.
+
+`verify.sh` proves end to end that counting the course folder does not make
+every deploy build: a folder deploy with nothing changed builds nothing and
+leaves the deployed files byte for byte as they were; a page added builds
+once and is deployed; the page deleted builds once and leaves the site
+(#741); the deploy after that builds nothing. It also proves #748 part 1:
+an image is made from the run's own with the tick-box rule taken out of
+`/opt/support/…/tasks.scss` (`docker commit`, seconds), `preview.sh` makes
+the folder's workspace from it and builds there, and a plain folder deploy
+must remake the workspace (`PLANTOIR_FOLDER_SET_UP_AGAIN: update`) and
+publish the rule. Until then the check planted an old stamp and stylesheet
+in the CURRENT workspace, which a rebuild inside the old workspace (#746's
+own bug) would have passed, because `build_site.py` re-copies `tasks.scss`
+from the image on every build.
+
+### Known extra builds, each once
+
+- The first time a hidden folder or file is made at the top of a course
+  (`.publish_state`, `.netlify_sites`, `.cloudflare_sites`, `.DS_Store`),
+  and the first deploy after a built site is moved out of a course that
+  still held one: the course folder's own time changes.
+- A Finder tag, a quarantine flag, a sync service's own marks, or macOS
+  noting when a file was last opened: each changes a change time.
+- Preflight's rewrite of `course_config.json` when it discovers a new item
+  (the paragraph near the top of this page): unchanged.
+- A Netlify or Cloudflare build by `deploy.sh` whose address is not the
+  destination's is built again by deploy.py for the address. That happens
+  today and is not a stale path; named so a reviewer does not find it again.
+
+### Rejected
+
+- **Files only** (the plan): misses deletions and renames, which is #741.
+- **The modification time alone**: misses a file overwritten with its old
+  time kept.
+- **Windows' change time**: hard links make every deploy build (above).
+- **`-not -path '*/.*'`**: the whole path, not the name (above).
+- **An environment variable from the app saying the pages were checked**
+  (the issue's first idea): a deploy typed by hand has no app to set it.
+- **`deploy.sh` asking the website builder (`docker exec … python3`)**: a
+  folder deploy need not start it at all, and the question costs
+  milliseconds on the host.
+- **Asking in deploy.py only**: a folder deploy on the mac never enters it.
+- **A fingerprint of every file's bytes**: exact, but it reads every
+  picture on every deploy, and the apps and the scheduled shell compare
+  times.
+- **#748 part 2's console marker read by the app, for every writer**: it
+  reaches the trail only when the app ran the launcher, so the deploy typed
+  in Terminal, the case #768 is about, would leave nothing. Only the
+  scheduled wrapper, which the app reads afterwards, uses a marker.
 
 ## Printable pages: what the build does (#454, v1.6.0)
 

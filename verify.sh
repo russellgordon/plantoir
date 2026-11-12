@@ -54,12 +54,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 DEV_TEST_IMAGE="quartz-teacher:dev-test"
-# Every launcher this run starts writes its trail lines here, never into the
-# teacher's own trail (contracts/app-rules.json -> launcherTrailFolder). Since
-# #768 a deploy that builds first writes a line, and this run deploys often;
-# the #768 checks below read the lines back from here.
+# From step 1 on, every launcher this run starts writes its trail lines here,
+# never into the teacher's own trail (contracts/app-rules.json ->
+# launcherTrailFolder). Since #768 a deploy that builds first writes a line,
+# and this run deploys often; the #768 checks below read the lines back from
+# here. Exported only after step 0, whose tests read the trail a scratch
+# HOME gives them.
 VERIFY_TRAIL_DIR="$(mktemp -d -t plantoir-verify-trail)"
-export PLANTOIR_TRAIL_DIR="$VERIFY_TRAIL_DIR"
 # The launchers name their container after the working folder.
 CONTAINER_NAME="teaching-quartz-$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 # The launchers' own way of naming a folder they hand to a container, loaded
@@ -1057,6 +1058,8 @@ else
   echo "   and importing the module under test is what writes the .pyc."
 
 fi
+
+export PLANTOIR_TRAIL_DIR="$VERIFY_TRAIL_DIR"
 
 # -------------------- 1. Container runtime (shared Colima) --------------------
 # Maintainer variant: assumes Colima and the Docker CLI are installed (the

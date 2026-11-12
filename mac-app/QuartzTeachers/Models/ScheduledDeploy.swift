@@ -858,20 +858,25 @@ enum ScheduledDeploy {
 
         // BUILD IF STALE, THEN DEPLOY — exactly what the Deploy button does.
         //
-        // `deploy.sh` refuses outright when there is no built site, and builds
-        // only in two cases this check does not cover for it: a folder publish
-        // of a preview's site, and (since #746) a site an earlier version of
-        // Plantoir built — see the destination leg below. So an agent that ran
-        // it alone would either fail at half six or send whatever was last
-        // previewed.
+        // `deploy.sh` refuses outright when there is no built site. Since #768
+        // it asks the same question as this check before every destination,
+        // and builds in two cases this check does not cover for it: a site an
+        // earlier version of Plantoir built (#746) and a folder publish of a
+        // preview's site. This check is therefore no longer the only guard
+        // against a stale deploy; it is here so the BUILD is its own step, with
+        // its own record kinds (`buildNeededAnAnswer`, `buildDidNotFinish`),
+        // its own `--non-interactive`, and its own line on the trail.
         //
-        // The staleness test is `BuildFreshness.needsRebuild` written out in
+        // The staleness test is `BuildFreshness.whyRebuild` written out in
         // shell, because the app is closed when this runs and cannot be
-        // asked. It has to stay in step with the Swift, so all three of its
-        // parts are here — and the second is the one that matters most.
-        // Its preview check reads the same tree as the Swift's
-        // (`contracts/app-rules.json` → `buildFreshness.previewBuild`), and
-        // `ScheduledPublishOutcomeTests` runs it against every case there.
+        // asked. It has to stay in step with the Swift, so every part of it
+        // is here: no site, an unreadable front page, a preview's build, a
+        // build dated later than now, and anything in the course changed
+        // since the build started. Its preview check reads the same tree as
+        // the Swift's (`contracts/app-rules.json` → `buildFreshness.previewBuild`),
+        // and `ScheduledPublishOutcomeTests` runs it against every case there;
+        // `ReuseTheLastBuildTests` runs it against every
+        // `buildFreshness.reuseTheLastBuild` case.
         let previewPath: String = workspaceURL.appendingPathComponent("preview.sh").path
         let builtIndexPath: String = workspaceURL
             .appendingPathComponent("courses")
@@ -1165,11 +1170,15 @@ enum ScheduledDeploy {
         // update the rebuild happens inside the DESTINATION leg: a build
         // question there is recorded as `neededAnAnswer` and a failed build as
         // `didNotFinish`, against the destination, not as the build's own
-        // kinds. Changing this wrapper would not help the runs that meet it:
-        // a wrapper is written when the deploy is SCHEDULED, so every one set
-        // before 1.9.2 keeps its old text. The advice those outcomes give
-        // (deploy it yourself) still recovers. documentation/05-build-pipeline.md
-        // → "Which toolchain built a site (#746)".
+        // kinds. The advice those outcomes give (deploy it yourself) still
+        // recovers. (This said a wrapper is written when the deploy is
+        // SCHEDULED; since #323 it is written at the run. What stays old is the
+        // folder's own launchers, last mirrored when the folder was opened:
+        // #748 part 4.) The same leg also builds when the folder's launchers
+        // ask the pages question (#768) and this check did not, which only a
+        // change between the two can make happen. documentation/05-build-pipeline.md
+        // → "Which toolchain built a site (#746)" and "A deploy asks for itself
+        // whether anything changed (#768)".
         //
         // The FIRST destination that stopped is the one kept: a course can
         // publish to several and only one may have gone wrong, so overwriting

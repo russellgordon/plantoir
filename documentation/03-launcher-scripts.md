@@ -1218,7 +1218,14 @@ it compares the site's `.built-with-toolchain` stamp with its `$IMAGE` and runs
 `update` reason above; every workspace is made with `-e
 PLANTOIR_TOOLCHAIN_ID=$IMAGE` (the PREVIEW PORT BLOCK) so the stamp names the
 image a build really ran in. [05 → "Which toolchain built a site
-(#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746). (Not checking the BINDINGS there
+(#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746). Since #768 the
+same decision also asks whether anything in the course changed since the build
+(`pages_or_clock_ask_for_a_build`, cut out and run by
+`scripts/test_build_freshness_reuse.py`), asked BEFORE `link_course_build_output`
+can move a built site out of the course, and `preview.sh` and `setup.sh` remake a
+workspace that does not carry `PLANTOIR_TOOLCHAIN_ID=$IMAGE` (`toolchainId`,
+#748 part 3): [05 → "A deploy asks for itself whether anything changed
+(#768)"](05-build-pipeline.md#a-deploy-asks-for-itself-whether-anything-changed-768). (Not checking the BINDINGS there
 is the one part that IS a decision, #684: see "Remaking in `deploy.sh` too"
 among the rejected options above.) `preview.sh` has no writability
 check and no comment in it says why.
@@ -2750,7 +2757,10 @@ and what was measured.
 Most trail lines are written by the app, but a few are written by the
 launcher itself, through `note_on_the_trail` — a refusal (a preview while its
 section deploys, a deploy while that section is busy, a folder spelled two
-ways), and the launcher's own lines from a publish it runs (on the Mac a
+ways), a deploy that built its site first and why (#768: "site built again
+before deploying", one line per reason, written by `deploy.sh` after its
+`preview.sh --build-only` returned 0, so a deploy typed in Terminal is recorded
+too), and the launcher's own lines from a publish it runs (on the Mac a
 scheduled publish is started by the app itself, so those lines are the app's;
 on Windows, Task Scheduler runs `deploy.ps1` and they are the launcher's).
 The function is the same in `setup.sh`, `preview.sh` and `deploy.sh`

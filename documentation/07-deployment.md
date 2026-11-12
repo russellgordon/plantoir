@@ -155,6 +155,24 @@ Netlify supports a
 Deploys always go to **production** (no draft deploys), matching the
 "publish what I previewed" mental model.
 
+### A deploy builds first exactly when something changed (#768)
+
+Since #768 every way of deploying, typed at a command line or pressed in the
+app, reuses the last build only when nothing in the course changed since the
+build that made it started, and builds again first otherwise (Russell's ruling,
+2026-11-12). `deploy.sh` asks before every destination, folder included, in
+the same decision as the toolchain question below; `deploy.py` looks for the
+build in `toolchain_paths.WORK_DIR` (the literal `/tmp/quartz-builds` it read
+until then never matched on Windows, so every Netlify and Cloudflare deploy
+there rebuilt) and asks the same question as a backstop, except where
+`deploy.sh` passed `PLANTOIR_PAGES_ALREADY_ASKED=1`. A deletion counts (#741).
+A deploy typed for a section never built still refuses with "Built site not
+found". The rule and its cases: `contracts/app-rules.json` →
+`buildFreshness.reuseTheLastBuild`; why, measured and rejected:
+[05 → "A deploy asks for itself whether anything changed (#768)"](05-build-pipeline.md#a-deploy-asks-for-itself-whether-anything-changed-768).
+A teacher notices one thing: `./deploy.sh` typed after an edit takes a build
+longer than it used to. That is the fix.
+
 ### Automatic production rebuilds (a site an earlier version built, #746)
 
 Since v1.9.2 a deploy also builds first when the site was built by an earlier
@@ -4330,7 +4348,8 @@ model:
 - `deployAndWait` reads it after the busy check and uses it for the
   destinations, the destination refusal (`deployRefusalReason` is now static
   only, so nothing can reach the window's copy through an instance property),
-  `BuildFreshness` and `MultiDestinationDeployRunner.run`. The decision is the
+  `BuildFreshness.whyRebuild` (whose reason the runner writes on the trail
+  after its own build first, #768) and `MultiDestinationDeployRunner.run`. The decision is the
   static `SectionDetailView.whatADeployUses(windowCourse:anyCopyUnsaved:cloudflareAccountID:)`,
   so the suite can drive it without a view.
 - The sheet reads it on every redraw (`ScheduleDeploySheet.whatTheSheetShows`

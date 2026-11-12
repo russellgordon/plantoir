@@ -3373,9 +3373,6 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   elif [[ -n "$DESIRED_IMAGE_ID" && -n "$RUNNING_IMAGE_ID" && "$RUNNING_IMAGE_ID" != "$DESIRED_IMAGE_ID" ]]; then
     echo "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…"
     remake_the_workspace update
-  elif ! workspace_names_this_toolchain; then
-    echo "♻️  Setting this folder up again so the websites it builds name this version of Plantoir…"
-    remake_the_workspace toolchainId
   elif ! docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>/dev/null | grep -q '9084/tcp'; then
     # An older container publishes only 8081, and published ports cannot
     # be changed after creation — recreating is the only way to add them.
@@ -3388,6 +3385,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     # the safety net for a workspace the image check passed.
     echo "♻️  Setting this folder up again so its previews can only be opened on this Mac…"
     remake_the_workspace thisMacOnly
+  elif ! workspace_names_this_toolchain; then
+    # Last of the reasons, so any remake above also puts the name right.
+    echo "♻️  Setting this folder up again so the websites it builds name this version of Plantoir…"
+    remake_the_workspace toolchainId
   else
     # Mounts match; only start if not already running
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
