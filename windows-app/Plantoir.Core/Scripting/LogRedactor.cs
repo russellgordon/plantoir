@@ -30,6 +30,8 @@ public static class LogRedactor
         new("netlifyToken", @"\bnfp_[A-Za-z0-9]{8,}", RemovedToken),
         new("accountFlag", @"(?i)(--account[=\s]\s*)[A-Za-z0-9]{16,}", "$1" + RemovedAccount),
         new("accountIdentifier", @"(?i)(account\s*id\s*[:=]?\s*)[A-Za-z0-9]{16,}", "$1" + RemovedAccount),
+        // #739: wrangler's "A request to the Cloudflare API (/accounts/<id>/pages/…) failed."
+        new("accountPath", @"(?i)(/accounts/)[A-Za-z0-9]{16,}", "$1" + RemovedAccount),
     };
 
     public static string Redacting(string text)

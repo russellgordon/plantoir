@@ -56,4 +56,28 @@ public class LauncherRunnerCaptureTests : IDisposable
         Assert.DoesNotContain("PLANTOIR_", transcript);
         Assert.Contains("Building ICS3U", transcript);
     }
+
+    /// <summary>
+    /// #739: what a run prints leaves this process for an outside
+    /// assistant's conversation, as progress and as the "Last output" of a
+    /// failure, so it is redacted on the way in like every file the app
+    /// writes. The line is wrangler's own failure shape, the Account ID inside
+    /// the resource path; the ID is a made-up one.
+    /// </summary>
+    [Fact]
+    public void AnAccountIdInWhatTheLauncherPrintsNeverReachesTheAssistant()
+    {
+        const string fakeId = "9b2c4d6e8f0a1b3c5d7e9f0a1b2c3d4e";
+        var progress = new Collect();
+        var capture = new LauncherRunner.OutputCapture(progress);
+
+        capture.Take($"✘ [ERROR] A request to the Cloudflare API (/accounts/{fakeId}/pages/projects/ics3u-1/deployments) failed.");
+        capture.Take($"🚀 deploy.ps1 ICS3U 1 --target cloudflare --account {fakeId}");
+
+        var (transcript, _, _) = capture.Snapshot();
+        Assert.Equal(2, progress.Reports.Count);
+        Assert.All(progress.Reports, report => Assert.DoesNotContain(fakeId, report));
+        Assert.DoesNotContain(fakeId, transcript);
+        Assert.Contains("/accounts/" + LogRedactor.RemovedAccount + "/pages/projects/ics3u-1", transcript);
+    }
 }

@@ -1257,6 +1257,19 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   made-up ID); no real Cloudflare deploy was run through `plantoir-mcp`.
   `AssistWorkspace.CloudflareAccountIdOverrideForTests` is held per async
   flow now, so two test classes setting it cannot race.
+  **What the run prints is redacted before it leaves the process**
+  (`LauncherRunner.OutputCapture`): progress lines and the kept tail both
+  reach an outside assistant's conversation, and a failing wrangler call
+  names its resource, `/accounts/<id>/pages/…`, which no rule caught. A new
+  rule, `accountPath`, and its case in `shared-rules.json` →
+  `problemReportRedaction` (proposed from Windows; the mac's
+  `LogRedactor.swift` lacks it, so its suite goes red until it adds it, the
+  `mac` issue). On the window's side the console is the teacher's own; what
+  it writes to disk already went through `LogRedactor` (the run transcripts,
+  `ProblemReportStore.SaveRunTranscript`, and the trail), so the new rule
+  covers them too. A scheduled Cloudflare leg's output goes to a temporary
+  file in `scheduledolder-problems` that the wrapper deletes after reading
+  one marker from it; it is not redacted, and does not outlive the run.
 - **The trail.** `ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId`
   ("deploy refused for the Cloudflare Account ID"), written from that
   refusal before the dialog goes up, by kind, never the ID: "ICS3U/1 · deploy
@@ -1271,7 +1284,7 @@ five sentences, `netlifyNoteCases` for both notes and for the schedule note,
 `deployWithoutAnAccountID.cases` for the refusal, Open Settings…, the line and
 that the line never carries the ID, and a source check that OK stays the
 refusal's default button). `HeadlessCloudflareDeployTests` runs every
-`deployWithoutAnAccountID` case through the headless deploy (below). Through the window,
+`deployWithoutAnAccountID` case through the headless deploy (above). Through the window,
 `PublishingDestinationsUiTests` (the refusal's Open Settings… and its trail
 line; a folder refused first with neither; the sentences in the dialog;
 Course Settings and Schedule a deploy for a course with no destination saved),
