@@ -54,6 +54,12 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 DEV_TEST_IMAGE="quartz-teacher:dev-test"
+# Every launcher this run starts writes its trail lines here, never into the
+# teacher's own trail (contracts/app-rules.json -> launcherTrailFolder). Since
+# #768 a deploy that builds first writes a line, and this run deploys often;
+# the #768 checks below read the lines back from here.
+VERIFY_TRAIL_DIR="$(mktemp -d -t plantoir-verify-trail)"
+export PLANTOIR_TRAIL_DIR="$VERIFY_TRAIL_DIR"
 # The launchers name their container after the working folder.
 CONTAINER_NAME="teaching-quartz-$(/bin/pwd -P | shasum -a 256 | cut -c1-8)"
 # The launchers' own way of naming a folder they hand to a container, loaded
@@ -729,6 +735,16 @@ if (cd scripts && python3 test_deploy_toolchain_stamp.py) >/tmp/verify_deploy_to
 else
   fail "a site an earlier version of Plantoir built is built again before it is deployed, once (scripts/test_deploy_toolchain_stamp.py, #746)"
   cat /tmp/verify_deploy_toolchain_stamp_test.log
+fi
+
+# A deploy reuses the last build only when nothing has changed (GitHub #768,
+# #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
+# and deploy.sh's own question, and the real deploy.sh and deploy.py.
+if (cd scripts && python3 test_build_freshness_reuse.py) >/tmp/verify_build_freshness_reuse_test.log 2>&1; then
+  pass "a deploy reuses the last build only when nothing in the course changed, a deletion included (scripts/test_build_freshness_reuse.py, #768)"
+else
+  fail "a deploy reuses the last build only when nothing in the course changed, a deletion included (scripts/test_build_freshness_reuse.py, #768)"
+  cat /tmp/verify_build_freshness_reuse_test.log
 fi
 
 # A refused publishing token is explained in the launchers' own words, and a
@@ -6544,19 +6560,32 @@ rm -rf "$VERIFY_LOCK_DIR" "$VERIFY_LOCK_BUILDS"
 # tagged image, and a section redeployed under 1.9.1 still served 1.9.0's
 # stylesheet: nothing a teacher wrote had changed, so the deploy found the
 # site up to date, and the one rebuild it made ran in the folder's OLD
-# workspace. Here an earlier version's site is planted - its stamp, its
-# stylesheet, and the workspace's copy of the recipe's tasks.scss without the
-# rule - and a plain folder deploy, with no --full-rebuild anywhere, must
-# publish the rule the recipe carries now. Measured failing on the old
-# deploy.sh in a scratch folder (documentation/05-build-pipeline.md ->
-# "Which toolchain built a site (#746)").
+# workspace. Since #748 part 1 this is proved against a real earlier
+# WORKSPACE, not a planted copy: an image is made from this run's with the
+# rule taken out of the recipe's tasks.scss (docker commit, seconds rather
+# than a second build), the folder's workspace is made from it by preview.sh
+# itself and builds the site in it, and a plain folder deploy, with no
+# --full-rebuild anywhere, must remake the workspace from this run's image
+# and publish the rule. A planted copy could not tell a rebuild inside the
+# old workspace (#746's own bug) from a right one, because build_site.py
+# re-copies tasks.scss from the image on every build. Measured failing with
+# deploy.sh's rebuild doctored to run build_site.py in the existing
+# workspace (documentation/05-build-pipeline.md -> "Which toolchain built a
+# site (#746)").
+# BEGIN the old-workspace and reuse checks (#746, #748, #768)
 echo ""
-echo "🔁 A site an earlier version built is built again before it is deployed (#746)…"
+echo "🔁 A site an earlier version built is built again before it is deployed (#746, #748)…"
 TC_SECTION="courses/EXC2O/.merged_output/section1"
-TC_WORKSPACE_STYLE="/tmp/quartz-builds/EXC2O/section1/quartz/components/styles/tasks.scss"
+TC_IMAGE_STYLE="/opt/support/quartz/components/styles/tasks.scss"
 TC_RECIPE_RULE='vertical-align: calc(0.5cap - 8px)'
 TC_BUILT_RULE='vertical-align:calc(.5cap - 8px)'
+TC_OLD_IMAGE="teaching-quartz:verify-746-old"
+TC_MAKER="plantoir-verify-746-old-maker"
 TC_OUT="$(mktemp -d -t plantoir-verify-746)"
+TC_TRAIL="$VERIFY_TRAIL_DIR/activity.txt"
+tc_trail_count() { grep -cF "$1" "$TC_TRAIL" 2>/dev/null || true; }
+tc_started_ns() { python3 -c 'import os,sys; print(os.stat(sys.argv[1]).st_mtime_ns)' "$TC_SECTION/.build-started" 2>/dev/null || echo none; }
+tc_deployed() { (cd "$TC_OUT" && find . -type f -print0 | sort -z | xargs -0 shasum) 2>/dev/null; }
 if grep -Fq "$TC_RECIPE_RULE" support/quartz/components/styles/tasks.scss; then
   pass "the recipe's tasks.scss carries the rule this check looks for (#746)"
 else
@@ -6568,12 +6597,38 @@ if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
 else
   fail "the built site is stamped '${TC_STAMP:-nothing}', not $DEV_TEST_IMAGE (#746)"
 fi
-docker exec "$CONTAINER_NAME" sh -c "sed -i 's/vertical-align: calc(0.5cap - 8px);//' '$TC_WORKSPACE_STYLE'" 2>/dev/null || true
-printf '/* built by an earlier version */\n' > "$TC_SECTION/public/index.css"
-printf 'teaching-quartz:src-00000000\n' > "$TC_SECTION/.built-with-toolchain"
-if docker exec "$CONTAINER_NAME" grep -Fq "$TC_RECIPE_RULE" "$TC_WORKSPACE_STYLE" 2>/dev/null; then
-  fail "could not plant the earlier version's tasks.scss in the workspace (#746)"
+# An earlier version's image: this run's, with the rule taken out of the recipe.
+docker rm -f "$TC_MAKER" >/dev/null 2>&1 || true
+TC_MADE="no"
+if docker run -d --name "$TC_MAKER" "$DEV_TEST_IMAGE" tail -f /dev/null >/dev/null 2>&1 \
+   && docker exec "$TC_MAKER" sh -c "sed -i 's/vertical-align: calc(0.5cap - 8px);//' '$TC_IMAGE_STYLE'" \
+   && ! docker exec "$TC_MAKER" grep -Fq "$TC_RECIPE_RULE" "$TC_IMAGE_STYLE" \
+   && docker commit "$TC_MAKER" "$TC_OLD_IMAGE" >/dev/null 2>&1; then
+  TC_MADE="yes"
 fi
+docker rm -f "$TC_MAKER" >/dev/null 2>&1 || true
+if [[ "$TC_MADE" == "yes" ]]; then
+  pass "an earlier version's image was made from this run's, without the rule (#748)"
+else
+  fail "could not make an earlier version's image (#748)"
+fi
+# The folder's workspace made from it, by the launcher, and the site built in it.
+if ./preview.sh EXC2O 1 --build-only --non-interactive --image "$TC_OLD_IMAGE" \
+     >/tmp/verify_old_workspace_build.log 2>&1; then
+  pass "preview.sh built the site in a workspace made from the earlier image (#748)"
+else
+  fail "preview.sh could not build the site in a workspace made from the earlier image (#748)"
+  tail -20 /tmp/verify_old_workspace_build.log
+fi
+TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
+TC_RUNNING="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
+if [[ "$TC_STAMP" == "$TC_OLD_IMAGE" && "$TC_RUNNING" == "$TC_OLD_IMAGE" ]] \
+   && ! grep -Fq "$TC_BUILT_RULE" "$TC_SECTION/public/index.css" 2>/dev/null; then
+  pass "so the site is an earlier version's: its stamp, its workspace, and a stylesheet without the rule (#748)"
+else
+  fail "the planted site is not an earlier version's (stamp '${TC_STAMP:-nothing}', workspace '$TC_RUNNING') (#748)"
+fi
+TC_UPDATED_BEFORE="$(tc_trail_count "built the website again before deploying it — Plantoir had been updated since it was last built")"
 if ./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
      >/tmp/verify_toolchain_stamp_deploy.log 2>&1; then
   pass "a folder deploy of a site an earlier version built finished (#746)"
@@ -6586,6 +6641,11 @@ if grep -q "Plantoir has been updated since this site was built" /tmp/verify_too
 else
   fail "the deploy did not build the site again first (#746)"
 fi
+if grep -q "PLANTOIR_FOLDER_SET_UP_AGAIN: update EXC2O/1" /tmp/verify_toolchain_stamp_deploy.log; then
+  pass "and it made the folder's workspace again from this run's image before building (#748)"
+else
+  fail "the deploy did not remake the earlier version's workspace before building, so it built in the old one (#748)"
+fi
 if grep -Fq "$TC_BUILT_RULE" "$TC_OUT/section1/index.css" 2>/dev/null; then
   pass "and the deployed stylesheet carries the recipe's rule ($TC_BUILT_RULE), without --full-rebuild (#746)"
 else
@@ -6597,7 +6657,99 @@ if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then
 else
   fail "the rebuilt site is stamped '${TC_STAMP:-nothing}', not $DEV_TEST_IMAGE (#746)"
 fi
+TC_UPDATED_AFTER="$(tc_trail_count "built the website again before deploying it — Plantoir had been updated since it was last built")"
+if [[ "$((TC_UPDATED_AFTER - TC_UPDATED_BEFORE))" == "1" ]]; then
+  pass "and the trail says, once, that the site was built again because Plantoir had been updated (#748 part 2)"
+else
+  fail "the trail has $((TC_UPDATED_AFTER - TC_UPDATED_BEFORE)) 'Plantoir had been updated' lines for that deploy, not 1 (#748 part 2)"
+fi
+docker rmi "$TC_OLD_IMAGE" >/dev/null 2>&1 || true
+
+# A workspace that does not name its toolchain (#748 part 3): made here by a
+# copy of preview.sh with the PLANTOIR_TOOLCHAIN_ID line taken out, as a
+# hand-made workspace or an older verify.sh made one. Every site it builds is
+# stamped with something else, so before part 3 every deploy built again.
+# The copy sits beside preview.sh because a launcher works in its own folder.
+echo "🔁 A workspace that does not name its toolchain is made again once (#748 part 3)…"
+TC_NAMELESS="./.verify-preview-without-the-toolchain-name.sh"
+grep -vF -- '-e "PLANTOIR_TOOLCHAIN_ID=$IMAGE" \' preview.sh > "$TC_NAMELESS"
+docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+if bash "$TC_NAMELESS" EXC2O 1 --build-only --non-interactive --image "$DEV_TEST_IMAGE" \
+     >/tmp/verify_nameless_workspace_build.log 2>&1 \
+   && ! docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" | grep -q '^PLANTOIR_TOOLCHAIN_ID='; then
+  pass "a workspace made without the toolchain's name built the site (#748 part 3)"
+else
+  fail "could not make a workspace without the toolchain's name (#748 part 3)"
+  tail -20 /tmp/verify_nameless_workspace_build.log
+fi
+rm -f "$TC_NAMELESS"
+./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+  >/tmp/verify_nameless_deploy.log 2>&1 || true
+if grep -q "PLANTOIR_FOLDER_SET_UP_AGAIN: toolchainId EXC2O/1" /tmp/verify_nameless_deploy.log \
+   && docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" | grep -Fxq "PLANTOIR_TOOLCHAIN_ID=$DEV_TEST_IMAGE"; then
+  pass "the next deploy made that workspace again, naming the toolchain (#748 part 3)"
+else
+  fail "the next deploy did not make the nameless workspace again (#748 part 3)"
+  tail -20 /tmp/verify_nameless_deploy.log
+fi
+
+# A deploy reuses the last build only when nothing has changed (#768, #741).
+# Deployed twice with nothing changed, the second must not build: this is the
+# end-to-end proof that counting the course folder and its folders (the plan
+# review's H1) does not make every deploy build, which it would if a build or
+# a deploy wrote anything that is not hidden into the course. Then a page is
+# added, and then deleted (#741): each deploy builds once and says why.
+echo "🔁 A deploy reuses the last build only when nothing has changed (#768)…"
+TC_BEFORE_NS="$(tc_started_ns)"
+TC_BEFORE_FILES="$(tc_deployed)"
+./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+  >/tmp/verify_reuse_deploy.log 2>&1 || true
+if ! grep -q "🔁" /tmp/verify_reuse_deploy.log && [[ "$(tc_started_ns)" == "$TC_BEFORE_NS" ]] \
+   && [[ "$(tc_deployed)" == "$TC_BEFORE_FILES" ]] && [[ "$TC_BEFORE_NS" != "none" ]]; then
+  pass "a deploy with nothing changed since the last build reused it: no build, the same files (#768)"
+else
+  fail "a deploy with nothing changed built again or changed what was deployed (#768)"
+  tail -20 /tmp/verify_reuse_deploy.log
+fi
+TC_PAGE="courses/EXC2O/Concepts/Verify Reuse 768.md"
+TC_WORDS="verify-768-a-page-that-comes-and-goes"
+TC_PAGES_LINE="EXC2O/1 · built the website again before deploying it — something in the course had changed since it was last built"
+TC_PAGES_BEFORE="$(tc_trail_count "$TC_PAGES_LINE")"
+printf -- '---\ntitle: Verify Reuse 768\npublishForSection1: true\n---\n\n%s\n' "$TC_WORDS" > "$TC_PAGE"
+./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+  >/tmp/verify_reuse_added.log 2>&1 || true
+if [[ "$(grep -c "Something in this course has changed since its site was last built" /tmp/verify_reuse_added.log)" == "1" ]] \
+   && grep -rqF "$TC_WORDS" "$TC_OUT/section1" 2>/dev/null; then
+  pass "a page added since the last build: the deploy built once, said why, and deployed the page (#768)"
+else
+  fail "a page added since the last build was not built and deployed (#768)"
+  tail -20 /tmp/verify_reuse_added.log
+fi
+rm -f "$TC_PAGE"
+./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+  >/tmp/verify_reuse_deleted.log 2>&1 || true
+if grep -q "Something in this course has changed since its site was last built" /tmp/verify_reuse_deleted.log \
+   && ! grep -rqF "$TC_WORDS" "$TC_OUT/section1" 2>/dev/null; then
+  pass "a page deleted since the last build: the deploy built again and the page left the site (#741)"
+else
+  fail "a page deleted since the last build stayed on the deployed site (#741)"
+  tail -20 /tmp/verify_reuse_deleted.log
+fi
+if [[ "$(( $(tc_trail_count "$TC_PAGES_LINE") - TC_PAGES_BEFORE ))" == "2" ]]; then
+  pass "and the trail says, for each, that something in the course had changed (#768)"
+else
+  fail "the trail does not have one 'something in the course had changed' line for each of those deploys (#768)"
+fi
+./deploy.sh EXC2O 1 --to-folder "$TC_OUT" --non-interactive --image "$DEV_TEST_IMAGE" \
+  >/tmp/verify_reuse_again.log 2>&1 || true
+if ! grep -q "🔁" /tmp/verify_reuse_again.log; then
+  pass "and the deploy after that reused the build (#768)"
+else
+  fail "the deploy after a build built again, so every deploy would (#768)"
+  tail -20 /tmp/verify_reuse_again.log
+fi
 rm -rf "$TC_OUT"
+# END the old-workspace and reuse checks (#746, #748, #768)
 
 RUNNING_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo '(none)')"
 if [[ "$RUNNING_IMAGE" == "$DEV_TEST_IMAGE" ]]; then

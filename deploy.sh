@@ -1261,74 +1261,6 @@ else
   IMAGE="teaching-quartz:src-$(toolchain_hash "$BUILD_CONTEXT")"
 fi
 
-# Settled before the paths below are read: MERGED_DIR_HOST and everything
-# under it resolve THROUGH the link, and a course still holding a real
-# .merged_output folder has to be moved out before the preflight looks.
-link_course_build_output "$COURSE_CODE"
-
-# Host-side paths (bind-mounted into the container at /teaching/courses)
-COURSE_DIR_HOST="$(pwd)/courses/${COURSE_CODE}"
-MERGED_DIR_HOST="${COURSE_DIR_HOST}/.merged_output"
-SECTION_DIR_HOST="${MERGED_DIR_HOST}/section${SECTION_NUM}"
-PUBLIC_DIR_HOST="${SECTION_DIR_HOST}/public"
-
-# Detect host timezone offset in ±HHMM format
-HOST_TZ_OFFSET="$(date +%z)"
-echo "🕒 Host timezone offset: $HOST_TZ_OFFSET"
-
-# Preflight checks
-if [[ ! -d "${COURSE_DIR_HOST}" ]]; then
-  echo "❌ Course folder not found on host:"
-  echo " ${COURSE_DIR_HOST}"
-  echo
-  echo " Make sure you've run the course setup and/or preview steps."
-  echo " Try: ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
-  if [[ -d "$(pwd)/courses" ]]; then
-    echo
-    echo " Available course folders:"
-    ls -1 "$(pwd)/courses" | sed 's/^/ - /'
-  fi
-  exit 1
-fi
-
-if [[ ! -d "${SECTION_DIR_HOST}" ]]; then
-  echo "❌ Section directory not found on host:"
-  echo " ${SECTION_DIR_HOST}"
-  echo
-  echo " You likely need to build the merged output first:"
-  echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
-  if [[ -d "${MERGED_DIR_HOST}" ]]; then
-    EXISTING_SECTIONS=$(ls -1d "${MERGED_DIR_HOST}"/section* 2>/dev/null | xargs -n1 basename || true)
-    if [[ -n "${EXISTING_SECTIONS:-}" ]]; then
-      echo
-      echo " Existing merged sections for ${COURSE_CODE}:"
-      echo "${EXISTING_SECTIONS}" | sed 's/^/ - /'
-    fi
-  fi
-  exit 1
-fi
-
-_BUILT_FOUND="false"
-for ((_i=0; _i<10; _i++)); do
-  if [[ -d "${PUBLIC_DIR_HOST}" && -n "$(ls -A "${PUBLIC_DIR_HOST}" 2>/dev/null || true)" ]]; then
-    _BUILT_FOUND="true"
-    break
-  fi
-  sleep 0.2
-done
-
-if [[ "$_BUILT_FOUND" != "true" ]]; then
-  echo "❌ Built site not found at:"
-  echo " ${PUBLIC_DIR_HOST}"
-  echo
-  echo " If you have just built, check this section still has its front page."
-  echo " A section without one produces no website, so there is nothing to deploy."
-  echo
-  echo " Build first:"
-  echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM} --build-only"
-  exit 1
-fi
-
 # -------------------- Did THIS version build the site? (#746) ----------
 # A site is deployed as it was built, and nothing a teacher wrote had to
 # change for the toolchain to change: 1.9.1's tick-box rule (#693) and quiz
@@ -1421,14 +1353,93 @@ pages_or_clock_ask_for_a_build() {
 # Toolchain first: its rebuild covers a page change as well, so one build at
 # most, and its words are the more surprising. Not for --reset-token, which
 # deploys nothing and exits further down.
+#
+# Asked HERE, before link_course_build_output below moves a built site out of
+# a course that still holds one: the move puts a link in the course folder,
+# whose own time then changes, and nothing students see has changed. The
+# answer is acted on after the preflight, which refuses a section with no
+# built site first. The paths are spelled out because COURSE_DIR_HOST and the
+# rest are set only after the move.
 _REBUILD_FOR=""
 if [[ "$RESET_TOKEN" != "true" ]]; then
-  if ! site_was_built_by_this_toolchain "${SECTION_DIR_HOST}" "$IMAGE"; then
+  _ASKED_COURSE="$(pwd)/courses/${COURSE_CODE}"
+  _ASKED_SECTION="${_ASKED_COURSE}/.merged_output/section${SECTION_NUM}"
+  if ! site_was_built_by_this_toolchain "${_ASKED_SECTION}" "$IMAGE"; then
     _REBUILD_FOR="toolchain"
   else
-    _REBUILD_FOR="$(pages_or_clock_ask_for_a_build "${COURSE_DIR_HOST}" "${SECTION_DIR_HOST}")" || _REBUILD_FOR=""
+    _REBUILD_FOR="$(pages_or_clock_ask_for_a_build "${_ASKED_COURSE}" "${_ASKED_SECTION}")" || _REBUILD_FOR=""
   fi
 fi
+# Settled before the paths below are read: MERGED_DIR_HOST and everything
+# under it resolve THROUGH the link, and a course still holding a real
+# .merged_output folder has to be moved out before the preflight looks.
+link_course_build_output "$COURSE_CODE"
+
+# Host-side paths (bind-mounted into the container at /teaching/courses)
+COURSE_DIR_HOST="$(pwd)/courses/${COURSE_CODE}"
+MERGED_DIR_HOST="${COURSE_DIR_HOST}/.merged_output"
+SECTION_DIR_HOST="${MERGED_DIR_HOST}/section${SECTION_NUM}"
+PUBLIC_DIR_HOST="${SECTION_DIR_HOST}/public"
+
+# Detect host timezone offset in ±HHMM format
+HOST_TZ_OFFSET="$(date +%z)"
+echo "🕒 Host timezone offset: $HOST_TZ_OFFSET"
+
+# Preflight checks
+if [[ ! -d "${COURSE_DIR_HOST}" ]]; then
+  echo "❌ Course folder not found on host:"
+  echo " ${COURSE_DIR_HOST}"
+  echo
+  echo " Make sure you've run the course setup and/or preview steps."
+  echo " Try: ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
+  if [[ -d "$(pwd)/courses" ]]; then
+    echo
+    echo " Available course folders:"
+    ls -1 "$(pwd)/courses" | sed 's/^/ - /'
+  fi
+  exit 1
+fi
+
+if [[ ! -d "${SECTION_DIR_HOST}" ]]; then
+  echo "❌ Section directory not found on host:"
+  echo " ${SECTION_DIR_HOST}"
+  echo
+  echo " You likely need to build the merged output first:"
+  echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM}"
+  if [[ -d "${MERGED_DIR_HOST}" ]]; then
+    EXISTING_SECTIONS=$(ls -1d "${MERGED_DIR_HOST}"/section* 2>/dev/null | xargs -n1 basename || true)
+    if [[ -n "${EXISTING_SECTIONS:-}" ]]; then
+      echo
+      echo " Existing merged sections for ${COURSE_CODE}:"
+      echo "${EXISTING_SECTIONS}" | sed 's/^/ - /'
+    fi
+  fi
+  exit 1
+fi
+
+_BUILT_FOUND="false"
+for ((_i=0; _i<10; _i++)); do
+  if [[ -d "${PUBLIC_DIR_HOST}" && -n "$(ls -A "${PUBLIC_DIR_HOST}" 2>/dev/null || true)" ]]; then
+    _BUILT_FOUND="true"
+    break
+  fi
+  sleep 0.2
+done
+
+if [[ "$_BUILT_FOUND" != "true" ]]; then
+  echo "❌ Built site not found at:"
+  echo " ${PUBLIC_DIR_HOST}"
+  echo
+  echo " If you have just built, check this section still has its front page."
+  echo " A section without one produces no website, so there is nothing to deploy."
+  echo
+  echo " Build first:"
+  echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM} --build-only"
+  exit 1
+fi
+
+# -------------------- Build first when something changed (#746, #768) ---
+# What was asked above, before the built site could be moved, acted on now.
 if [[ -n "$_REBUILD_FOR" ]]; then
   # The words differ by reason; none of the new ones holds an anchor
   # windows-app's LauncherRulesContractTests reads (its toolchain pair is
