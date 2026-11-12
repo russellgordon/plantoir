@@ -9934,11 +9934,113 @@
       ]
     },
     "aBuildWithNoLinkIsNotAdopted": {
-      "rule": "A per-course builds folder found with no link pointing at it is CLEARED, never reused.",
+      "rule": "A per-course builds folder found with no link pointing at it is CLEARED, never reused. Its kept copies of geogebra.org sketches are the one thing the clear leaves: keptCopiesSurviveTheClear.",
       "why": "Archiving a course, restoring one from a backup, and replacing a course's contents all remove the link along with everything else in the course folder — and each of them leaves content whose timestamps may be OLDER than the built site standing outside. Adopting that build would let a restored course publish last month's pages while every freshness check said it was up to date, which is the silent wrong answer this codebase refuses. Archiving a course or a section discards its build outright as well, so the clearing is a safety net rather than the only line of defence.",
       "aSecondMacClearsRatherThanAdopts": "A link left by a SECOND MAC sharing the folder clears this machine's build too, rather than adopting it. ADOPTING was proposed by one adversarial review and rejected by the next, and the reasoning is the point. Adopting looks strictly better: a teacher switching between two Macs would keep each machine's build instead of rebuilding after every switch. But the second Mac cannot tell 'the folder came back unchanged' from 'the folder was archived and restored while I was shut' — and in the second case the pages it would adopt a build for are OLDER than that build, so the freshness check says up to date and the teacher publishes what they undid. Clearing costs one rebuild, which is cheap and visible; adopting risks a wrong site nobody is told about. A generation stamp carried in the course folder (a UUID written beside the link and copied into the build, adopted only when the two match) would buy both, and was judged not worth a new synced file inside a teacher's vault for a case this rare. If two-Mac working ever becomes common, that is the design to build.",
       "renameIsTheException": "Renaming a course CARRIES its build across to the new code and re-points the link, because the built site used to travel with the folder and a rename should not silently cost a teacher their website.",
       "restoringOneSection": "Putting ONE section's pages back — from a backup, or by the assistant undoing what it just did — discards that section's built website too. The link is at COURSE level and survives, so the clearing rule above does not reach it. This staleness is OLDER than the move: it was equally true when .merged_output sat inside the course folder, because a section restore replaces section<N> and never touched the built tree beside it. Found and fixed on 2026-09-05 while moving the output; recorded as pre-existing so the fix is not read as repairing damage this piece did."
+    },
+    "keptCopiesSurviveTheClear": {
+      "rule": "Every clear of a course's builds folder keeps `folder`, the copies of geogebra.org sketches kept beside the course's built sites (geogebraFences.cache): a course never linked, a link pointing anywhere else, a missing link, and a file where the link belongs all clear the built sites and leave the kept copies where they are. Moving a real .merged_output out of the working folder carries the copies already beside the built sites INTO the site being moved before anything is cleared; where both hold a copy under the same key the moved site's copy wins, because it is the one the course's builds have been using, and the copies only the builds folder holds are added to it. The built sites themselves are still cleared, exactly as aBuildWithNoLinkIsNotAdopted says. Only a REAL folder is kept: a `folder` that is a file, a link or a link to itself is cleared with the rest, so the course can keep copies again, and removing a link never touches what it points at. Copies are carried only out of a REAL builds folder, so a builds folder that is a link gives up nothing of the folder it points at. Every entry of the folder is carried, a name starting with a dot included, by both implementations. Restoring a whole course from a backup in the app keeps them too. Implemented in the launchers' BUILD OUTPUT BLOCK (KEPT_COPIES_FOLDER) and in the app (BuildOutputLocation.keptCopiesFolderName); the cases below are run by scripts/test_build_output_link.sh against the real block and by BuildOutputLocationTests against the app, which skips the cases that carry a `fault` (shell only: they shadow a command).",
+      "folder": ".geogebra-cache",
+      "why": "A kept copy is the one thing under the builds folder that is NOT derived from the teacher's notes: it was fetched from geogebra.org, so a cleared copy comes back only while the Mac is online, and a sketch with no copy and no connection is a folder problem (geogebraFences.cache). It is also the one thing the clear has no reason to remove. The clear exists because a build with no link may be OLDER than the pages it would publish; a kept copy is named by the key of the fence that asked for it (figureRules.keyOf), so it is right for any page that still carries that fence, whatever happened to the course folder in between. Measured 2026-11-12 with the launcher's own block against a scratch folder before the change: a course never linked, a link naming another Mac's folder, and a missing link each lost a planted copy; the course already linked kept it. A brand-new working copy is the first case, which is why verify.sh's GeoGebra check failed on its first run in a fresh clone and passed on the second.",
+      "howTheyAreKept": "In place. The clear removes every entry of the builds folder except `folder`, so no step puts the copies anywhere else and a run stopped halfway leaves fewer built files, never fewer copies. The move out of the working folder moves the copies into the site being moved, so the move, and the put-back when the link cannot be made, carry them; when a copy cannot be moved nothing is cleared and the built website stays where it is, with every copy still in one of the two folders.",
+      "whenTheyCannotBeKept": "Nothing new is said to a teacher, because no branch loses a copy: the one failure that could, a copy that cannot be moved during the move out of the working folder, leaves everything where it was and prints the move's existing line that the built website was left where it is.",
+      "onlyThisFolder": "The other caches beside the built sites, .figure-cache (diagrams and graphs) and .swift-cache (Swift blocks), are still cleared. Both are made again on this computer with no network: the figures from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB on the mac and 2.3 GB on Windows (codeRunnerBlocks.swift.downloadGigabytes) kept in its own image on the mac and under %LOCALAPPDATA% on Windows, which no clear here touches. So a clear costs time and nothing else: every diagram is drawn again, and every Swift block on the course's pages is compiled again on the next build. Keeping them was left out to keep this to the copies that cannot be made again offline.",
+      "noSweepHere": "A copy whose fence has gone is harmless and stays until geogebraFences.cache's own rule removes it: an entry unused for pruneDays is removed by the build that next reads the folder. Moving a copy keeps its modification time, so surviving a clear does not reset that clock. No sweep was added here.",
+      "rejected": [
+        "Setting the copies aside in another folder, clearing, and putting them back. A run stopped between the two steps would leave the copies in a folder no reader looks in, and the app's sweep of the builds folder removes every entry that is not a course code it has, so the copies set aside would be thrown away by the next folder-open. Keeping them in place leaves no such state.",
+        "Moving the kept copies into the course folder, hidden, so they would travel with the course to a second Mac and into backups (Russell's first ruling on #789, replaced the same day). A build that fetches a sketch would then write into the course folder, which the check of whether anything in the course changed since the last build could read as a change, and it would add files to whatever syncs or backs up the course. A second Mac, or a synced copy opened elsewhere, fetches the sketches again the first time it builds online, as before.",
+        "Adopting the whole build when the link is missing. Rejected long before this piece, for the reason aBuildWithNoLinkIsNotAdopted gives; keeping the copies is safe where adopting the site is not, because a copy is keyed by the fence and a site is not keyed by anything."
+      ],
+      "cases": [
+        {
+          "name": "a course never linked, with copies already kept for it",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": false, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites", "b": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a link that went missing (a restored or synced course), over a built site and its copies",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites", "b": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a link naming another Mac's builds folder",
+          "courseFolder": "a link to another Mac's builds folder",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a file where the link belongs",
+          "courseFolder": "a file where the link belongs",
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": true}
+        },
+        {
+          "name": "a built site moved out of the working folder, both holding copies",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b", "c"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder", "c": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a built site with no copies of its own moved out of the working folder",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": [],
+          "buildsFolder": {"builtSite": false, "keptCopies": ["a"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a move whose link cannot be made is put back, copies and all",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", "b"]},
+          "fault": "the link cannot be made",
+          "expect": {"link": "a real folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a move where a kept copy cannot be carried leaves everything where it was",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a"]},
+          "fault": "a kept copy cannot be moved",
+          "expect": {"link": "a real folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": false, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a copy whose name starts with a dot is carried with the rest in the move",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": true, "keptCopies": ["a", ".dot"]},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"a": "beside the built sites", ".dot": "beside the built sites", "b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false}
+        },
+        {
+          "name": "a kept-copies folder that is a file is cleared with the rest",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a file"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true}
+        },
+        {
+          "name": "a kept-copies folder that is a link to a folder outside is cleared, and the folder outside is not touched",
+          "courseFolder": "no link",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a link to a folder outside"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true, "theFolderOutsideIsUntouched": true}
+        },
+        {
+          "name": "a kept-copies folder that is a link to itself is cleared",
+          "courseFolder": "a link to another Mac's builds folder",
+          "buildsFolder": {"builtSite": true, "keptCopies": [], "keptCopiesFolderIs": "a link to itself"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "gone", "keptCopies": {}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "nothingRemainsInTheBuildsFolder": true}
+        },
+        {
+          "name": "a builds folder that is a link: the move takes no copy out of what it points at",
+          "courseFolder": "a built site of its own",
+          "courseFolderKeptCopies": ["b"],
+          "buildsFolder": {"builtSite": false, "keptCopies": [], "is": "a link to a folder outside"},
+          "expect": {"link": "this Mac's builds folder", "builtSite": "in the course folder", "keptCopies": {"b": "in the course folder"}, "readByTheNextBuild": true, "onlyTheKeptCopiesRemain": false, "theFolderOutsideIsUntouched": true}
+        }
+      ]
     },
     "aSecondSpellingIsClearedAway": {
       "rule": "A launcher handed a spelling of its folder that is not the disk's own clears away the second copy that spelling made before GitHub #189: the workspace teaching-quartz-{id of the spelling handed} if it is STOPPED (plain docker rm, never -f), and builds/{that id} if its working-folder.txt names THIS folder (an EMPTY note names no folder) and no workspace, running or stopped, still mounts it. A RUNNING one is left exactly as it is and named on the console. Nothing is removed when Docker cannot be asked, and the teacher's courses are never touched. It lives in the PREVIEW PORT BLOCK the three launchers share (clear_away_this_folders_other_spelling), called once by each just before it looks at its own workspace.",

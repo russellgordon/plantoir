@@ -61,6 +61,18 @@ nonisolated enum BuildOutputLocation {
     /// tell an abandoned one from a live one — the hash cannot be reversed.
     static let workingFolderMarkerName: String = "working-folder.txt"
 
+    /// The folder beside a course's built sites that holds the copies of
+    /// geogebra.org sketches its pages name (`scripts/geogebra.py`
+    /// `CACHE_FOLDER`). It is the one thing under a builds folder that is not
+    /// derived from the teacher's notes: a cleared copy comes back only while
+    /// the Mac is online. Each copy is named by the key of the fence that
+    /// asked for it, so it is right for any page that still carries that
+    /// fence, which is why every clear here keeps it while the built sites
+    /// go (#789, `contracts/shared-rules.json` →
+    /// `buildOutputLocation.keptCopiesSurviveTheClear`). The launchers keep
+    /// the same folder as `KEPT_COPIES_FOLDER`.
+    static let keptCopiesFolderName: String = ".geogebra-cache"
+
     /// Where builds go. Replaceable so a test can point it somewhere of its
     /// own rather than writing into the teacher's real Application Support.
     nonisolated(unsafe) static var buildsRootOverride: URL?
@@ -250,7 +262,21 @@ nonisolated enum BuildOutputLocation {
         if directoryExists(link) {
             // A real folder: the teacher's current built site, and the one
             // thing here that is authoritative. Anything already standing at
-            // the target belongs to an earlier life of this course code.
+            // the target belongs to an earlier life of this course code,
+            // except its kept copies of geogebra.org sketches. Those go INTO
+            // the site being moved first, so the clear below cannot reach
+            // them and the move, and the put-back if the link fails, carry
+            // them along. The moved site's copy wins a key both hold. If a
+            // copy cannot be carried, this throws before anything is cleared,
+            // and every copy is still in one of the two folders.
+            // Only out of a REAL builds folder: when it is a link, the copies
+            // seen through it belong to whatever it points at.
+            if isRealDirectory(target) {
+                try carryKeptCopies(
+                    from: target.appendingPathComponent(keptCopiesFolderName),
+                    into: link.appendingPathComponent(keptCopiesFolderName)
+                )
+            }
             if fileManager.fileExists(atPath: target.path) {
                 try? fileManager.removeItem(at: target)
             }
@@ -288,6 +314,16 @@ nonisolated enum BuildOutputLocation {
     static func discardBuild(forWorkingFolder workingFolderURL: URL, courseCode: String) {
         let target: URL = buildFolder(forWorkingFolder: workingFolderURL, courseCode: courseCode)
         try? FileManager.default.removeItem(at: target)
+    }
+
+    /// Throws away a course's built sites and keeps its kept copies of
+    /// geogebra.org sketches, because the course's contents have been
+    /// replaced (a whole course restored from a backup) while the course
+    /// itself stays. The built sites can be older than the pages put back;
+    /// a kept copy is named by its fence and cannot be (#789).
+    static func discardBuiltSites(forWorkingFolder workingFolderURL: URL, courseCode: String) {
+        let target: URL = buildFolder(forWorkingFolder: workingFolderURL, courseCode: courseCode)
+        clearBuiltSitesKeepingCopies(at: target)
     }
 
     /// Throws away ONE section's built site, for a section that has been
@@ -440,12 +476,77 @@ nonisolated enum BuildOutputLocation {
     /// adopted.
     private static func linkFreshly(target: URL, at link: URL, workingFolderURL: URL) throws {
         let fileManager: FileManager = FileManager.default
-        if fileManager.fileExists(atPath: target.path) {
-            try? fileManager.removeItem(at: target)
-        }
+        clearBuiltSitesKeepingCopies(at: target)
         try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
         try writeWorkingFolderMarker(workingFolderURL: workingFolderURL)
         try fileManager.createSymbolicLink(at: link, withDestinationURL: target)
+    }
+
+    /// Clears one course's builds folder and keeps its kept copies, in place.
+    ///
+    /// In place rather than set aside and put back: no step puts the copies
+    /// anywhere else, so a clear stopped halfway leaves fewer built files and
+    /// never fewer copies, and `discardBuildsForMissingCourses`, which removes
+    /// every entry of the builds folder that is not a course code, has no
+    /// set-aside folder to throw away. A link or a file standing where the
+    /// folder belongs goes whole, and so does a kept-copies entry that is not
+    /// a real folder (a file, a link, a link to itself): left standing, no
+    /// build could keep a copy in it again, and a link would send the copies
+    /// out of the builds folder. Removing a link never touches what it points
+    /// at. Best-effort, like the clear it replaces.
+    private static func clearBuiltSitesKeepingCopies(at target: URL) {
+        let fileManager: FileManager = FileManager.default
+        if !isRealDirectory(target) {
+            if (try? fileManager.attributesOfItem(atPath: target.path)) != nil {
+                try? fileManager.removeItem(at: target)
+            }
+            return
+        }
+        guard let entries = try? fileManager.contentsOfDirectory(atPath: target.path) else {
+            return
+        }
+        for name in entries {
+            if name == keptCopiesFolderName && isRealDirectory(target.appendingPathComponent(name)) {
+                continue
+            }
+            try? fileManager.removeItem(at: target.appendingPathComponent(name))
+        }
+    }
+
+    /// Moves the kept copies in `source` into `destination`, keeping the
+    /// destination's copy of any key both hold, then removes `source`. Every
+    /// entry moves, a name starting with a dot included, as the launchers'
+    /// copy of this rule moves them.
+    /// Throws, having removed nothing, when a copy cannot be moved.
+    private static func carryKeptCopies(from source: URL, into destination: URL) throws {
+        let fileManager: FileManager = FileManager.default
+        if !isRealDirectory(source) {
+            return
+        }
+        if (try? fileManager.attributesOfItem(atPath: destination.path)) == nil {
+            try fileManager.moveItem(at: source, to: destination)
+            return
+        }
+        if !isRealDirectory(destination) {
+            throw CocoaError(.fileWriteFileExists)
+        }
+        let names: [String] = try fileManager.contentsOfDirectory(atPath: source.path)
+        for name in names {
+            let arriving: URL = destination.appendingPathComponent(name)
+            if (try? fileManager.attributesOfItem(atPath: arriving.path)) != nil {
+                continue
+            }
+            try fileManager.moveItem(at: source.appendingPathComponent(name), to: arriving)
+        }
+        try? fileManager.removeItem(at: source)
+    }
+
+    /// True for a real directory only: a symlink, even to a directory, is not.
+    private static func isRealDirectory(_ url: URL) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return false
+        }
+        return attributes[.type] as? FileAttributeType == .typeDirectory
     }
 
     /// Writes which working folder this builds folder serves.
