@@ -53,11 +53,24 @@ Mac first. The Windows app follows in its own update.
   handout are brought up to date: copyable text that wraps, lettered parts
   that line up on quizzes and tests, and a settled shape for a lesson page.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
+- **Guidance for writing tests, marking, and report comments.** Three more
+  sets of notes for an assistant working beside Plantoir: writing a unit
+  test with its solutions, marking guide and practice test; marking tests
+  and coding assignments onto feedback sheets; and drafting report comments
+  from the marks. Student names stay on your computer.
+  ([#751](https://github.com/russellgordon/plantoir/issues/751), [#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
 
 ## Version 1.11.0
 
 Small fixes and conveniences. Mac first where it says so.
 
+- **GitHub Copilot beside Plantoir.** When the Copilot command-line tool is
+  installed, Plantoir offers it wherever it offers Claude Code or Codex
+  today: revising a course, fixing a section's problems, planning a unit.
+  GitHub offers Copilot at no cost to verified teachers, which would make
+  this the first free way to work with a capable assistant beside Plantoir.
+  (What GitHub offers can change; check GitHub Education when you sign up.)
+  ([#783](https://github.com/russellgordon/plantoir/issues/783))
 - **See, change or remove a saved Netlify or Cloudflare token** in
   Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
 - **Vimeo videos embed like YouTube ones**, from a plain link, with a
@@ -125,9 +138,7 @@ Small fixes and conveniences. Mac first where it says so.
 
 - **"Revise with…" in more places.** Use the Claude and Codex desktop apps,
   not just their command-line versions
-  ([#507](https://github.com/russellgordon/plantoir/issues/507)), and add
-  Google Gemini and Antigravity
-  ([#508](https://github.com/russellgordon/plantoir/issues/508)).
+  ([#507](https://github.com/russellgordon/plantoir/issues/507)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
   answer key when you print, and questions that use PhET (2.0). Questions
   with a GeoGebra sketch arrived with GeoGebra itself, in 1.9.
@@ -137,6 +148,21 @@ Small fixes and conveniences. Mac first where it says so.
 - Behind the scenes: trying the next major version of the engine Plantoir
   builds sites with, only if it is measurably faster
   ([#512](https://github.com/russellgordon/plantoir/issues/512)).
+
+---
+
+## Version 2.3
+
+- **Music notation on your pages**, written as text, with playback.
+  ([#679](https://github.com/russellgordon/plantoir/issues/679))
+
+---
+
+## Version 2.4
+
+- **More assistants for "Revise with…":** Google Gemini and Antigravity.
+  Held for later, with no date.
+  ([#508](https://github.com/russellgordon/plantoir/issues/508))
 
 ---
 
