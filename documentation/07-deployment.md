@@ -1049,9 +1049,9 @@ is unchanged (it does one destination per call). The new-course default, its
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.
 
-**The mac runs the eighteen cases too, since #771.** `deploy.sh` carries
-`the_saved_destinations`, `destination_words` and
-`flags_for_the_saved_destination` between `# BEGIN saved_destinations` and
+**The mac runs every case too, since #771.** `deploy.sh` carries
+`the_saved_destinations`, `destination_words`,
+`flags_for_the_saved_destination` and `the_one_saved_destination` between `# BEGIN saved_destinations` and
 `# END saved_destinations`, and `test_deploy_sh_destination.py`'s
 `TheSavedDestinationsAreTheContracts` cuts them out and runs every case
 through the launcher's own reading loop twice on a Mac: once with `plutil`
@@ -1062,9 +1062,14 @@ every `sentences` template to a printed line of the #668 block (the
 placeholders written as the launcher writes them, and the cross or target
 taken off the front), checks the block prints no other sentence, and pins
 `sentences.where` to `destination_words`, including Netlify's word for a
-kind it does not list. Function-level rather than one launcher run per case:
-the eight whole-launcher tests above already cover the loop that runs the
-legs, and 36 runs of the launcher would cost minutes.
+kind it does not list. A run with ONE saved destination does not run a leg
+with the flags; it sets `TARGET` or `TO_FOLDER` through
+`the_one_saved_destination`. The review of #771 found that path untested (a
+copy whose Cloudflare line set Netlify passed every test while saying
+"Cloudflare Pages"), so every leg the contract accepts is also put through
+that function and must come out as its flags say. Function-level rather than
+one launcher run per case: the eight whole-launcher tests above already cover
+the loop that runs the legs, and a launcher run per case would cost minutes.
 
 **The contract found a mac fault, and #771 fixed it.** Measured on macOS
 26.6 with the functions cut from `deploy.sh`: the Python reader passed 18 of
@@ -1076,13 +1081,33 @@ block exists to stop, and the Python reader and `deploy.ps1` already refused
 it. The `plutil` reader now converts the file to JSON on stdout and requires
 its first character to be `{`, since `plutil` writes the converted JSON with
 no leading space (measured: leading whitespace in the file is dropped). It
-gives 18 of 18. The other shapes `plutil` was measured on refused already: a
-top-level string or number and an empty file fail to convert, and `null`
-converts but every `-extract` fails, which reads as Netlify, as the contract
-says. One difference remains and is accepted: an XML or binary property list
-whose top level is a dictionary, saved as `course_config.json`, is read on a
-Mac and refused by the Python reader. Plantoir never writes one and it is not
-a contract case, so it is left alone rather than given a second check.
+gave 18 of 18. The other shapes `plutil` was measured on refused already: a
+top-level string, number or `null` and an empty file fail to convert, and a
+`deploy_target` of `null` converts but its `-extract` fails, which reads as
+Netlify, as the contract says.
+
+**The review of #771 found three more, and they are fixed with a contract
+case each.** Measured with `plutil -convert json -o -` on macOS 26.6: a file
+of one line break, of only white space, or of only a comment converts to `{}`
+with exit 0, so it passed the check above and deployed to Netlify, which the
+Python reader and `deploy.ps1` refuse. An editor that saves an emptied file
+usually adds a final line break, so this is no rarer than `["netlify"]`. The
+reader now first checks the FILE's own first character other than white
+space (`tr -d` then `head -c 1`) and refuses unless it is `{`. Measured on
+the fixed functions: white space, a tab, a comment, a comment before an
+object, and a UTF-8 byte-order mark all refuse, and an object after blank
+lines still reads. The same check refuses an XML or binary property list,
+which the Python reader refused already, so no difference between the
+readers is left there. A byte-order mark now refuses on a Mac where
+`deploy.ps1` may read it; Plantoir never writes one, and that difference is
+in the safe direction. Second, a kind holding a tab or a line break became
+two legs, and the second could deploy (`"cloudflare_pages\nnetlify"` refused
+one leg and deployed to Netlify on the next); a kind's tabs and line breaks
+now become spaces, as a path's do, in both readers, so it is one kind
+Plantoir does not know. Third, an additional entry whose `type` is a number
+or `true` was a refused leg under `plutil` and passed over by the Python
+reader and `deploy.ps1`; the `plutil` reader now asks `plutil -type` and
+reads only a `string`.
 
 **Why.** Netlify moved new accounts to a credit-based plan, and the free one
 is a hard cap. Read on 2026-11-01 from Netlify's "How credits work" page
@@ -1377,7 +1402,7 @@ file alone and clears nothing. **The rule is data since 1.9.3:**
 `contracts/app-rules.json` → `savedTokenCheck` — each service's URL, the two
 body patterns, and 25 cases — proposed from Windows so the two launchers stop
 holding it in two tables. The patterns are written so `grep -E` and .NET read
-them IDENTICALLY: `[[:space:]]`, deploy.sh's spelling, is a POSIX class that
+them IDENTICALLY: `[[:space:]]`, deploy.sh's old spelling, is a POSIX class that
 .NET reads as a set of the characters `[ : s p a c e`, matching wrongly with
 no error (measured: with it, two cases fail); a bracket of a real space and
 a real tab reads the same in both. `windows-app/test_launcher_rules.ps1`

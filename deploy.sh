@@ -945,19 +945,30 @@ the_saved_destinations() {
   # and it used to read as a course naming no destination, so it deployed to
   # Netlify (#771, found by the contract's case). plutil writes the converted
   # JSON with no leading space, so a first character of { is an object.
+  # The file's OWN first character is checked first: plutil reads a file of
+  # only a line break, white space or a comment as an empty object, and an
+  # XML or binary property list is not JSON at all (#771 review).
+  # A tab or a line break in a kind becomes a space, as in a path, so a kind
+  # is always one leg: split, it was two, and the second deployed.
   if command -v plutil >/dev/null 2>&1; then
+    [[ "$(LC_ALL=C tr -d ' \t\r\n' < "$config" 2>/dev/null | head -c 1)" == "{" ]] || return 1
     [[ "$(plutil -convert json -o - "$config" 2>/dev/null)" == "{"* ]] || return 1
     primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
     folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
-    printf '%s\t%s\n' "${primary:-netlify}" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
+    printf '%s\t%s\n' "$(printf '%s' "${primary:-netlify}" | tr '\t\n' '  ')" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
     count="$(plutil -extract additional_deploy_targets raw -o - "$config" 2>/dev/null || true)"
     [[ "$count" =~ ^[0-9]+$ ]] || count=0
     index=0
     while [[ "$index" -lt "$count" ]]; do
-      kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
+      kind=""
+      # Only a TEXT type names a destination, as the Python reader and
+      # deploy.ps1 read it; a number or true is passed over, not refused.
+      if [[ "$(plutil -type "additional_deploy_targets.${index}.type" "$config" 2>/dev/null)" == "string" ]]; then
+        kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
+      fi
       path="$(plutil -extract "additional_deploy_targets.${index}.path" raw -o - "$config" 2>/dev/null || true)"
       if [[ -n "$kind" ]]; then
-        printf '%s\t%s\n' "$kind" "$(printf '%s' "$path" | tr '\t\n' '  ')"
+        printf '%s\t%s\n' "$(printf '%s' "$kind" | tr '\t\n' '  ')" "$(printf '%s' "$path" | tr '\t\n' '  ')"
       fi
       index=$((index + 1))
     done
@@ -977,7 +988,7 @@ def text(value):
         return ""
     return value if isinstance(value, str) else json.dumps(value)
 def one(kind, path):
-    print((text(kind) or "netlify") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
+    print((text(kind) or "netlify").replace("\t", " ").replace("\n", " ") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
 one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
 extras = settings.get("additional_deploy_targets")
 if isinstance(extras, list):
@@ -1016,6 +1027,18 @@ flags_for_the_saved_destination() {
     *)
       echo "${COURSE_CODE}'s settings name a destination Plantoir does not know: ${kind}."
       return 1 ;;
+  esac
+}
+
+# The destination a run with ONE saved destination deploys to, set from the
+# kind flags_for_the_saved_destination has accepted. It must agree with
+# those flags, which are what a leg of several is run with; the contract's
+# cases are run through both (#771 review).
+the_one_saved_destination() {
+  case "$1" in
+    cloudflare_pages) TARGET="cloudflare" ;;
+    local_folder) TO_FOLDER="$2" ;;
+    *) TARGET="netlify" ;;
   esac
 }
 # END saved_destinations
@@ -1072,11 +1095,7 @@ if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]
     echo ""
     exit 1
   fi
-  case "$_kind" in
-    cloudflare_pages) TARGET="cloudflare" ;;
-    local_folder) TO_FOLDER="$_path" ;;
-    *) TARGET="netlify" ;;
-  esac
+  the_one_saved_destination "$_kind" "$_path"
   echo "🎯 Deploying to $(destination_words "$_kind"), as ${COURSE_CODE}'s settings say."
 fi
 

@@ -6463,10 +6463,74 @@
         "expectUnreadable" : true,
         "name" : "empty settings refuse",
         "settingsText" : ""
+      },
+      {
+        "expectUnreadable" : true,
+        "name" : "a file of one line break refuses",
+        "settingsText" : "\n",
+        "why" : "An editor that saves an emptied file usually adds a final line break. plutil reads such a file, or one of only white space or a comment, as an empty object, which would read as Netlify (#771 review)."
+      },
+      {
+        "expectLegs" : [
+          {
+            "kind" : "cloudflare_pages netlify",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: cloudflare_pages netlify."
+          },
+          {
+            "kind" : "local_folder C:/x",
+            "refusal" : "ICS3U's settings name a destination Plantoir does not know: local_folder C:/x."
+          }
+        ],
+        "name" : "a kind with a line break or a tab in it is one kind Plantoir does not know",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : "local_folder\tC:/x"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "cloudflare_pages\nnetlify"
+        },
+        "why" : "deploy.sh carries each leg as one tab-separated line, so a tab or a line break in a kind becomes a space, as one in a path does; split, it was two legs, and the second deployed (#771 review)."
+      },
+      {
+        "expectLegs" : [
+          {
+            "flags" : [
+              "--target",
+              "netlify"
+            ],
+            "kind" : "netlify"
+          },
+          {
+            "flags" : [
+              "--target",
+              "cloudflare"
+            ],
+            "kind" : "cloudflare_pages"
+          }
+        ],
+        "name" : "an additional entry whose type is not text is passed over",
+        "settings" : {
+          "additional_deploy_targets" : [
+            {
+              "type" : 5
+            },
+            {
+              "type" : true
+            },
+            {
+              "type" : "cloudflare_pages"
+            }
+          ],
+          "course_code" : "ICS3U",
+          "deploy_target" : "netlify"
+        },
+        "why" : "Only an object with a non-empty TEXT type is a destination. The main deploy_target is different: a non-text one is read as written, and refuses."
       }
     ],
     "course" : "ICS3U",
-    "note" : "GitHub #739 items 7 and 8 (Windows) and #668 (mac). A deploy given neither --target nor --to-folder reads the course's course_config.json and deploys where it says, as the app's Deploy button does: deploy_target absent, empty, null or \"netlify\" is --target netlify, \"cloudflare_pages\" is --target cloudflare, \"local_folder\" is --to-folder deploy_folder_path, and each additional_deploy_targets entry (an object with a non-empty text type) is a leg of its own after the main one. One destination: the launcher sets it and prints sentences.oneDestination. More than one: it runs ITSELF once per leg with every flag as typed plus that leg's flags, prints sentences.eachLeg before each, keeps going after a leg that fails or is refused (sentences.legRefused), and exits with the first failing leg's code. --reset-token looks only at the first. A settings file that is there and cannot be read refuses with sentences.couldNotRead and never falls back to Netlify; an absent one is left to the course-folder check. A typed --target or --to-folder wins and the file is not read. Because a flagless call now deploys every leg, the app names every leg it runs, Netlify included (deployArguments). Proposed from Windows on 2026-11-11: deploy.ps1's Get-SavedDestinations runs every case (windows-app/test_launcher_rules.ps1), and since #771 scripts/test_deploy_sh_destination.py runs every case against deploy.sh, through both of its readers (plutil and a Python). {course}, {section}, {where} and {kind} are filled; {where} comes from sentences.where, and a kind not listed there reads as Netlify's word.",
+    "note" : "GitHub #739 items 7 and 8 (Windows) and #668 (mac). A deploy given neither --target nor --to-folder reads the course's course_config.json and deploys where it says, as the app's Deploy button does: deploy_target absent, empty, null or \"netlify\" is --target netlify, \"cloudflare_pages\" is --target cloudflare, \"local_folder\" is --to-folder deploy_folder_path, and each additional_deploy_targets entry (an object with a non-empty text type) is a leg of its own after the main one. One destination: the launcher sets it and prints sentences.oneDestination. More than one: it runs ITSELF once per leg with every flag as typed plus that leg's flags, prints sentences.eachLeg before each, keeps going after a leg that fails or is refused (sentences.legRefused), and exits with the first failing leg's code. --reset-token looks only at the first. A settings file that is there and cannot be read refuses with sentences.couldNotRead and never falls back to Netlify; an absent one is left to the course-folder check. A typed --target or --to-folder wins and the file is not read. Because a flagless call now deploys every leg, the app names every leg it runs, Netlify included (deployArguments). Proposed from Windows on 2026-11-11: deploy.ps1's Get-SavedDestinations runs every case (windows-app/test_launcher_rules.ps1), and since #771 scripts/test_deploy_sh_destination.py runs every case against deploy.sh, through both of its readers (plutil and a Python). A tab or a line break in a kind or a path becomes a space, so each leg is one line (#771). {course}, {section}, {where} and {kind} are filled; {where} comes from sentences.where, and a kind not listed there reads as Netlify's word.",
     "sentences" : {
       "couldNotRead" : [
         "Plantoir could not read where {course} deploys from its settings.",
