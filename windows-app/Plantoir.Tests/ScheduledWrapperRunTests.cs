@@ -91,7 +91,8 @@ public class ScheduledWrapperRunTests : IDisposable
 
     private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null,
                                                      string deployBody = "Write-Host 'DEPLOY RAN'\nexit 0",
-                                                     string destinationType = "local_folder")
+                                                     string destinationType = "local_folder",
+                                                     IReadOnlyDictionary<string, string>? environment = null)
     {
         // "work with spaces" by DEFAULT, deliberately. Every fixture here used
         // a space-free temp path at first, and that hid a real defect: the
@@ -113,13 +114,15 @@ public class ScheduledWrapperRunTests : IDisposable
             "");
         Assert.NotNull(script);
 
-        var info = new ProcessStartInfo("powershell.exe")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            WorkingDirectory = work,
-        };
+        string runnable = Path.Combine(_root, Path.GetFileName(script!));
+
+        // Started the way the product starts it (#702): ScheduledRun's own
+        // start info, environment included, with only the output captured.
+        var info = environment is null
+            ? ScheduledRun.WrapperStartInfo(runnable)
+            : ScheduledRun.WrapperStartInfo(runnable, environment);
+        info.RedirectStandardOutput = true;
+        info.RedirectStandardError = true;
         // #179: the wrapper's $healthDir and $pendingDir follow this in the CHILD only.
         info.Environment[TaskScheduling.TestStateDirVariable] = AppDataRoot.Current;
         // The wrapper is RUN, so it writes wherever it was told to write — and
@@ -137,12 +140,8 @@ public class ScheduledWrapperRunTests : IDisposable
         // does and for the same reason. AppDataRoot.RedirectTo is NOT the
         // answer: it is process-wide with no way back, so it would point every
         // later test in this process at a scratch folder.
-        string runnable = Path.Combine(_root, Path.GetFileName(script!));
         File.WriteAllText(runnable,
             File.ReadAllText(script!).Replace(ScheduledPublishOutcome.Directory(), _root));
-
-        foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", runnable })
-            info.ArgumentList.Add(a);
 
         using var process = Process.Start(info)!;
         string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
@@ -293,6 +292,35 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.Empty(Directory.Exists(dir)
             ? Directory.GetFiles(dir, _lastTaskName + "*")
             : Array.Empty<string>());
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+    }
+
+    // ---- #702: the launchers run on the registering app's runtime -----------
+
+    /// <summary>
+    /// Run for real: the build and the deploy leg the wrapper starts with
+    /// <c>Start-Process</c> both see the <c>PLANTOIR_RUNTIME</c> the wrapper
+    /// was started with, not the installed copy's fallback. The runtime is a
+    /// folder name no machine has, so the value cannot have come from
+    /// anywhere else; it carries no <c>python.exe</c>, so the fingerprint step
+    /// is skipped and nothing real runs.
+    /// </summary>
+    [Fact]
+    public void TheBuildAndTheDeployRunOnTheRuntimeTheWrapperWasHanded()
+    {
+        if (!PowerShellIsAvailable) return;
+        string seen = Path.Combine(_root, "seen runtime.txt");
+        string runtime = Path.Combine(_root, $"the registering app {Guid.NewGuid():N}", "runtime");
+        string record = $"Add-Content -LiteralPath '{seen}' -Value";
+
+        var (exitCode, output) = RunWrapper(
+            $"{record} ('build ' + $env:PLANTOIR_RUNTIME)\nWrite-Host 'Static build complete.'\nexit 0",
+            deployBody: $"{record} ('deploy ' + $env:PLANTOIR_RUNTIME)\nWrite-Host 'DEPLOY RAN'\nexit 0",
+            environment: Plantoir.Core.Scripting.LauncherEnvironment.Variables(
+                runtime, Plantoir.Core.Scripting.ActivityTrail.CurrentLogDirectory));
+
+        Assert.True(exitCode == 0, output);
+        Assert.Equal(new[] { "build " + runtime, "deploy " + runtime }, File.ReadAllLines(seen));
         ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
     }
 

@@ -2828,14 +2828,29 @@ the runtime) and `PLANTOIR_TRAIL_DIR` (always, `ActivityTrail.CurrentLogDirector
 `ScriptRunner.Run`, `plantoir-mcp`'s `LauncherRunner` (its run and its
 `--stop` sweep), `PreviewStopper`, and the scheduled publish's wrapper
 (`ScheduledRun.WrapperStartInfo`), whose `Start-Process` children inherit it.
-The wrapper is handed ONLY the trail: which runtime a task uses is a separate
-question (#702). `windows-app/test_launcher_rules.ps1` section 6 runs the five
+Since #702 (Windows 1.9.3) the wrapper gets BOTH variables, like every other
+start; until then it was handed only the trail, so it fell back to
+`%LOCALAPPDATA%\Programs\Plantoir\runtime` and a task registered from a
+Debug build ran that build's code with the INSTALLED copy's Python and
+wrangler (on the PC where it was found, 1.9.0's Python 3.11.9 against the
+Debug build's 3.14.10). For an installed copy the two folders are one, so a
+teacher sees no change. A task registered by an older app keeps its
+`<Command>`, the installed `Plantoir.exe`, which rewrites the wrapper at run
+time and starts it through `WrapperStartInfo`, so it is covered without
+being registered again; the pre-v1.2.0 tasks that run a `.ps1` straight from
+Task Scheduler never pass through the app and are deliberately left alone.
+`windows-app/test_launcher_rules.ps1` section 6 runs the five
 contract cases through each launcher's real function, with `LOCALAPPDATA` and
 the current folder (PowerShell's and the process's) inside a scratch folder,
 plus two Windows-only rows for `C:state` and `\state\Logs`;
 `LauncherEnvironmentTests` pins the override, the contract's variable name,
-the wrapper, and - by scanning the product for every process started with
-`-File` - that no launcher start site is missing it.
+the wrapper (through a seam that takes the environment, since the test host
+carries no runtime), and - by scanning the product, comments removed, for
+every process started with `-File` - that no launcher start site is missing
+a USE of it (a mention in a comment no longer counts: the wrapper passed the
+old scan on its doc comment). `ScheduledWrapperRunTests.TheBuildAndTheDeployRunOnTheRuntimeTheWrapperWasHanded`
+runs the generated wrapper against stub launchers and reads the runtime
+each `Start-Process` child saw.
 
 ## A note on line endings
 
