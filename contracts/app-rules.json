@@ -6110,6 +6110,7 @@
     "sentences" : {
       "accountIDCanWait" : "You can create the course without it and preview it as usual. It is needed before the first deploy.",
       "cloudflareCaption" : "Recommended. Free, with no limit on visitors.",
+      "cloudflareSizeNote" : "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely.",
       "netlifyNote" : "A note about Netlify’s free plan: Netlify accounts made since September 2025 get a fixed monthly allowance, and every deploy of every section uses part of it. When the allowance runs out, Netlify pauses every site on the account until the next month. Cloudflare Pages’ free plan has no limit on visitors, which is why Plantoir suggests it. If your Netlify account is older than that, or you deploy only now and then, Netlify works well.",
       "netlifyScheduleNote" : "This course deploys to Netlify. On Netlify’s free plan every deploy uses part of a monthly allowance, and when it runs out Netlify pauses every site on the account until the next month.",
       "wizardCaption" : "Cloudflare Pages is the usual choice — change it any time in Course Settings"
