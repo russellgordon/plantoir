@@ -74,8 +74,8 @@ Small fixes and conveniences. Mac first where it says so.
     time ([#523](https://github.com/russellgordon/plantoir/issues/523));
   - the backups size in the sidebar should no longer get cut off
     ([#516](https://github.com/russellgordon/plantoir/issues/516)).
-- **plantoir.app:** correcting what it says about scheduled publishing when
-  your computer is closed or asleep at the scheduled time ([#509](https://github.com/russellgordon/plantoir/issues/509)).
+- **Change the time of a scheduled deploy on the Mac**, without cancelling
+  it and scheduling again, as Windows already allows. ([#525](https://github.com/russellgordon/plantoir/issues/525))
 - Behind the scenes: old build folders are cleared away
   ([#722](https://github.com/russellgordon/plantoir/issues/722)), and a handful of checks that the Mac and Windows apps behave
   the same way.
@@ -92,9 +92,10 @@ Small fixes and conveniences. Mac first where it says so.
   success-criteria headings in Course Settings, a way for students to narrow
   the page to a date or a unit, and a check that it prints well.
   ([#595](https://github.com/russellgordon/plantoir/issues/595))
-- **Backups and archives, made clearer.** These two features overlap; the
-  plan is to decide whether to combine them into one place for every kept
-  copy of a course, or to give archives the same browsing that backups have.
+- **Archives you can browse.** Backups and archives stay two separate
+  features, and archives gain what backups already have: a list, what each
+  one holds, and a way to open, compare, restore or carefully delete one.
+  Nothing you have today moves or is renamed.
   ([#573](https://github.com/russellgordon/plantoir/issues/573))
 - **Printing on Windows:** a handout printed on Windows should look the same
   as one printed on a Mac
@@ -113,12 +114,8 @@ Small fixes and conveniences. Mac first where it says so.
 - **A live circuit simulator** with real schematic symbols, for physics and
   Technological Education. Lower priority than the rest.
   ([#487](https://github.com/russellgordon/plantoir/issues/487))
-- **Changing a scheduled publish time — being decided.** Either both apps
-  let you change the time directly, as Windows does today, or both ask you to
-  cancel and schedule again
-  ([#525](https://github.com/russellgordon/plantoir/issues/525)). On Windows,
-  a course you keep for reference will stop publishing on a schedule, as it
-  does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
+- On Windows, a course you keep for reference will stop publishing on a
+  schedule, as it does on the Mac ([#527](https://github.com/russellgordon/plantoir/issues/527)).
 - **plantoir.app updates:** showing off the newer features
   ([#486](https://github.com/russellgordon/plantoir/issues/486)).
 - Behind the scenes: fixes to how plantoir.app's pictures are made.
