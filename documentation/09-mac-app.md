@@ -3709,7 +3709,8 @@ rejected:
   draw.
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
-  only. It sits inside the course so it travels with a backup, an archive
+  only. (Since #707 it is one of two places under a dot folder an
+  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below.) It sits inside the course so it travels with a backup, an archive
   and a restore, as `.internal/timetable/` does; a reference import keeps
   `.internal` minus `activity`. It never reaches a site: discovery skips
   dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
@@ -3835,6 +3836,125 @@ whole/decimal column is right-aligned "with the same trailing padding", and
 equal widths make aligned numbers "sit at one offset in both" columns. The
 skills follow the 14:19 refinement in both places. That file is his, not
 this repository's, and was left alone.
+
+### Unit planning (#707): the skill, the plan folder, the reminder
+
+The seventh skill, `plantoir-unit-planning`, teaches an outside assistant to
+plan a unit with the teacher and then build the plan as a small site of its
+own: a calendar across the sections (a colleague's included), how the
+sections differ, lesson cards, each day's materials, assessment drafts, and a
+curriculum correlation page. It reaches a working folder as every skill does
+(`AgentGuidance.write` enumerates `support/agent_guidance/skills/`), and its
+`template/` folder, fonts included, travels with it through
+`WorkspaceModel.syncDirectory`, which copies any regular file. No Swift was
+needed for that half. The contract is `shared-rules.json` → `unitPlanning`
+(the folder, the site's layout, `planFile` and its cases, the slug rules,
+`appendOnly`, and `agentGuidance` with the pinned fonts). This piece lands
+before the course's Planning tab (#708) and sharing (#709), so the skill and
+the greeting point at the folder and say nothing about either (Russell,
+2026-11-12); those pieces add their sentences.
+
+**Where the plan lives: `courses/<CODE>/.internal/planning/`.** A folder whose
+name starts with a dot is never built (`build_site.py` → `_is_hidden`), never
+content for freshness (`BuildFreshness.newestContentDate` skips hidden
+files), and travels with the course in a backup, an archive, a restore and a
+reference copy (`ReferenceCopier` keeps `.internal` minus `activity`), as
+`handouts.json` and the timetable do. The handouts and page-authoring
+skills, which used to call `handouts.json` the ONE file under a dot folder
+an assistant may write, now name both. REJECTED: beside the handouts folder
+outside the course (the website builder's container cannot see it, and it
+would not travel); the course's visible folders (everything there that is
+not a page is copied to the students' site); a plan the app renders from
+JSON, or a Quartz site (Russell asked for the example's exact format).
+One trap is named in the contract and the skill: `CourseArchiver.excludedFromArchives`
+is matched at ANY depth, so a folder called `build`, `dist`, `out` and so on
+anywhere under the planning folder would be silently left out of a backup.
+`unitPlanning.neverFolderNames` is that list, pinned against the archiver by
+`UnitPlansTests.testTheNeverFolderNamesAreTheArchiveExclusions`, and a unit's
+folder name is never one of them (`neverSlugs`, which adds `assets`).
+
+**Two stylesheets, not one, and both append-only.** The example's two pages
+carry different `<style>` blocks (43 against 46 rules, 28 shared selectors,
+three with different bodies, and a bare `section` rule on the correlation
+page only), so `assets/plan.css` is the plan page's block byte for byte and
+`assets/correlation.css` the correlation page's, each after Plantoir's comment
+and the `@font-face` rules. The one edit is Russell's ruling 2: a `--ok` token
+in `:root` and both dark blocks, and the reviewed mark's fixed `#1f7a3a`
+replaced by `var(--ok)`. MEASURED contrast: `#1f7a3a` is 5.38:1 on the light
+panel and 4.98:1 on the light page, but 2.96:1 on the dark panel `#1d2326`;
+the dark value `#5cc77a` is 7.5:1 there and 8.35:1 on the dark page.
+`scripts/test_unit_plan_template.py` proves each sheet, with those taken out,
+still starts with its fixture (`scripts/fixtures/unit_plan/`, CSS only,
+extracted once from the example with Russell's leave), that the tokens and
+dark blocks are identical across the two sheets, and that every class a
+shipped release defined still has a rule (`classes-shipped.json`, whose
+first entry is 1.10.0). A later release adds rules at the end of a sheet and
+never removes or renames one, because a plan written today must keep its look.
+REJECTED: one merged sheet (it cannot equal both blocks); one sheet scoped by
+a body class (every selector rewritten and one class more specific, so the
+cascade changes against the patterns' inline styles); an inline `<style>` per
+page (copies drift and nothing can refresh them).
+
+**The fonts.** IBM Plex as the example's Google Fonts link asked for it
+(Serif 500 and 600, Sans 400, 500 and 600, Mono 400 and 500), served from the
+plan's own `assets/fonts/` so a plan opened offline looks the same (#566).
+Each face carries Plex's Latin1 split, its Pi split (which, MEASURED from
+Plex's own CSS, holds U+2713, so the reviewed mark is real Plex, along with
+arrows, `≤ ≥ ≠ √`, superscript and subscript digits and the narrow no-break
+space) and, where the family has one, its Greek split (Plex Mono has none).
+Each split is its own `@font-face` with the subset's own `unicode-range`
+copied from the package's CSS, so a browser fetches Pi or Greek only for a
+page that uses one of their characters. 19 files, 262,084 bytes, read from
+jsdelivr on 2026-11-12 (`@ibm/plex-sans@1.1.0`, `@ibm/plex-serif@2.0.0`,
+`@ibm/plex-mono@2.5.0`); the seven Latin1 files alone are 148,528 bytes. Each
+file's size and SHA-256 is pinned in `unitPlanning.agentGuidance.fonts`, and
+`*.woff2` is `binary` in `.gitattributes`. REJECTED: Latin1 alone, because a
+mathematics or science plan's `≤`, `√`, `x²` or `π` would switch typeface
+mid-line (707 plan review M3).
+
+**The template's content is invented**: an SNC2D unit on chemical reactions,
+with sections called Section 1, Section 2 and A colleague's section. Only the
+two blocks of CSS came from Russell's example; its lessons, its file names and
+its people did not. Every component of the example is a commented PATTERN in
+the template pages, so an assistant writes each component the same way.
+
+**The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
+gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
+reference-courses sentence, so the opening instructions keep their order.
+Nil says nothing; an empty list is a course with no plan yet and gets
+`greetingUnitPlans.none` in EVERY session until a plan exists (Russell,
+2026-11-12); one plan gets `one` and several `some`, which name them and
+where they are kept, never what is in them. The sentences are instructions
+to the assistant to say one sentence in its first reply (707 plan review
+M3). Only `SidebarView.reviseWithClaude` and `.reviseWithCodex` pass the
+plans, read at the click by `UnitPlans.toMention(for:)` (nil on a course kept
+for reference, which has no door anyway). That read is a handful of small
+files; `greetingHowITeachSentence` avoids the disk at the click for a
+different reason (the page may not exist, and its tool handles that). Fix
+with Claude… and Fix with Codex… pass none, and their own message replaces
+the greeting, so they never mention planning (Russell's ruling 4). A name is
+`{unit}: {title}`, cut at 60 characters with "…"; at most six are named, then
+", and N more". `UnitPlans.read` never throws: a plan file that is not JSON,
+or breaks `planFile.rules`, is left out and counted. The trail's
+"assistant opened" line gains " · told about unit planning", " · reminded of
+1 unit plan" or " · reminded of N unit plans", and " · N plan.json could not
+be read" when files were left out (`greetingUnitPlans.trail`). Every case is
+`greetingUnitPlansCases`, run through both doors' `prepareSession` by
+`UnitPlansTests.testTheUnitPlanSentenceFollowsTheContract`; `planFileCases`
+by `testEveryPlanFileCaseHoldsAsTheContractSays`. No tool description,
+schema or prompt moved, and `scripts/test_tool_surface_digest.py` is green.
+
+**NOT measured in this piece:** whether Claude Code and Codex, started at the
+working folder and at a course, find the new skill and follow it, the way the
+earlier skills were measured above. The root files name it in one bullet each,
+as they name the others.
+
+**Adding the next skill** (#758, #754, #765, #750 to #752): drop its folder
+into `support/agent_guidance/skills/`, add one bullet to each root file, add a
+contract key for it under the feature it belongs to (`<feature>.agentGuidance`,
+as `unitPlanning.agentGuidance` is), and copy one of the
+`PrintablePagesTests.testThe…SkillIsWritten…` tests. No code enumerates the
+skills by name on either platform.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
