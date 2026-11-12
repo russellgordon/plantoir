@@ -2907,6 +2907,17 @@ probe_container_write() {
      rm -f /teaching/courses/.write_probe'
 }
 
+# Whether this container was made naming the toolchain it runs, as
+# PLANTOIR_TOOLCHAIN_ID=<this run's $IMAGE> (#746). Every site built in a
+# workspace without it is stamped with something else, so every deploy
+# would build it again (#748 part 3). Only a workspace made by hand, or by
+# an older verify.sh, can be missing it while running the current image;
+# the launchers have made every workspace with it since 1.9.2.
+workspace_names_this_toolchain() {
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" 2>/dev/null \
+    | grep -Fxq "PLANTOIR_TOOLCHAIN_ID=$IMAGE"
+}
+
 # A container keeps running the version it was created from, so an update
 # only takes effect once the container itself is recreated.
 DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null || echo "")
@@ -2938,6 +2949,9 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   elif [[ -n "$DESIRED_IMAGE_ID" && -n "$RUNNING_IMAGE_ID" && "$RUNNING_IMAGE_ID" != "$DESIRED_IMAGE_ID" ]]; then
     echo "♻️  Plantoir has been updated, so it is setting this folder up again to use the update…"
     remake_the_workspace update
+  elif ! workspace_names_this_toolchain; then
+    echo "♻️  Setting this folder up again so the websites it builds name this version of Plantoir…"
+    remake_the_workspace toolchainId
   elif ! docker inspect -f '{{json .HostConfig.PortBindings}}' "$CONTAINER_NAME" 2>/dev/null | grep -q '9084/tcp'; then
     # An older container publishes only 8081; published ports cannot be
     # changed after creation, so recreating is how the range arrives.

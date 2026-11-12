@@ -1079,8 +1079,14 @@ final class ScheduledDeployTests: XCTestCase {
         // the bytes already on disk.
         XCTAssertTrue(command.contains("NEEDS_BUILD"), "The build has to be conditional")
         XCTAssertTrue(command.contains("-newer"), "Staleness is content newer than the built page")
-        XCTAssertTrue(command.contains("-not -path '*/.*'"),
+        XCTAssertTrue(command.contains("-name '.*' -prune"),
                       "Hidden entries are skipped, or .merged_output makes the site look stale the instant it is built")
+        // By NAME, never by the whole path (#768): `-not -path '*/.*'` skipped
+        // every entry of a working folder kept under a hidden folder.
+        XCTAssertFalse(command.contains("-not -path '*/.*'"))
+        // Folders and change times count (#768, #741): no `-type f`.
+        XCTAssertFalse(command.contains("-type f"))
+        XCTAssertTrue(command.contains("-cnewer"))
         // A PREVIEW build is never deploy-fresh, however recent it looks:
         // serve mode bakes a ws://localhost client into every page. Found by
         // its script tag and first statement, each page read as one record

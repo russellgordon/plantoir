@@ -32,6 +32,7 @@ Pure stdlib, no Docker, no network. Run with:
     python3 scripts/test_deploy_toolchain_stamp.py
 """
 
+import hashlib
 import os
 import shutil
 import stat
@@ -179,10 +180,21 @@ class TheRealLauncherPublishingToAFolder(unittest.TestCase):
         preview.write_text(STAND_IN_PREVIEW, encoding="utf-8")
         preview.chmod(preview.stat().st_mode | stat.S_IXUSR)
         course = folder / "courses" / "ICS4U"
-        built = course / ".merged_output" / "section1" / "public"
-        built.mkdir(parents=True)
+        course.mkdir(parents=True)
         (course / "course_config.json").write_text(
             '{"course_code": "ICS4U", "section_numbers": [1], "num_sections": 1}', encoding="utf-8")
+        # The built site where deploy.sh keeps it, linked as it links it, and
+        # built after the course was last changed: since #768 the deploy also
+        # asks whether anything in the course changed, and moving a built
+        # site out of the course changes the course folder.
+        spelled = subprocess.run(["/bin/pwd", "-P"], cwd=str(folder),
+                                 capture_output=True, check=True).stdout
+        builds = (folder / "home" / "Library" / "Application Support" / "Plantoir"
+                  / "builds" / hashlib.sha256(spelled).hexdigest()[:8] / "ICS4U")
+        built = builds / "section1" / "public"
+        built.mkdir(parents=True)
+        os.symlink(builds, course / ".merged_output")
+        time.sleep(0.02)
         (built / "index.html").write_text(OLD_PAGE, encoding="utf-8")
         if stamp is not None:
             (built.parent / MARKER).write_text(stamp, encoding="utf-8")
@@ -191,7 +203,7 @@ class TheRealLauncherPublishingToAFolder(unittest.TestCase):
         environment.pop("PLANTOIR_TRAIL_DIR", None)
         environment.pop("PWD", None)
         environment["RSYNC_RSH"] = "false"
-        (folder / "home").mkdir()
+        (folder / "home").mkdir(exist_ok=True)
         target = Path(tmp) / "published"
         result = subprocess.run(
             ["bash", "./deploy.sh", "ICS4U", "1", "--to-folder", str(target),

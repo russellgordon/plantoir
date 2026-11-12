@@ -905,14 +905,26 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         }
         defer { BuildFreshnessTests.makeReadable(lockedURLs) }
 
-        let now: Date = Date()
-        let stamps: [(URL, TimeInterval)] = [
-            (page, -600), (marker, started), (settings, settingsSaved), (builtPage, pageWritten),
-        ]
-        for (url, offset) in stamps {
-            try FileManager.default.setAttributes(
-                [.modificationDate: now.addingTimeInterval(offset)], ofItemAtPath: url.path
-            )
+        // The offsets give the ORDER, played on the real clock (#768): a
+        // file's change time counts now, and no test can set one back, so a
+        // site is fresh by being built later than the course, never by
+        // back-dating the course. The page comes first; then the marker, the
+        // settings and the built page, in the order of their offsets, each a
+        // moment after the last. The settings are written (a Save); the
+        // marker and the built page are given the time now (a build).
+        var steps: [(URL, TimeInterval)] = [(marker, started), (settings, settingsSaved), (builtPage, pageWritten)]
+        steps.sort { first, second in
+            return first.1 < second.1
+        }
+        Thread.sleep(forTimeInterval: 0.02)
+        try "# lesson\n".write(to: page, atomically: false, encoding: .utf8)
+        for (url, _) in steps {
+            Thread.sleep(forTimeInterval: 0.02)
+            if url == settings {
+                try "{\"saved\": true}\n".write(to: settings, atomically: false, encoding: .utf8)
+            } else {
+                try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+            }
         }
 
         if frontPageUnreadable {
