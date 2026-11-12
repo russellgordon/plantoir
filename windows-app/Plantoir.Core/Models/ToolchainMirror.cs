@@ -223,12 +223,26 @@ public static class ToolchainMirror
     /// the app passes <see cref="IndexFolder"/> once a launch. Best effort;
     /// answers how many files it removed.
     ///
+    /// <para><b>An index the app still knows is never removed by age</b>
+    /// (<paramref name="keep"/>: the ids of the folders the settings name, see
+    /// <see cref="IndexIdsToKeep"/>). Before 1.9.3 nothing marked an index
+    /// used, and a pass with nothing to change never rewrote it, so on the
+    /// first 1.9.3 launch an index's write time is the date of its folder's
+    /// last toolchain CHANGE, not of its last use. A folder opened every day
+    /// and last changed more than ninety days ago would otherwise lose its
+    /// index to a prune racing the window's first pass, and pay a full read
+    /// of every copy (about 100 s cold on the i5-8365U) the morning after the
+    /// update. Null means the known folders could not be read: nothing is
+    /// removed by age that launch. A known folder that is GONE is the builds
+    /// sweep's to remove. Leftover temporary files go by age whatever their
+    /// name.</para>
+    ///
     /// <para>A wrongly removed index costs one pass that reads every copy
     /// once; a dead one costs up to the manifest's size. The race with a pass
     /// reading the same index (removed between its read and its mark) ends
     /// the same way: the next pass reads in full and writes it again.</para>
     /// </summary>
-    public static int PruneIndexes(string indexFolder, DateTime nowUtc)
+    public static int PruneIndexes(string indexFolder, DateTime nowUtc, IReadOnlySet<string>? keep)
     {
         int removed = 0;
         IEnumerable<string> files;
@@ -240,7 +254,11 @@ public static class ToolchainMirror
             {
                 string name = Path.GetFileName(file);
                 TimeSpan limit;
-                if (name.EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase)) limit = UnusedIndexLimit;
+                if (name.EndsWith(ManifestName, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (keep is null || keep.Contains(name[..^ManifestName.Length])) continue;
+                    limit = UnusedIndexLimit;
+                }
                 else if (IsLeftoverTemporary(name)) limit = LeftoverTemporaryLimit;
                 else continue;
                 var info = new FileInfo(file);
@@ -252,6 +270,43 @@ public static class ToolchainMirror
             catch { }
         }
         return removed;
+    }
+
+    /// <summary>
+    /// The index ids (<see cref="FolderContainers.FolderIdentifier"/>) of every
+    /// working folder the settings at <paramref name="settingsPath"/> name:
+    /// the last working folder, the remembered windows and Open Recent, the
+    /// same folders <see cref="Assist.MachineWork.KnownFolders"/> reads plus
+    /// the recent list, and WITHOUT dropping one that is not there just now
+    /// (a USB stick that is out; a folder truly gone is the builds sweep's).
+    /// Read here rather than through <see cref="AppSettings.Load"/>, which
+    /// answers fresh defaults for a file it cannot read, so that "cannot be
+    /// read" is told apart from "names nothing": null when the file is
+    /// missing or cannot be read or parsed. Case-insensitive.
+    /// </summary>
+    public static IReadOnlySet<string>? IndexIdsToKeep(string settingsPath)
+    {
+        AppSettings? settings;
+        try
+        {
+            if (!File.Exists(settingsPath)) return null;
+            settings = Newtonsoft.Json.JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(settingsPath));
+        }
+        catch { return null; }
+        if (settings is null) return null;
+
+        var folders = new List<string?> { settings.WorkspacePath };
+        foreach (var window in settings.RememberedWindows ?? new()) folders.Add(window?.Path);
+        foreach (string folder in settings.RecentWorkingFolders ?? new()) folders.Add(folder);
+
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string? folder in folders)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) continue;
+            try { ids.Add(FolderContainers.FolderIdentifier(folder)); }
+            catch { }
+        }
+        return ids;
     }
 
     /// <summary><c>&lt;id&gt;.hashes.&lt;pid&gt;.tmp</c>: what <see cref="WriteFingerprints"/> writes first.</summary>

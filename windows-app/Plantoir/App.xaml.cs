@@ -227,14 +227,19 @@ public partial class App : Application
         catch (Exception ex) { LogDiagnostic($"builds sweep: {ex.Message}"); }
 
         // #735 (mac #683): toolchain indexes unused for ninety days, and
-        // leftover temporary ones, once a launch and off the UI thread. Silent
-        // like the sweep above: a teacher cannot see a cache being pruned.
+        // leftover temporary ones, once a launch and off the UI thread. Never,
+        // by age, the index of a folder the settings still name: before 1.9.3
+        // an index's time was its last CHANGE, not its last use. Silent like
+        // the sweep above: a teacher cannot see a cache being pruned.
         string indexFolder = ToolchainMirror.IndexFolder;
+        string settingsPath = AppSettings.DefaultPath;
         _ = System.Threading.Tasks.Task.Run(() =>
         {
             try
             {
-                int pruned = ToolchainMirror.PruneIndexes(indexFolder, DateTime.UtcNow);
+                var keep = ToolchainMirror.IndexIdsToKeep(settingsPath);
+                if (keep is null) LogDiagnostic("The settings could not be read, so no mirror index is removed for its age this launch");
+                int pruned = ToolchainMirror.PruneIndexes(indexFolder, DateTime.UtcNow, keep);
                 if (pruned > 0) LogDiagnostic($"Pruned {pruned} mirror index file(s) unused for 90 days or left over");
             }
             catch (Exception ex) { LogDiagnostic($"index prune: {ex.Message}"); }

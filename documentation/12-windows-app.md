@@ -5852,7 +5852,8 @@ the whole table).
 
 The mac's reasoning, the race and what was rejected are in
 `documentation/09-mac-app.md` → "Pruning the index (#683)"; Windows matches
-it. What is different here, and what to know:
+it, plus one rule the mac does not have (an index the settings still name is
+never removed by age, below). What is different here, and what to know:
 
 - **Every pass marks its folder's index USED** (`ToolchainMirror.MarkIndexUsed`,
   the write time set to now) right after `RefreshToolchain` READS it, whether
@@ -5864,7 +5865,7 @@ it. What is different here, and what to know:
   have it turned off, so it is not something to depend on. Nothing else reads
   the index's own time.
 - **Once a launch**, in `App.OnLaunched` straight after the builds sweep and
-  inside `Task.Run`, so off the UI thread, `ToolchainMirror.PruneIndexes(folder, nowUtc)`
+  inside `Task.Run`, so off the UI thread, `ToolchainMirror.PruneIndexes(folder, nowUtc, keep)`
   removes every `*.hashes` unused for more than 90 days and every
   `<id>.hashes.<pid>.tmp` (`WriteFingerprints`' temporary file, left only by
   an interrupted write) more than a day old. Plain files at the top of the
@@ -5873,6 +5874,28 @@ it. What is different here, and what to know:
   (`ThePruneHasNoDefaultFolder` checks by reflection), and the app passes
   `ToolchainMirror.IndexFolder`. It writes a line to `startup.log` when it
   removed something, and no trail line: a teacher cannot see a cache.
+- **An index the app still knows is never removed by AGE** (the final
+  sweep's case). `keep` is `ToolchainMirror.IndexIdsToKeep(AppSettings.DefaultPath)`:
+  the index ids of every folder the settings name (the last working folder,
+  the remembered windows and Open Recent, kept even when the folder is not
+  there just now). The reason: before 1.9.3 nothing marked an index used, and
+  a pass with nothing to change never rewrote it, so on the first 1.9.3
+  launch an index's write time is the date of its folder's last toolchain
+  CHANGE, not its last use. A teacher who opens a folder every day and
+  installs 1.9.3 more than 90 days after that change would otherwise have
+  the launch prune, racing the window's first mirror pass, remove the index
+  before the pass marks it, and pay a full read of every copy that morning
+  (about 100 s cold for `.toolchain\support` on the i5-8365U, measured by
+  #749's review). The same holds on any later launch for a folder the
+  settings name but nobody has opened for 90 days. The settings are read
+  directly rather than through `AppSettings.Load`, which answers fresh
+  defaults for a file it cannot read: when the file is missing or cannot be
+  read, `keep` is null and NO index is removed by age that launch (a
+  `startup.log` line says so). Leftover temporary files go by age either
+  way. A known folder that is gone is the builds sweep's to remove, below.
+  Tests: `AKnownFoldersIndexIsKeptHoweverOld`,
+  `UnreadableSettingsKeepEveryIndexButNotOldTemporaries`,
+  `TheKeepSetIsEveryFolderTheSettingsName`.
 - **The builds sweep takes the index with the builds.**
   `BuildOutputLocation.DiscardBuildsForMissingWorkingFolders` deletes
   `toolchain-index\<entry's name>.hashes` when it deletes `builds\<entry>`,

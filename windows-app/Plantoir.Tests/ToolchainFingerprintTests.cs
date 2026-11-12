@@ -303,7 +303,7 @@ public sealed class ToolchainFingerprintTests : IDisposable
         string old = Aged(Path.Combine(folder, "aaaaaaaa.hashes"), TimeSpan.FromDays(91));
         string recent = Aged(Path.Combine(folder, "bbbbbbbb.hashes"), TimeSpan.FromDays(89));
 
-        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now));
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now, NothingKnown));
 
         Assert.False(File.Exists(old));
         Assert.True(File.Exists(recent));
@@ -316,7 +316,7 @@ public sealed class ToolchainFingerprintTests : IDisposable
         string leftover = Aged(Path.Combine(folder, "aaaaaaaa.hashes.4242.tmp"), TimeSpan.FromHours(25));
         string inFlight = Aged(Path.Combine(folder, "bbbbbbbb.hashes.4243.tmp"), TimeSpan.FromHours(23));
 
-        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now));
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now, NothingKnown));
 
         Assert.False(File.Exists(leftover));
         Assert.True(File.Exists(inFlight));
@@ -341,7 +341,7 @@ public sealed class ToolchainFingerprintTests : IDisposable
         Directory.CreateDirectory(plain);
         string nested = Aged(Path.Combine(plain, "dddddddd.hashes"), ancient);
 
-        Assert.Equal(0, ToolchainMirror.PruneIndexes(folder, Now));
+        Assert.Equal(0, ToolchainMirror.PruneIndexes(folder, Now, NothingKnown));
 
         foreach (string kept in new[] { text, otherTmp, notAPid, notAnIndexTmp, noPid, lettersPid, notTmp, nested })
             Assert.True(File.Exists(kept), kept);
@@ -383,9 +383,14 @@ public sealed class ToolchainFingerprintTests : IDisposable
             @"//[^\n]*", "");
 
         var call = System.Text.RegularExpressions.Regex.Match(code,
-            @"string\s+(\w+)\s*=\s*ToolchainMirror\.IndexFolder\s*;\s*_\s*=\s*System\.Threading\.Tasks\.Task\.Run\(\s*\(\)\s*=>\s*\{\s*try\s*\{\s*int\s+\w+\s*=\s*ToolchainMirror\.PruneIndexes\(\s*(\w+)\s*,\s*DateTime\.UtcNow\s*\)\s*;");
-        Assert.True(call.Success, "App.xaml.cs no longer prunes ToolchainMirror.IndexFolder inside Task.Run");
-        Assert.Equal(call.Groups[1].Value, call.Groups[2].Value);
+            @"string\s+(\w+)\s*=\s*ToolchainMirror\.IndexFolder\s*;\s*string\s+(\w+)\s*=\s*AppSettings\.DefaultPath\s*;\s*" +
+            @"_\s*=\s*System\.Threading\.Tasks\.Task\.Run\(\s*\(\)\s*=>\s*\{\s*try\s*\{\s*" +
+            @"var\s+(\w+)\s*=\s*ToolchainMirror\.IndexIdsToKeep\(\s*(\w+)\s*\)\s*;[^;]*;\s*" +
+            @"int\s+\w+\s*=\s*ToolchainMirror\.PruneIndexes\(\s*(\w+)\s*,\s*DateTime\.UtcNow\s*,\s*(\w+)\s*\)\s*;");
+        Assert.True(call.Success, "App.xaml.cs no longer prunes ToolchainMirror.IndexFolder, keeping the settings' folders, inside Task.Run");
+        Assert.Equal(call.Groups[1].Value, call.Groups[5].Value);   // the index folder is the one pruned
+        Assert.Equal(call.Groups[2].Value, call.Groups[4].Value);   // the keep-set is read from the settings
+        Assert.Equal(call.Groups[3].Value, call.Groups[6].Value);   // and handed to the prune
         // In OnLaunched, beside the builds sweep: after it, once.
         Assert.True(code.IndexOf("DiscardBuildsForMissingWorkingFolders(", StringComparison.Ordinal) < call.Index);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(code, @"PruneIndexes\("));
@@ -400,5 +405,78 @@ public sealed class ToolchainFingerprintTests : IDisposable
         Assert.Equal(typeof(string), folder.ParameterType);
         Assert.False(folder.IsOptional);
         Assert.False(folder.HasDefaultValue);
+        var keep = method.GetParameters()[2];
+        Assert.False(keep.IsOptional, "the keep-set must be said, not defaulted to nothing");
+    }
+
+    // ---- #735 final sweep: an index the settings still name is kept --------
+
+    private static readonly IReadOnlySet<string> NothingKnown = new HashSet<string>();
+
+    /// <summary>
+    /// Before 1.9.3 nothing marked an index used, so its write time is its
+    /// folder's last toolchain CHANGE. A folder the settings still name keeps
+    /// its index however old that time is; one nobody names goes.
+    /// </summary>
+    [Fact]
+    public void AKnownFoldersIndexIsKeptHoweverOld()
+    {
+        string folder = PruneFolder();
+        string known = Aged(Path.Combine(folder, "aaaaaaaa.hashes"), TimeSpan.FromDays(400));
+        string unknown = Aged(Path.Combine(folder, "bbbbbbbb.hashes"), TimeSpan.FromDays(400));
+
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "AAAAAAAA" }));
+
+        Assert.True(File.Exists(known), "the index of a folder the settings name went by age");
+        Assert.False(File.Exists(unknown));
+    }
+
+    /// <summary>Known folders that cannot be read keep every index by age; old temporary files still go.</summary>
+    [Fact]
+    public void UnreadableSettingsKeepEveryIndexButNotOldTemporaries()
+    {
+        string folder = PruneFolder();
+        string index = Aged(Path.Combine(folder, "aaaaaaaa.hashes"), TimeSpan.FromDays(400));
+        string leftover = Aged(Path.Combine(folder, "aaaaaaaa.hashes.4242.tmp"), TimeSpan.FromDays(400));
+        string settings = Path.Combine(_root, "settings.json");
+        File.WriteAllText(settings, "{ this is not json");
+
+        var keep = ToolchainMirror.IndexIdsToKeep(settings);
+        Assert.Null(keep);
+        Assert.Null(ToolchainMirror.IndexIdsToKeep(Path.Combine(_root, "no-such-settings.json")));
+
+        Assert.Equal(1, ToolchainMirror.PruneIndexes(folder, Now, keep));
+        Assert.True(File.Exists(index));
+        Assert.False(File.Exists(leftover));
+    }
+
+    /// <summary>
+    /// The keep-set names every folder the settings name - the last working
+    /// folder, the remembered windows and Open Recent - by the same id the
+    /// index is filed under, and keeps one that is not there just now.
+    /// </summary>
+    [Fact]
+    public void TheKeepSetIsEveryFolderTheSettingsName()
+    {
+        string open = Path.Combine(_root, "open");
+        string window = Path.Combine(_root, "window");
+        string recent = Path.Combine(_root, "recent");
+        string unplugged = @"Q:\Teaching";
+        foreach (string f in new[] { open, window, recent }) Directory.CreateDirectory(f);
+        var written = new AppSettings
+        {
+            WorkspacePath = open,
+            RecentWorkingFolders = new List<string> { recent, unplugged },
+        };
+        written.RememberedWindows.Add(new RememberedWindow(window, 0, 0, 800, 600));
+        string settings = Path.Combine(_root, "settings.json");
+        written.Save(settings);
+
+        var keep = ToolchainMirror.IndexIdsToKeep(settings)!;
+
+        foreach (string f in new[] { open, window, recent })
+            Assert.Contains(Path.GetFileName(ToolchainMirror.IndexPathFor(f))[..^ToolchainMirror.ManifestName.Length], keep);
+        Assert.Contains(FolderContainers.FolderIdentifier(unplugged), keep);
+        Assert.Equal(4, keep.Count);
     }
 }
