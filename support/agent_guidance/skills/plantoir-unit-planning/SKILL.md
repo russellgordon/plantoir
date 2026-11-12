@@ -26,10 +26,13 @@ and a file written here is lost). Copy from it instead.
   are plain HTML pages, not course pages, so section 23 of
   `plantoir-page-authoring` (no raw HTML, no `<style>`) does not apply to
   them; it applies to the class website.
-- **Opening it.** The teacher opens
-  `courses/<CODE>/.internal/planning/index.html` in a web browser. In
+- **Seeing it.** Plantoir shows the plans on the course's Planning tab,
+  beside the course's Settings, with a menu of units and the page each one
+  opens; it opens on the unit being taught today. The plan also opens in a
+  web browser from `courses/<CODE>/.internal/planning/index.html` (in
   Finder a folder whose name starts with a dot is hidden; Command-Shift-.
-  shows it. Tell the teacher the full path when you finish.
+  shows it). When you finish, tell the teacher to look on the course's
+  Planning tab, and give the full path as well.
 - **You never upload it.** Do not deploy, upload or send the plan site
   anywhere, and do not put it in the course's pages.
 
@@ -121,7 +124,11 @@ revisions; the plan says what will happen, not how it was reached.
 Every component of the page is in the template as a commented PATTERN,
 with the classes it uses. Use those classes and only those; add no
 `<style>` block, no `style` of your own beyond the ones the patterns carry,
-and no font or script from the internet. The template is laid out the way
+and no font or script from the internet. Add no script at all: the
+Planning tab shows a plan with scripts turned off and with nothing from the
+internet, so a page that needs either shows wrongly there. A link to a
+web page opens in the teacher's browser when they click it; a link to a
+file outside the planning folder does nothing. The template is laid out the way
 the plan folder is, so its relative links (`../assets/plan.css`,
 `correlation.html`, `../index.html`) work unchanged once copied.
 
