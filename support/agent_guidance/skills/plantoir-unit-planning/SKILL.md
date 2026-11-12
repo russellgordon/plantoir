@@ -127,7 +127,13 @@ the plan folder is, so its relative links (`../assets/plan.css`,
 
 ## 6. Assessments go through `plantoir-handouts`
 
-A quiz, a test or a practice set is a handout. Make it with the
+A unit test with versions and a kit to mark it from is made with the
+`plantoir-test-authoring` skill
+(`.claude/skills/plantoir-test-authoring/SKILL.md`, the same file is at
+`.agents/skills/plantoir-test-authoring/SKILL.md`), from the plan's
+lessons; copy its PDFs into the plan as below, never a `.tex` file or
+its marking kit. Any other quiz, test or practice set is a handout. Make
+it with the
 `plantoir-handouts` skill (`.claude/skills/plantoir-handouts/SKILL.md`,
 the same file is at `.agents/skills/plantoir-handouts/SKILL.md`), in its
 house style and in the course's handouts folder, which it reads from
@@ -240,6 +246,12 @@ courses/<CODE>/.internal/planning/
 - Open the plan page and the correlation page in a web browser, in light
   and in dark appearance, and look at both before telling the teacher it
   is done.
+
+When the plan is built and the teacher has looked at it, you may mention
+once, in one sentence, that you can also write the unit's test from the
+plan, with its solutions and marking guide, using the
+plantoir-test-authoring skill. Do not raise it again in this session if
+they do not take it up.
 
 ## 11. Adopting a plan the teacher already has
 

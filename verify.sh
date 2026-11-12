@@ -671,6 +671,17 @@ else
   cat /tmp/verify_unit_plan_template_test.log
 fi
 
+# Test authoring (#751): every assessment.kitFormat case through the skill's
+# own check_kit.py, the worked example and its marks template, the example
+# checks (OK, and a changed answer named), the Marking Guide's points and its
+# teacher-decides sentence, and no firearms context in any example. Stdlib only.
+if (cd scripts && python3 test_assessment_kit.py) >/tmp/verify_assessment_kit_test.log 2>&1; then
+  pass "test authoring: every kit-format contract case through check_kit.py, the worked example, its marks template, its checks and its Marking Guide (scripts/test_assessment_kit.py, #751)"
+else
+  fail "test authoring: the kit format and the skill's templates (scripts/test_assessment_kit.py, #751)"
+  cat /tmp/verify_assessment_kit_test.log
+fi
+
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else

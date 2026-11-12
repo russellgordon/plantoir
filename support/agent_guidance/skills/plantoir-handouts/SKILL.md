@@ -244,6 +244,11 @@ blanks, that is:
   totals such as `\score{K 10}` beside each question.
 - A second version is a separate source with parallel questions, never a
   switch inside one file.
+- A unit test with versions, a marking guide and a kit to mark it from is
+  the `plantoir-test-authoring` skill
+  (`.claude/skills/plantoir-test-authoring/SKILL.md`, the same file is at
+  `.agents/skills/plantoir-test-authoring/SKILL.md`). It makes each
+  version from `starters/Quiz.tex` in this house style.
 - In the solutions, working is dark blue and balancing steps (what is done
   to both sides) light red, so they stay distinct when printed in greyscale.
 - **A lettered part hangs under its first word.** When a part a), b), c)
