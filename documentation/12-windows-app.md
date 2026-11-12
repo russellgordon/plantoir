@@ -859,9 +859,13 @@ added when two rows share a kind and a page. A page or course name carrying
 seeded UI test); handing such text to a terminal is #736's.
 
 **300 rows, measured** (same PC, `ProblemsTabUiTests.ThreeHundredRowsShowInTime`):
-the rows are made up front, every one, when the tab FIRST shows — 486–522 ms for
-300 — and the `ListView` realises only the rows on screen (6–18 listed by UI
-Automation before scrolling; the 300th is there at the bottom). The first
+every row's `ListViewItem` (its box, cells and button) is BUILT up front when the
+tab FIRST shows — 413–522 ms for 300 — but the list's panel lays out and puts in
+the UI Automation tree only the rows near the view: 6–27 were listed before
+scrolling, measured, and the rest arrive as the list scrolls (the 300th is
+there at the bottom). So a screen reader moving down the list reaches every
+row, as the list brings it in; nothing is cut off, and nothing is listed that
+is not near the view. The first
 version made them whenever the record was read, so opening a section on its
 Website tab paid the half second; now it does not (the section opened in
 299–341 ms either way, click and title included), and Problems shows 562–625 ms
@@ -884,12 +888,39 @@ stays on the window, and the first version dropped the answer as "the view went
 away", so the next view raised the same alert again (found by the full UI run,
 2026-11-11, `ProblemsTabUiTests.OpeningOntoAnUnansweredRecordRaisesTheAlert_AndAnAnsweredOneDoesNot`).
 Only a dialog the WINDOW took down as it closed (`LetGoAsTheWindowCloses`)
-leaves it due. Answers are also kept in memory for the session
-(`SectionProblems`), so one the file could not keep — a replace a scanner
-refused — still holds until the app closes; the file's reads and replaces are
-tried again on a sharing violation. The links checklist now FOLLOWS it: it reads the
-record first (the marker came before the checklist's, but the read is
-asynchronous) and waits while the alert is due or up. `NoteHealthFindings`,
+leaves it due. The answers file is read ONCE per working folder, on the worker
+that reads the records, and kept in memory (`SectionProblems`): the interface
+thread — which the waiting checklist asks every 300 ms — never reads the disk
+for it, and an answer the file could not keep still holds until the app
+closes. Every change is written through; a relaunch reads the file.
+
+**The links checklist FOLLOWS the alert** — the mac's order, which the contract
+writes as "The links checklist (#379) follows it": today's-class question,
+then the alert, then the checklist (`SectionProblemsRules.TheChecklistWaits`).
+It reads the record first (the marker came before the checklist's, but the
+read is asynchronous) and waits while the alert is on screen here (as long as
+the teacher reads it) or due but not up here (at most ten seconds: held by
+another window, or unable to get on screen). **The first version could
+deadlock** (implementation review, finding 1): the checklist set the flag the
+alert waits behind BEFORE its wait, so opening a section onto a record with a
+link into a hidden page and a waiting checklist — the ordinary way in after a
+scheduled, MCP or terminal build — showed neither. Now one flag guards
+re-entry and another, set only as the checklist goes on screen, is what the
+alert waits behind; the bound makes any future ordering fail open.
+`ProblemsTabUiTests.TheAlertComesFirstAndTheLinksChecklistFollowsIt`.
+
+**The record and its writer.** Windows refuses `os.replace` (and .NET's
+overwriting move) while ANY other handle has the file open — measured on this
+PC, Python 3.14.10, with and without delete sharing — and the app reads the
+record whenever the window comes to the front, while `section_problems._write`
+swallowed a refused replace and lost that build's record. The app's read now
+shares read, write and delete (`SectionProblemsRecord.OpenShared`, so an
+archive can still remove the folder) and holds the file only for the read;
+the shared Python tries a refused replace again, ten times 50 ms apart
+(`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`; it
+costs the mac nothing, where a replace is never refused). Rejected: relying
+on delete sharing alone, which the review proposed and the measurement
+refuted. `NoteHealthFindings`,
 `FolderProblemQueue` and the held #333 finding are gone: on Windows the
 checklist was already decided by its marker, so routing the finding had nothing
 left to do once no dialog showed it. The overnight record is still TAKEN

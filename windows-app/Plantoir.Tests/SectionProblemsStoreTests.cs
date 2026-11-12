@@ -139,6 +139,26 @@ public sealed class SectionProblemsStoreTests : IDisposable
         Assert.NotNull(SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1));
     }
 
+    /// <summary>
+    /// Once a record has been read, whether its alert is due is answered from
+    /// memory: the interface thread asks every 300 ms while the links checklist
+    /// waits, and must not read the disk to answer (#734 review, finding 3).
+    /// </summary>
+    [Fact]
+    public void WhetherTheAlertIsDueIsAnsweredFromMemory()
+    {
+        WriteRecord(1, SectionProblemsContractTests.RecordJson);
+        SectionProblems.Reload(_folder, Course());
+        // Another program's answer, written after the read: not seen until a relaunch.
+        var outside = ProblemsAcknowledgements.Read(_folder);
+        outside.RememberAnswered("B2", "MPM2D", 1);
+        outside.Write(_folder);
+        Assert.NotNull(SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1));
+        SectionProblems.Reset();
+        SectionProblems.Reload(_folder, Course());
+        Assert.Null(SectionProblems.RecordWithAnAlertDue(_folder, "MPM2D", 1));
+    }
+
     [Fact]
     public void TheTrailLineIsWrittenOncePerAlertKey_NotAgainAfterARelaunch()
     {

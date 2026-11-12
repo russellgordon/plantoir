@@ -196,6 +196,19 @@ public class ProblemsTabUiTests
         Keyboard.Type(VirtualKeyShort.SPACE);
         Assert.True(Retry.WhileFalse(() => Status(app.Find(RowId, "the row")) == "ticked", TimeSpan.FromSeconds(3)).Result, "Space ticked it again");
 
+        // Tab from the row reaches its repair button (review item 5): a focus walk.
+        string? repairReached = null;
+        var walked = new List<string>();
+        for (int press = 0; press < 6 && repairReached is null; press++)
+        {
+            Keyboard.Type(VirtualKeyShort.TAB);
+            Thread.Sleep(150);
+            walked.Add(FocusedId(app));
+            if (FocusedAndAbove(app).Contains("problemRepair-mediaFolderMissing")) repairReached = FocusedId(app);
+        }
+        Measured($"Tab from the row walked: {string.Join(" > ", walked)}.");
+        Assert.True(repairReached is not null, $"Tab never reached the row's repair button; it walked {string.Join(" > ", walked)}");
+
         // The sidebar: one warning, named, and said on the row.
         var badge = app.Find($"problemsBadge-{Code}-section1", "the section's warning");
         Assert.Contains(Word("markerHelp"), badge.Name);
@@ -482,6 +495,51 @@ public class ProblemsTabUiTests
     }
 
     /// <summary>
+    /// The order a teacher sees on opening a section whose last build — one
+    /// this window did not watch — found a link into a hidden page and left a
+    /// links checklist waiting: the alert FIRST, then the checklist (#734
+    /// review, finding 1: the two once waited on each other for ever, and
+    /// neither appeared).
+    /// </summary>
+    [UiFact]
+    public void TheAlertComesFirstAndTheLinksChecklistFollowsIt()
+    {
+        const string Course = LinksChecklistUiTests.Code;
+        using var app = new DrivenApp(courses =>
+        {
+            LinksChecklistUiTests.WriteCourseWithAnOffer(courses);
+        }, beforeLaunch: workspace =>
+        {
+            string id = $"linksIntoHiddenPages|{LinksChecklistUiTests.ClassPlace}|{LinksChecklistUiTests.WorksheetPlace}";
+            var row = new JsonObject
+            {
+                ["id"] = id, ["kind"] = "linksIntoHiddenPages", ["page"] = LinksChecklistUiTests.ClassPlace, ["reason"] = "",
+                ["item"] = "a link", ["sentence"] = "A page links to a hidden page.", ["detail"] = "", ["fixable"] = false,
+                ["prompt"] = "p", ["from"] = "build", ["firstSeen"] = "2026-09-30T12:00:00Z", ["lastSeen"] = "2026-09-30T12:00:00Z",
+            };
+            var record = new JsonObject
+            {
+                ["version"] = 1, ["course"] = Course, ["section"] = 1, ["buildId"] = "20260930T120000Z-test",
+                ["builtAt"] = "2026-09-30T12:00:00Z", ["occasion"] = "preview", ["pagesShown"] = new JsonArray(),
+                ["siteSaidComplete"] = true, ["alertKey"] = "20260930T120000Z-test",
+                ["changed"] = new JsonObject { ["new"] = new JsonArray(id), ["gone"] = new JsonArray() },
+                ["rows"] = new JsonArray(row),
+            };
+            Seed(workspace, Course, 1, record.ToJsonString());
+        });
+        string title = Word("alertTitleOne", ("course", Course), ("section", "1"));
+        app.SelectSection(Course, 1);
+        var alert = WaitForDialog(app, title, TimeSpan.FromSeconds(30));
+        Assert.Null(app.FindOrNull(LinksChecklistUiTests.RowId(LinksChecklistUiTests.ClassPlace), TimeSpan.FromSeconds(1)));
+        Button(alert, "CloseButton").AsButton().Invoke();   // Not Now
+        Assert.True(Retry.WhileFalse(() => app.FindOrNull(LinksChecklistUiTests.RowId(LinksChecklistUiTests.ClassPlace),
+                                                          TimeSpan.FromMilliseconds(300)) is not null,
+                                     TimeSpan.FromSeconds(30)).Result,
+                    "the links checklist followed the alert");
+        app.Find("linksChecklistNotNow", "Not Now").AsButton().Invoke();
+    }
+
+    /// <summary>
     /// 300 rows: how long the tab takes to show, and that every row is made
     /// up front and the last can be scrolled to (review change 4). A
     /// measurement first; it fails only past two seconds, which a teacher
@@ -515,7 +573,7 @@ public class ProblemsTabUiTests
         Assert.StartsWith("built 300 rows in", built);
         var items = Retry.WhileEmpty(() => table.FindAllDescendants(cf => cf.ByControlType(ControlType.ListItem)),
                                      TimeSpan.FromSeconds(5)).Result ?? Array.Empty<AutomationElement>();
-        Measured($"UI Automation lists {items.Length} of the 300 rows before scrolling (a ListView realises the rows it shows).");
+        Measured($"UI Automation lists {items.Length} of the 300 rows before scrolling (every row is built; the list's panel lists the ones near the view).");
         Assert.NotEmpty(items);
         // The last row can be reached: scrolled to the bottom, it is there.
         Assert.True(table.Patterns.Scroll.IsSupported, "the table scrolls");

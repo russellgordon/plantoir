@@ -180,6 +180,67 @@ public class SectionProblemsContractTests
                      SectionProblemsWording.AlertParagraphs(new[] { one, one }, 2));
     }
 
+    /// <summary>
+    /// The order a teacher sees (today's class, the alert, the checklist) and
+    /// the bound that keeps the checklist from waiting for ever on an alert
+    /// that is due but not up here (#734 review, finding 1).
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, false, 0, false)]   // nothing in front: shown
+    [InlineData(true, false, false, 0, true)]     // the alert (or a repair's outcome) on screen here
+    [InlineData(true, false, true, 600, true)]    // ... however long the teacher reads it
+    [InlineData(false, true, false, 0, true)]     // today's-class question first
+    [InlineData(false, false, true, 0, true)]     // the alert is due: it comes first
+    [InlineData(false, false, true, 9, true)]
+    [InlineData(false, false, true, 10, false)]   // due but never up here: not for ever
+    [InlineData(false, false, true, 3600, false)]
+    public void TheChecklistFollowsTheAlert_ButNeverWaitsForEver(bool dialogUp, bool todaysClassUp, bool alertDue, int seconds, bool waits) =>
+        Assert.Equal(waits, SectionProblemsRules.TheChecklistWaits(dialogUp, todaysClassUp, alertDue, TimeSpan.FromSeconds(seconds)));
+
+    /// <summary>
+    /// The contract says the checklist FOLLOWS the alert; the rule's order is
+    /// that sentence, not a choice of this app's.
+    /// </summary>
+    [Fact]
+    public void TheContractPutsTheChecklistAfterTheAlert() =>
+        Assert.Contains("The links checklist (#379) follows it.", Section()["alert"]!["rule"]!.ToString());
+
+    /// <summary>
+    /// The app's read stands in a launcher's way as little as Windows allows
+    /// (#734 review, finding 2). MEASURED on this PC: os.replace (and .NET's
+    /// overwriting move) is refused while ANY handle has the file open, delete
+    /// sharing or not — so sharing cannot fix it, and the shared Python
+    /// retries a refused replace instead (<c>section_problems._write</c>,
+    /// <c>test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go</c>).
+    /// What the app owes, pinned here: its open shares DELETE, so an archive
+    /// or a discarded build can remove the section's folder under a read; and
+    /// a read has let go of the file by the time it returns.
+    /// </summary>
+    [Fact]
+    public void TheAppsReadSharesDeleteAndLetsGoBeforeItReturns()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "plantoir-record-share-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string path = Path.Combine(folder, SectionProblemsRecord.FileName);
+            File.WriteAllText(path, RecordJson);
+            using (SectionProblemsRecord.OpenShared(path))
+                File.Delete(path);   // refused with read-only sharing
+            File.WriteAllText(path, RecordJson);
+            Assert.NotNull(SectionProblemsRecord.Read(path));
+            string script = Path.Combine(folder, "replace.py");
+            File.WriteAllText(script, "import os, sys\nopen(sys.argv[1] + '.py', 'w').write('{}')\nos.replace(sys.argv[1] + '.py', sys.argv[1])\n");
+            var python = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("python", $"\"{script}\" \"{path}\"")
+                { UseShellExecute = false, RedirectStandardError = true, CreateNoWindow = true })!;
+            string error = python.StandardError.ReadToEnd();
+            python.WaitForExit(30000);
+            Assert.True(python.ExitCode == 0, "os.replace was refused after the app's read returned: " + error);
+            Assert.Equal("{}", File.ReadAllText(path));
+        }
+        finally { try { Directory.Delete(folder, true); } catch { } }
+    }
+
     /// <summary>Rule 1: nothing the tab, the marker or the alert says names the machinery.</summary>
     [Fact]
     public void NoWordNamesTheMachinery()

@@ -1740,6 +1740,10 @@ new filter. A build prints it twice: the build's, then the site's.
 
 **Never fails a build.** Every write is atomic and wrapped; one that cannot be
 written prints one `ℹ️` line (`test_a_record_that_cannot_be_written_is_one_plain_line`).
+On Windows a replace is refused while another program has the file open, any
+sharing — the app reads it when its window comes to the front — so `_write`
+tries a refused `os.replace` again, ten times 50 ms apart (#734;
+`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`).
 
 **What Windows inherits free:** all of the above — the file, the rows, their
 words, `firstSeen`, `changed`, `alertKey`, the marker, the site's merge and the

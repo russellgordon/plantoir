@@ -124,6 +124,35 @@ public static class SectionProblemsRules
         $"the {(record.CameFromADeploy ? "deploy" : "preview")} found {record.NewIds.Count} new and {record.GoneIds.Count} fewer problems "
         + $"(new: {KindsNamed(record.NewIds)}; gone: {KindsNamed(record.GoneIds)})";
 
+    /// <summary>
+    /// How long the links checklist waits for an alert that is DUE but has not
+    /// come up in this window — held by another window on the section, or
+    /// unable to get on screen. Past it the checklist is shown; an alert this
+    /// window HAS on screen is waited for as long as the teacher reads it.
+    /// </summary>
+    public static readonly TimeSpan LongestTheChecklistWaitsForAnAlertNotUp = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Whether the links checklist (#379) waits, in the order a teacher sees
+    /// them: today's-class question first (#406), then the alert about new
+    /// problems, then the checklist — the mac's order, which the contract
+    /// writes as "The links checklist (#379) follows it" (<c>sectionProblems.alert.rule</c>).
+    /// It waits while either is ON SCREEN here, and while the alert is due or
+    /// asked for but not yet up — that, for at most
+    /// <see cref="LongestTheChecklistWaitsForAnAlertNotUp"/>, so no ordering of
+    /// the two can leave both waiting (#734 implementation review, finding 1:
+    /// the checklist once held a flag the alert waited on while it waited for
+    /// the alert).
+    /// </summary>
+    /// <param name="aDialogIsUpHere">The alert, or what a repair did, is on screen in this view.</param>
+    /// <param name="todaysClassQuestionIsUp">Today's-class question is on screen in this view.</param>
+    /// <param name="theAlertIsAskedForOrDue">The alert is queued here, or due (in any window).</param>
+    /// <param name="waitedSoFar">How long the checklist has waited on a due alert that is not up here.</param>
+    public static bool TheChecklistWaits(bool aDialogIsUpHere, bool todaysClassQuestionIsUp,
+                                         bool theAlertIsAskedForOrDue, TimeSpan waitedSoFar) =>
+        aDialogIsUpHere || todaysClassQuestionIsUp
+        || (theAlertIsAskedForOrDue && waitedSoFar < LongestTheChecklistWaitsForAnAlertNotUp);
+
     /// <summary>The answers the alert can be given, as the trail writes them (the mac's).</summary>
     public const string AnsweredShow = "Show", AnsweredRepair = "the repair", AnsweredNotNow = "Not Now";
 

@@ -384,6 +384,22 @@ class NeverBreaksABuild(unittest.TestCase):
         finally:
             shutil.rmtree(folder)
 
+    def test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go(self):
+        # #734 review, finding 2: on Windows os.replace is refused while the
+        # app has the record open (any sharing). The writer tries again; a
+        # reader that holds it for 150 ms costs a wait, not the record.
+        import threading
+        folder = Path(tempfile.mkdtemp())
+        try:
+            path = folder / section_problems.RECORD_FILE
+            path.write_text('{"version": 1, "rows": []}', encoding="utf-8")
+            held = open(path, "r", encoding="utf-8")
+            threading.Timer(0.15, held.close).start()
+            section_problems._write(path, {"version": 1, "rows": [], "buildId": "B9"})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["buildId"], "B9")
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
     def test_an_unreadable_previous_record_is_no_previous_record(self):
         folder = Path(tempfile.mkdtemp())
         try:

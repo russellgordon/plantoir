@@ -1057,6 +1057,9 @@ public sealed partial class SectionDetailView : UserControl
 
     /// <summary>Null until this build's marker arrives; then whether the checklist is being shown.</summary>
     private bool? _linksChecklistDecided;
+    /// <summary>True while a links checklist is on its way in this view — waiting, then shown: one at a time.</summary>
+    private bool _linksChecklistPending;
+    /// <summary>True only while the checklist is ON SCREEN: what the alert waits behind. Never set while the checklist waits.</summary>
     private bool _linksChecklistUp;
     private string? _linksChecklistShownFor;
 
@@ -1092,9 +1095,9 @@ public sealed partial class SectionDetailView : UserControl
 
     private async Task PresentTheLinksChecklistAsync(LinksChecklistOffer offer, string occasion)
     {
-        if (_linksChecklistUp || _window.Workspace.WorkspacePath is not { } folder) return;
+        if (_linksChecklistPending || _window.Workspace.WorkspacePath is not { } folder) return;
         if (offer.BuildId is { } id && id == _linksChecklistShownFor) return;   // once per build
-        _linksChecklistUp = true;
+        _linksChecklistPending = true;
         try
         {
             // The alert about new problems first (#734: the checklist FOLLOWS
@@ -1103,10 +1106,20 @@ public sealed partial class SectionDetailView : UserControl
             // but the read is asynchronous — and today's-class question (#406).
             await ReadTheProblemsNowAsync();
             QueueTheProblemsAlert();
-            while ((_healthDialogIsUp || _problemsAlertQueued || TheProblemsAlertIsDue() || _todaysClassQuestionUp) && !_isTornDown)
+            // The order (SectionProblemsRules.TheChecklistWaits): today's class,
+            // the alert, then this. The wait on an alert that is due but not
+            // up here is bounded, so nothing can leave both waiting.
+            var waited = System.Diagnostics.Stopwatch.StartNew();
+            while (!_isTornDown)
+            {
+                bool dueOrAsked = _problemsAlertQueued || TheProblemsAlertIsDue();
+                if (!dueOrAsked || _healthDialogIsUp || _todaysClassQuestionUp) waited.Restart();
+                if (!SectionProblemsRules.TheChecklistWaits(_healthDialogIsUp, _todaysClassQuestionUp, dueOrAsked, waited.Elapsed)) break;
                 await Task.Delay(300);
+            }
             if (_isTornDown) return;
             _linksChecklistShownFor = offer.BuildId;
+            _linksChecklistUp = true;   // only now: the alert waits behind what is ON SCREEN
             string? said = await LinksChecklistDialog.OfferAsync(folder, _course, _sectionNumber, offer, occasion,
                                                                   ShowHealthDialogAsync);
             if (said is not null) await SayAsync(said);
@@ -1119,6 +1132,7 @@ public sealed partial class SectionDetailView : UserControl
         finally
         {
             _linksChecklistUp = false;
+            _linksChecklistPending = false;
             QueueTheProblemsAlert();   // #734: a later build's alert waited behind the checklist
         }
     }

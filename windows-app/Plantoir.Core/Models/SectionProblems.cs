@@ -58,11 +58,23 @@ public static class SectionProblems
     private static readonly Dictionary<SectionKey, string> AlertsUp = new();
 
     /// <summary>
-    /// The alert keys answered in THIS run, beside the file: an answer the file
-    /// could not keep (a replace refused by a scanner) still holds until the
-    /// app closes. The file is what a relaunch reads.
+    /// Each working folder's answers file, read ONCE (by the first read of a
+    /// record, on a worker) and kept: the interface thread asks it from memory
+    /// — the links checklist asks every 300 ms while it waits — and an answer
+    /// the file could not keep (a replace refused by a scanner) still holds
+    /// until the app closes. Every change is written through to the file,
+    /// which is what a relaunch reads. Keyed by the folder as
+    /// <see cref="WorkingFolder.Resolved"/> spells it, case-insensitively.
     /// </summary>
-    private static readonly HashSet<(SectionKey, string)> AnsweredHere = new();
+    private static readonly Dictionary<string, ProblemsAcknowledgements> Acks = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The folder's answers, from memory after the first read. Call under <see cref="ProblemsAcknowledgements.Gate"/>.</summary>
+    private static ProblemsAcknowledgements AcknowledgementsOf(string folder)
+    {
+        string key = WorkingFolder.Resolved(folder);
+        if (!Acks.TryGetValue(key, out var kept)) Acks[key] = kept = ProblemsAcknowledgements.Read(folder);
+        return kept;
+    }
 
     /// <summary>
     /// Where a working folder's records are: where the LAUNCHERS built
@@ -106,6 +118,8 @@ public static class SectionProblems
         string root;
         try { root = BuildsRootFor(folder); }
         catch (Exception) { return reads; }
+        // Here, on the worker, so the interface thread never reads it.
+        lock (ProblemsAcknowledgements.Gate) _ = AcknowledgementsOf(folder);
         foreach (int section in sections.Distinct())
         {
             string path = SectionProblemsRecord.PathFor(root, courseCode, section);
@@ -200,11 +214,9 @@ public static class SectionProblems
     public static SectionProblemsRecord? RecordWithAnAlertDue(string? folder, string courseCode, int section)
     {
         if (folder is null || Record(folder, courseCode, section) is not { } found) return null;
-        lock (Gate)
-            if (AnsweredHere.Contains((SectionKey.For(folder, courseCode, section), found.AlertKey))) return null;
         IReadOnlySet<string> answered;
         lock (ProblemsAcknowledgements.Gate)
-            answered = ProblemsAcknowledgements.Read(folder).Answered(courseCode, section);
+            answered = AcknowledgementsOf(folder).Answered(courseCode, section);
         return SectionProblemsRules.AlertIsDue(found, answered) ? found : null;
     }
 
@@ -215,10 +227,9 @@ public static class SectionProblems
     /// </summary>
     public static void Answer(SectionProblemsRecord record, string answer, string folder, string courseCode, int section)
     {
-        lock (Gate) AnsweredHere.Add((SectionKey.For(folder, courseCode, section), record.AlertKey));
         lock (ProblemsAcknowledgements.Gate)
         {
-            var kept = ProblemsAcknowledgements.Read(folder);
+            var kept = AcknowledgementsOf(folder);
             kept.RememberAnswered(record.AlertKey, courseCode, section);
             kept.Write(folder);
         }
@@ -236,7 +247,7 @@ public static class SectionProblems
         if (!record.SetChanged) return;
         lock (ProblemsAcknowledgements.Gate)
         {
-            var kept = ProblemsAcknowledgements.Read(folder);
+            var kept = AcknowledgementsOf(folder);
             if (kept.Noted(courseCode, section).Contains(record.AlertKey)) return;
             kept.RememberNoted(record.AlertKey, courseCode, section);
             kept.Write(folder);
@@ -307,7 +318,7 @@ public static class SectionProblems
             Tabs.Clear();
             Unticked.Clear();
             AlertsUp.Clear();
-            AnsweredHere.Clear();
+            lock (ProblemsAcknowledgements.Gate) Acks.Clear();
         }
     }
 }

@@ -161,9 +161,16 @@ public sealed class SectionProblemsSourceTests
     {
         string present = Body(View, "    private async Task PresentTheLinksChecklistAsync(");
         int read = present.IndexOf("await ReadTheProblemsNowAsync();", StringComparison.Ordinal);
-        int wait = present.IndexOf("TheProblemsAlertIsDue()", StringComparison.Ordinal);
-        Assert.True(read > 0 && wait > read, "the checklist reads the record, then waits while the alert is due");
-        Assert.Contains("_todaysClassQuestionUp", present[wait..]);
+        int wait = present.IndexOf("SectionProblemsRules.TheChecklistWaits(", StringComparison.Ordinal);
+        int up = present.IndexOf("_linksChecklistUp = true;", StringComparison.Ordinal);
+        int offer = present.IndexOf("LinksChecklistDialog.OfferAsync(", StringComparison.Ordinal);
+        Assert.True(read > 0 && wait > read, "the checklist reads the record, then waits by the one rule");
+        // The flag the alert waits behind is set only once the checklist is
+        // going on screen — never while it waits for the alert (review finding 1).
+        Assert.True(up > wait && offer > up, "_linksChecklistUp is set after the wait and just before the checklist shows");
+        Assert.DoesNotContain("_linksChecklistUp = true;", present[..wait]);
+        Assert.Contains("if (_healthDialogIsUp || _todaysClassQuestionUp || _linksChecklistUp) return;",
+                        Body(View, "    private async Task RaiseTheProblemsAlertIfDueAsync("));
     }
 
     /// <summary>A due alert that could not get on screen is asked for again when whatever held the slot goes.</summary>

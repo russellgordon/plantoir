@@ -76,10 +76,24 @@ public sealed class SectionProblemsRecord
         try
         {
             if (!File.Exists(path)) return null;
-            return Parse(File.ReadAllText(path));
+            using var stream = OpenShared(path);
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            return Parse(reader.ReadToEnd());
         }
         catch (Exception) { return null; }
     }
+
+    /// <summary>
+    /// Opens the record for reading WITHOUT standing in the writer's way:
+    /// sharing read, write and DELETE. The shared Python replaces the file
+    /// with <c>os.replace</c> (<c>section_problems.py</c>), which Windows
+    /// refuses while another handle has it open without delete sharing — and
+    /// its caller swallows the refusal, so a read at the wrong moment would
+    /// lose a build's record silently (#734 implementation review, finding 2;
+    /// <c>File.ReadAllText</c> shares read only).
+    /// </summary>
+    public static FileStream OpenShared(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
     /// <summary>The record in <paramref name="text"/>, or null. Never throws.</summary>
     public static SectionProblemsRecord? Parse(string? text)
