@@ -1145,12 +1145,19 @@ the ID's sentence first, then "it can wait", then the 25 MB note, as one block (
   `carries` says, deliberately, "not where it publishes", and
   `course_config.json` already answers the question.
 
-**Windows** owes the same default, order, sentences, the warning in place of
-the refusal, Open Settings… on the refusal, the trail event, and a test that
-its new-course dialog WRITES `newCourseDefault` (#739 items 1 to 6). Its
-goldens hold the setup answers rather than the written file, so none of them
-moves. The command-line half is shared Python and reaches it free, and the
-launcher half (items 7 and 8) landed in 1.9.3, above.
+**Windows matched it in 1.9.3** (#739 items 1 to 6): the same default, order,
+sentences, the warning in place of the refusal, Open Settings… on the
+refusal, and the trail event. Its rules are `PublishingDestinations` in
+`Plantoir.Core` (the Swift's twin, with the notice's one block as
+`CloudflareNotice`), run against all three case lists by
+`PublishingDestinationsContractTests`; that the new-course dialog WRITES
+`newCourseDefault` is proven through the real window
+(`NewCourseWizardUiTests.TheCreateButtonReallyMakesACourse` reads the written
+file), since its goldens hold the setup answers rather than the file. Where
+Windows differs, and why, is in
+[12](12-windows-app.md) → "A new course starts on Cloudflare Pages (#739)".
+The command-line half is shared Python and reaches it free, and the launcher
+half (items 7 and 8) landed in 1.9.3, above.
 
 ## Cloudflare Pages (`--target cloudflare`)
 

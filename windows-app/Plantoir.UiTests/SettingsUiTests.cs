@@ -93,26 +93,33 @@ public class SettingsUiTests
     }
 
     /// <summary>
-    /// The wizard with no Account ID: Cloudflare Pages chosen, Create refused
-    /// with the contract's sentence beside Open Settings…; that button raises
-    /// Settings on Deploying WHILE the wizard stays open, and a valid ID typed
-    /// there enables Create without the wizard closing.
+    /// The wizard with no Account ID (#739, the mac's #668): Cloudflare Pages
+    /// is ALREADY chosen, and the missing ID is a warning, not a refusal — the
+    /// contract's sentence, then accountIDCanWait, then the 25 MB note, as ONE
+    /// block beside Open Settings…, with Create available. Open Settings… raises
+    /// Settings on Deploying WHILE the wizard stays open; an ID that cannot be
+    /// one, typed there, refuses Create and loses "it can wait"; a valid one
+    /// leaves only the 25 MB note, and Create available again.
     /// </summary>
     [UiFact]
-    public void TheWizardWaitsForTheIdTypedInSettings()
+    public void TheWizardLetsAMissingIdWaitAndFollowsTheIdTypedInSettings()
     {
         using var app = new DrivenApp(CourseFixtures.WriteBoth);
         NewCourseWizardUiTests.OpenWizard(app);
         NewCourseWizardUiTests.PutCodeIn(app, "MFM2P");
-        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(1);   // Cloudflare Pages
+        DeployPicker.AssertChosen(app, PublishingDestinations.NewCourseDefault);
 
         var create = app.Find("PrimaryButton", "the wizard's Create button");
         string noId = CourseConfiguration.CloudflareAccountProblem("")!;
-        Assert.True(Retry.WhileFalse(() => app.FindOrNull("cloudflareAccountProblem", TimeSpan.FromSeconds(1))?.Name == noId,
+        string waiting = noId + " " + PublishingDestinations.AccountIdCanWait + " " + PublishingDestinations.CloudflareSizeNote;
+        string lastSeen = "";
+        Assert.True(Retry.WhileFalse(() => (lastSeen = app.FindOrNull("cloudflareAccountProblem", TimeSpan.FromSeconds(1))?.Name ?? "") == waiting,
                                      TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
-                    $"the wizard never said \"{noId}\"");
-        Assert.False(create.IsEnabled, "Create was offered with no Account ID");
+                    $"the wizard never said \"{waiting}\" as one block; it said \"{lastSeen}\"");
+        Assert.True(Retry.WhileFalse(() => create.IsEnabled, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    "Create was refused over a MISSING Account ID, which may wait until the first deploy");
         Assert.Equal(DeployingSettings.ShownWhenEmpty, app.Find("cloudflareAccountValue", "the wizard's Account ID").Name);
+        Assert.Equal(PublishingDestinations.CloudflareCaption, app.Find("cloudflareCaption", "the Cloudflare caption").Name);
 
         app.Find("cloudflareAccountOpenSettings", "Open Settings…").AsButton().Invoke();
         var settings = app.FindTopLevel("settingsWindow", "the Settings window");
@@ -122,10 +129,21 @@ public class SettingsUiTests
                     "Open Settings… did not open on Deploying");
         Assert.NotNull(app.FindOrNull("newCourseDialog"));
 
+        // Something saved, and wrong: Create is refused, and nothing says it can wait.
+        Field(settings).Patterns.Value.Pattern.SetValue("abc");
+        string wrong = CourseConfiguration.CloudflareAccountProblem("abc")!;
+        Assert.True(Retry.WhileFalse(() => !create.IsEnabled, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    "an ID that cannot be one left Create available");
+        Assert.True(Retry.WhileFalse(() => (lastSeen = app.FindOrNull("cloudflareAccountProblem", TimeSpan.FromSeconds(1))?.Name ?? "")
+                                               == wrong + " " + PublishingDestinations.CloudflareSizeNote,
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"the wizard did not say \"{wrong}\" before the 25 MB note, without \"it can wait\"; it said \"{lastSeen}\"");
+
         Field(settings).Patterns.Value.Pattern.SetValue(AnId);
         Assert.True(Retry.WhileFalse(() => create.IsEnabled, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
                     "a valid ID typed in Settings never enabled Create");
         Assert.Equal(AnId, app.Find("cloudflareAccountValue", "the wizard's Account ID").Name);
+        Assert.Equal(PublishingDestinations.CloudflareSizeNote, app.Find("cloudflareSizeNote", "the 25 MB note, alone").Name);
         Assert.NotNull(app.FindOrNull("newCourseDialog"));
 
         settings.AsWindow().Close();
@@ -147,7 +165,7 @@ public class SettingsUiTests
         using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
         app.SelectCourse(CourseFixtures.NeverAsked);
 
-        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(1);   // Cloudflare Pages, no ID on this PC
+        DeployPicker.Choose(app, "cloudflare_pages");   // no ID on this PC
         Assert.True(Retry.WhileFalse(() => app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result,
                     "moving to Cloudflare Pages left nothing to revert");
         Assert.False(app.Find("saveButton", "Save").IsEnabled, "Save was offered for Cloudflare Pages with no Account ID");
@@ -160,7 +178,7 @@ public class SettingsUiTests
         Assert.Equal(AnId, app.Find("cloudflareAccountValue", "the course's Account ID").Name);
         settings.AsWindow().Close();
 
-        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(0);   // back to Netlify
+        DeployPicker.Choose(app, "netlify");   // back to Netlify
         Assert.True(Retry.WhileFalse(() => !app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result,
                     "the ID typed in Settings was counted as an unsaved edit to the course");
         Assert.False(app.Find("saveButton", "Save").IsEnabled, "Save stayed enabled with nothing changed in the course");

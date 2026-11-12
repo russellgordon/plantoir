@@ -646,6 +646,16 @@ public static class ActivityTrail
         /// </summary>
         CloudflareAccountIdChangedInSettings,
         /// <summary>
+        /// The Deploy button (or the in-app assistant pressing it) was refused
+        /// because the Cloudflare Account ID is missing or not a whole ID (#739,
+        /// the mac's #668): by KIND, never the ID
+        /// (<see cref="Plantoir.Core.Models.PublishingDestinations.AccountIdRefusalTrailLine"/>).
+        /// Since a new course starts on Cloudflare Pages, this is the refusal
+        /// every new teacher meets at their first deploy. A windowless MCP
+        /// deploy refuses with the same sentence and writes no line.
+        /// </summary>
+        DeployRefusedForTheCloudflareAccountId,
+        /// <summary>
         /// Help ▸ Plantoir Help (or F1) opened the support page in the browser
         /// (#491). A teacher who looked for help just before something went
         /// wrong is a teacher whose report should say so.
@@ -891,6 +901,7 @@ public static class ActivityTrail
         Event.LaterClassesWentOut => "deployed with classes dated after the next class",
         Event.LaterClassesHeldADeployBack => "a deploy was held back for classes dated after the next class",
         Event.CloudflareAccountIdChangedInSettings => "Cloudflare account ID changed in Settings",
+        Event.DeployRefusedForTheCloudflareAccountId => "deploy refused for the Cloudflare Account ID",
         Event.PlantoirHelpOpened => "opened Plantoir Help",
         Event.PreviewPageOpenedInBrowser => "preview page opened in the web browser",
         Event.GuidanceFileAskedAbout => "asked before adding guidance to a file",

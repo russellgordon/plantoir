@@ -11,6 +11,15 @@ public class CourseConfigurationTests
     private static CourseConfiguration FromJson(string json) =>
         CourseConfiguration.FromBytes(Encoding.UTF8.GetBytes(json));
 
+    /// <summary>
+    /// An ABSENT deploy_target still means Netlify, although a NEW course starts
+    /// on Cloudflare Pages (#739): the two differ on purpose
+    /// (<c>publishingDestinations.whyTheyDiffer</c>). Every course written before
+    /// the other destinations existed has no key and deploys to Netlify today;
+    /// reading it as Cloudflare would move a working class site to a host the
+    /// teacher has no account with. The new-course dialog writes the key
+    /// instead, so this fallback only reaches a file that predates it.
+    /// </summary>
     [Fact]
     public void PublishingAccessorsDefaultToNetlifyAndRoundTrip()
     {

@@ -1287,6 +1287,15 @@ public sealed partial class SidebarPane : UserControl
         // #547: its own line, never glued into DialogOpening — that is "the
         // first sentence" #400 and SharedRuleContractTests read.
         body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = ScheduledDeploy.OnBatterySleepsSooner });
+        // #739 (the mac's #668): a deploy that happens on its own is the
+        // easiest one to forget the cost of, so the SAVED settings' Netlify
+        // destination says so here.
+        if (PublishingDestinations.ScheduleNote(course.Configuration) is { } netlifyNote)
+        {
+            var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Text = netlifyNote, Opacity = 0.8 };
+            AutomationProperties.SetAutomationId(note, "netlifyScheduleNote");
+            body.Children.Add(note);
+        }
         if (unsavedSomewhere)
             body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = SavedSettings.SchedulingUsesSavedSettings });
         body.Children.Add(day);

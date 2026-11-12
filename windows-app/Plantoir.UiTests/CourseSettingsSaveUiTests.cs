@@ -39,12 +39,12 @@ public class CourseSettingsSaveUiTests
         using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
         app.SelectCourse(CourseFixtures.NeverAsked);
 
-        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(2);   // "A folder on this PC", no folder yet
+        DeployPicker.Choose(app, "local_folder");   // "A folder on this PC", no folder yet
         Assert.True(Retry.WhileFalse(() => app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result);
         Assert.False(app.Find("saveButton", "Save").IsEnabled, "Save is enabled for a move to a folder not chosen");
         Assert.StartsWith(SaveHeldBackOpening(), app.Find("savedConfirmation", "the note beside Save").Name);
 
-        app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(0);   // back to Netlify: nothing unsaved
+        DeployPicker.Choose(app, "netlify");   // back to Netlify: nothing unsaved
         Assert.True(Retry.WhileFalse(() => !app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result);
         // An EMPTY TextBlock reports no Name at all (PropertyNotSupported,
         // measured on the second run of bundle 11) — that is the empty note.

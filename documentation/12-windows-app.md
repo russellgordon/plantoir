@@ -978,8 +978,10 @@ ticks (the store's), and the alert is raised in one (`ClaimTheAlert`).
 **The trail.** "problems changed" (`ActivityTrail.Event.ProblemsChanged`): the
 change line once per alert key, from the store, and the answer line
 (`Show`, `the repair`, `Not Now`) from the view. Nothing for a tick or the tab.
-"asked an assistant to fix problems" (#736) and "deploy refused for the
-Cloudflare Account ID" (#739) are held in `NamedGapLedger` for v1.9.3.
+"asked an assistant to fix problems" (#736) was held in `NamedGapLedger` for
+v1.9.3 when this landed; "deploy refused for the Cloudflare Account ID" (#739)
+was too, and is written since #739 ("A new course starts on Cloudflare Pages
+(#739)" below).
 
 **Tests.** `SectionProblemsContractTests` (the 12 `rowState`, 4 `sectionMarker`
 and 6 `alert` cases, the lists, words and kinds pinned, rule 1, the trail line,
@@ -1370,6 +1372,131 @@ comment in its leg loop, and `test_launcher_rules.ps1` section 10).
 `Plantoir.Mcp` uses `ProcessStartInfo.ArgumentList` and was never affected;
 `PtyDriver`'s own joiner has the same naive rule but is fed only the
 harness's `cmd.exe /c "<runner>.cmd"`.
+
+### A new course starts on Cloudflare Pages (#739)
+
+The Windows half of the mac's #668, items 1 to 6 of #739; the why, the dated
+figures and what was rejected are in [07](07-deployment.md) → "Choosing a
+destination (#668)", and the rules are `contracts/app-rules.json` →
+`publishingDestinations`. On Windows:
+
+- **The rules are one Core class**, `PublishingDestinations`
+  (`Plantoir.Core/Models`): the default, the absent-key meaning, the order
+  (`PickerOrder`, which is `CourseConfiguration.KnownDeployTargetTypes`, now
+  Cloudflare, Netlify, folder), the five sentences, when each note shows,
+  `WizardCreateRefusal`, `DeployRefusalOpensSettings`, the trail line
+  (`AccountIdRefusalTrailLine`) and the Cloudflare notice as ordered runs
+  (`CloudflareNotice`). `PublishingDestinationsContractTests` runs all three
+  case lists against it and pins the sentences; the views only draw what it
+  returns. The 25 MB sentence moved there from the view (it is not a contract
+  sentence) so the block's ORDER is testable.
+- **The new-course dialog** (`NewCourseDialog`) starts `_deployTarget` at
+  `NewCourseDefault` and always writes it; its Deploying header carries
+  `wizardCaption` (automation id `wizardDeployingCaption`); its
+  `PublishingChoiceView` is built with `accountIdMayWait: true`, so
+  `Problem` (what holds Create back) is `WizardCreateRefusal` for the ID: a
+  missing one waits, one that cannot be an ID refuses.
+- **`PublishingChoiceView`** (both the dialog and Course Settings): the
+  picker lists `PickerOrder`, an absent or unknown saved value showing as
+  Netlify; `cloudflareCaption` heads the Cloudflare block, primary
+  (`cloudflareCaption`) or additional (`additionalCloudflareCaption`);
+  `netlifyNote` sits under the picker when Netlify is the primary or no
+  destination is saved (`netlifyNote`), and under the "Also deploy to
+  Netlify" switch when it is additional (`additionalNetlifyNote`). **The
+  notice is ONE `TextBlock` of runs**: the ID's sentence in the caution
+  colour, `accountIDCanWait` in the secondary colour (the dialog, a missing
+  ID), then the 25 MB note in the caution colour. Its automation id is
+  `cloudflareAccountProblem` while the ID has a problem and `cloudflareSizeNote`
+  when it has none (the additional block: the same with `additional…`), as
+  the mac names its single `Text`; its Name is the whole block, so Narrator
+  reads it in that order. The additional Cloudflare block gained the 25 MB
+  note it never had, as the mac's shared `CloudflareDetailFields` shows it.
+- **Course Settings is unchanged in what it refuses**: a changed destination
+  to Cloudflare with no ID still holds Save back, and never says it can wait.
+- **Schedule a deploy** (`SidebarPane.AskWhenToDeploy`) adds
+  `netlifyScheduleNote` (`netlifyScheduleNote`) when the SAVED settings deploy
+  to Netlify, primary or additional, absent key included
+  (`PublishingDestinations.ScheduleNote`).
+- **The Deploy button's refusal** (`SectionDetailView.DeployAsync`, the one
+  path the button and the in-app assistant share) keeps its title, "This
+  section can't be deployed yet" (the mac's alert is "Cannot Deploy Yet"),
+  and gains **Open Settings…** as its primary button when the sentence is the
+  Account ID's; OK stays the default button, so Enter and Escape both leave.
+  It is the same `ContentDialog` as before, through `ShowDialogSafelyAsync`,
+  so `DialogTitleScanTests`' census does not move; Settings is opened from the
+  dialog's ANSWER, after it has closed, and is a window of its own, so
+  nothing outlives a view rebuilt under it. Focus: OK returns it to the
+  Deploy button (ContentDialog's own return); Open Settings… activates the
+  Settings window on Deploying.
+- **The headless deploy no longer refuses every Cloudflare section.**
+  `AssistWorkspace.Deploy` (`plantoir-mcp`'s `deploy_section`, and Plantoir's
+  own assistant with no window to press in) refused EVERY Cloudflare
+  destination from 2026-08-13 until #739, saved ID or not, with a sentence
+  of its own ("…needs the account ID Plantoir stores. Deploy this section
+  from Plantoir instead."). The reason given was that a Pages token cannot
+  list its account and "only the app can pass" the ID; but the ID has always
+  been in `AppSettings`, which this process reads (`CurrentCloudflareAccountId`,
+  already serving `schedule_deploy`), and the mac never had the refusal. With
+  Cloudflare every new course's default it would have let an outside
+  assistant schedule a new course's deploy but never deploy it. It now
+  refuses exactly when the window does (`MultiDestinationDeployRunner.RefusalReason`,
+  the same sentence; a folder not chosen included) and otherwise hands each
+  Cloudflare leg `--account <id>` as the window's Deploy and the scheduled
+  run do, plus the `--non-interactive` it always passed. Nothing is left to
+  answer headless: a missing saved token makes `deploy.ps1
+  --non-interactive` exit 3 (`deployNeedsAnAnswer`), and a section never
+  deployed there is still refused first. It writes no trail line, as the
+  contract's event `why` says of this path and as the mac's
+  `AssistSiteWork.deploy` does. Proven against a stub launcher only
+  (`HeadlessCloudflareDeployTests`: every `deployWithoutAnAccountID` case,
+  each leg's arguments equal to the window's but for `--non-interactive`, a
+  made-up ID); no real Cloudflare deploy was run through `plantoir-mcp`.
+  `AssistWorkspace.CloudflareAccountIdOverrideForTests` is held per async
+  flow now, so two test classes setting it cannot race.
+  **What the run prints is redacted before it leaves the process**
+  (`LauncherRunner.OutputCapture`): progress lines and the kept tail both
+  reach an outside assistant's conversation, and a failing wrangler call
+  names its resource, `/accounts/<id>/pages/…`, which no rule caught. A new
+  rule, `accountPath`, and its case in `shared-rules.json` →
+  `problemReportRedaction` (proposed from Windows; the mac's
+  `LogRedactor.swift` lacks it, so its suite goes red until it adds it, the
+  `mac` issue). On the window's side the console is the teacher's own; what
+  it writes to disk already went through `LogRedactor` (the run transcripts,
+  `ProblemReportStore.SaveRunTranscript`, and the trail), so the new rule
+  covers them too. A scheduled Cloudflare leg's output goes to a temporary
+  file in `scheduledolder-problems` that the wrapper deletes after reading
+  one marker from it; it is not redacted, and does not outlive the run.
+- **The trail.** `ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId`
+  ("deploy refused for the Cloudflare Account ID"), written from that
+  refusal before the dialog goes up, by kind, never the ID: "ICS3U/1 · deploy
+  refused: no Cloudflare Account ID is saved in Settings" or "…is not a whole
+  ID". A folder refused first writes nothing; so does an MCP client's deploy
+  and a refused schedule (the event's `why`).
+
+**Proven.** `PublishingDestinationsContractTests` (the default
+and the absent key read from a file, the order and the additional list, the
+five sentences, `netlifyNoteCases` for both notes and for the schedule note,
+`wizardAccountID.cases` with the block's order and colours, and
+`deployWithoutAnAccountID.cases` for the refusal, Open Settings…, the line and
+that the line never carries the ID, and a source check that OK stays the
+refusal's default button). `HeadlessCloudflareDeployTests` runs every
+`deployWithoutAnAccountID` case through the headless deploy (above). Through the window,
+`PublishingDestinationsUiTests` (the refusal's Open Settings… and its trail
+line; a folder refused first with neither; the sentences in the dialog;
+Course Settings and Schedule a deploy for a course with no destination saved),
+`SettingsUiTests.TheWizardLetsAMissingIdWaitAndFollowsTheIdTypedInSettings`
+and `NewCourseWizardUiTests.TheCreateButtonReallyMakesACourse` (which reads
+the written `deploy_target`). Window tests pick a destination by its type
+through `DeployPicker`, never by position: index 1 meant Cloudflare before
+#739 and Netlify after.
+
+**Rejected.** *Leaving the 25 MB note a TextBlock of its own beside the
+problem line* — the mac's review found two orange warnings on a first
+course were one too many. *A second dialog for Open Settings…* — one
+`ContentDialog` per window, and the refusal already is one. *Writing the trail
+line in `MultiDestinationDeployRunner.RefusalReason`* — that is also the MCP
+server's and the assistant's refusal, and the event is for a window that was
+open.
 
 ---
 

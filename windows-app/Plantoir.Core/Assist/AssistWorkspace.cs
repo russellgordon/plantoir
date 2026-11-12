@@ -44,7 +44,16 @@ public sealed partial class AssistWorkspace
     /// on the machine running the suite — exactly the kind of surprise this
     /// override exists to make deterministic instead.
     /// </summary>
-    internal static Func<string>? CloudflareAccountIdOverrideForTests;
+    /// <remarks>Held per async flow (#739): two test classes setting it at
+    /// once (the scheduled-deploy plans and the headless deploy) would
+    /// otherwise race on one static, since xUnit runs classes in parallel.</remarks>
+    internal static Func<string>? CloudflareAccountIdOverrideForTests
+    {
+        get => CloudflareAccountIdOverride.Value;
+        set => CloudflareAccountIdOverride.Value = value;
+    }
+
+    private static readonly AsyncLocal<Func<string>?> CloudflareAccountIdOverride = new();
 
     internal static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
@@ -1627,20 +1636,30 @@ public sealed partial class AssistWorkspace
 
         var destinations = course.Configuration.AllDeployDestinations;
 
-        // A Pages-scoped Cloudflare token cannot list its own account, so
-        // the account id lives in Plantoir's settings and only the app —
-        // never this headless process — can pass it. Checked against EVERY
-        // configured destination, primary or additional: a redundancy
-        // target the assistant cannot reach is refused up front rather than
-        // silently skipped partway through a multi-destination deploy.
-        foreach (var destination in destinations)
-        {
-            if (destination.Type != "cloudflare_pages") continue;
-            bool isPrimary = destination.Type == course.Configuration.DeployTarget;
-            throw new AssistRefusal(
-                $"{course.Code} {(isPrimary ? "deploys" : "also deploys")} to Cloudflare Pages, which needs " +
-                "the account ID Plantoir stores. Deploy this section from Plantoir instead.");
-        }
+        // A Pages-scoped Cloudflare token cannot list its own account, so the
+        // launcher is handed the Account ID with --account, read from
+        // AppSettings exactly as the Deploy button and the scheduled run read
+        // it (#739). Until #739 this path refused EVERY Cloudflare
+        // destination, saved ID or not ("only the app can pass it", 2026-08-13);
+        // that was never true of this process, which reads the same settings
+        // file, and since #739 made Cloudflare every new course's default it
+        // would have left an outside assistant able to schedule a new
+        // course's deploy but never to deploy it. The mac had no such refusal.
+        //
+        // The refusal is now the one every in-app door gives
+        // (MultiDestinationDeployRunner.RefusalReason; publishingDestinations
+        // → deployWithoutAnAccountID), checked against EVERY destination up
+        // front: a missing or malformed ID, or a folder not chosen. No trail
+        // line here: the event "deploy refused for the Cloudflare Account ID"
+        // is for a window that was open, and the contract's own `why` names
+        // this path as writing none, as the mac's AssistSiteWork.deploy does.
+        //
+        // Nothing left to answer headless: a missing saved token makes
+        // deploy.ps1 --non-interactive exit 3 (deployNeedsAnAnswer, below),
+        // and a site never deployed there is refused just after this.
+        string cloudflareAccount = CurrentCloudflareAccountId().Trim();
+        if (MultiDestinationDeployRunner.RefusalReason(destinations, cloudflareAccount) is { } destinationProblem)
+            throw new AssistRefusal(destinationProblem);
 
         // With no site marker, deploy.py asks what to call the website — a
         // prompt on stdin, which is closed here, so the launcher would die
@@ -1738,7 +1757,7 @@ public sealed partial class AssistWorkspace
         {
             // unattended: --non-interactive, so a question refuses with exit 3
             // instead of waiting for ever on a terminal nobody reads (#391).
-            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination, unattended: true);
+            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination, cloudflareAccount, unattended: true);
             progress?.Report($"Deploying to {Models.DeployCommand.DestinationDescription(destination)}…");
             var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
             outcomeLegs.Add((destination, deployed.Succeeded));

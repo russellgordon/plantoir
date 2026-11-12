@@ -140,8 +140,11 @@ public sealed class NewCourseDialog : ContentDialog
     private bool _includeCoverageNotes = true;
     private bool _useLcs;
 
-    // Publishing (rows 101–102): Netlify by default, or a folder on this PC.
-    private string _deployTarget = "netlify";
+    // Publishing (rows 101–102). Cloudflare Pages unless the teacher picks
+    // another (#739, the mac's #668), and ALWAYS written as deploy_target: an
+    // absent key still means Netlify for every course made before
+    // (PublishingDestinations.WhenTheKeyIsAbsent, the contract's whyTheyDiffer).
+    private string _deployTarget = PublishingDestinations.NewCourseDefault;
     private string _deployFolderPath = "";
     private List<CourseConfiguration.AdditionalDeployTarget> _additionalDeployTargets = new();
     private PublishingChoiceView? _publishingChoice;
@@ -623,7 +626,9 @@ public sealed class NewCourseDialog : ContentDialog
         form.Children.Add(FormBuilders.LabeledRow("Show page read-time estimates to students", readTimeToggle));
 
         // -------- Publishing --------
-        form.Children.Add(FormBuilders.SectionHeaderWithCaption("Deploying", null));
+        var deployingHeader = (StackPanel)FormBuilders.SectionHeaderWithCaption("Deploying", PublishingDestinations.WizardCaption);
+        AutomationProperties.SetAutomationId(deployingHeader.Children[^1], "wizardDeployingCaption");
+        form.Children.Add(deployingHeader);
         _publishingChoice = new PublishingChoiceView(_window,
             () => _deployTarget,
             v =>
@@ -642,10 +647,14 @@ public sealed class NewCourseDialog : ContentDialog
             // window while this one stays open, so nothing typed is lost.
             () => _window.Workspace.Settings.CloudflareAccountId,
             () => _additionalDeployTargets,
-            v => _additionalDeployTargets = v.ToList());
+            v => _additionalDeployTargets = v.ToList(),
+            // A MISSING ID is a warning here, not a refusal (#739): the
+            // sentence stays beside Open Settings… with accountIDCanWait after
+            // it, and the first deploy refuses instead. One that cannot be an
+            // ID still refuses Create.
+            accountIdMayWait: true);
         _publishingChoice.Changed += RefreshCreateEnabled;
-        // With no ID, Create stays refused with the contract's sentence beside
-        // Open Settings…; an ID typed in Settings enables it at once.
+        // An ID typed or changed in Settings re-reads Create at once.
         _publishingChoice.AccountRefreshed += RefreshCreateEnabled;
         form.Children.Add(_publishingChoice.Root);
 
