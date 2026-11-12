@@ -161,8 +161,9 @@ look the same:
   `\usepackage[T1]{fontenc}`, no paragraph indent.
 - A bold sans title (`{\LARGE\bfseries\sffamily \doctitle}`), then a grey
   subtitle line of instructions.
-- `tasks` columns for a), b), c) parts. The answer key keeps the
-  worksheet's column count.
+- `tasks` columns for short a), b), c) parts side by side. The answer key
+  keeps the worksheet's column count. On a quiz or test, a part that runs
+  to more than one line hangs under its first word (section 6).
 - `pgfplots` for graphs. How far a graph is drawn, and when it has
   arrowheads, is in section 12.
 - **A blank students write on is about two lines tall.** Any line that
@@ -228,8 +229,31 @@ blanks, that is:
   switch inside one file.
 - In the solutions, working is dark blue and balancing steps (what is done
   to both sides) light red, so they stay distinct when printed in greyscale.
+- **A lettered part hangs under its first word.** When a part a), b), c)
+  runs to more than one line, every line after the first starts under the
+  part's first word, and the letter stands alone to the left, as a numbered
+  question's does. Write each part with `\qpart{b}{...}`, or with
+  `\partbox{4cm}{c}{...}{answer}` when the part needs a slot of fixed height
+  to write in. The slot is the same height in the solutions, so the two
+  copies line up, and the answer sits at the part's edge (write it inline,
+  not as a centred display, which ignores the edge). If an answer does not
+  fit its slot, raise the height; it is one source, so both copies change.
+  Never type a part as "b) ..." at the start of a paragraph, where its
+  second line returns under the letter. Short parts side by side stay in
+  `tasks` columns, which already hang, and whose letters line up with
+  `\qpart`'s (both 1.8em in, `\partindent`).
+- **Questions are worded in plain English.** Many students are learning
+  English. Around the terms the class was taught, use short sentences in
+  the present tense, name the thing rather than writing "it" or "this", and
+  avoid idioms ("use good form", "in plain sight"). Say what the student
+  sees, then what to do: "The graph shows a parabola. Write its equation."
 
-`starters/Quiz.tex` has all three.
+`starters/Quiz.tex` has all of these; its question 3 is a worked example
+of hanging parts. The four part macros (`\partindent`, `\qlabel`, `\qpart`
+and `\partbox`) are a starting point, not a rule about their shape: if the
+teacher's own quizzes set parts another way, or their house style differs,
+adjust the macros to match, and keep what the rule asks (a part hangs, and
+the two copies line up).
 
 ## 7. Answers are checked, and new questions are reviewed
 

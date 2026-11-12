@@ -632,6 +632,8 @@ final class PrintablePagesTests: XCTestCase {
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
         let starters: [String] = try XCTUnwrap(guidance["starters"] as? [String])
         let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let starterMacros: [String: Any] = try XCTUnwrap(guidance["starterMacros"] as? [String: Any])
+        XCTAssertFalse(starterMacros.isEmpty)
         let pageAuthoring: [String: Any] = try XCTUnwrap(contract["pageAuthoringSkill"] as? [String: Any])
         let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
         XCTAssertFalse(routesTo.contains(skillName), "a handout made as a PDF is not part of a page")
@@ -662,6 +664,20 @@ final class PrintablePagesTests: XCTestCase {
                 let other: String = try String(
                     contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
                 XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+            // #754: each macro a starter must carry is defined in the written
+            // starter and named in the skill, so an edit to either cannot
+            // drop a macro the other relies on.
+            for (starter, value) in starterMacros {
+                let macros: [String] = try XCTUnwrap(value as? [String], starter)
+                XCTAssertFalse(macros.isEmpty, starter)
+                let source: String = try String(
+                    contentsOf: skillFolder.appendingPathComponent(starter), encoding: .utf8)
+                for macro in macros {
+                    let defined: Bool = source.contains("\\newcommand{\(macro)}") || source.contains("\\newlength{\(macro)}")
+                    XCTAssertTrue(defined, "\(home): \(starter) must define \(macro)")
+                    XCTAssertTrue(skill.contains("`\(macro)"), "\(home): the skill must name \(macro)")
+                }
             }
         }
         for name in AgentGuidance.rootFiles {

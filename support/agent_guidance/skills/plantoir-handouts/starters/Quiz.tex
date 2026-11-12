@@ -104,13 +104,32 @@
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 
+% ---------- Lettered parts that hang (the skill's section 6) ----------
+% A part that runs to more than one line hangs: every line after the first
+% starts under the part's first word, and the letter stands alone to the
+% left, as a numbered question's does. \qpart{b}{words} is a part in the flow
+% of the page; \partbox{4cm}{c}{words}{answer} is a part with a slot of fixed
+% height to write in, the SAME height in the solutions, where the answer sits
+% at the part's edge, so the two copies line up. If an answer does not fit
+% its slot, raise the height: it is one source, so both copies change.
+% \partindent matches the tasks columns' item-indent, so every part letter
+% lines up. Never type a part as "b) ..." at the start of a paragraph.
+% These are a starting point: adjust them to the teacher's own house style.
+\newlength{\partindent}
+\setlength{\partindent}{1.8em}
+\newcommand{\qlabel}[1]{\makebox[\partindent][l]{#1)}}
+\newcommand{\qpart}[2]{\par\begingroup\setlength{\leftskip}{\partindent}\noindent\llap{\qlabel{#1}}\ignorespaces#2\par\endgroup}
+\newcommand{\partbox}[4]{\par\noindent\begin{minipage}[t][#1][t]{\linewidth}
+  \setlength{\leftskip}{\partindent}\noindent\llap{\qlabel{#2}}\ignorespaces#3\par
+  \onlya{\work{#4}\par}\end{minipage}\par}
+
 \begin{document}
 
 {\LARGE\bfseries\sffamily \doctitle}\par
 \medskip
 {\color{why} \qa{Show all your work. Answers without work may not earn full marks.}{Full solutions.}}\par
 \smallskip
-\totals{K \rule[-0.15em]{0.8cm}{0.4pt}\,/\,4 \quad A \rule[-0.15em]{0.8cm}{0.4pt}\,/\,3}
+\totals{K \rule[-0.15em]{0.8cm}{0.4pt}\,/\,4 \quad A \rule[-0.15em]{0.8cm}{0.4pt}\,/\,3 \quad T \rule[-0.15em]{0.8cm}{0.4pt}\,/\,5}
 
 \begin{questions}
 \q{1}\score{K 4} Solve each equation.
@@ -126,6 +145,13 @@
 \onlya{%
 \[\work{4 + 2k = 20} \qquad \work{4 + 2k \bal{{}- 4} = 20 \bal{{}- 4}} \qquad \work{2k = 16} \qquad \work{k = 8}\]
 \work{You can ride 8 km.}}
+
+\q[12]{3}\score{T 5} A garden bed is a rectangle. Its width is $w$ metres. Its length is 3 m more than its width.
+\partbox{2.4cm}{a}{Write the area of the bed as an expression in $w$. Write the expression in factored form, then in expanded form.}{\work{$A = w(w + 3)$ \qquad $A = w^2 + 3w$}}
+\partbox{3.4cm}{b}{The area of the bed is 40 square metres. Write an equation for the width and solve the equation. Then say which solution is the width of the bed, and why.}{%
+\work{$w^2 + 3w = 40$ \qquad $w^2 + 3w \bal{{}- 40} = 40 \bal{{}- 40}$ \qquad $(w + 8)(w - 5) = 0$ \qquad $w = -8$ or $w = 5$}\par
+\work{A width cannot be negative, so the width of the bed is 5 m.}}
+\qpart{c}{The length of the bed is 3 m more than its width. Use the width from part b to find the length of the bed, and write the length on the line. \fillin{8 m}}
 \end{questions}
 
 \end{document}
