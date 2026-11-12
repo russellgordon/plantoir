@@ -769,6 +769,16 @@ public static class ActivityTrail
         /// the teacher gave the alert (Show, the repair, or Not Now).
         /// </summary>
         ProblemsChanged,
+        /// <summary>
+        /// Fix with Claude… or Fix with Codex… on a section's Problems tab
+        /// opened its door (#736, the mac's #717 part two): which assistant,
+        /// how many problems went and their KINDS, how many the message
+        /// names and how many were left out — never a page or a row's words
+        /// (<see cref="Plantoir.Core.Assist.FixWithAssistant.TrailLine"/>).
+        /// Written after the door's own "assistant opened" line; a door that
+        /// did not open writes nothing here.
+        /// </summary>
+        AskedAnAssistantToFixProblems,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -907,6 +917,7 @@ public static class ActivityTrail
         Event.SwiftGotReady => "Swift got ready on this computer",
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         Event.ProblemsChanged => "problems changed",
+        Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

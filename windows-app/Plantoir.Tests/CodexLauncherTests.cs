@@ -117,7 +117,7 @@ public class CodexLauncherTests : IDisposable
 
         var (server, folder, course, greeting) = Awkward();
         var sent = CodexLauncher.Arguments(server, folder, course, greeting);
-        AssertArrived(sent, Run(CodexLauncher.CmdArguments(stub, sent, keepOpen: false)), folder, course);
+        AssertArrived(sent, Run(OutsideDoor.CmdArguments(stub, sent, keepOpen: false)), folder, course);
     }
 
     /// <summary>The same through ONE cmd parse, for a native <c>codex.exe</c>.</summary>
@@ -128,7 +128,7 @@ public class CodexLauncherTests : IDisposable
         string python = FindPython();
         var (server, folder, course, greeting) = Awkward();
         var sent = CodexLauncher.Arguments(server, folder, course, greeting);
-        var received = Run(CodexLauncher.CmdArguments(python, new[] { echo }.Concat(sent), keepOpen: false));
+        var received = Run(OutsideDoor.CmdArguments(python, new[] { echo }.Concat(sent), keepOpen: false));
         AssertArrived(sent, received, folder, course);
     }
 

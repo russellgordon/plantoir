@@ -7431,8 +7431,10 @@ doors hold their course, so the mac's Codex door names it too, and since #468
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
-(`ArgvQuote`, the rule Rust's and Node's parsers read back), then cmd's
-metacharacters (`ForCmd`), which follows cmd's OWN quote toggling — cmd knows
+(`ArgvQuote`, the rule Rust's and Node's parsers read back), then — since
+Windows 1.9.3 (#736) only for npm's `codex.cmd`, an `.exe` being started with
+no cmd at all — cmd's metacharacters (`ForCmd`, now `OutsideDoor.ForCmd`, the
+one builder both doors use), which follows cmd's OWN quote toggling — cmd knows
 nothing of `\"`, so after a TOML `\"` the rest of a path is unquoted to cmd and
 `&`, `|`, `<`, `>`, `(`, `)` and `^` there get a caret. A `codex.cmd` (npm's
 shim, which re-parses `%*`) is escaped for TWO cmd parses; a `codex.exe` for
@@ -7444,13 +7446,19 @@ exactly and that `args` still parses as a list of two strings. Measured
 must-fails: escaping for one cmd parse where the shim needs two cut the argv
 off after the first override; a TOML `"` left unescaped failed the fixture.
 
-**Rejected: `wt.exe`**, which the Claude door uses. Windows Terminal parses its
-own command line — `;` starts a new tab, and it re-joins arguments with its own
-quoting — a third layer no unit test can drive without opening a window. The
-door starts `cmd.exe /s /k "…"` directly; on Windows 11 the console it opens is
-Windows Terminal anyway when that is the default terminal. **Not handled**: a
-`%NAME%` inside a folder or server path is expanded by cmd's first parse when a
-variable of that name exists; cmd offers no escape for `%` on a command line.
+**Rejected: `wt.exe`**, which the Claude door used until Windows 1.9.3.
+Windows Terminal parses its own command line — `;` starts a new tab, it
+re-joins arguments with its own quoting, and (measured with #736) it expands
+`%NAME%`. The door started `cmd.exe /s /k "…"` directly; since 1.9.3 a
+`codex.exe` is started with nothing in front, and a `codex.cmd` through
+`cmd.exe /v:off /s /k "…"`. On Windows 11 the console it opens is Windows
+Terminal anyway when that is the default terminal. **Handled since 1.9.3**
+(#736): a `%NAME%` inside a folder, a server path or the greeting was expanded
+by cmd's first parse when a variable of that name existed; cmd offers no escape
+for `%` on a command line, so every `%` is now followed by a quote, which no
+variable's name begins with. The Claude door's own fault, and why both doors
+are built by `OutsideDoor` now: documentation/12-windows-app.md → "What the
+outside doors hand to Windows, and how".
 
 **The trail**: `started Claude Code for <CODE>` (the Claude door shipped
 recording nothing) and `started Codex for <CODE>`, both `assistant opened`.
@@ -7949,6 +7957,23 @@ launch argument the teacher sees in their terminal, not something either
 assistant is shown as a tool. `test_tool_surface_digest.py` and the hasher
 gave the same digests before and after (local 13 `46b96562…`, MCP 38
 `89641d12…`), so no routing re-measurement was owed.
+
+**On Windows (1.9.3, #736)** the same, through `ClaudeCodeLauncher.Open(…,
+greeting)` and `CodexLauncher.Open(…, greeting)`, and it changed how BOTH
+doors start, Revise With ▸ included: an `.exe` with nothing in front, an npm
+`.cmd` shim through `cmd /v:off /s /k`, no Windows Terminal (1.9.0's Claude
+door had handed the course's name to cmd outside quotes).
+`12-windows-app.md` → "What the outside doors hand to Windows, and how".
+No tool or tool description moved there either.
+
+**Windows' plain Revise With ▸ greeting cuts the course's name at 80
+characters** (`fixWith.courseNameMaxCharacters`, with an ellipsis, the same
+cut Fix with… makes; since 1.9.3, #736's third review). A long imported name
+otherwise pushed the command line past cmd's limit, and the door refused with
+its could-not-start sentence, which tells the teacher a restart may help when
+it will not. The mac's greeting does not cut the name and need not: its shell
+script has no such limit. It may match, for one greeting on both platforms.
+Test: `OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`.
 
 ## Telling an outside assistant how the course is taught (#209)
 

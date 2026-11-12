@@ -939,9 +939,11 @@ carries and every key a `sectionProblems` kind. The message is filled in ONE
 pass over its template (`FixWithAssistant.fill`), so a row whose words carry
 `{section}` — TeX is braces everywhere — goes over as written.
 
-**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). On
-Windows the door runs `wt.exe -d <folder> cmd /k …` when Windows Terminal is
-there, and `wt` splits its command line at EVERY `;`, inside quotes too,
+**No semicolon, anywhere** (`fixWith.replaceInTheMessage`, review H1). When
+this was written Windows' Claude door ran `wt.exe -d <folder> cmd /k …` when
+Windows Terminal was there (since Windows 1.9.3 neither of its doors puts
+Windows Terminal in front: documentation/12-windows-app.md → "What the outside
+doors hand to Windows, and how"), and `wt` splits its command line at EVERY `;`, inside quotes too,
 because it reads the arguments after the quotes are removed
 (microsoft/terminal #13264; the documented escape is `\;`). A message with a
 semicolon opens cut short, with its tail as a second tab. The first draft used
@@ -962,7 +964,8 @@ the course's name at 80 (`courseNameMaxCharacters`, review L2 — before it, a
 absolute. Characters are Swift's (grapheme clusters, `fixWith.charactersAre`);
 Windows counts UTF-16 units, which can be more, and keeps the whole command
 line under 8,191 of those, with the rest of 6,500's room as the margin. Why
-6,500: Windows hands the message to `cmd /k`, whose command line is 8,191
+6,500: Windows hands the message to `cmd /k` (since its 1.9.3 only for an npm
+`.cmd` shim; an `.exe` is started directly), whose command line is 8,191
 characters, and the rest of that line (the terminal, the assistant's path, the
 configuration's) needs room. Measured with the contract's cases: ten 400-character
 rows on ordinary pages make 5,659 characters; long page names (286
@@ -1003,7 +1006,17 @@ the same `buttonCases` and `greetingCases`, the trail event, and the message
 through `wt.exe`/`cmd /k`. The message has no `;` for `wt` to split at. A `%`
 the record's prompts already drop, but a page's name can carry one. `^` and
 `!` need checking in its quoting. Measure the whole command line in UTF-16
-units against 8,191.
+units against 8,191. **Done in Windows 1.9.3 (#736)**, and reading the door
+for `%`, `^` and `!` found that 1.9.0's Claude door handed the course's name to
+cmd outside quotes: both Windows doors now start an `.exe` with nothing in
+front and an npm shim through `cmd /v:off /s /k` with every `%` neutralised,
+and Windows Terminal is no longer in front of either (it was measured
+expanding `%NAME%`). The message is the mac's, character for character; what
+was measured and rejected is documentation/12-windows-app.md → "Fix with
+Claude… and Fix with Codex…" and "What the outside doors hand to Windows, and
+how". Windows also proposed `fixWith.notEnabledHelp`, the sentence a greyed
+button gives to assistive technology, which the mac owes as an accessibility
+hint.
 
 **Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
 with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the

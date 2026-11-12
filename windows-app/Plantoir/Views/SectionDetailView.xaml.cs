@@ -230,7 +230,8 @@ public sealed partial class SectionDetailView : UserControl
         WebsiteTab.Text = SectionProblemsWording.TabWebsite;
         ProblemsTab.Text = SectionProblemsWording.TabProblems;
         _problemsView = new SectionProblemsView(course, sectionNumber, () => _window.Workspace.WorkspacePath,
-                                                row => _ = RepairFromTheProblemsTabAsync(row))
+                                                row => _ = RepairFromTheProblemsTabAsync(row),
+                                                assistant => _ = FixWithAsync(assistant))
         {
             Visibility = Visibility.Collapsed,
         };
@@ -1051,6 +1052,47 @@ public sealed partial class SectionDetailView : UserControl
         catch (Exception ex) { App.LogDiagnostic($"Repair from the Problems tab: {ex.Message}"); }
         if (!_isTornDown && !_problemsView.FocusRow(row.Id) && _problemsView.Visibility == Visibility.Visible)
             _problemsView.FocusTheTable();
+    }
+
+    /// <summary>
+    /// Fix with Claude… / Fix with Codex… (#736, the mac's #717 part two):
+    /// the ticked rows that are still this section's problem, handed to the
+    /// same door as Revise With ▸ with a message that lists them
+    /// (<see cref="FixWithAssistant"/>). Revise With's refusal is made first
+    /// and opens nothing; a door that does not open says so in its own words;
+    /// the trail's line is written only once it has opened, after the door's
+    /// own "assistant opened" line, and carries counts and kinds, never a page.
+    /// </summary>
+    private async Task FixWithAsync(FixWithAssistant.Assistant assistant)
+    {
+        if (_window.Workspace.WorkspacePath is not { } folder) return;
+        var record = SectionProblems.Record(folder, _course.Code, _sectionNumber);
+        if (record is null || _problemsView.CurrentHandover() is not { HasRows: true } handover) return;
+        if (OutsideDoorWording.RefusedWhileRevised(folder, _course.Code) is { } refusal)
+        {
+            await ShowDialogSafelyAsync(new ContentDialog { Title = refusal.Title, Content = refusal.Message, CloseButtonText = "OK" });
+            return;
+        }
+        var fits = assistant == FixWithAssistant.Assistant.Claude
+            ? ClaudeCodeLauncher.Fits(_course.Code)
+            : CodexLauncher.Fits(folder, _course.Code);
+        var greeting = FixWithAssistant.GreetingFor(handover.Rows, _course.Code, _course.Configuration.CourseName,
+                                                    _sectionNumber, record.Occasion, fits);
+        if (greeting is null) return;
+        bool opened = assistant == FixWithAssistant.Assistant.Claude
+            ? ClaudeCodeLauncher.Open(folder, _course.Code, _course.Configuration.CourseName, greeting.Text)
+            : CodexLauncher.Open(folder, _course.Code, _course.Configuration.CourseName, greeting.Text);
+        if (!opened)
+        {
+            await ShowDialogSafelyAsync(new ContentDialog
+            {
+                Title = OutsideDoorWording.DidNotOpenTitle(assistant),
+                Content = OutsideDoorWording.CouldNotStart(assistant, _course.Code),
+                CloseButtonText = "OK",
+            });
+            return;
+        }
+        FixWithAssistant.NoteOnTheTrail(assistant, handover, greeting, _course.Code, _sectionNumber);
     }
 
     // ---- The links checklist (#392, #399, #405) ---------------------------
