@@ -153,6 +153,14 @@ $setup1 = Invoke-Compile '1' $payload1 (Join-Path $work 'out') ''
 $setup2 = Invoke-Compile '2' $payload2 (Join-Path $work 'out') ''
 # Version 2 with only the ssInstall look (PrepareToInstall answers ''), for the 'ssinstall' case.
 $setup2Ss = Invoke-Compile '2' $payload2 (Join-Path $work 'out-ssinstall') '' @('HarnessOnlyAtSsInstall=1')
+# Version 2 taking the HAND-RUN path although run /VERYSILENT /SUPPRESSMSGBOXES
+# (RunningWorkSilent=False), for the 'hand-*' cases: the Retry/Cancel box is
+# suppressed and answers its default, Cancel, so a box that would have been
+# shown is a refusal ("the teacher chose Cancel") in the log, with no window
+# and no sound. Everything else about the hand-run path is the real one.
+$handRunDefine = 'RunningWorkSilent=False'
+$setup2Hand = Invoke-Compile '2' $payload2 (Join-Path $work 'out-hand') '' @($handRunDefine)
+$handRunCases = @('hand-preview', 'hand-build-and-preview')
 
 # Never Start-Process -Wait: in Windows PowerShell it waits for every
 # DESCENDANT too, and a refused update starts Plantoir, which never exits.
@@ -411,10 +419,42 @@ $cases['scheduled-that-waits-breaks-it'] = {
     $inUse = Select-String -Path $r.Log -Pattern 'Dest filename: .*\\Plantoir\.exe\s*$' -Context 0,8 | Where-Object { $_.Context.PostContext -match 'in use' } | Select-Object -First 1
     [PSCustomObject]@{ Pass = [bool](($r.Exit -ne 0) -and -not (Test-IsV2) -and $inUse); Detail = "exit $($r.Exit) in $($r.Seconds) s (went wrong as the review said: the copy of Plantoir.exe met it in use: $([bool]$inUse)); tree is version 2: $(Test-IsV2)" }
 }
+# A hand-run wizard with a preview SERVING whose build_site.py python outlives
+# its ended server by 2 s (0.3 s on the real installer, round three's W-preview):
+# the preview closes without a question, and the install completes.
+$cases['hand-preview'] = {
+    param($setup)
+    Install-Version1
+    $python = Start-StandIn 'runtime\python\python.exe' ("--hold `"$appDir\runtime\python\python311.dll`" -u C:\wf\.toolchain\scripts\build_site.py --course=EXC2O --section=1 --port=8081 --linger-ms 2000 --child `"$appDir\runtime\node\node.exe`" C:\builds\x\EXC2O\section1\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081")
+    Start-Sleep 2
+    $r = Invoke-Version2 $setup $handArgs 'hand-preview'
+    $python.WaitForExit(5000) | Out-Null
+    $v2 = Test-IsV2
+    $ended = (Select-String -Path $r.Log -Pattern "ending .*node\.exe.*a preview's server" -Quiet)
+    $asked = (Select-String -Path $r.Log -Pattern 'the teacher chose' -Quiet)
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 0) -and $v2 -and $ended -and -not $asked -and $python.HasExited); Detail = "exit $($r.Exit) in $($r.Seconds) s; server ended: $ended; the Retry/Cancel box asked: $asked; its python gone: $($python.HasExited); tree is version 2: $v2" }
+}
+
+# The same preview, plus a build that never ends: the preview is ended, and the
+# build still gets the box, once the grace after the ending is over.
+$cases['hand-build-and-preview'] = {
+    param($setup)
+    Install-Version1
+    $before = @(Get-Tree)
+    $python = Start-StandIn 'runtime\python\python.exe' ("-u C:\wf\.toolchain\scripts\build_site.py --course=EXC2O --section=1 --port=8081 --linger-ms 2000 --child `"$appDir\runtime\node\node.exe`" C:\builds\x\EXC2O\section1\quartz\bootstrap-cli.mjs build --concurrency 1 --serve --port 8081 --wsPort 9081")
+    $node = Start-StandIn 'runtime\node\node.exe' 'C:\builds\x\EXC2O\section2\quartz\bootstrap-cli.mjs build --concurrency 1'
+    Start-Sleep 2
+    $r = Invoke-Version2 $setup $handArgs 'hand-build-and-preview'
+    $same = ((@(Get-Tree) -join "`n") -eq ($before -join "`n"))
+    $ended = (Select-String -Path $r.Log -Pattern "ending .*node\.exe.*a preview's server" -Quiet)
+    $asked = (Select-String -Path $r.Log -Pattern 'the teacher chose Cancel' -Quiet)
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 7) -and $same -and $ended -and $asked -and -not $node.HasExited -and $r.Seconds -ge 4); Detail = "exit $($r.Exit) in $($r.Seconds) s; server ended: $ended; the Retry/Cancel box asked (Cancel, its default): $asked; the build still running: $(-not $node.HasExited); tree byte-identical to version 1: $same" }
+}
+
 # ---- Must-fail: break one rule, and the case it protects goes wrong -----------------
 $mustFails = @(
     @{ Name = 'no check at all'; Case = 'serve'
-       From = "  Result := RunningWorkRefusal(ExpandConstant('{app}'), Updating, WizardSilent);"
+       From = "  Result := RunningWorkRefusal(ExpandConstant('{app}'), Updating, {#RunningWorkSilent});"
        To = "  Result := '';"
        Expect = { param($r) $r.Exit -ne 0 } ; Says = 'the night''s case B: a preview serving makes the update fail part way' },
     @{ Name = 'a preview counted as work'; Case = 'serve'
@@ -438,7 +478,11 @@ $mustFails = @(
     @{ Name = 'no guard against a second copy'; Case = 'open-at-start'
        From = "  if RwPlantoirIsOpen then"
        To = "  if False and RwPlantoirIsOpen then"
-       Expect = { param($r) $true } ; Says = 'a second Plantoir is started beside the open one' }
+       Expect = { param($r) $true } ; Says = 'a second Plantoir is started beside the open one' },
+    @{ Name = 'no grace after ending a preview (hand-run)'; Case = 'hand-preview'
+       From = "  RwGraceAfterEndingMs = {#RunningWorkGraceAfterEndingMs};"
+       To = "  RwGraceAfterEndingMs = 0;"
+       Expect = { param($r) $r.Exit -eq 7 } ; Says = 'round three''s W-preview: the box asks "still building or deploying" about a preview, and Cancel refuses' }
 )
 
 # ---- Run ----------------------------------------------------------------------------
@@ -448,10 +492,11 @@ try {
     $names = if ($Case.Count -gt 0) { $Case } else { @($cases.Keys) }
     if (-not $MustFail) {
         foreach ($name in $names) {
-            $outcome = @(& $cases[$name] $setup2 | Where-Object { $_ -is [PSCustomObject] -and $_.PSObject.Properties['Pass'] })[-1]
+            $setupFor = if ($name -in $handRunCases) { $setup2Hand } else { $setup2 }
+            $outcome = @(& $cases[$name] $setupFor | Where-Object { $_ -is [PSCustomObject] -and $_.PSObject.Properties['Pass'] })[-1]
             # Every case: a refusal leaves the refusal marker, a finished install
             # none, and no installing marker is ever left behind.
-            $refuses = $name -in @('never', 'never-relaunch', 'assistant', 'ssinstall', 'came-back', 'open-at-start')
+            $refuses = $name -in @('never', 'never-relaunch', 'assistant', 'ssinstall', 'came-back', 'open-at-start', 'hand-build-and-preview')
             $marker = Test-Path $refusalMarker
             $left = Test-InstallingLeft
             $markersRight = ($marker -eq $refuses) -and -not $left
@@ -466,7 +511,8 @@ try {
             if ($original.IndexOf($mf.From) -lt 0) { Add-Result "must-fail: $($mf.Name)" $false "the line to break was not found in the include"; continue }
             $broken = Join-Path $work "broken-$i.iss"
             [IO.File]::WriteAllText($broken, $original.Replace($mf.From, $mf.To))
-            $setupBroken = Invoke-Compile '2' $payload2 (Join-Path $work "out-broken-$i") $broken
+            $extra = if ($mf.Case -in $handRunCases) { @($handRunDefine) } else { @() }
+            $setupBroken = Invoke-Compile '2' $payload2 (Join-Path $work "out-broken-$i") $broken $extra
             $outcome = @(& $cases[$mf.Case] $setupBroken | Where-Object { $_ -is [PSCustomObject] -and $_.PSObject.Properties['Pass'] })[-1]
             $r = [PSCustomObject]@{ Exit = [int](([regex]::Match($outcome.Detail, 'exit (-?\d+)')).Groups[1].Value)
                                     Seconds = [double](([regex]::Match($outcome.Detail, 'in ([\d.]+) s')).Groups[1].Value) }

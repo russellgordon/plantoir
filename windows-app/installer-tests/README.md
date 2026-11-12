@@ -23,6 +23,13 @@ every case passed, 1 otherwise, 2 when it could not run. Every installer run is
 Plantoir's folder and uninstall key are fingerprinted before and after, and the
 run fails if either changed.
 
+**The hand-run path, without a box.** The `hand-*` cases run a version 2
+compiled with `RunningWorkSilent=False` (a `#define` `installer.iss` never
+sets), so a `/VERYSILENT /SUPPRESSMSGBOXES` run takes the hand-run wizard's
+path: the Retry/Cancel box is suppressed and answers its default, Cancel, so a
+box that would have been shown is "the teacher chose Cancel" and exit 7 in the
+setup log. No window, no sound.
+
 **Not part of `dotnet test`, deliberately.** It installs and uninstalls a
 program, takes minutes, ends processes it started, and uses a fixed folder, so
 two runs at once (two agents, two worktrees) would break each other.
@@ -32,7 +39,7 @@ the code does; `RELEASING.md` step 3a runs it at every Windows cut.
 
 **What it cannot prove**: anything about the real installer's 1.2 GB tree and
 real processes (the measured upgrade in `RELEASING.md` step 3a), the
-hand-run wizard's Retry box (it makes a sound), and a process that starts in
+hand-run wizard's Retry box as a teacher sees it, and a process that starts in
 the gap between the last look at `ssInstall` and `[InstallDelete]`.
 `documentation/12-windows-app.md` → "The installer waits for work that is
 still running (#700)".

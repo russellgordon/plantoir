@@ -11,6 +11,7 @@
 //                     remove it while this runs
 //   --child EXE ...   start EXE with the remaining arguments and wait for it,
 //                     then exit (build_site.py's subprocess.run of node)
+//   --linger-ms N     (before --child) stay N ms after the child has gone
 // Any other argument is ignored, so a command line can carry the real shapes
 // (`bootstrap-cli.mjs build --serve --port 8081`). Every start is recorded in
 // %TEMP%\plantoir-installer-harness\started.txt, OUTSIDE the install folder.
@@ -34,6 +35,7 @@ static class StandIn
         catch (Exception) { }
 
         int seconds = -1;
+        int lingerMs = 0;
         FileStream held = null;
         for (int i = 0; i < args.Length; i++)
         {
@@ -74,6 +76,7 @@ static class StandIn
                 return 0;
             }
             if (args[i] == "--seconds" && i + 1 < args.Length) { seconds = int.Parse(args[++i]); }
+            else if (args[i] == "--linger-ms" && i + 1 < args.Length) { lingerMs = int.Parse(args[++i]); }
             else if (args[i] == "--hold" && i + 1 < args.Length)
             {
                 held = new FileStream(args[++i], FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -89,6 +92,9 @@ static class StandIn
                 }
                 var child = Process.Start(new ProcessStartInfo(exe, rest.ToString()) { UseShellExecute = false });
                 child.WaitForExit();
+                // A real build_site.py outlives its ended server briefly (0.3 s
+                // on the real installer, 2026-11-12); --linger-ms makes that so.
+                if (lingerMs > 0) Thread.Sleep(lingerMs);
                 GC.KeepAlive(held);
                 return 3;   // like subprocess.run(check=True) when its child was ended
             }

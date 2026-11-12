@@ -28,7 +28,9 @@
 //     way is the one thing a teacher cannot get back;
 //   - a silent install waits up to RunningWorkWaitSeconds and then REFUSES
 //     (PrepareToInstall returns a message: exit code 7, nothing changed); a
-//     hand-run wizard asks Retry or Cancel instead, with no time limit.
+//     hand-run wizard asks Retry or Cancel instead, with no time limit, but
+//     not within RunningWorkGraceAfterEndingMs of ending something, so the
+//     python a just-ended preview leaves behind is not asked about as work.
 //
 // How processes are found: K32EnumProcesses, then OpenProcess with
 // PROCESS_QUERY_LIMITED_INFORMATION and QueryFullProcessImageNameW for the
@@ -52,10 +54,32 @@
   #define RunningWorkWaitSeconds 600
 #endif
 
+#ifndef RunningWorkSilent
+  // Which path a look takes: the silent wait, or the hand-run wizard's
+  // Retry/Cancel box. installer.iss never defines this. The harness compiles
+  // one installer with it set to False, so a /VERYSILENT /SUPPRESSMSGBOXES run
+  // takes the hand-run path and the box answers its default (Cancel) unseen
+  // and unheard: a box that would have been shown is a refusal in its log.
+  #define RunningWorkSilent "WizardSilent"
+#endif
+
+#ifndef RunningWorkGraceAfterEndingMs
+  // After this run ENDED something (a preview's server, the assistant's
+  // engine), the hand-run wizard looks again for this long before it asks.
+  // What it ended leaves remains that are about to go: a preview's
+  // build_site.py python exits once its server is gone (measured on the real
+  // installer, 2026-11-12: 0.3 s after the ending; B2, silent: nothing running
+  // 1.24 s after it). Without this, the look that ended the server counted that
+  // python as work and asked "still building or deploying" about a preview.
+  // Real work beside a preview is still asked about, this much later.
+  #define RunningWorkGraceAfterEndingMs 5000
+#endif
+
 const
   RwProcessQueryLimitedInformation = $1000;
   RwProcessCommandLineInformation = 60;
   RwWaitSeconds = {#RunningWorkWaitSeconds};
+  RwGraceAfterEndingMs = {#RunningWorkGraceAfterEndingMs};
 
   // What a teacher reads. Plain words (CLAUDE.md rule 1): no "runtime",
   // "script", "process" or "toolchain". Windows mechanics with no mac
@@ -113,6 +137,10 @@ var
   // the update path, is the teacher opening Plantoir again: refused at once.
   RwPlantoirAtStart: array of Cardinal;
   RwLookedOnce: Boolean;
+  // When this setup last ended something (RwEnd), for the hand-run grace.
+  RwEndedAny: Boolean;
+  RwLastEndedTick: Cardinal;
+  RwGraceLogged: Boolean;
 
 function RwByte(const Buffer: AnsiString; Offset: Integer): Cardinal;
 begin
@@ -274,6 +302,14 @@ begin
   N := GetArrayLength(RwTriedToEnd);
   SetArrayLength(RwTriedToEnd, N + 1);
   RwTriedToEnd[N] := Pid;
+  RwEndedAny := True;
+  RwLastEndedTick := RwGetTickCount;
+end;
+
+// True while what this setup ended may still be leaving (the hand-run grace).
+function RwJustEndedSomething: Boolean;
+begin
+  Result := RwEndedAny and (RwGetTickCount - RwLastEndedTick < RwGraceAfterEndingMs);
 end;
 
 // '' when nothing under AppDir is still working, so files may be changed now;
@@ -399,6 +435,16 @@ begin
           Log(Format('Running work: still running after %d s; refusing, nothing changed', [Elapsed]));
           Result := RwRefusedForWork;
           Exit;
+        end;
+      end
+      else if RwJustEndedSomething then
+      begin
+        // What this run just ended may still be leaving (a preview's python):
+        // look again rather than ask about a preview (the hand-run grace).
+        if not RwGraceLogged then
+        begin
+          Log(Format('Running work: just ended a preview or the assistant''s engine; looking again for up to %d ms before asking', [RwGraceAfterEndingMs]));
+          RwGraceLogged := True;
         end;
       end
       else
@@ -532,7 +578,7 @@ end;
 // exit code 3). Every refusal, silent or hand-run, leaves the marker.
 function RunningWorkBeforeChangingFiles(Updating, Relaunch: Boolean): String;
 begin
-  Result := RunningWorkRefusal(ExpandConstant('{app}'), Updating, WizardSilent);
+  Result := RunningWorkRefusal(ExpandConstant('{app}'), Updating, {#RunningWorkSilent});
   if Result <> '' then
   begin
     RunningWorkWriteRefusalMarker(RwReasonOf(Result));
