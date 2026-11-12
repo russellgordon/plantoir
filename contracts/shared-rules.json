@@ -684,7 +684,8 @@
           "coursesJustMade": "'courses/' had just been created",
           "couldNotSave": "the website builder could not save into 'courses/'",
           "lostConnection": "Plantoir had lost its connection to the website builder",
-          "addressTaken": "something else was using its preview addresses"
+          "addressTaken": "something else was using its preview addresses",
+          "toolchainId": "it had not been set up to name the version of Plantoir that builds its websites"
         },
         "why": "GitHub #684 (the director's ruling on its plan review). A remake throws away the warm website builder, so the next preview takes about two minutes instead of seconds (109 s measured on a teacher's Mac, #225), and 'why was my first preview this morning so slow?' is asked days later. Until #684 only a WAIT before a remake reached the trail ('workspace was in use'), so the commonest remake of all - after an update - left nothing. One event with the reason carried, rather than one per reason: to a teacher they are the same thing, the folder being got ready again. Not filed under 'workspace was in use' (rejected for #310 too, documentation/03-launcher-scripts.md): that event's lines are written from its own marker and say a remake with nothing running writes nothing. In v1.9.1 the image changed, so every folder is remade for 'update' first and 'thisMacOnly' fires on its own only for a workspace the image check passed. Where #310 already records a remake ('preview address held by another account', outcomes before-start and remade) this line is written too, on purpose (#684 review L1): that one says WHY and names the address, this one says WHAT was done to the folder in the same words as every other remake, so every remake is found under one event; the plain port-clash remake writes only this one.",
         "appliesOn": [
@@ -1045,6 +1046,35 @@
         "carries": "the course and section, which assistant (Claude or Codex), how many problems were handed over and their KINDS (sectionProblems.kinds' names), how many of them the opening message names (at most app-rules.json -> outsideAgents.fixWith.mostRowsInThePrompt), and how many rows were left out - unticked, or fixed in the source - never a page, which is the teacher's own name",
         "line": "{course}/{section} · asked {assistant} to fix {count} problem(s) ({kinds}); named in the message: {named}; left out: {unticked} unticked, {fixed} fixed in the source",
         "why": "#717 part two (717b): Fix with Claude… / Fix with Codex… on a section's Problems tab. The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, and a report of 'it changed the wrong page' starts there. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for ticking a row."
+      },
+      {
+        "event": "site built again before deploying",
+        "carries": "the course and section, and WHY the deploy built first, as one of the reasons in buildFreshness.reuseTheLastBuild.reasons (app-rules.json): something in the course had changed (pages), Plantoir had been updated (toolchain), the last build was a preview's (preview), the build was dated later than now (clock), the front page could not be read (frontPageUnreadable), or the section had not been built yet (neverBuilt). Never a page's name, a path or a command.",
+        "line": "{course}/{section} · built the website again before deploying it — {why}",
+        "lineWhenItHadNotBeenBuilt": "{course}/{section} · built the website before deploying it — it had not been built yet",
+        "whyWords": {
+          "pages": "something in the course had changed since it was last built",
+          "toolchain": "Plantoir had been updated since it was last built",
+          "preview": "the last build was made by a preview",
+          "clock": "its last build was dated later than now, so the computer's clock had changed",
+          "frontPageUnreadable": "its front page could not be read"
+        },
+        "marker": {
+          "prefix": "PLANTOIR_BUILT_BEFORE_DEPLOYING:",
+          "shape": "PLANTOIR_BUILT_BEFORE_DEPLOYING: <reason> <course>/<section>, the course's one permitted space written +; <reason> is a key of whyWords, or neverBuilt",
+          "examples": [
+            "PLANTOIR_BUILT_BEFORE_DEPLOYING: pages ICS4U/1",
+            "PLANTOIR_BUILT_BEFORE_DEPLOYING: neverBuilt AP+CALC/2"
+          ],
+          "why": "Printed only by the scheduled deploy's own wrapper (ScheduledDeploy.oneShotCommand), after its own build succeeded, and read from that run's log by the app (BuiltBeforeDeployingReport) in the same place as PLANTOIR_FOLDER_SET_UP_AGAIN. deploy.sh does not print it: it writes its own lines, so a deploy typed in Terminal is recorded, and printing the marker as well would write each line twice for a run the app watched. Machinery, so the console leaves it out (transcriptStripping.machineLines)."
+        },
+        "writers": "deploy.sh writes preview, toolchain, pages and clock after its own `preview.sh --build-only` returned 0, for every destination, through note_on_the_trail (its folder deploy's later preview line is a backstop, for a preview that overwrote that build); the mac app writes the line for its own build first (MultiDestinationDeployRunner, the Deploy button and the windowless assistant and MCP deploys alike), with BuildFreshness.whyRebuild's reason; the scheduled deploy's wrapper prints the marker. Each build is written once: a deploy.sh run after the app built finds the build current and writes nothing. On Windows deploy.ps1 and the app, likewise (owed).",
+        "why": "#768 and #748 part 2. A deploy that builds first takes a minute or more longer, and the line answers 'why was this morning's deploy slow?' days later. #746's own measurement is the case for the toolchain line: a 1.9.1 site served 1.9.0's stylesheet, and nothing on the trail said the site had or had not been built again. The words say what the reason WAS, never 'something changed' for a build that happened for another reason (the plan review's H3). The toolchain line is Russell's wording, approved on #748, 2026-11-12.",
+        "knownLimits": "deploy.py's own builds write no line: on a Mac it runs inside the website builder, which cannot reach the trail, and deploy.sh asks the preview's site, the toolchain, the pages and the clock before it, so there it builds only for a new address on Netlify or Cloudflare (its other builds are a backstop that should not fire).",
+        "appliesOn": [
+          "mac",
+          "windows"
+        ]
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",

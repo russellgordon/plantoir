@@ -2766,7 +2766,7 @@ struct SectionDetailView: View {
             ))
         }
 
-        let needsBuild: Bool = BuildFreshness.needsRebuild(course: saved, sectionNumber: sectionNumber)
+        let buildReason: BuildFreshness.RebuildReason? = BuildFreshness.whyRebuild(course: saved, sectionNumber: sectionNumber)
 
         // The real progress panel takes over from here — `run.runner.run()`
         // is about to give its legs fresh runners of their own and start
@@ -2783,7 +2783,7 @@ struct SectionDetailView: View {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            needsBuild: needsBuild
+            buildReason: buildReason
         )
 
         // A failed shared build is reported the same way regardless of

@@ -4,11 +4,37 @@ import Foundation
 /// the teacher's content, so publishing can rebuild first when needed.
 enum BuildFreshness {
 
+    /// Why a deploy builds the section's site first. The raw values are the
+    /// reasons `contracts/app-rules.json` → `buildFreshness.reuseTheLastBuild.reasons`
+    /// names, and the trail's words are keyed by them
+    /// (`BuiltBeforeDeployingReport`), so the line says what the reason WAS.
+    enum RebuildReason: String, CaseIterable, Sendable {
+        /// There is no built site yet.
+        case neverBuilt
+        /// The site's front page cannot be read, so it is rebuilt rather
+        /// than trusted.
+        case frontPageUnreadable
+        /// The site is a preview's build.
+        case preview
+        /// The build that made the site is dated later than now.
+        case clock
+        /// Something in the course changed after that build started.
+        case pages
+    }
+
     // MARK: - Functions
 
-    /// True when there is no built site yet, the built site is a
-    /// preview's build, or the content has changed since the build that
-    /// made it STARTED.
+    /// True when a deploy must build first: `whyRebuild` gives a reason.
+    static func needsRebuild(course: Course, sectionNumber: Int) -> Bool {
+        return whyRebuild(course: course, sectionNumber: sectionNumber) != nil
+    }
+
+    /// Why a deploy must build the section's site first, or nil when the
+    /// last build can be deployed as it is: there is no built site yet, the
+    /// built site is a preview's build, its front page cannot be read, it is
+    /// dated later than now, or something in the course changed after the
+    /// build that made it STARTED. `contracts/app-rules.json` →
+    /// `buildFreshness.reuseTheLastBuild`, whose cases this answers.
     ///
     /// Since the START, not since `index.html` was written (issue #265). A
     /// build reads the settings and the pages when it begins and writes the
@@ -16,12 +42,20 @@ enum BuildFreshness {
     /// older than the page — and compared with the page alone it looked
     /// built, so the next Publish sent the same old site and said it had
     /// succeeded. `build_site.py` notes the start in `.build-started` beside
-    /// the site; see `referenceDate`. `contracts/app-rules.json` →
-    /// `buildFreshness`.
-    static func needsRebuild(course: Course, sectionNumber: Int) -> Bool {
+    /// the site; see `referenceDate`.
+    ///
+    /// Since #768 the launchers ask the same question for a deploy typed at a
+    /// command line, and every reader counts the course folder itself and
+    /// change times as well (`newestChangeDate`).
+    static func whyRebuild(course: Course, sectionNumber: Int, now: Date = Date()) -> RebuildReason? {
         let indexURL: URL = builtIndexURL(course: course, sectionNumber: sectionNumber)
         guard let builtDate = modificationDate(of: indexURL) else {
-            return true
+            return .neverBuilt
+        }
+        // Unreadable: rebuild rather than trust it. Asked here, before the
+        // preview check, so the trail can say which it was.
+        if (try? Data(contentsOf: indexURL)) == nil {
+            return .frontPageUnreadable
         }
         // A preview's build is never deploy-fresh: serve mode bakes a
         // live-reload client pointed at ws://localhost into every page
@@ -30,16 +64,27 @@ enum BuildFreshness {
         // "access to other apps and services on this device". Every page,
         // not the front page alone (issue #136) — see `builtForPreview`.
         if builtForPreview(publicDirectory: builtPublicURL(course: course, sectionNumber: sectionNumber)) {
-            return true
-        }
-        guard let contentDate = newestContentDate(course: course) else {
-            // No readable content: nothing to rebuild for.
-            return false
+            return .preview
         }
         let startedDate: Date? = modificationDate(
             of: buildStartedMarkerURL(course: course, sectionNumber: sectionNumber)
         )
-        return contentDate > referenceDate(builtDate: builtDate, buildStartedDate: startedDate)
+        let reference: Date = referenceDate(builtDate: builtDate, buildStartedDate: startedDate)
+        // While the build is still dated later than now, a clock that was
+        // ahead when the site was built would otherwise hide a change made
+        // since (the #768 plan review's M1). Once real time passes the build's
+        // date this no longer fires: `reuseTheLastBuild.knownLimits`.
+        if reference > now {
+            return .clock
+        }
+        guard let changeDate = newestChangeDate(course: course) else {
+            // No readable content: nothing to rebuild for.
+            return nil
+        }
+        if changeDate > reference {
+            return .pages
+        }
+        return nil
     }
 
     /// The time the course's files are compared with: when the build that
@@ -238,6 +283,97 @@ enum BuildFreshness {
             }
         }
         return newestDate
+    }
+
+    /// The latest change anywhere in the course, for the deploy's question
+    /// (#768, #741): the course folder itself and every folder and file under
+    /// it whose name does not start with ".", each read for the LATER of its
+    /// modification time and its change time.
+    ///
+    /// Folders and the course folder count because only their times show a
+    /// page deleted or renamed: a page removed in Obsidian stayed on the site
+    /// when only files were read. The change time counts because a file
+    /// copied in with its old modification time kept (a restore, a sync
+    /// service, `cp -p`) shows only there, and no copy can set it back. Hidden
+    /// entries are left out with everything under them, judged by each
+    /// entry's NAME (`.skipsHiddenFiles`), so a working folder kept under a
+    /// hidden folder is still read. `newestContentDate` stays as it was, for
+    /// the links checklist (#379), which asks something else.
+    ///
+    /// Two details the #768 review measured. A course folder that is itself a
+    /// symbolic link is read THROUGH it, as the build reads it: the enumerator
+    /// does not descend into a link it is handed, so every change behind one
+    /// read as built. And hidden is judged by the name alone, never by
+    /// `.skipsHiddenFiles`, which also skips an entry carrying the Finder
+    /// hidden flag (a Windows file's hidden attribute on a shared drive
+    /// arrives as that flag), while the launchers and the scheduled shell
+    /// read such a page.
+    static func newestChangeDate(course: Course) -> Date? {
+        let fileManager: FileManager = FileManager.default
+        let keys: [URLResourceKey] = [
+            .contentModificationDateKey, .attributeModificationDateKey, .isDirectoryKey, .isSymbolicLinkKey,
+        ]
+        // A fresh URL for the course folder, through any link: a URL keeps
+        // the resource values it was asked for before, and this one must be
+        // read now. Used for the walk only, so the spelling it ends up with
+        // (FolderIdentity's concern) matters to nothing else.
+        let courseFolder: URL = URL(
+            fileURLWithPath: course.directoryURL.resolvingSymlinksInPath().path, isDirectory: true
+        )
+        guard let enumerator = fileManager.enumerator(
+            at: courseFolder,
+            includingPropertiesForKeys: keys,
+            options: []
+        ) else {
+            return nil
+        }
+
+        var newestDate: Date? = latestChangeDate(of: courseFolder)
+        // A course folder that is a link: the link's own times too, read
+        // through the unresolved path. Pointing the link at another folder
+        // made before the build changes nothing behind it, only the link (the
+        // #768 fix review's M1). For a real folder it is the same folder.
+        let asNamed: URL = URL(fileURLWithPath: course.directoryURL.path, isDirectory: false)
+        if let linkDate = latestChangeDate(of: asNamed), newestDate == nil || linkDate > newestDate! {
+            newestDate = linkDate
+        }
+        for case let entryURL as URL in enumerator {
+            if entryURL.lastPathComponent.hasPrefix(".") {
+                // Hidden, with everything under it. Only a real folder is
+                // skipped: asked of a file or a link, `skipDescendants` skips
+                // the rest of the folder the walk is in (measured: every
+                // page after `.merged_output` went unread).
+                let kind = try? entryURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                if kind?.isDirectory == true && kind?.isSymbolicLink != true {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+            guard let date = latestChangeDate(of: entryURL) else {
+                continue
+            }
+            if newestDate == nil || date > newestDate! {
+                newestDate = date
+            }
+        }
+        return newestDate
+    }
+
+    /// The later of an entry's modification time and its change time.
+    private static func latestChangeDate(of url: URL) -> Date? {
+        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .attributeModificationDateKey])
+        let modified: Date? = values?.contentModificationDate
+        let changed: Date? = values?.attributeModificationDate
+        guard let modified else {
+            return changed
+        }
+        guard let changed else {
+            return modified
+        }
+        if changed > modified {
+            return changed
+        }
+        return modified
     }
 
     private static func modificationDate(of url: URL) -> Date? {

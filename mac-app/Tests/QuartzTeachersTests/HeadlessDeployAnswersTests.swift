@@ -256,7 +256,7 @@ final class HeadlessDeployAnswersTests: XCTestCase {
             destinations: course.configuration.allDeployDestinations,
             cloudflareAccountID: "",
             workingDirectory: root,
-            needsBuild: true
+            buildReason: .pages
         )
         XCTAssertFalse(wordsGiven(to: "deploy").contains("--non-interactive"), wordsGiven(to: "deploy"))
         XCTAssertFalse(wordsGiven(to: "preview").contains("--non-interactive"), wordsGiven(to: "preview"))
@@ -264,6 +264,51 @@ final class HeadlessDeployAnswersTests: XCTestCase {
             course: "ICS3U", section: "1", destinationCount: 1, outcome: runner.outcome
         )
         XCTAssertEqual(said.message, AssistWording.deployDidNotFinish(course: "ICS3U", section: "1"))
+    }
+
+    // MARK: - The trail says why a deploy built first (#768, #748 part 2)
+
+    /// A build first that succeeded leaves one line, in the words for its
+    /// OWN reason: a first build is never said to be a changed page (the
+    /// plan review's H3). The words are `BuiltBeforeDeployingReport`'s, which
+    /// `BuiltBeforeDeployingReportTests` pins to the contract.
+    func testABuildFirstThatSucceededSaysWhyOnce() async throws {
+        try stubLaunchers(buildExits: 0, deployExits: 0)
+        for reason in [BuildFreshness.RebuildReason.pages, .neverBuilt, .preview] {
+            let runner: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+            await runner.run(
+                course: course,
+                sectionNumber: 1,
+                destinations: course.configuration.allDeployDestinations,
+                cloudflareAccountID: "",
+                workingDirectory: root,
+                buildReason: reason
+            )
+        }
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        for reason in [BuildFreshness.RebuildReason.pages, .neverBuilt, .preview] {
+            let line: String = "ICS3U/1 · " + BuiltBeforeDeployingReport.sentence(for: reason)
+            XCTAssertEqual(trail.components(separatedBy: line).count - 1, 1, trail)
+        }
+        XCTAssertFalse(trail.contains(BuiltBeforeDeployingReport.sentence(for: .clock)), trail)
+    }
+
+    /// A build that failed, and a deploy that did not build, write none.
+    func testNoBuildOrAFailedBuildSaysNothing() async throws {
+        try stubLaunchers(buildExits: 1, deployExits: 0)
+        let failing: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+        await failing.run(
+            course: course, sectionNumber: 1, destinations: course.configuration.allDeployDestinations,
+            cloudflareAccountID: "", workingDirectory: root, buildReason: .pages
+        )
+        try stubLaunchers(buildExits: 0, deployExits: 0)
+        let reusing: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
+        await reusing.run(
+            course: course, sectionNumber: 1, destinations: course.configuration.allDeployDestinations,
+            cloudflareAccountID: "", workingDirectory: root, buildReason: nil
+        )
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertFalse(trail.contains("before deploying it"), trail)
     }
 
     /// Two destinations, one asking and one going out: both are said.

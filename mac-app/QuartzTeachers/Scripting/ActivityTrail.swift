@@ -1037,6 +1037,19 @@ nonisolated enum ActivityTrail {
         /// `ScriptRunner` reads from a run's console and `ScheduledDeploy` from
         /// a publish's log. Mac only, permanently: Windows has no workspace.
         case folderSetUpAgain = "folder set up again"
+        /// A deploy built the section's site first (#768, #748 part 2), and
+        /// why: something in the course had changed, Plantoir had been
+        /// updated, the last build was a preview's, the build was dated later
+        /// than now, its front page could not be read, or it had not been
+        /// built yet — `BuiltBeforeDeployingReport`'s words, keyed by
+        /// `BuildFreshness.RebuildReason`. Written after the build succeeded:
+        /// by `MultiDestinationDeployRunner` for the app's own build first, by
+        /// `ScheduledDeploy` from the marker its wrapper prints, and by
+        /// deploy.sh itself for a deploy typed in Terminal. One line per
+        /// build. On the trail because a deploy that builds first takes a
+        /// minute longer, and "why was this morning's deploy slow?" is asked
+        /// days later.
+        case siteBuiltAgainBeforeDeploying = "site built again before deploying"
         /// Plantoir installed one or more of the website builder's helper
         /// programs into its tools folder (GitHub #312): which ones, at which
         /// pinned versions, whether from inside Plantoir or downloaded, why

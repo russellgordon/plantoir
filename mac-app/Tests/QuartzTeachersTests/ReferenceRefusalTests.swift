@@ -419,7 +419,7 @@ final class ReferenceRefusalTests: XCTestCase {
             destinations: reference.configuration.allDeployDestinations,
             cloudflareAccountID: "",
             workingDirectory: root,
-            needsBuild: false
+            buildReason: nil
         )
         XCTAssertTrue(deployRunner.legs.isEmpty, "Not one leg may be started.")
         XCTAssertFalse(deployRunner.isRunning)

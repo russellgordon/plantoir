@@ -27,6 +27,8 @@ final class BuildFreshnessTests: XCTestCase {
                 .appendingPathComponent("section1")
                 .appendingPathComponent("public")
             try FileManager.default.createDirectory(at: publicURL, withIntermediateDirectories: true)
+            // Built LATER than the course, on the real clock (#768).
+            pause()
             try Data("<html></html>".utf8).write(to: publicURL.appendingPathComponent("index.html"))
         }
 
@@ -34,29 +36,34 @@ final class BuildFreshnessTests: XCTestCase {
         return Course(code: "ICS3U", directoryURL: courseURL, configuration: configuration)
     }
 
+    /// Since #768 a file's change time counts as well as its modification
+    /// time, and no test can set a change time back: so a site is made fresh
+    /// by being built LATER on the real clock than the course, never by
+    /// back-dating the course. A short pause gives each step its own time.
+    func pause() {
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+
+    /// After a pause, gives a file the time now (a build writing it).
+    func stampNow(_ url: URL) throws {
+        pause()
+        try setModificationDate(Date(), of: url)
+    }
+
+    /// After a pause, edits a file of the course where it is (a Save).
+    func editNow(_ url: URL) throws {
+        pause()
+        let handle: FileHandle = try FileHandle(forWritingTo: url)
+        handle.seekToEndOfFile()
+        handle.write(Data("\nedited\n".utf8))
+        try handle.close()
+    }
+
     /// Stamps a file's modification date, for ordering tests.
     func setModificationDate(_ date: Date, of url: URL) throws {
         try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
     }
 
-    /// Back-dates EVERY entry in the course (files and the folders that
-    /// hold them — creating a file bumps its parent's date too), so a
-    /// test can then make exactly one thing newer.
-    func backdateEverything(in courseURL: URL, to date: Date) throws {
-        var urls: [URL] = [courseURL]
-        if let enumerator = FileManager.default.enumerator(at: courseURL, includingPropertiesForKeys: nil) {
-            for case let url as URL in enumerator {
-                urls.append(url)
-            }
-        }
-        // Deepest first, so stamping a child cannot re-dirty its parent.
-        urls.sort { first, second in
-            return first.pathComponents.count > second.pathComponents.count
-        }
-        for url in urls {
-            try setModificationDate(date, of: url)
-        }
-    }
 
     @MainActor
     func testNeverBuiltMeansRebuild() throws {
@@ -75,10 +82,9 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
 
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
         try Data(BuildFreshnessTests.clientAsQuartzWritesIt().utf8)
             .write(to: builtIndexURL)
-        try setModificationDate(Date(timeIntervalSinceNow: 300), of: builtIndexURL)
+        try stampNow(builtIndexURL)
 
         let builtPublicURL: URL = builtIndexURL.deletingLastPathComponent()
         XCTAssertTrue(BuildFreshness.builtForPreview(publicDirectory: builtPublicURL))
@@ -86,7 +92,7 @@ final class BuildFreshnessTests: XCTestCase {
                       "A preview's build is never deploy-fresh, however new it is")
 
         try Data("a clean production page".utf8).write(to: builtIndexURL)
-        try setModificationDate(Date(timeIntervalSinceNow: 300), of: builtIndexURL)
+        try stampNow(builtIndexURL)
         XCTAssertFalse(BuildFreshness.builtForPreview(publicDirectory: builtPublicURL))
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
                        "A clean production build newer than the content is current")
@@ -99,8 +105,7 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
 
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -60), of: builtIndexURL)
+        try stampNow(builtIndexURL)
         XCTAssertNotNil(lessonURL)
 
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1), "A site built after the last edit is current")
@@ -113,9 +118,8 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
 
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -10), of: lessonURL)
+        try stampNow(builtIndexURL)
+        try editNow(lessonURL)
 
         XCTAssertTrue(BuildFreshness.needsRebuild(course: course, sectionNumber: 1), "An edit after the build must trigger a rebuild")
     }
@@ -127,9 +131,8 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
 
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -10), of: configURL)
+        try stampNow(builtIndexURL)
+        try editNow(configURL)
 
         XCTAssertTrue(BuildFreshness.needsRebuild(course: course, sectionNumber: 1), "Saved settings must trigger a rebuild")
     }
@@ -140,12 +143,13 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
         // Deploy markers and Obsidian settings churn constantly; they are
-        // not content and must not force a rebuild. Create them BEFORE
-        // back-dating so only their own (hidden) entries are recent.
+        // not content and must not force a rebuild. The folder is made BEFORE
+        // the build: since #768 the course folder's own time counts, and the
+        // first creation of a hidden folder at its top costs one build.
         let markerURL: URL = course.directoryURL.appendingPathComponent(".netlify_sites")
         try FileManager.default.createDirectory(at: markerURL, withIntermediateDirectories: true)
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+        try stampNow(builtIndexURL)
+        pause()
         try Data("{}".utf8).write(to: markerURL.appendingPathComponent("section1.json"))
 
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1), "Hidden, generated files should be ignored")
@@ -163,13 +167,11 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
         let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
-        try Data("started".utf8).write(to: markerURL)
-
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
         // The build started, the teacher saved, the build finished.
-        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -350), of: course.configFileURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+        pause()
+        try Data("started".utf8).write(to: markerURL)
+        try editNow(course.configFileURL)
+        try stampNow(builtIndexURL)
 
         XCTAssertTrue(
             BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
@@ -186,12 +188,10 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
         let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
+        pause()
         try Data("started".utf8).write(to: markerURL)
-
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -350), of: lessonURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+        try editNow(lessonURL)
+        try stampNow(builtIndexURL)
 
         XCTAssertTrue(BuildFreshness.needsRebuild(course: course, sectionNumber: 1))
     }
@@ -204,11 +204,9 @@ final class BuildFreshnessTests: XCTestCase {
         let builtIndexURL: URL = course.directoryURL
             .appendingPathComponent(".merged_output/section1/public/index.html")
         let markerURL: URL = BuildFreshness.buildStartedMarkerURL(course: course, sectionNumber: 1)
+        pause()
         try Data("started".utf8).write(to: markerURL)
-
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -400), of: markerURL)
-        try setModificationDate(Date(timeIntervalSinceNow: -300), of: builtIndexURL)
+        try stampNow(builtIndexURL)
 
         XCTAssertFalse(BuildFreshness.needsRebuild(course: course, sectionNumber: 1))
     }
@@ -393,8 +391,7 @@ final class BuildFreshnessTests: XCTestCase {
         try Data("<html><body>Welcome</body></html>".utf8).write(to: indexURL)
         try Data("<html><body>Day 1</body></html>".utf8).write(to: notesURL)
 
-        try backdateEverything(in: course.directoryURL, to: Date(timeIntervalSinceNow: -600))
-        try setModificationDate(Date(timeIntervalSinceNow: -60), of: indexURL)
+        try stampNow(indexURL)
         XCTAssertFalse(
             BuildFreshness.needsRebuild(course: course, sectionNumber: 1),
             "A clean site newer than every edit is current — the walk must not make every publish rebuild"

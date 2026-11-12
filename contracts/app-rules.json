@@ -210,10 +210,10 @@
     "builtWithToolchain" : {
       "file" : ".built-with-toolchain",
       "issue" : "#746",
-      "note" : "Which toolchain built the site, so a change to the toolchain reaches a site whose pages have not changed. build_site.py reads the toolchain's name when a build STARTS and writes it here only when the site is that build's (beside renaming .build-started; a preview or a failed build leaves it alone). The name is PLANTOIR_TOOLCHAIN_ID when the launcher sets it - the mac's launchers make every workspace with its image's tag, teaching-quartz:src-<hash of the recipe> - and otherwise toolchain_paths' hash of the scripts, support, contracts, the Quartz scaffold's sources and the bundled runtime's manifest.json, leaving out support's example_content, example_course and skeletons, which only course setup reads (Windows, native; since #749 remembered in the build root against a stat fingerprint of the same files: a cold first read took 1.63 s on 337 files, a remembered one 0.01 s). A deploy builds first when the file is missing, empty, or names another toolchain: deploy.sh compares it with its own $IMAGE and runs preview.sh --build-only (which remakes an out-of-date workspace); deploy.ps1's folder publish asks toolchain_paths.site_was_built_by_this_toolchain and builds first on anything but a plain yes (#749); deploy.py compares it with its own toolchain in ensure_base_url_and_rebuild, the one place both destinations decide to rebuild, so a deploy builds at most once. BuildFreshness in the apps does NOT read it: the deploy itself decides, so every caller - the window, the assistant, a scheduled deploy, the command line - is covered by one check. Measured 2026-11-01: a site redeployed under 1.9.1 served 1.9.0's stylesheet without it. Every site built before 1.9.2 has no file, and is built once on its next deploy.",
+      "note" : "Which toolchain built the site, so a change to the toolchain reaches a site whose pages have not changed. build_site.py reads the toolchain's name when a build STARTS and writes it here only when the site is that build's (beside renaming .build-started; a preview or a failed build leaves it alone). The name is PLANTOIR_TOOLCHAIN_ID when the launcher sets it - the mac's launchers make every workspace with its image's tag, teaching-quartz:src-<hash of the recipe> - and otherwise toolchain_paths' hash of the scripts, support, contracts, the Quartz scaffold's sources and the bundled runtime's manifest.json, leaving out support's example_content, example_course and skeletons, which only course setup reads (Windows, native; since #749 remembered in the build root against a stat fingerprint of the same files: a cold first read took 1.63 s on 337 files, a remembered one 0.01 s). A deploy builds first when the file is missing, empty, or names another toolchain: deploy.sh compares it with its own $IMAGE and runs preview.sh --build-only (which remakes an out-of-date workspace); deploy.ps1's folder publish asks toolchain_paths.site_was_built_by_this_toolchain and builds first on anything but a plain yes (#749); deploy.py compares it with its own toolchain in ensure_base_url_and_rebuild, the one place both destinations decide to rebuild, so a deploy builds at most once. BuildFreshness in the apps does NOT read it: the deploy itself decides, so every caller - the window, the assistant, a scheduled deploy, the command line - is covered by one check. Measured 2026-11-01: a site redeployed under 1.9.1 served 1.9.0's stylesheet without it. Every site built before 1.9.2 has no file, and is built once on its next deploy. Since #768 the launchers ask the PAGES too, in the same decision and after this question (toolchain_paths.why_build_before_deploying, deploy.sh's pages_or_clock_ask_for_a_build): `reuseTheLastBuild` is the whole rule. A workspace that does not carry PLANTOIR_TOOLCHAIN_ID=<its image's tag> (made by hand, or by an older verify.sh) is made again once by preview.sh and setup.sh (#748 part 3, the reason toolchainId), since every site built in it would otherwise be stamped with something else and built again on every deploy.",
       "where" : "Beside .build-started: .merged_output/section<N>/, the folder that holds public/. One line, the toolchain's name."
     },
-    "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site.",
+    "note" : "Whether a deploy has to build first. Getting this wrong in one direction wastes minutes; in the other it publishes yesterday's site. `reuseTheLastBuild` is the whole rule and its cases, asked by every way of deploying since #768; `rules` below is the apps' half as it was first written down.",
     "previewBuild" : {
       "cases" : [
         {
@@ -376,6 +376,401 @@
       },
       "where" : "Every file whose name ends .html anywhere under the section's built public/ folder, hidden folders included, compared as bytes and read as ONE record, not line by line: the tag and the client are on different lines. The front page first, so a real preview's build answers from one file. A page that cannot be opened is passed over, as every launcher does."
     },
+    "reuseTheLastBuild" : {
+      "cases" : [
+        {
+          "expect" : "reuse",
+          "name" : "nothing has changed since the build"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page edited after the build"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "whileItBuilt"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page edited while the build ran (#265)"
+        },
+        {
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "beforeTheBuildStarted"
+            }
+          ],
+          "expect" : "reuse",
+          "name" : "a page edited before the build started"
+        },
+        {
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "whileItBuilt"
+            }
+          ],
+          "expect" : "reuse",
+          "name" : "no start marker, and a page edited before the front page was written",
+          "startedMarker" : "absent"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "whileItBuilt"
+            }
+          ],
+          "expect" : "build",
+          "name" : "the start marker is later than the front page, and a page edited between the two",
+          "startedMarker" : "afterTheSite",
+          "why" : "The EARLIER of the two times is the reference. Taking the later one would call this page built."
+        },
+        {
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "atTheBuildStart"
+            }
+          ],
+          "expect" : "reuse",
+          "name" : "a page edited at the very moment the build started",
+          "why" : "Changed means strictly later."
+        },
+        {
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : ".obsidian/workspace.json",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "reuse",
+          "name" : "only Obsidian's own settings changed"
+        },
+        {
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/.trash/old.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "reuse",
+          "name" : "a file in a hidden folder deep in the course edited"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "course_config.json",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "the course's settings changed"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "Media/diagram.png",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a picture edited"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "delete",
+              "path" : "notes/day-2.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page in a subfolder deleted (#741)",
+          "why" : "Only the folder's own time shows a deletion. A check of files alone sent the last build, and the deleted page stayed on the site until a second deploy."
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "delete",
+              "path" : "Welcome.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page at the top of the course deleted",
+          "why" : "Only the course folder's own time shows it."
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "rename",
+              "path" : "notes/day-1.md",
+              "to" : "notes/first-day.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page renamed"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "rename",
+              "path" : "notes",
+              "to" : "lessons",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a folder renamed"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "rename",
+              "path" : "Welcome.md",
+              "to" : "Start here.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page at the top of the course renamed"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "rename",
+              "path" : "notes/day-2.md",
+              "to" : ".trash/day-2.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page moved into a hidden folder, as Obsidian deletes one"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "replaceKeepingItsOldTime",
+              "path" : "Media/diagram.png",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a picture replaced by a copy that keeps its old time (a copy in Finder)"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "createKeepingAnOldTime",
+              "path" : "notes/day-3.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a page restored from a backup with a date long past"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "overwriteKeepingItsOldTime",
+              "path" : "Media/diagram.png",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "knownLimitOn" : [
+            "windows"
+          ],
+          "name" : "a picture overwritten in place and given back its old time (cp -p, or a sync service that keeps the other computer's time)",
+          "why" : "Only the change time shows it, and no copy can set that back."
+        },
+        {
+          "because" : "clock",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "datedLaterThanNow" : true,
+          "expect" : "build",
+          "name" : "the build is dated later than now, and a page edited since",
+          "why" : "While the build is still dated later than now, a clock that was ahead when the site was built would hide a change made since. Once real time passes the build's date the guard no longer fires (knownLimits)."
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "name" : "a working folder kept under a hidden folder, and a page edited",
+          "why" : "Hidden is judged by the name of each entry below the course, never by the whole path.",
+          "workingFolderUnderAHiddenFolder" : true
+        },
+        {
+          "course" : [
+
+          ],
+          "expect" : "reuse",
+          "name" : "a course with nothing in it"
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "courseFolderIsALink" : true,
+          "expect" : "build",
+          "name" : "the course folder is a link to a folder kept elsewhere, and a page edited",
+          "why" : "The build reads through the link, so every reader must: a reader that stops at the link reads every change behind it as built (the #768 review's M3; BSD find without -H, and FileManager's enumerator, stopped there)."
+        },
+        {
+          "because" : "pages",
+          "changes" : [
+            {
+              "do" : "pointTheLinkAtAnOlderCopy",
+              "path" : ".",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "courseFolderIsALink" : true,
+          "expect" : "build",
+          "name" : "a linked course folder pointed at an older copy builds",
+          "why" : "Nothing behind the link changed; only the link did, so its OWN times must be read as well as those it leads to. Reading through the link alone reused here in deploy.sh, the scheduled shell and the app (the #768 fix review's M1), and the build would have sent the older copy's pages."
+        },
+        {
+          "because" : "preview",
+          "expect" : "build",
+          "name" : "only ever previewed: no toolchain stamp, no start marker, and the preview's client in the front page",
+          "previewClient" : true,
+          "stamp" : "missing",
+          "startedMarker" : "absent",
+          "why" : "A preview never stamps its site or leaves a start marker, so a reader that asks the toolchain first said an earlier version had built it, on the console and on the trail (the #768 review's M1). A preview's site is not a site to deploy, whatever else is true, so it is asked first."
+        },
+        {
+          "because" : "toolchain",
+          "expect" : "build",
+          "inTheApps" : {
+            "expect" : "reuse"
+          },
+          "name" : "no toolchain stamp (built before 1.9.2), and nothing changed",
+          "stamp" : "missing"
+        },
+        {
+          "because" : "toolchain",
+          "changes" : [
+            {
+              "do" : "edit",
+              "path" : "notes/day-1.md",
+              "when" : "afterTheBuild"
+            }
+          ],
+          "expect" : "build",
+          "inTheApps" : {
+            "because" : "pages",
+            "expect" : "build"
+          },
+          "name" : "another toolchain's stamp, and a page edited",
+          "stamp" : "another",
+          "why" : "One build, for the toolchain, whose words cover the page too."
+        },
+        {
+          "because" : "neverBuilt",
+          "expect" : "build",
+          "name" : "never built",
+          "site" : "notBuilt",
+          "typedByHand" : "refused",
+          "why" : "Russell's ruling is about reusing a build. A deploy typed at a command line for a section never built still refuses with its 'Built site not found' words, which failureExplanations matches on both platforms; the apps build it first, as before."
+        }
+      ],
+      "casesShape" : "Every case starts from the same course unless it gives `course`: the files in `theCourse` (folders made as their paths need), and the hidden link .merged_output to the folder outside the course that holds section1, as the launchers keep built sites. The course and the built section are made in this order on the real clock, with a pause between each step so each has its own time: the course; the changes `beforeTheBuildStarted`; then for `startedMarker` beforeTheSite (the default) the start marker, the changes `whileItBuilt`, the front page; for afterTheSite the front page, the changes `whileItBuilt`, the start marker; for absent the changes `whileItBuilt`, then the front page; then the changes `afterTheBuild`. `atTheBuildStart` edits the file just before the marker is written and then gives the marker exactly the file's modification time. `datedLaterThanNow` moves the marker and the front page one hour ahead, keeping their order, before the `afterTheBuild` changes. `site` notBuilt makes no front page and no marker. `previewClient` writes a preview's front page (`previewBuild.signature.asQuartzWritesIt` in a body). `courseFolderIsALink` makes the course in a folder elsewhere and links courses/C to it, and makes the older copy beside it before the build; a reader that cannot make links (Windows without Developer Mode) skips these cases and says so. `stamp` is this (the default: the reader's own toolchain), another, or missing. A change `do`es one of: edit (add a line to the file where it is), delete, rename (to `to`), replaceKeepingItsOldTime (a new copy written beside it, given the old file's modification time, and moved over it), overwriteKeepingItsOldTime (rewritten in place, then given back its old modification time), createKeepingAnOldTime (a new file dated a year ago), pointTheLinkAtAnOlderCopy (for `courseFolderIsALink`: the link made again, under a temporary name renamed over it as `ln -sfn` does, pointing at a copy of the course made before the build, with other words and the same built sites). `expect` is reuse or build, and `because` the reason when it builds. `inTheApps` replaces both for the readers that do not read the stamp. `typedByHand` refused: deploy.sh refuses before it asks. `knownLimitOn` names a platform whose readers skip the case, with `knownLimits` saying why.",
+      "issue" : "#768, with #748 parts 1 to 3 and #741",
+      "knownLimits" : [
+        "A file system that keeps times to the second (HFS+) or two seconds (exFAT) can date a save made in the same second as the build's start no later than the start, and it then reads as built. The working folder has to be in the home folder on a Mac (#221), which is APFS there; on Windows an exFAT drive is possible.",
+        "Anything that changes a file's metadata without changing what students see costs one build that was not needed: a Finder tag, a quarantine flag, a sync service's own marks, macOS noting when a file was last opened. So does a hidden file or folder being created, removed or replaced in ANY folder of the course (.publish_state, .netlify_sites or .cloudflare_sites at the top the first time, a .DS_Store Finder writes, an editor's swap file), because that folder's own time changes. Each errs toward building, once.",
+        "A symbolic link INSIDE the course is not followed, by any reader: a folder linked in from elsewhere (a section folder kept outside the course, say) changes behind its link and reads as built, while the build follows it. Such a link POINTED at another folder is seen (its own times change, and they are read). The course folder ITSELF being a link is followed (`courseFolderIsALink`). Media is a link only inside the BUILD's own folder (content/Media points at the course's Media, a real folder of the course), so every reader sees a changed picture where it really is.",
+        "The clock guard holds only while the build is still dated later than now. Anything changed while the clock reads earlier than the build's date (a page edited, deleted or renamed), and deployed after real time has passed that date, is sent as last built by every reader: no time a reader can see is later than the build's. A deploy, or Deploy pressed, while the build is still dated ahead rebuilds and closes the window. A fingerprint that needs no clock is a later piece (a digest of every entry's path, size and times, which four readers would have to compute identically).",
+        "On Windows a file overwritten in place and given back its old modification time is not seen (`knownLimitOn`): the creation time is read there in place of Windows' change time, which every build changes for the course's pictures by hard-linking them (`rejected`). A reader on Windows skips that case by name and says so.",
+        "A deploy typed at a command line for a section that has never been built still refuses (`typedByHand`).",
+        "On Netlify and Cloudflare a build deploy.py makes for a new address writes no trail line on a Mac: it runs in the website builder, which cannot reach the trail. deploy.sh asks the preview's site, the toolchain, the pages and the clock before it, so on a Mac deploy.py's own builds for those are a backstop that should not fire."
+      ],
+      "measured" : "The cost of the question, nothing changed so every entry is read (the worst case). SPH3U's example course (320 files) copied 1, 10 and 60 times, warm, APFS, Apple M4 Pro, macOS 26.6: see documentation/05-build-pipeline.md -> 'A deploy asks for itself whether anything changed (#768)' for the numbers, inside the website builder too.",
+      "readers" : "Four readers answer the pages half and each runs every case: toolchain_paths.why_build_before_deploying (deploy.py, and Windows' deploy.ps1; it reads the stamp too), deploy.sh's pages_or_clock_ask_for_a_build with its site_was_built_by_this_toolchain (scripts/test_build_freshness_reuse.py), BuildFreshness.whyRebuild in each app, and the scheduled deploy's shell (ScheduledDeploy.oneShotCommand on the mac). The apps' readers do not read the stamp (builtWithToolchain.note) and take `inTheApps` where a case gives it. A preview's build is `previewBuild`, which every reader asks as well; one case here (only ever previewed) pins that it is asked BEFORE the toolchain. A new address is deploy.py's own question (Netlify and Cloudflare) and is not repeated here.",
+      "reasons" : {
+        "address" : "deploy.py only: the build carries another site address than the destination's.",
+        "clock" : "The build that made the site is dated later than now.",
+        "frontPageUnreadable" : "The apps only: the site's front page cannot be read, so the site is rebuilt rather than trusted.",
+        "neverBuilt" : "There is no built site. The apps build; a deploy typed by hand refuses.",
+        "pages" : "Something in the course, a folder, or the course folder itself changed after the build that made the site started.",
+        "preview" : "The site is a preview's build (`previewBuild`). Asked first by every reader, before the toolchain, since #768's review: a preview never stamps its site.",
+        "toolchain" : "The launchers only: the site's stamp is missing or names another toolchain (`builtWithToolchain`)."
+      },
+      "rejected" : [
+        "Files only, as the plan first had it: misses a deleted page, a renamed one and a replaced attachment (measured by the plan's review on APFS), which is #741.",
+        "The modification time alone: misses a file overwritten in place with its old time kept, which a sync service does. Measured by the plan's review: every reader of modification times missed it, folders included.",
+        "Windows' own change time in place of its creation time: a build there hard-links the course's Media into its build folder, which changes each picture's change time, so every deploy would build again.",
+        "`-not -path '*/.*'`, the scheduled shell's form until #768: it matches the WHOLE path, so in a working folder kept under a hidden folder every file was skipped and the answer was always reuse.",
+        "An environment variable from the app saying the pages had been checked (the issue's first idea): a deploy typed by hand has no app to set it.",
+        "Asking the website builder (docker exec python3) from deploy.sh: a folder deploy need not start it at all, and the question costs milliseconds on the host.",
+        "A fingerprint of every file's bytes: exact, but it reads every picture on every deploy, and the apps and the scheduled shell compare times."
+      ],
+      "rule" : "A deploy reuses the last build of a section exactly when that build is there, is not a preview's, was made by this toolchain, is not dated later than now, and nothing in the course (the course folder itself, its folders and files, hidden entries aside) was modified or changed after the build that made it STARTED; and, for Netlify and Cloudflare, the build carries the destination's address. Otherwise it builds again, once, then deploys. Every way of deploying asks: Deploy in the app, a deploy set for later, and deploy.sh, deploy.ps1 or deploy.bat typed at a command line.",
+      "theCourse" : [
+        "course_config.json",
+        "Welcome.md",
+        "notes/day-1.md",
+        "notes/day-2.md",
+        "notes/.trash/old.md",
+        "Media/diagram.png",
+        ".obsidian/workspace.json",
+        ".trash/earlier.md"
+      ],
+      "why" : "Russell's ruling, 2026-11-12 (#768): a deploy typed at the command line may reuse the last build, and the mac mirrors it, so the rule is one for both platforms and every way of deploying. Until then only the apps asked about the pages: a deploy.sh typed after an edit sent the last build and reported success, and a page deleted from the course stayed on the site (#741). Windows' deploy.py looked for the build in a folder Windows does not use, so every Netlify and Cloudflare deploy there rebuilt (55 to 66 s on a Lenovo 20QES70500); the path fix alone would have copied the mac's fault to Windows."
+    },
     "rules" : [
       {
         "expectRebuild" : true,
@@ -405,7 +800,7 @@
         "why" : "Issue #265. A build reads the settings and the pages when it starts and writes index.html minutes later, so a Save made while a publish was building is OLDER than index.html. Compared with index.html alone it looked built: the next Publish sent the same old site, said it had succeeded, and settingsSavedWhilePublishing told the teacher to do exactly that. So the time compared with is the START of the build that made the site on disk — read from buildStartedMarker when it is there, and the earlier of it and index.html's time when both are (an earlier time only ever costs a rebuild that was not needed; a later one sends a stale site). With no marker (a site built before this existed) index.html's time is used, as before. Rejected: comparing the build's copy of course_config.json with the course's (the plan review's A3) — the build copies the settings some seconds AFTER it reads them, so a Save in between matches the copy and is still missed, and it would not catch a PAGE saved during the build, which this does."
       }
     ],
-    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. That held for a whole preview's build, whose front page carries the client too; the MIXED state in (1) below reached the apps until issue #136, because they read the front page alone. They now read the same tree as the launchers — `previewBuild`. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1)."
+    "theLaunchersMustDoThisToo" : "These rules were implemented in the APPS only, and that left a hole for two years' worth of command-line use. `deploy.py` refuses a preview build for the Netlify and Cloudflare destinations, but publishing TO A FOLDER is handled entirely host-side by `deploy.sh` / `deploy.ps1` — it never enters the container, so `deploy.py` never runs. From the command line, `./preview.sh CODE N` followed by `./deploy.sh CODE N --to-folder …` therefore published the live-reload client: measured 2026-09-05 as 230 of 244 files. The apps were never exposed, because BuildFreshness forces a rebuild first, which is why three destinations tested clean in August. That held for a whole preview's build, whose front page carries the client too; the MIXED state in (1) below reached the apps until issue #136, because they read the front page alone. They now read the same tree as the launchers — `previewBuild`. Both launchers now make the same check and rebuild. THREE things are needed, and each was discovered by getting it wrong. (1) The CHECK must read every HTML page, not just index.html: serve mode bakes the client into all of them and the tree is replaced file by file, so a clean front page in front of stale preview pages is a real state that front-page detection cannot see and publishes untouched. (2) The rebuild must STOP a preview that is still serving that section: the preview's sync watcher mirrors the serve build to the host every second and overwrites the rebuild within a second of it finishing. This was first blamed on bind-mount lag, which was wrong — a rebuild takes about 3 seconds and the tree is clean the moment it returns; the cause was always the race. (3) The WAIT after the rebuild must also cover every HTML page, for the same reason as (1). And (4), since #768: the launchers ask whether anything in the course CHANGED since the build, the question only the apps asked until then (`reuseTheLastBuild`), so a deploy typed after an edit, or after a page was deleted (#741), builds first."
   },
   "configurationRules" : {
     "cloudflareAccountID" : [
