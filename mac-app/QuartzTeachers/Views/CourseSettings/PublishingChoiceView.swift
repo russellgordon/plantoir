@@ -305,11 +305,6 @@ private struct CloudflareDetailFields: View {
 
     // MARK: - Stored properties
 
-    /// The fixed fact about this destination, shown whether or not
-    /// anything is wrong.
-    static let sizeNote: String =
-        "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely."
-
     let cloudflareAccountID: String
     let accountProblem: String?
 
@@ -347,7 +342,7 @@ private struct CloudflareDetailFields: View {
                 built = built + Text(PublishingDestinations.accountIDCanWait + " ").foregroundStyle(.secondary)
             }
         }
-        return built + Text(CloudflareDetailFields.sizeNote).foregroundStyle(.orange)
+        return built + Text(PublishingDestinations.cloudflareSizeNote).foregroundStyle(.orange)
     }
 
     // MARK: - Body
