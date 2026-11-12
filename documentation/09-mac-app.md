@@ -808,8 +808,18 @@ row; another section's build never puts it on or takes it off. The stopped
 scheduled deploy already drew the same glyph, so when both apply it is still
 one glyph, and its help and accessibility label say each sentence that applies
 (`warningTooltip`); the clock beside it keeps saying a deploy is scheduled.
-Identifier `problemsBadge-section<N>`, or `stoppedPublishBadge-section<N>`
-when the stopped deploy applies, so the tests that find that one still do.
+Identifier `problemsBadge-<COURSE>-section<N>`, or
+`stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies, so
+a test can find the stopped deploy's warning by that name
+(`SidebarView.warningIdentifier`). The
+course is in it since #772, in Windows' form (#734): the sidebar is one list
+holding every course, so an identifier naming the section alone repeated
+whenever two courses each had a Section N, and a UI test finding "the"
+warning found the first course's. No UI test or screenshot harness read the
+old form, so nothing else changed with it. The clock beside a scheduled
+deploy is `scheduledDeployBadge-<COURSE>-section<N>` in the same form and
+for the same reason (`SidebarView.clockIdentifier`); Windows has no such
+identifier.
 **Rejected:** a second triangle (plan review, MED 7 — two near-identical
 glyphs, two meanings).
 
