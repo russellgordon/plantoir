@@ -44,7 +44,7 @@ appended to the juniors. `['Ali', 'Bea', 'Cy']`, because something
 sneaky is going on. A crash, because surely you cannot do that.
 
 > [!success]- What Python actually prints
-> ```text
+> ```text wrap
 > ['Ali', 'Bea', 'Cy']
 > ```
 >

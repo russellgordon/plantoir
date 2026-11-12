@@ -22,7 +22,7 @@ The review protocol has an author and a reviewer, and today they are
 both you. Take the reviewer's chair first, and do not let the author
 speak until step four.
 
-```text
+```text wrap
 1. State what your work does, in your own words, without looking at
    what you meant it to do. If you cannot, that is finding number one.
 2. Find the criteria row you meet best and say WHY, naming the file,

@@ -85,7 +85,7 @@ python3 hello.py
 ```
 
 You should see:
-```text
+```text wrap
 Checking systems for the Salish Sea Tracker...
 Ready to go.
 ```

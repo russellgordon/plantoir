@@ -287,13 +287,48 @@ In a sentence, `print()` in single backticks is code too.
   yourself" - is the `plantoir-runnable-code` skill's ` ```python run `
   block, not this one.
 
-Plain text whose lines are long - an error message, sample output, a
-paragraph to copy - can wrap instead of scrolling sideways: write `text wrap`
-after the backticks.
+**Every text block on a page wraps, unless its meaning depends on
+characters lining up.** Whenever you put plain text in a fenced block on a
+page, inside a callout or a list item too, ask one question: does its
+meaning depend on characters lining up?
+
+- **No** (an error message, sample output, a terminal session, a paragraph
+  to copy): write `text wrap` after the backticks, so a long line wraps
+  instead of scrolling sideways.
+- **Yes** (a drawing made of characters, a table or columns lined up with
+  spaces, a traceback whose `^^^` or `~~~` markers sit under the code they
+  point at): write `text nowrap`. The block scrolls sideways and keeps its
+  shape, exactly as a bare `text` block does.
+
+Never a bare `text`: an unwrapped block is always deliberate. `nowrap` is
+one word; `no wrap` is read as `wrap`. This is for text blocks only: a code
+block (` ```swift `, ` ```python ` ...) never wraps, because code is read
+by column.
+
+**Anything students copy goes in a text block.** A prompt for an AI
+assistant and a commit message are always given in a `text wrap` block,
+even when a screenshot on the page shows the same words. Students who can
+only see the words in a picture copy them from the picture, and the text
+comes out mangled.
 
 ````markdown
 ```text wrap
 FileNotFoundError: [Errno 2] No such file or directory: 'scores.csv' - the program looked in the folder it was started from, not the folder the file was saved in.
+```
+
+Commit this change with the message:
+
+```text wrap
+Stop the score going below zero when a player loses a round
+```
+
+The queue after three numbers arrive, drawn so its boxes line up:
+
+```text nowrap
+ front             back
++-------+-------+-------+
+|   4   |   9   |   2   |
++-------+-------+-------+
 ```
 ````
 
@@ -673,7 +708,39 @@ Add a bullet for a page that belongs there; leave the others alone.
 Plantoir adds its own entries when it builds the site (the curriculum
 coverage map, and My Progress from 1.8.2) - do not add those by hand.
 
-## 22. Do not
+## 22. Lesson pages: warmups, discussions, summaries, exercises
+
+A teacher may ask for a Warmup, a Discussion of task cards, a Summary or an
+Exercise page, or any mix of them. The rules for what each holds are written
+once, in the `plantoir-handouts` skill, sections 13 and 14
+(`.claude/skills/plantoir-handouts/SKILL.md`, the same file is at
+`.agents/skills/plantoir-handouts/SKILL.md`); read them before writing any
+of these pages, whether or not anything is printed.
+
+- **The course's How I Teach page comes first.** If
+  `courses/<CODE>/How I Teach.md` exists, read it (with Plantoir's tools
+  connected, `read_how_i_teach` reads it) and run the lesson its way.
+  Otherwise do what the teacher asks. The handouts skill's section 13 ends
+  with one teacher's template, called "Lessons students can catch up on". It is offered only to a
+  teacher who has shown an interest in both halves of what it is for, as
+  that section says, and never applied unasked.
+- **A Discussion page**, when the lesson has task cards, repeats each
+  card's wording word for word, in the cards' order.
+- **A Summary page** states what the lesson built, accurately and
+  completely, and nothing it did not reach.
+- **An Exercise page** stays on its lesson's topic unless the teacher asks
+  for something else. Whether it has hints is the teacher's choice; when it
+  has them, each is a folded hint callout under its question
+  (` > [!hint]- Hint `, section 5). A hint never gives the answer; how much
+  more it gives is the teacher's (the handouts skill's section 13). On a page that prints, a
+  folded hint prints opened where it is (`plantoir-printing`); if students
+  should get the hints separately on paper, make the exercise as a PDF
+  handout with its hints sheet.
+- **Wording** is plain English (the handouts skill's section 14): short
+  sentences, the thing named, no idioms, and say what the student sees,
+  then what to do.
+
+## 23. Do not
 
 - Do not write raw HTML for something Markdown already does (headings,
   lists, bold, tables, pictures): the site's styles and printing rely on
@@ -682,6 +749,10 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   survey service; use the feature skills.
 - Do not link to a page by its folder path (`[[Concepts/Slope]]`) unless two
   pages share the name.
+- Do not write a bare ` ```text ` fence: every text block says `wrap`, or
+  `nowrap` when its meaning depends on characters lining up. Do not give a
+  prompt or a commit message students should copy only in a screenshot:
+  put the words in a ` ```text wrap ` block (section 9).
 - Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
   Course Settings write it), or anything in a folder whose name starts with
   a dot. (The two exceptions are `plantoir-handouts`' own
@@ -689,7 +760,7 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   are kept, and `plantoir-unit-planning`'s `.internal/planning/`, where a
   course's unit plans are kept.)
 
-## 23. Check it
+## 24. Check it
 
 Preview the section in Plantoir and open the page: every callout should be
 a coloured box, every diagram drawn, every formula typeset, and every link

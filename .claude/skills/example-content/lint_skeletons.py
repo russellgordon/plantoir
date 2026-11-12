@@ -41,6 +41,8 @@ from generate_skeletons import article_for  # noqa: E402 — one rule for "a"/"a
 # The heading-mark rule (#444) has ONE home, lint_payload.py, which runs it on
 # every payload page; it is borrowed here only to read the Example Course.
 from lint_payload import heading_marks_missing  # noqa: E402
+# So is the text-fence rule (#758): every text block on a page says `wrap`.
+from lint_payload import text_fence_problems  # noqa: E402
 from lint_payload import check_the_checks as heading_mark_rule_misbehaves  # noqa: E402
 
 # A {brace} placeholder is never filled — the generator's tokens are
@@ -234,6 +236,8 @@ def check(family: str) -> list:
                     f"Windows cannot create")
                 break
 
+        problems.extend(text_fence_problems(relative, text))
+
         if not fields:
             problems.append(f"{relative}: no frontmatter")
             continue
@@ -371,10 +375,10 @@ def check(family: str) -> list:
 
 
 def example_course_problems() -> list:
-    """The #443 phrase rule and the #444 heading-mark rule over the Example
-    Course (EXC2O).
+    """The #443 phrase rule, the #444 heading-mark rule and the #758
+    text-fence rule over the Example Course (EXC2O).
 
-    Only those TWO rules: EXC2O is hand-written course content, not a
+    Only those THREE rules: EXC2O is hand-written course content, not a
     skeleton, so the skeleton-shape checks (sentinels, manifests, every link)
     do not apply to it. It copies the skeleton template sentences, though,
     and was missed once because nothing read it (review of #443,
@@ -398,6 +402,7 @@ def example_course_problems() -> list:
                 f"before it (\"Every  (level 2)\") — write Every `##` (level 2) and "
                 f"`###` (level 3) (#444)"
             )
+        problems.extend(text_fence_problems(str(where), text))
     return problems
 
 

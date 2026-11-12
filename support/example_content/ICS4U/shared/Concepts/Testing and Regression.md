@@ -69,7 +69,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-```text
+```text wrap
 ....
 ----------------------------------------------------------------------
 Ran 4 tests in 0.000s
@@ -95,7 +95,7 @@ nearly the same act, done twice — which is why
 Suppose somebody "tidies" `add_hold` to use `holds.insert(0, name)`.
 The program still runs. The tests do not:
 
-```text
+```text nowrap
 F...
 ======================================================================
 FAIL: test_adding_returns_true (__main__.TestHolds.test_adding_returns_true)

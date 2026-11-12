@@ -3463,7 +3463,12 @@ callouts (every kind, folding with `-` and `+`), Mermaid (labels quoted),
 tables (`\|` in a cell), maths (`$$` on lines of their own, two prices in a
 paragraph read as maths, `\$`), code (a fenced block with its language, line
 numbers, no ligatures, inline code; code students run is routed to
-`plantoir-runnable-code`), checklists students tick, a full section on My Progress
+`plantoir-runnable-code`; since #758 every text block is written
+```` ```text wrap ````, or ```` ```text nowrap ```` when its meaning depends
+on characters lining up (Russell, 2026-11-12), and a prompt or commit
+message students copy is always given in a wrapped one, even beside a
+screenshot, its phrases pinned in
+`printablePages.agentGuidance.mustSay` - doc 06 → P8), checklists students tick, a full section on My Progress
 ("from Plantoir 1.8.2", Russell's ruling of 2026-10-19: what the student
 sees, when the page appears, and a complete page whose items count - the
 three default headings or the course's `success_criteria_headings`, task
@@ -3749,7 +3754,10 @@ rejected:
   there, its solutions never. The PDF is copied again after every change.
 - **Task cards**: one relation per grid, never "on the same axes", at most
   four graphs per set, discussion pages mirror the cards word for word -
-  carried as the issue wrote them.
+  carried as the issue wrote them. (Since #765 the first two are part of
+  the offered template, "Lessons students can catch up on", because they
+  follow from four empty grids per group at a whiteboard; the third holds
+  for any teacher's cards.)
 
 **Graphs, the key's layout, and table widths and spacing (#715 reopened,
 2026-11-01).** Russell added rules and refinements after the merge (issue
@@ -3843,6 +3851,136 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   or typed empty lines, and to make a PDF handout when written answers need
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
+
+**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
+c) that runs to more than one line hangs under its first word, as a
+numbered question does. `starters/Quiz.tex` gains four macros:
+`\partindent` (1.8em, the `tasks` columns' `item-indent`, so every part
+letter lines up), `\qlabel`, `\qpart{b}{...}` (`\leftskip` set to
+`\partindent` in a group, the letter pulled back into it with `\llap`) and
+`\partbox{height}{c}{...}{answer}` (the same, in a `minipage` of fixed
+height whose answer shows only in the solutions). Its question 3 is a
+worked example: a garden bed, two `\partbox` parts and a `\qpart` ending in
+a `\fillin`. Compiled with `tectonic` and rendered at 80 dpi in both copies,
+no overfull or underfull box in either log: every part's continuation lines
+start under its first word, the part letters sit at the `tasks` letters' x,
+and the three parts of question 3 start at the same height in both copies.
+Two things the render settled. An answer written as a centred `\[ ... \]`
+display ignores `\leftskip` and starts left of the part's edge, so the
+skill says to write a part's answer inline. And `\partbox` is fixed height
+in BOTH copies: the planner's first version added the writing space only to
+the question copy, and the key then drifted up and stopped lining up with
+it. The skill's section 6 also says an answer too long for its slot means
+raising the height (one source, both copies), and, by Russell's ruling of
+2026-11-12, that the macros are a starting point to adjust to a teacher's
+own house style rather than a rule about their shape. The plain-English
+bullet (short sentences, present tense, the thing named rather than "it",
+no idioms, "say what the student sees, then what to do") is there because
+many students are learning English. The macros are listed in
+`printablePages.agentGuidance.handoutsSkill.starterMacros`, which
+`PrintablePagesTests.testTheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt`
+walks (each defined in the written starter and named in the skill), and
+the two binding sentences are in `mustSay`. REJECTED: `enumitem` with
+`leftmargin=*` (it hangs, but a part that needs a fixed slot with its
+answer inside it would need a second mechanism); `\hangindent` per
+paragraph (it holds for one paragraph, so an answer paragraph under the
+part loses the indent); the issue's "project copy" of Russell's own macros,
+which is not in the repository and, if it was in a working folder's
+`.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
+(`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
+
+**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+settled on 2026-11-10 while building a day's resources (a warmup, task
+cards, a summary, an exercise). The handouts skill gains section 13,
+"Lesson materials", and section 14, "Wording and contexts"; the
+page-authoring skill gains section 22, "Lesson pages", which points at them
+so the rules are written once. Its "Do not" and "Check it" became 23 and
+24, and the two references to the old section 22 moved with them: the
+unit-planning skill's, and `unitPlanning.rejected` in the contract (the
+second was missed at first, and the implementation review's M1 found it).
+Every rule outside the template applies only when the lesson has the thing
+it names, and nothing assumes a lesson has task cards, a summary, groups or
+hints. When a lesson uses task cards: one ask per card, core before
+extension, every card serving the idea the teacher wants. When it has
+a summary: exactly what the lesson built, with a picture where it explains
+better. An exercise stays on its lesson's topic unless the teacher asks for
+something else. Whether there are hints is the teacher's choice; when there
+are, a hint never gives the answer (how much more it gives, a first step
+or a pointer back, is the teacher's), and a hints sheet on paper is made
+when the teacher wants one. Unconditional, because each is a mechanic of
+making and checking a handout rather than a way of teaching: the four-step
+review in section 7 (build, a separate reviewer re-solving every answer and
+checking every hint, the lead's coherence pass against what the teacher
+asked, any changed question back to the reviewer), equal unit lengths on a
+card's printed graph that compares width or steepness, plain wording a
+student still learning English can follow, and invented contexts never
+about firearms or ammunition. House style, which a teacher who takes the
+house style takes with it: the `Adapted from` line under a title, never on
+an assessment unless the teacher's own quizzes carry one, because a source
+line tells students where to look the questions up. What
+belongs to the teacher is how the lesson is RUN: the course's How I Teach
+page comes first, and otherwise the teacher's request. Russell's own shape
+(the warmup as two or three questions whose last is a "movie trailer"
+lead-in, one big idea per class built by a progression of task cards,
+visibly random groups of three or four at vertical whiteboards, the
+exercise following from that day's cards and summary, hints on every
+exercise on the page and on paper that point back to a card or a summary
+rather than give a first step, each graph on its own grid and at most four
+per set, finishing the exercise as the only homework) is written as a
+template named "Lessons students can catch up on" that is OFFERED, never
+applied, and only to a teacher who has shown an interest in BOTH halves of
+what it bridges, constructivist and Thinking Classrooms practice and a
+school where students often miss class (sports, weather, illness, field
+trips and other school activities): his ruling of 2026-11-12, on the
+issue. One half without the other is not enough, and after a no it is not
+offered again in that conversation. The skill says how an assistant tells
+which case it is in (the page, what the teacher asks, what they say about
+their students) and not to offer it when it cannot tell. The name is
+`handoutsSkill.offeredTemplate.name`, defined in one sentence of each skill
+that names it, and the handouts test requires it exactly once in each, so
+a rename is the contract value and one sentence per skill; later skills
+(#751, #750) cite the same name. The fix review moved two more rules into
+the template: a hint that never gives a pointed first step and points back
+to a card (a teaching choice, and the card half means nothing without
+cards), and #715's each-graph-on-its-own-grid and four-graph limit (they
+follow from four empty grids per group at a whiteboard).
+
+A hints sheet is the worksheet with each hint under its question, from the
+same source: `Handout.tex` gains `\ifhints`, `\showhints` and `\hint{...}`
+(grey, small sans, "Hint:"), its title gains "--- Hints", its question 3
+carries one, and a third two-line wrapper ships as
+`starters/Handout - Hints.tex`. Compiled with `tectonic` in all three
+outputs and rendered at 80 dpi: one page each, the hint only on the hints
+sheet, no overfull or underfull box (the one log warning, shellesc's "Shell
+escape disabled", is the base starter's too). The wrapper is
+`handoutsSkill.hintsStarter`, deliberately NOT one of `starters`, because
+both platforms' handouts tests assert every listed starter defines
+`\showanswers` and the wrapper defines `\showhints`; `\hint` joins
+`starterMacros`. The binding sentences, the template's "offered, never
+applied" among them, are in `mustSay`.
+
+REJECTED: every rule as a fixed rule (a teacher who does not run Thinking
+Classrooms would be told to by Plantoir); the template as the default where
+the How I Teach page says nothing (the first plan: most courses have no
+such page, so it would have applied to nearly everyone, which the plan
+review's HIGH 4 caught and Russell's ruling settled); shipping none of it
+(most of it is good practice anywhere, and the issue asked for it); a
+hints-only sheet (every question's text would need a switch, a third
+structure to keep in step); the hints wrapper in `starters` (it turns the
+Windows suite red); writing the lesson rules in both skills (page-authoring
+points at the handouts skill instead); "no winter sports or sports played
+in one region" for every class (one school's context; it is kept only for a
+class with many students learning English or from many countries); and a
+`> [!hint]- Hint` pin in `mustSay` (the phrase was already in the
+page-authoring skill, so it proved nothing). Also rejected, on the
+implementation review (HIGH 1): the first wording of section 13, which
+said its rules "hold for every teacher" and so carried "one class builds
+one big idea", an exercise that follows from the day's cards and summary,
+hints always on paper as well as on the page, a coherence pass that the
+cards flow to one idea, and section 11's groups at whiteboards to a teacher
+who had shown no interest in the template. Each moved into the template or
+became conditional on the lesson having the thing it names.
 
 Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
 refinement) now carries these rules - the centred box for a column with a

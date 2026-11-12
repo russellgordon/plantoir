@@ -1,6 +1,6 @@
 ---
 name: plantoir-handouts
-description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered, aligned and turned, how far a graph is drawn and when it has arrowheads, how the answer key keeps the question copy's layout, the finite-difference scaffold, task cards, how quizzes and tests differ, and how every answer is checked before handing over.
+description: Use when a teacher asks for help making something to print and hand out - a worksheet, warmup, review sheet, practice set, quiz, test, answer key or solutions - or asks for one to be made, in any course. Offers the house style (a LaTeX source compiled to a PDF, with its answer key from the same file), says where the files go (and remembers the folder for the course), how the page looks, how tables are bordered, aligned and turned, how far a graph is drawn and when it has arrowheads, how the answer key keeps the question copy's layout, the finite-difference scaffold, task cards, lesson materials (warmups, task cards, summaries, exercises with hints) and plain wording, how quizzes and tests differ, and how every answer is checked before handing over.
 ---
 
 # Making a printed handout in the house style
@@ -113,7 +113,7 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
   course's folder has a year after it), in capitals. Do not edit
   `course_config.json` yourself unless the teacher asks.
 
-## 3. One source, two outputs
+## 3. One source, two or three outputs
 
 `Name.tex` holds the questions and the answers together, behind a switch
 defined in its preamble (the starters have it):
@@ -135,6 +135,19 @@ defined in its preamble (the starters have it):
 
 Compile both, so `Name.pdf` and `Name - Answers.pdf` sit beside the
 source.
+
+An exercise with hints (section 13) has a third wrapper,
+`Name - Hints.tex`, copied from `starters/Handout - Hints.tex`:
+
+```latex
+\def\showhints{}
+\input{Name.tex}
+```
+
+It makes `Name - Hints.pdf`: the worksheet itself, with each `\hint{...}`
+shown under its question and nowhere else (the starter's `Handout.tex`
+defines `\hint` and `\ifhints`, and its question 3 carries one). One
+source, so the hints sheet never drifts from the worksheet.
 
 **The answer key keeps the question copy's layout.** A student holds the
 two side by side, so what they wrote on and what they check against must
@@ -161,8 +174,13 @@ look the same:
   `\usepackage[T1]{fontenc}`, no paragraph indent.
 - A bold sans title (`{\LARGE\bfseries\sffamily \doctitle}`), then a grey
   subtitle line of instructions.
-- `tasks` columns for a), b), c) parts. The answer key keeps the
-  worksheet's column count.
+- A handout that draws on a textbook carries a grey line under its title:
+  `Adapted from <book>, <pages>`. An assessment (a quiz or test) never does.
+  A source line on a quiz tells students where to look the questions up,
+  so leave it off unless the teacher's own quizzes carry one.
+- `tasks` columns for short a), b), c) parts side by side. The answer key
+  keeps the worksheet's column count. On a quiz or test, a part that runs
+  to more than one line hangs under its first word (section 6).
 - `pgfplots` for graphs. How far a graph is drawn, and when it has
   arrowheads, is in section 12.
 - **A blank students write on is about two lines tall.** Any line that
@@ -228,20 +246,44 @@ blanks, that is:
   switch inside one file.
 - In the solutions, working is dark blue and balancing steps (what is done
   to both sides) light red, so they stay distinct when printed in greyscale.
+- **A lettered part hangs under its first word.** When a part a), b), c)
+  runs to more than one line, every line after the first starts under the
+  part's first word, and the letter stands alone to the left, as a numbered
+  question's does. Write each part with `\qpart{b}{...}`, or with
+  `\partbox{4cm}{c}{...}{answer}` when the part needs a slot of fixed height
+  to write in. The slot is the same height in the solutions, so the two
+  copies line up, and the answer sits at the part's edge (write it inline,
+  not as a centred display, which ignores the edge). If an answer does not
+  fit its slot, raise the height; it is one source, so both copies change.
+  Never type a part as "b) ..." at the start of a paragraph, where its
+  second line returns under the letter. Short parts side by side stay in
+  `tasks` columns, which already hang, and whose letters line up with
+  `\qpart`'s (both 1.8em in, `\partindent`).
+- **Questions are worded in plain English**, as section 14 says.
 
-`starters/Quiz.tex` has all three.
+`starters/Quiz.tex` has all of these; its question 3 is a worked example
+of hanging parts. The four part macros (`\partindent`, `\qlabel`, `\qpart`
+and `\partbox`) are a starting point, not a rule about their shape: if the
+teacher's own quizzes set parts another way, or their house style differs,
+adjust the macros to match, and keep what the rule asks (a part hangs, and
+the two copies line up).
 
 ## 7. Answers are checked, and new questions are reviewed
 
 - **Verify every answer independently**, by solving it again a different
   way or by substituting it back. An answer key with one wrong answer costs
   the teacher a class.
-- **A newly written question set** (a new test, a rewrite, a practice set)
-  is reviewed by a separate agent from the one that wrote it - for fit to
-  what the teacher asked and for answer accuracy, re-solving every answer
-  from scratch. Fix what it finds before the final compile. If you cannot
-  start a second agent, say plainly that the questions have not had that
-  second check.
+- **A newly written question set** (a new test, a rewrite, a practice
+  set, a lesson's materials) goes through four steps. Build it; then
+  a separate agent from the one that wrote it reviews it, for fit to what
+  the teacher asked, re-solving every answer from scratch and checking
+  every hint; then a coherence pass by you, the lead, against what the
+  teacher asked (where the set has task cards and a summary, the cards
+  lead where the teacher wants them to and the summary is accurate and
+  complete; an exercise stays on its topic); then any question that
+  changed goes back to the reviewer.
+  Fix what it finds before the final compile. If you cannot start a second
+  agent, say plainly that the questions have not had that second check.
 - **Adapting a textbook page**: renumber the questions that are kept.
 
 ## 8. Compile, look at every page, leave the folder clean
@@ -442,15 +484,17 @@ The same figure goes on a page as a ` ```tikz ` fence:
 
 ## 11. Task cards
 
-Each group has four empty Cartesian-plane templates on its whiteboard.
+These rules hold whenever a teacher asks for task cards. How the cards are
+used in class (alone, in pairs, in groups, at desks or at whiteboards) is
+the teacher's (section 13). The rules for cards done at whiteboards with
+four empty grids each are part of the template at the end of section 13.
 
-- A card never says "on the same axes", "on the same grid" or "on one
-  grid": every relation it asks students to plot or sketch goes on its
-  own grid, and comparing is side by side ("put it beside your graph of
-  $y = x^2$ and compare").
-- A card set asks a group for **at most four graphs in total**, counting
-  the sketch prompts for a group that finishes early.
 - A table on a card has a full border, as every table does (section 9).
+- Where a card's graph compares width or steepness, it is printed with the
+  same unit length on both axes (`x=0.42cm, y=0.42cm` on the `axis`, as the
+  starter's graph does), so a narrower parabola looks narrower.
+- How the cards are written (one ask each, core before extension) is in
+  section 13.
 - A page that discusses the cards repeats each card's wording word for
   word.
 
@@ -503,3 +547,132 @@ context?**
 The same rule holds on a page of the class website: `plantoir-math-graphs`
 section 4 says how. Whatever the graph, the answer key draws it on the
 same grid the question copy gives (section 3).
+
+## 13. Lesson materials: warmups, task cards, summaries, exercises
+
+A teacher may ask for a warmup, task cards (and a Discussion page that
+mirrors them), a summary, an exercise, or any mix of these. Make what they
+ask for. When you make one of these, the rules below hold, and each one
+applies only when the lesson has the thing it names. How the lesson is RUN
+(the shape of a warmup, whether there are task cards at all, whether
+students work in groups and where, whether an exercise has hints, what the
+homework is) belongs to the teacher.
+
+### Whose way of teaching
+
+1. **The course's How I Teach page comes first.** If
+   `courses/<CODE>/How I Teach.md` exists, read it before writing any
+   lesson material (with Plantoir's tools connected, `read_how_i_teach`
+   reads it). Where it says how this teacher runs a warmup, groups, hints
+   or homework, do it their way.
+2. **Otherwise, do what the teacher asks.** Do not bring a lesson structure
+   of your own, and do not use the template at the end of this section
+   unasked.
+3. **The template is offered, never applied.** The template is the one
+   at the end of this section. Offer it, in one or two sentences, only to
+   a teacher who has shown an interest in both things it bridges:
+   lessons built from students' own thinking (constructivist practice,
+   Thinking Classrooms, vertical whiteboards, random groups), AND the
+   reality of a school where students often miss class (sports and team
+   travel, weather days, illness, field trips and other school
+   activities). One without the other is not enough. The interest may be
+   in what they ask, in what they say about their students, or on their
+   How I Teach page. Say it is one teacher's template, use it only after
+   they say yes, and only where their How I Teach page does not say
+   otherwise. If they say no, do not offer it again in this conversation.
+   If you cannot tell whether they have shown that interest, do not offer
+   it. Nothing in the template is a rule for anyone else.
+
+### Task cards
+
+When a lesson uses task cards, every card serves the idea the teacher wants
+students to reach. One ask per card: a card never holds four or
+five parts, and a short "check it" line is the most it may add. Core cards
+come first, then extension cards, marked as extensions. Section 11 has the
+rules for graphs and tables on cards.
+
+### Summary
+
+When a lesson has a summary, it states what the lesson built (its core
+cards, when it has them): accurately, completely, and nothing the lesson
+did not reach. Where a picture explains better than algebra, use the
+picture: for example, why the steps of $y = x^2$ go 1, 3, 5, shown as a
+staircase on the graph beside squares that grow by L-shaped layers.
+
+### Exercise
+
+Unless the teacher asks for something else (a review across several
+lessons, say), an exercise stays on the topic of the lesson it belongs to
+and needs nothing from a later lesson.
+
+### Hints
+
+Whether an exercise has hints is the teacher's choice. When it has them:
+
+- **A hint never gives the answer.** How much more a hint gives (a first
+  step, a reminder of a method, a pointer to a worked example) is the
+  teacher's; follow their How I Teach page or ask. A hint that names
+  something names it the way the student sees it (a worked example by its
+  title, a page by its title), never by an internal label such as a day
+  number.
+- When the teacher wants the hints on paper, they come as
+  `Name - Hints.pdf` beside `Name.pdf` and `Name - Answers.pdf`, from the
+  same source (section 3, `\hint`).
+
+### When the length is not given, go shorter
+
+When the teacher has not said how long a piece should be, drop what is not
+essential rather than fill the class.
+
+### The offered template
+
+**The template is called "Lessons students can catch up on".** It is one
+teacher's template: how one teacher brings constructivist, Thinking
+Classrooms practice into a school where students are often away. Offer it as that, as "Whose way of teaching"
+says, and never as Plantoir's rule. A teacher who asks for it by its name
+has said yes.
+
+- **Warmup.** Two or three short questions students answer at their desks.
+  They touch ideas from the class before; the last one is a small lead-in
+  to today's idea, like a movie trailer: it asks, and it never teaches or
+  names the new idea. No "recap" or "preview" labels, no bold run-in labels
+  on the questions, and never a full recap of the last class.
+- **One big idea per class.** The day's task cards are a progression of
+  small steps that lead groups to it, and the summary states what the core
+  cards built.
+- **Task cards** are done in groups of three or four, chosen visibly at
+  random, at vertical whiteboards with four empty Cartesian-plane templates
+  each. One set of groups for the whole class, never re-grouped part way
+  through.
+- **Each graph on its own grid.** A card never says "on the same axes",
+  "on the same grid" or "on one grid": every relation it asks students to
+  plot or sketch goes on its own grid, and comparing is side by side ("put
+  it beside your graph of $y = x^2$ and compare"). A card set asks a group
+  for **at most four graphs in total**, counting the sketch prompts for a
+  group that finishes early.
+- **The exercise follows from that day's cards and summary.**
+- **Every exercise has hints**, on the page and on paper (`Name.pdf`,
+  `Name - Hints.pdf` and `Name - Answers.pdf`), so a student who missed the
+  class can work through it alone. A hint here never gives a pointed first
+  step: it points back to where the idea was built, a card from the same
+  day by its number ("Look back at Card 4.") or an earlier day's summary by
+  its title.
+- **Finishing the exercise is the only homework.**
+
+## 14. Wording and contexts
+
+Write so that a student who is still learning English can follow.
+
+- Around the terms the class was taught, use short sentences in the present
+  tense, and name the thing rather than writing "it" or "this".
+- Say what the student sees, then what to do: "The graph shows a parabola.
+  Write its equation." Never "is given as a graph".
+- No idioms ("use good form", "in plain sight", "for free", "convince them
+  otherwise") and no hypotheticals ("If this graph showed ...").
+- Choose contexts students anywhere can picture, and give each one a plain
+  sentence saying what it is. When many of the class are learning English
+  or come from many countries (ask, or read How I Teach), avoid a sport or
+  pastime known in one region only, such as a winter sport.
+- Contexts you invent never involve firearms or ammunition: a dice game, a
+  race or a treasure hunt will do. A teacher's own material, and a course
+  whose subject requires the topic, are the teacher's.

@@ -23,7 +23,7 @@ and a file written here is lost). Copy from it instead.
   archive and a restore.
 - **Its look is fixed.** The plan page and the correlation page are built
   from `template/` beside this file, with its stylesheets and fonts. They
-  are plain HTML pages, not course pages, so section 22 of
+  are plain HTML pages, not course pages, so section 23 of
   `plantoir-page-authoring` (no raw HTML, no `<style>`) does not apply to
   them; it applies to the class website.
 - **Seeing it.** Plantoir shows the plans on the course's Planning tab,
@@ -186,7 +186,7 @@ and the gaps.
 
 ## 9. The planning folder: where everything goes
 
-```text wrap
+```text nowrap
 courses/<CODE>/.internal/planning/
   index.html          the course's list of plans, one card per unit (from template/index.html)
   robots.txt          two lines that ask search engines to stay away (from template/robots.txt)

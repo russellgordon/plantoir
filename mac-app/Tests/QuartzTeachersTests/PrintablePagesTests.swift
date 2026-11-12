@@ -632,6 +632,14 @@ final class PrintablePagesTests: XCTestCase {
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
         let starters: [String] = try XCTUnwrap(guidance["starters"] as? [String])
         let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let starterMacros: [String: Any] = try XCTUnwrap(guidance["starterMacros"] as? [String: Any])
+        XCTAssertFalse(starterMacros.isEmpty)
+        let hintsStarter: String = try XCTUnwrap(guidance["hintsStarter"] as? String)
+        let offeredTemplate: [String: Any] = try XCTUnwrap(guidance["offeredTemplate"] as? [String: Any])
+        let templateName: String = try XCTUnwrap(offeredTemplate["name"] as? String)
+        let templateNamedIn: [String] = try XCTUnwrap(offeredTemplate["namedIn"] as? [String])
+        XCTAssertFalse(templateNamedIn.isEmpty)
+        XCTAssertFalse(starters.contains(hintsStarter), "every starter defines \\showanswers, and the hints wrapper does not")
         let pageAuthoring: [String: Any] = try XCTUnwrap(contract["pageAuthoringSkill"] as? [String: Any])
         let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
         XCTAssertFalse(routesTo.contains(skillName), "a handout made as a PDF is not part of a page")
@@ -662,6 +670,38 @@ final class PrintablePagesTests: XCTestCase {
                 let other: String = try String(
                     contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
                 XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+            // #765: the hints wrapper is written beside the starters, defines
+            // \showhints (not \showanswers, which is why it is not one of
+            // `starters`) and is named in the skill.
+            let hints: String = try String(
+                contentsOf: skillFolder.appendingPathComponent(hintsStarter), encoding: .utf8)
+            XCTAssertTrue(hints.contains("\\showhints"), "\(home): \(hintsStarter)")
+            XCTAssertTrue(skill.contains("`" + hintsStarter + "`"), "\(home): the skill must name \(hintsStarter)")
+            // #765: the offered template's name is defined in exactly one
+            // sentence of each skill that names it, so a rename is the
+            // contract's value and one sentence per skill.
+            for naming in templateNamedIn {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(naming)/SKILL.md"), encoding: .utf8)
+                let folded: String = PrintablePagesTests.foldingWhiteSpace(in: other)
+                let wanted: String = PrintablePagesTests.foldingWhiteSpace(in: templateName)
+                let times: Int = folded.components(separatedBy: wanted).count - 1
+                XCTAssertEqual(times, 1, "\(home): \(naming) must name the template \(templateName) exactly once")
+            }
+            // #754: each macro a starter must carry is defined in the written
+            // starter and named in the skill, so an edit to either cannot
+            // drop a macro the other relies on.
+            for (starter, value) in starterMacros {
+                let macros: [String] = try XCTUnwrap(value as? [String], starter)
+                XCTAssertFalse(macros.isEmpty, starter)
+                let source: String = try String(
+                    contentsOf: skillFolder.appendingPathComponent(starter), encoding: .utf8)
+                for macro in macros {
+                    let defined: Bool = source.contains("\\newcommand{\(macro)}") || source.contains("\\newlength{\(macro)}")
+                    XCTAssertTrue(defined, "\(home): \(starter) must define \(macro)")
+                    XCTAssertTrue(skill.contains("`\(macro)"), "\(home): the skill must name \(macro)")
+                }
             }
         }
         for name in AgentGuidance.rootFiles {
@@ -728,6 +768,56 @@ final class PrintablePagesTests: XCTestCase {
             let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
             XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
         }
+    }
+
+    /// #758: every phrase `printablePages.agentGuidance.mustSay` pins is in
+    /// its skill as written into both homes, matched with white space folded
+    /// as the contract's rule says, and every key names a skill that is
+    /// written. Later pieces add their phrases to the contract, not here.
+    func testEverySkillSaysWhatTheContractSaysItMust() throws {
+        let mustSay: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["mustSay"] as? [String: Any])
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        var pinnedSkills: Int = 0
+        for (skillName, value) in mustSay {
+            if skillName == "rule" {
+                continue
+            }
+            let phrases: [String] = try XCTUnwrap(value as? [String], "\(skillName) must be a list of phrases")
+            XCTAssertFalse(phrases.isEmpty, skillName)
+            pinnedSkills += 1
+            for home in [".claude", ".agents"] {
+                let file: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)/SKILL.md")
+                guard FileManager.default.fileExists(atPath: file.path) else {
+                    XCTFail("\(home): mustSay names \(skillName), and no such skill is written")
+                    continue
+                }
+                let skill: String = try String(contentsOf: file, encoding: .utf8)
+                let folded: String = PrintablePagesTests.foldingWhiteSpace(in: skill)
+                let foldedWithoutQuoteMarks: String = PrintablePagesTests.foldingWhiteSpaceAndQuoteMarks(in: skill)
+                for phrase in phrases {
+                    let wanted: String = PrintablePagesTests.foldingWhiteSpace(in: phrase)
+                    let found: Bool = folded.contains(wanted) || foldedWithoutQuoteMarks.contains(wanted)
+                    XCTAssertTrue(found, "\(home): \(skillName) must say \(phrase)")
+                }
+            }
+        }
+        XCTAssertGreaterThan(pinnedSkills, 0, "mustSay pins no skill at all")
+    }
+
+    /// Every run of white space, a line break included, as one space
+    /// (`mustSay.rule`), so re-wrapping a paragraph never breaks a pin.
+    private static func foldingWhiteSpace(in text: String) -> String {
+        return text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
+    /// The same, with the `>` marks that begin a callout's or a quote's lines
+    /// dropped as well, so a sentence wrapped inside `> ` lines is found.
+    private static func foldingWhiteSpaceAndQuoteMarks(in text: String) -> String {
+        let joined: String = text.replacingOccurrences(
+            of: "\\s*\\n[ \\t]*(?:>[ \\t]*)*", with: " ", options: .regularExpression)
+        return foldingWhiteSpace(in: joined)
     }
 
     func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {

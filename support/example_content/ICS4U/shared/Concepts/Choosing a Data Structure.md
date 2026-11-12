@@ -53,7 +53,7 @@ We asked the same question of a list and a dictionary — *is this
 member in there?* — for a name that was not present, which is the
 worst case for a list:
 
-```text
+```text nowrap
    size    list (s)    dict (s)
    1000  0.00000498  0.00000001
   10000  0.00005147  0.00000001

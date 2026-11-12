@@ -35,7 +35,7 @@ def parse_telemetry_line(raw_line: str):
 
 ### The Chaos Input Stream
 
-```text
+```text wrap
 # Packet 1: Normal
 VENUS-01,2024-09-01T12:00:00Z,10.5,29.4
 # Packet 2: Sensor dropout (blank salinity)

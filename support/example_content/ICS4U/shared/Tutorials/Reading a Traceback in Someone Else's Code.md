@@ -19,7 +19,7 @@ failure.
 Here is a real one. A program prints a weekly summary; the summary is
 computed by a helper module; the helper does the arithmetic.
 
-```text
+```text nowrap
 Traceback (most recent call last):
   File "/home/student/main.py", line 4, in <module>
     weekly_summary(weeks_sessions)

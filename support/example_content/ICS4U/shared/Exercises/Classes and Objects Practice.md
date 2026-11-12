@@ -81,12 +81,12 @@ class is responsible for which fact.
 > `"M. Okonjo"`, and `1` are arguments matched to the parameters
 > `title`, `author`, and `copies`; and `guide` is a name now referring
 > to that one object. Leave an argument out and Python is precise:
-> ```text
+> ```text wrap
 > TypeError: Book.__init__() missing 1 required positional argument: 'copies'
 > ```
 
 > [!success]- Answer 2
-> ```text
+> ```text wrap
 > True
 > False
 > None
@@ -102,7 +102,7 @@ class is responsible for which fact.
 > The method is missing `self`. Every method's first parameter is the
 > object it was called on, and Python passes it in whether or not you
 > declared it:
-> ```text
+> ```text wrap
 > TypeError: Tool.is_available() takes 0 positional arguments but 1 was given
 > ```
 > Read that message carefully — "1 was given" is the object itself.
@@ -115,7 +115,7 @@ class is responsible for which fact.
 > [!success]- Answer 4
 > `name = name` assigns a local parameter to itself and then throws it
 > away when `__init__` ends. Nothing is ever stored on the object:
-> ```text
+> ```text wrap
 > AttributeError: 'Tool' object has no attribute 'name'
 > ```
 > The missing three characters are `self.`:
@@ -153,7 +153,7 @@ class is responsible for which fact.
 > print(guide.lend())
 > print(guide)
 > ```
-> ```text
+> ```text wrap
 > Exam Study Guide by M. Okonjo (1 on the shelf)
 > True
 > False
@@ -192,7 +192,7 @@ class is responsible for which fact.
 > print(titles_on_the_shelf(catalogue))
 > print(total_copies(catalogue))
 > ```
-> ```text
+> ```text wrap
 > ['Exam Study Guide', 'Short Stories']
 > 5
 > ```
@@ -225,7 +225,7 @@ class is responsible for which fact.
 > print(rowan)
 > print(stories)
 > ```
-> ```text
+> ```text wrap
 > True
 > Rowan has 1 book(s)
 > Short Stories by L. Tran (3 on the shelf)
@@ -237,7 +237,7 @@ class is responsible for which fact.
 
 > [!success]- Answer 8
 > A defensible set of cards:
-> ```text
+> ```text nowrap
 > Attendee    | knows name, contact for emergencies
 >             | signs in and out
 >             | collaborates with: Activity

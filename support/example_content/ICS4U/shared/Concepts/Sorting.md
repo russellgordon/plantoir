@@ -129,7 +129,7 @@ When two records tie, does their original order survive? A sort that
 promises it does is **stable**. Sorting the sign-in sheet by hours
 with insertion sort's `>` comparison:
 
-```text
+```text wrap
 [('Rowan', 2), ('Nadia', 1), ('Bea', 2), ('Ali', 1)]
 ->  [('Nadia', 1), ('Ali', 1), ('Rowan', 2), ('Bea', 2)]
 ```
