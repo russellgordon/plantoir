@@ -408,7 +408,7 @@ $cases['scheduled-that-waits-breaks-it'] = {
     param($setup)
     Install-Version1
     $r = Invoke-Version2 $setup "$updateArgs $returnTo /HARNESSSCHEDULED=--wait-while-installing" 'scheduled-that-waits-breaks-it'
-    $inUse = Select-String -Path $r.Log -Pattern 'Plantoir\.exe' -Context 0,3 | Where-Object { $_.Context.PostContext -match 'in use' } | Select-Object -First 1
+    $inUse = Select-String -Path $r.Log -Pattern 'Dest filename: .*\\Plantoir\.exe\s*$' -Context 0,8 | Where-Object { $_.Context.PostContext -match 'in use' } | Select-Object -First 1
     [PSCustomObject]@{ Pass = [bool](($r.Exit -ne 0) -and -not (Test-IsV2) -and $inUse); Detail = "exit $($r.Exit) in $($r.Seconds) s (went wrong as the review said: the copy of Plantoir.exe met it in use: $([bool]$inUse)); tree is version 2: $(Test-IsV2)" }
 }
 # ---- Must-fail: break one rule, and the case it protects goes wrong -----------------

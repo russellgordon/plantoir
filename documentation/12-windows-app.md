@@ -12293,11 +12293,12 @@ it at every Windows cut. Results, this PC, 2026-11-12:
 | ssinstall | PrepareToInstall made to answer `''`, so only the `ssInstall` look runs; node that never ends | **3**, 21.5 s (Inno's code for an Abort at `ssInstall`); tree byte-identical; marker `work` |
 | came-back | node that never ends; 3 s in, `Plantoir.exe` opened (by `cmd.exe`), `/RELAUNCH=1` | **7**, 3.9 s; no second copy; marker `reopened` |
 | open-at-start | `Plantoir.exe` open and never quitting, `/RELAUNCH=1` | **7**, 21.1 s; no second copy started beside it; marker `work` |
-| scheduled-during-copy | a scheduled-shaped stand-in started at `ssInstall`, copy held 4 s | **0**, 5.2 s; it saw `installing.<pid>` and waited 4,310 ms |
+| scheduled-during-copy | a scheduled run of the harness's OWN `{app}\Plantoir.exe` started at `ssInstall`, standing down when it sees `installing.<pid>` | **0**, 2.6 s; it stood down at once, the copy completed |
+| scheduled-that-waits-breaks-it (must-fail) | the same run behaving as the first build did: WAITING while the marker is there | **5**, 6.6 s: the copy of `Plantoir.exe` met it "in use" four times, the hidden box defaulted to Abort, rollback (case B in miniature) |
 
 Every case also checks the markers: a refusal leaves `update-not-installed.txt`
 with its reason, a finished install leaves none, and no `installing.*` is ever
-left behind (all 13 held). All 13 in 211 s. Must-fails (`-MustFail`, each
+left behind (all held). All 14 in 234 s. Must-fails (`-MustFail`, each
 compiled from an edited COPY of the include): the check made to answer `''`
 → serve **exit 5** and a part-replaced tree (the night's case B, reproduced);
 the preview rule never matching → serve refused, exit 7; one look only → the
@@ -12305,7 +12306,7 @@ late case installed before the late work had ended (judged by time: whether
 Inno's in-use retries then trip over it depends on timing, exit 5 on one run
 and 0 after retries on another); the wait removed → build exit 5; a reopened
 Plantoir counted as work → came-back waited the full 21.5 s; the second-copy
-guard removed → open-at-start started a second Plantoir. Every run: "the real
+guard removed → open-at-start started a second Plantoir; and the scheduled run that waits (above) → exit 5. Every run: "the real
 Plantoir untouched" (42,764 files and its uninstall key, the same fingerprint
 before and after). Source must-fails, each red and restored: the
 `PrepareToInstall` call, the `ssInstall` look, the `__pycache__` line, the

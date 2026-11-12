@@ -52,7 +52,8 @@ static class StandIn
                 catch (Exception) { }
                 return 0;
             }
-            // What it did before (the must-fail): WAIT while the marker is there.            if (args[i] == "--wait-while-installing" && i + 1 < args.Length)
+            // What it did before (the must-fail): WAIT while the marker is there.
+            if (args[i] == "--wait-while-installing" && i + 1 < args.Length)
             {
                 // A scheduled run's wait, in miniature: while the installer's
                 // installing.<pid> marker is in the state folder, wait.
