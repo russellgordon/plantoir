@@ -1084,12 +1084,15 @@ in so many words. The 100-project cap, which a teacher who rolls over many
 sections a year could reach in about seven years, is #723.
 
 **What the teacher is told.** No figures in the app — the hosts change them;
-the dated figures are here and on plantoir.app's deploying page. Every
+the dated figures are here and on plantoir.app's deploying page. The one
+figure kept is Cloudflare's 25 MB per file, in `cloudflareSizeNote`, because
+that limit is the fact the sentence exists to state. Every
 sentence says DEPLOY for what spends the allowance, because in Plantoir
 publishing marks a page and costs nothing. `netlifyNote` sits under Netlify
 wherever it is configured (primary or additional, the new-course window and
 Course Settings, and an absent key counts as Netlify); `cloudflareCaption`
-sits wherever Cloudflare is; `netlifyScheduleNote` is in Schedule a deploy
+sits wherever Cloudflare is, and `cloudflareSizeNote` under it in the
+Cloudflare fields; `netlifyScheduleNote` is in Schedule a deploy
 when the SAVED settings deploy to Netlify; the window's section caption is
 `wizardCaption`.
 
@@ -1119,6 +1122,11 @@ cases (`wizardAccountID`, `deployWithoutAnAccountID`, six cases with
 with no ID would have met two orange warnings on their first course: the
 ID's sentence and the fixed 25 MB fact. When both apply they are one block,
 the ID's sentence first, then "it can wait", then the 25 MB note, as one block (#668 second fixes round).
+The 25 MB note is `publishingDestinations.sentences.cloudflareSizeNote`
+since #775 (Russell, 2026-11-12): until then each app typed its own copy,
+which no test compared, so a drift would have passed both suites. The
+alternative, leaving two copies because the sentence states a fact rather
+than a rule, was rejected for that reason.
 
 **What was rejected, and why.**
 - *Letting the launcher ask for the ID at the first deploy.* The plan's first
@@ -1464,6 +1472,8 @@ unhelpful error — so `deploy.py` checks sizes *before* uploading anything and
 names the offending files, suggesting a shorter or compressed video, or
 Netlify for that section. Ordinary course material is nowhere near it;
 long-form video is, which is why most teachers embed from YouTube or Vimeo.
+Both apps say so under Cloudflare Pages in one sentence,
+`publishingDestinations.sentences.cloudflareSizeNote` (#775).
 
 Cloudflare's free plan limits builds to 500 a month, but that does not apply
 here: a Direct Upload deployment records `deployment_trigger.type: ad_hoc`

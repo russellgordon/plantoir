@@ -54,6 +54,12 @@ enum PublishingDestinations {
     nonisolated static let accountIDCanWait: String =
         "You can create the course without it and preview it as usual. It is needed before the first deploy."
 
+    /// The fixed fact about Cloudflare Pages, shown under it whether or not
+    /// anything is wrong, after the Account ID's sentences in the one orange
+    /// block (`publishingDestinations.sentences.cloudflareSizeNote`, #775).
+    nonisolated static let cloudflareSizeNote: String =
+        "One thing to know: Cloudflare won’t accept any single file larger than 25 MB. Documents, images, and slide decks are almost always comfortably under that — a long video usually isn’t. Most teachers embed video from YouTube or Vimeo rather than uploading it, which avoids the limit entirely."
+
     // MARK: - Functions
 
     /// Whether the Netlify note belongs on screen for these destinations.

@@ -1406,8 +1406,11 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   (`AccountIdRefusalTrailLine`) and the Cloudflare notice as ordered runs
   (`CloudflareNotice`). `PublishingDestinationsContractTests` runs all three
   case lists against it and pins the sentences; the views only draw what it
-  returns. The 25 MB sentence moved there from the view (it is not a contract
-  sentence) so the block's ORDER is testable.
+  returns. The 25 MB sentence moved there from the view so the block's ORDER is
+  testable. It became a contract sentence with #775,
+  `publishingDestinations.sentences.cloudflareSizeNote`, which
+  `TheSentencesAreTheContracts` must pin (its count of five is red until it
+  does).
 - **The new-course dialog** (`NewCourseDialog`) starts `_deployTarget` at
   `NewCourseDefault` and always writes it; its Deploying header carries
   `wizardCaption` (automation id `wizardDeployingCaption`); its
