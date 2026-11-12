@@ -1015,10 +1015,14 @@ expanding `%NAME%`). The message is the mac's, character for character; what
 was measured and rejected is documentation/12-windows-app.md → "Fix with
 Claude… and Fix with Codex…" and "What the outside doors hand to Windows, and
 how". Windows also proposed `fixWith.notEnabledHelp`, the sentence a greyed
-button gives to assistive technology, which the mac owes as an accessibility
-hint.
+button gives to assistive technology. The mac gives it to both buttons as
+their accessibility hint while they are disabled, and no hint while they are
+enabled (#776: `FixWithAssistant.notEnabledHelp`, `buttonHint(hasRows:)`). A
+hint and not a `.help` tooltip, because the enabled buttons carry no tooltip
+and a sighted teacher can see the ticks; the hint is what VoiceOver reads,
+which is the job Windows' help text does for Narrator.
 
-**Tests.** `FixWithAssistantTests` (13): the words and bounds pinned (no piece
+**Tests.** `FixWithAssistantTests` (14): the words and bounds pinned (no piece
 with a semicolon), every skill real, every key a kind and `deployOnlyKinds` the
 kinds a deploy writes, both case lists (no message with a semicolon, a newline
 or ". ("), no semicolon and no unbounded name with every input carrying them,
@@ -1026,8 +1030,9 @@ the closing per kind, rule 1 over the message, the
 real `rowState` leaving a row out, which pages are shared, both doors sending
 the message they are given (and the plain greeting without one), the message
 surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
-apostrophe in it, the trail line against the contract's, and a source scan of
-the view.
+apostrophe in it, the trail line against the contract's, a source scan of
+the view, and the disabled buttons' hint in both states with both buttons
+carrying it (#776).
 
 ## One folder, however it is spelled
 

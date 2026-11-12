@@ -1017,7 +1017,7 @@ the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
 `greetingCases`). A button is HIDDEN when its assistant is not on this PC or
 the course is kept for reference, and GREYED when nothing ticked is handed
 over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
-(proposed from Windows; the mac owes the same as an accessibility hint).
+(proposed from Windows; the mac gives the same as an accessibility hint since #776).
 Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
 `MainWindow.Activated` off the interface thread — never while the tab draws,
 and false until the first answer, so a tab that draws first shows its buttons
