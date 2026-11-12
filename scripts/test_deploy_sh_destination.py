@@ -259,7 +259,7 @@ class TheSavedDestinationsAreTheContracts(unittest.TestCase):
     """GitHub #771: deploy.sh runs `contracts/app-rules.json` ->
     `savedDestinations`, the cases Windows proposed (#739) and deploy.ps1 runs.
 
-    The three functions are CUT from deploy.sh and run with the launcher's
+    The block's functions are CUT from deploy.sh and run with the launcher's
     own reading loop, once with plutil (the Mac's reader) and once with only
     a Python to read with (every other bash). The whole-launcher tests above
     cover the loop that runs the legs.

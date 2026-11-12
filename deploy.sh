@@ -931,9 +931,25 @@ fi
 # REFUSES rather than falling back to Netlify: falling back is exactly the
 # silent wrong-host deploy this exists to stop.
 # The rule is contracts/app-rules.json -> savedDestinations, whose cases
-# scripts/test_deploy_sh_destination.py runs through the three functions
+# scripts/test_deploy_sh_destination.py runs through the functions
 # between the markers below, with each reader (#771). Keep the markers.
 # BEGIN saved_destinations
+# One value from the settings as plutil reads it, on one line: a tab, a
+# carriage return or a line break in it becomes a space, AT ITS END TOO. A
+# command substitution drops every line break at the end, the value's own
+# included, so the x is written after plutil's output and taken off again;
+# without it a kind of only a line break read as empty, which is Netlify
+# (#771 review). An absent or null key, or a failed read, is empty.
+the_saved_setting() {
+  local value
+  value="$(plutil -extract "$1" raw -o - "$2" 2>/dev/null && printf x)" || value=""
+  if [[ "$value" == *x ]]; then
+    value="${value%x}"
+    value="${value%$'\n'}"
+  fi
+  printf '%s' "$value" | tr '\t\r\n' '   '
+}
+
 the_saved_destinations() {
   local config="$1" reader primary folder count index kind path
   # macOS: plutil reads JSON and is on every Mac, Command Line Tools or not —
@@ -948,15 +964,16 @@ the_saved_destinations() {
   # The file's OWN first character is checked first: plutil reads a file of
   # only a line break, white space or a comment as an empty object, and an
   # XML or binary property list is not JSON at all (#771 review).
-  # A tab or a line break in a kind becomes a space, as in a path, so a kind
-  # is always one leg: split, it was two, and the second deployed.
+  # A tab, a carriage return or a line break in a kind becomes a space, as in
+  # a path (the_saved_setting), so a kind is always one leg: split, it was
+  # two, and the second deployed.
   if command -v plutil >/dev/null 2>&1; then
     [[ "$(LC_ALL=C tr -d ' \t\r\n' < "$config" 2>/dev/null | head -c 1)" == "{" ]] || return 1
     [[ "$(plutil -convert json -o - "$config" 2>/dev/null)" == "{"* ]] || return 1
-    primary="$(plutil -extract deploy_target raw -o - "$config" 2>/dev/null || true)"
-    folder="$(plutil -extract deploy_folder_path raw -o - "$config" 2>/dev/null || true)"
-    printf '%s\t%s\n' "$(printf '%s' "${primary:-netlify}" | tr '\t\n' '  ')" "$(printf '%s' "$folder" | tr '\t\n' '  ')"
-    count="$(plutil -extract additional_deploy_targets raw -o - "$config" 2>/dev/null || true)"
+    primary="$(the_saved_setting deploy_target "$config")"
+    folder="$(the_saved_setting deploy_folder_path "$config")"
+    printf '%s\t%s\n' "${primary:-netlify}" "$folder"
+    count="$(the_saved_setting additional_deploy_targets "$config")"
     [[ "$count" =~ ^[0-9]+$ ]] || count=0
     index=0
     while [[ "$index" -lt "$count" ]]; do
@@ -964,11 +981,11 @@ the_saved_destinations() {
       # Only a TEXT type names a destination, as the Python reader and
       # deploy.ps1 read it; a number or true is passed over, not refused.
       if [[ "$(plutil -type "additional_deploy_targets.${index}.type" "$config" 2>/dev/null)" == "string" ]]; then
-        kind="$(plutil -extract "additional_deploy_targets.${index}.type" raw -o - "$config" 2>/dev/null || true)"
+        kind="$(the_saved_setting "additional_deploy_targets.${index}.type" "$config")"
       fi
-      path="$(plutil -extract "additional_deploy_targets.${index}.path" raw -o - "$config" 2>/dev/null || true)"
+      path="$(the_saved_setting "additional_deploy_targets.${index}.path" "$config")"
       if [[ -n "$kind" ]]; then
-        printf '%s\t%s\n' "$(printf '%s' "$kind" | tr '\t\n' '  ')" "$(printf '%s' "$path" | tr '\t\n' '  ')"
+        printf '%s\t%s\n' "$kind" "$path"
       fi
       index=$((index + 1))
     done
@@ -987,8 +1004,10 @@ def text(value):
     if value is None:
         return ""
     return value if isinstance(value, str) else json.dumps(value)
+def one_line(value):
+    return value.replace("\t", " ").replace("\r", " ").replace("\n", " ")
 def one(kind, path):
-    print((text(kind) or "netlify").replace("\t", " ").replace("\n", " ") + "\t" + text(path).replace("\t", " ").replace("\n", " "))
+    print(one_line(text(kind) or "netlify") + "\t" + one_line(text(path)))
 one(settings.get("deploy_target"), settings.get("deploy_folder_path"))
 extras = settings.get("additional_deploy_targets")
 if isinstance(extras, list):
