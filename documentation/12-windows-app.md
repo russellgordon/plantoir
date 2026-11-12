@@ -2705,10 +2705,14 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   since #715 a `patterns` subfolder holding `.tex` files and one `.py` -
   copied like any other file, never run by the app;
   `printablePages.agentGuidance.handoutsSkill`, 09 → "The handouts skill"
-  and "Tables, the scaffold, cards and the remembered folder (#715)") and
+  and "Tables, the scaffold, cards and the remembered folder (#715)"),
   `plantoir-unit-planning` (#707, a `template` folder of pages, two
   stylesheets and 19 `.woff2` fonts pinned by SHA-256,
-  `unitPlanning.agentGuidance`, 09 → "Unit planning (#707)"). The
+  `unitPlanning.agentGuidance`, 09 → "Unit planning (#707)") and
+  `plantoir-test-authoring` (#751, templates for a unit test's marking
+  guide and marking kit, and `scripts/check_kit.py`, which an assistant
+  runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
+  09 → "Tests, marking and report comments"). The
   handouts skill has an assistant write ONE file inside a course,
   `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
   handouts are kept), and the unit-planning skill a folder,
