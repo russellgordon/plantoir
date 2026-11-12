@@ -1444,7 +1444,8 @@ struct SidebarView: View {
             courseName: course.configuration.courseName,
             referenceCourses: ClaudeCodeLauncher.referenceCoursesToMention(
                 for: course, among: workspace.courses
-            )
+            ),
+            unitPlans: UnitPlans.toMention(for: course)
         ) {
             return
         }
@@ -1486,7 +1487,8 @@ struct SidebarView: View {
             courseName: course.configuration.courseName,
             referenceCourses: ClaudeCodeLauncher.referenceCoursesToMention(
                 for: course, among: workspace.courses
-            )
+            ),
+            unitPlans: UnitPlans.toMention(for: course)
         ) {
             return
         }

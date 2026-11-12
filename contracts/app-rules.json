@@ -3305,8 +3305,252 @@
       "that the plantoir tools are the way to do anything to do with this course",
       "that the session should start by listing the course's sections",
       "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
-      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)"
+      "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
+      "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and where they are kept, without describing them (greetingUnitPlans)"
     ],
+    "greetingUnitPlans" : {
+      "joinedAs" : "One name alone; two as 'A and B'; three to mostUnitsNamed as 'A, B and C'; past mostUnitsNamed, the first mostUnitsNamed joined by ', ' and then more, with {n} the rest.",
+      "more" : ", and {n} more",
+      "mostUnitsNamed" : 6,
+      "nameForm" : "'{unit}: {title}' when both are there (each trimmed), or whichever one is (shared-rules.json -> unitPlanning.planFile: at least one is). A name longer than unitNameMaxCharacters is cut to that many with the last one an ellipsis (…), counted as fixWith.charactersAre says.",
+      "none" : "In your first reply, also tell me in one sentence that you can help me plan a unit for this course, from a calendar across my sections to a plan page with lesson cards and assessment drafts, and that I start by asking you to plan one.",
+      "one" : "In your first reply, also remind me in one sentence that this course has a unit plan for {units}, kept in courses/{course}/.internal/planning, and do not describe what is in it.",
+      "order" : "Dated plans first, by firstClass; then the undated ones; a tie by folder name.",
+      "some" : "In your first reply, also remind me in one sentence that this course has unit plans for {units}, kept in courses/{course}/.internal/planning, and do not describe what is in them.",
+      "trail" : {
+        "none" : "told about unit planning",
+        "one" : "reminded of 1 unit plan",
+        "rule" : "Appended to the door's own trailLine, each clause after separator: none, one or several for the sentence said, then unreadable when plan files were left out (shared-rules.json -> activityTrail.mustRecord 'assistant opened').",
+        "separator" : " · ",
+        "several" : "reminded of {n} unit plans",
+        "unreadable" : "{n} plan.json could not be read"
+      },
+      "unitNameMaxCharacters" : 60,
+      "where" : "The LAST sentence of the plain greeting, after the reference-courses sentence when there is one, with one space before it, so the opening instructions keep their order. {course} is the course's code as the greeting names it. Said on the two Revise doors only, in every session: none while the course has no readable plan (Russell, 2026-11-12: every session until a plan exists), one or some once it has. Never on a course kept for reference (no door opens there), and never in fixWith's message, which replaces the greeting (Russell's ruling 4, 2026-11-01). The whole greeting's double quotes become apostrophes as greetingCarriesNoDoubleQuotes says, a plan's name included.",
+      "why" : "GitHub #707. Russell, 2026-11-01: when an outside session opens, the assistant tells the teacher unit planning is there, and once plans exist it reminds them which units have one and where they are, never what is in them. The sentences are INSTRUCTIONS to the assistant, in the teacher's voice, asking for one sentence in its first reply (707 plan review M3): a sentence in which the teacher seems to tell themselves about the feature is one the assistant was never asked to say. They point at the course's .internal/planning folder and say nothing about a Planning tab or about sharing until those exist (Russell, 2026-11-12; #708 and #709 change them). Read from each unit's plan.json at the click, a handful of small files; no tool moved, and the local model's digest is unchanged."
+    },
+    "greetingUnitPlansCases" : {
+      "cases" : [
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also tell me in one sentence that you can help me plan a unit for this course, from a calendar across my sections to a plan page with lesson cards and assessment drafts, and that I start by asking you to plan one.",
+            "trail" : " · told about unit planning"
+          },
+          "name" : "no planning folder",
+          "planningFolder" : false,
+          "plans" : [
+
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also tell me in one sentence that you can help me plan a unit for this course, from a calendar across my sections to a plan page with lesson cards and assessment drafts, and that I start by asking you to plan one.",
+            "trail" : " · told about unit planning"
+          },
+          "name" : "a planning folder with only its stylesheets",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"not a unit\"}",
+              "folder" : "assets"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has a unit plan for Unit 3: Chemical Reactions, kept in courses/SNC2D/.internal/planning, and do not describe what is in it.",
+            "trail" : " · reminded of 1 unit plan"
+          },
+          "name" : "one plan",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-08\", \"lastClass\": \"2027-02-19\", \"sections\": [\"Section 1\", \"Section 2\"], \"updated\": \"2027-02-01\"}",
+              "folder" : "unit-3"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has unit plans for Optics and Light, kept in courses/SNC2D/.internal/planning, and do not describe what is in them.",
+            "trail" : " · reminded of 2 unit plans"
+          },
+          "name" : "two undated plans, by folder name",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"title\": \"Light\"}",
+              "folder" : "unit-b"
+            },
+            {
+              "file" : "{\"title\": \"Optics\"}",
+              "folder" : "unit-a"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has unit plans for Unit 3: Chemical Reactions, Unit 5: Waves and Exam Review, kept in courses/SNC2D/.internal/planning, and do not describe what is in them.",
+            "trail" : " · reminded of 3 unit plans"
+          },
+          "name" : "three plans, by first class, the undated one last",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"title\": \"Exam Review\"}",
+              "folder" : "review"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 5\", \"title\": \"Waves\", \"firstClass\": \"2027-04-12\"}",
+              "folder" : "unit-5"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-08\"}",
+              "folder" : "unit-3"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has unit plans for Unit 1, Unit 2, Unit 3, Unit 4, Unit 5, Unit 6, and 2 more, kept in courses/SNC2D/.internal/planning, and do not describe what is in them.",
+            "trail" : " · reminded of 8 unit plans"
+          },
+          "name" : "eight plans: six named and the rest counted",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 8\", \"firstClass\": \"2026-09-01\"}",
+              "folder" : "unit-8"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 7\", \"firstClass\": \"2026-08-01\"}",
+              "folder" : "unit-7"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 6\", \"firstClass\": \"2026-07-01\"}",
+              "folder" : "unit-6"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 5\", \"firstClass\": \"2026-06-01\"}",
+              "folder" : "unit-5"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 4\", \"firstClass\": \"2026-05-01\"}",
+              "folder" : "unit-4"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"firstClass\": \"2026-04-01\"}",
+              "folder" : "unit-3"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 2\", \"firstClass\": \"2026-03-01\"}",
+              "folder" : "unit-2"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 1\", \"firstClass\": \"2026-02-01\"}",
+              "folder" : "unit-1"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has a unit plan for Unit 1: The 'Big' Ideas, kept in courses/SNC2D/.internal/planning, and do not describe what is in it.",
+            "trail" : " · reminded of 1 unit plan"
+          },
+          "name" : "a title with double quotes",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 1\", \"title\": \"The \\\"Big\\\" Ideas\"}",
+              "folder" : "unit-1"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has a unit plan for Unit 4: Energy Transformations in Everyday Devices, from Ke…, kept in courses/SNC2D/.internal/planning, and do not describe what is in it.",
+            "trail" : " · reminded of 1 unit plan"
+          },
+          "name" : "a 90-character title is cut",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 4\", \"title\": \"Energy Transformations in Everyday Devices, from Kettles to Hybrid Cars and Wind Turbines.\"}",
+              "folder" : "unit-4"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also remind me in one sentence that this course has a unit plan for Unit 3: Chemical Reactions, kept in courses/SNC2D/.internal/planning, and do not describe what is in it.",
+            "trail" : " · reminded of 1 unit plan · 1 plan.json could not be read"
+          },
+          "name" : "an unreadable plan beside a good one",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"title\": \"Chemical Reactions\"}",
+              "folder" : "unit-3"
+            },
+            {
+              "file" : "{\"unit\": \"Unit 4\",",
+              "folder" : "unit-4"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D",
+          "expect" : {
+            "sentence" : "In your first reply, also tell me in one sentence that you can help me plan a unit for this course, from a calendar across my sections to a plan page with lesson cards and assessment drafts, and that I start by asking you to plan one.",
+            "trail" : " · told about unit planning · 1 plan.json could not be read"
+          },
+          "name" : "only an unreadable plan",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 4\", \"firstClass\": \"2027-02-30\"}",
+              "folder" : "unit-4"
+            }
+          ],
+          "referenceCourse" : false
+        },
+        {
+          "course" : "SNC2D-2025",
+          "expect" : {
+            "sentence" : null,
+            "trail" : ""
+          },
+          "name" : "a course kept for reference is told nothing",
+          "planningFolder" : true,
+          "plans" : [
+            {
+              "file" : "{\"unit\": \"Unit 3\", \"title\": \"Chemical Reactions\"}",
+              "folder" : "unit-3"
+            }
+          ],
+          "referenceCourse" : true
+        }
+      ],
+      "how" : "Each case is a course folder: planningFolder says whether courses/<course>/.internal/planning exists, and each of plans is a folder in it holding plan.json with exactly `file` as its text. referenceCourse is whether the course is kept for reference. expect.sentence is the greeting's last sentence exactly, after its double quotes become apostrophes, or null for no sentence about unit planning at all; expect.trail is what the door's trailLine gains (empty for nothing). Both doors are run."
+    },
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file. Since 1.9.3 (#736) both its doors start the program DIRECTLY when it is an .exe - by argument vector, with no command interpreter and no Windows Terminal in front, in a console window of its own (Windows Terminal anyway where it is the default terminal) - and through cmd.exe /v:off /s /k when it is an npm .cmd shim, with cmd's metacharacters escaped per parse and every % followed by a quote. Until 1.9.3 the Claude door ran wt.exe -d <folder> cmd /k with a hand-joined line, which left the greeting, and the course's name in it, outside cmd's quotes; and Windows Terminal itself was measured expanding %NAME% and re-joining arguments with its own quoting, which is why it is no longer in front of either door (documentation/12-windows-app.md -> 'What the outside doors hand to Windows, and how'). The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
     "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",

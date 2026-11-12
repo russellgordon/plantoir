@@ -88,6 +88,7 @@ nonisolated enum CodexLauncher {
         courseCode: String,
         courseName: String,
         referenceCourses: [String] = [],
+        unitPlans: UnitPlans.Reading? = nil,
         greeting openingMessage: String? = nil
     ) -> Bool {
         guard let codex: String = findCodex(),
@@ -104,6 +105,7 @@ nonisolated enum CodexLauncher {
                 codexPath: codex,
                 serverPath: server,
                 referenceCourses: referenceCourses,
+                unitPlans: unitPlans,
                 greeting: openingMessage
             )
         } catch {
@@ -126,16 +128,21 @@ nonisolated enum CodexLauncher {
         codexPath: String,
         serverPath: String,
         referenceCourses: [String] = [],
+        unitPlans: UnitPlans.Reading? = nil,
         greeting openingMessage: String? = nil
     ) throws -> String {
         // The greeting is the SAME paragraph both doors send. It names no
         // product, and a teacher who tries both should get the same session.
-        // So is Fix with…'s message, when one is given (#717).
+        // So is Fix with…'s message, when one is given (#717), which says
+        // nothing about unit planning (#707).
         var prompt: String = ClaudeCodeLauncher.greeting(
-            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses
+            courseCode: courseCode, courseName: courseName, referenceCourses: referenceCourses,
+            unitPlans: unitPlans?.plans
         )
+        var said: UnitPlans.Reading? = unitPlans
         if let openingMessage {
             prompt = openingMessage.replacingOccurrences(of: "\"", with: "'")
+            said = nil
         }
 
         let scriptPath: String = try writeLauncherScript(
@@ -146,7 +153,7 @@ nonisolated enum CodexLauncher {
             prompt: prompt
         )
 
-        ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode))
+        ActivityTrail.note(.assistantOpened, trailSentence(courseCode: courseCode, unitPlans: said))
 
         return scriptPath
     }
@@ -163,6 +170,16 @@ nonisolated enum CodexLauncher {
     /// out once there is more than one door.
     static func trailSentence(courseCode: String) -> String {
         return "started Codex for \(courseCode)"
+    }
+
+    /// The same line with what the greeting said about unit planning, as
+    /// `ClaudeCodeLauncher.trailSentence(courseCode:unitPlans:)` does.
+    static func trailSentence(courseCode: String, unitPlans: UnitPlans.Reading?) -> String {
+        var line: String = trailSentence(courseCode: courseCode)
+        if let unitPlans {
+            line += UnitPlans.trailClause(unitPlans)
+        }
+        return line
     }
 
     /// The `-c` overrides that describe Plantoir's MCP server to Codex for

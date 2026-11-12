@@ -122,7 +122,7 @@
         "why": "GitHub #668. Since Cloudflare Pages is the default for every new course (app-rules.json -> publishingDestinations), the new-course window no longer stops a teacher with no Account ID; the first DEPLOY does, before anything runs. That refusal is now the ordinary path for every new teacher, and a report of 'Deploy said Cannot Deploy Yet' was answered by an empty trail. The other line is 'deploy refused: the Cloudflare Account ID in Settings is not a whole ID'. Both are pinned with the refusal itself in publishingDestinations.deployWithoutAnAccountID. Written where a window is open: the Deploy button and the assistant in that window (one path, SectionDetailView.deployAndWait). A deploy asked for by an MCP client with no window open (AssistSiteWork.deploy) is refused with the same sentence and writes NO line — named here so a report from that path is not read as the trail missing something; a refused SCHEDULE has its own sentence and is not this event either."
       },
       {
-        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report.",
+        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… add nothing: their message replaces the greeting.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
@@ -32623,5 +32623,361 @@
     },
     "trail": "One 'problems changed' line per alertKey whose changed is not empty, written by the app when it first reads the record - from a run it watched, or later, for a scheduled deploy, the assistant, the MCP server or a terminal - and remembered in the same file as the answers, so a relaunch does not write it again. It carries the counts and the KINDS, never a page. A second line of the same event records the answer to the alert (Show, the repair, or Not Now). Nothing for a tick or for opening the tab: neither changes anything.",
     "knownLimits": "The alert's count is changed.new against the previous BUILD; a deploy of an old build that is newly refused re-counts that build's own new rows beside the refusal. A section built by a copy of Plantoir from before #717 has no record until it is built again, and shows no marker meanwhile. A deploy that does not rebuild (a public/ that was already deploy-fresh) leaves the record as the build that made it wrote it. A self-check question is identified by its place (`n`), not its content (kindsRule): inserting a question above a broken one reads as one new problem and one gone, and raises the alert. A row the site adds after the build's alert was answered raises nothing (alert.rule)."
+  },
+  "unitPlanning": {
+    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan. It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and nothing else in this release. A later piece adds the course's Planning tab (#708) and sharing (#709) as sub-keys of this one.",
+    "folder": "courses/<CODE>/.internal/planning",
+    "siteLayout": {
+      "index.html": "the course's list of plans, one card per unit (from the template's index.html)",
+      "robots.txt": "two lines, User-agent: * then Disallow: /",
+      "assets/": "the stylesheets and fonts, copied whole from the template's assets/ and never edited (assetsAreThePlantoirs)",
+      "<unit-slug>/index.html": "the unit's plan page, linking ../assets/plan.css",
+      "<unit-slug>/correlation.html": "the unit's curriculum correlation page, linking ../assets/correlation.css",
+      "<unit-slug>/plan.json": "the unit's facts (planFile)",
+      "<unit-slug>/pdfs/": "copies of the unit's handouts, under their real names"
+    },
+    "assetsAreThePlantoirs": "assets/ holds the template's two stylesheets and its fonts, and belongs to Plantoir rather than to the plan: the skill copies it whole from the template and never edits a file in it or adds one beside it, so every plan in every course looks the same and a later release can refresh it. Its rules are only ever added to (appendOnly).",
+    "planFile": {
+      "name": "plan.json",
+      "keys": {
+        "unit": "text: the course's own word and number for the unit (\"Unit 3\", \"Thread 2\")",
+        "title": "text: the unit's name",
+        "firstClass": "a day written yyyy-mm-dd: the unit's first class in any section",
+        "lastClass": "a day written yyyy-mm-dd: its last",
+        "sections": "a list of text: the calendar's columns, by the names the plan uses",
+        "updated": "a day written yyyy-mm-dd: when the plan last changed"
+      },
+      "rules": "Every key is optional, but unit and title are not BOTH empty (after trimming). A key that is present and not null has its type: text, a real day in exactly the form yyyy-mm-dd (2026-11-31 is not a day), a list whose every item is text. A file that is not a JSON object, or that breaks a rule, is UNREADABLE: left out of what the app names, and counted (the trail says how many). Unknown keys are ignored, so a later release can add one. A plan is read only from a folder whose name is a unit slug (slugRules) and not one of neverSlugs; any other folder, and a unit folder with no plan.json, is not a plan and is not counted.",
+      "example": {
+        "unit": "Unit 3",
+        "title": "Chemical Reactions",
+        "firstClass": "2027-02-08",
+        "lastClass": "2027-02-19",
+        "sections": [
+          "Section 1",
+          "Section 2",
+          "A colleague's section"
+        ],
+        "updated": "2027-02-01"
+      }
+    },
+    "planFileCases": {
+      "rule": "`folder` is the unit's folder name under the planning folder; `file` is plan.json's exact text, or null for a folder with no plan.json. `expect` is read (and then `named` is the name the greeting uses, outsideAgents.greetingUnitPlans.nameForm, and `firstClass` the day read or null), unreadable (left out and counted) or ignored (not a plan, not counted).",
+      "cases": [
+        {
+          "name": "a whole plan",
+          "folder": "thread-2",
+          "file": "{\"unit\": \"Thread 2\", \"title\": \"Quadratic Relations\", \"firstClass\": \"2026-11-02\", \"lastClass\": \"2026-11-27\", \"sections\": [\"Section 1\", \"Section 2\"], \"updated\": \"2026-10-31\"}",
+          "expect": "read",
+          "named": "Thread 2: Quadratic Relations",
+          "firstClass": "2026-11-02"
+        },
+        {
+          "name": "a title only",
+          "folder": "review",
+          "file": "{\"title\": \"Exam Review\"}",
+          "expect": "read",
+          "named": "Exam Review",
+          "firstClass": null
+        },
+        {
+          "name": "a unit only, with spaces round it",
+          "folder": "unit-1",
+          "file": "{\"unit\": \"  Unit 1  \", \"firstClass\": \"2026-09-08\"}",
+          "expect": "read",
+          "named": "Unit 1",
+          "firstClass": "2026-09-08"
+        },
+        {
+          "name": "an unknown key is ignored",
+          "folder": "unit-2",
+          "file": "{\"unit\": \"Unit 2\", \"title\": \"Forces\", \"reviewer\": \"a colleague\", \"draft\": true}",
+          "expect": "read",
+          "named": "Unit 2: Forces",
+          "firstClass": null
+        },
+        {
+          "name": "a null is the key left out",
+          "folder": "unit-4",
+          "file": "{\"unit\": \"Unit 4\", \"title\": null, \"firstClass\": null, \"sections\": null}",
+          "expect": "read",
+          "named": "Unit 4",
+          "firstClass": null
+        },
+        {
+          "name": "neither unit nor title",
+          "folder": "unit-5",
+          "file": "{\"firstClass\": \"2026-11-02\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "unit and title both blank",
+          "folder": "unit-6",
+          "file": "{\"unit\": \" \", \"title\": \"\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "a unit that is not text",
+          "folder": "unit-7",
+          "file": "{\"unit\": 7, \"title\": \"Waves\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "a day that does not exist",
+          "folder": "unit-8",
+          "file": "{\"unit\": \"Unit 8\", \"firstClass\": \"2026-11-31\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "a day in another form",
+          "folder": "unit-9",
+          "file": "{\"unit\": \"Unit 9\", \"lastClass\": \"Nov 27\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "sections that are not a list",
+          "folder": "unit-10",
+          "file": "{\"unit\": \"Unit 10\", \"sections\": \"Section 1\"}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "a section that is not text",
+          "folder": "unit-11",
+          "file": "{\"unit\": \"Unit 11\", \"sections\": [\"Section 1\", 2]}",
+          "expect": "unreadable"
+        },
+        {
+          "name": "not JSON",
+          "folder": "unit-12",
+          "file": "Unit 12: Light",
+          "expect": "unreadable"
+        },
+        {
+          "name": "JSON that is not an object",
+          "folder": "unit-13",
+          "file": "[\"Unit 13\"]",
+          "expect": "unreadable"
+        },
+        {
+          "name": "the stylesheets' folder is never a unit",
+          "folder": "assets",
+          "file": "{\"unit\": \"Unit 14\"}",
+          "expect": "ignored"
+        },
+        {
+          "name": "a folder name that is not a slug",
+          "folder": "Unit 15",
+          "file": "{\"unit\": \"Unit 15\"}",
+          "expect": "ignored"
+        },
+        {
+          "name": "a unit folder with no plan.json yet",
+          "folder": "unit-16",
+          "file": null,
+          "expect": "ignored"
+        }
+      ]
+    },
+    "slugRules": {
+      "pattern": "^[a-z][a-z0-9-]{0,39}$",
+      "why": "A unit's folder name becomes part of the plan site's addresses, so it is lowercase letters, digits and hyphens, starting with a letter, 1 to 40 characters: one form both platforms read alike and every web host serves unchanged."
+    },
+    "neverSlugs": [
+      "assets",
+      "build",
+      "dist",
+      "node_modules",
+      "out",
+      "__pycache__"
+    ],
+    "neverSlugsWhy": "assets is the stylesheets' own folder. The rest are the names in neverFolderNames that do not start with a dot: a unit folder of one of those names would be left out of every backup and archive of the course (two of them cannot match the pattern anyway, and are listed so the rule reads as the archive's list).",
+    "neverFolderNames": [
+      ".merged_output",
+      "node_modules",
+      ".git",
+      ".quartz-cache",
+      ".cache",
+      "dist",
+      "build",
+      "out",
+      "__pycache__",
+      ".DS_Store"
+    ],
+    "neverFolderNamesWhy": "Exactly CourseArchiver.excludedFromArchives (and Windows' copy of it), which is matched at ANY depth: a folder of one of these names anywhere under the planning folder is silently dropped from a backup, an archive, a restore and a reference copy (707 plan review L3). The skill says so; the mac pins this list against its own (UnitPlanningContractTests).",
+    "stylesheets": {
+      "index.html": "assets/plan.css",
+      "correlation.html": "assets/correlation.css"
+    },
+    "appendOnly": "A rule in either stylesheet is never removed or renamed by a later release; changes are added at the end. Each sheet is the example page's own <style> block byte for byte (scripts/fixtures/unit_plan/), after Plantoir's comment and its @font-face rules, with ONE edit: a --ok colour token in :root and both dark blocks, and the reviewed mark's fixed green replaced by var(--ok) (Russell's ruling 2, 2026-11-01: the one change to the exact look). scripts/test_unit_plan_template.py proves the sheet equals its fixture once those are taken out, that the colour tokens and dark blocks are the same in both sheets, and that every class every shipped release defined still has a rule (scripts/fixtures/unit_plan/classes-shipped.json).",
+    "agentGuidance": {
+      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. It says nothing about a Planning tab or about sharing: those sentences arrive with #708 and #709 (Russell, 2026-11-12). The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
+      "skill": "plantoir-unit-planning",
+      "template": [
+        "template/index.html",
+        "template/robots.txt",
+        "template/assets/plan.css",
+        "template/assets/correlation.css",
+        "template/assets/fonts/OFL.txt",
+        "template/unit/index.html",
+        "template/unit/correlation.html",
+        "template/unit/plan.json"
+      ],
+      "fonts": [
+        {
+          "file": "template/assets/fonts/IBMPlexMono-Medium-Latin1.woff2",
+          "bytes": 17868,
+          "sha256": "41201b658a328b9d00368215c2f1102770f80b15952ab82631e4006255e6365d",
+          "package": "@ibm/plex-mono",
+          "version": "2.5.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexMono-Medium-Pi.woff2",
+          "bytes": 13968,
+          "sha256": "92bd18415e8c43a2569f615e4e84a94b1b1c4e0377ba9d8f4d894bbf6ffcc39d",
+          "package": "@ibm/plex-mono",
+          "version": "2.5.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexMono-Regular-Latin1.woff2",
+          "bytes": 17544,
+          "sha256": "e8993d946649b9d01abb1ed06d574b19d8ea3e66b5c3948602db335c44c18e56",
+          "package": "@ibm/plex-mono",
+          "version": "2.5.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexMono-Regular-Pi.woff2",
+          "bytes": 13780,
+          "sha256": "b8002770aa636f544ba43e124da6a227301769754f295eae26e16475b469c767",
+          "package": "@ibm/plex-mono",
+          "version": "2.5.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Medium-Greek.woff2",
+          "bytes": 9008,
+          "sha256": "aaec2cf906c26eec857f92b941f85ed14653bb21d810d9aac3b4137c55d2818c",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Medium-Latin1.woff2",
+          "bytes": 21960,
+          "sha256": "b5610af04d0d4b5a14a621d96d974b993e945a065db1a8861918f69ef9321934",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Medium-Pi.woff2",
+          "bytes": 7768,
+          "sha256": "bf05f10c977353cfb5a5c11e8973adf77c2b93a4798da3aa0dd8ba5088e12515",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Regular-Greek.woff2",
+          "bytes": 8832,
+          "sha256": "3b8a8b6b655aeba128d65b7a5904766d743574e19450b83a7185facfe285ae15",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Regular-Latin1.woff2",
+          "bytes": 20984,
+          "sha256": "b5ad7bd39f996144915f0ad9849a90183b27d8c28ad97ed98af5b1bebc51f6b1",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-Regular-Pi.woff2",
+          "bytes": 7500,
+          "sha256": "1487059829a180f975627e473acc81ff22c2c0faf1da09b314c27eeb41b7f2e4",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-SemiBold-Greek.woff2",
+          "bytes": 9072,
+          "sha256": "b262d4716b1ae6f02171ecd562c7f816e8b6d31dd0fc2f4b6cef1455f7ff84b6",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-SemiBold-Latin1.woff2",
+          "bytes": 22260,
+          "sha256": "fff0ab3a88b0b4aa0b693e4f0201359a15183b08e3fa5696d1918d8f0ade8ad5",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSans-SemiBold-Pi.woff2",
+          "bytes": 7824,
+          "sha256": "768421433d850d3a30118dddf05972625d99ee49bc32c5a8fd26bbe020c4d0f9",
+          "package": "@ibm/plex-sans",
+          "version": "1.1.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-Medium-Greek.woff2",
+          "bytes": 10024,
+          "sha256": "74b66a4bdd1c21e73131764260961ad32530e84c8e7aae9bdd5d64e6f6b5b646",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-Medium-Latin1.woff2",
+          "bytes": 23896,
+          "sha256": "3c9cce76ac4f3ced490650e2688f926e19f3da6cb49245db0a3b1c35d45c3253",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-Medium-Pi.woff2",
+          "bytes": 7708,
+          "sha256": "78de95c3ab0fbe13c37b57544985f27548f52feefd8b40d84b1d2f43ead9f110",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-SemiBold-Greek.woff2",
+          "bytes": 10216,
+          "sha256": "e96ff49b3123cda8ded88412dde21bc775e713e8b8336c85fa934a3893b4ce46",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-SemiBold-Latin1.woff2",
+          "bytes": 24016,
+          "sha256": "c1487f9484cc8f04c656f7f074724154a04fdefd2ce7ffeab653f517bb4d366d",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        },
+        {
+          "file": "template/assets/fonts/IBMPlexSerif-SemiBold-Pi.woff2",
+          "bytes": 7856,
+          "sha256": "0cb226060194ba9488edc6d5ef63881ab936aac17077b883856652d6932b3867",
+          "package": "@ibm/plex-serif",
+          "version": "2.0.0"
+        }
+      ],
+      "fontsWhy": "IBM Plex, as the example's Google Fonts link asked for it (Serif 500 and 600, Sans 400, 500 and 600, Mono 400 and 500), served from the plan's own assets so a plan opened offline, or on a host that blocks third parties, looks the same (#566). Plex's split woff2 files from the npm packages named, read from jsdelivr on 2026-11-12: for each face the Latin1 subset, the Pi subset (the check mark of the reviewed mark, arrows, <= >= != and the square root, superscript and subscript digits, the narrow no-break space French puts before ; : ! ?) and, where the family has one, the Greek subset (Mono has none). Each is its own @font-face with the subset's own unicode-range copied from Plex's CSS, so a browser fetches Pi or Greek only for a page that uses one of their characters (707 plan review M3). 19 files, 262,084 bytes; the seven Latin1 files alone are 148,528. The licence is assets/fonts/OFL.txt (SIL Open Font License 1.1, the same text in all three packages).",
+      "mentionedBy": [
+        "plantoir-handouts",
+        "plantoir-page-authoring"
+      ],
+      "why": "Russell, 2026-11-01: the plan site is 'that exact format', his own Thread 2 plan site's layout and look. The template's content is invented (an invented unit, sections called Section 1, Section 2 and A colleague's section); only the two pages' CSS came from the example, read for structure and CSS only with Russell's leave (2026-11-12).",
+      "rejected": [
+        "one merged stylesheet for both pages: the two pages' blocks differ in three shared rules (h2, h3, th) and the correlation page has a bare section rule, so one sheet cannot equal both (707 plan review H3)",
+        "one sheet scoped by a body class: every selector rewritten and one class more specific, which changes the cascade against the inline styles the patterns carry, and cannot be proven equal to the example",
+        "an inline <style> per page: copies drift, and nothing can refresh them",
+        "fonts from Google Fonts: a plan opened offline, or where the address is blocked, loses its typeface (#566)",
+        "the Latin1 subsets alone: a mathematics or science plan's <=, the square root, x squared to the fourth, H2O's subscript, pi and theta would switch typeface mid-line (707 plan review M3)",
+        "raw HTML being against plantoir-page-authoring section 22: that section is about course pages, and a plan is not one; the skill says so"
+      ]
+    },
+    "why": "Where the plan lives: under .internal in the course, because a folder whose name starts with a dot is never built (build_site.py's _is_hidden), never content for a build's freshness (BuildFreshness skips hidden files), and travels with the course in a backup, an archive and a restore, as handouts.json and the timetable do.",
+    "rejected": [
+      "the plan beside the course's handouts folder, outside the course: the website builder's container cannot see it, and it would not travel with the course",
+      "the plan in the course's visible folders: everything there that is not a page is copied to the students' site",
+      "a plan the app renders from JSON, or a Quartz site: Russell asked for the example's exact format, which a plain static site reproduces and a Quartz site does not",
+      "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
+    ]
   }
 }
