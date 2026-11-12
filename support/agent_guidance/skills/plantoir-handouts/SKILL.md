@@ -272,12 +272,14 @@ the two copies line up).
   way or by substituting it back. An answer key with one wrong answer costs
   the teacher a class.
 - **A newly written question set** (a new test, a rewrite, a practice
-  set, a day's cards and exercise) goes through four steps. Build it; then
+  set, a lesson's materials) goes through four steps. Build it; then
   a separate agent from the one that wrote it reviews it, for fit to what
   the teacher asked, re-solving every answer from scratch and checking
-  every hint; then a coherence pass by you, the lead: the cards flow to one
-  idea, the summary is accurate and complete, and the exercises stay on the
-  day's topic; then any question that changed goes back to the reviewer.
+  every hint; then a coherence pass by you, the lead, against what the
+  teacher asked (where the set has task cards and a summary, the cards
+  lead where the teacher wants them to and the summary is accurate and
+  complete; an exercise stays on its topic); then any question that
+  changed goes back to the reviewer.
   Fix what it finds before the final compile. If you cannot start a second
   agent, say plainly that the questions have not had that second check.
 - **Adapting a textbook page**: renumber the questions that are kept.
@@ -480,19 +482,23 @@ The same figure goes on a page as a ` ```tikz ` fence:
 
 ## 11. Task cards
 
-Each group has four empty Cartesian-plane templates on its whiteboard.
+These rules hold whenever a teacher asks for task cards. How the cards are
+used in class (alone, in pairs, in groups, at desks or at whiteboards) is
+the teacher's (section 13).
 
 - A card never says "on the same axes", "on the same grid" or "on one
   grid": every relation it asks students to plot or sketch goes on its
   own grid, and comparing is side by side ("put it beside your graph of
   $y = x^2$ and compare").
-- A card set asks a group for **at most four graphs in total**, counting
-  the sketch prompts for a group that finishes early.
+- When groups work at whiteboards with four empty Cartesian-plane
+  templates each, a card set asks a group for **at most four graphs in
+  total**, counting the sketch prompts for a group that finishes early.
 - A table on a card has a full border, as every table does (section 9).
 - Where a card compares width or steepness, a printed graph uses the same
   unit length on both axes (`x=0.42cm, y=0.42cm` on the `axis`, as the
   starter's graph does), so a narrower parabola looks narrower.
-- What the cards ask, and in what order, is in section 13.
+- How the cards are written (one ask each, core before extension) is in
+  section 13.
 - A page that discusses the cards repeats each card's wording word for
   word.
 
@@ -548,11 +554,13 @@ same grid the question copy gives (section 3).
 
 ## 13. Lesson materials: warmups, task cards, summaries, exercises
 
-A day's resources often come as a set: a warmup, task cards (and a
-Discussion page that mirrors them), a summary, and an exercise. The rules
-in this section hold for every teacher. How the lesson is RUN - the shape
-of a warmup, whether students work in groups and where, whether every
-exercise has hints, what the homework is - belongs to the teacher.
+A teacher may ask for a warmup, task cards (and a Discussion page that
+mirrors them), a summary, an exercise, or any mix of these. Make what they
+ask for. When you make one of these, the rules below hold, and each one
+applies only when the lesson has the thing it names. How the lesson is RUN
+(the shape of a warmup, whether there are task cards at all, whether
+students work in groups and where, whether an exercise has hints, what the
+homework is) belongs to the teacher.
 
 ### Whose way of teaching
 
@@ -574,44 +582,46 @@ exercise has hints, what the homework is - belongs to the teacher.
    their How I Teach page. Name it as one teacher's approach, use it only
    after they say yes, and only where their How I Teach page does not say
    otherwise. If you cannot tell whether they have shown that interest, do
-   not offer it.
+   not offer it. Nothing in the template is a rule for anyone else.
 
 ### Task cards
 
-One class builds one big idea. The cards are a progression of small steps
-that lead students to it, not a set of unrelated questions. One ask per
-card: a card never holds four or five parts, and a short "check it" line is
-the most it may add. Core cards come first, then extension cards, marked as
-extensions. Section 11 has the rules for graphs and tables on cards.
+When a lesson uses task cards, every card serves the idea the teacher wants
+students to reach. One ask per card: a card never holds four or
+five parts, and a short "check it" line is the most it may add. Core cards
+come first, then extension cards, marked as extensions. Section 11 has the
+rules for graphs and tables on cards.
 
 ### Summary
 
-A summary states what the core cards built: accurately, completely, and
-nothing the cards did not reach. Where a picture explains better than
-algebra, use the picture: for example, why the steps of $y = x^2$ go 1, 3,
-5, shown as a staircase on the graph beside squares that grow by L-shaped
-layers.
+When a lesson has a summary, it states what the lesson built (its core
+cards, when it has them): accurately, completely, and nothing the lesson
+did not reach. Where a picture explains better than algebra, use the
+picture: for example, why the steps of $y = x^2$ go 1, 3, 5, shown as a
+staircase on the graph beside squares that grow by L-shaped layers.
 
 ### Exercise
 
-An exercise follows from that day's cards and summary, stays on the day's
-topic, and needs nothing from a later day.
+Unless the teacher asks for something else (a review across several
+lessons, say), an exercise stays on the topic of the lesson it belongs to
+and needs nothing from a later lesson.
 
 ### Hints
 
-Whenever an exercise has hints (always, in the template; otherwise when the
-teacher wants them):
+Whether an exercise has hints is the teacher's choice. When it has them:
 
-- They come on paper as well as on the page: `Name.pdf`, `Name - Hints.pdf`
-  and `Name - Answers.pdf`, from one source (section 3, `\hint`).
 - **A hint never gives the answer or a pointed first step.** It points back
-  to where the idea was built: a card from the same day by its number
-  ("Look back at Card 4."), or an earlier day's summary by its title, never
-  an internal label such as a day number.
+  to where the idea was built, by a name the student can find: a card by
+  its number ("Look back at Card 4."), a worked example, or an earlier
+  summary by its title, never an internal label such as a day number.
+- When the teacher wants the hints on paper, they come as
+  `Name - Hints.pdf` beside `Name.pdf` and `Name - Answers.pdf`, from the
+  same source (section 3, `\hint`).
 
-### When in doubt, go shorter
+### When the length is not given, go shorter
 
-Drop what is not essential rather than fill a class.
+When the teacher has not said how long a piece should be, drop what is not
+essential rather than fill the class.
 
 ### The template: one teacher's approach, for lessons students can catch up on
 
@@ -624,17 +634,22 @@ way of teaching" says, and never as Plantoir's rule.
   to today's idea, like a movie trailer: it asks, and it never teaches or
   names the new idea. No "recap" or "preview" labels, no bold run-in labels
   on the questions, and never a full recap of the last class.
+- **One big idea per class.** The day's task cards are a progression of
+  small steps that lead groups to it, and the summary states what the core
+  cards built.
 - **Task cards** are done in groups of three or four, chosen visibly at
-  random, at vertical whiteboards. One set of groups for the whole class,
-  never re-grouped part way through.
-- **Every exercise has hints**, on the page and on paper, so a student who
-  missed the class can work through it alone.
+  random, at vertical whiteboards with four empty Cartesian-plane templates
+  each. One set of groups for the whole class, never re-grouped part way
+  through.
+- **The exercise follows from that day's cards and summary.**
+- **Every exercise has hints**, on the page and on paper (`Name.pdf`,
+  `Name - Hints.pdf` and `Name - Answers.pdf`), so a student who missed the
+  class can work through it alone.
 - **Finishing the exercise is the only homework.**
 
 ## 14. Wording and contexts
 
-Many students are learning English, and a class may come from many
-countries.
+Write so that a student who is still learning English can follow.
 
 - Around the terms the class was taught, use short sentences in the present
   tense, and name the thing rather than writing "it" or "this".

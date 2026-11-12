@@ -4186,7 +4186,8 @@ assistant is told to write and what the ready-made courses hold.
   message, inside the SAME ````markdown fence, so 6n's one claim still
   matches one example and 6o still finds the wrapper on one example page;
   6n now counts two wrappers there, so the commit-message block cannot be
-  deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
+  deleted unnoticed. Section 23 ("Do not", section 22 until #765 added
+  "Lesson pages" before it) repeats it in one bullet.
   `plantoir-printing` says a text block prints wrapped either way and still
   asks for the flag, so it wraps on screen.
 - **The pins.** The binding sentences are listed in `contracts/shared-rules.json`

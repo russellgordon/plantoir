@@ -3873,25 +3873,35 @@ settled on 2026-11-10 while building a day's resources (a warmup, task
 cards, a summary, an exercise). The handouts skill gains section 13,
 "Lesson materials", and section 14, "Wording and contexts"; the
 page-authoring skill gains section 22, "Lesson pages", which points at them
-so the rules are written once (its "Do not" and "Check it" became 23 and
-24, and the unit-planning skill's one reference to "section 22" moved with
-them). What holds for every teacher: one big idea per class, built by task
-cards with one ask each, core before extension; a summary of exactly what
-the cards built, with a picture where it explains better; an exercise on
-the day's topic that needs nothing from a later day; hints, whenever there
-are any, that point back to a card or a summary by name and never give the
-answer or a pointed first step; plain wording for students learning
-English, contexts anyone can picture, and invented contexts never about
-firearms or ammunition; equal unit lengths on a card's graph where width or
-steepness is the point; the `Adapted from` line, never on an assessment;
-and the four-step review in section 7 (build, a separate reviewer
-re-solving every answer and checking every hint, the lead's coherence pass,
-any changed question back to the reviewer). What belongs to the teacher is
-how the lesson is RUN: the course's How I Teach page comes first, and
-otherwise the teacher's request. Russell's own shape (the warmup as two or
-three questions whose last is a "movie trailer" lead-in, visibly random
-groups of three or four at vertical whiteboards, hints on every exercise,
-finishing the exercise as the only homework) is written as a template that
+so the rules are written once. Its "Do not" and "Check it" became 23 and
+24, and the two references to the old section 22 moved with them: the
+unit-planning skill's, and `unitPlanning.rejected` in the contract (the
+second was missed at first, and the implementation review's M1 found it).
+Every rule outside the template applies only when the lesson has the thing
+it names, and nothing assumes a lesson has task cards, a summary, groups or
+hints. When a lesson uses task cards: one ask per card, core before
+extension, every card serving the idea the teacher wants. When it has
+a summary: exactly what the lesson built, with a picture where it explains
+better. An exercise stays on its lesson's topic unless the teacher asks for
+something else. Whether there are hints is the teacher's choice; when there
+are, a hint points back by a name the student can find and never gives the
+answer or a pointed first step, and a hints sheet on paper is made when the
+teacher wants one. Unconditional, because each is a mechanic of making and
+checking a handout rather than a way of teaching: the four-step review in
+section 7 (build, a separate reviewer re-solving every answer and checking
+every hint, the lead's coherence pass against what the teacher asked, any
+changed question back to the reviewer), the `Adapted from` line (never on
+an assessment), equal unit lengths on a printed graph where width or
+steepness is the point, plain wording a student still learning English can
+follow, and invented contexts never about firearms or ammunition. What
+belongs to the teacher is how the lesson is RUN: the course's How I Teach
+page comes first, and otherwise the teacher's request. Russell's own shape
+(the warmup as two or three questions whose last is a "movie trailer"
+lead-in, one big idea per class built by a progression of task cards,
+visibly random groups of three or four at vertical whiteboards, the
+exercise following from that day's cards and summary, hints on every
+exercise on the page and on paper, finishing the exercise as the only
+homework) is written as a template that
 is OFFERED, never applied, and only to a teacher who has shown an interest
 in bridging constructivist and Thinking Classrooms practice with a school
 where students often miss class (sports, weather, illness, field trips and
@@ -3927,7 +3937,14 @@ points at the handouts skill instead); "no winter sports or sports played
 in one region" for every class (one school's context; it is kept only for a
 class with many students learning English or from many countries); and a
 `> [!hint]- Hint` pin in `mustSay` (the phrase was already in the
-page-authoring skill, so it proved nothing).
+page-authoring skill, so it proved nothing). Also rejected, on the
+implementation review (HIGH 1): the first wording of section 13, which
+said its rules "hold for every teacher" and so carried "one class builds
+one big idea", an exercise that follows from the day's cards and summary,
+hints always on paper as well as on the page, a coherence pass that the
+cards flow to one idea, and section 11's groups at whiteboards to a teacher
+who had shown no interest in the template. Each moved into the template or
+became conditional on the lesson having the thing it names.
 
 Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
 refinement) now carries these rules - the centred box for a column with a
