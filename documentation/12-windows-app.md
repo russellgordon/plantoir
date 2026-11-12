@@ -5818,9 +5818,9 @@ the whole table).
   never assumed).
   - It lives at `AppDataRoot\toolchain-index\<FolderContainers.FolderIdentifier>.hashes`,
     so the teacher never sees it, it does not travel with a copied folder,
-    and a `--state-dir` run keeps its own. Like `builds\<id>`, one index
-    (about 2 MB) accumulates per folder id and nothing deletes it; accepted,
-    since a working folder is rarely abandoned and the cost is a file.
+    and a `--state-dir` run keeps its own. One index (up to about 2 MB)
+    accumulates per folder id; until #735 (Windows 1.9.3) nothing deleted
+    one. "Pruning the index (#735)" below says what removes them now.
   - It is written whole (a temporary file, then a rename), and only when the
     pass failed nothing and the index changed.
 - **The comparison** (`MirrorPass`). Length and time equal → identical, as
@@ -5853,6 +5853,78 @@ the whole table).
   script in place).
 - **`AgentGuidance`'s skills** go through `SyncDirectory` with no manifest,
   so they take exactly the pre-#559 path.
+
+#### Pruning the index (#735, Windows 1.9.3; the mac's #683)
+
+The mac's reasoning, the race and what was rejected are in
+`documentation/09-mac-app.md` → "Pruning the index (#683)"; Windows matches
+it, plus one rule the mac does not have (an index the settings still name is
+never removed by age, below). What is different here, and what to know:
+
+- **Every pass marks its folder's index USED** (`ToolchainMirror.MarkIndexUsed`,
+  the write time set to now) right after `RefreshToolchain` READS it, whether
+  or not the pass rewrites it. A pass with nothing to change never rewrites
+  the index, so without the mark a folder opened every day would look unused
+  after ninety. Not the last-access time: on this PC
+  `fsutil behavior query disablelastaccess` answers 2 (system managed,
+  enabled), but NTFS updates it lazily (up to an hour late) and a volume can
+  have it turned off, so it is not something to depend on. Nothing else reads
+  the index's own time.
+- **Once a launch**, in `App.OnLaunched` straight after the builds sweep and
+  inside `Task.Run`, so off the UI thread, `ToolchainMirror.PruneIndexes(folder, nowUtc, keep)`
+  removes every `*.hashes` unused for more than 90 days and every
+  `<id>.hashes.<pid>.tmp` (`WriteFingerprints`' temporary file, left only by
+  an interrupted write) more than a day old. Plain files at the top of the
+  folder only: a folder, a link, a file under a subfolder or any other name is
+  left alone. The folder is an argument with NO default
+  (`ThePruneHasNoDefaultFolder` checks by reflection), and the app passes
+  `ToolchainMirror.IndexFolder`. It writes a line to `startup.log` when it
+  removed something, and no trail line: a teacher cannot see a cache.
+- **An index the app still knows is never removed by AGE** (the final
+  sweep's case). `keep` is `ToolchainMirror.IndexIdsToKeep(AppSettings.DefaultPath)`:
+  the index ids of every folder the settings name (the last working folder,
+  the remembered windows and Open Recent, kept even when the folder is not
+  there just now). The reason: before 1.9.3 nothing marked an index used, and
+  a pass with nothing to change never rewrote it, so on the first 1.9.3
+  launch an index's write time is the date of its folder's last toolchain
+  CHANGE, not its last use. A teacher who opens a folder every day and
+  installs 1.9.3 more than 90 days after that change would otherwise have
+  the launch prune, racing the window's first mirror pass, remove the index
+  before the pass marks it, and pay a full read of every copy that morning
+  (about 100 s cold for `.toolchain\support` on the i5-8365U, measured by
+  #749's review). The same holds on any later launch for a folder the
+  settings name but nobody has opened for 90 days. The settings are read
+  directly rather than through `AppSettings.Load`, which answers fresh
+  defaults for a file it cannot read: when the file is missing or cannot be
+  read, `keep` is null and NO index is removed by age that launch (a
+  `startup.log` line says so). Leftover temporary files go by age either
+  way. A known folder that is gone is the builds sweep's to remove, below.
+  Tests: `AKnownFoldersIndexIsKeptHoweverOld`,
+  `UnreadableSettingsKeepEveryIndexButNotOldTemporaries`,
+  `TheKeepSetIsEveryFolderTheSettingsName`.
+- **The builds sweep takes the index with the builds.**
+  `BuildOutputLocation.DiscardBuildsForMissingWorkingFolders` deletes
+  `toolchain-index\<entry's name>.hashes` when it deletes `builds\<entry>`,
+  by the entry's NAME, never by hashing the recorded path again (that resolves
+  through a folder that no longer exists). The index folder defaults to
+  `toolchain-index` BESIDE the builds parent it was given, which in the app is
+  `ToolchainMirror.IndexFolder`, so a test passing its own builds parent never
+  reaches the real one (`AGoneFoldersIndexGoesWithItsBuilds`).
+- **The trap the issue named is already closed.** #735 said
+  `ToolchainFingerprintTests` write to the REAL `AppDataRoot`. They no longer
+  do: since #285 `TestAppDataRedirect` redirects `AppDataRoot` to a scratch
+  folder for the whole test process, before any test. So, as on the mac, a
+  test compares the folder the app prunes with the REAL one, built from the
+  system's own answer for `%LOCALAPPDATA%` rather than from `AppDataRoot`, so
+  that it can fail (`APruneUnderTheSuiteNeverReachesTheRealIndexFolder`). The
+  prune itself is tested only against a temporary folder, and the suite never
+  runs `OnLaunched`.
+- **Measured** on the Lenovo 20QES70500 (i5-8365U, 16 GB, Windows 11 Pro
+  26200), 2026-11-11, read only: the real `toolchain-index` holds 2 indexes of
+  2,011,308 bytes and 12,932 lines each (a full index, the manifest's size),
+  both last written 2026-10-31, both with a builds folder; one names a working
+  folder that exists, the other's builds folder carries no marker. Nothing the
+  prune would remove yet. Nothing here was timed: the prune lists one folder.
 
 **A test of the mirror must never depend on two writes landing in different
 clock ticks (#673).** Equal length plus times within 2 ms is the fast path,

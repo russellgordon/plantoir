@@ -9505,12 +9505,21 @@ their indexes go by age.
   ever open again.
 
 **Windows** has the same index (`ToolchainMirror.IndexPathFor` →
-`AppDataRoot\toolchain-index\<id>.hashes`) and the same leak; its issue
-carries the mark, the 90 days, the `.tmp` sweep, removal with its own builds
-sweep (`DiscardBuildsForMissingWorkingFolders`), and the one trap there:
-its `ToolchainFingerprintTests` write to the real `AppDataRoot`, so a prune
-must not run in that test host. NTFS last-access times are unreliable too,
-so it must mark the file explicitly.
+`AppDataRoot\toolchain-index\<id>.hashes`) and had the same leak until
+Windows 1.9.3 (#735), which matches all of this: the mark at read time, the
+90 days, the `.tmp` sweep, and removal with its own builds sweep
+(`DiscardBuildsForMissingWorkingFolders`). It adds one rule: an index whose
+folder the settings still name is never removed by age, because before the
+mark existed an index's write time was its folder's last toolchain CHANGE,
+not its last use, and the launch prune could otherwise take the index of a
+folder opened every day before that day's first pass marks it. The mac has
+the same first-launch case after #683 and pays it in about a second (the
+0.95 s full read above), so it needs nothing; on the i5-8365U the same read
+of `.toolchain\support` is about 100 s cold, which is why Windows keeps
+known folders. The trap this paragraph used to
+name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
+already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
+→ "Pruning the index (#735)" has the Windows details.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
