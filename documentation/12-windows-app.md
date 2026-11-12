@@ -11915,29 +11915,57 @@ apply.
 **What cannot be closed, and what is partly closed now.** The last look is at
 `ssInstall`, milliseconds before `[InstallDelete]`. Work that starts AFTER
 it, during the three to five minutes `[Files]` takes, is not seen by the
-installer. A scheduled deploy firing then is the likely one, and it is now
-partly covered: at `ssInstall`, after its last look, the installer writes
-`installing.<its pid>` in the state folder, and removes it at `ssPostInstall`
-and in `DeinitializeSetup` (so a failed or cancelled install cannot leave
-it). `ScheduledRun` waits while a live one is there, in the same ten-minute
-window and on the same clock as its wait for a tools copy (#477), takes no
-lease meanwhile, and writes "waited N s for a new version of Plantoir to
-finish installing (process P), and went ahead" — or stands down at ten
-minutes. A marker whose process is gone, or whose pid now belongs to a
-process started after the marker was written, is stale and deleted
-(`AppUpdates.LiveInstaller`). **It helps only if the `Plantoir.exe` that
-starts is whole:** one started while `[Files]` is replacing it may fail to
-start at all, and the task records nothing, which nothing here prevents; and
-a launcher typed by hand at that moment still runs a half-copied runtime.
-Pausing Plantoir's scheduled tasks for the install was rejected (plan,
-2026-11-11): a task the installer disabled stays disabled if setup dies part
-way, which is worse than one missed run. Why the marker is in the state
-folder and not beside the tools-copy markers in
-`<working folder>\courses\.internal\activity`: the installer does not know
-which working folders exist, and a scheduled run reads the same state
-folder as the app that set it. This is case E of the morning measurement
-below.
+installer. A scheduled deploy firing then is the likely one. At `ssInstall`,
+after its last look, the installer writes `installing.<its pid>` in the state
+folder, and removes it at `ssPostInstall` and in `DeinitializeSetup` (so a
+failed or cancelled install cannot leave it). **A scheduled run that finds a
+live one stands down AT ONCE** — `Program.Main` asks before it loads anything
+a run does not need (no notification is posted, since that loads more of the
+files being replaced), and `ScheduledRun.Execute` checks it first: the run is
+recorded and turned off the way every stood-down run is
+(`CouldNotRunAsSetNow`, the contract's own `wrapperCouldNotBeWritten`
+sentence, so the section's band says it did not run and to deploy it or
+schedule another), and the trail says "did not run: a new version of
+Plantoir was being installed (process P), so it stood down at once and left
+the site as it was". It does NOT wait. The first build of this piece waited,
+and the third review found the fault in that: while the run lives it holds
+`Plantoir.exe`'s own image, so when `[Files]` reached that file the copy
+failed "in use", the silent install aborted, and the rollback after
+`[InstallDelete]` left the broken install of case B. The harness shows both
+sides (`scheduled-during-copy`, `scheduled-that-waits-breaks-it`).
 
+A marker is stale, deleted and counted for nothing (`AppUpdates.LiveInstaller`),
+when it is older than an hour (`[Files]` takes 3 to 5 minutes; the whole
+1.9.0 → 1.9.3 install took 277 s), its process is gone, its pid now belongs
+to a process started after the marker was written, or that process cannot be
+read at all. The last was the third review's finding: as the ordinary user,
+`Process.GetProcessById(pid).HasExited` throws access-denied for a SYSTEM
+process, and the first build read that as "cannot tell: assume live", so a
+setup killed (or a power cut) between `ssInstall` and `DeinitializeSetup`,
+followed by Windows giving the pid to a SYSTEM process, would have held back
+every scheduled deploy for ever. Setup runs as the teacher, so its own process
+can always be read: unreadable means it is not the installer.
+
+**The 1.9.0 → 1.9.3 upgrade itself is NOT protected against this.** The
+scheduled run that fires during that copy is 1.9.0's code, which knows
+nothing of the marker; it starts, holds `Plantoir.exe`, and the install can
+end as case B did (exit 5, a broken install). Only upgrades FROM 1.9.3 on are
+protected. How likely: a scheduled deploy is one minute, and the copy is 3 to
+5 minutes, so it needs a deploy set inside that window on the night or
+morning the teacher updates. So the 1.9.3 release notes keep ONE "before you
+update" line: let a scheduled deploy that is about to run finish first.
+
+**It helps only if the `Plantoir.exe` that starts is whole:** one started
+while `[Files]` is replacing it may fail to start at all, and the task records
+nothing, which nothing here prevents; and a launcher typed by hand at that
+moment still runs a half-copied runtime. Pausing Plantoir's scheduled tasks
+for the install was rejected (plan, 2026-11-11): a task the installer
+disabled stays disabled if setup dies part way, which is worse than one
+missed run. Why the marker is in the state folder and not beside the
+tools-copy markers in `<working folder>\courses\.internal\activity`: the
+installer does not know which working folders exist, and a scheduled run
+reads the same state folder as the app that set it. This is case E of the
+morning measurement below.
 **The assistant's engine in the bundle.** The signed 1.9.0 installer carries
 no `llama\` folder: the night's measurement found that a clean install of it
 has no assistant engine, and the owner's PC had one only because an older
@@ -11948,7 +11976,7 @@ signed `llama-server.exe` only if present, and `RELEASING.md` never named
 `Vendor\llama`, and again on the published `llama\` before the installer is
 compiled — when any of `llama-server.exe` and what it loads is missing
 (`llama-server-impl.dll`, `llama.dll`, `llama-common.dll`, `mtmd.dll`,
-`ggml.dll`, `ggml-base.dll`, read from the binaries' imports, plus
+`ggml.dll`, `ggml-base.dll`, and `libomp140.x86_64.dll` (LLVM's OpenMP runtime, which `ggml-base` and every CPU backend import; added after the third review), read from the binaries' PE import tables, plus
 `ggml-vulkan.dll` and `ggml-cpu-x64.dll`, the two backends the app relies on:
 Vulkan first, the CPU after). `-WithoutAssistantEngine` builds without it for
 a developer and is refused with `-Sign`. `fetch-llama.ps1` now pins the zip:

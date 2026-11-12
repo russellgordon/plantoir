@@ -205,7 +205,7 @@ public static class AppUpdates
         if (utcNow - written > NotInstalledMarkerLongestAge) return null;
         if (lines.Length < 2 || !Version.TryParse(lines[0].Trim(), out var waiting)) return null;
         if (Normalised(waiting) <= Normalised(running)) return null;
-        return NotInstalledSentence(lines[1].Trim(), lines[0].Trim());
+        return NotInstalledSentence(lines[1].Trim(), Spell(waiting));
     }
 
     private static Version Normalised(Version v) => new(v.Major, v.Minor, Math.Max(v.Build, 0));
@@ -225,21 +225,26 @@ public static class AppUpdates
     /// <c>installing.&lt;pid&gt;</c> in the state folder: written by the
     /// installer at ssInstall, once its last look found nothing running, and
     /// deleted at ssPostInstall and in DeinitializeSetup. A scheduled run that
-    /// starts while it is there waits (<see cref="ScheduledRun"/>), as it waits
-    /// for a tools copy.
+    /// starts while it is there stands down AT ONCE (<see cref="ScheduledRun"/>):
+    /// waiting would hold Plantoir.exe while the installer replaces it.
     /// </summary>
     public const string InstallingMarkerPrefix = "installing.";
 
     /// <summary>
     /// The pid of a LIVE installer with a marker in the state folder, or null.
-    /// A marker whose process is gone, or whose pid now belongs to a process
-    /// started AFTER the marker was written (the id reused), is stale: deleted
-    /// and counted for nothing, so a killed installer never holds a scheduled
-    /// deploy back.
+    /// Stale — deleted and counted for nothing, so a killed installer never
+    /// holds a scheduled deploy back — when the marker is older than
+    /// <see cref="InstallingMarkerLongestAge"/>, its process is gone, its pid
+    /// now belongs to a process started AFTER the marker was written (the id
+    /// reused), or that process cannot be read at all. The last is the
+    /// review's case: setup runs as the teacher, so its own process can always
+    /// be read, and "access denied" (a SYSTEM process that took the pid after
+    /// setup was killed or the power went) means it is NOT the installer.
     /// </summary>
-    public static int? LiveInstaller(string stateFolder, Func<int, DateTime?>? startOf = null)
+    public static int? LiveInstaller(string stateFolder, Func<int, DateTime?>? startOf = null, DateTime? utcNow = null)
     {
         startOf ??= StartTimeUtc;
+        DateTime now = utcNow ?? DateTime.UtcNow;
         List<string> markers;
         try { markers = Directory.EnumerateFiles(stateFolder, InstallingMarkerPrefix + "*").ToList(); }
         catch (Exception) { return null; }
@@ -248,12 +253,23 @@ public static class AppUpdates
             if (!int.TryParse(Path.GetFileName(marker)[InstallingMarkerPrefix.Length..], out int pid) || pid <= 0) continue;
             DateTime written;
             try { written = File.GetLastWriteTimeUtc(marker); } catch (Exception) { continue; }
-            if (startOf(pid) is { } started && started <= written.AddSeconds(2)) return pid;
+            DateTime? started;
+            try { started = startOf(pid); } catch (Exception) { started = null; }
+            bool young = now - written <= InstallingMarkerLongestAge;
+            if (young && started is { } s && s > DateTime.MinValue && s <= written.AddSeconds(2)) return pid;
             try { File.Delete(marker); } catch (Exception) { }
         }
         return null;
     }
 
+    /// <summary>
+    /// An installing marker older than this is stale whatever its pid says:
+    /// [Files] takes three to five minutes on the build PC (277 s for the whole
+    /// 1.9.0 → 1.9.3 install, 2026-11-12), so an hour is far past any real copy.
+    /// </summary>
+    public static readonly TimeSpan InstallingMarkerLongestAge = TimeSpan.FromHours(1);
+
+    /// <summary>The process's start (UTC), or null when it is gone OR cannot be read.</summary>
     private static DateTime? StartTimeUtc(int pid)
     {
         try
@@ -262,8 +278,7 @@ public static class AppUpdates
             if (process.HasExited) return null;
             return process.StartTime.ToUniversalTime();
         }
-        catch (ArgumentException) { return null; }               // no such process: stale
-        catch (Exception) { return DateTime.MinValue; }          // cannot tell: assume live
+        catch (Exception) { return null; }   // gone, or another account's (access denied): not the teacher's installer
     }
 
     /// <summary>

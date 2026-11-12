@@ -37,11 +37,13 @@ Set-Location $PSScriptRoot
 # installer with no assistant engine, and an upgrade hid it (Inno never
 # deletes an older install's llama\ files). Measured 2026-11-12 (#700).
 # What llama-server.exe loads, read from its imports and llama.cpp's backend
-# loader: its -impl DLL, llama, llama-common, mtmd, ggml, ggml-base, and at
-# least the Vulkan backend and the generic CPU one (the app runs it with
-# --n-gpu-layers 999 and falls back to the CPU).
+# loader: its -impl DLL, llama, llama-common, mtmd, ggml, ggml-base, LLVM's
+# OpenMP runtime (libomp140.x86_64.dll, which ggml-base and every CPU backend
+# import), and at least the Vulkan backend and the generic CPU one (the app
+# runs it with --n-gpu-layers 999 and falls back to the CPU). The import tables
+# were read from the PE headers of b10435's files (#700 third review).
 $AssistantEngineFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama.dll', 'llama-common.dll', 'mtmd.dll',
-                          'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'ggml-cpu-x64.dll')
+                          'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'ggml-cpu-x64.dll', 'libomp140.x86_64.dll')
 function Get-MissingAssistantEngineFiles([string]$folder) {
     $missing = @()
     foreach ($name in $AssistantEngineFiles) {

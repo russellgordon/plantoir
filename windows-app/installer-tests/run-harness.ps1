@@ -390,18 +390,27 @@ $cases['open-at-start'] = {
     [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 7) -and $copies -eq 1 -and -not $app.HasExited -and (Get-MarkerReason) -eq 'work'); Detail = "exit $($r.Exit) in $($r.Seconds) s; Plantoir copies started: $copies; marker: $(Get-MarkerReason)" }
 }
 
-# A scheduled-shaped program started DURING the copy waits for the installing marker.
+# A scheduled run of the installed Plantoir.exe started DURING the copy: it
+# sees the installing marker and exits at once, so the copy completes.
 $cases['scheduled-during-copy'] = {
     param($setup)
     Install-Version1
-    $r = Invoke-Version2 $setup "$updateArgs $returnTo `"/HARNESSSCHEDULED=$standIn`"" 'scheduled-during-copy'
-    for ($i = 0; $i -lt 40 -and -not (Get-Started | Where-Object { $_ -like 'WAITED*' }); $i++) { Start-Sleep -Milliseconds 250 }
-    $waited = @(Get-Started | Where-Object { $_ -like 'WAITED*' }) | Select-Object -First 1
-    $ms = if ($waited) { [int](($waited -split "`t")[1]) } else { -1 }
-    $saw = $waited -match 'SAW\tTrue'
-    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 0) -and (Test-IsV2) -and $saw -and $ms -ge 3000); Detail = "exit $($r.Exit) in $($r.Seconds) s; the scheduled-shaped run saw the installing marker: $saw and waited $ms ms" }
+    $r = Invoke-Version2 $setup "$updateArgs $returnTo /HARNESSSCHEDULED=--stand-down-if-installing" 'scheduled-during-copy'
+    $line = @(Get-Started | Where-Object { $_ -like 'STOODDOWN*' -or $_ -like 'RAN*' }) | Select-Object -First 1
+    $fromApp = $line -match [regex]::Escape("$appDir\Plantoir.exe")
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -eq 0) -and (Test-IsV2) -and ($line -like 'STOODDOWN*') -and $fromApp); Detail = "exit $($r.Exit) in $($r.Seconds) s; the run from {app}\Plantoir.exe ($fromApp) stood down at once: $($line -like 'STOODDOWN*'); tree is version 2: $(Test-IsV2)" }
 }
 
+# MUST-FAIL for the above: the same run behaving as it did before the third
+# review (it WAITS while the marker is there) holds Plantoir.exe's image while
+# [Files] must replace it: the copy fails "in use" and the silent install aborts.
+$cases['scheduled-that-waits-breaks-it'] = {
+    param($setup)
+    Install-Version1
+    $r = Invoke-Version2 $setup "$updateArgs $returnTo /HARNESSSCHEDULED=--wait-while-installing" 'scheduled-that-waits-breaks-it'
+    $inUse = Select-String -Path $r.Log -Pattern 'Plantoir\.exe' -Context 0,3 | Where-Object { $_.Context.PostContext -match 'in use' } | Select-Object -First 1
+    [PSCustomObject]@{ Pass = [bool](($r.Exit -ne 0) -and -not (Test-IsV2) -and $inUse); Detail = "exit $($r.Exit) in $($r.Seconds) s (went wrong as the review said: the copy of Plantoir.exe met it in use: $([bool]$inUse)); tree is version 2: $(Test-IsV2)" }
+}
 # ---- Must-fail: break one rule, and the case it protects goes wrong -----------------
 $mustFails = @(
     @{ Name = 'no check at all'; Case = 'serve'

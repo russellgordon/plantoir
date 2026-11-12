@@ -314,6 +314,9 @@ public sealed class InstallerRunningWorkTests
             File.WriteAllText(marker, "1.9.3\r\nwork\r\n");
             string? line = AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow);
             Assert.Equal("the new version was not installed: a course was still being built or deployed when it came to install; it will be offered again (1.9.3 waiting)", line);
+            // The PARSED version, spelt as the trail spells versions, never the raw line.
+            File.WriteAllText(marker, " 1.9.3.0 \nwork\n");
+            Assert.EndsWith("(1.9.3 waiting)", AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow)!);
             Assert.False(File.Exists(marker));
             Assert.Null(AppUpdates.ConsumeNotInstalledMarker(folder, running, DateTime.UtcNow));   // once only
 
@@ -364,6 +367,23 @@ public sealed class InstallerRunningWorkTests
             File.WriteAllText(live, "111\nPlantoirSetup\n");
             Assert.Null(AppUpdates.LiveInstaller(folder, _ => null));
             Assert.False(File.Exists(live));
+            // The review's case: a pid that cannot be read (access denied: a
+            // SYSTEM process took it) is NOT the teacher's installer.
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            Assert.Null(AppUpdates.LiveInstaller(folder, _ => throw new UnauthorizedAccessException()));
+            Assert.False(File.Exists(live));
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            Assert.Null(AppUpdates.LiveInstaller(folder, _ => DateTime.MinValue));
+            Assert.False(File.Exists(live));
+            // Older than an hour: stale, whatever its process says.
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            DateTime w2 = File.GetLastWriteTimeUtc(live);
+            Assert.Null(AppUpdates.LiveInstaller(folder, _ => w2.AddMinutes(-1), w2 + AppUpdates.InstallingMarkerLongestAge + TimeSpan.FromMinutes(1)));
+            Assert.False(File.Exists(live));
+            File.WriteAllText(live, "111\nPlantoirSetup\n");
+            DateTime w3 = File.GetLastWriteTimeUtc(live);
+            Assert.Equal(111, AppUpdates.LiveInstaller(folder, _ => w3.AddMinutes(-1), w3 + TimeSpan.FromMinutes(5)));
+            File.Delete(live);
             // This process, for real: live.
             string mine = Path.Combine(folder, AppUpdates.InstallingMarkerPrefix + Environment.ProcessId);
             File.WriteAllText(mine, "x");
@@ -417,6 +437,8 @@ public sealed class InstallerRunningWorkTests
     {
         string publish = Publish;
         Assert.Contains("$AssistantEngineFiles = @('llama-server.exe', 'llama-server-impl.dll', 'llama.dll', 'llama-common.dll', 'mtmd.dll',", publish);
+        // ggml-base.dll and every CPU backend import LLVM's OpenMP runtime (#700 third review).
+        Assert.Contains("'ggml.dll', 'ggml-base.dll', 'ggml-vulkan.dll', 'ggml-cpu-x64.dll', 'libomp140.x86_64.dll')", publish);
         // Before the build, from Vendor\llama, and again on the published folder.
         Assert.Contains("$missingVendor = Get-MissingAssistantEngineFiles (Join-Path $PSScriptRoot 'Vendor\\llama')", publish);
         Assert.Contains("$missingPublished = Get-MissingAssistantEngineFiles (Join-Path $publishDir 'llama')", publish);

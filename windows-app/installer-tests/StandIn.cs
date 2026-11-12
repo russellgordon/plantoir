@@ -37,7 +37,22 @@ static class StandIn
         FileStream held = null;
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--wait-while-installing" && i + 1 < args.Length)
+            if (args[i] == "--stand-down-if-installing" && i + 1 < args.Length)
+            {
+                // What ScheduledRun does since #700's third review: an
+                // installer's installing.<pid> marker means stand down and
+                // EXIT AT ONCE, so this image is not held while it is replaced.
+                string folder = args[++i];
+                bool installing = Directory.Exists(folder) && Directory.GetFiles(folder, "installing.*").Length > 0;
+                try
+                {
+                    File.AppendAllText(Path.Combine(Path.GetTempPath(), "plantoir-installer-harness", "started.txt"),
+                        (installing ? "STOODDOWN" : "RAN") + "\t" + Process.GetCurrentProcess().MainModule.FileName + Environment.NewLine);
+                }
+                catch (Exception) { }
+                return 0;
+            }
+            // What it did before (the must-fail): WAIT while the marker is there.            if (args[i] == "--wait-while-installing" && i + 1 < args.Length)
             {
                 // A scheduled run's wait, in miniature: while the installer's
                 // installing.<pid> marker is in the state folder, wait.

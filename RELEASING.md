@@ -132,6 +132,7 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+| 2026-11-12 | **Windows 1.9.3, before you update: if a deploy is scheduled to run in the next few minutes, let it finish first.** (Plain words for the notes: "If you have a deploy set to run on its own in the next few minutes, wait until it has run before you update.") | #700: the 1.9.0 → 1.9.3 update runs 1.9.0's scheduled-deploy code, which does not know the new installer's marker, so a scheduled deploy firing during the 3 to 5 minute copy holds Plantoir.exe and the install can fail part way, leaving a broken install (case B, measured 2026-11-12). Updates from 1.9.3 on are protected. Keep the 1.9.0 notes' "close any preview first" line too unless the morning's real-installer cases pass (the row above). |
 
 ## Trim the roadmap
 

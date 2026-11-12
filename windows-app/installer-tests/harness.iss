@@ -91,14 +91,18 @@ begin
     if RunningWorkBeforeChangingFiles(IsUpdate, WantsRelaunch) <> '' then
       Abort;
     RunningWorkInstallingBegins;
-    // The 'scheduled-during-copy' case: a scheduled-shaped program started
-    // now, while the installing marker is there, and a copy made to last
-    // four seconds (the harness's payload copies in milliseconds).
+    // The scheduled-during-copy cases: a scheduled run of the INSTALLED
+    // Plantoir.exe (the harness's own {app}\Plantoir.exe, so its image is
+    // what setup must replace) starts now, while the installing marker is
+    // there. /HARNESSSCHEDULED= names how it behaves: stand down at once (what
+    // ScheduledRun does), or wait while the marker is there (what it did before
+    // the third review). Then 1.5 s for it to start and decide, before [Files].
     if ExpandConstant('{param:HARNESSSCHEDULED|}') <> '' then
     begin
-      Exec(ExpandConstant('{param:HARNESSSCHEDULED|}'), '--wait-while-installing "' + RunningWorkStateFolder + '"',
+      Exec(ExpandConstant('{app}\Plantoir.exe'),
+           ExpandConstant('{param:HARNESSSCHEDULED|}') + ' "' + RunningWorkStateFolder + '"',
            '', SW_HIDE, ewNoWait, ResultCode);
-      Sleep(4000);
+      Sleep(1500);
     end;
   end;
   if CurStep = ssPostInstall then
