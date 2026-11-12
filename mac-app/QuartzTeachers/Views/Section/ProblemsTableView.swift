@@ -211,12 +211,14 @@ struct ProblemsTableView: View {
                     fix(with: .claude)
                 }
                 .accessibilityIdentifier("fixWithClaude")
+                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
             }
             if showsCodex {
                 Button(FixWithAssistant.codexButtonTitle) {
                     fix(with: .codex)
                 }
                 .accessibilityIdentifier("fixWithCodex")
+                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
             }
         }
         .disabled(!handover.hasRows)
