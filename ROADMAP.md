@@ -138,7 +138,9 @@ Small fixes and conveniences. Mac first where it says so.
 
 - **"Revise with…" in more places.** Use the Claude and Codex desktop apps,
   not just their command-line versions
-  ([#507](https://github.com/russellgordon/plantoir/issues/507)).
+  ([#507](https://github.com/russellgordon/plantoir/issues/507)), and look into doing
+  the same with GitHub Copilot's desktop app
+  ([#784](https://github.com/russellgordon/plantoir/issues/784)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
   answer key when you print, and questions that use PhET (2.0). Questions
   with a GeoGebra sketch arrived with GeoGebra itself, in 1.9.
