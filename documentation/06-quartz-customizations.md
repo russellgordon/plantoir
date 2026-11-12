@@ -4207,10 +4207,23 @@ assistant is told to write and what the ready-made courses hold.
   window. Whether the markers, and the drawings made of characters (CRC
   cards, a stack and a queue, `git log --graph`, aligned tables of output),
   keep their shape was NOT measured: no converted page was previewed. On a
-  phone, at about 40 characters a row at 390 px, those blocks do wrap and a
-  drawing breaks apart. Whether a drawing in text is exempt from the rule,
-  or should become a Mermaid diagram or a table, is a question for Russell
-  (the #758 implementation review, L1, lists the pages).
+  phone a block holds about 40 characters a row at 390 px (an estimate, not
+  measured; a block inside a callout holds fewer), so longer lines wrap and
+  a drawing breaks apart. Read by hand on 2026-11-12, the ICS4U blocks that
+  depend on their columns are: five drawings made of characters (the CRC
+  cards in Concepts/Objects Working Together and Exercises/Classes and
+  Objects Practice, the stack and queue in Concepts/Stacks and Queues,
+  `git log --graph` in Tutorials/Using Version Control, and the aligned
+  conflict markers in Explorations/The Merge Conflict, 51 to 70 characters
+  wide); ten tables or aligned columns of program output (in Programs/
+  Sorting and Timing It, Searching and Timing It and Using a Dictionary,
+  Exercises/Efficiency Practice and Sorting Practice, and Concepts/Choosing
+  a Data Structure, Recursion and Version Control, 28 to 71 wide); nine
+  tracebacks with `^^^` or `~~~` markers under a line (20 to 49 wide); and
+  four blocks of `unittest` output whose 70-character rule lines wrap.
+  MCMPR11, the other payloads, the Example Course and the skeletons hold
+  none. Whether a drawing in text is exempt from the rule, or should become
+  a Mermaid diagram or a table, is a question for Russell.
   `lint_payload.py` and `lint_skeletons.py` (skeletons and EXC2O) refuse a
   bare text fence, and both run the rule's own accept and refuse cases
   first. verify.sh builds the EXC2O fixture, not ICS4U, so no gate reads
