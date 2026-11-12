@@ -293,6 +293,157 @@ else
   echo "  (skipped: this disk tells upper and lower case apart, so there is no wrong-case spelling to reach)"
 fi
 
+# ---- Kept copies of geogebra.org sketches survive the clear (#789) -----
+# The cases are the CONTRACT's (buildOutputLocation.keptCopiesSurviveTheClear),
+# read from it rather than typed here, so the app's suite and this one run
+# the same list. Each copy holds the name of the place it started in, so a
+# check can tell which copy won where two held the same key.
+echo
+echo "Kept copies of geogebra.org sketches survive every clear (contracts: keptCopiesSurviveTheClear)"
+RULES="$REPO/contracts/shared-rules.json"
+KEPT="$(python3 -c "
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8'))['buildOutputLocation']['keptCopiesSurviveTheClear']['folder'])
+" "$RULES")"
+check "the contract names the folder the GeoGebra fences keep their copies in" \
+  "$(python3 -c "
+import json, sys
+print(json.load(open(sys.argv[1], encoding='utf-8'))['geogebraFences']['cache']['folder'])
+" "$RULES")" "$KEPT"
+check "and the block keeps that same folder" "$KEPT" "${KEPT_COPIES_FOLDER:-}"
+
+# One line per field: name, courseFolder, courseFolderKeptCopies, builtSite,
+# keptCopies, fault, then expect's link, builtSite, readByTheNextBuild,
+# onlyTheKeptCopiesRemain, and one "copy=<key>=<place>" line per kept copy.
+case_fields() {
+  python3 - "$RULES" "$1" <<'CASE'
+import json, sys
+cases = json.load(open(sys.argv[1], encoding="utf-8"))["buildOutputLocation"]["keptCopiesSurviveTheClear"]["cases"]
+if int(sys.argv[2]) >= len(cases):
+    sys.exit(1)
+case = cases[int(sys.argv[2])]
+expect = case["expect"]
+print(case["name"])
+print(case["courseFolder"])
+print(" ".join(case.get("courseFolderKeptCopies", [])))
+print("yes" if case["buildsFolder"]["builtSite"] else "no")
+print(" ".join(case["buildsFolder"]["keptCopies"]))
+print(case.get("fault", ""))
+print(expect["link"])
+print(expect["builtSite"])
+print("yes" if expect["readByTheNextBuild"] else "no")
+print("yes" if expect["onlyTheKeptCopiesRemain"] else "no")
+for key, place in expect["keptCopies"].items():
+    print(f"copy={key}={place}")
+CASE
+}
+
+OUTSIDE="beside the built sites"
+INSIDE="in the course folder"
+CASE_INDEX=0
+while FIELDS="$(case_fields "$CASE_INDEX")"; do
+  CASE_INDEX=$((CASE_INDEX + 1))
+  CASE_NAME="$(sed -n 1p <<<"$FIELDS")"
+  COURSE_STATE="$(sed -n 2p <<<"$FIELDS")"
+  COURSE_COPIES="$(sed -n 3p <<<"$FIELDS")"
+  BUILDS_SITE="$(sed -n 4p <<<"$FIELDS")"
+  BUILDS_COPIES="$(sed -n 5p <<<"$FIELDS")"
+  FAULT="$(sed -n 6p <<<"$FIELDS")"
+  WANT_LINK="$(sed -n 7p <<<"$FIELDS")"
+  WANT_SITE="$(sed -n 8p <<<"$FIELDS")"
+  READ_NEXT="$(sed -n 9p <<<"$FIELDS")"
+  ONLY_COPIES="$(sed -n 10p <<<"$FIELDS")"
+  echo "  · $CASE_NAME"
+
+  new_working_folder
+  make_course ICS3U
+  if [ "$BUILDS_SITE" = "yes" ]; then
+    mkdir -p "$BUILDS/ICS3U/section1/public"
+    echo "$OUTSIDE" > "$BUILDS/ICS3U/section1/public/index.html"
+  fi
+  mkdir -p "$BUILDS"
+  for key in $BUILDS_COPIES; do
+    mkdir -p "$BUILDS/ICS3U/$KEPT"
+    echo "$OUTSIDE" > "$BUILDS/ICS3U/$KEPT/$key.ggb"
+  done
+  case "$COURSE_STATE" in
+    "no link") ;;
+    "a link to another Mac's builds folder")
+      ln -s "/Users/somebody-else/Library/Application Support/Plantoir/builds/xxxx/ICS3U" \
+        "courses/ICS3U/.merged_output" ;;
+    "a file where the link belongs")
+      echo "not a folder" > "courses/ICS3U/.merged_output" ;;
+    "a built site of its own")
+      make_course_with_a_built_site ICS3U "$INSIDE"
+      for key in $COURSE_COPIES; do
+        mkdir -p "courses/ICS3U/.merged_output/$KEPT"
+        echo "$INSIDE" > "courses/ICS3U/.merged_output/$KEPT/$key.ggb"
+      done ;;
+    *) fail "a case this test does not know how to set up: $COURSE_STATE"; continue ;;
+  esac
+
+  case "$FAULT" in
+    "") link_course_build_output ICS3U >/dev/null ;;
+    "the link cannot be made")
+      ln() { return 1; }
+      link_course_build_output ICS3U >/dev/null
+      unset -f ln ;;
+    "a kept copy cannot be moved")
+      mv() {
+        case "$1" in
+          */"$KEPT"|*/"$KEPT"/*) return 1 ;;
+        esac
+        command mv "$@"
+      }
+      link_course_build_output ICS3U >/dev/null
+      unset -f mv ;;
+    *) fail "a fault this test does not know how to make: $FAULT"; continue ;;
+  esac
+
+  case "$WANT_LINK" in
+    "this Mac's builds folder")
+      check "    the link points at this Mac's builds folder" "$BUILDS/ICS3U" \
+        "$(readlink courses/ICS3U/.merged_output 2>/dev/null || echo "no link")" ;;
+    "a real folder")
+      if [ -d "courses/ICS3U/.merged_output" ] && [ ! -L "courses/ICS3U/.merged_output" ]; then
+        pass "    the built website is still a real folder in the course"
+      else
+        fail "    the built website is still a real folder in the course"
+      fi ;;
+  esac
+  if [ "$WANT_SITE" = "gone" ]; then
+    check "    the built pages are gone" "MISSING" "$(built_page ICS3U)"
+  else
+    check "    the built pages are the ones $WANT_SITE" "$WANT_SITE" "$(built_page ICS3U)"
+  fi
+  WANT_COUNT=0
+  while IFS='=' read -r _ key place; do
+    [ -n "$key" ] || continue
+    WANT_COUNT=$((WANT_COUNT + 1))
+    READ_BY_BUILD="$(cat "courses/ICS3U/.merged_output/$KEPT/$key.ggb" 2>/dev/null || echo "MISSING")"
+    if [ "$READ_NEXT" = "yes" ]; then
+      check "    copy $key is kept where the next build reads it, the one $place" "$place" "$READ_BY_BUILD"
+    else
+      FOUND="$READ_BY_BUILD"
+      if [ "$FOUND" = "MISSING" ]; then
+        FOUND="$(cat "$BUILDS/ICS3U/$KEPT/$key.ggb" 2>/dev/null || echo "MISSING")"
+      fi
+      check "    copy $key is kept, the one $place" "$place" "$FOUND"
+    fi
+  done < <(grep '^copy=' <<<"$FIELDS")
+  if [ "$READ_NEXT" = "yes" ]; then
+    check "    and no other copy is there" "$WANT_COUNT" \
+      "$(find "courses/ICS3U/.merged_output/$KEPT/" -name '*.ggb' 2>/dev/null | wc -l | tr -d ' ')"
+  fi
+  if [ "$ONLY_COPIES" = "yes" ]; then
+    check "    only the kept copies remain in the builds folder" "$KEPT" \
+      "$(ls -A "$BUILDS/ICS3U" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+  fi
+done
+if [ "$CASE_INDEX" -eq 0 ]; then
+  fail "the contract carries no keptCopiesSurviveTheClear cases"
+fi
+
 echo
 if [ "$FAILURES" -eq 0 ]; then
   echo "✅ $CHECKS checks passed."
