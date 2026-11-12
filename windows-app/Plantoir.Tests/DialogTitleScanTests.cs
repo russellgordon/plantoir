@@ -45,7 +45,7 @@ public class DialogTitleScanTests
         ["Views/LinksChecklistDialog.cs"] = 1,
         ["Views/NewCourseDialog.cs"] = 1,
         ["Views/ObsidianWorld.cs"] = 2,   // the add-ons offer and the reopen question (#581)
-        ["Views/SectionDetailView.xaml.cs"] = 14,
+        ["Views/SectionDetailView.xaml.cs"] = 16,   // +2 with #736: Fix with…'s refusal and its "didn’t open"
         ["Views/SectionScheduleDialog.cs"] = 1,
         ["Views/SectionVerbDialog.cs"] = 1,
         ["Views/SidebarPane.Reference.cs"] = 6,

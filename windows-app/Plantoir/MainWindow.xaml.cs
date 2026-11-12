@@ -176,8 +176,13 @@ public sealed partial class MainWindow : Window
                 // this window and a dialog of its own fires it again), so it is
                 // read at most every few seconds, and off this thread.
                 ReadTheProblems(throttled: true);
+                // #736: whether Claude and Codex are on this PC, for the
+                // Problems tab's Fix with… buttons — asked here and at launch,
+                // off this thread, never while the tab draws.
+                _ = System.Threading.Tasks.Task.Run(OutsideAssistantPresence.Refresh);
             }
         };
+        _ = System.Threading.Tasks.Task.Run(OutsideAssistantPresence.Refresh);
         // Covers app launch itself, in case the window's first Activated
         // fires before this runs (or does not fire at all on some launch
         // paths) — cheap and idempotent when there is nothing pending.

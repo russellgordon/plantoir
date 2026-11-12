@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,21 +21,25 @@ namespace Plantoir.Core.Assist;
 /// <para><b>The trap is the escaping, and it fails SILENTLY.</b> Each value is
 /// a TOML basic string inside an argument; Codex does not reject a malformed
 /// value, it treats it as a raw string, so <c>args</c> stops being a list and
-/// the door greets the teacher and then cannot start its server. On Windows
-/// the argument then passes through <c>cmd</c> — TWICE when <c>codex</c> is
-/// npm's <c>codex.cmd</c> shim, whose <c>%*</c> is parsed again inside the
-/// batch file. So the layers are: TOML (<see cref="TomlBasicString"/>), the
-/// C runtime's argv quoting (<see cref="ArgvQuote"/>), and cmd's own
-/// metacharacters once per cmd parse (<see cref="ForCmd"/>). Each is its own
-/// function, and <c>CodexLauncherTests</c> sends the result through a real
-/// <c>cmd.exe</c> and a stub <c>codex.cmd</c>.</para>
+/// the door greets the teacher and then cannot start its server. So the
+/// layers are: TOML (<see cref="TomlBasicString"/>), the C runtime's argv
+/// quoting (<see cref="OutsideDoor.ArgvQuote"/>), and — only when
+/// <c>codex</c> is npm's <c>codex.cmd</c> shim, which needs cmd — cmd's own
+/// metacharacters once per cmd parse, twice for the shim's <c>%*</c>
+/// (<see cref="OutsideDoor.ForCmd"/>). A <c>codex.exe</c> is started
+/// directly, with no cmd at all (since 1.9.3, #736; until then every Codex
+/// session went through <c>cmd.exe /s /k</c>, and a <c>%NAME%</c> in a
+/// course's name was expanded). <c>CodexLauncherTests</c> and
+/// <c>OutsideDoorTests</c> send the result through the real start and a stub
+/// program that writes down what it was given.</para>
 ///
-/// <para><b>Rejected: going through <c>wt.exe</c></b>, as the Claude door
-/// does. Windows Terminal parses its own command line — <c>;</c> splits it
-/// into tabs and it re-joins arguments with its own quoting — which is a THIRD
-/// layer no test here can run without opening a window. This door starts
-/// <c>cmd.exe</c> directly; on Windows 11, where Windows Terminal is the
-/// default terminal, the window it opens in is Windows Terminal anyway.</para>
+/// <para><b>Rejected: going through <c>wt.exe</c></b>. Windows Terminal
+/// parses its own command line — <c>;</c> splits it into tabs, it re-joins
+/// arguments with its own quoting, and it expands <c>%NAME%</c> (measured,
+/// <see cref="OutsideDoor"/>) — a layer with no escape for the last. Since
+/// 1.9.3 the Claude door does not go through it either. On Windows 11, where
+/// Windows Terminal is the default terminal, the window opens in it
+/// anyway.</para>
 ///
 /// <para><b>Not isolated, and that is structural</b>
 /// (<c>isolatesTheTeachersOwnServers: false</c>): Codex has no
@@ -75,31 +78,37 @@ public static class CodexLauncher
     /// <summary>
     /// Open a session for one course. False when it could not be started, so
     /// the caller can say <c>couldNotStart</c> rather than show nothing.
+    /// <paramref name="greeting"/> is Fix with Codex…'s message (#736); null
+    /// is Revise With ▸'s plain greeting.
     /// </summary>
-    public static bool Open(string workspacePath, string courseCode, string courseName)
+    public static bool Open(string workspacePath, string courseCode, string courseName, string? greeting = null)
     {
         string? codex = FindCodex();
         string? server = ClaudeCodeLauncher.FindServer();
         if (codex is null || server is null) return false;
 
-        var info = new ProcessStartInfo
-        {
-            FileName = "cmd.exe",
-            Arguments = CmdArguments(codex, Arguments(server, workspacePath, courseCode,
-                                                      ClaudeCodeLauncher.Greeting(courseCode, courseName)), keepOpen: true),
-            WorkingDirectory = workspacePath,
-            UseShellExecute = true,
-        };
-        try
-        {
-            if (Process.Start(info) is null) return false;
-        }
-        catch { return false; }
+        var arguments = Arguments(server, workspacePath, courseCode,
+                                  greeting ?? ClaudeCodeLauncher.Greeting(courseCode, courseName));
+        // Refuse rather than start into a command line cmd rejects as too long
+        // and leaves at a silent prompt. No "assistant opened" line then.
+        if (!OutsideDoor.WithinCommandLineLimit(codex, arguments)) return false;
+        if (!OutsideDoor.Start(OutsideDoor.StartInfo(codex, arguments, workspacePath))) return false;
 
         // outsideAgents.agents[codex].trailLine. A course-wide door carries
         // no section.
         ActivityTrail.Note(ActivityTrail.Event.AssistantOpened, $"started Codex for {courseCode}");
         return true;
+    }
+
+    /// <summary>
+    /// Whether a message would keep this door's whole command line under
+    /// cmd's 8,191 UTF-16 units (<c>fixWith.charactersAre</c>); null when the
+    /// door is not here.
+    /// </summary>
+    public static Func<string, bool>? Fits(string workspacePath, string courseCode)
+    {
+        if (FindCodex() is not { } codex || ClaudeCodeLauncher.FindServer() is not { } server) return null;
+        return message => OutsideDoor.WithinCommandLineLimit(codex, Arguments(server, workspacePath, courseCode, message));
     }
 
     /// <summary>
@@ -155,62 +164,6 @@ public static class CodexLauncher
             }
         }
         return text.Append('"').ToString();
-    }
-
-    /// <summary>
-    /// One argument quoted so the C runtime (and Rust's and Node's argv
-    /// parsers) read it back exactly: backslashes doubled only where they
-    /// precede a quote.
-    /// </summary>
-    public static string ArgvQuote(string argument)
-    {
-        if (argument.Length > 0 && argument.IndexOfAny(new[] { ' ', '\t', '\n', '\v', '"' }) < 0) return argument;
-        var text = new StringBuilder("\"");
-        for (int i = 0; i < argument.Length; i++)
-        {
-            int backslashes = 0;
-            while (i < argument.Length && argument[i] == '\\') { backslashes++; i++; }
-            if (i == argument.Length) { text.Append('\\', backslashes * 2); break; }
-            if (argument[i] == '"') text.Append('\\', backslashes * 2 + 1).Append('"');
-            else text.Append('\\', backslashes).Append(argument[i]);
-        }
-        return text.Append('"').ToString();
-    }
-
-    /// <summary>
-    /// A command line made safe for ONE cmd parse: every cmd metacharacter that
-    /// cmd would read as unquoted — following cmd's own quote toggling, which
-    /// knows nothing of <c>\"</c> — gets a caret. Inside a region cmd sees as
-    /// quoted a caret would be kept literally, so none is added there.
-    /// </summary>
-    public static string ForCmd(string line)
-    {
-        var text = new StringBuilder();
-        bool quoted = false;
-        foreach (char c in line)
-        {
-            if (c == '"') { quoted = !quoted; text.Append(c); continue; }
-            if (!quoted && "^&|<>()".IndexOf(c) >= 0) text.Append('^');
-            text.Append(c);
-        }
-        return text.ToString();
-    }
-
-    /// <summary>
-    /// What follows <c>cmd.exe</c>: <c>/s /k "…"</c> (or <c>/c</c>, for a
-    /// test). <c>/s</c> makes cmd strip exactly the outer pair of quotes and
-    /// nothing else. A <c>.cmd</c>/<c>.bat</c> target is parsed by cmd a
-    /// SECOND time (its <c>%*</c>), so its arguments are made safe for two
-    /// parses; an <c>.exe</c> for one.
-    /// </summary>
-    public static string CmdArguments(string executable, IEnumerable<string> arguments, bool keepOpen)
-    {
-        string argv = string.Join(" ", arguments.Select(ArgvQuote));
-        bool batch = executable.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
-                     executable.EndsWith(".bat", StringComparison.OrdinalIgnoreCase);
-        if (batch) argv = ForCmd(argv);
-        string line = ForCmd("\"" + executable + "\" " + argv);
-        return (keepOpen ? "/s /k \"" : "/s /c \"") + line + "\"";
     }
 
     private static string? OnPath(string name)
