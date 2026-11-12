@@ -77,6 +77,10 @@ Small fixes and conveniences. Mac first where it says so.
   Settings ▸ Deploying. ([#696](https://github.com/russellgordon/plantoir/issues/696))
 - **Vimeo videos embed like YouTube ones**, from a plain link, with a
   privacy-friendly player. ([#692](https://github.com/russellgordon/plantoir/issues/692))
+- **Backups that take far less space.** The backups Plantoir makes on its
+  own stop keeping a fresh copy of every picture, video and PDF each time.
+  Backups you make yourself, and everything you have today, stay as they
+  are. ([#785](https://github.com/russellgordon/plantoir/issues/785))
 - **A plain explanation when Cloudflare will not make another site**
   because a free account has reached its limit of 100. ([#723](https://github.com/russellgordon/plantoir/issues/723))
 - **The assistant:** "Open my website" opens it rather than deploying it
