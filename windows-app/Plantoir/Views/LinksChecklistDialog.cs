@@ -95,16 +95,29 @@ public sealed class LinksChecklistDialog
             CloseButtonText = LinksChecklistWording.NotNow,
             DefaultButton = ContentDialogButton.Primary,
         };
-        _dialog.Opened += (_, _) => TagButtons();
+        // Named when the dialog opens, and again once its template has been
+        // laid out: a dialog opened beside other layout work was seen with its
+        // buttons not yet in the tree at Opened (#734 third review).
+        _dialog.Opened += (_, _) => TagButtons(attempt: 1);
         Refresh();
     }
 
     /// <summary>The ContentDialog's own buttons are template parts; tag them once it is up.</summary>
-    private void TagButtons()
+    private void TagButtons(int attempt)
     {
         if (_dialog.Content is not FrameworkElement) return;
-        if (FindByName(_dialog, "PrimaryButton") is Button publish) AutomationProperties.SetAutomationId(publish, PublishAutomationId);
-        if (FindByName(_dialog, "CloseButton") is Button notNow) AutomationProperties.SetAutomationId(notNow, NotNowAutomationId);
+        var publish = FindByName(_dialog, "PrimaryButton") as Button;
+        var notNow = FindByName(_dialog, "CloseButton") as Button;
+        if (publish is not null) AutomationProperties.SetAutomationId(publish, PublishAutomationId);
+        if (notNow is not null) AutomationProperties.SetAutomationId(notNow, NotNowAutomationId);
+        if (publish is not null && notNow is not null) return;
+        if (attempt >= 10)
+        {
+            App.LogDiagnostic($"Links checklist: its buttons were not found to name after {attempt} tries.");
+            return;
+        }
+        if (attempt == 1) App.LogDiagnostic("Links checklist: its buttons were not in the tree when it opened; naming them again after layout.");
+        _dialog.DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => TagButtons(attempt + 1));
     }
 
     private static DependencyObject? FindByName(DependencyObject root, string name)

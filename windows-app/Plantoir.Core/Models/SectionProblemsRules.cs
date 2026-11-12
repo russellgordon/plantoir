@@ -153,6 +153,16 @@ public static class SectionProblemsRules
         aDialogIsUpHere || todaysClassQuestionIsUp
         || (theAlertIsAskedForOrDue && waitedSoFar < LongestTheChecklistWaitsForAnAlertNotUp);
 
+    /// <summary>
+    /// Whether the checklist goes up at once, in the turn that offered it:
+    /// nothing in front of it here and no alert asked for or due. Then it
+    /// must not wait even a tick (third review on #734: 1.9.0 showed it at
+    /// once, and a wait put it in a later turn where it lost its buttons'
+    /// names).
+    /// </summary>
+    public static bool TheChecklistGoesAtOnce(bool aDialogIsUpHere, bool todaysClassQuestionIsUp, bool theAlertIsAskedForOrDue) =>
+        !aDialogIsUpHere && !todaysClassQuestionIsUp && !theAlertIsAskedForOrDue;
+
     /// <summary>The answers the alert can be given, as the trail writes them (the mac's).</summary>
     public const string AnsweredShow = "Show", AnsweredRepair = "the repair", AnsweredNotNow = "Not Now";
 

@@ -169,6 +169,15 @@ public sealed class SectionProblemsSourceTests
         // going on screen — never while it waits for the alert (review finding 1).
         Assert.True(up > wait && offer > up, "_linksChecklistUp is set after the wait and just before the checklist shows");
         Assert.DoesNotContain("_linksChecklistUp = true;", present[..wait]);
+        // With nothing due it is shown in the SAME turn: the at-once test comes
+        // before the first await, and the wait is only on the other branch.
+        int atOnce = present.IndexOf("SectionProblemsRules.TheChecklistGoesAtOnce(", StringComparison.Ordinal);
+        int firstAwait = present.IndexOf("await ", StringComparison.Ordinal);
+        Assert.True(atOnce > 0 && atOnce < firstAwait, "the checklist asks whether it can go at once before it awaits anything");
+        Assert.Contains("if (!SectionProblemsRules.TheChecklistGoesAtOnce(", present);
+        // A view rebuilt while it waited hands the offer on, and the next view takes it.
+        Assert.Contains("ChecklistsWaiting[SectionKey.For(folder, _course.Code, _sectionNumber)] = (offer, occasion);", present);
+        Assert.Contains("ChecklistsWaiting.Remove(", Body(View, "    private void OfferTheLinksChecklistIfWaiting("));
         Assert.Contains("if (_healthDialogIsUp || _todaysClassQuestionUp || _linksChecklistUp) return;",
                         Body(View, "    private async Task RaiseTheProblemsAlertIfDueAsync("));
     }

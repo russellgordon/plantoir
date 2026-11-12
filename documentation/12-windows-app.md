@@ -892,7 +892,12 @@ leaves it due. The answers file is read ONCE per working folder, on the worker
 that reads the records, and kept in memory (`SectionProblems`): the interface
 thread — which the waiting checklist asks every 300 ms — never reads the disk
 for it, and an answer the file could not keep still holds until the app
-closes. Every change is written through; a relaunch reads the file.
+closes. Every change is written through; a relaunch reads the file. **Only
+this app writes the file**, and the cache is never re-read: `Write` puts the
+whole in-memory copy back, so a second process writing it (a second copy of
+Plantoir on the same folder, say) would have its answers overwritten by the
+next write here and not seen here until a relaunch — at worst one alert raised
+again, never one lost for good, since both copies remember their own.
 
 **The links checklist FOLLOWS the alert** — the mac's order, which the contract
 writes as "The links checklist (#379) follows it": today's-class question,
@@ -906,19 +911,33 @@ alert waits behind BEFORE its wait, so opening a section onto a record with a
 link into a hidden page and a waiting checklist — the ordinary way in after a
 scheduled, MCP or terminal build — showed neither. Now one flag guards
 re-entry and another, set only as the checklist goes on screen, is what the
-alert waits behind; the bound makes any future ordering fail open.
+alert waits behind; the bound makes any future ordering fail open. **With
+nothing in front of it and no alert due — read from memory — it goes up in the
+SAME turn that offered it**, as in 1.9.0 (`TheChecklistGoesAtOnce`): the
+second version always took at least one turn (a hop to a worker, the alert
+queued, a 300 ms tick), which put it beside the window's activation work, and
+`LinksChecklistUiTests` then failed 1–2 runs in 3 against 3 of 3 on `dev`
+(third review) — the dialog went up with its buttons unnamed, because
+`LinksChecklistDialog.TagButtons` ran once, on `Opened`, before the template's
+buttons were in the tree. It now tries again after layout and logs when it
+cannot. A view rebuilt while the checklist waits hands the offer to the
+section's next view (`ChecklistsWaiting`).
 `ProblemsTabUiTests.TheAlertComesFirstAndTheLinksChecklistFollowsIt`.
 
 **The record and its writer.** Windows refuses `os.replace` (and .NET's
 overwriting move) while ANY other handle has the file open — measured on this
 PC, Python 3.14.10, with and without delete sharing — and the app reads the
-record whenever the window comes to the front, while `section_problems._write`
-swallowed a refused replace and lost that build's record. The app's read now
+record whenever the window comes to the front. A refused replace was not
+silent — every caller of `section_problems._write` prints a "Could not keep the
+list of problems…" line to the console and the build goes on — but that build's
+record was lost, and nobody reads a console for it. The app's read now
 shares read, write and delete (`SectionProblemsRecord.OpenShared`, so an
 archive can still remove the folder) and holds the file only for the read;
 the shared Python tries a refused replace again, ten times 50 ms apart
 (`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`; it
-costs the mac nothing, where a replace is never refused). Rejected: relying
+costs the mac nothing, where a replace is never refused). An eleventh refusal
+is what it was before: the temporary file is removed, the caller prints its
+"Could not keep…" line, the build goes on, and the previous record stays. Rejected: relying
 on delete sharing alone, which the review proposed and the measurement
 refuted. `NoteHealthFindings`,
 `FolderProblemQueue` and the held #333 finding are gone: on Windows the

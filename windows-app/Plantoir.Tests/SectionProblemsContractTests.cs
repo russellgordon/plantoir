@@ -198,6 +198,18 @@ public class SectionProblemsContractTests
         Assert.Equal(waits, SectionProblemsRules.TheChecklistWaits(dialogUp, todaysClassUp, alertDue, TimeSpan.FromSeconds(seconds)));
 
     /// <summary>
+    /// Nothing in front and nothing due: the checklist goes up at once, in the
+    /// turn that offered it, as in 1.9.0 (third review on #734).
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    public void WithNothingDueTheChecklistGoesAtOnce(bool dialogUp, bool todaysClassUp, bool alertDue, bool atOnce) =>
+        Assert.Equal(atOnce, SectionProblemsRules.TheChecklistGoesAtOnce(dialogUp, todaysClassUp, alertDue));
+
+    /// <summary>
     /// The contract says the checklist FOLLOWS the alert; the rule's order is
     /// that sentence, not a choice of this app's.
     /// </summary>
