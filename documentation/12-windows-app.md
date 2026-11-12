@@ -1232,6 +1232,31 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   nothing outlives a view rebuilt under it. Focus: OK returns it to the
   Deploy button (ContentDialog's own return); Open Settings… activates the
   Settings window on Deploying.
+- **The headless deploy no longer refuses every Cloudflare section.**
+  `AssistWorkspace.Deploy` (`plantoir-mcp`'s `deploy_section`, and Plantoir's
+  own assistant with no window to press in) refused EVERY Cloudflare
+  destination from 2026-08-13 until #739, saved ID or not, with a sentence
+  of its own ("…needs the account ID Plantoir stores. Deploy this section
+  from Plantoir instead."). The reason given was that a Pages token cannot
+  list its account and "only the app can pass" the ID; but the ID has always
+  been in `AppSettings`, which this process reads (`CurrentCloudflareAccountId`,
+  already serving `schedule_deploy`), and the mac never had the refusal. With
+  Cloudflare every new course's default it would have let an outside
+  assistant schedule a new course's deploy but never deploy it. It now
+  refuses exactly when the window does (`MultiDestinationDeployRunner.RefusalReason`,
+  the same sentence; a folder not chosen included) and otherwise hands each
+  Cloudflare leg `--account <id>` as the window's Deploy and the scheduled
+  run do, plus the `--non-interactive` it always passed. Nothing is left to
+  answer headless: a missing saved token makes `deploy.ps1
+  --non-interactive` exit 3 (`deployNeedsAnAnswer`), and a section never
+  deployed there is still refused first. It writes no trail line, as the
+  contract's event `why` says of this path and as the mac's
+  `AssistSiteWork.deploy` does. Proven against a stub launcher only
+  (`HeadlessCloudflareDeployTests`: every `deployWithoutAnAccountID` case,
+  each leg's arguments equal to the window's but for `--non-interactive`, a
+  made-up ID); no real Cloudflare deploy was run through `plantoir-mcp`.
+  `AssistWorkspace.CloudflareAccountIdOverrideForTests` is held per async
+  flow now, so two test classes setting it cannot race.
 - **The trail.** `ActivityTrail.Event.DeployRefusedForTheCloudflareAccountId`
   ("deploy refused for the Cloudflare Account ID"), written from that
   refusal before the dialog goes up, by kind, never the ID: "ICS3U/1 · deploy
@@ -1239,12 +1264,14 @@ destination (#668)", and the rules are `contracts/app-rules.json` →
   ID". A folder refused first writes nothing; so does an MCP client's deploy
   and a refused schedule (the event's `why`).
 
-**Proven.** `PublishingDestinationsContractTests` (nine facts: the default
+**Proven.** `PublishingDestinationsContractTests` (the default
 and the absent key read from a file, the order and the additional list, the
 five sentences, `netlifyNoteCases` for both notes and for the schedule note,
 `wizardAccountID.cases` with the block's order and colours, and
 `deployWithoutAnAccountID.cases` for the refusal, Open Settings…, the line and
-that the line never carries the ID). Through the window,
+that the line never carries the ID, and a source check that OK stays the
+refusal's default button). `HeadlessCloudflareDeployTests` runs every
+`deployWithoutAnAccountID` case through the headless deploy (below). Through the window,
 `PublishingDestinationsUiTests` (the refusal's Open Settings… and its trail
 line; a folder refused first with neither; the sentences in the dialog;
 Course Settings and Schedule a deploy for a course with no destination saved),

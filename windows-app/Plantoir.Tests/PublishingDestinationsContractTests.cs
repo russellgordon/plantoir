@@ -229,6 +229,27 @@ public class PublishingDestinationsContractTests
     }
 
     /// <summary>
+    /// OK stays the refusal's DEFAULT button when Open Settings… is offered
+    /// (#739, the mac's "OK stays the default button"): Enter must leave the
+    /// refusal, not open another window. Read from the source, since a
+    /// ContentDialog cannot be built in this suite: the initializer that sets
+    /// the Open Settings… button must say <c>ContentDialogButton.Close</c>.
+    /// </summary>
+    [Fact]
+    public void OkStaysTheRefusalsDefaultButton()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        int button = source.IndexOf("PrimaryButtonText = opensSettings ? \"Open Settings…\"", StringComparison.Ordinal);
+        Assert.True(button >= 0, "the Deploy refusal no longer offers Open Settings… where this test looks");
+        int start = source.LastIndexOf("new ContentDialog", button, StringComparison.Ordinal);
+        int end = source.IndexOf("};", button, StringComparison.Ordinal);
+        string initializer = source[start..end];
+        Assert.Contains("DefaultButton = ContentDialogButton.Close", initializer);
+        Assert.DoesNotContain("ContentDialogButton.Primary", initializer);
+    }
+
+    /// <summary>
     /// A folder's refusal never offers Open Settings…, however the ID stands:
     /// it is put right in the course's own settings.
     /// </summary>
