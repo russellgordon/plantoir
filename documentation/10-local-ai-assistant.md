@@ -7966,6 +7966,15 @@ door had handed the course's name to cmd outside quotes).
 `12-windows-app.md` → "What the outside doors hand to Windows, and how".
 No tool or tool description moved there either.
 
+**Windows' plain Revise With ▸ greeting cuts the course's name at 80
+characters** (`fixWith.courseNameMaxCharacters`, with an ellipsis, the same
+cut Fix with… makes; since 1.9.3, #736's third review). A long imported name
+otherwise pushed the command line past cmd's limit, and the door refused with
+its could-not-start sentence, which tells the teacher a restart may help when
+it will not. The mac's greeting does not cut the name and need not: its shell
+script has no such limit. It may match, for one greeting on both platforms.
+Test: `OutsideDoorRefusalTests.ALongNameIsCutInThePlainGreeting_AndTheDoorOpens`.
+
 ## Telling an outside assistant how the course is taught (#209)
 
 Asked "How about my teaching style?", both doors' sessions said they did not
