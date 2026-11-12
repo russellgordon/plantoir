@@ -1,0 +1,33 @@
+{
+  "_about": "One marks record, empty. The plantoir-marking skill, when it is in the working folder, copies it once per paper, names the copy by the student's identifier, and fills it in. It has every point of answers.json, and no place for a name. FORMAT.md says what each key holds.",
+  "kit": 1,
+  "identifier": null,
+  "section": null,
+  "version": null,
+  "points": {
+    "A1": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "A2": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "A3": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "A4": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B1.1": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B1.2": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B1.3": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B1.4": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B2.1": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "B2.2": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "C1.1": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "C1.2": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "C1.3": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "D1.1": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "D1.2": {"earned": null, "seen": "", "note": "", "studentNote": ""},
+    "D1.3": {"earned": null, "seen": "", "note": "", "studentNote": ""}
+  },
+  "voided": {},
+  "checks": [],
+  "summary": "",
+  "byQuestion": [],
+  "strengths": [],
+  "focus": [],
+  "closing": "",
+  "feedback": {}
+}
