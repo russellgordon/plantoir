@@ -9850,6 +9850,27 @@ for. The rules are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `problemReportRedaction`, so both apps redact identically.
 
+A Cloudflare Account ID is removed in three shapes: after `--account`
+(`accountFlag`), after the words "Account ID" (`accountIdentifier`), and
+inside an API path, `/accounts/<id>/…` (`accountPath`, #773, proposed from
+Windows with #739). The third is what a failing wrangler call prints: it
+names the resource it asked for, and every Pages resource starts with the
+account. The ID is 32 characters, under the 40 that the long-secret rule
+needs, so without `accountPath` it reached the run records, the trail and
+the problem report whole. The one file this rule does not reach is a
+scheduled deploy's own log, `~/Library/Logs/Plantoir/<label>.log`
+(`ScheduledDeploy.logURL`). launchd writes it directly from the agent's
+`StandardOutPath` and `StandardErrorPath`, so what `deploy.sh` and wrangler
+print lands there unredacted, appended night after night, and nothing removes
+it. It is not part of the problem report. The trail lines read from it go
+through the redactor; the log itself does not. Nothing a launcher prints
+reaches an outside assistant on the mac beyond its own fixed refusal
+sentences and the build's findings: the MCP server's deploy answers with
+fixed sentences (`MultiDestinationDeployRunner.result`, `AssistWording`),
+never the transcript, and the server writes nothing to stdout but its
+replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
+which is why it redacts that output too (documentation/12-windows-app.md).
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
