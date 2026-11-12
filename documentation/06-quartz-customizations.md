@@ -4188,7 +4188,8 @@ assistant is told to write and what the ready-made courses hold.
   boxes) inside the SAME ````markdown fence, so 6n's one claim still
   matches one example and 6o still finds the wrapper on one example page;
   6n now requires two wrappers and three text blocks there, so neither new
-  block can be deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
+  block can be deleted unnoticed. Section 23 ("Do not", section 22 until
+  #765 added "Lesson pages" before it) repeats it in one bullet.
   `plantoir-printing` says a text block prints wrapped either way and still
   asks for the flag, so it wraps on screen.
 - **The pins.** The binding sentences are listed in `contracts/shared-rules.json`

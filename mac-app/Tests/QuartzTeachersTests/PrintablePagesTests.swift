@@ -634,6 +634,12 @@ final class PrintablePagesTests: XCTestCase {
         let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
         let starterMacros: [String: Any] = try XCTUnwrap(guidance["starterMacros"] as? [String: Any])
         XCTAssertFalse(starterMacros.isEmpty)
+        let hintsStarter: String = try XCTUnwrap(guidance["hintsStarter"] as? String)
+        let offeredTemplate: [String: Any] = try XCTUnwrap(guidance["offeredTemplate"] as? [String: Any])
+        let templateName: String = try XCTUnwrap(offeredTemplate["name"] as? String)
+        let templateNamedIn: [String] = try XCTUnwrap(offeredTemplate["namedIn"] as? [String])
+        XCTAssertFalse(templateNamedIn.isEmpty)
+        XCTAssertFalse(starters.contains(hintsStarter), "every starter defines \\showanswers, and the hints wrapper does not")
         let pageAuthoring: [String: Any] = try XCTUnwrap(contract["pageAuthoringSkill"] as? [String: Any])
         let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
         XCTAssertFalse(routesTo.contains(skillName), "a handout made as a PDF is not part of a page")
@@ -664,6 +670,24 @@ final class PrintablePagesTests: XCTestCase {
                 let other: String = try String(
                     contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
                 XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+            // #765: the hints wrapper is written beside the starters, defines
+            // \showhints (not \showanswers, which is why it is not one of
+            // `starters`) and is named in the skill.
+            let hints: String = try String(
+                contentsOf: skillFolder.appendingPathComponent(hintsStarter), encoding: .utf8)
+            XCTAssertTrue(hints.contains("\\showhints"), "\(home): \(hintsStarter)")
+            XCTAssertTrue(skill.contains("`" + hintsStarter + "`"), "\(home): the skill must name \(hintsStarter)")
+            // #765: the offered template's name is defined in exactly one
+            // sentence of each skill that names it, so a rename is the
+            // contract's value and one sentence per skill.
+            for naming in templateNamedIn {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(naming)/SKILL.md"), encoding: .utf8)
+                let folded: String = PrintablePagesTests.foldingWhiteSpace(in: other)
+                let wanted: String = PrintablePagesTests.foldingWhiteSpace(in: templateName)
+                let times: Int = folded.components(separatedBy: wanted).count - 1
+                XCTAssertEqual(times, 1, "\(home): \(naming) must name the template \(templateName) exactly once")
             }
             // #754: each macro a starter must carry is defined in the written
             // starter and named in the skill, so an edit to either cannot

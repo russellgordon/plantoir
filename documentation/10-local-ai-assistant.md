@@ -8292,6 +8292,25 @@ before changing it:
   the tools, never before them, for the reason the issue gives.
 - Not done here: Course Settings' row (#360) and MCP `instructions` (mac only).
 
+### The skills read it too (#765, v1.10.0)
+
+Since #765 the `plantoir-handouts` skill (section 13) and the
+`plantoir-page-authoring` skill (section 22) tell an assistant to read the
+course's How I Teach page before writing any lesson material, and to run
+the lesson its way; where the page says nothing, the teacher's own request
+decides. Russell's own lesson shape (a two- or three-question warmup whose
+last question is a lead-in, one big idea per class built by a progression
+of task cards, visibly random groups at vertical whiteboards, the exercise
+following from that day's cards and summary, hints on every exercise, the
+exercise as the only homework) ships as a template named "Lessons students
+can catch up on" (`handoutsSkill.offeredTemplate`) that is OFFERED, never
+applied, and only to a teacher who has shown an interest in both
+constructivist and Thinking Classrooms practice and the reality of a
+school where students often miss class (his ruling on #765, 2026-11-12). The unit-planning skill (#707) already took its lesson
+shape from the page. Why, and what was rejected:
+`documentation/09-mac-app.md` → "Lesson materials, and whose way of
+teaching (#765, v1.10.0)".
+
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
 > **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 43 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
