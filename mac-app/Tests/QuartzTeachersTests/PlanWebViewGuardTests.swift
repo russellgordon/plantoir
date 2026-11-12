@@ -23,10 +23,8 @@ import XCTest
 ///   controller a list that cannot compile, which is what a bad edit of
 ///   `localOnlyRules` would be.
 ///
-/// The fixtures live under the user's Caches folder, not the temporary
-/// folder: the review measured that WebKit's page process may read
-/// `/private/tmp` whatever folder it was given, so a picture there would
-/// load and prove nothing.
+/// The fixtures live under `/Users/Shared` (`fixturesFolder` says why),
+/// and each run removes its own folder.
 @MainActor
 final class PlanWebViewGuardTests: XCTestCase {
 
@@ -34,11 +32,21 @@ final class PlanWebViewGuardTests: XCTestCase {
 
     nonisolated(unsafe) private var root: URL!
 
+    /// Where the fixtures live: a folder WebKit's page process does not open
+    /// by itself, or a picture "outside the planning folder" would load and
+    /// prove nothing. MEASURED (macOS 26.6): the process reads
+    /// `/private/tmp` and this user's temporary folder (`/var/folders/…/T`,
+    /// where `RealHome.forFiles` points under the suite) whatever folder it
+    /// was given, so a fixture there loaded the outside picture with the
+    /// guard in place; under `/Users/Shared` it did not, and it did once the
+    /// guard was widened to the course. Not the teacher's home: the
+    /// tripwire (`RealHomeTripwireTests`) keeps the suite out of it.
+    static let fixturesFolder: URL = URL(fileURLWithPath: "/Users/Shared/plantoir-plan-guard-tests", isDirectory: true)
+
     // MARK: - Functions
 
     override func setUpWithError() throws {
-        let caches: URL = try XCTUnwrap(FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first)
-        root = caches.appendingPathComponent("Plantoir-dev/plan-guard-tests/\(UUID().uuidString)", isDirectory: true)
+        root = PlanWebViewGuardTests.fixturesFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     }
 

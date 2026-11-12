@@ -4333,9 +4333,11 @@ everything through (3 connections), scripts on (the title changed), read
 access to the course (the picture showed at 9). The review measured more
 by hand (`<meta refresh>` to the web or outside the folder refused; a
 `_blank` web link opened outside exactly once; `plantoir:` and `ftp:`
-refused). One caveat it measured: WebKit's page process may read
-`/private/tmp` whatever folder it is given, so the tests keep their
-fixtures under the user's Caches folder. Still hand tests: a PDF drawn
+refused). One caveat, measured: WebKit's page process may read
+`/private/tmp` and the user's temporary folder (`/var/folders/…/T`, where the
+suite's throwaway home is) whatever folder it is given, so the tests keep their
+fixtures under `/Users/Shared`, which it does not open, and not in the
+teacher's home, which the suite never touches (`RealHomeTripwireTests`). Still hand tests: a PDF drawn
 inline, Back after a new-window PDF, dark mode through
 `prefers-color-scheme`.
 

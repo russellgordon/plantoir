@@ -349,8 +349,8 @@ final class PlanningTabTests: XCTestCase {
     /// drawing them (`CourseDetailStructureTests`), not by reading this file.
     func testTheCourseBranchUsesTheTabbedPage() throws {
         let page: String = try PlanningTabTests.readSource("QuartzTeachers/Views/CourseSettings/CourseDetailView.swift")
-        XCTAssertFalse(page.contains("TabView {"))
-        XCTAssertFalse(page.contains("TabView("))
+        // SwiftUI's TabView, never the name inside `PlanningTabView`.
+        XCTAssertNil(page.range(of: #"(?<![A-Za-z])TabView\s*[({]"#, options: .regularExpression), "no TabView")
         // The page's own wiring, which no drawn test reaches without a
         // window model (708 fix review 2, L5): the switch goes through the
         // binding that clears Undo, Planning publishes its own Save, and

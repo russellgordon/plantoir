@@ -128,10 +128,13 @@ final class CourseDetailStructureTests: XCTestCase {
         return nil
     }
 
-    private func courseNameField(under view: NSView) -> NSTextField? {
+    /// The Course name field, found by what it shows. Not by its
+    /// identifier: measured on the first real run, SwiftUI puts
+    /// `courseNameField` on the field's accessibility element, not on the
+    /// `NSTextField`, so a lookup by the view's identifier found nothing.
+    private func courseNameField(under view: NSView, showing name: String) -> NSTextField? {
         for candidate in allViews(under: view) {
-            if let field = candidate as? NSTextField, field.isEditable,
-               field.accessibilityIdentifier() == "courseNameField" {
+            if let field = candidate as? NSTextField, field.isEditable, field.stringValue == name {
                 return field
             }
         }
@@ -161,7 +164,8 @@ final class CourseDetailStructureTests: XCTestCase {
         defer {
             window.close()
         }
-        XCTAssertTrue(runUntil(timeout: 5) { courseNameField(under: host) != nil }, "Settings draws its form")
+        let name: String = course.configuration.courseName
+        XCTAssertTrue(runUntil(timeout: 5) { courseNameField(under: host, showing: name) != nil }, "Settings draws its form")
         let onSettings: [String] = settingsControls(under: host)
         XCTAssertTrue(onSettings.contains("NSTextView"), "the probe sees the footer box: \(onSettings)")
         XCTAssertTrue(onSettings.contains("NSTextField"), "the probe sees the fields: \(onSettings)")
@@ -239,7 +243,7 @@ final class CourseDetailStructureTests: XCTestCase {
         }
         var found: NSTextField? = nil
         XCTAssertTrue(runUntil(timeout: 5) {
-            found = courseNameField(under: host)
+            found = courseNameField(under: host, showing: course.configuration.courseName)
             return found != nil
         })
         let field: NSTextField = try XCTUnwrap(found)
@@ -252,7 +256,7 @@ final class CourseDetailStructureTests: XCTestCase {
         var tab: CourseDetailTab = .settings
         CourseDetailTabs.choose(.planning, current: &tab, undoManager: window.undoManager)
         shown.planning = true
-        XCTAssertTrue(runUntil(timeout: 5) { courseNameField(under: host) == nil }, "the form left the window")
+        XCTAssertTrue(runUntil(timeout: 5) { courseNameField(under: host, showing: "Typed on Settings") == nil }, "the form left the window")
         XCTAssertEqual(course.configuration.courseName, "Typed on Settings", "the draft outlives the form")
         XCTAssertTrue(course.configuration.hasUnsavedChanges)
 
@@ -280,7 +284,7 @@ final class CourseDetailStructureTests: XCTestCase {
         shown.planning = false
         var back: NSTextField? = nil
         XCTAssertTrue(runUntil(timeout: 5) {
-            back = courseNameField(under: host)
+            back = courseNameField(under: host, showing: "Typed on Settings")
             return back != nil
         })
         XCTAssertEqual(back?.stringValue, "Typed on Settings")
