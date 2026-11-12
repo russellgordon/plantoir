@@ -13,6 +13,10 @@ course's settings: it reads the destination, says it, and then stops at the
 missing recipe for the website builder, long before anything needs Docker,
 the network or a credential. The line it says is what is read here.
 
+The last class runs `contracts/app-rules.json` -> `savedDestinations` (#771):
+every case through the reader functions cut from deploy.sh, with each
+reader, and every sentence pinned to the line the launcher prints.
+
 Listed in verify.sh; Windows' PythonToolchainTests discovers it, and skips it
 there when no bash can run the launcher (see test_deploy_non_interactive).
 
@@ -39,9 +43,15 @@ atexit.register(shutil.rmtree, _TRAIL_FOLDER, True)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
+# Set before anything first imports toolchain_paths (contracts does, and
+# test_deploy_non_interactive reaches it through deploy.py), which reads it
+# once, at import.
+os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY_ROOT / "contracts"))
+
+import contracts  # noqa: E402
 import test_deploy_non_interactive as launcher_harness  # noqa: E402
 
-REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 STOPPED_BEFORE_THE_BUILDER = "missing the recipe for its website builder"
 
 
@@ -165,6 +175,238 @@ class DeployShReadsTheSavedDestination(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("could not read where ICS3U deploys", said)
         self.assertNotIn(STOPPED_BEFORE_THE_BUILDER, said)
+
+
+THE_DESTINATION_BLOCK_BEGINS = "# ---- Where this course deploys, when no destination was typed (#668) ----\n"
+THE_DESTINATION_BLOCK_ENDS = "# >>> DEPLOY WHILE ITS SECTION DEPLOYS GUARD >>>"
+
+# What each placeholder in savedDestinations.sentences is in deploy.sh's
+# printed lines.
+THE_LAUNCHERS_PLACEHOLDERS = {
+    "{course}": "${COURSE_CODE}",
+    "{section}": "${SECTION_NUM}",
+    "{where}": '$(destination_words "$_kind")',
+    "{refusal}": "${_leg_output}",
+    "{kind}": "${kind}",
+}
+
+# The launcher's own reading loop, run on the cut-out functions: a settings
+# file that cannot be read, or reads as nothing, is unreadable (the
+# couldNotRead refusal); otherwise each line is a leg, written
+# LEG <kind> <flags joined by US> or REFUSED <kind> <refusal>.
+LEGS_SCRIPT = r'''
+if ! saved="$(the_saved_destinations "$1" 2>/dev/null)" || [[ -z "$saved" ]]; then
+  echo UNREADABLE
+  exit 0
+fi
+while IFS=$'\t' read -r kind path; do
+  [[ -n "$kind" ]] || continue
+  if output="$(flags_for_the_saved_destination "$kind" "$path")"; then
+    printf 'LEG\t%s\t%s\n' "$kind" "$(printf '%s' "$output" | tr '\n' '\037')"
+  else
+    printf 'REFUSED\t%s\t%s\n' "$kind" "$output"
+  fi
+done <<< "$saved"
+'''
+
+
+def _the_launchers_text() -> str:
+    return (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+
+
+def _cut_from_deploy_sh(name: str) -> str:
+    text = _the_launchers_text()
+    begin = f"# BEGIN {name}\n"
+    end = f"# END {name}\n"
+    if text.count(begin) != 1 or text.count(end) != 1:
+        raise AssertionError(f"deploy.sh no longer carries {name} between its markers")
+    return text[text.index(begin) + len(begin):text.index(end)]
+
+
+def _printed(line: str):
+    """What an `echo "…"` line prints, with the cross or target and the
+    indent taken off the front as a teacher's window lifts them, or None."""
+    stripped = line.strip()
+    if not (stripped.startswith('echo "') and stripped.endswith('"')):
+        return None
+    said = stripped[len('echo "'):-1]
+    while said and not (said[0].isascii() and (said[0].isalnum() or said[0] in "${")):
+        said = said[1:]
+    return said
+
+
+def _the_destination_blocks_printed_lines() -> list:
+    text = _the_launchers_text()
+    if text.count(THE_DESTINATION_BLOCK_BEGINS) != 1 or text.count(THE_DESTINATION_BLOCK_ENDS) != 1:
+        raise AssertionError("deploy.sh's #668 destination block has lost its first or last line")
+    block = text[text.index(THE_DESTINATION_BLOCK_BEGINS):text.index(THE_DESTINATION_BLOCK_ENDS)]
+    printed = []
+    for line in block.split("\n"):
+        said = _printed(line)
+        if said:
+            printed.append(said)
+    return printed
+
+
+def _as_the_launcher_writes_it(sentence: str) -> str:
+    written = sentence
+    for placeholder, variable in THE_LAUNCHERS_PLACEHOLDERS.items():
+        written = written.replace(placeholder, variable)
+    return written
+
+
+class TheSavedDestinationsAreTheContracts(unittest.TestCase):
+    """GitHub #771: deploy.sh runs `contracts/app-rules.json` ->
+    `savedDestinations`, the cases Windows proposed (#739) and deploy.ps1 runs.
+
+    The block's functions are CUT from deploy.sh and run with the launcher's
+    own reading loop, once with plutil (the Mac's reader) and once with only
+    a Python to read with (every other bash). The whole-launcher tests above
+    cover the loop that runs the legs.
+    """
+
+    def setUp(self):
+        self.shell = launcher_harness._a_bash_that_can_run_deploy_sh()
+        if self.shell is None:
+            self.skipTest("no bash on this machine that can run deploy.sh's definitions")
+        if not shutil.which("plutil"):
+            # The class above's rule: off a Mac the Python reader is the only
+            # one, and a bash that has no Python cannot read the settings.
+            probe = subprocess.run(
+                self.shell + ["-c", "command -v python3 || command -v python"],
+                capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+            )
+            if probe.returncode != 0 or not probe.stdout.strip():
+                self.skipTest("the bash that runs the launcher has no python to read the settings with")
+        self.rule = contracts.section("app-rules", "savedDestinations")
+
+    def _legs(self, case, path=None) -> list:
+        with tempfile.TemporaryDirectory() as folder:
+            settings = Path(folder) / "course_config.json"
+            if "settingsText" in case:
+                settings.write_text(case["settingsText"], encoding="utf-8")
+            else:
+                settings.write_text(json.dumps(case["settings"]), encoding="utf-8")
+            environment = dict(os.environ)
+            if path is not None:
+                environment["PATH"] = path
+            script = (f"COURSE_CODE={self.rule['course']}\n"
+                      + _cut_from_deploy_sh("saved_destinations") + LEGS_SCRIPT)
+            result = subprocess.run(
+                self.shell + ["-c", script, "_", str(settings)],
+                capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+                env=environment,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            return result.stdout.rstrip("\n").split("\n")
+
+    def _expected(self, case) -> list:
+        if case.get("expectUnreadable"):
+            return ["UNREADABLE"]
+        expected = []
+        for leg in case["expectLegs"]:
+            if "flags" in leg:
+                expected.append("LEG\t" + leg["kind"] + "\t" + "\x1f".join(leg["flags"]))
+            else:
+                expected.append("REFUSED\t" + leg["kind"] + "\t" + leg["refusal"])
+        return expected
+
+    def _run_every_case(self, path=None):
+        self.assertTrue(self.rule["cases"], "the contract carries no cases to run")
+        for case in self.rule["cases"]:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(self._legs(case, path), self._expected(case))
+
+    @unittest.skipUnless(shutil.which("plutil"), "plutil is the Mac's reader")
+    def test_every_case_through_plutil(self):
+        """MUST-FAIL before #771: settings of ["netlify"] converted cleanly,
+        every -extract on them failed, and the course deployed to Netlify."""
+        self._run_every_case()
+
+    def test_every_case_through_python(self):
+        """The reader every bash but a Mac's uses, so on a Mac PATH is cut to
+        a Python and `tr` and plutil is not found."""
+        if not shutil.which("plutil"):
+            self._run_every_case()
+            return
+        python = shutil.which("python3")
+        if python is None:
+            self.skipTest("no python3 to read the settings with")
+        with tempfile.TemporaryDirectory() as tools:
+            os.symlink(python, os.path.join(tools, "python3"))
+            os.symlink(shutil.which("tr"), os.path.join(tools, "tr"))
+            self._run_every_case(path=tools)
+
+    def test_one_destination_deploys_with_the_flags_the_contract_checks(self):
+        """With ONE saved destination the launcher does not run a leg with
+        the flags; it sets TARGET or TO_FOLDER through
+        the_one_saved_destination. Every leg the contract accepts, set that
+        way, must be what its flags say (#771 review M1)."""
+        text = _the_launchers_text()
+        block = _cut_from_deploy_sh("saved_destinations")
+        self.assertEqual(text.count('the_one_saved_destination "$_kind" "$_path"'), 1,
+                         "the one-destination run no longer sets its destination through the block's function")
+        script = (block + '\nTARGET=unset\nTO_FOLDER=\n'
+                  'the_one_saved_destination "$1" "$2"\nprintf "%s\\t%s" "$TARGET" "$TO_FOLDER"\n')
+        checked = 0
+        for case in self.rule["cases"]:
+            for leg in case.get("expectLegs", []):
+                if "flags" not in leg:
+                    continue
+                flag, value = leg["flags"]
+                path = value if flag == "--to-folder" else ""
+                expected = (value, "") if flag == "--target" else ("unset", value)
+                with self.subTest(case=case["name"], kind=leg["kind"]):
+                    result = subprocess.run(
+                        self.shell + ["-c", script, "_", leg["kind"], path],
+                        capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+                    )
+                    self.assertEqual(tuple(result.stdout.split("\t")), expected)
+                checked += 1
+        self.assertTrue(checked, "the contract carries no accepted leg to check")
+
+    def test_the_sentences_are_the_contracts(self):
+        """Every sentence in savedDestinations.sentences is a line the block
+        prints, and the block prints nothing else a teacher reads."""
+        printed = _the_destination_blocks_printed_lines()
+        sentences = self.rule["sentences"]
+        expected = []
+        for key, sentence in sentences.items():
+            if key == "where":
+                continue
+            if isinstance(sentence, list):
+                written = []
+                for line in sentence:
+                    written.append(_as_the_launcher_writes_it(line))
+                with self.subTest(sentence=key):
+                    found = False
+                    for index in range(len(printed) - len(written) + 1):
+                        if printed[index:index + len(written)] == written:
+                            found = True
+                    self.assertTrue(found, f"deploy.sh does not print {written} in a row")
+                expected.extend(written)
+            else:
+                written = _as_the_launcher_writes_it(sentence)
+                with self.subTest(sentence=key):
+                    self.assertIn(written, printed)
+                expected.append(written)
+        for line in printed:
+            with self.subTest(printed=line):
+                self.assertIn(line, expected, "the block prints a sentence the contract does not carry")
+
+    def test_where_is_the_contracts(self):
+        """sentences.where, and a kind it does not list reads as Netlify's word."""
+        where = self.rule["sentences"]["where"]
+        script = _cut_from_deploy_sh("saved_destinations") + '\ndestination_words "$1"\n'
+        kinds = dict(where)
+        kinds["github_pages"] = where["netlify"]
+        for kind, words in kinds.items():
+            with self.subTest(kind=kind):
+                result = subprocess.run(
+                    self.shell + ["-c", script, "_", kind],
+                    capture_output=True, timeout=60, encoding="utf-8", errors="replace",
+                )
+                self.assertEqual(result.stdout.strip(), words)
 
 
 if __name__ == "__main__":

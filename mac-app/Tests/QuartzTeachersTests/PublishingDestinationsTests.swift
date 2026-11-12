@@ -51,19 +51,27 @@ final class PublishingDestinationsTests: XCTestCase {
     func testTheSentencesAreTheContracts() throws {
         let block: [String: Any] = try PublishingDestinationsTests.block()
         let sentences: [String: String] = try XCTUnwrap(block["sentences"] as? [String: String])
-        XCTAssertEqual(sentences.count, 5, "a sentence was added to the contract without a Swift twin, or removed")
+        XCTAssertEqual(sentences.count, 6, "a sentence was added to the contract without a Swift twin, or removed")
         XCTAssertEqual(PublishingDestinations.wizardCaption, sentences["wizardCaption"])
         XCTAssertEqual(PublishingDestinations.cloudflareCaption, sentences["cloudflareCaption"])
         XCTAssertEqual(PublishingDestinations.netlifyNote, sentences["netlifyNote"])
         XCTAssertEqual(PublishingDestinations.netlifyScheduleNote, sentences["netlifyScheduleNote"])
         XCTAssertEqual(PublishingDestinations.accountIDCanWait, sentences["accountIDCanWait"])
+        XCTAssertEqual(PublishingDestinations.cloudflareSizeNote, sentences["cloudflareSizeNote"])
 
         // What spends Netlify's allowance is a DEPLOY; publishing marks a
         // page. And no figures: the hosts change them (#668, M2 and M3).
         for (name, sentence) in sentences {
             XCTAssertFalse(sentence.lowercased().contains("publish"), "\(name) says publish for a deploy")
+            // The size note keeps one figure, "25 MB": Cloudflare's per-file
+            // limit is the fact that sentence exists to state (#775). Only
+            // that is taken out before looking, so a second figure still fails.
+            var checked: String = sentence
+            if name == "cloudflareSizeNote" {
+                checked = checked.replacingOccurrences(of: "25 MB", with: "")
+            }
             for digit in "0123456789" where name != "netlifyNote" {
-                XCTAssertFalse(sentence.contains(digit), "\(name) carries a figure")
+                XCTAssertFalse(checked.contains(digit), "\(name) carries a figure")
             }
         }
         // The note's only figure is the year Netlify's plans changed.
@@ -202,7 +210,7 @@ final class PublishingDestinationsTests: XCTestCase {
             "accountIDMayWait && PublishingDestinations.accountIDIsMissing(cloudflareAccountID)",
             // One block: the ID's problem, the sentence that it can wait
             // right after it, then the 25 MB fact (L5, L4).
-            "return built + Text(CloudflareDetailFields.sizeNote)",
+            "return built + Text(PublishingDestinations.cloudflareSizeNote)",
         ] {
             XCTAssertTrue(source.contains(needle), "PublishingChoiceView no longer shows: \(needle)")
         }

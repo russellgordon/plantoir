@@ -145,6 +145,7 @@ struct SidebarView: View {
                                     courseCode: course.code, sectionNumber: sectionNumber
                                 )
                                 sectionRowLabel(
+                                    courseCode: course.code,
                                     sectionNumber: sectionNumber,
                                     scheduledFor: scheduledFor,
                                     stoppedPublish: stoppedPublish,
@@ -643,9 +644,10 @@ struct SidebarView: View {
     /// sectionMarker`, plan review MED 7): two near-identical triangles side
     /// by side would be two meanings a teacher cannot tell apart. Its help
     /// says each that applies; its identifier is the stopped deploy's when
-    /// that applies, so the tests that find it keep finding it.
+    /// that applies (`warningIdentifier`).
     @ViewBuilder
     func sectionRowLabel(
+        courseCode: String,
         sectionNumber: Int,
         scheduledFor: Date?,
         stoppedPublish: ScheduledPublishOutcome.Stopped? = nil,
@@ -659,9 +661,11 @@ struct SidebarView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .accessibilityIdentifier(
-                            stoppedPublish != nil
-                                ? "stoppedPublishBadge-section\(sectionNumber)"
-                                : "problemsBadge-section\(sectionNumber)"
+                            SidebarView.warningIdentifier(
+                                courseCode: courseCode,
+                                sectionNumber: sectionNumber,
+                                stoppedPublish: stoppedPublish != nil
+                            )
                         )
                         // The same sentence twice, on purpose: hovering and
                         // hearing the row should tell a teacher the same thing.
@@ -675,7 +679,7 @@ struct SidebarView: View {
                     Image(systemName: "clock")
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier(
-                            "scheduledDeployBadge-section\(sectionNumber)"
+                            SidebarView.clockIdentifier(courseCode: courseCode, sectionNumber: sectionNumber)
                         )
                         .help(SidebarView.scheduledDeployTooltip(for: scheduledFor))
                 }
@@ -976,6 +980,25 @@ struct SidebarView: View {
     static func stoppedPublishTooltip() -> String {
         return "A deploy that was set to happen on its own did not get through. "
              + "Open this section to see what happened."
+    }
+
+    /// The one warning's identifier (#772, matching Windows' #734). The
+    /// sidebar is one list holding every course, so two courses' Section 1
+    /// rows would share an identifier that named the section alone, and a
+    /// test that found "the" warning found the first course's. The stopped
+    /// deploy's name wins when both apply, so a test can find the stopped
+    /// deploy's warning by that name.
+    static func warningIdentifier(courseCode: String, sectionNumber: Int, stoppedPublish: Bool) -> String {
+        if stoppedPublish {
+            return "stoppedPublishBadge-\(courseCode)-section\(sectionNumber)"
+        }
+        return "problemsBadge-\(courseCode)-section\(sectionNumber)"
+    }
+
+    /// The clock's identifier, in the same form and for the same reason
+    /// (#772). Windows has no such identifier.
+    static func clockIdentifier(courseCode: String, sectionNumber: Int) -> String {
+        return "scheduledDeployBadge-\(courseCode)-section\(sectionNumber)"
     }
 
     /// The one warning's words: each sentence that applies, the stopped
