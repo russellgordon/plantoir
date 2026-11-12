@@ -54,6 +54,19 @@ public static class AppDataRoot
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir");
 
     /// <summary>
+    /// The Plantoir folder as the LAUNCHERS compute it — <c>$env:LOCALAPPDATA\Plantoir</c>,
+    /// never redirected: <c>--state-dir</c> moves <see cref="Current"/> and is
+    /// not told to the launchers (#664). READ-ONLY by intent: it is here only so
+    /// <see cref="BuildOutputLocation.WhereTheLaunchersBuild"/> can name where a
+    /// build's records ARE (#734). Nothing may write through it.
+    /// </summary>
+    public static string AsTheLaunchersSeeIt => Path.Combine(
+        Environment.GetEnvironmentVariable("LOCALAPPDATA") is { Length: > 0 } fromTheEnvironment
+            ? fromTheEnvironment
+            : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Plantoir");
+
+    /// <summary>
     /// Keep this run's state somewhere else. Resolved to a full path, because
     /// a relative one would land wherever the working directory happened to
     /// be — which the app changes at startup.

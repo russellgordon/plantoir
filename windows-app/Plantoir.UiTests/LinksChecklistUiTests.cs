@@ -21,11 +21,11 @@ namespace Plantoir.UiTests;
 [Collection("drives the real app")]
 public class LinksChecklistUiTests
 {
-    private const string Code = "SPH3U";
-    private const string ClassPlace = "section1/All Classes/Unit 1, Day 2";
-    private const string WorksheetPlace = "Concepts/Worksheet";
+    internal const string Code = "SPH3U";
+    internal const string ClassPlace = "section1/All Classes/Unit 1, Day 2";
+    internal const string WorksheetPlace = "Concepts/Worksheet";
 
-    private static void WriteCourseWithAnOffer(string coursesDir)
+    internal static void WriteCourseWithAnOffer(string coursesDir)
     {
         string dir = Path.Combine(coursesDir, Code);
         var config = new JsonObject
@@ -74,7 +74,7 @@ public class LinksChecklistUiTests
         File.WriteAllText(Path.Combine(state, "section1.links-checklist.json"), offer.ToJsonString(), utf8);
     }
 
-    private static string RowId(string place) => "linksChecklistRow:" + place.Normalize(NormalizationForm.FormC);
+    internal static string RowId(string place) => "linksChecklistRow:" + place.Normalize(NormalizationForm.FormC);
 
     [UiFact]
     public void ARowAClassBringsIsShownTickedAndDisabledAndTheButtonCountsIt()

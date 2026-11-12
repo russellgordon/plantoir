@@ -52,6 +52,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -269,8 +270,21 @@ def read(path) -> dict | None:
     return record
 
 
+# How often, and how long apart, a replace refused by a reader is tried again.
+REPLACE_ATTEMPTS = 10
+REPLACE_PAUSE_SECONDS = 0.05
+
+
 def _write(path, record: dict) -> None:
-    """Atomically: a reader never meets half a file."""
+    """Atomically: a reader never meets half a file.
+
+    On Windows a replace is REFUSED (PermissionError, WinError 5) while any
+    other handle has the file open - even one that shares delete, measured on
+    Windows 11 26200 with Python 3.14.10 (#734 implementation review, finding
+    2) - and the app reads the record whenever its window comes to the front.
+    So a refused replace is tried again, ten times 50 ms apart, before the
+    record is given up; elsewhere it never happens and costs nothing.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(prefix=".problems-", suffix=".json", dir=str(path.parent))
@@ -278,7 +292,14 @@ def _write(path, record: dict) -> None:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             json.dump(record, stream, indent=2, ensure_ascii=False, sort_keys=True)
             stream.write("\n")
-        os.replace(temporary, path)
+        for attempt in range(1, REPLACE_ATTEMPTS + 1):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError:
+                if attempt == REPLACE_ATTEMPTS:
+                    raise
+                time.sleep(REPLACE_PAUSE_SECONDS)
     except BaseException:
         try:
             os.unlink(temporary)

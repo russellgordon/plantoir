@@ -30,7 +30,13 @@ public static class BuildMachineLines
     /// <param name="WasMachineLine">Whether the line is machinery
     /// (<c>transcriptStripping.machineLines</c>), read or not: such a line
     /// never reaches a teacher's console or the assistant's progress text.</param>
-    public sealed record Read(LinksChecklistMarker? Checklist, SiteHealthFinding? Finding, bool WasMachineLine);
+    /// <param name="Problems">The build's word that a section's Problems record
+    /// changed (<c>PLANTOIR_PROBLEMS:</c>, #734): counts only, for the caller
+    /// to hand to <see cref="SectionProblems.NoteMarker"/>. Written on the
+    /// trail by nobody here — the store writes "problems changed" when it
+    /// reads the record the marker points at.</param>
+    public sealed record Read(LinksChecklistMarker? Checklist, SiteHealthFinding? Finding, bool WasMachineLine,
+                              SectionProblemsMarker? Problems = null);
 
     /// <summary>The markers this helper writes on the trail itself, in the order it tries them.</summary>
     public static readonly IReadOnlyList<string> TrailMarkers = new[]
@@ -64,6 +70,11 @@ public static class BuildMachineLines
 
         if (LinksChecklistMarker.Parse(line) is { } checklist)
             return new Read(checklist, null, true);
+
+        // PLANTOIR_PROBLEMS: (#734, the mac's #717): the section's record of
+        // its problems was written; the window reads the file again.
+        if (SectionProblemsMarker.Parse(line) is { } problems)
+            return new Read(null, null, true, problems);
 
         // PLANTOIR_MAPS: (#345): which coverage maps the build wrote.
         if (CoverageMapsBuilt.Parse(line) is { } maps)

@@ -115,6 +115,7 @@ version line. A list that survives its own release is worse than no list.
 | 2026-11-11 | A deploy to a folder after an update builds the site again first, so the new version's look reaches it (Netlify and Cloudflare already did) | Windows (mac since 1.9.2) | #749 |
 | 2026-11-11 | A saved Netlify or Cloudflare token is kept when the service could not be reached, and the deploy says so in plain words; a token Cloudflare refuses is explained | Windows (mac since 1.9.1) | #705, #725 |
 | 2026-11-11 | `deploy.bat` typed with no destination deploys where the course's settings say, every destination in turn | Windows (mac since 1.9.2) | #739 (items 7, 8) |
+| 2026-11-11 | A section's Problems tab on Windows: every problem the last preview or deploy found, one row each with a tick, sortable, the repair in the row; one warning on the section in the sidebar until its own next build is clean; and ONE alert, only when a build found something new, offering Show. **It replaces the dialog that listed every folder problem on every build**, so the notes must say that dialog is gone | Windows (the mac since v1.9.1, #717) | [#734](https://github.com/russellgordon/plantoir/issues/734) |
 
 
 ## Warnings the release notes MUST carry

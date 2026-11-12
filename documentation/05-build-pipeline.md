@@ -1502,11 +1502,12 @@ links with ~190-character page names (4,382 whole) name 9.
   carries on editing does not meet it again on the next redraw. A healthy course
   must see nothing at all — the failure mode for this whole feature is nagging,
   and a warning dismissed by habit is dismissed when it matters. **Since #717 the
-  findings no longer have a dialog of their own on the mac**: each is a row of
-  the section's record (below, "A section's record of its problems"), and the
-  one alert is raised only when a build found something NEW, once per record —
-  the same rule taken further. The HEALTH line, the trail line and the
-  assistant's sentences are unchanged.
+  findings no longer have a dialog of their own on the mac, and since #734 not
+  on Windows either** (doc 12, "A section's Problems tab, its marker and its
+  alert"): each is a row of the section's record (below, "A section's record
+  of its problems"), and the one alert is raised only when a build found
+  something NEW, once per record — the same rule taken further. The HEALTH
+  line, the trail line and the assistant's sentences are unchanged on both.
 
 ### The overnight path's trail line (#153)
 
@@ -1739,12 +1740,23 @@ new filter. A build prints it twice: the build's, then the site's.
 
 **Never fails a build.** Every write is atomic and wrapped; one that cannot be
 written prints one `ℹ️` line (`test_a_record_that_cannot_be_written_is_one_plain_line`).
+On Windows a replace is refused while another program has the file open, any
+sharing — the app reads it when its window comes to the front — so `_write`
+tries a refused `os.replace` again, ten times 50 ms apart (#734;
+`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`).
 
 **What Windows inherits free:** all of the above — the file, the rows, their
 words, `firstSeen`, `changed`, `alertKey`, the marker, the site's merge and the
-deploy's refusal — because it is the shared Python. What it owes (the tab, the
-table, the marker on the row, the alert and its answers file) is in doc 09's
-section and the `windows` issue.
+deploy's refusal — because it is the shared Python. **Since #734 (v1.9.3) it
+reads them**: the tab, the table, the marker on the row, the alert and its
+answers file are doc 12's "A section's Problems tab, its marker and its alert
+(#734)". One thing to know when reading a Windows record by hand: the app reads
+it where the LAUNCHERS wrote it, `%LOCALAPPDATA%\Plantoir\builds\<folder id>`
+(`BuildOutputLocation.WhereTheLaunchersBuild`), which `--state-dir` does not
+move (#664). The site's merge (`site_said.py`, one Python start per site
+build) costs 228–280 ms per call on the Lenovo i5-8365U, measured 2026-11-11
+with another build running; the emitter wraps it in a `try`, so it cannot fail
+a build — it can only cost the site's rows, after at most its 20 s timeout.
 
 **Measured.** `scripts/test_section_problems.py` (26 tests, the contract's 10
 `rowCases`) in 0.05 s; verify.sh's two-section check plants a real TeX error
@@ -3569,8 +3581,12 @@ then `deploy`, so failing the build stops the run at the step that KNOWS the
 reason. The mac shows the alert about new problems on a failed build (since
 #717 from the section's record, which the build wrote before it stopped), so
 the teacher gets **Put them back** → **Preview Again**, and the row stays on
-the Problems tab; check that each app's failed-build path does the same
-rather than swallowing the findings.
+the Problems tab. Windows does the same since #734: the alert is raised from
+the record when the build prints `PLANTOIR_PROBLEMS:` (before Quartz, so
+before the build can stop), not when the preview ends, and a deploy whose
+build failed raises it from its ending (`TakeWhatTheDeployLeft`). Check that
+each app's failed-build path still does this rather than swallowing the
+findings.
 
 **The half nobody had named, and the worse one.** The skipped sync left the
 PREVIOUS build's `public/` on the host, and `deploy.py` uploads whatever it

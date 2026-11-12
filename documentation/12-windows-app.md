@@ -600,8 +600,9 @@ build claim — a preview's, or the assistant's rebuild — not the deploy's.
 - `SectionKey` (`Models/SectionKey.cs`): folder through `WorkingFolder.Resolved`
   and compared case-insensitively, course case-insensitive, section. Built
   canonical, so `C:\Work\` and `c:\work` are one key. `PerSectionStore<T>` beside
-  it creates an entry on first ask and never replaces or removes one. Both are
-  meant for #734's per-section Problems store too.
+  it creates an entry on first ask and never replaces or removes one. `SectionKey`
+  keys #734's Problems store too (`SectionProblems`, below; a dictionary of its
+  own, since nothing there is an object a running task holds).
 - `SectionDeployRun` (`Scripting/SectionDeployRun.cs`): the runner, `IsPreparing`,
   `IsAsking` (the question about classes dated later is up in SOME window), the
   `Folder` Cancel aims at, the deploy's claims, and the ending: `Endings`,
@@ -717,6 +718,289 @@ cases), `SectionDeployRunSourceTests` (the view binds to the run, appearing neve
 deploys, the deploy takes its run once and holds its claims, Cancel and Unloaded,
 the later preview, every reader, `IsSectionBusy`, the progress panel), and the UI
 test `ReturningToASectionMidDeployUiTests`.
+
+---
+
+## A section's Problems tab, its marker and its alert (#734, the mac's #717)
+
+**What it replaced.** Every build that met a folder problem put ALL of them in
+one `ContentDialog` (`FolderProblemsDialog.Findings`, queued by
+`FolderProblemQueue`), mid-build; the teacher dismissed it and nothing kept it,
+and a build the window did not watch (a scheduled deploy, the MCP server, a
+terminal) left only the overnight record. The record the build now writes
+(`<builds root>\<COURSE>\section<N>\.problems.json`, doc 05 → "A section's record
+of its problems") is the one list on Windows too: a tab, one warning on the
+sidebar row, and one alert only when a build found something NEW. The rulings
+and the mac's half are doc 09 → "A section's Problems tab, its marker and its
+alert (#717)"; this is what Windows built, and where it differs.
+
+**Core** (so the rules are unit-tested; Windows has no view tests):
+
+- `SectionProblemsRecord` reads the file tolerantly (a missing or broken file,
+  or another version, is no record, never an exception), with its rows and the
+  `PLANTOIR_PROBLEMS:` marker (`SectionProblemsMarker.Parse`, from the prefix
+  onward). `BuildMachineLines.Record` hands the marker back as `Read.Problems`,
+  and `ScriptRunner` raises `ProblemsMarker` and the app-wide
+  `SectionProblems.NoteMarker`, so a deploy that outlived its view and the
+  in-app assistant's build are seen too. `plantoir-mcp`'s `LauncherRunner`
+  ignores it (machinery, `transcriptStripping.machineLines`).
+- `SectionProblemsRules`: `State` (`rowState`: of the other sections' records
+  that show the page, the LATEST decides; no row of the same KIND on the page,
+  not merely no row with this id; `clearsAcrossSections`, `notAboutThePage`,
+  `siteSaidComplete` for a kind the site says), `HasMarker`, `AlertIsDue`,
+  `TrailLine` and `AnswerLine` — the mac's words, with the `{course}/{section} · `
+  front that `ActivityTrail.Note` writes on every line here.
+- `SectionProblemsWording`: the 19 `words` as constants named by key, the 16
+  kinds' labels and scopes, and a one-pass `Fill` (a brace inside a course name
+  or a TeX error is never read as a placeholder). Close and Not Now are
+  `SiteHealthRepair.CloseTitle`'s.
+- `ProblemsAcknowledgements`: `%LOCALAPPDATA%\Plantoir\problems-acknowledged\<folder id>.json`
+  (under `AppDataRoot`, so `--state-dir` and the unit suite keep their own),
+  `answered` and `noted` per `"<course lowercased>/<section>"`, 20 each, written
+  atomically; the mac's JSON shape.
+- `SectionProblems` (static, keyed by `SectionKey`): the records READ, the tab
+  each section shows and the rows unticked (session only). `ReloadAsync` reads on
+  a worker and keeps on the caller's thread; a file whose size and time have not
+  moved is not parsed again, so an activation costs a stat per section; it raises
+  `Changed(folder, course)` only when something moved. The "problems changed"
+  line is written there, once per alert key (remembered in `noted`, so a
+  relaunch does not write it again). `ClaimTheAlert` lets one view in the app
+  hold a section's alert, so two windows on one section raise it once.
+
+**Where the records are read from: one builds-root rule, not a Problems-only
+exception.** Under `--state-dir` the app's builds root moves and the launchers'
+does not (#664): `BuildOutputLocation.BuildsRootFor` follows `AppDataRoot`,
+while `Enter-NativeRuntime` in `preview.ps1`, `deploy.ps1` and `setup.ps1`
+computes `Join-Path $env:LOCALAPPDATA ('Plantoir\builds\' + $WORKDIR_ID)` and
+then OVERWRITES `PLANTOIR_BUILD_ROOT` with it — so that variable, which
+`BuildsRootFor` honours, never moves where a build is written. The question
+"where did the launchers write this section's build records" now has one named
+answer, `BuildOutputLocation.WhereTheLaunchersBuild` (over
+`AppDataRoot.AsTheLaunchersSeeIt`, so `RealStateTripwireTests`' one-place rule
+holds), which ignores both, and
+the store reads through it (`SectionProblemsStoreTests.TheRecordsAreWhereTheLaunchersBuild`
+also reads the three launchers for that expression). It is read-only by
+intent. **The other readers were left on `BuildsRootFor`, deliberately:**
+`BuildFreshness` (Deploy's "does it need a rebuild"), `PreviewedPageSource.ListPathFor`
+(#690's page list for Open in Obsidian) and `AssistWorkspace.LegacyMarkerHomes`
+read the redirected root under `--state-dir` and find nothing — a rebuild, an
+empty list, a marker not moved, each a safe answer, and none different for a
+teacher, whose two roots are the same folder. Nothing proves any of them wrong
+today, so none was moved. Rejected: seeding records into the redirected root in
+the UI tests (it loses the mid-build path through the window), and moving
+`BuildsRootFor` itself (it would change `CourseArchiver`'s discard under
+`--state-dir`, which DOES write).
+
+**When a record is read** — never while anything draws: a marker from any run
+(`MainWindow` reloads that course for its folder), the section view's `Loaded`,
+its own preview's `ProblemsMarker`, a deploy's ending (`TakeWhatTheDeployLeft`),
+the courses loading (`WorkspaceViewModel.Courses`), the scheduled-run watcher,
+and window activation. **`Activated` fires on deactivation too, and on every
+return of focus** (a dialog of the window's own closing raises it): the
+deactivated state is ignored, as before, and the read is throttled to once in
+three seconds (`MainWindow.ReadTheProblems(throttled: true)`). The view asks
+for the alert on activation whether or not anything moved, so one that could
+not get on screen is asked again.
+
+**The sidebar.** ONE warning `FontIcon` per row, as on the mac: shown for a
+stopped scheduled deploy OR `SectionProblems.HasMarker` (memory, read on every
+reconcile and on `Changed` through `SidebarPane.RefreshProblemMarkers`); its
+tooltip, its Name and the ROW's `HelpText` say each sentence that applies
+(Narrator reads the row, not a tooltip on a child icon). **Its id names the
+course as well as the section** — `problemsBadge-<COURSE>-section<N>`, or
+`stoppedPublishBadge-<COURSE>-section<N>` when the stopped deploy applies —
+because two courses' Section 1 rows are in one tree (the mac's id has the
+section only; it has one window per section). The old fixed id
+`scheduledPublishWarning` had no reader.
+
+**Website | Problems.** A `SelectorBar` in its own row under the notices, shown
+only while the section's OWN record has rows; with none the section looks as it
+always has and the tab falls back to Website. Not in the toolbar (every item
+always present — the mac's reason too), and not a `TabView`, which would move
+the web view between containers. `SectionProblemsView` (code-only) is the LAST
+child of the content grid, opaque, over the console and the site. **What is
+under it is COLLAPSED as well as covered** (`BaseLayer` and `Preview` in
+`RefreshChrome`), so the covered page and console leave the Tab order and the UI
+Automation tree; the `WebView2` is never removed from the tree and its source is
+never reset. **Measured** (Lenovo 20QES70500, i5-8365U, 16 GB, Windows 11 Pro
+26200, the laptop's own display at 150 %, 2026-11-11,
+`ProblemsTabUiTests.TheCoveredPageKeepsItsPageAndItsScroll`): a 250-paragraph
+front page scrolled to 60.0 % read 60.0 % after Problems and back, three rounds
+of three, with the same page loaded and the same Back state; while Problems
+showed, `previewWebView` was absent from the UI Automation tree and twelve Tab
+presses never reached it. The covered-but-not-collapsed variant was not
+measured: the Tab-order rule needs the collapse anyway, and the collapse kept
+the scroll. **A collapsed `SelectorBar`'s items stay in the UI Automation tree,
+marked off screen** (measured): a test that asks whether the bar is shown must
+read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
+(selection followed focus on the last run; one earlier run moved the focus
+only, so the UI test accepts either and says which).
+
+**The table.** Include (a box; ticked means included, every row starts ticked,
+for the session), Kind, Page (or Whole section / Whole course), Problem (the
+row's item, or `fixedInTheSource` in secondary text; the whole sentence and
+detail as the row's tooltip AND its `HelpText`), First found, Last found. Sorted
+by Kind; Kind, Page, First found and Last found sort, as on the mac (header
+buttons; the sorted one carries an arrow and `ItemStatus` "sorted ascending" /
+"sorted descending" — a plain button has no `SortDirection`, which belongs to a
+table's column header, and a `ListView` exposes none; that is the limit). The
+tick rules are `TickTable`'s, called rather than copied (`TickTable.TickWithSpace`,
+`Status`, `ItemWithTheFocus`, extracted for this; the later-classes, Publish
+Pages… and Start of Year tables use the same three): Space on its way down, a
+held Space's repeats swallowed, the row's `ItemStatus` ticked / not ticked. The
+builder was NOT generalised — this table's first column is a box with no title,
+its Problem cell carries a button and its headers sort — which is a deviation
+from the plan, made so the three existing tables' builder did not change. A
+fixable row carries its repair inline (`SiteHealthRepair.ButtonTitle`), never on
+a course kept for reference, its outcome shown as the alert's is. Every box and
+button is named for its row ("Include: Media folder, Whole course", "Put the
+Media folder back: Media folder, Whole course"), with the problem's own words
+added when two rows share a kind and a page. A page or course name carrying
+`%`, `&`, `|`, `<`, `>`, `^`, `"`, `;` or a newline is shown as written
+(`SectionProblemsContractTests.AnAwkwardPageNameIsShownAsWritten`, and the
+seeded UI test); handing such text to a terminal is #736's.
+
+**300 rows, measured** (same PC, `ProblemsTabUiTests.ThreeHundredRowsShowInTime`):
+every row's `ListViewItem` (its box, cells and button) is BUILT up front when the
+tab FIRST shows — 413–522 ms for 300 — but the list's panel lays out and puts in
+the UI Automation tree only the rows near the view: 6–27 were listed before
+scrolling, measured, and the rest arrive as the list scrolls (the 300th is
+there at the bottom). So a screen reader moving down the list reaches every
+row, as the list brings it in; nothing is cut off, and nothing is listed that
+is not near the view. The first
+version made them whenever the record was read, so opening a section on its
+Website tab paid the half second; now it does not (the section opened in
+299–341 ms either way, click and title included), and Problems shows 562–625 ms
+after its click. Not virtualised further: 300 problems is far past any record
+seen, and the cost is paid once per record.
+
+**The alert.** ONE `ContentDialog` (`FolderProblemsDialog.NewProblems`): the
+title counts the new problems, the message is the new problem's own sentence
+when there is one, then `alertMessage`, then how many went; Show (the default:
+selects Problems), the repair as the second button when a NEW row has one, Not
+Now. No check box (#731). Raised when `AlertIsDue` holds and nothing else of
+this view's is up (today's-class question, the links checklist, a health
+dialog) — it stays due in the store, so `ShowDialogSafelyAsync`, the outcome
+dialog, today's-class question and the checklist each ask again as they close;
+one that could not get on screen asks again two seconds later. An answer is
+written only when the teacher gave one — but **a dialog that outlives its VIEW is
+still the teacher's answer**: the view is rebuilt under an open dialog whenever
+the courses reload (`ShowDetailForSelection` on `Courses`), the `ContentDialog`
+stays on the window, and the first version dropped the answer as "the view went
+away", so the next view raised the same alert again (found by the full UI run,
+2026-11-11, `ProblemsTabUiTests.OpeningOntoAnUnansweredRecordRaisesTheAlert_AndAnAnsweredOneDoesNot`).
+Only a dialog the WINDOW took down as it closed (`LetGoAsTheWindowCloses`)
+leaves it due. The answers file is read ONCE per working folder, on the worker
+that reads the records, and kept in memory (`SectionProblems`): the interface
+thread — which the waiting checklist asks every 300 ms — never reads the disk
+for it, and an answer the file could not keep still holds until the app
+closes. Every change is written through; a relaunch reads the file. **Only
+this app writes the file**, and the cache is never re-read: `Write` puts the
+whole in-memory copy back, so a second process writing it (a second copy of
+Plantoir on the same folder, say) would have its answers overwritten by the
+next write here and not seen here until a relaunch — at worst one alert raised
+again, never one lost for good, since both copies remember their own.
+
+**The links checklist FOLLOWS the alert** — the mac's order, which the contract
+writes as "The links checklist (#379) follows it": today's-class question,
+then the alert, then the checklist (`SectionProblemsRules.TheChecklistWaits`).
+It reads the record first (the marker came before the checklist's, but the
+read is asynchronous) and waits while the alert is on screen here (as long as
+the teacher reads it) or due but not up here (at most ten seconds: held by
+another window, or unable to get on screen). **The first version could
+deadlock** (implementation review, finding 1): the checklist set the flag the
+alert waits behind BEFORE its wait, so opening a section onto a record with a
+link into a hidden page and a waiting checklist — the ordinary way in after a
+scheduled, MCP or terminal build — showed neither. Now one flag guards
+re-entry and another, set only as the checklist goes on screen, is what the
+alert waits behind; the bound makes any future ordering fail open. **With
+nothing in front of it and no alert due — read from memory — it goes up in the
+SAME turn that offered it**, as in 1.9.0 (`TheChecklistGoesAtOnce`): the
+second version always took at least one turn (a hop to a worker, the alert
+queued, a 300 ms tick), which put it beside the window's activation work, and
+`LinksChecklistUiTests` then failed 1–2 runs in 3 against 3 of 3 on `dev`
+(third review) — the dialog went up with its buttons unnamed, because
+`LinksChecklistDialog.TagButtons` ran once, on `Opened`, before the template's
+buttons were in the tree. It now tries again after layout and logs when it
+cannot. A view rebuilt while the checklist waits hands the offer to the
+section's next view (`ChecklistsWaiting`).
+`ProblemsTabUiTests.TheAlertComesFirstAndTheLinksChecklistFollowsIt`.
+
+**The record and its writer.** Windows refuses `os.replace` (and .NET's
+overwriting move) while ANY other handle has the file open — measured on this
+PC, Python 3.14.10, with and without delete sharing — and the app reads the
+record whenever the window comes to the front. A refused replace was not
+silent — every caller of `section_problems._write` prints a "Could not keep the
+list of problems…" line to the console and the build goes on — but that build's
+record was lost, and nobody reads a console for it. The app's read now
+shares read, write and delete (`SectionProblemsRecord.OpenShared`, so an
+archive can still remove the folder) and holds the file only for the read;
+the shared Python tries a refused replace again, ten times 50 ms apart
+(`test_a_record_a_reader_holds_open_is_replaced_once_the_reader_lets_go`; it
+costs the mac nothing, where a replace is never refused). An eleventh refusal
+is what it was before: the temporary file is removed, the caller prints its
+"Could not keep…" line, the build goes on, and the previous record stays. Rejected: relying
+on delete sharing alone, which the review proposed and the measurement
+refuted. `NoteHealthFindings`,
+`FolderProblemQueue` and the held #333 finding are gone: on Windows the
+checklist was already decided by its marker, so routing the finding had nothing
+left to do once no dialog showed it. The overnight record is still TAKEN
+(`ScheduledHealthFindings.Take`), so it does not pile up and its trail lines are
+written, with no dialog of its own.
+
+**Measured, the alert's timing:** 172.8 s after Preview on the FIRST build in a
+brand-new working folder (the UI test's; that build makes the workspace, and
+another agent's suites shared the CPU) — not comparable with the mac's ~5 s on
+an M4 Pro, and not measured on a warm folder here.
+
+**Focus, decided** (review change 3): after Show, the first row of the table
+(posted at low priority, after the dialog's own focus restore, so it never lands
+under the tab); after a choice of tab on the bar, it stays on the bar; after a
+repair's outcome closes, that problem's row (it stays until the next build), or
+the table; when the last row clears with the focus inside the table, Preview.
+After Not Now, wherever the dialog gives it back — on the Website tab, which is
+what shows.
+
+**A preview or deploy started while Problems shows does NOT switch back to
+Website** — matching the mac, read off its code (the tab is a top layer, and
+nothing sets it back but Show, the switch, or the record losing its rows); the
+mac had not recorded it. The Preview button's face still changes, and the tab
+goes by itself when a clean build empties the record.
+
+**Cases met and not drawn differently:** a problem whose page has since been
+deleted or renamed stays as its build named it until the section's next build
+(the record is the last build's; the row has no link to follow); a build that is
+now stale is read the same way, which is what the intro says ("What the last
+preview or deploy … found"); two windows on one section share the tab and the
+ticks (the store's), and the alert is raised in one (`ClaimTheAlert`).
+
+**The trail.** "problems changed" (`ActivityTrail.Event.ProblemsChanged`): the
+change line once per alert key, from the store, and the answer line
+(`Show`, `the repair`, `Not Now`) from the view. Nothing for a tick or the tab.
+"asked an assistant to fix problems" (#736) and "deploy refused for the
+Cloudflare Account ID" (#739) are held in `NamedGapLedger` for v1.9.3.
+
+**Tests.** `SectionProblemsContractTests` (the 12 `rowState`, 4 `sectionMarker`
+and 6 `alert` cases, the lists, words and kinds pinned, rule 1, the trail line,
+the marker, the record, awkward names), `SectionProblemsStoreTests` (the
+canonical key, a course read whole, no re-read of an unmoved file, answers and
+the trail line across a relaunch, 20 kept, ticks and the tab, one alert per
+section, where the launchers build), `SectionProblemsSourceTests` (one alert
+from the record, the old dialog gone, no box, the web view kept mounted, no disk
+search in the table, the sidebar from memory, the moments of reading, the
+checklist after the alert, a due alert asked again), and the UI tests
+`ProblemsTabUiTests` (five: a real preview with a missing Media folder — alert,
+Show, focus, names, Space, sort state, the warning, the covered page out of the
+Tab order, the inline repair and a clean build; a shared page fixed in another
+section; opening onto an unanswered record and an answered one, with the
+keyboard; 300 rows; the covered page's scroll).
+
+**What cannot be judged here:** the layout at 100 %, 125 % or 200 %, or on a
+large external monitor (the laptop's own display is the only one); the Problem
+column's trimming at the window's narrowest beside a wide sidebar; the
+secondary "fixed in the source" text's contrast in dark mode; the warning
+glyph's size beside the clock at other DPI; and what Narrator SAYS (#713's
+listen, before the cut).
 
 ---
 
@@ -1619,6 +1903,17 @@ behaviour without a desktop.) Rejected: redirecting `LOCALAPPDATA` for the app's
 launchers would build under the state folder — it would have stopped the
 tests exercising the real path the ruling asked for, and node and npm resolve
 caches from the same variable.
+
+**A fixture with a folder problem now meets an alert (#734).** A preview of a
+course missing its `Media` folder or its front page, or with a page whose
+settings cannot be read, writes the section's Problems record and raises the
+alert about new problems mid-build. `DrivenApp.WaitAnsweringDialogs` answers it
+with its Close button (Not Now, which is recorded as the answer) like any other
+ordinary dialog, and takes `except:` a title it must leave for the test to
+read (`ProblemsTabUiTests`). A test that SEEDS a record writes it where the
+launchers would, under `RealBuildsRoot`, which `Dispose` deletes. And a
+collapsed `SelectorBar`'s items are still in the tree, off screen: ask
+`IsOffscreen`, not presence (`ProblemsTabUiTests.Showing`).
 
 **Still never done from a test:** scheduling a deploy (it registers a REAL
 Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
@@ -4603,6 +4898,13 @@ again.)
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)
 
 ## The links checklist on Windows (#392, #399, #405)
+
+**Since #734 it FOLLOWS the alert about new problems** (`sectionProblems.alert`):
+`PresentTheLinksChecklistAsync` reads the section's Problems record first and
+waits while that alert is due or up, as it already waited behind today's-class
+question (#406). The #333 finding is no longer held for it: no dialog shows
+findings any more, and the checklist was always decided by its own marker here.
+See "A section's Problems tab, its marker and its alert (#734)".
 
 The mac's sheet (documentation/09-mac-app.md → "The links checklist (#379)") is,
 on this side, split in two, and only the first half is built.

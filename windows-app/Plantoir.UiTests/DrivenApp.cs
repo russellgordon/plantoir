@@ -702,7 +702,8 @@ public sealed class DrivenApp : IDisposable
     /// reports them, because a refusal answered here is the likeliest reason
     /// the wait never ended.
     /// </summary>
-    public bool WaitAnsweringDialogs(Func<bool> done, TimeSpan within)
+    /// <param name="except">A dialog title NOT to answer — the one the caller is waiting for (#734's alert).</param>
+    public bool WaitAnsweringDialogs(Func<bool> done, TimeSpan within, string? except = null)
     {
         var until = DateTime.UtcNow + within;
         while (DateTime.UtcNow < until)
@@ -711,6 +712,7 @@ public sealed class DrivenApp : IDisposable
             try
             {
                 if (OpenDialog() is { } dialog
+                    && (except is null || dialog.Name != except)
                     && dialog.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")) is { } close
                     && close.IsEnabled)
                 {

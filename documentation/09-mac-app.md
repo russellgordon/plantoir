@@ -871,12 +871,20 @@ answer to the alert. Nothing for a tick or for opening the tab.
 the alert, Show, the tab, the table, the marker; the fence put right, a
 preview, the row and the marker gone.
 
-**What Windows owes** (the `windows` issue): a store keyed like #706's, the
+**What Windows owed** (#734, v1.9.3, landed): a store keyed like #706's, the
 Website | Problems switch with WebView2 kept mounted, a check-box list sortable
 by kind, the Segoe Fluent warning glyph on the section row (one, as above), the
 alert with Show and the repair, the answers file, `rowState`/`sectionMarker`/
 `alert` cases, and the trail event. The record, its rows and their words are
-free: Windows runs the same Python.
+free: Windows runs the same Python. How Windows built it, and the three places
+it differs on purpose (the warning's id names the COURSE as well as the
+section, the rows are made only when the tab first shows, and the covered web
+view is collapsed as well as covered), are doc 12's "A section's Problems tab,
+its marker and its alert (#734)". **One behaviour read off this side's code,
+not recorded anywhere before:** a preview or deploy started while the Problems
+tab shows does NOT switch back to Website — the tab is a top layer and nothing
+sets the tab back but Show, the switch, or the record losing its rows. Windows
+matches it; doc 12 says so.
 
 **Tests.** `SectionProblemsTests` (13, with #731's): the three case lists, the lists and
 words pinned key by key, rule 1 over every word, the marker read from its

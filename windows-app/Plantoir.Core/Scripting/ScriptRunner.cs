@@ -226,6 +226,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             _healthFindingsSeen.Clear();
             Notify(nameof(HealthFindings));
             LinksChecklistMarker = null;
+            ProblemsMarker = null;
         }
         NotifyRunState();
 
@@ -694,11 +695,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// Every folder problem this run's build reported, in the order it
     /// reported them.
     ///
-    /// <para><b>Nothing on Windows displays these yet</b> — there is no
-    /// findings dialog on this platform (issue #86). What the
-    /// collection is for today is the "folder problem found" line each finding
-    /// leaves on the activity trail; the property is the seam a dialog will
-    /// attach to.</para>
+    /// <para><b>No dialog shows these since #734.</b> What a teacher is shown
+    /// is the section's Problems record (<see cref="ProblemsMarker"/>, the
+    /// tab and its alert). What this collection is for now: the "folder
+    /// problem found" line each finding leaves on the activity trail, the
+    /// #333 finding the links checklist is routed by, and what a deploy's
+    /// ending hands to the view that takes it.</para>
     ///
     /// <para>A SNAPSHOT, not the live list: the list behind it is appended to
     /// as output arrives and cleared at the start of an unrelated run, so
@@ -757,6 +759,12 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     /// </summary>
     public Plantoir.Core.Assist.LinksChecklistMarker? LinksChecklistMarker { get; private set; }
 
+    /// <summary>
+    /// The last <c>PLANTOIR_PROBLEMS:</c> line this run printed (#734): the
+    /// build wrote the section's <c>.problems.json</c> before printing it.
+    /// </summary>
+    public Plantoir.Core.Models.SectionProblemsMarker? ProblemsMarker { get; private set; }
+
     private void RecordHealthFinding(string line)
     {
         // One dispatch for every machine line a build prints (#660): the
@@ -764,6 +772,18 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // record, so a marker cannot be known to one reader and not another.
         // It writes the trail lines itself; what the window keeps is here.
         var read = BuildMachineLines.Record(line);
+        if (read.Problems is { } problems)
+        {
+            // #734: mid-build, before Quartz (the #153 timing), so the alert
+            // keeps the moment the folder-problem dialog had. Raised for the
+            // whole app too, so the sidebar and a view whose own runner this
+            // is not (a deploy that outlived its view, the in-app assistant's
+            // build) read the record again.
+            ProblemsMarker = problems;
+            Notify(nameof(ProblemsMarker));
+            Plantoir.Core.Models.SectionProblems.NoteMarker(problems);
+            return;
+        }
         if (read.Checklist is { } offered)
         {
             LinksChecklistMarker = offered;
