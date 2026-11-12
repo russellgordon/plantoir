@@ -287,13 +287,23 @@ In a sentence, `print()` in single backticks is code too.
   yourself" - is the `plantoir-runnable-code` skill's ` ```python run `
   block, not this one.
 
-**Every text block on a page wraps.** Whenever you put plain text in a
-fenced block on a page (an error message, sample output, a terminal
-session, a paragraph to copy), write `text wrap` after the backticks, never
-a bare `text`, so a long line wraps instead of scrolling sideways. This
-holds inside a callout and a list item too. It is for text blocks only: a
-code block (` ```swift `, ` ```python ` ...) never wraps, because code is
-read by column.
+**Every text block on a page wraps, unless its meaning depends on
+characters lining up.** Whenever you put plain text in a fenced block on a
+page, inside a callout or a list item too, ask one question: does its
+meaning depend on characters lining up?
+
+- **No** (an error message, sample output, a terminal session, a paragraph
+  to copy): write `text wrap` after the backticks, so a long line wraps
+  instead of scrolling sideways.
+- **Yes** (a drawing made of characters, a table or columns lined up with
+  spaces, a traceback whose `^^^` or `~~~` markers sit under the code they
+  point at): write `text nowrap`. The block scrolls sideways and keeps its
+  shape, exactly as a bare `text` block does.
+
+Never a bare `text`: an unwrapped block is always deliberate. `nowrap` is
+one word; `no wrap` is read as `wrap`. This is for text blocks only: a code
+block (` ```swift `, ` ```python ` ...) never wraps, because code is read
+by column.
 
 **Anything students copy goes in a text block.** A prompt for an AI
 assistant and a commit message are always given in a `text wrap` block,
@@ -310,6 +320,15 @@ Commit this change with the message:
 
 ```text wrap
 Stop the score going below zero when a player loses a round
+```
+
+The queue after three numbers arrive, drawn so its boxes line up:
+
+```text nowrap
+ front             back
++-------+-------+-------+
+|   4   |   9   |   2   |
++-------+-------+-------+
 ```
 ````
 
@@ -698,9 +717,10 @@ coverage map, and My Progress from 1.8.2) - do not add those by hand.
   survey service; use the feature skills.
 - Do not link to a page by its folder path (`[[Concepts/Slope]]`) unless two
   pages share the name.
-- Do not write a bare ` ```text ` fence, and do not give a prompt or a
-  commit message students should copy only in a screenshot: put the words
-  in a ` ```text wrap ` block (section 9).
+- Do not write a bare ` ```text ` fence: every text block says `wrap`, or
+  `nowrap` when its meaning depends on characters lining up. Do not give a
+  prompt or a commit message students should copy only in a screenshot:
+  put the words in a ` ```text wrap ` block (section 9).
 - Do not edit `course_config.json` unless the teacher asks you to (Plantoir's
   Course Settings write it), or anything in a folder whose name starts with
   a dot. (The two exceptions are `plantoir-handouts`' own

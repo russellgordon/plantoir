@@ -27,7 +27,7 @@ def factorial(n):
     return n * factorial(n - 1)
 ```
 
-```text wrap
+```text nowrap
 factorial(5)  ->  120
 factorial(0)  ->  1
 factorial(20) ->  2432902008176640000
@@ -89,7 +89,7 @@ countdown(3)
 ```
 
 > [!bug] The traceback for a missing base case
-> ```text wrap
+> ```text nowrap
 > 3
 > 2
 > 1

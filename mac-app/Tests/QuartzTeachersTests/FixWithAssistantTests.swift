@@ -56,6 +56,7 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertEqual(fixWith["courseNameMaxCharacters"] as? Int, FixWithAssistant.courseNameMaxCharacters)
         XCTAssertEqual(fixWith["replaceInTheMessage"] as? [[String]], FixWithAssistant.replaceInTheMessage)
         XCTAssertEqual(Set((fixWith["deployOnlyKinds"] as? [String]) ?? []), FixWithAssistant.deployOnlyKinds)
+        XCTAssertEqual(fixWith["notEnabledHelp"] as? String, FixWithAssistant.notEnabledHelp)
         for (_, piece) in swiftPieces {
             XCTAssertFalse(piece.contains(";"), "Windows Terminal splits at a semicolon: \(piece)")
         }
@@ -488,6 +489,21 @@ final class FixWithAssistantTests: XCTestCase {
         let opened: Range<String.Index> = try XCTUnwrap(fix.range(of: "if opened {"))
         let noted: Range<String.Index> = try XCTUnwrap(fix.range(of: "FixWithAssistant.noteOnTheTrail("))
         XCTAssertLessThan(opened.lowerBound, noted.lowerBound, "the line is written once the door opened")
+    }
+
+    /// #776: while the buttons cannot be pressed, each tells VoiceOver why
+    /// (`fixWith.notEnabledHelp`), and while they can, it says nothing more.
+    /// Both buttons take the hint from the one rule, so neither can drift.
+    func testTheButtonsSayWhyOnlyWhileTheyCannotBePressed() throws {
+        let fixWith: [String: Any] = try FixWithAssistantTests.fixWith()
+        let sentence: String = try XCTUnwrap(fixWith["notEnabledHelp"] as? String)
+        XCTAssertEqual(FixWithAssistant.buttonHint(hasRows: false), sentence, "disabled: the reason")
+        XCTAssertEqual(FixWithAssistant.buttonHint(hasRows: true), "", "enabled: no hint")
+
+        let view: String = try FixWithAssistantTests.readSource("QuartzTeachers/Views/Section/ProblemsTableView.swift")
+        let buttons: String = try FixWithAssistantTests.body(of: "var fixButtons: some View {", in: view)
+        let hint: String = ".accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))"
+        XCTAssertEqual(buttons.components(separatedBy: hint).count - 1, 2, "both buttons carry the hint")
     }
 
     // MARK: - Helpers

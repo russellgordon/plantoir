@@ -17,7 +17,7 @@ which item is allowed out next.
 
 ## A promise about which one comes out next
 
-```text wrap
+```text nowrap
 STACK - last in, first out          QUEUE - first in, first out
 
    push        pop                    enqueue              dequeue
