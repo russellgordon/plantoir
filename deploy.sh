@@ -134,11 +134,18 @@ KEPT_COPIES_FOLDER=".geogebra-cache"
 # stay where they are, rather than being set aside somewhere and put back,
 # so no step can leave them anywhere but their own place: a run stopped
 # halfway leaves fewer built files, never fewer copies. A link or a file
-# standing where the folder belongs is not a folder of copies and goes.
+# standing where the folder belongs is not a folder of copies and goes, and
+# so does a KEPT_COPIES_FOLDER that is not a real folder (a file, a link,
+# a link to itself): left standing, no build could keep a copy in it again,
+# and a link would send the copies out of the builds folder. Only the link
+# or the file itself is removed, never what a link points at.
 clear_built_sites_keeping_copies() {
   local target="$1"
   [ -n "$target" ] || return 0
   if [ -d "$target" ] && [ ! -L "$target" ]; then
+    if [ -L "$target/$KEPT_COPIES_FOLDER" ] || { [ -e "$target/$KEPT_COPIES_FOLDER" ] && [ ! -d "$target/$KEPT_COPIES_FOLDER" ]; }; then
+      rm -f "$target/$KEPT_COPIES_FOLDER" 2>/dev/null || true
+    fi
     find "$target" -mindepth 1 -maxdepth 1 ! -name "$KEPT_COPIES_FOLDER" -exec rm -rf {} + 2>/dev/null || true
   else
     rm -rf "$target" 2>/dev/null || true
@@ -146,9 +153,10 @@ clear_built_sites_keeping_copies() {
 }
 
 # Moves the kept copies in folder $1 into folder $2, keeping $2's copy of
-# any key both hold, then removes $1. Answers 1, having removed nothing,
-# when a copy could not be moved: every copy is then still in one of the
-# two folders.
+# any key both hold, then removes $1. Every entry moves, a name starting
+# with a dot included, as the app's copy of this rule moves them. Answers 1,
+# having removed nothing, when a copy could not be moved: every copy is
+# then still in one of the two folders.
 carry_kept_copies() {
   local from="$1" into="$2" entry
   [ -d "$from" ] && [ ! -L "$from" ] || return 0
@@ -157,7 +165,7 @@ carry_kept_copies() {
     return 0
   fi
   [ -d "$into" ] && [ ! -L "$into" ] || return 1
-  for entry in "$from"/*; do
+  for entry in "$from"/* "$from"/.[!.]* "$from"/..?*; do
     [ -e "$entry" ] || continue
     [ -e "$into/${entry##*/}" ] && continue
     mv "$entry" "$into/" 2>/dev/null || return 1
@@ -242,7 +250,9 @@ link_course_build_output() {
     # copy the course's builds have been using; the copies only the builds
     # folder holds are added to it. If any copy cannot be carried, nothing
     # is cleared and the built website stays where it is.
-    if ! carry_kept_copies "$target/$KEPT_COPIES_FOLDER" "$link/$KEPT_COPIES_FOLDER"; then
+    # Only out of a REAL builds folder: when it is a link, the copies seen
+    # through it belong to whatever it points at, which is left alone.
+    if [ -d "$target" ] && [ ! -L "$target" ] && ! carry_kept_copies "$target/$KEPT_COPIES_FOLDER" "$link/$KEPT_COPIES_FOLDER"; then
       echo "⚠️  Could not move it; leaving the built website where it is."
       return 0
     fi

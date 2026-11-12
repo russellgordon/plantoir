@@ -1881,6 +1881,15 @@ those branches:
   website was left where it is; every copy is then still in one of the two
   folders.
 
+Only a REAL folder is kept. A `.geogebra-cache` that is a file, a link or a
+link to itself is cleared with the rest, so the course can keep copies again;
+removing a link never touches what it points at. Copies are carried only out
+of a real builds folder, so a builds folder that is itself a link gives up
+nothing of the folder it points at. Every entry is carried, a name starting
+with a dot included, the same in the shell and in the app (the review of
+#789 found the shell's `*` passing over dot names while the app's
+`contentsOfDirectory` moved them).
+
 No new message reaches a teacher, because no branch now loses a copy.
 
 **Measured** 2026-11-12, by running the block extracted from `preview.sh`
@@ -1890,10 +1899,11 @@ lost it, and a course already linked kept it; after it, all five rows keep
 it. A brand-new working copy is the first row, which is why `verify.sh`
 failed its GeoGebra check on the first run in a fresh clone and passed on the
 second; section 6 now checks the planted copy straight after the main build
-and says whether the course had a link before the run. The rule and eight
+and says whether the course had a link before the run. The rule and thirteen
 cases are `contracts/shared-rules.json` → `buildOutputLocation.keptCopiesSurviveTheClear`,
-run against the real block by `scripts/test_build_output_link.sh`; all eight
-fail on the old block (23 of 66 checks). The app's `BuildOutputLocation`
+run against the real block by `scripts/test_build_output_link.sh`; the first eight
+fail on the old block (23 of 66 checks), and the five the review added fail
+on the first version of the fix (8 of 90). The app's `BuildOutputLocation`
 carries the same rule and runs the cases that need no shell fault.
 
 **Rejected:** setting the copies aside in a folder of their own, clearing,
@@ -1904,8 +1914,7 @@ moving the copies into the course folder (Russell's first ruling on #789,
 replaced the same day: a build that fetches a sketch would write into the
 course folder, which the check for a changed course could read as a change,
 and it would add files to whatever syncs the course); keeping
-`.figure-cache` and `.swift-cache` too (both are made on this Mac with no
-network, so a clear costs only a rebuild).
+`.figure-cache` and `.swift-cache` too (both are made again on this Mac with no network: the diagrams from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB kept in an image of its own that no clear touches; so a clear costs time, every diagram drawn and every Swift block compiled again on the next build, and nothing else).
 
 ## 5. Per-task specifics
 

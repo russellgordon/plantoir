@@ -474,6 +474,20 @@ final class BuildOutputLocationTests: XCTestCase {
             let code: String = "KC\(casesRun)"
             let courseURL: URL = try makeCourse(code)
             let target: URL = BuildOutputLocation.buildFolder(forWorkingFolder: workingFolder, courseCode: code)
+            let fileManager: FileManager = FileManager.default
+
+            // A folder outside the builds folder, holding a copy of its own,
+            // for the cases where a link points at it.
+            let elsewhere: URL = workingFolder.deletingLastPathComponent().appendingPathComponent("elsewhere-\(code)")
+            try writeKeptCopy("x", saying: "outside the builds folder", in: elsewhere)
+            let elsewhereCopy: URL = elsewhere
+                .appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+                .appendingPathComponent("x.ggb")
+            if let buildsFolderIs = buildsFolder["is"] as? String {
+                XCTAssertEqual(buildsFolderIs, "a link to a folder outside", "a builds folder this test cannot make")
+                try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fileManager.createSymbolicLink(at: target, withDestinationURL: elsewhere)
+            }
             if buildsFolder["builtSite"] as? Bool == true {
                 let publicURL: URL = target.appendingPathComponent("section1").appendingPathComponent("public")
                 try FileManager.default.createDirectory(at: publicURL, withIntermediateDirectories: true)
@@ -482,6 +496,24 @@ final class BuildOutputLocationTests: XCTestCase {
             let outsideKeys: [String] = try XCTUnwrap(buildsFolder["keptCopies"] as? [String])
             for key in outsideKeys {
                 try writeKeptCopy(key, saying: outside, in: target)
+            }
+            if let copiesFolderIs = buildsFolder["keptCopiesFolderIs"] as? String {
+                try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
+                let copiesEntry: URL = target.appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+                if copiesFolderIs == "a file" {
+                    try Data("not a folder".utf8).write(to: copiesEntry)
+                } else if copiesFolderIs == "a link to a folder outside" {
+                    try fileManager.createSymbolicLink(
+                        at: copiesEntry,
+                        withDestinationURL: elsewhere.appendingPathComponent(BuildOutputLocation.keptCopiesFolderName)
+                    )
+                } else if copiesFolderIs == "a link to itself" {
+                    try fileManager.createSymbolicLink(
+                        atPath: copiesEntry.path, withDestinationPath: BuildOutputLocation.keptCopiesFolderName
+                    )
+                } else {
+                    XCTFail("\(name): a kept-copies folder this test cannot make")
+                }
             }
 
             let link: URL = courseURL.appendingPathComponent(".merged_output")
@@ -532,6 +564,20 @@ final class BuildOutputLocationTests: XCTestCase {
                     try FileManager.default.contentsOfDirectory(atPath: target.path),
                     [BuildOutputLocation.keptCopiesFolderName],
                     "\(name): only the kept copies remain in the builds folder"
+                )
+            }
+            if expect["nothingRemainsInTheBuildsFolder"] as? Bool == true {
+                XCTAssertEqual(
+                    try fileManager.contentsOfDirectory(atPath: target.path),
+                    [],
+                    "\(name): nothing remains, so copies can be kept there again"
+                )
+            }
+            if expect["theFolderOutsideIsUntouched"] as? Bool == true {
+                XCTAssertEqual(
+                    try? String(contentsOf: elsewhereCopy, encoding: .utf8),
+                    "outside the builds folder",
+                    "\(name): the folder outside still holds its own copy"
                 )
             }
         }

@@ -314,7 +314,9 @@ check "and the block keeps that same folder" "$KEPT" "${KEPT_COPIES_FOLDER:-}"
 
 # One line per field: name, courseFolder, courseFolderKeptCopies, builtSite,
 # keptCopies, fault, then expect's link, builtSite, readByTheNextBuild,
-# onlyTheKeptCopiesRemain, and one "copy=<key>=<place>" line per kept copy.
+# onlyTheKeptCopiesRemain, then buildsFolder's keptCopiesFolderIs and is,
+# expect's nothingRemainsInTheBuildsFolder and theFolderOutsideIsUntouched,
+# and one "copy=<key>=<place>" line per kept copy.
 case_fields() {
   python3 - "$RULES" "$1" <<'CASE'
 import json, sys
@@ -333,6 +335,10 @@ print(expect["link"])
 print(expect["builtSite"])
 print("yes" if expect["readByTheNextBuild"] else "no")
 print("yes" if expect["onlyTheKeptCopiesRemain"] else "no")
+print(case["buildsFolder"].get("keptCopiesFolderIs", ""))
+print(case["buildsFolder"].get("is", ""))
+print("yes" if expect.get("nothingRemainsInTheBuildsFolder") else "no")
+print("yes" if expect.get("theFolderOutsideIsUntouched") else "no")
 for key, place in expect["keptCopies"].items():
     print(f"copy={key}={place}")
 CASE
@@ -353,10 +359,26 @@ while FIELDS="$(case_fields "$CASE_INDEX")"; do
   WANT_SITE="$(sed -n 8p <<<"$FIELDS")"
   READ_NEXT="$(sed -n 9p <<<"$FIELDS")"
   ONLY_COPIES="$(sed -n 10p <<<"$FIELDS")"
+  COPIES_FOLDER_IS="$(sed -n 11p <<<"$FIELDS")"
+  BUILDS_FOLDER_IS="$(sed -n 12p <<<"$FIELDS")"
+  NOTHING_REMAINS="$(sed -n 13p <<<"$FIELDS")"
+  OUTSIDE_UNTOUCHED="$(sed -n 14p <<<"$FIELDS")"
   echo "  · $CASE_NAME"
 
   new_working_folder
   make_course ICS3U
+  # A folder outside the builds folder, holding a copy of its own, for the
+  # cases where a link points at it. Under the sandbox, never anywhere else.
+  ELSEWHERE="$SANDBOX/elsewhere-$CASE_INDEX"
+  mkdir -p "$ELSEWHERE/$KEPT"
+  echo "outside the builds folder" > "$ELSEWHERE/$KEPT/x.ggb"
+  case "$BUILDS_FOLDER_IS" in
+    "") ;;
+    "a link to a folder outside")
+      mkdir -p "$BUILDS"
+      ln -s "$ELSEWHERE" "$BUILDS/ICS3U" ;;
+    *) fail "a builds folder this test does not know how to make: $BUILDS_FOLDER_IS"; continue ;;
+  esac
   if [ "$BUILDS_SITE" = "yes" ]; then
     mkdir -p "$BUILDS/ICS3U/section1/public"
     echo "$OUTSIDE" > "$BUILDS/ICS3U/section1/public/index.html"
@@ -366,6 +388,19 @@ while FIELDS="$(case_fields "$CASE_INDEX")"; do
     mkdir -p "$BUILDS/ICS3U/$KEPT"
     echo "$OUTSIDE" > "$BUILDS/ICS3U/$KEPT/$key.ggb"
   done
+  case "$COPIES_FOLDER_IS" in
+    "") ;;
+    "a file")
+      mkdir -p "$BUILDS/ICS3U"
+      echo "not a folder" > "$BUILDS/ICS3U/$KEPT" ;;
+    "a link to a folder outside")
+      mkdir -p "$BUILDS/ICS3U"
+      ln -s "$ELSEWHERE/$KEPT" "$BUILDS/ICS3U/$KEPT" ;;
+    "a link to itself")
+      mkdir -p "$BUILDS/ICS3U"
+      ln -s "$KEPT" "$BUILDS/ICS3U/$KEPT" ;;
+    *) fail "a kept-copies folder this test does not know how to make: $COPIES_FOLDER_IS"; continue ;;
+  esac
   case "$COURSE_STATE" in
     "no link") ;;
     "a link to another Mac's builds folder")
@@ -438,6 +473,14 @@ while FIELDS="$(case_fields "$CASE_INDEX")"; do
   if [ "$ONLY_COPIES" = "yes" ]; then
     check "    only the kept copies remain in the builds folder" "$KEPT" \
       "$(ls -A "$BUILDS/ICS3U" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+  fi
+  if [ "$NOTHING_REMAINS" = "yes" ]; then
+    check "    nothing remains in the builds folder, so copies can be kept there again" "" \
+      "$(ls -A "$BUILDS/ICS3U" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+  fi
+  if [ "$OUTSIDE_UNTOUCHED" = "yes" ]; then
+    check "    the folder outside still holds its own copy" "outside the builds folder" \
+      "$(cat "$ELSEWHERE/$KEPT/x.ggb" 2>/dev/null || echo "MISSING")"
   fi
 done
 if [ "$CASE_INDEX" -eq 0 ]; then

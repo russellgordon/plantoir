@@ -269,10 +269,14 @@ nonisolated enum BuildOutputLocation {
             // them along. The moved site's copy wins a key both hold. If a
             // copy cannot be carried, this throws before anything is cleared,
             // and every copy is still in one of the two folders.
-            try carryKeptCopies(
-                from: target.appendingPathComponent(keptCopiesFolderName),
-                into: link.appendingPathComponent(keptCopiesFolderName)
-            )
+            // Only out of a REAL builds folder: when it is a link, the copies
+            // seen through it belong to whatever it points at.
+            if isRealDirectory(target) {
+                try carryKeptCopies(
+                    from: target.appendingPathComponent(keptCopiesFolderName),
+                    into: link.appendingPathComponent(keptCopiesFolderName)
+                )
+            }
             if fileManager.fileExists(atPath: target.path) {
                 try? fileManager.removeItem(at: target)
             }
@@ -485,7 +489,11 @@ nonisolated enum BuildOutputLocation {
     /// never fewer copies, and `discardBuildsForMissingCourses`, which removes
     /// every entry of the builds folder that is not a course code, has no
     /// set-aside folder to throw away. A link or a file standing where the
-    /// folder belongs goes whole. Best-effort, like the clear it replaces.
+    /// folder belongs goes whole, and so does a kept-copies entry that is not
+    /// a real folder (a file, a link, a link to itself): left standing, no
+    /// build could keep a copy in it again, and a link would send the copies
+    /// out of the builds folder. Removing a link never touches what it points
+    /// at. Best-effort, like the clear it replaces.
     private static func clearBuiltSitesKeepingCopies(at target: URL) {
         let fileManager: FileManager = FileManager.default
         if !isRealDirectory(target) {
@@ -498,7 +506,7 @@ nonisolated enum BuildOutputLocation {
             return
         }
         for name in entries {
-            if name == keptCopiesFolderName {
+            if name == keptCopiesFolderName && isRealDirectory(target.appendingPathComponent(name)) {
                 continue
             }
             try? fileManager.removeItem(at: target.appendingPathComponent(name))
@@ -506,7 +514,9 @@ nonisolated enum BuildOutputLocation {
     }
 
     /// Moves the kept copies in `source` into `destination`, keeping the
-    /// destination's copy of any key both hold, then removes `source`.
+    /// destination's copy of any key both hold, then removes `source`. Every
+    /// entry moves, a name starting with a dot included, as the launchers'
+    /// copy of this rule moves them.
     /// Throws, having removed nothing, when a copy cannot be moved.
     private static func carryKeptCopies(from source: URL, into destination: URL) throws {
         let fileManager: FileManager = FileManager.default

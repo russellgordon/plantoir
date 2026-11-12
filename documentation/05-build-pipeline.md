@@ -4258,14 +4258,24 @@ What keeps it, on the mac, in both implementations of the rule:
 | A whole course restored from a backup (the app) | `discardBuiltSites`: the built sites go | Stay where they are |
 | A course or a section archived | Discarded outright, as before | Go with the course |
 
+Only a REAL `.geogebra-cache` folder is kept: one that is a file, a link or a
+link to itself is cleared with the rest, so the course can keep copies again,
+and nothing a link points at is touched. Copies are carried only out of a
+real builds folder, never through one that is a link. Dot-named entries are
+carried like the rest, by both implementations.
+
 **Measured** (2026-11-12): the launchers' block against a scratch folder
 lost a planted copy for a course never linked, a link naming another Mac's
 folder and a missing link, and kept it for a course already linked; after
-the change every row keeps it. The eight cases in
+the change every row keeps it. The first eight of the thirteen cases in
 `contracts/shared-rules.json` → `buildOutputLocation.keptCopiesSurviveTheClear`
 fail on the old block (23 of 66 checks in `scripts/test_build_output_link.sh`),
 and the app's six fault-free cases fail on the old `BuildOutputLocation.swift`
-(18 checks, measured in a standalone harness).
+(18 checks, measured in a standalone harness). The review's five further
+cases (a dot-named copy, a kept-copies entry that is a file, a link outside
+or a link to itself, and a builds folder that is a link) fail on the first
+version of the fix (8 of 90 checks; 6 of 60 in the app's harness, where
+the dot-named case already passed).
 
 **No sweep was added.** A copy whose fence has gone stays until
 `geogebraFences.cache`'s own rule takes it: an entry unused for 90 days
@@ -4282,8 +4292,7 @@ replaced the same day: a build that fetches would write into the course
 folder, which the check of whether anything changed since the last build
 could read as a change, and it would add files to whatever syncs or backs up
 the course, so a second Mac fetches again the first time it builds online,
-as before); keeping `.figure-cache` and `.swift-cache` as well (made on this
-Mac with no network, so clearing them costs a rebuild and nothing else).
+as before); keeping `.figure-cache` and `.swift-cache` as well (both are made again on this Mac with no network: the diagrams from the engines the website builder carries, and the Swift blocks by the Swift toolchain, a first download of about 1.3 GB kept in an image of its own that no clear touches; so a clear costs time, every diagram drawn and every Swift block compiled again on the next build, and nothing else; on Windows the toolchain is about 2.3 GB, kept under `%LOCALAPPDATA%`).
 
 **Windows** has no link and so no clear of this kind; it discards a
 course's whole builds folder when a course is restored from a backup, which
