@@ -26,7 +26,7 @@ need to read those to use Plantoir.
 
 ---
 
-## Version 1.9.4
+## Version 1.10.0
 
 Mac first. The Windows app follows in its own update.
 
