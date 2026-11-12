@@ -3830,6 +3830,44 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
 
+**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
+c) that runs to more than one line hangs under its first word, as a
+numbered question does. `starters/Quiz.tex` gains four macros:
+`\partindent` (1.8em, the `tasks` columns' `item-indent`, so every part
+letter lines up), `\qlabel`, `\qpart{b}{...}` (`\leftskip` set to
+`\partindent` in a group, the letter pulled back into it with `\llap`) and
+`\partbox{height}{c}{...}{answer}` (the same, in a `minipage` of fixed
+height whose answer shows only in the solutions). Its question 3 is a
+worked example: a garden bed, two `\partbox` parts and a `\qpart` ending in
+a `\fillin`. Compiled with `tectonic` and rendered at 80 dpi in both copies,
+no overfull or underfull box in either log: every part's continuation lines
+start under its first word, the part letters sit at the `tasks` letters' x,
+and the three parts of question 3 start at the same height in both copies.
+Two things the render settled. An answer written as a centred `\[ ... \]`
+display ignores `\leftskip` and starts left of the part's edge, so the
+skill says to write a part's answer inline. And `\partbox` is fixed height
+in BOTH copies: the planner's first version added the writing space only to
+the question copy, and the key then drifted up and stopped lining up with
+it. The skill's section 6 also says an answer too long for its slot means
+raising the height (one source, both copies), and, by Russell's ruling of
+2026-11-12, that the macros are a starting point to adjust to a teacher's
+own house style rather than a rule about their shape. The plain-English
+bullet (short sentences, present tense, the thing named rather than "it",
+no idioms, "say what the student sees, then what to do") is there because
+many students are learning English. The macros are listed in
+`printablePages.agentGuidance.handoutsSkill.starterMacros`, which
+`PrintablePagesTests.testTheHandoutsSkillIsWrittenWithItsStartersAndEveryRouteToItNamesIt`
+walks (each defined in the written starter and named in the skill), and
+the two binding sentences are in `mustSay`. REJECTED: `enumitem` with
+`leftmargin=*` (it hangs, but a part that needs a fixed slot with its
+answer inside it would need a second mechanism); `\hangindent` per
+paragraph (it holds for one paragraph, so an answer paragraph under the
+part loses the indent); the issue's "project copy" of Russell's own macros,
+which is not in the repository and, if it was in a working folder's
+`.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
+(`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
+
 Russell's own `~/.claude/CLAUDE.md` (read 2026-11-01, after the 14:19
 refinement) now carries these rules - the centred box for a column with a
 negative value, matched decimal places without `\phantom`, no padding in
