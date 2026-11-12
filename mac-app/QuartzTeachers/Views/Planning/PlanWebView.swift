@@ -23,6 +23,13 @@ import WebKit
 ///    content rule list that blocks every load that is not a `file:` one,
 ///    so a page cannot reach the network for a font, a picture or anything
 ///    else.
+///
+/// Guard 2's "only on a click" rests on guard 3: measured (708
+/// implementation review L1), a script's `click()` on a link reaches the
+/// delegate as a link click. Turning page scripts on would reopen that.
+///
+/// Each guard is proved with no window by `PlanWebViewGuardTests`.
+@MainActor
 @Observable
 final class PlanWebController {
 
@@ -40,6 +47,18 @@ final class PlanWebController {
 
     @ObservationIgnored private(set) var rulesAreInstalled: Bool = false
 
+    /// True when the rule list could not be made, so no page will ever be
+    /// shown: the tab says so instead of staying blank.
+    var couldNotShow: Bool = false
+
+    /// The page the web view is on, as it last changed: what the unit popup
+    /// follows when a link inside the plan leads to another unit (708
+    /// implementation review L4).
+    var currentPage: URL?
+
+    /// Told once when the rule list could not be made, for the trail.
+    @ObservationIgnored var whenItCannotShow: (() -> Void)?
+
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
 
     /// Every navigation's decision, and links asking for a new window.
@@ -54,11 +73,18 @@ final class PlanWebController {
 
     static let rulesIdentifier: String = "PlantoirPlanningTabLocalFilesOnly"
 
+    /// The rule list this controller compiles: `localOnlyRules` in the app;
+    /// a test may hand it another to prove what a broken one does.
+    @ObservationIgnored private let rules: String
+
     // MARK: - Initializer
 
-    init() {
+    init(rules: String = PlanWebController.localOnlyRules) {
+        self.rules = rules
         let configuration: WKWebViewConfiguration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+        // Off: the template needs none, and guard 2's "a click only" holds
+        // only while a page cannot click a link itself (review L1).
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let webView: WKWebView = WKWebView(frame: .zero, configuration: configuration)
@@ -86,8 +112,19 @@ final class PlanWebController {
                 self.canGoForward = self.webView.canGoForward
             }
         }
+        let pageObservation: NSKeyValueObservation = webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor in
+                guard let self else {
+                    return
+                }
+                if self.currentPage != self.webView.url {
+                    self.currentPage = self.webView.url
+                }
+            }
+        }
         observations.append(backObservation)
         observations.append(forwardObservation)
+        observations.append(pageObservation)
 
         Task { @MainActor [weak self] in
             await self?.installTheRules()
@@ -125,6 +162,13 @@ final class PlanWebController {
         webView.goForward()
     }
 
+    /// No page will be shown: say so on screen and on the trail.
+    private func giveUp() {
+        waitingPage = nil
+        couldNotShow = true
+        whenItCannotShow?()
+    }
+
     /// Compiles the local-only rule list, adds it, and loads any page that
     /// was waiting. If it cannot be compiled no page is ever loaded: a plan
     /// shown without the rule could reach the network, so the tab stays
@@ -136,14 +180,16 @@ final class PlanWebController {
             guard let store,
                   let list = try await store.compileContentRuleList(
                       forIdentifier: PlanWebController.rulesIdentifier,
-                      encodedContentRuleList: PlanWebController.localOnlyRules
+                      encodedContentRuleList: rules
                   ) else {
                 AppLog.interface.error("the Planning tab's local-only rule list could not be made")
+                giveUp()
                 return
             }
             webView.configuration.userContentController.add(list)
         } catch {
             AppLog.interface.error("the Planning tab's local-only rule list could not be made: \(error.localizedDescription, privacy: .public)")
+            giveUp()
             return
         }
         rulesAreInstalled = true
@@ -158,6 +204,7 @@ final class PlanWebController {
 /// `PlanNavigation.decide`. An NSObject of its own because WebKit's
 /// protocols need one, and so the web view's weak reference is to something
 /// the controller owns.
+@MainActor
 final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     // MARK: - Stored properties

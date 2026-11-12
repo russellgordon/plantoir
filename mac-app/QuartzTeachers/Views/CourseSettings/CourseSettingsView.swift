@@ -9,6 +9,18 @@ struct CourseSettingsView: View {
 
     let course: Course
 
+    /// Whether the course page's Planning tab is drawn over this form
+    /// (#708, `CourseDetailView`). While it is, every control in the form is
+    /// DISABLED, which takes the keyboard focus away from any field that had
+    /// it and keeps Tab out of the form: a key pressed on the plan can never
+    /// edit a setting the teacher cannot see (708 implementation review H1;
+    /// `CourseDetailFocusTests`). The form stays mounted, so an edit made
+    /// before the switch is still there after it, and Course ▸ Save still
+    /// saves it from either tab: it can only be an edit made while Settings
+    /// was showing. The toolbar and the menu's value are attached outside the
+    /// disabled part, so Open in Obsidian stays as it was.
+    var isCovered: Bool = false
+
     @State var isShowingFoldersHelp: Bool = false
     @State var isRenamingUnitWord: Bool = false
 
@@ -432,6 +444,8 @@ struct CourseSettingsView: View {
             }
             .padding(12)
         }
+        .disabled(isCovered)
+        .accessibilityHidden(isCovered)
         .navigationTitle(course.displayCode)
         // Course ▸ Save Course Settings ⌘S and Revert Course Settings (#457).
         // ⌘S lived on the Save button until then — a shortcut hung on a

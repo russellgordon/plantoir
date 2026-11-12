@@ -119,6 +119,57 @@ nonisolated enum PlanningTab {
         }
     }
 
+    /// The popup entry a page belongs to, so the popup follows a link inside
+    /// the plan to another unit (708 implementation review L4): the
+    /// planning folder's own `index.html` is All Plans, and any page in a
+    /// unit's folder is that unit when the popup offers it. Nil for a page
+    /// that is neither, and the popup then keeps what it showed.
+    static func choice(forPage page: URL, planningFolder: URL, choices: [Choice]) -> Choice? {
+        let pageParts: [String] = PlanNavigation.pathComponents(of: page.standardizedFileURL.path)
+        let folderParts: [String] = PlanNavigation.pathComponents(of: planningFolder.standardizedFileURL.path)
+        if pageParts.count <= folderParts.count {
+            return nil
+        }
+        for index in 0..<folderParts.count {
+            if pageParts[index] != folderParts[index] {
+                return nil
+            }
+        }
+        let rest: [String] = Array(pageParts[folderParts.count...])
+        if rest == [pageName] {
+            if choices.contains(.allPlans) {
+                return .allPlans
+            }
+            return nil
+        }
+        let unit: Choice = .unit(rest[0])
+        if rest.count > 1 && choices.contains(unit) {
+            return unit
+        }
+        return nil
+    }
+
+    /// The trail's line when the tab is opened (`activityTrail.mustRecord`
+    /// → "looked at a course's unit plans"): the course and how many plans
+    /// it could choose from, never a plan's title or anything in it.
+    static func openedTrailText(courseCode: String, choices: [Choice]) -> String {
+        var units: Int = 0
+        for choice in choices {
+            if choice != .allPlans {
+                units += 1
+            }
+        }
+        var what: String = PlanningTrail.nothingToShow
+        if units == 1 {
+            what = PlanningTrail.oneUnitPlan
+        } else if units > 1 {
+            what = PlanningTrail.unitPlans.replacingOccurrences(of: "{n}", with: String(units))
+        } else if choices.contains(.allPlans) {
+            what = PlanningTrail.listOnly
+        }
+        return courseCode + UnitPlans.trailSeparator + PlanningTrail.opened.replacingOccurrences(of: "{what}", with: what)
+    }
+
     /// What the planning folder holds right now, read from the disk: the
     /// plans, whether the folder has its own page, and which units have one.
     static func look(in planningFolder: URL, courseDirectory: URL) -> Look {
@@ -339,6 +390,38 @@ nonisolated enum PlanAUnit {
     }
 }
 
+/// The Planning tab's trail lines, verbatim from `contracts/shared-rules.json`
+/// → `activityTrail.mustRecord` "looked at a course's unit plans". Written
+/// once each time the tab appears, and once for each failure, so a report
+/// of "the Planning tab is blank" finds something (708 implementation
+/// review M1). No plan's title: it is the teacher's own words, and the count
+/// says what support needs.
+nonisolated enum PlanningTrail {
+
+    // MARK: - Stored properties
+
+    static let opened: String = "opened the Planning tab: {what}"
+    static let oneUnitPlan: String = "1 unit plan to choose from"
+    static let unitPlans: String = "{n} unit plans to choose from"
+    static let listOnly: String = "only the list of plans"
+    static let nothingToShow: String = "nothing to show yet, offered to plan a unit"
+    static let couldNotShow: String =
+        "the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet on this Mac"
+    static let couldNotRefreshTheLook: String =
+        "the Planning tab could not bring the plan's look up to date: {n} file(s) could not be copied"
+
+    // MARK: - Functions
+
+    static func couldNotShowText(courseCode: String) -> String {
+        return courseCode + UnitPlans.trailSeparator + couldNotShow
+    }
+
+    static func couldNotRefreshTheLookText(courseCode: String, failed: Int) -> String {
+        return courseCode + UnitPlans.trailSeparator
+            + couldNotRefreshTheLook.replacingOccurrences(of: "{n}", with: String(failed))
+    }
+}
+
 /// Every word the Planning tab shows a teacher, verbatim from
 /// `contracts/shared-rules.json` → `unitPlanning.tab.words`
 /// (`PlanningTabTests` pins them). Plain words only: what the teacher sees,
@@ -358,4 +441,7 @@ nonisolated enum PlanningWording {
     static let emptyDescription: String =
         "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, "
         + "assessment drafts and a curriculum correlation. Once it is built, the plan shows here."
+    static let cannotShowTitle: String = "This Plan Can’t Be Shown"
+    static let cannotShowDescription: String =
+        "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."
 }

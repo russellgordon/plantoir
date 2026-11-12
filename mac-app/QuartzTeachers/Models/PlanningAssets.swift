@@ -26,7 +26,7 @@ enum PlanningAssets {
     /// The folder's name inside the planning folder.
     static let folderName: String = "assets"
 
-    // MARK: - Functions
+    // MARK: - Computed properties
 
     /// The template's `assets/` in the app's bundle, or nil without one.
     static var bundledTemplateAssets: URL? {
@@ -36,14 +36,33 @@ enum PlanningAssets {
         return guidance.appendingPathComponent(templateAssetsPath, isDirectory: true)
     }
 
+    // MARK: - Functions
+
+    /// Whether `url` is itself a symbolic link (not followed).
+    /// `attributesOfItem` reads the item itself (`lstat`), so a link is a
+    /// link however its URL is spelled.
+    static func isALink(_ url: URL) -> Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return false
+        }
+        return (attributes[.type] as? FileAttributeType) == FileAttributeType.typeSymbolicLink
+    }
+
     /// Makes `planningFolder/assets` the same as `source`. Nil, having done
     /// nothing, when the planning folder does not exist or `source` is not
-    /// there.
+    /// there, and when the planning folder or its `assets` is a symbolic
+    /// link: the mirror deletes extra files, and through a link it would
+    /// delete them in a folder that is not the plan's (708 implementation
+    /// review L2, measured: a linked planning folder lost a photo).
     @discardableResult
     static func refresh(
         planningFolder: URL, from source: URL? = PlanningAssets.bundledTemplateAssets
     ) -> WorkspaceModel.MirrorOutcome? {
         let fileManager: FileManager = FileManager.default
+        let destination: URL = planningFolder.appendingPathComponent(folderName, isDirectory: true)
+        if isALink(planningFolder) || isALink(destination) {
+            return nil
+        }
         var isFolder: ObjCBool = false
         if !fileManager.fileExists(atPath: planningFolder.path, isDirectory: &isFolder) || !isFolder.boolValue {
             return nil
@@ -55,7 +74,6 @@ enum PlanningAssets {
         if !fileManager.fileExists(atPath: source.path, isDirectory: &sourceIsFolder) || !sourceIsFolder.boolValue {
             return nil
         }
-        let destination: URL = planningFolder.appendingPathComponent(folderName, isDirectory: true)
         let outcome: WorkspaceModel.MirrorOutcome = WorkspaceModel.syncDirectory(from: source, to: destination)
         if outcome.failed > 0 {
             AppLog.interface.error(

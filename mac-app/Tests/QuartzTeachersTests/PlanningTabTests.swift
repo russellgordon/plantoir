@@ -182,6 +182,8 @@ final class PlanningTabTests: XCTestCase {
             "reload": PlanningWording.reload,
             "emptyTitle": PlanningWording.emptyTitle,
             "emptyDescription": PlanningWording.emptyDescription,
+            "cannotShowTitle": PlanningWording.cannotShowTitle,
+            "cannotShowDescription": PlanningWording.cannotShowDescription,
         ]
         XCTAssertEqual(Set(words.keys), Set(mine.keys), "every word in the contract has a constant, and only those")
         for (key, value) in mine {
@@ -360,9 +362,9 @@ final class PlanningTabTests: XCTestCase {
     }
 
     /// No timed refresh anywhere in the tab's views (CLAUDE.md: a delay
-    /// would paper over a race), and the web view reads the PLANNING folder
-    /// alone, with scripts off and the local-only rule list.
-    func testThePlanViewWaitsOnNothingAndReadsOnlyThePlanningFolder() throws {
+    /// would paper over a race). The web view's guards are proved by
+    /// running it, in `PlanWebViewGuardTests`, not by reading it.
+    func testThePlanViewWaitsOnNothing() throws {
         let folderURL: URL = PlanningTabTests.repositoryRoot().appendingPathComponent("mac-app/QuartzTeachers/Views/Planning")
         let files: [String] = try FileManager.default.contentsOfDirectory(atPath: folderURL.path)
         XCTAssertGreaterThanOrEqual(files.count, 2)
@@ -372,12 +374,109 @@ final class PlanningTabTests: XCTestCase {
                 XCTAssertFalse(text.contains(forbidden), "\(file) uses \(forbidden)")
             }
         }
-        let web: String = try PlanningTabTests.readSource("QuartzTeachers/Views/Planning/PlanWebView.swift")
-        XCTAssertTrue(web.contains("allowsContentJavaScript = false"))
-        XCTAssertTrue(web.contains("WKWebsiteDataStore.nonPersistent()"))
-        XCTAssertTrue(web.contains("userContentController.add(list)"))
-        XCTAssertEqual(web.components(separatedBy: "allowingReadAccessTo: planningFolder").count - 1, 2)
-        XCTAssertEqual(web.components(separatedBy: "allowingReadAccessTo: folder)").count - 1, 1)
-        XCTAssertFalse(web.contains("load(URLRequest"))
+    }
+
+    // MARK: - The popup follows the page
+
+    func testThePopupFollowsThePageAsTheContractSays() throws {
+        let block: [String: Any] = try XCTUnwrap(try tab()["followsThePage"] as? [String: Any])
+        let followCases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(followCases.count, 7)
+        let planning: URL = folder.appendingPathComponent("course/.internal/planning", isDirectory: true)
+        for testCase in followCases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            var choices: [PlanningTab.Choice] = []
+            for written in try XCTUnwrap(testCase["choices"] as? [String]) {
+                if written == "allPlans" {
+                    choices.append(.allPlans)
+                } else {
+                    choices.append(.unit(String(written.dropFirst("unit:".count))))
+                }
+            }
+            let page: URL = planning.appendingPathComponent(try XCTUnwrap(testCase["page"] as? String))
+            let followed: PlanningTab.Choice? = PlanningTab.choice(forPage: page, planningFolder: planning, choices: choices)
+            XCTAssertEqual(PlanningTabTests.written(followed), testCase["expect"] as? String, name)
+        }
+    }
+
+    // MARK: - The tab's own trail lines
+
+    private func lookedAtEntry() throws -> [String: Any] {
+        let activityTrail: [String: Any] = try SharedRulesContractTests.section("activityTrail")
+        for entry in try XCTUnwrap(activityTrail["mustRecord"] as? [[String: Any]]) {
+            if (entry["event"] as? String) == ActivityTrail.Event.lookedAtUnitPlans.rawValue {
+                return entry
+            }
+        }
+        XCTFail("the event is in activityTrail.mustRecord")
+        return [:]
+    }
+
+    /// "looked at a course's unit plans": the lines are the contract's, and
+    /// none carries a plan's title.
+    func testTheTabsTrailLinesAreTheContractsAndNameNoPlan() throws {
+        let entry: [String: Any] = try lookedAtEntry()
+        let what: [String: Any] = try XCTUnwrap(entry["what"] as? [String: Any])
+        XCTAssertEqual(entry["line"] as? String, "{course}" + UnitPlans.trailSeparator + PlanningTrail.opened)
+        XCTAssertEqual(what["one"] as? String, PlanningTrail.oneUnitPlan)
+        XCTAssertEqual(what["several"] as? String, PlanningTrail.unitPlans)
+        XCTAssertEqual(what["listOnly"] as? String, PlanningTrail.listOnly)
+        XCTAssertEqual(what["none"] as? String, PlanningTrail.nothingToShow)
+        XCTAssertEqual(entry["couldNotShowLine"] as? String, "{course}" + UnitPlans.trailSeparator + PlanningTrail.couldNotShow)
+        XCTAssertEqual(
+            entry["couldNotRefreshTheLookLine"] as? String,
+            "{course}" + UnitPlans.trailSeparator + PlanningTrail.couldNotRefreshTheLook
+        )
+
+        XCTAssertEqual(
+            PlanningTab.openedTrailText(courseCode: "SNC2D", choices: [.allPlans, .unit("unit-1"), .unit("unit-2")]),
+            "SNC2D · opened the Planning tab: 2 unit plans to choose from"
+        )
+        XCTAssertEqual(
+            PlanningTab.openedTrailText(courseCode: "SNC2D", choices: [.unit("unit-1")]),
+            "SNC2D · opened the Planning tab: 1 unit plan to choose from"
+        )
+        XCTAssertEqual(
+            PlanningTab.openedTrailText(courseCode: "SNC2D", choices: [.allPlans]),
+            "SNC2D · opened the Planning tab: only the list of plans"
+        )
+        XCTAssertEqual(
+            PlanningTab.openedTrailText(courseCode: "SNC2D", choices: []),
+            "SNC2D · opened the Planning tab: nothing to show yet, offered to plan a unit"
+        )
+        XCTAssertEqual(
+            PlanningTrail.couldNotRefreshTheLookText(courseCode: "SNC2D", failed: 3),
+            "SNC2D · the Planning tab could not bring the plan's look up to date: 3 file(s) could not be copied"
+        )
+    }
+
+    /// The mirror never works through a link: it removes extra files, and
+    /// through a linked planning folder it would remove them somewhere that
+    /// is not the plan's (review L2).
+    func testTheRefreshLeavesALinkedPlanningFolderAlone() throws {
+        let elsewhere: URL = folder.appendingPathComponent("elsewhere", isDirectory: true)
+        let elsewhereAssets: URL = elsewhere.appendingPathComponent(PlanningAssets.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhereAssets, withIntermediateDirectories: true)
+        let photo: URL = elsewhereAssets.appendingPathComponent("photo.jpg")
+        try "a picture".write(to: photo, atomically: true, encoding: .utf8)
+        let internalFolder: URL = folder.appendingPathComponent("course/.internal", isDirectory: true)
+        try FileManager.default.createDirectory(at: internalFolder, withIntermediateDirectories: true)
+        let planning: URL = internalFolder.appendingPathComponent("planning", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: planning, withDestinationURL: elsewhere)
+
+        XCTAssertNil(PlanningAssets.refresh(planningFolder: planning, from: templateAssetsInTheRepository()))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: photo.path), "a file behind the link was removed")
+
+        let realPlanning: URL = folder.appendingPathComponent("other/.internal/planning", isDirectory: true)
+        try FileManager.default.createDirectory(at: realPlanning, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: realPlanning.appendingPathComponent(PlanningAssets.folderName), withDestinationURL: elsewhereAssets
+        )
+        XCTAssertNil(PlanningAssets.refresh(planningFolder: realPlanning, from: templateAssetsInTheRepository()))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: photo.path), "a file behind a linked assets folder was removed")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: elsewhereAssets.appendingPathComponent("plan.css").path),
+            "the copy wrote through the link"
+        )
     }
 }

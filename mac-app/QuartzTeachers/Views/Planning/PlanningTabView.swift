@@ -63,6 +63,11 @@ struct PlanningTabView: View {
     /// busy: the refusal Revise With ▸ makes at the click (#458).
     @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
 
+    /// Whether this appearance of the tab has written its trail line about
+    /// the plan's look failing to refresh, so a window coming back to key
+    /// again and again writes it once (708 implementation review M1).
+    @State var lookFailureNoted: Bool = false
+
     // MARK: - Computed properties
 
     var presence: OutsideAssistantPresence {
@@ -80,10 +85,10 @@ struct PlanningTabView: View {
                 return model.choice ?? .allPlans
             },
             set: { (newChoice: PlanningTab.Choice) in
-                if newChoice != model.choice {
-                    model.choice = newChoice
-                    show(newChoice)
-                }
+                // Always shown, even when it is what the popup already says:
+                // a link inside the plan may have led elsewhere (review L4).
+                model.choice = newChoice
+                show(newChoice)
             }
         )
     }
@@ -96,6 +101,13 @@ struct PlanningTabView: View {
                 Color.clear
             } else if model.look.choices.isEmpty {
                 emptyOffer
+            } else if model.controller?.couldNotShow ?? false {
+                ContentUnavailableView(
+                    PlanningWording.cannotShowTitle,
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(PlanningWording.cannotShowDescription)
+                )
+                .accessibilityIdentifier("planningCannotShow")
             } else {
                 VStack(spacing: 0) {
                     planBar
@@ -114,6 +126,14 @@ struct PlanningTabView: View {
             // Reloaded when the tab is drawn again after Settings: the plan
             // may have changed meanwhile, and its history is kept.
             lookAgain(reloadingThePage: true)
+            // Once per appearance: what the tab had to offer (review M1).
+            ActivityTrail.note(
+                .lookedAtUnitPlans,
+                PlanningTab.openedTrailText(courseCode: course.code, choices: model.look.choices)
+            )
+        }
+        .onChange(of: model.controller?.currentPage) { (_: URL?, page: URL?) in
+            followThePage(page)
         }
         .onChange(of: controlActiveState) { (_: ControlActiveState, newState: ControlActiveState) in
             if newState == .key {
@@ -229,7 +249,14 @@ struct PlanningTabView: View {
     /// app's own, and shows what is chosen: the same unit when it is still
     /// there (reloaded when asked), otherwise the unit the popup starts on.
     func lookAgain(reloadingThePage: Bool) {
-        PlanningAssets.refresh(planningFolder: planningFolder)
+        let refreshed: WorkspaceModel.MirrorOutcome? = PlanningAssets.refresh(planningFolder: planningFolder)
+        if let refreshed, refreshed.failed > 0, !lookFailureNoted {
+            lookFailureNoted = true
+            ActivityTrail.note(
+                .lookedAtUnitPlans,
+                PlanningTrail.couldNotRefreshTheLookText(courseCode: course.code, failed: refreshed.failed)
+            )
+        }
         let look: PlanningTab.Look = PlanningTab.look(in: planningFolder, courseDirectory: course.directoryURL)
         if look != model.look {
             model.look = look
@@ -254,10 +281,27 @@ struct PlanningTabView: View {
         }
     }
 
+    /// The popup follows the page the web view is on, when that page is
+    /// one of its entries' (a link from one unit's plan to another's).
+    func followThePage(_ page: URL?) {
+        guard let page,
+              let followed = PlanningTab.choice(forPage: page, planningFolder: planningFolder, choices: model.look.choices) else {
+            return
+        }
+        if followed != model.choice {
+            model.choice = followed
+        }
+    }
+
     /// Loads a choice's page, making the web view the first time.
     func show(_ choice: PlanningTab.Choice) {
         if model.controller == nil {
-            model.controller = PlanWebController()
+            let controller: PlanWebController = PlanWebController()
+            let courseCode: String = course.code
+            controller.whenItCannotShow = {
+                ActivityTrail.note(.lookedAtUnitPlans, PlanningTrail.couldNotShowText(courseCode: courseCode))
+            }
+            model.controller = controller
         }
         model.controller?.show(
             page: PlanningTab.page(for: choice, planningFolder: planningFolder),

@@ -5,10 +5,15 @@ import SwiftUI
 /// thin bar (`DetailTabs`, the switch #717 built for a section's
 /// Website | Problems).
 ///
-/// **The settings stay MOUNTED.** The Planning tab is drawn OVER them in a
-/// `ZStack` rather than instead of them, so a setting typed and not yet
-/// saved is still there after a look at the plan, and Course ▸ Save keeps
-/// working. A `TabView` would unmount the hidden tab and lose the edit.
+/// **The settings stay MOUNTED, and covered they are DISABLED.** The
+/// Planning tab is drawn OVER them in a `ZStack` rather than instead of
+/// them, so a setting typed and not yet saved is still there after a look
+/// at the plan, and Course ▸ Save still saves it. While the plan is on top
+/// the form is disabled (`CourseSettingsView.isCovered`), so no field in it
+/// can hold the keyboard: a Space pressed to scroll the plan cannot replace
+/// the course's name out of sight. Taking the form out of the tree instead
+/// would also lose what is half-typed in its own fields (a folder name not
+/// yet added) and its title and toolbar. A `TabView` would unmount it too.
 ///
 /// **No assistant, no tab.** With neither installed the page is exactly
 /// what it was before #708: no tabs and no word about planning (Russell,
@@ -70,8 +75,9 @@ struct CourseDetailView: View {
             }
             ZStack {
                 // Base layer: the settings, always mounted.
-                CourseSettingsView(course: course)
-                    .accessibilityHidden(showsPlanning)
+                // Covered, it is disabled: no field in it keeps the keyboard
+                // while the plan is on top (708 implementation review H1).
+                CourseSettingsView(course: course, isCovered: showsPlanning)
 
                 // Top layer: the Planning tab, drawn over the settings.
                 if showsPlanning, let folder = workspace.workspaceURL {

@@ -4008,8 +4008,30 @@ Planning switch in the thin bar a section's Website | Problems tabs use
 (#717), then a `ZStack` with `CourseSettingsView` underneath and
 `PlanningTabView` drawn over it while Planning is chosen. A setting typed and
 not saved is still there after a look at the plan, and Course ▸ Save keeps
-its focused value. The settings are hidden from VoiceOver while covered
-(`.accessibilityHidden`). The tab chosen is the view's `@State`, because
+its focused value.
+
+**Covered, the settings are DISABLED (708 implementation review H1).**
+Mounted under the plan, a field focused on Settings stayed the window's first
+responder: MEASURED in an offscreen window, a Space and an "x" typed with the
+plan on top replaced the course's name, unseen, and Tab walked into the hidden
+controls. So `CourseSettingsView` takes `isCovered`, and `CourseDetailView`
+passes `showsPlanning`: the form's controls are `.disabled` and hidden from
+VoiceOver while the plan is on top. Measured with that shape: the first
+responder became the window, the text stayed, and Tab reached nothing in the
+form. The toolbar (Open in Obsidian) and the menu's focused value are
+attached outside the disabled part, so they are as they were. **Course ▸
+Save on the Planning tab saves the form as it stands, which can only hold
+edits made while Settings showed**, because nothing in the form can take a key
+while it is covered; that keeps "an unsaved setting survives a look at the plan
+and ⌘S saves it" true from either tab. `CourseDetailFocusTests` hosts the real
+form in a window never put on screen, focuses Course name, covers it and
+types. REJECTED: taking the form out of the tree while Planning shows (it
+would lose what is half-typed in its own fields, such as a folder name not yet
+added, and the window's title and toolbar with it); moving the first responder
+to the web view (it holds only while nothing else takes focus, which is
+"unlikely", not "cannot").
+
+The tab chosen is the view's `@State`, because
 nothing outside the page selects Planning; `.id(code)` makes it Settings
 again for each course. The plan's web view and the unit chosen live in a
 `PlanningTabModel` the page owns, so a switch to Settings and back keeps the
@@ -4087,7 +4109,9 @@ guards, each with one job (`unitPlanning.tab.whatAPageMayRead`):
    `PreviewBrowserHandoff` measured for the section preview); http, https
    and mailto open in the teacher's own browser or mail app, and only on a
    CLICK, so a `<meta http-equiv="refresh">` or a frame's address cannot
-   open the browser just by being shown; anything else is refused without a
+   open the browser just by being shown (this holds because page scripts
+   are off: measured by the review, a script's `click()` reaches the
+   decision as a click, so turning scripts on reopens it, review L1); anything else is refused without a
    word. Inside means after `..` is removed and every symbolic link on the
    way is followed (`realpath` on the part that exists), compared folder by
    folder, so `planning-old` is not inside `planning` and a link inside the
@@ -4104,24 +4128,66 @@ retyped stubs (macOS 26.6, swiftc 6): the 65 cases of `tabCases`,
 `choiceCases`, `navigationCases` and `planAUnit.messageCases` all held, and
 the 18 `greetingUnitPlansCases` with the new sentences. Made to allow any
 `file:` address, the rule failed 5 navigation cases; made to follow no
-links, it failed the shortcut case. NOT measured here: the web view itself
-(PDF inline, Back after a new-window PDF, dark mode through
-`prefers-color-scheme`, the rule list blocking a remote font), which needs
-the window; it is a hand test, and the mac suite runs `PlanningTabTests`.
+links, it failed the shortcut case. Since the fixes the harness runs 72
+(with `followsThePage`), all held.
 
-**Nothing on the trail for looking.** Showing a plan, choosing a unit, Back,
-Forward, Reload and the assets refresh write nothing (rule 5 records what a
-teacher DID that a report needs; looking changes nothing), and a plan's
-title or contents is the teacher's own and is never recorded, so
-`LogRedactor` needed no new rule: the one new line carries a course code and
-an assistant's name.
+MEASURED, the real web view with no window (708 implementation review M3;
+`PlanWebViewGuardTests`, also run headless through a driver on macOS 26.6):
+a page carrying a stylesheet, `@import`, `@font-face`, a CSS background,
+`<img>`, `srcset`, a remote script and frame, `<object>`, a poster,
+`prefetch`, `preconnect`, an icon and `<a ping>` made **zero** connections
+to a listener on 127.0.0.1, where a plain web view with the same page made
+some; an inline script and an `onload` did not run; a picture three folders
+up loaded at 0 pixels while one beside the page loaded at 7; and a rule list
+that cannot compile leaves the tab saying `cannotShowTitle`, writes the
+trail once, and loads nothing. Each was made to fail: a rule list that lets
+everything through (3 connections), scripts on (the title changed), read
+access to the course (the picture showed at 9). The review measured more
+by hand (`<meta refresh>` to the web or outside the folder refused; a
+`_blank` web link opened outside exactly once; `plantoir:` and `ftp:`
+refused). One caveat it measured: WebKit's page process may read
+`/private/tmp` whatever folder it is given, so the tests keep their
+fixtures under the user's Caches folder. Still hand tests: a PDF drawn
+inline, Back after a new-window PDF, dark mode through
+`prefers-color-scheme`.
+
+**The popup follows the page** (review L4): a link from one unit's plan to
+another's moves the popup to that unit (`followsThePage`, the web view's
+address observed), and choosing an entry always loads it, even the one the
+popup already names.
+
+**A linked planning folder is never mirrored** (review L2): the mirror
+removes extra files, and through a symbolic link at `.internal/planning` it
+removed a photo from the folder behind it (measured by the review). It now
+does nothing when the planning folder or its `assets` is a link.
+
+**The trail when the tab opens (review M1).** Each appearance of the tab
+writes "looked at a course's unit plans" once: the course and how many unit
+plans it offered, "only the list of plans", or "nothing to show yet". The
+same event writes a line when no plan can be shown at all (the rule list
+could not be made; the tab then says `cannotShowTitle` rather than staying
+blank) and, once per appearance, when the assets mirror failed, with how
+many files. The first version wrote nothing for looking, following the
+plan; the brief's ruling asked for a line, and a report of "the Planning tab
+is blank" found nothing, which is the failure rule 5 exists for. Choosing a
+unit, Back, Forward and Reload still write nothing. No line carries a plan's
+title: it is the teacher's own words, and the count is what a report needs.
+So `LogRedactor` needed no new rule: the lines carry a course code, counts
+and an assistant's name.
+
+**A greeting can name plans the tab does not offer yet** (review L3,
+accepted): the greeting names every plan with a readable `plan.json`, the
+popup only those with a page, so mid-build the greeting says "Planning tab"
+while the tab shows the offer. The gap is short, and closing it would make
+the greeting look for pages too. Said in `choiceCases.rule`.
 
 **The greeting points here.** `greetingUnitPlans.one` and `.some` now say
 the plans are on the course's Planning tab, and the skill tells the
 assistant to send the teacher there (707 plan review M5). That is always
 true on the mac when a greeting is said, since a Revise door and the tab
-both need Claude Code or Codex. Windows keeps the old sentences until its
-own tab exists.
+both need Claude Code or Codex. Windows does #790 (#707's greeting) and
+#708's tab together, because `greetingUnitPlansCases` now carries these
+sentences and a greeting written with the folder wording fails them.
 
 REJECTED: a `TabView` (it unmounts the hidden tab, so an unsaved setting is
 lost); the switch in the toolbar (`DetailTabs`' comment); a disabled Planning
