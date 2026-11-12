@@ -11,10 +11,13 @@ The rule cases are deserialised from `contracts/shared-rules.json` ->
 test_coverage_maps.py, which must stay green beside this file: one counting
 function serves both maps, and the site's page must not move by a byte.
 
-Pure Python, temporary folders, no Docker: verify.sh runs it on the mac host
-and Windows' PythonToolchainTests discovers it. Nothing here makes a file or
+It needs python-frontmatter (the counting cases go through the build's own
+process_frontmatter), which on the mac is only in the image: verify.sh runs
+it there, with deploy.sh mounted beside it, and Windows' PythonToolchainTests
+discovers it. Temporary folders, no network. Nothing here makes a file or
 folder whose name Windows refuses (<, >, " and | are handed in as data).
 """
+import errno
 import hashlib
 import html
 import io
@@ -79,7 +82,8 @@ class Course:
     """
 
     def __init__(self, root: Path, curriculum: dict, pages: dict, section: int,
-                 class_folders=None, graded_folders=None, curriculum_folder="Curriculum"):
+                 class_folders=None, graded_folders=None, curriculum_folder="Curriculum",
+                 section_pages=None):
         self.root = root
         self.course_dir = root / "course"
         self.content_root = root / "content"
@@ -107,16 +111,21 @@ class Course:
                 shutil.copy2(source, copy)
                 build_site.remember_vault_source(copy, source, is_section_page=False)
                 build_site.process_frontmatter(copy, section)
+            if section_pages:
+                section_dir = self.course_dir / f"section{section}"
+                folders = set()
+                for place, text in section_pages.items():
+                    write(section_dir / place, text)
+                    folders.add(Path(place).parts[0])
+                build_site.copy_the_per_section_folders(section_dir, self.content_root,
+                                                        sorted(folders), section)
         self.host_output_dir.mkdir(parents=True)
         self.plan = build_site.plan_coverage_maps(self.content_root, self.configured)
         build_site.set_coverage_titles([title for _, title in self.plan])
         self.taught = build_site._pages_the_course_teaches(self.content_root, self.class_folders)
 
     def unreadable_copies(self) -> list:
-        copies = []
-        for copy, _, _ in build_site._unreadable_pages:
-            copies.append(copy)
-        return copies
+        return build_site.copies_still_unreadable()
 
     def published(self):
         """The site's count, called as build_curriculum_coverage calls it."""
@@ -194,7 +203,7 @@ class Attributes(HTMLParser):
         self.text.append(data)
 
 
-ALLOWED_TAGS = {"html", "head", "meta", "title", "style", "body", "main", "h1", "h2", "p",
+ALLOWED_TAGS = {"html", "head", "meta", "title", "style", "body", "main", "h1", "h2", "p", "bdi",
                 "section", "div", "a", "span", "hr", "table", "caption", "tr", "th", "td"}
 ALLOWED_ATTRIBUTES = {"lang", "charset", "http-equiv", "content", "name", "class", "href",
                       "aria-label", "title", "role", "data-assessed", "id",
@@ -232,7 +241,8 @@ class TheCountingCases(unittest.TestCase):
             with self.subTest(case["name"]), tempfile.TemporaryDirectory() as temp:
                 course = Course(Path(temp), fixture["curriculum"], case["pages"], case["section"],
                                 class_folders=fixture["classFolders"],
-                                graded_folders=fixture["gradedFolders"])
+                                graded_folders=fixture["gradedFolders"],
+                                section_pages=case.get("sectionPages"))
                 specific, overall, covered_by, assessed_by = course.published()
                 self.assertEqual(counts_by_code(specific, covered_by, assessed_by),
                                  expected_counts(specific, case["expect"]["published"]),
@@ -278,7 +288,10 @@ class TheCountingCases(unittest.TestCase):
 
 def the_anti_drift_course(temp: str, section=1, **keywords) -> Course:
     fixture = the_counting_fixture()
-    case = fixture["cases"][-1]
+    case = None
+    for candidate in fixture["cases"]:
+        if "anti-drift" in candidate["name"]:
+            case = candidate
     return Course(Path(temp), fixture["curriculum"], case["pages"], section,
                   class_folders=fixture["classFolders"],
                   graded_folders=fixture["gradedFolders"], **keywords)
@@ -521,9 +534,10 @@ class TheWords(unittest.TestCase):
             _, _, text = a_page(temp)
         for key in ("heading", "chipsHint", "standingsCaption", "whatCountsHere", "hiddenNone"):
             self.assertIn(on_the_page(words[key]), text, key)
-        self.assertIn(on_the_page(words["subheading"].replace("{course}", "COURSE")
-                                  .replace("{section}", "1")), text)
-        self.assertIn(on_the_page(words["intro"].replace("{course}", "COURSE")), text)
+        shown = "".join(read_page(text).text)
+        self.assertIn(words["subheading"].replace("{course}", "COURSE").replace("{section}", "1"), shown)
+        self.assertIn(words["intro"].replace("{course}", "COURSE"), shown)
+        self.assertIn("<bdi>COURSE</bdi>", text)
         self.assertNotIn(on_the_page(words["whatCountsHereSiteMapOff"]), text)
         self.assertNotIn(on_the_page(words["unreadableOne"]), text)
 
@@ -685,8 +699,8 @@ class WhereItIsWritten(unittest.TestCase):
             answer = course.write_tab(printer=said.append)
             self.assertIsNone(answer)
             self.assertEqual(len(said), 1)
-            self.assertTrue(said[0].startswith("⚠️  The coverage map Plantoir shows for this "
-                                               "section could not be made this time: "))
+            sentence = coverage_tab_contract()["consoleWords"]["couldNotMake"]
+            self.assertTrue(said[0].startswith("⚠️  " + sentence.split("{reason}")[0]))
 
     def test_a_contract_it_cannot_read_is_one_warning(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -742,8 +756,8 @@ class TwoMaps(unittest.TestCase):
         self.assertEqual(titles, planned)
         self.assertEqual(titles[0], "Curriculum Coverage")
         self.assertEqual(len(re.findall(r"<section ", text)), 2)
-        self.assertLess(text.index(f'<h2 id="coverage-map-0">{titles[0]}</h2>'),
-                        text.index(f'<h2 id="coverage-map-1">{titles[1]}</h2>'))
+        self.assertLess(text.index(f'<h2 id="coverage-map-0"><bdi>{titles[0]}</bdi></h2>'),
+                        text.index(f'<h2 id="coverage-map-1"><bdi>{titles[1]}</bdi></h2>'))
         self.assertIn(build_site.coverage_tab_link(BUILD_ID, 0, "A1.1"), text)
         self.assertIn(build_site.coverage_tab_link(BUILD_ID, 1, "1.A"), text)
         self.assertIn(build_site.coverage_tab_link(BUILD_ID, 1, "CRD-1.A"), text)
@@ -780,6 +794,158 @@ class InTheBuild(unittest.TestCase):
 
     def test_beside_the_site(self):
         self.assertIn("host_output_dir, content_root, course_dir", self.body[self.call:self.call + 200])
+
+
+class WhetherTheMapIsThisBuilds(unittest.TestCase):
+    """coverageTab.mapOfThisBuild: the PLANTOIR_PROBLEMS: line says the map
+    step ran, not that it made a map (the implementation review's M2)."""
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def test_every_case(self):
+        for case in coverage_tab_contract()["mapOfThisBuild"]["cases"]:
+            with self.subTest(case["name"]), tempfile.TemporaryDirectory() as temp:
+                host = Path(temp) / "section1"
+                folder = build_site.coverage_tab_folder(host)
+                folder.mkdir(parents=True)
+                if "recordText" in case:
+                    write(folder / "about.json", case["recordText"])
+                elif case.get("record") is not None:
+                    write(folder / "about.json", json.dumps(case["record"]))
+                for name in case["pagesOnDisk"]:
+                    write(folder / name, "a page")
+                self.assertEqual(build_site.coverage_tab_map_state(host, case["buildId"]),
+                                 case["expect"])
+
+    def test_a_failed_map_step_leaves_the_earlier_map_and_says_older(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            first = course.write_tab()
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            second_id = "20261112T200000Z-bbbbbbbb"
+            real_replace = build_site.os.replace
+
+            def no_space(source, target):
+                raise OSError(errno.ENOSPC, "No space left on device", str(target))
+
+            build_site.os.replace = no_space
+            said = []
+            try:
+                arguments = (course.host_output_dir, course.content_root, course.course_dir,
+                             "COURSE", "COURSE", 1, second_id, "preview", course.plan,
+                             course.class_folders, course.graded_folders, True, course.taught,
+                             {}, True)
+                self.assertIsNone(build_site.make_the_coverage_tab(
+                    *arguments, printer=said.append, schemes=schemes()))
+            finally:
+                build_site.os.replace = real_replace
+            self.assertEqual(said, ["⚠️  " + coverage_tab_contract()["consoleWords"]["couldNotMake"]
+                                    .replace("{reason}", "No space left on device")])
+            self.assertEqual(sorted(os.listdir(folder)), sorted(["about.json", first["page"]]),
+                             "no half-written temporary is left behind")
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, second_id), "older")
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir, BUILD_ID), "thisBuild")
+
+
+class TwoBuildsAndLeftovers(unittest.TestCase):
+    """The implementation review's L1 and L2."""
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def test_an_earlier_builds_temporaries_go_and_a_newer_builds_stay(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            earlier = [".map-20200101T000000Z-00000000.html.123.tmp",
+                       ".about.json.20200101T000000Z-00000000.tmp"]
+            newer = [".map-20991231T000000Z-ffffffff.html.456.tmp",
+                     ".about.json.20991231T000000Z-ffffffff.tmp",
+                     "map-20991231T000000Z-ffffffff.html"]
+            for name in earlier + newer:
+                write(folder / name, "left behind")
+            record = course.write_tab()
+            names = set(os.listdir(folder))
+            for name in earlier:
+                self.assertNotIn(name, names)
+            for name in newer:
+                self.assertIn(name, names)
+            self.assertIn(record["page"], names)
+
+    def test_a_newer_builds_record_stands_and_this_builds_page_goes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            newer_page = "map-20991231T000000Z-ffffffff.html"
+            write(folder / newer_page, "the newer build's page")
+            newer_record = {"version": 1, "buildId": "20991231T000000Z-ffffffff", "page": newer_page}
+            write(folder / "about.json", json.dumps(newer_record))
+            answer = course.write_tab()
+            self.assertEqual(answer, newer_record)
+            self.assertEqual(sorted(os.listdir(folder)), ["about.json", newer_page])
+            self.assertEqual(build_site.coverage_tab_map_state(course.host_output_dir,
+                                                               "20991231T000000Z-ffffffff"), "thisBuild")
+
+    def test_the_page_about_json_names_is_never_removed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            folder = build_site.coverage_tab_folder(course.host_output_dir)
+            older_page = "map-20200101T000000Z-00000000.html"
+            write(folder / older_page, "an older page")
+            write(folder / "about.json", json.dumps({"version": 1, "page": older_page,
+                                                      "buildId": "20200101T000000Z-00000000"}))
+            # As if this build's record had been overtaken, right before the tidy.
+            build_site._tidy_the_coverage_tab_folder(folder, BUILD_ID)
+            self.assertTrue((folder / older_page).is_file())
+
+
+class TheConsoleLine(unittest.TestCase):
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def test_the_fallback_is_the_contracts_sentence(self):
+        self.assertEqual(build_site.COVERAGE_TAB_COULD_NOT_MAKE,
+                         coverage_tab_contract()["consoleWords"]["couldNotMake"])
+
+    def test_it_names_no_tab_and_no_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            course = the_anti_drift_course(temp)
+            write(build_site.coverage_tab_folder(course.host_output_dir), "in the way")
+            said = []
+            course.write_tab(printer=said.append)
+        self.assertEqual(len(said), 1)
+        self.assertNotIn("/", said[0])
+        self.assertNotIn("\\", said[0])
+        self.assertNotIn("tab", said[0].lower())
+        self.assertNotIn(temp, said[0])
+
+
+class TheHiddenLine(unittest.TestCase):
+
+    def setUp(self):
+        use_the_repository_contracts()
+
+    def test_a_page_the_site_never_publishes_is_counted_as_hidden(self):
+        fixture = the_counting_fixture()
+        pages = {"All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson Outline]]\n",
+                 "templates/Lesson Outline.md": "---\npublish: true\n---\n![[A1.1]]\n"}
+        with tempfile.TemporaryDirectory() as temp:
+            course = Course(Path(temp), fixture["curriculum"], pages, 1)
+            record = course.write_tab()
+        self.assertEqual(record["hiddenPagesCounted"], 1)
+
+    def test_an_empty_map_says_nothing_untrue(self):
+        words = coverage_tab_contract()["pageWords"]
+        fixture = the_counting_fixture()
+        with tempfile.TemporaryDirectory() as temp:
+            course = Course(Path(temp), fixture["curriculum"], {}, 1)
+            record = course.write_tab()
+            text = (build_site.coverage_tab_folder(course.host_output_dir)
+                    / record["page"]).read_text(encoding="utf-8")
+        self.assertEqual(record["hiddenPagesCounted"], 0)
+        self.assertIn(on_the_page(words["hiddenNone"]), text)
 
 
 # === Never on a website ======================================================

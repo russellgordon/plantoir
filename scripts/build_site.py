@@ -4918,6 +4918,25 @@ _unreadable_pages: list[tuple[Path, str, int | None]] = []
 _HIDDEN_SETTINGS = "---\npublish: false\n---"
 
 
+def copies_still_unreadable() -> list:
+    """
+    The build's copies that are STILL pages whose settings could not be read
+    (#793, the implementation review's M1). A copy is listed when the file it
+    came from could not be read, but a section's own page copied over a
+    shared one at the same path afterwards (#678) replaces it with a page
+    that reads fine, and `_unreadable_pages` is never told. So a copy counts
+    as unreadable only while the build's source record still names the file
+    that could not be read. A copy with no source record keeps its entry.
+    """
+    copies = []
+    for copy, name, _ in _unreadable_pages:
+        source = _vault_sources.get(Path(copy))
+        if source is not None and _name_in_the_course(source[0]) != name:
+            continue
+        copies.append(copy)
+    return copies
+
+
 def forget_unreadable_pages() -> None:
     """Starts a new build's list of pages whose settings could not be read."""
     _unreadable_pages.clear()
@@ -9045,8 +9064,15 @@ def coverage_as_if_published(content_root: Path, course_dir: Path, coverage_plan
             "standing": _coverage_standing_counts(specific, overall, covered_by, assessed_by),
             "pages": pages,
         })
+    # Hidden: held back by its settings, or in a place Quartz never publishes
+    # (a top-level templates/ or private/ folder, or a dot-named part of the
+    # path: geogebra.is_published, geogebraFences.files.notPublished), which
+    # the count itself does not ask about (the implementation review's L5).
     hidden = 0
     for place in sorted(counted_pages):
+        if not geogebra.is_published(place):
+            hidden += 1
+            continue
         try:
             text = (content_root / place).read_text(encoding="utf-8")
         except Exception:
@@ -9120,10 +9146,11 @@ body {
   line-height: 1.5;
 }
 main { max-width: 60rem; }
-h1, h2 { color: var(--dark); line-height: 1.25; }
+h1, h2 { color: var(--dark); line-height: 1.25; overflow-wrap: anywhere; }
 h1 { font-size: 1.45rem; margin: 0 0 0.2rem; }
 h2 { font-size: 1.2rem; margin: 2rem 0 0.4rem; }
-.coverage-tab-subheading { margin: 0 0 1rem; color: var(--darkgray); }
+.coverage-tab-subheading { margin: 0 0 1rem; color: var(--darkgray); overflow-wrap: anywhere; }
+p { overflow-wrap: anywhere; }
 .coverage-tab-count { margin: 0.25rem 0; }
 .coverage-tab-hint { margin: 0.6rem 0 1rem; }
 .coverage-standings { border-collapse: collapse; margin: 0.6rem 0 0; }
@@ -9154,10 +9181,27 @@ def coverage_tab_page(maps: list, course_display: str, section_number, build_id:
     def escaped(text) -> str:
         return html.escape(str(text), quote=True)
 
+    def isolated(text) -> str:
+        # <bdi>: a right-to-left mark in a course code or a folder's name
+        # reorders only its own text, not the sentence around it (the
+        # implementation review's L8).
+        return f"<bdi>{escaped(text)}</bdi>"
+
+    def filled(template: str, values: dict) -> str:
+        # The sentence escaped, each {name} replaced by its value, isolated.
+        pieces = re.split(r"(\{[a-z]+\})", template)
+        out = []
+        for piece in pieces:
+            if piece[1:-1] in values and piece.startswith("{") and piece.endswith("}"):
+                out.append(isolated(values[piece[1:-1]]))
+            else:
+                out.append(escaped(piece))
+        return "".join(out)
+
     course = escaped(course_display)
     heading = escaped(words["heading"])
-    subheading = escaped(words["subheading"].replace("{course}", str(course_display))
-                         .replace("{section}", str(section_number)))
+    subheading = filled(words["subheading"], {"course": course_display,
+                                              "section": section_number})
     count_lines = []
     for line in _coverage_tab_count_lines(words, hidden, unreadable):
         count_lines.append(f'<p class="coverage-tab-count">{escaped(line)}</p>')
@@ -9176,10 +9220,10 @@ def coverage_tab_page(maps: list, course_display: str, section_number, build_id:
                                                one_map["covered_by"], one_map["assessed_by"],
                                                href_for=href_for, labels=words)
         if one_map["namesTheFolder"]:
-            intro = (words["introNamingTheFolder"].replace("{folder}", str(one_map["folder"]))
-                     .replace("{course}", str(course_display)))
+            intro = filled(words["introNamingTheFolder"], {"folder": one_map["folder"],
+                                                           "course": course_display})
         else:
-            intro = words["intro"].replace("{course}", str(course_display))
+            intro = filled(words["intro"], {"course": course_display})
         hint = (f'\n<p class="coverage-tab-hint">{escaped(words["chipsHint"])}</p>'
                 if has_chips else "")
         standing = one_map["standing"]
@@ -9193,8 +9237,8 @@ def coverage_tab_page(maps: list, course_display: str, section_number, build_id:
                               f'<td>{number}</td></tr>')
         sections.append(
             f'<section aria-labelledby="coverage-map-{index}">\n'
-            f'<h2 id="coverage-map-{index}">{escaped(one_map["title"])}</h2>\n'
-            f'<p>{escaped(intro)}</p>\n'
+            f'<h2 id="coverage-map-{index}">{isolated(one_map["title"])}</h2>\n'
+            f'<p>{intro}</p>\n'
             f'{_coverage_panel_html(columns)}{hint}\n'
             f'<table class="coverage-standings">\n'
             f'<caption>{escaped(words["standingsCaption"])}</caption>\n'
@@ -9238,20 +9282,106 @@ def coverage_tab_page(maps: list, course_display: str, section_number, build_id:
 """
 
 
-def _remove_other_coverage_tab_pages(folder: Path, keep: str | None) -> None:
-    """Every `map-*.html` in the folder but `keep`, one by one by name."""
+# A build id as _new_build_id makes it: the UTC second it started and eight
+# hex characters, so two ids compare in the order their builds started.
+_BUILD_ID_SHAPE = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{8}")
+
+
+def _older_than(other_id: str, build_id: str) -> bool:
+    """Whether `other_id` names a build that started before `build_id`, or is
+    not a build id at all (a stray file by the map's name)."""
+    if not _BUILD_ID_SHAPE.fullmatch(other_id):
+        return True
+    if not _BUILD_ID_SHAPE.fullmatch(str(build_id)):
+        return False
+    return other_id < str(build_id)
+
+
+def _read_coverage_tab_record(folder: Path) -> dict | None:
+    """`about.json` as written, or None when it is missing or unreadable."""
+    try:
+        with open(folder / COVERAGE_TAB_RECORD, encoding="utf-8") as handle:
+            record = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _tidy_the_coverage_tab_folder(folder: Path, build_id: str) -> None:
+    """
+    Removes, one by one by name, what this build or an earlier one left that
+    nothing names: every `map-<id>.html` and every half-written temporary
+    (`.map-<id>.html.<pid>.tmp`, `.about.json.<id>.tmp`) whose build started
+    BEFORE this one, except the page `about.json` names as it stands now. A
+    newer build's files are never touched, so two builds of one section at
+    once cannot leave `about.json` naming a page that was removed (the
+    implementation review's L1 and L2).
+    """
+    record = _read_coverage_tab_record(folder)
+    named = record.get("page") if record else None
     try:
         names = os.listdir(folder)
     except OSError:
         return
     for name in names:
-        if name == keep:
+        if name == named:
             continue
+        other_id = None
         if name.startswith("map-") and name.endswith(".html"):
+            other_id = name[len("map-"):-len(".html")]
+        elif name.startswith(".map-") and name.endswith(".tmp"):
+            other_id = name[len(".map-"):].split(".html", 1)[0]
+        elif name.startswith(f".{COVERAGE_TAB_RECORD}.") and name.endswith(".tmp"):
+            other_id = name[len(f".{COVERAGE_TAB_RECORD}."):-len(".tmp")]
+        if other_id is None or other_id == str(build_id):
+            continue
+        if _older_than(other_id, build_id):
             try:
                 os.remove(folder / name)
             except OSError:
                 pass
+
+
+def _write_text_by_rename(folder: Path, final_name: str, temporary_name: str, text: str) -> None:
+    """`text` into a temporary beside the file, then a rename, so a reader
+    never meets half a file; the temporary is removed if anything fails."""
+    temporary = folder / temporary_name
+    try:
+        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        os.replace(temporary, folder / final_name)
+    except BaseException:
+        try:
+            os.remove(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def coverage_tab_map_state(host_output_dir: Path, build_id: str | None) -> str:
+    """
+    What the section's `.coverage-tab` holds, measured against the build the
+    caller knows of (shared-rules.json -> coverageTab.mapOfThisBuild):
+    `none` when there is no usable map (no record, one that cannot be read,
+    another version, no page named, or the named page not there),
+    `thisBuild` when the record's buildId is `build_id`, and `older` when it
+    is any other build's: that build ran its map step and the map was not
+    made again, so the map shown is an earlier build's, with its own date.
+    The build's id is the one its PLANTOIR_PROBLEMS: line carries, and the
+    section's `.build-id`.
+    """
+    folder = coverage_tab_folder(host_output_dir)
+    record = _read_coverage_tab_record(folder)
+    if record is None or record.get("version") != COVERAGE_TAB_RECORD_VERSION:
+        return "none"
+    page = record.get("page")
+    if not isinstance(page, str) or not page or "/" in page or "\\" in page:
+        return "none"
+    if not (folder / page).is_file():
+        return "none"
+    if build_id is not None and record.get("buildId") == build_id:
+        return "thisBuild"
+    return "older"
 
 
 def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Path,
@@ -9263,17 +9393,18 @@ def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Pa
                        schemes=None) -> dict:
     """
     Writes `<host_output_dir>/.coverage-tab/`: the page first (a temporary
-    file renamed into place), `about.json` LAST, then every other `map-*.html`
-    removed, so a reader of `about.json` always finds the page it names
-    (file-formats.json -> coverageTabMap.orderOfWriting). A course with no
-    curriculum folder holding an expectation page gets `"maps": []`, no page,
-    and any older page removed. Returns the record. Raises on failure; the
-    build's call is `make_the_coverage_tab`, which never lets it stop a build.
+    file renamed into place), `about.json` LAST (likewise), then what earlier
+    builds left removed, so a reader of `about.json` always finds the page it
+    names (file-formats.json -> coverageTabMap.orderOfWriting). A course with
+    no curriculum folder holding an expectation page gets `"maps": []`, no
+    page, and every older page removed. When a NEWER build of the section has
+    already written its record (two builds at once), this build's page is
+    removed and that record left as it is. Returns the record on disk.
+    Raises on failure; the build's call is `make_the_coverage_tab`, which
+    never lets it stop a build.
     """
     if unreadable_copies is None:
-        unreadable_copies = []
-        for copy, _, _ in _unreadable_pages:
-            unreadable_copies.append(copy)
+        unreadable_copies = copies_still_unreadable()
     if words is None:
         words = coverage_tab_page_words()
     folder = coverage_tab_folder(host_output_dir)
@@ -9309,10 +9440,7 @@ def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Pa
         text = coverage_tab_page(maps, course_display, section_number, build_id,
                                  coverage_tab_scheme_colours(config, section_number, schemes),
                                  words, answer["hiddenCounted"], unreadable, site_map_on)
-        temporary = folder / f".{page_name}.{os.getpid()}.tmp"
-        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-        os.replace(temporary, folder / page_name)
+        _write_text_by_rename(folder, page_name, f".{page_name}.{os.getpid()}.tmp", text)
 
     record_maps = []
     for one_map in maps:
@@ -9340,9 +9468,39 @@ def write_coverage_tab(host_output_dir: Path, content_root: Path, course_dir: Pa
         "unreadablePagesLeftOut": unreadable,
         "maps": record_maps,
     }
-    _write_json_atomically(folder / COVERAGE_TAB_RECORD, record)
-    _remove_other_coverage_tab_pages(folder, page_name)
+
+    # A newer build of this section got here first: its record stands, and
+    # this build's page, which nothing will name, goes.
+    standing_record = _read_coverage_tab_record(folder)
+    if standing_record is not None:
+        standing_id = str(standing_record.get("buildId") or "")
+        if standing_id != str(build_id) and not _older_than(standing_id, build_id):
+            if page_name is not None:
+                try:
+                    os.remove(folder / page_name)
+                except OSError:
+                    pass
+            return standing_record
+
+    text = json.dumps(record, ensure_ascii=False, indent=1) + "\n"
+    _write_text_by_rename(folder, COVERAGE_TAB_RECORD, f".{COVERAGE_TAB_RECORD}.{build_id}.tmp", text)
+    _tidy_the_coverage_tab_folder(folder, build_id)
     return record
+
+
+# The console line when the map cannot be made, as coverageTab.consoleWords
+# says it; held here as well because the contract may be the thing that
+# could not be read. TheWords in test_coverage_tab.py pins the two together.
+COVERAGE_TAB_COULD_NOT_MAKE = ("The map of this section's coverage as if every page were "
+                               "published could not be made this time ({reason}).")
+
+
+def _a_reason_without_a_path(error: BaseException) -> str:
+    """What went wrong, in the system's own words and never with a path: the
+    console goes into problem reports, and a path carries the home folder."""
+    if isinstance(error, OSError) and error.strerror:
+        return str(error.strerror)
+    return type(error).__name__
 
 
 def make_the_coverage_tab(*arguments, printer=print, **keywords) -> dict | None:
@@ -9352,8 +9510,12 @@ def make_the_coverage_tab(*arguments, printer=print, **keywords) -> dict | None:
     try:
         return write_coverage_tab(*arguments, **keywords)
     except Exception as error:
-        printer(f"⚠️  The coverage map Plantoir shows for this section could not be "
-                f"made this time: {error}")
+        sentence = COVERAGE_TAB_COULD_NOT_MAKE
+        try:
+            sentence = contracts.section("shared-rules", "coverageTab", "consoleWords", "couldNotMake")
+        except Exception:
+            pass
+        printer("⚠️  " + sentence.replace("{reason}", _a_reason_without_a_path(error)))
         return None
 
 
@@ -10054,9 +10216,11 @@ def build_section_site(
     # ALWAYS, and whatever coverage_wanted says (Russell's ruling, 2026-11-12):
     # the setting decides what students see, not the teacher's planning view.
     # After the How I Teach sweep, the #246 hiding and the clearing of a site
-    # this build cannot replace; BEFORE the problems record below, so the
-    # PLANTOIR_PROBLEMS: line also means this map is on disk. Beside the site,
-    # never in content/ or public/. Never fails the build.
+    # this build cannot replace; BEFORE the problems record below, so by the
+    # PLANTOIR_PROBLEMS: line the map step has run. Not that it succeeded:
+    # the map is this build's only when about.json's buildId is this build's
+    # (coverageTab.mapOfThisBuild). Beside the site, never in content/ or
+    # public/. Never fails the build.
     make_the_coverage_tab(
         host_output_dir, content_root, course_dir, course_code,
         displayed_course_code(config, course_code), section_number,

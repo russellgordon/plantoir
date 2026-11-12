@@ -1980,7 +1980,7 @@ stylesheet are shared the same way (`_coverage_panel_html`,
 `COVERAGE_STANDING_ROWS`, `coverage_stylesheet()`); the site's `base.scss`
 with the coverage block appended hashes the same as on `dev` e7c452711 (a
 test pins the hash). The counting cases (`coverageTab.whatCounts.countingCases`,
-13) run every rule both ways, and the last of them is the anti-drift case: with
+14) run every rule both ways, and one of them is the anti-drift case: with
 every page published the two answers are identical.
 
 **What counts, and what does not.** Every page the build copies into the
@@ -1992,9 +1992,18 @@ How I Teach page, another section's pages, the curriculum folders' own pages
 and the build's own pages. **A page whose settings could not be read (#246)
 is LEFT OUT** (Russell's ruling, 2026-11-12), through `leave_out`: the build
 cannot tell which section such a page was meant for, and counting it would
-overstate every section's map. The page says how many there were, the same
-number the Problems tab lists, and points to that tab. It also says, always,
-how many of the pages it counted students cannot see yet (`hiddenPagesCounted`),
+overstate every section's map. The page says how many there were and points
+to the Problems tab. A copy counts as unreadable only while the build's record
+of where it came from still names the file that could not be read
+(`copies_still_unreadable`): the implementation review's M1 measured a
+section's readable page copied over a shared unreadable one at the same path
+(#678), which `_unreadable_pages` is never told about, so the tab had counted
+LESS than the site and named a page students can see as left out (counting
+case 14). The Problems list carries the same stale entry, which is older than
+this piece and is a #246 follow-up. It also says, always,
+how many of the pages it counted students cannot see yet (`hiddenPagesCounted`:
+held back by their settings, or in a place the site never publishes, a
+top-level `templates/` or `private/` folder, by `geogebra.is_published`),
 which is the teacher's one check against a deliberately unpublished answer key
 or last year's draft inflating the map. Which cells only unpublished pages
 colour is NOT marked in this release (ruled out, 2026-11-12).
@@ -2016,7 +2025,9 @@ a chip is still colour and code only. Everything from the course (the course
 code a teacher reads, a folder's name and the title made from it) goes through
 `html.escape` with quotes; codes are limited to the expectation shapes and
 escaped too; an overall page's title after its code and every file name never
-reach the page. The sentence about clicking a code is deliberately not on the
+reach the page. Course text is isolated in `<bdi>`, so a right-to-left mark in
+a folder's name reorders only that name, and headings and paragraphs wrap
+anywhere, so a very long course code does not make the page scroll sideways. The sentence about clicking a code is deliberately not on the
 page: on a Mac without Obsidian, and on Windows until its tab is wired, it
 would be false, so 793b says it above the page (the plan review's L1).
 
@@ -2045,9 +2056,15 @@ course folder (it would sync, Obsidian would show it, and #768's walk would
 read every build as a change).
 
 **Order of writing.** The page (a temporary file, then `os.replace`), then
-`about.json` (`_write_json_atomically`), then every other `map-*.html`,
-listed and removed one by one by name. A reader of `about.json` always finds
-the page it names. A course whose curriculum has gone gets `"maps": []`,
+`about.json` (likewise), then what EARLIER builds left, removed one by one by
+name: their `map-<id>.html` and any half-written temporary, never the page
+`about.json` names at that moment and never a newer build's file (build ids
+sort in the order their builds started). A write that fails removes its own
+temporary (the review measured a half page left by a full disk). When a newer
+build of the same section has written its record first, the older build
+leaves it standing and removes its own page, so two builds at once cannot
+leave `about.json` naming a removed page (the review's L2, measured by
+interleaving). A reader still treats a named page that is missing as no map. A course whose curriculum has gone gets `"maps": []`,
 `"page": null`, and its last page removed, so a stale map never outlives the
 curriculum.
 
@@ -2057,10 +2074,20 @@ ruling, 2026-11-12: the setting decides what students see, not the teacher's
 planning view; the page's last paragraph changes to say the site's map is off,
 and `siteMapSwitchedOn` records it). After the How I Teach sweep, the #246
 hiding and `_clear_a_site_this_build_cannot_replace`; BEFORE
-`section_problems.write_after_build`, so the `PLANTOIR_PROBLEMS:` line every
-build already prints also means this map is on disk, and the app needs no new
-machine line. It never fails a build: `make_the_coverage_tab` turns any error
-(an unwritable folder, a contract it cannot read) into one ⚠️ line. A
+`section_problems.write_after_build`, so by the time the `PLANTOIR_PROBLEMS:`
+line every build already prints arrives, the map STEP has run, and the app
+needs no new machine line. That line does not say the step SUCCEEDED (the
+implementation review's M2: on a full disk the step printed its warning and
+`about.json` kept the previous build's id). It never fails a build:
+`make_the_coverage_tab` turns any error (a full disk, an unwritable folder, a
+contract it cannot read) into one ⚠️ line, `coverageTab.consoleWords.couldNotMake`,
+which names no tab (no app shows one until 793b) and gives only the system's
+words for the error, never a path. **The rule for every reader**
+(`coverageTab.mapOfThisBuild`, `coverage_tab_map_state`): the map is THIS
+build's only when `about.json`'s `buildId` equals the build's own id, the one
+its `PLANTOIR_PROBLEMS:` line carries and `.build-id` holds; any other id means
+the step ran and made nothing, and the map shown is an earlier build's, which
+the tab must say. A
 successful map prints NOTHING, which the plan first proposed as a 🗺️ line and
 the plan review's M4 rejected: on its own, 793a would have named a tab no app
 has yet, under the site's own 🗺️ line with different numbers for the same
