@@ -186,7 +186,7 @@ nothing to commit, working tree clean
 `git log --oneline --graph` will now show the two lines of work
 joining back up:
 
-```text wrap
+```text nowrap
 *   7345dea Merge branch 'waitlist'
 |\  
 | * 3d7f92b Reword the docstring for the waitlist work

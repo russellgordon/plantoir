@@ -4180,13 +4180,15 @@ the word a block still scrolls, as #653 ruled; what changed is what an
 assistant is told to write and what the ready-made courses hold.
 
 - **The skills.** `plantoir-page-authoring` section 9 says every text block
-  on a page is written ```text wrap, never a bare ```text (inside a callout
-  and a list item too), and that a prompt for an AI assistant or a commit
-  message is always given in one. Its example gains a second block, a commit
-  message, inside the SAME ````markdown fence, so 6n's one claim still
+  on a page is written ```text wrap (inside a callout and a list item too),
+  unless its meaning depends on characters lining up, when it is written
+  ```text nowrap; never a bare ```text; and that a prompt for an AI
+  assistant or a commit message is always given in a wrapped one. Its
+  example gains a commit-message block and a nowrap drawing (a queue in
+  boxes) inside the SAME ````markdown fence, so 6n's one claim still
   matches one example and 6o still finds the wrapper on one example page;
-  6n now counts two wrappers there, so the commit-message block cannot be
-  deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
+  6n now requires two wrappers and three text blocks there, so neither new
+  block can be deleted unnoticed. Section 22 ("Do not") repeats it in one bullet.
   `plantoir-printing` says a text block prints wrapped either way and still
   asks for the flag, so it wraps on screen.
 - **The pins.** The binding sentences are listed in `contracts/shared-rules.json`
@@ -4222,8 +4224,41 @@ assistant is told to write and what the ready-made courses hold.
   tracebacks with `^^^` or `~~~` markers under a line (20 to 49 wide); and
   four blocks of `unittest` output whose 70-character rule lines wrap.
   MCMPR11, the other payloads, the Example Course and the skeletons hold
-  none. Whether a drawing in text is exempt from the rule, or should become
-  a Mermaid diagram or a table, is a question for Russell.
+  none. **Russell ruled on 2026-11-12 (his comment on #758):** a drawing
+  made of characters, a table or columns lined up with spaces, and a
+  traceback whose markers sit under the code they point at stay UNWRAPPED
+  and scroll sideways; anything students copy wraps; an unwrapped block is
+  always deliberate. So the 24 drawings, tables and tracebacks are written
+  ```text nowrap. The four `unittest` blocks stay `wrap`: their meaning
+  does not depend on alignment, and a wrapped rule line of `=====` is ugly
+  rather than wrong (one of them, in Concepts/Testing and Regression, also
+  holds a traceback and is nowrap for that). The other 98 blocks were read
+  again against the rule: diffs and `git status` output depend only on
+  their first column, and no other block depends on alignment. The
+  unit-planning skill's folder tree, read raw by an assistant and never
+  built, is marked nowrap too, as the rule says.
+
+  **The mark is the word `nowrap`.** It is not the word `wrap`, so
+  `wrapsText` leaves the block alone and it scrolls as before; and
+  rehype-pretty-code ignores a bare word in the meta. Measured 2026-11-12
+  outside the container, with the image's locked rehype-pretty-code 0.14.0,
+  shiki 1.26.2, unified 11.0.5, remark-parse 11.0.0, remark-gfm 4.0.1 and
+  remark-rehype 11.1.1 (Quartz 4.5.0's package-lock): ```text nowrap builds
+  byte for byte the HTML of ```text, and the parser gives `lang` "text" and
+  `meta` "nowrap". Obsidian reads the first word as the language and
+  ignores the rest, as it does `wrap`. `no wrap` as two words holds the
+  word `wrap` and so WRAPS; both linters refuse it, and a fence that says
+  both. `fence.cases` gains both. What verify.sh must show for the mark:
+  `check_runner_rules_against_the_site.py` passes the two new cases
+  (`text nowrap` not wrapped, `text no wrap` wrapped) through the image's
+  parser and `textWrapRule.ts`; 6n finds two wrappers and three text
+  blocks on the skill's example page, the drawing among them; 6o still
+  finds the wrapper on that one example page only. REJECTED for the mark:
+  a comment line inside the block (it is copied with the block); another
+  language word such as `text-art` or `txt` (it changes `data-language`
+  and what Obsidian shows); a list of exempt files in the linter (the mark
+  would not travel when a page is copied); `aligned` (it does not read as
+  the opposite of `wrap`).
   `lint_payload.py` and `lint_skeletons.py` (skeletons and EXC2O) refuse a
   bare text fence, and both run the rule's own accept and refuse cases
   first. verify.sh builds the EXC2O fixture, not ICS4U, so no gate reads

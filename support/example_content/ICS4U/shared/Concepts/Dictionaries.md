@@ -93,7 +93,7 @@ print(hours["Ali"])
 ```
 
 > [!example]- What Python says when the key is not there
-> ```text wrap
+> ```text nowrap
 > Traceback (most recent call last):
 >   File "hours.py", line 2, in <module>
 >     print(hours["Ali"])

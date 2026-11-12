@@ -41,7 +41,7 @@ for anyone after the cello. Nothing has changed at our end.
 
 Here is the wall of red text:
 
-```text wrap
+```text nowrap
 Traceback (most recent call last):
   File "/loans/signout.py", line 23, in <module>
     main()

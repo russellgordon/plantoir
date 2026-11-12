@@ -167,7 +167,7 @@ actually evidence of.
 
 > [!success]- Answer 6
 > Measured on one laptop, seconds for one call:
-> ```text wrap
+> ```text nowrap
 >  items       slow       fast
 >   1000   0.006302   0.000027
 >   2000   0.025519   0.000061

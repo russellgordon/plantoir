@@ -107,7 +107,7 @@ with open("summary.txt") as file:
         print(f"  {line.rstrip()}")
 ```
 
-```text wrap
+```text nowrap
 Donation drive summary
   beans    5
   oats     7

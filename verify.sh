@@ -5304,9 +5304,9 @@ claims = [
     ("def slope(x1, y1, x2, y2):", "a coloured code block with line numbers, and code in a sentence",
      lambda a, p: 'data-language="python"' in a and a.count("data-line") >= 4 and "<code>print()</code>" in a
      and "font-variant-ligatures" in (public / "index.css").read_text(encoding="utf-8")),
-    ("text wrap", "two text blocks that wrap, an error message and a commit message to copy (#653, #758)",
-     lambda a, p: a.count('class="plantoir-text-wrap"') == 2 and 'data-language="text"' in a and "FileNotFoundError" in a
-     and "Stop the score going below zero" in a),
+    ("text wrap", "two text blocks that wrap, an error message and a commit message to copy, and a drawing marked nowrap that does not (#653, #758)",
+     lambda a, p: a.count('class="plantoir-text-wrap"') == 2 and len(re.findall(r'<pre[^>]*data-language="text"', a)) == 3
+     and "FileNotFoundError" in a and "Stop the score going below zero" in a and "+-------+-------+-------+" in a),
     ("- [ ] Estimate before calculating", "a checklist students tick, one box ticked to start",
      lambda a, p: tasks(a) == 3 and len(re.findall(r'<input type="checkbox" checked class="plantoir-task"', a)) == 1),
     ("## Success criteria", "a page with three success criteria (one ticked) and a checklist under another heading",
