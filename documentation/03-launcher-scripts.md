@@ -2507,7 +2507,9 @@ all XNU compares).
     401 or 403 in its own words (a web filter's block page is not a
     refusal); with no answer the launcher keeps it and stops (#716,
     `token_check_answer`; `deploy.ps1`'s `Get-TokenCheckAnswer` since 1.9.3,
-    #705; the cases are `contracts/app-rules.json` → `savedTokenCheck`) —
+    #705; the cases are `contracts/app-rules.json` → `savedTokenCheck`,
+    run against both launchers, against `deploy.sh` since #771 by
+    `scripts/test_deploy_token_refusal.py`) —
     `07-deployment.md` → "A token Cloudflare refuses".
   - The token is injected into the container by piping it to a root-only
     temp file (`umask 077`) and reading it inside the `docker exec` shell
