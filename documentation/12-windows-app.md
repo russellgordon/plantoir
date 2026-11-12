@@ -858,7 +858,8 @@ Media folder back: Media folder, Whole course"), with the problem's own words
 added when two rows share a kind and a page. A page or course name carrying
 `%`, `&`, `|`, `<`, `>`, `^`, `"`, `;` or a newline is shown as written
 (`SectionProblemsContractTests.AnAwkwardPageNameIsShownAsWritten`, and the
-seeded UI test); handing such text to a terminal is #736's.
+seeded UI test); handing such text to a terminal is #736's, below ("What the
+outside doors hand to Windows, and how").
 
 **300 rows, measured** (same PC, `ProblemsTabUiTests.ThreeHundredRowsShowInTime`):
 every row's `ListViewItem` (its box, cells and button) is BUILT up front when the
@@ -1001,6 +1002,119 @@ column's trimming at the window's narrowest beside a wide sidebar; the
 secondary "fixed in the source" text's contrast in dark mode; the warning
 glyph's size beside the clock at other DPI; and what Narrator SAYS (#713's
 listen, before the cut).
+
+### Fix with Claude… and Fix with Codex… (#736, the mac's #717 part two)
+
+Two buttons under the Problems table, Claude's first (`fixWithClaudeButton`,
+`fixWithCodexButton`, titles from `fixWith.buttons`), hand the ticked rows that
+are still this section's problem to the SAME doors as Revise With ▸, with the
+contract's message in place of the plain greeting. `FixWithAssistant` (Core) is
+the mac's `FixWithAssistant.swift` function for function: `HandoverOf`,
+`Buttons`, `GreetingFor`, `TrailLine`, every word a constant pinned key by key
+(`FixWithAssistantContractTests`, which runs the 8 `buttonCases` and 10
+`greetingCases`). A button is HIDDEN when its assistant is not on this PC or
+the course is kept for reference, and GREYED when nothing ticked is handed
+over, with `fixWith.notEnabledHelp` as its help text so Narrator says why
+(proposed from Windows; the mac owes the same as an accessibility hint).
+Whether each door exists is `OutsideAssistantPresence`, asked at launch and on
+`MainWindow.Activated` off the interface thread — never while the tab draws,
+and false until the first answer, so a tab that draws first shows its buttons
+a moment later through `Changed`. A press makes Revise With's refusal first
+(`OutsideDoorWording.RefusedWhileRevised`, now the one place both callers read,
+with the doors' `didNotOpenTitle` and `couldNotStart`), opens the door, and
+only then writes "asked an assistant to fix problems" — counts and kinds,
+never a page — after the door's own "assistant opened" line.
+
+Characters are counted as Swift counts them (`StringInfo` text elements), and
+the door supplies a second bound (`ClaudeCodeLauncher.Fits`,
+`CodexLauncher.Fits`): the WHOLE command line, as `OutsideDoor.LineLength`
+computes it with this PC's real program path and the configuration's real
+path, in UTF-16 units under 8,191; when it bites first, rows go from the end
+with the `more` clause. Measured with the longest `greetingCases` message by
+`OutsideDoorTests.TheLongestMessagesCommandLineFits`; the numbers are in the
+closing comment on #736.
+
+### What the outside doors hand to Windows, and how (#736, fixing 1.9.0)
+
+**Everything a door hands over is hostile text**: the course's name (a course
+imported from somebody else's zip carries its own), page names, and what a
+build said about them. **Until 1.9.3 the Claude door handed the course's name
+to the command interpreter unquoted.** It joined the program, its flags and
+the quoted greeting by hand and ran the line as `cmd /k` (behind
+`wt.exe -d <folder>` when Windows Terminal was there). With more than two
+quotes on the line and no `/s`, cmd strips the first and the last, which left
+the greeting outside quotes, so cmd read the course's name as part of the
+command; and without Windows Terminal the greeting did not even arrive as one
+argument (`OutsideDoorTests.TheOldLineDidNotCarryTheName` keeps the old
+builder as the must-fail). The Codex door, through `cmd.exe /s /k` with
+carets, was safe from cmd's operators but expanded `%NAME%`.
+
+**Now both doors start through `OutsideDoor.StartInfo`:**
+
+- **An `.exe` (`claude.exe`, `codex.exe`) is started directly**, its command
+  line the standard quoting of each argument (`ScriptRunner.QuotedArgument`,
+  merged with #749's third review), with no command interpreter and no Windows
+  Terminal in front, through ShellExecute so it gets a console window of its
+  own. Nothing parses the line but the program, so `& | < > ^ ! %` are ordinary
+  characters, and a folder at a drive root needs nothing special (the folder is
+  the process's working directory, not an argument). On Windows 11, where
+  Windows Terminal is the default terminal, the window is Windows Terminal
+  anyway. One thing changed for a teacher: the window closes when the session
+  ends, where `cmd /k` left a prompt behind.
+- **An npm shim (`claude.cmd`, `codex.cmd`) goes through
+  `cmd.exe /v:off /s /k "…"`**, with no Windows Terminal in front, because a
+  batch file cannot run without cmd. `/s` strips exactly the outer quotes;
+  `/v:off` makes `!` ordinary even where the registry turns delayed expansion
+  on (its must-fail, `/v:on`, turned 19 of the shim cases red); cmd's
+  metacharacters get a caret wherever cmd reads them unquoted, once per parse
+  and twice for the shim's `%*`; and every run of `%` is followed by a quote,
+  written `"%"` unless a quote follows already, because cmd has NO escape for
+  `%` on a command line and none inside quotes, but reads a variable's name
+  from the character after the `%`, and no variable's name begins with a
+  quote. The program's own parser reads `a"%"b` as `a%b`; backslashes just
+  before the added quote are doubled so they still read as themselves (a TeX
+  `\%`; without the doubling three cases go red). `%` is handled on the OUTER
+  parse only: the text a batch file's `%*` becomes is not read for variables
+  again (without the `%` handling, 24 cases go red). A line break, which a
+  command line cannot carry, becomes a space on this path only.
+
+**Rejected: `wt.exe` with an argument vector.** Measured on this PC (Windows
+Terminal from the Store, 2026-11-11) with a stub program started as
+`wt.exe -d <folder> -- <stub> …` from an argument list, so that no cmd was
+anywhere: Windows Terminal EXPANDED `%OS%` and `%PATH%` in the line it was
+given, re-joined the arguments with its own quoting, which LOST an escaped
+quote (the message arrived as several arguments) and a trailing backslash, and
+it splits at every `;`. `& | < > ^ !` were inert. The expansion has no escape
+at all, so keeping Windows Terminal in front would have meant changing the
+message's text on Windows only, which doc 09 records as rejected for `;` ("the
+mac would send a different message"). Starting the program directly removes
+the layer instead, so that decision still holds: the message on Windows is the
+mac's, character for character.
+
+**Not applied: `replaceInTheMessage` to Revise With's plain greeting.** It was
+asked for while planning #736, for Windows Terminal's `;`; with Windows
+Terminal no longer in front a `;` in a course's name is an ordinary character
+on every path (cmd reads `;` as a separator only outside quotes, and the shim
+path quotes it). The plain greeting still replaces `"`
+(`greetingCarriesNoDoubleQuotes`), as the mac's does.
+
+**Proven** (`OutsideDoorTests`, 78 cases): eighteen hostile names — `&`, `|`,
+`>`, `<`, `^`, `%OS%`, `%PATH%`, `%%`, a lone `%`, runs of `%`, `!x!`, `;`, a
+double quote, a trailing backslash, a newline, `\%` with parentheses and
+apostrophes, and non-ASCII text with an emoji — in Revise With's greeting,
+Fix with's message (course AND page names) and the Codex door's TOML values,
+in a working folder whose own name carries `& ^ %OS% !x! ( ) ; '` and an emoji,
+each through the REAL `StartInfo` into a stub `.exe` and a stub `.cmd` in npm's
+cmd-shim shape, which write down their argument vector. Each arrives as the
+one argument it was (a newline as a space through the shim). The tests start
+the same program with the same command line through CreateProcess with no
+window, where a teacher's start uses ShellExecute, so the suite never takes
+the desktop; ShellExecute itself is proven by `FixWithButtonsUiTests`, which
+points both doors at stubs first on the driven app's PATH and presses each
+button for a course whose name carries cmd's metacharacters, `%OS%`, `!x!`, `;`
+and a double quote. The stub `.exe` is compiled at test time with the C#
+compiler .NET Framework 4.8 puts on every Windows 11, so no project was added
+to the solution for it.
 
 ---
 
