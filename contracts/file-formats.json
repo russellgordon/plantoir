@@ -1673,6 +1673,369 @@
       }
     ]
   },
+  "referenceShelf": {
+    "note": "#572's third piece: the arrangement of the Reference Courses shelf - the groups a teacher made, which reference course is in which, and what the group for courses with no school year is called. The rules it serves are shared-rules.json -> referenceCourses.groups. The mac's ReferenceShelf (reading, encoding, pruning) and ReferenceShelfStore (the lock, the atomic write, the acts); Windows owes the reader and the writer (#572c's windows issue).",
+    "path": "courses/.internal/reference-shelf.json, beside profile.json, timetable/ and activity/.",
+    "whyThere": "The arrangement belongs to the WORKING FOLDER: a second machine on the same folder through a synced drive sees the same groups. Not in each course's course_config.json, because a group exists with no course in it; not in the app's preferences, because two machines would then disagree about where every course is. It does NOT travel with a course's backup or archive, deliberately: those are of one course (courses/<FOLDER>/), and a group is the folder's. A backup restored where its course still is keeps the folder, and so the group; a course that was removed comes back by its school year (shared-rules.json -> referenceCourses.groups.arrivals). .gitignore already leaves courses/.internal out.",
+    "keys": {
+      "version": "Whole number, 1. A reader that finds a version above its own shows what it understands and refuses every change (wording.arrangedByANewerPlantoir), so an older app never rewrites a newer one's file. Absent, not a whole number, a boolean, or below 1: the file is unreadable.",
+      "noYearGroupName": "String, optional: what the group for courses with no school year is called. Absent, blank or not a string: 'Other'. Normalised as a group name is (shared-rules.json -> referenceCourses.groups.nameRule). Written only when the teacher renamed it; renaming it back to 'Other' removes the key.",
+      "groups": "List of {id, name}: the groups the teacher made, in any order (the shelf sorts them). id is opaque and stable - the mac writes 'g-' and eight lowercase hex digits; a reader accepts any non-empty string. name is the teacher's, normalised. An entry that is not an object, or has no non-empty string id, or no name that is non-empty once normalised, or repeats an earlier id, is left off the shelf and KEPT, as it was, on the next write. Not a list: the file is unreadable.",
+      "placements": "Object: a reference course's FOLDER name (its identity, referenceCourses.identity) -> the id of the made group it is in. A course with no entry, or whose entry names a group that is not there, sits where its school year puts it. A value that is not a string is ignored and kept. Not an object: the file is unreadable."
+    },
+    "example": "{\n  \"version\": 1,\n  \"noYearGroupName\": \"Example courses\",\n  \"groups\": [{\"id\": \"g-3f9a1c2e\", \"name\": \"From colleagues\"}],\n  \"placements\": {\"ICS3U-2025\": \"g-3f9a1c2e\"}\n}",
+    "writtenBy": "Both apps, only by the acts in shared-rules.json -> referenceCourses.groups (New, Rename and Remove Group, Move to Group) and by every door that lands or removes a reference course (groups.arrivals). Never by the build, the launchers or an assistant tool.",
+    "writing": {
+      "rule": "Every change is read, decided and written under ONE exclusive lock on courses/.internal, with the file read FRESH inside it (referenceCourses.groups.twoAtOnce), and written atomically: a temporary file renamed over the old one. The mac writes it pretty-printed with sorted keys and no escaped slashes; a reader must not depend on the layout. Unknown top-level keys, and entries of groups and placements this version could not read, are written back as they were. An UNREADABLE file, or one with a newer version, is never written: the change is refused with a sentence. On every write a placement is dropped when the group it names is not there (and no kept entry carries that id), or when its folder is not there - folderIsThere: courses/<FOLDER>, or courses/.plantoir-replacing-<FOLDER> or courses/.plantoir-importing-<FOLDER>, the hidden folders of a replace or an import of that name part way, so a change made in another window at that moment does not take the course out of its group. A folder with no file, and a change that leaves nothing to keep, writes no file.",
+      "folderIsThere": [
+        "<FOLDER>",
+        ".plantoir-replacing-<FOLDER>",
+        ".plantoir-importing-<FOLDER>"
+      ]
+    },
+    "startingAgain": {
+      "rule": "An arrangement that is there and cannot be read is not a dead end. Start the Groups Again (shared-rules.json -> referenceCourses.groups.whereItIsOffered) MOVES it, under the change lock, to reference-shelf.unreadable-<stamp>.json beside it in courses/.internal, <stamp> being course-management.json's yyyy-MM-dd_HHmmss in local Gregorian time; when that name is taken, -2, -3 and so on before .json. It is never deleted and never written over: an earlier copy kept aside stays as it was. The shelf then reads as having no file: the year layout, and every control works. A file written by a NEWER version is never moved by an older app: refused with arrangedByANewerPlantoir, byte-identical. A file that can be read, or no file, is left alone and nothing is moved. Whatever stands at the path is moved, a folder included.",
+      "cases": [
+        {"name": "an unreadable file is moved aside", "text": "{\n  \"version\": 1,\n  \"groups\": [", "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500.json", "readingAfter": "absent", "sentence": null}},
+        {"name": "an earlier copy kept aside is not written over", "text": "{", "alreadyKept": ["reference-shelf.unreadable-2026-11-13_091500.json"], "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500-2.json", "readingAfter": "absent", "sentence": null, "earlierUnchanged": true}},
+        {"name": "a newer version's file is never moved", "text": "{\"version\": 2, \"groups\": [], \"placements\": {}}", "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "newer", "sentence": "arrangedByANewerPlantoir"}},
+        {"name": "a file that can be read is left alone", "text": "{\"version\": 1}", "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "read", "sentence": null}},
+        {"name": "no file: nothing to do", "text": null, "atMoment": "2026-11-13_091500", "expect": {"keptAs": null, "readingAfter": "absent", "sentence": null}},
+        {"name": "a folder where the file should be is moved aside too", "folderInsteadOfFile": true, "atMoment": "2026-11-13_091500", "expect": {"keptAs": "reference-shelf.unreadable-2026-11-13_091500.json", "readingAfter": "absent", "sentence": null}}
+      ]
+    },
+    "readingCases": [
+      {
+        "name": "no file",
+        "text": null,
+        "expect": {
+          "reading": "absent",
+          "mayChange": true,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "a whole file",
+        "text": "{\n  \"version\": 1,\n  \"noYearGroupName\": \"Example courses\",\n  \"groups\": [{\"id\": \"g-3f9a1c2e\", \"name\": \"From colleagues\"}],\n  \"placements\": {\"ICS3U-2025\": \"g-3f9a1c2e\"}\n}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [
+            "From colleagues"
+          ],
+          "noYearTitle": "Example courses",
+          "placements": {
+            "ICS3U-2025": "From colleagues"
+          }
+        }
+      },
+      {
+        "name": "half written",
+        "text": "{\n  \"version\": 1,\n  \"groups\": [{\"id\": \"g-3f9a",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        },
+        "why": "A half-synced copy or a write cut short. The shelf shows the year layout and nothing is written over what may be the teacher's groups."
+      },
+      {
+        "name": "not an object",
+        "text": "[]",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "no version",
+        "text": "{\"groups\": [], \"placements\": {}}",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "a version that is a string",
+        "text": "{\"version\": \"1\"}",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "a version that is true",
+        "text": "{\"version\": true}",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        },
+        "why": "JSON's true is not the number 1, though some readers coerce it."
+      },
+      {
+        "name": "only a version",
+        "text": "{\"version\": 1}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "a blank no-year name",
+        "text": "{\"version\": 1, \"noYearGroupName\": \"   \"}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "groups that is not a list",
+        "text": "{\"version\": 1, \"groups\": {}}",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "placements that is not an object",
+        "text": "{\"version\": 1, \"placements\": []}",
+        "expect": {
+          "reading": "unreadable",
+          "mayChange": false,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "group entries this version cannot read are left off the shelf",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\"}, {\"name\": \"No id\"}, \"g-2\", {\"id\": \"g-3\", \"name\": \"  \"}, {\"id\": \"g-4\", \"name\": \"Kept\"}, {\"id\": \"g-4\", \"name\": \"Twice\"}]}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [
+            "Kept"
+          ],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      },
+      {
+        "name": "a placement naming a group that is not there",
+        "text": "{\"version\": 1, \"groups\": [], \"placements\": {\"ICS3U-2025\": \"g-gone0000\"}}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [],
+          "noYearTitle": "Other",
+          "placements": {}
+        },
+        "why": "Shown as no placement: the course sits where its school year puts it."
+      },
+      {
+        "name": "a newer version",
+        "text": "{\"version\": 2, \"groups\": [{\"id\": \"g-3f9a1c2e\", \"name\": \"From colleagues\", \"parent\": \"g-0\"}], \"placements\": {\"ICS3U-2025\": \"g-3f9a1c2e\"}}",
+        "expect": {
+          "reading": "newer",
+          "mayChange": false,
+          "groups": [
+            "From colleagues"
+          ],
+          "noYearTitle": "Other",
+          "placements": {
+            "ICS3U-2025": "From colleagues"
+          }
+        }
+      },
+      {
+        "name": "a name with a line break in it",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"name\": \"From\\ncolleagues\"}]}",
+        "expect": {
+          "reading": "read",
+          "mayChange": true,
+          "groups": [
+            "From colleagues"
+          ],
+          "noYearTitle": "Other",
+          "placements": {}
+        }
+      }
+    ],
+    "writingCases": [
+      {
+        "name": "a key this version does not know survives a change",
+        "text": "{\"version\": 1, \"shelfColour\": \"blue\", \"groups\": [], \"placements\": {}}",
+        "folders": [],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "keptKeys": {
+            "shelfColour": "blue"
+          },
+          "groups": [
+            "Exemplars"
+          ]
+        }
+      },
+      {
+        "name": "a group entry this version cannot read survives a change",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"colour\": \"blue\"}], \"placements\": {}}",
+        "folders": [],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "groupEntries": 2,
+          "groups": [
+            "Exemplars"
+          ]
+        }
+      },
+      {
+        "name": "a placement whose course has gone is dropped",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"name\": \"From colleagues\"}], \"placements\": {\"ICS3U-2025\": \"g-1\", \"ICS4U-2024\": \"g-1\"}}",
+        "folders": [
+          "ICS4U-2024"
+        ],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "placementFolders": [
+            "ICS4U-2024"
+          ]
+        }
+      },
+      {
+        "name": "a placement whose course is part way through a replace is kept",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"name\": \"From colleagues\"}], \"placements\": {\"ICS3U-2025\": \"g-1\"}}",
+        "folders": [
+          ".plantoir-replacing-ICS3U-2025"
+        ],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "placementFolders": [
+            "ICS3U-2025"
+          ]
+        }
+      },
+      {
+        "name": "a placement whose course is part way through an import is kept",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"name\": \"From colleagues\"}], \"placements\": {\"ICS3U-2025\": \"g-1\"}}",
+        "folders": [
+          ".plantoir-importing-ICS3U-2025"
+        ],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "placementFolders": [
+            "ICS3U-2025"
+          ]
+        }
+      },
+      {
+        "name": "an unreadable file is never written",
+        "text": "{\"version\": 1, \"groups\": [",
+        "folders": [],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": false,
+          "sentence": "couldNotReadGroups"
+        }
+      },
+      {
+        "name": "a newer file is never written",
+        "text": "{\"version\": 2, \"groups\": [], \"placements\": {}}",
+        "folders": [],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": false,
+          "sentence": "arrangedByANewerPlantoir"
+        }
+      },
+      {
+        "name": "no file, and an arrival with nothing to keep, writes no file",
+        "text": null,
+        "folders": [
+          "ICS3U-2025"
+        ],
+        "act": {
+          "recordArrival": "ICS3U-2025"
+        },
+        "expect": {
+          "written": false,
+          "sentence": null
+        }
+      },
+      {
+        "name": "an arrival clears a placement its folder name was left with",
+        "text": "{\"version\": 1, \"groups\": [{\"id\": \"g-1\", \"name\": \"From colleagues\"}], \"placements\": {\"ICS3U-2025\": \"g-1\"}}",
+        "folders": [
+          "ICS3U-2025"
+        ],
+        "act": {
+          "recordArrival": "ICS3U-2025"
+        },
+        "expect": {
+          "written": true,
+          "placementFolders": []
+        }
+      },
+      {
+        "name": "the first group made writes the file",
+        "text": null,
+        "folders": [],
+        "act": {
+          "makeGroup": "Exemplars"
+        },
+        "expect": {
+          "written": true,
+          "groups": [
+            "Exemplars"
+          ]
+        }
+      }
+    ],
+    "howToRunACase": "readingCases: read text (null: no file) and compare the reading's kind, whether a change may be made, the made groups' names in file order, the no-year group's title, and each placement by folder -> the NAME of the group it shows in (a placement naming a group that is not there shows as none). writingCases: in a temporary working folder, make courses/ with an empty folder for each of folders, write text to the path (null: no file), run the act through the app's own change path (makeGroup: New Group with that name; recordArrival: the write every arriving door makes with no group), then compare: whether the file was written (its bytes changed, or it now exists), the sentence of a refusal (a key of referenceCourses.groups.wording), keptKeys (top-level keys and their values after the write), groupEntries (the length of the written groups list), groups (made group names in the written file), and placementFolders (the written placements' folder names, sorted)."
+  },
   "unitPlanShared": {
     "note": "A course's shared unit plans (#709), one file per school year: written by scripts/share_plan.py and read by the Planning tab's share bar (PlanSharing.markers) and by deploy.sh (whether protection is sticky, whether any year is still shared). Its keys and rules are contracts/shared-rules.json -> unitPlanning.share.markerFile.",
     "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",

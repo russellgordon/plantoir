@@ -178,6 +178,11 @@ struct NewCourseWizardView: View {
     /// example lands beside last year's rather than clashing in Other.
     @State var referenceSchoolYear: Int?
 
+    /// The group the teacher made that a course kept for reference goes in
+    /// (#572, third piece), or nil for "Its school year". The picker is
+    /// drawn only when the teacher has made a group.
+    @State var referenceGroupID: String?
+
     /// The day the year list is built from, fixed for the life of the sheet
     /// so the list cannot change under the teacher.
     let today: CalendarDay
@@ -343,8 +348,26 @@ struct NewCourseWizardView: View {
             existingFolderNames: courseFolderNamesHere,
             keepsForReference: makesAReferenceCourse,
             schoolYear: referenceSchoolYear,
-            shelved: workspace.shelvedReferenceCourses(on: today)
+            shelved: workspace.shelvedReferenceCourses(on: today),
+            madeGroup: chosenReferenceGroup
         )
+    }
+
+    /// The made group the Group picker chose, as the shelf has it now, or
+    /// nil for "Its school year" (and for a group removed since).
+    var chosenReferenceGroup: ReferenceShelf.MadeGroup? {
+        guard let referenceGroupID else {
+            return nil
+        }
+        return workspace.referenceShelf.arrangement.group(withID: referenceGroupID)
+    }
+
+    /// Where the course would sit on the shelf.
+    var referencePlace: ReferenceShelf.Place {
+        if let chosenReferenceGroup {
+            return .made(chosenReferenceGroup.id)
+        }
+        return ReferenceShelf.Place.forYear(referenceSchoolYear)
     }
 
     /// The course on the shelf a reference course of this code and year
@@ -356,7 +379,7 @@ struct NewCourseWizardView: View {
         }
         return ReferenceCourseRule.courseInTheWay(
             placing: courseCode,
-            inYear: referenceSchoolYear,
+            in: referencePlace,
             among: workspace.shelvedReferenceCourses(on: today)
         )
     }
@@ -445,9 +468,25 @@ struct NewCourseWizardView: View {
                         ForEach(SchoolYear.offeredStartingYears(on: today), id: \.self) { year in
                             Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
                         }
-                        Text(SchoolYear.otherGroupName).tag(Int?.none)
+                        Text(workspace.referenceShelf.arrangement.noYearTitle).tag(Int?.none)
                     }
                     .accessibilityIdentifier("referenceSchoolYearPicker")
+                    // Only when there is a group to choose (plan review M8:
+                    // the wizard is the one door with a Group picker; every
+                    // other door files by year, and Move to Group does the
+                    // rest).
+                    if !workspace.referenceShelf.arrangement.groups.isEmpty {
+                        Picker(ReferenceGroupWording.groupPickerLabel, selection: $referenceGroupID) {
+                            Text(ReferenceGroupWording.groupPickerDefault).tag(String?.none)
+                            ForEach(
+                                ReferenceShelf.madeGroupsInOrder(workspace.referenceShelf.arrangement.groups),
+                                id: \.id
+                            ) { group in
+                                Text(group.name).tag(String?.some(group.id))
+                            }
+                        }
+                        .accessibilityIdentifier("referenceGroupPicker")
+                    }
                 }
             }
         case .offerUnderTheRefusal:
@@ -1906,7 +1945,8 @@ struct NewCourseWizardView: View {
             let shelfSentence: String? = ReferenceCreation.shelfTrouble(
                 typed: courseCode,
                 schoolYear: referenceSchoolYear,
-                shelved: workspace.shelvedReferenceCourses(on: today)
+                shelved: workspace.shelvedReferenceCourses(on: today),
+                madeGroup: chosenReferenceGroup
             )?.sentence
             if !replacesTheCourseInTheWay || problem != shelfSentence {
                 validationProblem = problem
@@ -1954,7 +1994,8 @@ struct NewCourseWizardView: View {
                 existingFolderNames: courseFolderNamesHere,
                 shelved: workspace.shelvedReferenceCourses(on: today),
                 replacing: replacesTheCourseInTheWay ? confirmedReplace : nil,
-                replaceWorld: ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+                replaceWorld: ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening),
+                madeGroupID: chosenReferenceGroup?.id
             )
             return
         }

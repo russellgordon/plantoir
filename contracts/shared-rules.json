@@ -453,6 +453,36 @@
         "why": "The ONE thing a frozen course still lets a teacher change, so rule 5 applies to it like any other feature. It names both the code and the folder because those two deliberately differ on a reference course, and a report saying 'ICS3U moved' would not say WHICH of the three ICS3Us on the shelf did. Not written when the sheet is cancelled, and not written when the write fails - the teacher is told about that in a sentence of its own."
       },
       {
+        "carries": "the group's name, quoted: the teacher's own words, like a course or folder name",
+        "event": "reference group made",
+        "why": "Added for #572's third piece: a teacher can make groups on the Reference Courses shelf. A course 'missing' from the shelf is often in a group the teacher forgot making, and this is the line that says it was made. The name passes through LogRedactor like every line, so a name that happens to look like a credential is taken out."
+      },
+      {
+        "carries": "the group's old and new names, and whether it was the group for courses with no school year (Other until renamed). A year group is never renamed",
+        "event": "reference group renamed",
+        "why": "Added for #572's third piece. A renamed group is the same group with a different row title, and 'where did my Examples group go' is answered only by this line. Not written when the name typed is the name it already had."
+      },
+      {
+        "carries": "the group's name and how many courses went back to the groups their school years put them in, and that no course was removed",
+        "event": "reference group removed",
+        "why": "Added for #572's third piece. Removing a group sends its courses back to their years, so a teacher who finds a course in 2025-26 that they had filed elsewhere can be shown that the group was removed. Never written for a removal that was refused; that one leaves 'reference groups not changed'."
+      },
+      {
+        "carries": "the code the course shows, its folder, and the group it came from and the group it went to, by name",
+        "event": "reference course moved to a group",
+        "why": "Added for #572's third piece. Nothing on disk moves when a course changes group, so this line is the only record of where a course went. Not written when the course was already in that group."
+      },
+      {
+        "carries": "what was asked (make, rename or remove a group, move a course, or record which group an arriving course is in) and the sentence the teacher read: a name already on the shelf, a clash with another course of the same code, or that the shelf's groups could not be read, were arranged by a newer Plantoir, or could not be saved",
+        "event": "reference groups not changed",
+        "why": "Added for #572's third piece. Every group act is a button pressed, and rule 5 says one pressed and refused leaves a line; the sentence is what the teacher saw. The name rule's live sentence under the field is not a press and writes nothing; the press itself does."
+      },
+      {
+        "carries": "the name the unreadable arrangement was kept under beside the new one (reference-shelf.unreadable-<stamp>.json), never what it held",
+        "event": "reference groups started again",
+        "why": "Added for #572's third piece (implementation review M2). Start the Groups Again moves an arrangement that cannot be read aside and gives the teacher the year layout back. The kept name is the way back to whatever it held, and 'my groups vanished' is answered by this line."
+      },
+      {
         "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
         "event": "reference course pages locked again",
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
@@ -486,7 +516,7 @@
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
       },
       {
-        "carries": "the folder a NEW reference course was given, the code it shows, its school year and how many sections, and that it began from the ready-made pages written for it",
+        "carries": "the folder a NEW reference course was given, the code it shows, its school year and how many sections, and that it began from the ready-made pages written for it; and, since #572's third piece, the group the teacher made that the wizard's Group picker put it in, by name, when one was chosen",
         "event": "course created for reference",
         "why": "Added for #572: the New Course wizard can make a course straight onto the Reference Courses shelf, beside a live course of the same code. The ordinary 'course created' line is written BEFORE setup runs and names the code alone, so for this course it would read as the live one; this line is written after the course is on the shelf, and names its folder. 'My new reference course is wrong' is the report it answers."
       },
@@ -14872,7 +14902,7 @@
       ]
     },
     "codeUniqueWithinAGroup": {
-      "rule": "Within one school-year group — including 'Other' — no two reference courses may share a course code. Refused with a sentence when a course is put on the shelf and again when its year is changed. The courses a teacher TEACHES are in no group at all and are never consulted.",
+      "rule": "Within one GROUP — a school-year group, the no-year group ('Other' until the teacher renames it), or a group the teacher made (#572, third piece, referenceCourses.groups) — no two reference courses may share a course code. A course in a made group is in no year group, so it never blocks a course of its code from its year. Refused with a sentence when a course is put on the shelf, when its year is changed (for a course in its year group; one in a made group stays in it, groups.setSchoolYear), and when it is moved to another group. The courses a teacher TEACHES are in no group at all and are never consulted. A case's shelf entry and its placing may carry madeGroup, a made group's NAME, which a runner turns into one id per name; expectSentence names the sentence (codeAlreadyInThatGroup for a made group).",
       "why": "Three rows all saying ICS3U under one year is a teacher's mistake made permanent; the same three under 2024–25, 2025–26 and 'Other' is exactly what they meant. It is also what makes 'take a fresh copy' an ordered act — delete the reference copy first, then copy again — rather than a way to end up with two of the same thing.",
       "cases": [
         {
@@ -14921,7 +14951,12 @@
           "ignoringFolderName": "ICS3U-2025",
           "expect": "allowed",
           "why": "Changing a course's school year must not find the course itself sitting where it is about to move from."
-        }
+        },
+        { "name": "the same code in one made group", "shelf": [{"code": "ICS3U", "year": null, "folderName": "ICS3U-REF", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "From colleagues"}, "expect": "refused", "expectSentence": "codeAlreadyInThatGroup", "why": "A made group is a group like any other, whatever years its courses carry." },
+        { "name": "the same code in a made group and in a year group", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025}, "expect": "allowed", "why": "ICS3U-2025 sits in From colleagues, so 2025–26 holds no ICS3U: a course in a made group is in no year group." },
+        { "name": "the same code in two made groups", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "Exemplars"}, "expect": "allowed" },
+        { "name": "into a year group whose code sits in a made group too", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025"}, {"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025-2", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025}, "expect": "refused", "expectSentence": "codeAlreadyInThatYear", "why": "The one left in 2025–26 still counts; the year sentence is unchanged." },
+        { "name": "moving a course into the made group it is in", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "From colleagues"}, "ignoringFolderName": "ICS3U-2025", "expect": "allowed" }
       ]
     },
     "neutralises": {
@@ -15258,7 +15293,7 @@
       "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
     },
     "interface": {
-      "group": "Reference Courses, folded into school-year sub-groups inside it. Newest year first, 'Other' last, and a group with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar. Every group's fold state is remembered with the folder, the outer one and each year, the same way Archived and Backups already are.",
+      "group": "Reference Courses, folded into groups inside it: school years newest first, then the groups the teacher made A to Z (#572, third piece), then 'Other' (the group for courses with no school year, renamable) last. A school-year group or Other with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar; a group the teacher MADE is drawn even when empty, since they just made it (referenceCourses.groups.rule). The outer group is drawn when it holds a course or a made group. Every group's fold state is remembered with the folder, the outer one, each year and each made group, the same way Archived and Backups already are.",
       "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
       "whatIsWithheld": [
         "the section window's Deploy button",
@@ -15282,7 +15317,8 @@
         "Open in Obsidian, with the calm note in front of it the first time",
         "Back Up Now - it only READS the course, and a restored backup is still a reference course",
         "Remove - unlocks first, same confirmation, same words",
-        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page"
+        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page",
+        "Move to Group - which group it sits in on the shelf (#572, third piece, referenceCourses.groups). Like the school year it is a fact about the shelf, not the course: nothing in the course is written, and it is not even in the course's settings"
       ],
       "theCalmNote": "Shown when the copy is made AND before the teacher opens the course in Obsidian - once per course, remembered. In FRONT of them rather than after, because what Obsidian shows somebody typing into a locked page could not be measured and silent loss is not ruled out. It claims no more than wording.pagesAreLocked says: not that the pages cannot be changed (the lock is per-Mac and a cloud folder strips it while files upload), and not that the teacher will be TOLD when an edit fails. No warning icon, no 'cannot', no 'error'.",
       "theLocalAssistant": "Not offered on a reference course and told nothing about one. The menu item is not drawn; a window request naming one opens no window, which also closes the deploy approval card as a door by construction; and list_courses does not list them to the LOCAL client - which matters because 'what courses do i have?' is matched in code and its answer is shown to the teacher.",
@@ -15302,6 +15338,7 @@
       "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can put it online. {course} keeps them.",
       "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
       "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
+      "codeAlreadyInThatGroup": "You already have a {code} kept for reference in {group}. Choose a different group.",
       "groupTitle": "Reference Courses",
       "keepACopyMenuItem": "Keep a Copy for Reference…",
       "setSchoolYearMenuItem": "Set School Year…",
@@ -18417,6 +18454,926 @@
         "rule": "{code} is the code a TEACHER reads, upper case. The offer line is said under the existing taken-code refusal, whose sentence is unchanged (course-management.json courseCode.problems). The menu item ends in a real ellipsis character in both apps.",
         "machineryCheck": "No 'staging', 'setup', 'script', 'container', 'toolchain' or 'folder name' in any sentence here."
       }
+    },
+    "groups": {
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "note": "Groups on the Reference Courses shelf (#572, third piece): a teacher can make groups of their own, rename them, remove them, and move a reference course into one. Russell's ruling of 2026-11-12: groups are FLAT; year groups keep their names; 'Other' (the group for courses with no school year) and groups the teacher makes can be renamed. Scope as amended by the plan review: placements are written explicitly at every arrival and pruned at removal (H2), and the Group picker is in the New Course wizard only (M8). The file is file-formats.json -> referenceShelf.",
+      "rule": "Three kinds of group, one list. A YEAR group is derived from reference_school_year (schoolYearRead), is named by SchoolYear's label, is never stored, never renamed, and not drawn when it holds nothing. The NO-YEAR group holds a course with no school year; it is derived and not drawn when empty, but its NAME is stored (noYearGroupName) and the teacher can change it, 'Other' until they do. A MADE group is stored with an id and a name, and is drawn even when EMPTY: an empty one is something the teacher just made and may want to fill or remove. A course is in a made group only when the file's placements put it there and that group exists; otherwise it is in its year group or the no-year group. With no file the shelf is EXACTLY the shelf before groups, which is the whole of the migration: nothing is converted and no file is written into a folder whose teacher has made no group. GROUPS ARE A VIEW: no group act renames, moves, removes or writes into a course folder, and nothing on disk moves when a course changes group.",
+      "order": "Year groups newest first; then made groups A to Z by name, compared as Finder compares (localised, case-insensitive, numbers by value), with the id breaking a tie; then the no-year group last. No hand ordering. While the sidebar's filter field narrows the list, an EMPTY made group is not drawn either, so a filtered shelf shows only what matched.",
+      "setSchoolYear": "Set School Year... keeps its meaning for a course in its year group (it moves to the new year, and the shelf rule is asked of the new year, as before). For a course in a made group it changes the year its summary shows and leaves it where it is, so no year group is asked.",
+      "theSummary": "The read-only summary of a course in a made group shows that group by name, under wording.summaryGroupLabel. A course in its year group or the no-year group shows nothing more: its school year already says where it is.",
+      "foldState": "Remembered per window with the folder, beside the years: the year and no-year groups keep the remembered starting years (the no-year group as 0) exactly as before, and made groups are remembered by id under a key of their own, so an entry written before groups restores as it did.",
+      "whereItIsOffered": [
+        "New Group...: on the Reference Courses heading's menu, beside New Reference Course..., and inside every Move to Group submenu (it makes the group and moves that course into it).",
+        "Rename Group...: on a made group's row and on the no-year group's row. A year group offers neither Rename nor Remove: its name is its year.",
+        "Remove Group: on a made group's row only. An empty group goes at once; one that holds courses is asked about first (removeGroupAskingMenuItem, removeGroupTitle, and removeGroupMessageOne or removeGroupMessageMany by how many it holds), and its courses go back to their year groups or the no-year group. Cancel is that question's default button.",
+        "Start the Groups Again...: on the Reference Courses heading's menu ONLY while the arrangement cannot be read (file-formats.json -> referenceShelf.startingAgain), under the sentence couldNotReadGroups, and asked first (startAgainTitle, startAgainMessage; Cancel is the default). It moves the unreadable arrangement aside under a dated name, never deleting it, and the shelf is the year layout with every control working again. While a NEWER Plantoir's arrangement is there, the heading's menu says arrangedByANewerPlantoir instead and offers nothing: an older app never moves a newer one's file.",
+        "Move to Group: a submenu on a reference course's row and in the menu bar's Course menu after Set School Year... (live where Set School Year is: subjectMenus item moveToGroup), so a teacher can reach it from the keyboard through menu search. It lists where the course's school year puts it first, named by what it is (the year label or the no-year group's name), then every made group A to Z, then a divider and New Group.... The group the course is in now carries a checkmark and does nothing.",
+        "The Group picker: in the New Course wizard's reference mode ONLY (plan review M8), drawn only when the teacher has made at least one group, defaulting to wording.groupPickerDefault. Every other door (Import, Keep a Copy, Restore from Archived, a backup restored where its course is gone) lands the course by its school year, and Move to Group does the rest."
+      ],
+      "notOffered": [
+        "Nested groups (Russell, 2026-11-12: flat).",
+        "Renaming a year group (Russell, 2026-11-12).",
+        "Drag and drop between groups, and hand ordering of groups.",
+        "Any assistant tool: the local assistant and the MCP surface gain no group tool, and no tool description moves."
+      ],
+      "nameRule": {
+        "rule": "The name is cleaned first by the SAME rule as a course's name, courseNameCharacters (#780): its controls become a space, the bidirectional controls are removed, and the zero-width joiner and non-joiner, the marks and every other character are kept, so an emoji joined by U+200D and a Persian word with U+200C come through whole. Then every run of white space (Unicode White_Space) becomes one space and the ends are trimmed, so a pasted line break is a space, not a refusal. Then: empty -> nameIsEmpty; more than mostCharacters characters (grapheme clusters: what a reader sees as one character) -> nameIsTooLong; a name that READS AS A SCHOOL YEAR, past, present or future (four digits, a dash, then the last two digits of the next year: SchoolYear's label shape for any year, not only the offered ones) -> nameIsAYear, because the shelf draws that year's own group the day a course is filed under it; the same as a name already on the shelf (the no-year group's, or a made group's) -> nameIsTaken with that name as the shelf spells it. Names are compared with case, accents and width folded and every dash read as an en dash, so '2025-26' reads as the year 2025–26. The group being renamed is never in its own way: its own name, in any case, is allowed. Checked live under the field and again at the button.",
+        "mostCharacters": 40,
+        "onDay": "2026-09-20",
+        "cases": [
+          {
+            "name": "empty",
+            "typed": "",
+            "expect": "empty"
+          },
+          {
+            "name": "only spaces",
+            "typed": "   ",
+            "expect": "empty"
+          },
+          {
+            "name": "forty characters is allowed",
+            "typed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "expect": null,
+            "expectName": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          {
+            "name": "forty-one is too long",
+            "typed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "expect": "tooLong"
+          },
+          {
+            "name": "the ends are trimmed",
+            "typed": "  Examples  ",
+            "expect": null,
+            "expectName": "Examples"
+          },
+          {
+            "name": "a pasted line break is a space",
+            "typed": "From\ncolleagues",
+            "expect": null,
+            "expectName": "From colleagues"
+          },
+          {
+            "name": "a year label",
+            "typed": "2025–26",
+            "expect": "isAYear"
+          },
+          {
+            "name": "a year label typed with a hyphen",
+            "typed": "2025-26",
+            "expect": "isAYear"
+          },
+          {
+            "name": "an offered year nobody has a course in",
+            "typed": "2022–23",
+            "expect": "isAYear",
+            "why": "The shelf draws that group the day a course is filed under it, and two rows called 2022–23 could not be told apart."
+          },
+          {
+            "name": "next year's name, not offered yet",
+            "typed": "2027–28",
+            "expect": "isAYear",
+            "why": "Made on 2026-09-20 it would pass a list of today's years, and from August 2027 it would sit beside the year group of the same name (implementation review L3)."
+          },
+          { "name": "a year at the turn of a century", "typed": "2099-00", "expect": "isAYear" },
+          { "name": "four digits and two that are not the next year", "typed": "2025–27", "expect": null, "expectName": "2025–27" },
+          { "name": "an emoji joined with a zero-width joiner is kept whole", "typed": "👩‍🏫 Exemplars", "expect": null, "expectName": "👩‍🏫 Exemplars", "expectCharacters": 11, "why": "Foundation's controlCharacters set holds U+200D, and spacing it split the teacher emoji in two (implementation review M1). courseNameCharacters keeps it." },
+          { "name": "a Persian word keeps its zero-width non-joiner", "typed": "می‌خواهم", "expect": null, "expectName": "می‌خواهم" },
+          { "name": "a right-to-left override is removed, not spaced", "typed": "A\u202eB", "expect": null, "expectName": "AB" },
+          {
+            "name": "the no-year group in another case",
+            "typed": "other",
+            "expect": {
+              "taken": "Other"
+            }
+          },
+          {
+            "name": "a made group in another case",
+            "groups": [
+              "From colleagues"
+            ],
+            "typed": "from COLLEAGUES",
+            "expect": {
+              "taken": "From colleagues"
+            }
+          },
+          {
+            "name": "renaming a made group to its own name in another case",
+            "groups": [
+              "From colleagues"
+            ],
+            "renaming": "From colleagues",
+            "typed": "from colleagues",
+            "expect": null,
+            "expectName": "from colleagues"
+          },
+          {
+            "name": "renaming the no-year group to a made group's name",
+            "groups": [
+              "Examples"
+            ],
+            "renaming": "noYear",
+            "typed": "Examples",
+            "expect": {
+              "taken": "Examples"
+            }
+          },
+          {
+            "name": "renaming the no-year group to its own name",
+            "renaming": "noYear",
+            "typed": "Other",
+            "expect": null,
+            "expectName": "Other"
+          },
+          {
+            "name": "a renamed no-year group's name is in the way",
+            "noYearGroupName": "Example courses",
+            "typed": "Example Courses",
+            "expect": {
+              "taken": "Example courses"
+            }
+          },
+          {
+            "name": "Other is free once the no-year group is renamed",
+            "noYearGroupName": "Example courses",
+            "typed": "Other",
+            "expect": null,
+            "expectName": "Other"
+          }
+        ]
+      },
+      "orderCases": [
+        {
+          "name": "no file: the shelf as it was",
+          "file": null,
+          "courses": [
+            {
+              "folder": "ICS3U-2024",
+              "code": "ICS3U",
+              "year": 2024
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            },
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": [
+            "2025–26",
+            "2024–25",
+            "Other"
+          ]
+        },
+        {
+          "name": "years, made groups A to Z, a renamed no-year group last, an empty made group drawn",
+          "file": {
+            "version": 1,
+            "noYearGroupName": "Example courses",
+            "groups": [
+              {
+                "id": "g-zeta0001",
+                "name": "Zeta"
+              },
+              {
+                "id": "g-alpha001",
+                "name": "alpha"
+              },
+              {
+                "id": "g-beta0001",
+                "name": "Beta"
+              }
+            ],
+            "placements": {
+              "ICS4U-2024": "g-zeta0001",
+              "ICD2O-2025": "g-alpha001"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            },
+            {
+              "folder": "ICS4U-2024",
+              "code": "ICS4U",
+              "year": 2024
+            },
+            {
+              "folder": "ICD2O-2025",
+              "code": "ICD2O",
+              "year": 2025
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": [
+            "2025–26",
+            "alpha",
+            "Beta",
+            "Zeta",
+            "Example courses"
+          ],
+          "why": "2024–25 is not drawn: its one course is in Zeta. Beta is drawn although empty."
+        },
+        {
+          "name": "an empty made group is not drawn while the filter narrows the list",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-beta0001",
+                "name": "Beta"
+              }
+            ],
+            "placements": {}
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "drawsEmptyMadeGroups": false,
+          "expect": [
+            "2025–26"
+          ]
+        },
+        {
+          "name": "numbers in names sort by value",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-00000010",
+                "name": "Unit 10"
+              },
+              {
+                "id": "g-00000002",
+                "name": "Unit 2"
+              }
+            ],
+            "placements": {}
+          },
+          "courses": [],
+          "expect": [
+            "Unit 2",
+            "Unit 10"
+          ]
+        }
+      ],
+      "placementCases": [
+        {
+          "name": "no file",
+          "file": null,
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26",
+            "ADA1O-REF": "Other"
+          }
+        },
+        {
+          "name": "a placed course is in its group, and leaves its year",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "From colleagues"
+          }
+        },
+        {
+          "name": "a placement naming a group that is not there",
+          "file": {
+            "version": 1,
+            "groups": [],
+            "placements": {
+              "ICS3U-2025": "g-gone0000"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          },
+          "why": "A group removed by hand, or by another Mac, leaves its courses where their school years put them."
+        },
+        {
+          "name": "a placement for a folder that is not there",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS4U-2023": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          }
+        },
+        {
+          "name": "a placed course with no school year",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ADA1O-REF": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ADA1O-REF": "From colleagues"
+          }
+        },
+        {
+          "name": "a renamed no-year group",
+          "file": {
+            "version": 1,
+            "noYearGroupName": "Example courses",
+            "groups": [],
+            "placements": {}
+          },
+          "courses": [
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ADA1O-REF": "Example courses"
+          }
+        },
+        {
+          "name": "an unreadable file: the shelf as it was",
+          "file": "unreadable",
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          }
+        },
+        {
+          "name": "a file from a newer Plantoir: what is understood is shown",
+          "file": {
+            "version": 2,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues",
+                "colour": "blue"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "From colleagues"
+          }
+        }
+      ],
+      "moveCases": {
+        "rule": "Move to Group puts one reference course in a made group, or back where its school year puts it (its own year group, or the no-year group when it has none; another year is Set School Year's). The shelf rule (codeUniqueWithinAGroup) is asked of the target, ignoring the course itself, and a refusal says the rule's sentence. Moving a course to the group it is in changes nothing and writes no line. Run against REAL folders: every course folder is byte-identical afterwards, whatever the case.",
+        "cases": [
+          {
+            "name": "into a made group",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {}
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "moved",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues"
+            },
+            "trail": "reference course moved to a group"
+          },
+          {
+            "name": "back to its school year",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "moved",
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "expectPlacements": {},
+            "trail": "reference course moved to a group"
+          },
+          {
+            "name": "into a made group that has that code",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-REF": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-REF",
+                "code": "ICS3U",
+                "year": null
+              },
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "refused",
+            "sentence": "codeAlreadyInThatGroup",
+            "expectGroups": {
+              "ICS3U-REF": "From colleagues",
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference groups not changed"
+          },
+          {
+            "name": "back to a year that has that code now",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ICS3U-2025-2",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "refused",
+            "sentence": "codeAlreadyInThatYear",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues",
+              "ICS3U-2025-2": "2025–26"
+            },
+            "trail": "reference groups not changed",
+            "why": "While ICS3U-2025 sat in From colleagues, a second ICS3U came into 2025–26. Moving the first back would put two in one group."
+          },
+          {
+            "name": "to the group it is in",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "unchanged",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues"
+            },
+            "trail": null
+          },
+          {
+            "name": "with the file unreadable",
+            "file": "unreadable",
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "refused",
+            "sentence": "couldNotReadGroups",
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference groups not changed",
+            "why": "Every change is refused while the file cannot be read, before anything is decided, and the file is left byte-identical (file-formats.json -> referenceShelf.writingCases). The sidebar greys Move to Group then, so this is the guard behind the greying."
+          }
+        ]
+      },
+      "removeCases": {
+        "rule": "Remove Group takes a made group off the shelf and its placements with it: every course in it goes back to its year group or the no-year group. NO COURSE IS REMOVED, renamed or changed, and every course folder is byte-identical afterwards. Refused, with removeWouldClash, when one of its courses would land beside another course of the same code; nothing is changed then. Run against REAL folders.",
+        "cases": [
+          {
+            "name": "an empty group",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {}
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "removed",
+            "expectGroupNames": [],
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference group removed"
+          },
+          {
+            "name": "a group holding two courses: they go back where their school years put them",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                },
+                {
+                  "id": "g-keep0001",
+                  "name": "Kept"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e",
+                "ADA1O-REF": "g-3f9a1c2e",
+                "ICS4U-2024": "g-keep0001"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ADA1O-REF",
+                "code": "ADA1O",
+                "year": null
+              },
+              {
+                "folder": "ICS4U-2024",
+                "code": "ICS4U",
+                "year": 2024
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "removed",
+            "expectGroupNames": [
+              "Kept"
+            ],
+            "expectGroups": {
+              "ICS3U-2025": "2025–26",
+              "ADA1O-REF": "Other",
+              "ICS4U-2024": "Kept"
+            },
+            "trail": "reference group removed"
+          },
+          {
+            "name": "a course that would clash in its year",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ICS3U-2025-2",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "refused",
+            "sentence": "removeWouldClash",
+            "expectGroupNames": [
+              "From colleagues"
+            ],
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues",
+              "ICS3U-2025-2": "2025–26"
+            },
+            "trail": "reference groups not changed"
+          },
+          {
+            "name": "a group whose id appears twice in the file does not come back under its other name",
+            "file": {"version": 1, "groups": [{"id": "g-4", "name": "Kept"}, {"id": "g-4", "name": "Twice"}], "placements": {}},
+            "courses": [{"folder": "ICS3U-2025", "code": "ICS3U", "year": 2025}],
+            "remove": "Kept",
+            "expect": "removed",
+            "expectGroupNames": [],
+            "expectGroups": {"ICS3U-2025": "2025–26"},
+            "trail": "reference group removed",
+            "why": "The reader shows the first entry with an id and keeps a repeat aside (file-formats.json -> referenceShelf.readingCases). Removing the group takes the kept entry with that id too; before, the next reading brought it back as Twice (implementation review L2)."
+          }
+        ]
+      },
+      "arrivals": {
+        "rule": "Every door that lands a course writes its placement EXPLICITLY at the moment it lands, before the course becomes visible (plan review H2): the made group the wizard's Group picker chose, or NO placement. A folder name freed by a removal is the name the next course of that code and year is given (ReferenceCourseRule.proposedFolderName takes the first free one), so a placement that outlived its course would file a stranger in its group, where the shelf rule never looked. Remove Course... forgets the placement of the course it removes. Two doors KEEP the placement, because the course keeps its folder: a replace (the replacement takes the replaced course's folder name and so its group, referenceCourses.replacing) and a backup restored where its course still is (it replaces the contents in place). A placement is also dropped on any change to the file once its folder is not there, unless a hidden folder of a replace or an import of that name is (folderIsThere in file-formats.json -> referenceShelf.writing). A folder with no file gets no file from an arrival.",
+        "cases": [
+          {
+            "door": "the New Course wizard, a made group chosen",
+            "writes": "placement",
+            "where": "ReferenceCreation.finish"
+          },
+          {
+            "door": "the New Course wizard, Its school year",
+            "writes": "noPlacement",
+            "where": "ReferenceCreation.finish"
+          },
+          {
+            "door": "the New Course wizard replacing a course",
+            "writes": "kept",
+            "where": "ReferenceCreation.finishByReplacing"
+          },
+          {
+            "door": "Import Courses for Reference...",
+            "writes": "noPlacement",
+            "where": "ReferenceImporter.land"
+          },
+          {
+            "door": "Import Courses for Reference... replacing a course",
+            "writes": "kept",
+            "where": "ReferenceImporter.land"
+          },
+          {
+            "door": "Keep a Copy for Reference...",
+            "writes": "noPlacement",
+            "where": "ReferenceCopier.makeTheCopy"
+          },
+          {
+            "door": "Keep a Copy for Reference... replacing a course",
+            "writes": "kept",
+            "where": "ReferenceCopier.keepACopy"
+          },
+          {
+            "door": "Restore from Archived (a whole course)",
+            "writes": "noPlacement",
+            "where": "CourseRestorer.restore"
+          },
+          {
+            "door": "Restore from Backup, its course gone",
+            "writes": "noPlacement",
+            "where": "CourseRestorer.restoreBackup"
+          },
+          {
+            "door": "Restore from Backup, its course still there",
+            "writes": "kept",
+            "where": "CourseRestorer.restoreBackup"
+          },
+          {
+            "door": "Remove Course...",
+            "writes": "forgotten",
+            "where": "CourseArchiver.archiveAndRemoveCourse"
+          }
+        ],
+        "recycledFolderNameCases": [{
+          "name": "a recycled folder name does not inherit a placement",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "steps": [
+            "remove ICS3U-2025 (Remove Course...)",
+            "import another ICS3U for 2025–26, given the freed name ICS3U-2025"
+          ],
+          "expectGroups": {
+            "ICS3U-2025": "2025–26"
+          },
+          "expectPlacements": {}
+        }]
+      },
+      "twoAtOnce": "Every change is read, decided and written under ONE lock on courses/.internal (on the mac an exclusive flock, taken by every window and every process, the MCP server included), and the file is read FRESH inside it, so two windows changing groups at once queue rather than undo each other, and the shelf rule is asked of where every course is at that moment. The file is written atomically: a temporary file renamed over the old one, so a reader never sees half a file. Two machines writing through a synced folder at the same moment: the later write wins, which costs at most one rename or one move. Another window on the same folder redraws its shelf when a change is written.",
+      "wording": {
+        "newGroupMenuItem": "New Group…",
+        "newGroupTitle": "New Group",
+        "nameLabel": "Name",
+        "createButton": "Create",
+        "renameGroupMenuItem": "Rename Group…",
+        "renameGroupTitle": "Rename Group",
+        "renameButton": "Rename",
+        "removeGroupMenuItem": "Remove Group",
+        "removeGroupAskingMenuItem": "Remove Group…",
+        "removeGroupTitle": "Remove the group {group}?",
+        "removeGroupMessageNone": "It holds no course, so nothing else changes.",
+        "removeGroupMessageOne": "Its course goes back to the group its school year puts it in. No course is removed, and nothing in it changes.",
+        "removeGroupMessageMany": "Its {count} courses go back to the groups their school years put them in. No course is removed, and nothing in them changes.",
+        "removeButton": "Remove Group",
+        "cancelButton": "Cancel",
+        "removeWouldClash": "{group} was not removed: its {course} would go back to {target}, which already has one. Move one of them to another group first.",
+        "couldNotRemoveTitle": "Could not remove {group}",
+        "moveToGroupMenuItem": "Move to Group",
+        "couldNotMoveTitle": "Could not move {course}",
+        "groupPickerLabel": "Group",
+        "groupPickerDefault": "Its school year",
+        "summaryGroupLabel": "Group",
+        "nameIsEmpty": "Give the group a name.",
+        "nameIsTooLong": "A group name can be at most 40 characters.",
+        "nameIsAYear": "A school year has a group of its own. Choose a name that is not a school year.",
+        "nameIsTaken": "There is already a group called {name}.",
+        "couldNotReadGroups": "The arrangement of the groups on the reference shelf cannot be read, so nothing was changed. Start the Groups Again, on the Reference Courses heading’s menu, sets them up afresh.",
+        "startAgainMenuItem": "Start the Groups Again…",
+        "startAgainTitle": "Start the groups on the reference shelf again?",
+        "startAgainMessage": "Their arrangement cannot be read. Starting again puts every reference course back in the group its school year puts it in, with no groups of your own. Nothing in any course changes, and what could not be read is kept beside the new arrangement.",
+        "startAgainButton": "Start Again",
+        "couldNotStartAgainTitle": "Could not start the groups again",
+        "arrangedByANewerPlantoir": "The reference shelf’s groups were last arranged by a newer version of Plantoir, so this one leaves them as they are.",
+        "couldNotSaveGroups": "The reference shelf’s groups could not be saved, so nothing was changed.",
+        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {count} a number of courses, two or more (removeGroupMessageOne says one, removeGroupMessageNone none; never '(s)'). The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Cancel is the default button of the removal question and of the start-again question, as it is of the replace warning. couldNotReadGroups says no 'try again in a moment', because waiting does not help a hand-edited or foreign-written copy; it names the way out. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
+        "machineryCheck": "No 'file', 'JSON', 'placement', 'id', 'folder name', 'script' or 'container' in any sentence here."
+      },
+      "rejected": "Converting today's layout into a stored list on first open: it would write a file into every working folder on every Mac on upgrade, an older Plantoir and Windows would then disagree with the file, and year labels stored as names drift from reference_school_year the first time a year is set; deriving years and storing only what the teacher made gives the same picture with nothing to convert. The group in each course's course_config.json: a group must exist with no course in it, which a per-course key cannot say, and the arrangement belongs to the folder. Keeping placements when a course is removed so it comes back into its group (the plan's first answer): a freed folder name is reused by the next course of that code and year, which would inherit the group (plan review H2). Remove Group withheld while the group holds a course (the plan's first answer): the teacher would have to move every course out by hand to get rid of a group, when sending them back to their years is exactly what removing it means; asked first instead. The Group picker at every door (plan review M8). A confirmation for an EMPTY group: nothing is lost. Renamable year groups, nested groups, hand ordering and drag and drop (Russell, 2026-11-12, and section 10 of the plan)."
     },
     "replacing": {
       "appliesOn": ["mac", "windows"],
@@ -25551,6 +26508,7 @@
       "revertCourseSettings",
       "rename",
       "setSchoolYear",
+      "moveToGroup",
       "keepACopyForReference",
       "backUpNow",
       "restoreFromBackup",
@@ -25884,6 +26842,7 @@
           "courseOpenInObsidian",
           "courseShowInFinder",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
@@ -25907,6 +26866,7 @@
           "backUpNow",
           "copyAPage",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
@@ -26086,6 +27046,7 @@
           "backUpNow",
           "copyAPage",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",

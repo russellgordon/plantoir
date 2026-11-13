@@ -147,6 +147,67 @@ final class ReferenceCreationTests: XCTestCase {
         }
     }
 
+    // MARK: - The Group picker (#572, third piece)
+
+    /// A course the wizard put in a group the teacher made lands in it: the
+    /// placement is written before the course is visible, the shelf rule is
+    /// asked of that group and not of the year, and the trail line names it.
+    func testTheWizardPutsTheCourseInTheChosenGroup() throws {
+        try prepareWorkingFolder()
+        try FileManager.default.createDirectory(
+            at: coursesDirectoryURL.appendingPathComponent(".internal"), withIntermediateDirectories: true
+        )
+        let shelfURL: URL = ReferenceShelfStore.fileURL(inCoursesDirectory: coursesDirectoryURL)
+        try Data((
+            "{\"version\": 1, \"groups\": [{\"id\": \"g-00000001\", \"name\": \"From colleagues\"}], "
+            + "\"placements\": {\"ICS3U-2026\": \"g-gone0000\"}}"
+        ).utf8).write(to: shelfURL)
+        // An ICS3U already in 2026–27's year group does not stand in the way
+        // of one going into From colleagues.
+        let shelved: [ReferenceCourseRule.Shelved] = [
+            ReferenceCourseRule.Shelved(displayCode: "ICS3U", schoolYear: 2026, folderName: "ICS3U-2026-OLD"),
+        ]
+        XCTAssertNil(ReferenceCreation.shelfTrouble(
+            typed: "ICS3U", schoolYear: 2026, shelved: shelved,
+            madeGroup: ReferenceShelf.MadeGroup(id: "g-00000001", name: "From colleagues")
+        ))
+        let prepared: ReferenceCreation.Prepared = try ReferenceCreation.prepare(
+            configuration: ["course_code": "ICS3U", "section_numbers": [1]], schoolYear: 2026,
+            coursesDirectoryURL: coursesDirectoryURL, existingFolderNames: ["ICS3U"], shelved: shelved,
+            madeGroupID: "g-00000001"
+        )
+        XCTAssertEqual(prepared.madeGroupName, "From colleagues")
+        try ReferenceCreationTests.writeWhatSetupWrites(into: prepared.stagingURL, withPages: true)
+        let made: ReferenceCopier.Made = try ReferenceCreation.finish(
+            prepared, setupSucceeded: true, wasStopped: false,
+            transcript: "📖 \(ReferenceCreation.pagesInstalledMarker): 1 page"
+        )
+        let arrangement: ReferenceShelf.Arrangement = ReferenceShelfStore.read(
+            inCoursesDirectory: coursesDirectoryURL
+        ).arrangement
+        XCTAssertEqual(arrangement.placements[made.folderName], "g-00000001")
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(", in the group \"From colleagues\""), trail)
+
+        // "Its school year": the same folder name, freed and made again,
+        // carries no group (plan review H2).
+        XCTAssertTrue(ReferenceStaging.remove(at: coursesDirectoryURL.appendingPathComponent(made.folderName)))
+        let again: ReferenceCreation.Prepared = try ReferenceCreation.prepare(
+            configuration: ["course_code": "ICS3U", "section_numbers": [1]], schoolYear: 2026,
+            coursesDirectoryURL: coursesDirectoryURL, existingFolderNames: ["ICS3U"], shelved: []
+        )
+        XCTAssertEqual(again.folderName, made.folderName)
+        try ReferenceCreationTests.writeWhatSetupWrites(into: again.stagingURL, withPages: true)
+        _ = try ReferenceCreation.finish(
+            again, setupSucceeded: true, wasStopped: false,
+            transcript: "📖 \(ReferenceCreation.pagesInstalledMarker): 1 page"
+        )
+        let after: ReferenceShelf.Arrangement = ReferenceShelfStore.read(
+            inCoursesDirectory: coursesDirectoryURL
+        ).arrangement
+        XCTAssertNil(after.placements[again.folderName], "A freed folder name kept the old course's group.")
+    }
+
     // MARK: - The code check
 
     func testTheCodeCheck() throws {
