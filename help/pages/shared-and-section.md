@@ -64,6 +64,6 @@ You do not have to type these lines yourself. [Show or hide pages for a section]
 
 Sometimes one section needs its own version of a shared page. Make a folder inside that section's folder, with the same name as the shared folder. Put a page in it with the same name as the shared page. On that section's website, the section's page takes the place of the shared one. Every other section still gets the shared page.
 
-For example, make a folder named Setup inside `section2` and put a page in it. That page takes the place of the shared Setup page of the same name, on Section 2's website only.
+For example, make a folder named Setup inside `section2`. Put a page in it with the same name as a page in the shared Setup folder. On Section 2's website only, your page takes the place of that shared page.
 
 Plantoir notices such a page by itself when the website is next made. The example course has no page of this kind.
