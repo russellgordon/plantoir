@@ -1063,7 +1063,7 @@ class ThirdTrialTests(unittest.TestCase):
         b_class = Class(root / "skill copy", skill_folder=skill)
         if CAN_DRIVE:
             printed, _status, _killed = box_the_papers(b_class, [(CLOSE_PROMPT, "")])
-            self.assertIn("Stopped: a marking file was changed: render_pages.py in the skill's folder", printed)
+            self.assertIn("Stopped: a marking file was changed. " + checked_file()["saysTheSkill"], folded(printed))
             self.assertNotIn("Drag it", printed)
         self.assertEqual(b_class.boxed_papers_in_the_marking_folder(), [])
 
@@ -1140,6 +1140,149 @@ class WhatTheAssistantIsGivenTests(unittest.TestCase):
         for skill, folder in (("plantoir-marking", SKILL), ("plantoir-report-comments", COMMENTS_SKILL)):
             self.assertIn(sentence, pins[skill], skill)
             self.assertIn(folded(sentence), folded((folder / "SKILL.md").read_text(encoding="utf-8")), skill)
+
+
+def checked_file():
+    return teacher_run()["checkedFiles"][0]
+
+
+def codex_edit(path):
+    """The edit Codex made in the third trial to its copy of render_pages.py; True when it applied."""
+    source = path.read_text(encoding="utf-8")
+    edited = source.replace("WORK = \"Work\"\n", "WORK = \"Work\"\nTEACHER_CHOSEN_MARKING_FOLDER = '/somewhere'\n", 1)
+    edited = edited.replace("            if inside(into, folder):",
+                            "            if inside(into, folder) and not inside(into, TEACHER_CHOSEN_MARKING_FOLDER):", 1)
+    path.write_text(edited, encoding="utf-8")
+    return edited != source and "TEACHER_CHOSEN_MARKING_FOLDER):" in edited
+
+
+class FourthTrialTests(unittest.TestCase):
+    """The fourth trial (2026-11-13) got past the render_pages.py check by hand: the check covered two paths, not
+    the file, and it never ran after the last teacher step."""
+
+    def a_working_folder_class(self, named=".claude"):
+        """A class whose skill is installed in BOTH homes of a working folder, as Plantoir writes it, with
+        'Skill folder.txt' naming one of them."""
+        root = new_root(self)
+        homes = {}
+        for home in (".claude", ".agents"):
+            homes[home] = root / "Working" / home / "skills" / "plantoir-marking"
+            shutil.copytree(SKILL, homes[home])
+        a_class = Class(root / "class", skill_folder=homes[named])
+        return a_class, homes
+
+    def stops(self, a_class, label):
+        for step in (teacher_only.box, teacher_only.names):
+            (a_class.marking / "Names request.json").write_text(json.dumps({"do": "check-table"}), encoding="utf-8")
+            with self.assertRaises(teacher_only.Refusal, msg=f"{label}: {step.__name__}") as raised:
+                step(a_class.marking, teacher([str(a_class.teacher_only), "yes"]), lambda _line: None)
+            self.assertIn("a marking file was changed", str(raised.exception), label)
+        self.assertFalse((a_class.marking / ASSESSMENT / "Redacted").exists(), label)
+        return str(raised.exception)
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_e3_the_home_skill_folder_txt_does_not_name(self):
+        a_class, homes = self.a_working_folder_class(named=".claude")
+        self.assertTrue(codex_edit(homes[".agents"] / "scripts" / "render_pages.py"))
+        said = self.stops(a_class, "e3")
+        self.assertIn(folded(checked_file()["saysTheSkill"]), folded(said))
+        self.assertNotIn("remove", said, "nothing in the marking folder to remove")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_e4_a_copy_under_another_name(self):
+        a_class, _homes = self.a_working_folder_class()
+        copy = a_class.marking / "Scripts" / "render_local.py"
+        shutil.copyfile(SCRIPTS / "render_pages.py", copy)
+        self.assertTrue(codex_edit(copy))
+        said = self.stops(a_class, "e4")
+        self.assertIn(folded(checked_file()["saysACopy"].replace("{n}", "1")), folded(said))
+        self.assertNotIn("render_local", said, "a copy's name is never printed")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_e5_verify_from_the_other_home(self):
+        a_class, homes = self.a_working_folder_class(named=".agents")
+        self.assertTrue(codex_edit(homes[".agents"] / "scripts" / "render_pages.py"))
+        for home in (".claude", ".agents"):
+            verified = subprocess.run([sys.executable, "-B", str(homes[home] / "scripts" / "teacher_only.py"), "--verify",
+                                       str(a_class.marking / ASSESSMENT)], capture_output=True, text=True, env=environment())
+            self.assertEqual(verified.returncode, 1, home)
+            self.assertIn("Stopped: a marking file was changed", verified.stdout, f"--verify run from {home}")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_e6_a_renamed_copy_inside_work(self):
+        a_class, _homes = self.a_working_folder_class()
+        copy = a_class.marking / ASSESSMENT / "Work" / "helper.py"
+        copy.parent.mkdir(parents=True)
+        shutil.copyfile(SCRIPTS / "render_pages.py", copy)
+        self.assertTrue(codex_edit(copy))
+        self.stops(a_class, "e6")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_e7_a_renamed_copy_beside_the_skills_own(self):
+        a_class, homes = self.a_working_folder_class()
+        copy = homes[".claude"] / "scripts" / "render_local.py"
+        shutil.copyfile(SCRIPTS / "render_pages.py", copy)
+        self.assertTrue(codex_edit(copy))
+        self.stops(a_class, "e7")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_the_shipped_scripts_are_not_taken_for_a_renderer(self):
+        a_class, _homes = self.a_working_folder_class()
+        for script in ("redact_scans.py", "build_test_sheet.py", "class_results.py", "make_named_copies.py", "render_pages.py"):
+            shutil.copyfile(SCRIPTS / script, a_class.marking / "Scripts" / script)
+        teacher_only.box(a_class.marking, teacher([str(a_class.teacher_only), "yes"]), lambda _line: None)
+        self.assertTrue((a_class.marking / ASSESSMENT / "Redacted").is_dir())
+
+    def test_tidy_runs_the_check_and_prints_no_path(self):
+        root = new_root(self)
+        assessment = root / "Marking" / "MDM4U" / ASSESSMENT
+        work = assessment / "Work"
+        (work / "Student A").mkdir(parents=True)
+        (work / "Student A" / "page-1.png").write_bytes(b"a picture of a page")
+        (work / MADE_LIST).write_text("Student A/page-1.png\n", encoding="utf-8")
+        scripts = root / "Marking" / "MDM4U" / "Scripts"
+        scripts.mkdir()
+        shutil.copyfile(SCRIPTS / "render_pages.py", scripts / ("render " + CANARIES[0] + ".py"))
+        self.assertTrue(codex_edit(scripts / ("render " + CANARIES[0] + ".py")))
+        result = subprocess.run([sys.executable, "-B", str(TEACHER_ONLY), "--tidy", str(assessment)], capture_output=True,
+                                text=True, env=environment(), timeout=60)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("Not finished: a marking file was changed", result.stdout)
+        self.assertNotIn(CANARIES[0].casefold(), result.stdout.casefold())
+        self.assertNotIn("/", result.stdout)
+        self.assertTrue((work / "Student A" / "page-1.png").exists(), "nothing is removed while a file is changed")
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
+    def test_report_comments_show_their_four_points_in_the_window(self):
+        a_class, _homes = self.a_working_folder_class()
+        folder = a_class.marking / "Term 1 Comments"
+        folder.mkdir()
+        check = [sys.executable, "-B", str(TEACHER_ONLY), "--points-shown", str(folder)]
+        self.assertEqual(subprocess.run(check, capture_output=True, text=True, env=environment()).returncode, 1)
+        (a_class.marking / "Names request.json").write_text(json.dumps({"do": "comment-facts", "term": "Term 1"}),
+                                                            encoding="utf-8")
+        with self.assertRaises(teacher_only.Refusal):
+            teacher_only.names(a_class.marking, teacher([str(a_class.teacher_only)], points="no"), lambda _line: None)
+        self.assertEqual(subprocess.run(check, capture_output=True, text=True, env=environment()).returncode, 1)
+        printed = []
+        teacher_only.names(a_class.marking, teacher([str(a_class.teacher_only)]), printed.append)
+        text = folded("\n".join(printed))
+        for point in teacher_run()["commentPrivacyPoints"]:
+            self.assertIn(folded(point), text)
+        self.assertLess(text.index(folded(teacher_run()["commentPrivacyPoints"][3])),
+                        text.index("Which is your teacher-only folder"), "before the folder is asked for")
+        self.assertEqual(subprocess.run(check, capture_output=True, text=True, env=environment()).returncode, 0)
+
+    def test_the_comment_points_are_the_skills_and_the_scripts_word_for_word(self):
+        rules = teacher_run()
+        self.assertEqual(rules["commentPrivacyPoints"], teacher_only.COMMENT_POINTS)
+        skill = folded((COMMENTS_SKILL / "SKILL.md").read_text(encoding="utf-8"))
+        for number, point in enumerate(rules["commentPrivacyPoints"], start=1):
+            self.assertIn(folded(f"{number}. {point}"), skill, f"point {number}")
+
+    def test_the_window_says_whose_words_the_points_are(self):
+        self.assertIn("in your assistant's words", teacher_only.WINDOW_INTRODUCTION)
+        self.assertIn("in your assistant's words", teacher_only.COVER_INTRODUCTION)
 
 
 class GreetingTests(unittest.TestCase):

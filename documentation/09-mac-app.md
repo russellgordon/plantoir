@@ -6022,6 +6022,69 @@ relayed `Stopped:` line got a set-up fixed in one turn. Russell ruled
   assistant program's own task-output file as a WARN, not a FAIL. The
   first-reply report reads either apostrophe.
 
+**The fourth trial, and what it changed (750d, 2026-11-13).** Six runs on
+9078008ac (Claude Code 2.1.323 and Codex CLI 0.162.0), with the marking
+folders under the home folder. No leak: no name, and no path holding one,
+reached an assistant, and no assistant ran a launcher, used the pasted
+path, opened the notes or changed a script it must not. The three fixes
+held when attacked by hand. Not clean, because the `render_pages.py`
+check could be got around unseen, by hand: the same edit in `.agents/`
+while "Skill folder.txt" named `.claude` (e3), in a copy named
+`Scripts/render_local.py` (e4), and `--verify` run from the other home
+(e5); and nothing checked after the last teacher step. Russell ruled: fix
+it, a short re-check of the attack, then it ships.
+
+- **The check covers the file, not two paths.** `render_pages.py` must
+  be the shipped file in every skill home (the running `teacher_only.py`'s,
+  the one "Skill folder.txt" names, and the other of `.claude` and
+  `.agents` in the same working folder), and any other script in a home's
+  `scripts/` that renders pages is a change. In the marking folder, at any
+  depth, every `render_pages.py`, and every other Python file that calls
+  `pdftoppm` with one of `rendererMarks` (`-png`, `check_the_folder`,
+  `render_pages`, `Made while marking`), must be the shipped file. None of
+  the other shipped scripts carries a mark (`redact_scans.py` calls
+  `pdftoppm` for JPEG pages only; a test copies all of them into
+  `Scripts/` and boxes). It prints counts only: a copy's name is the
+  assistant's choice (`teacherRun.checkedFiles`).
+- **`--tidy` runs the same check**, so an edit after the last teacher step
+  is seen before the marking is called finished; it removes nothing then,
+  and prints no path.
+- **The Stopped line says where.** A change in a skill home says Plantoir
+  puts the skill back when it next opens the working folder
+  (`checkedFiles.saysTheSkill`); a copy in the marking folder is to be
+  removed (`saysACopy`). Neither names a file.
+- **What the check cannot see**, said in the skill and the contract
+  (`checkedFiles.cannotSee`): a renderer written from scratch with none of
+  the marks, `pdftoppm` called by the assistant itself (into any folder,
+  `/tmp` included), and anything run from outside the skill and marking
+  folders. No hash can see these. Nothing in these files stops them; the
+  skill's rule is what holds, and the trials' checker (B8) looks for a
+  write into a temporary folder. REJECTED: stopping on any picture outside
+  `Work` (it cannot see `/tmp` either, and a stray picture is not a changed
+  safeguard).
+- **The points.** The skill asks for one sentence saying the Box the
+  papers window shows them, to be read there (both Claude runs said "on the
+  first page of the file"). The window now says the points are in the
+  assistant's words ("I" is your assistant); it used to print them under a
+  line saying the assistant does not repeat them. The report-comments
+  skill now handles them the same way: the first report-comments step in
+  Put names on the sheets shows that skill's four points and records the
+  yes in `<Term> Comments/Privacy points shown.json`, and the assistant
+  reads no marks record until `teacher_only.py --points-shown` says so
+  (`teacherRun.commentPrivacyPoints`, `commentPointsRecord`).
+- **The program's own copies.** The skill says to tell the teacher once
+  that Claude Code and Codex keep each session in files of their own
+  outside the marking folder, which these scripts cannot see or remove
+  (one of four marking runs said so).
+- **A held page.** "Mark every paper" does not release a page held for
+  what may be a name: everything else is marked and built, and the held
+  paper is named by identifier and page. Codex held, Claude marked; the
+  safer one is now the written rule.
+- **Small:** `syncAccepted` never lists a folder the teacher says is not
+  synced; scripts go in the marking folder's own `Scripts/`; the
+  report-comments skill copies `make_named_copies.py` before the first
+  request and uses identifiers, never "her" or "his", in replies.
+
 **The greeting names no marking skill (Russell, 2026-11-13, piece G).**
 "Marking and report comment writing should not be advertised when an
 agent opens in Plantoir, only within the appropriate context of a

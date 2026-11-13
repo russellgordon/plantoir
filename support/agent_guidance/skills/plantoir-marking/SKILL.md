@@ -36,8 +36,10 @@ shown.json`), and `--verify` reads nothing as confirmed without that
 record. The cover of the file the teacher looks through carries them too.
 Do not restate or paraphrase them in a reply: a version in your own words
 is not what the teacher said yes to. In your first reply, say in one
-sentence that Box the papers will show them four things about their
-students' privacy, and ask them to read them there. If the teacher asks
+sentence that the Box the papers window will show them four things about
+their students' privacy, and ask them to read them there, in that window,
+where they type yes (the cover of the file they look through repeats them;
+the window comes first). If the teacher asks
 about a point, answer the question, and point them to the window and the
 cover for its words. The points are here so that you know what the
 teacher has been told:
@@ -98,6 +100,14 @@ page 2` in that paper's marks record `checks` (never the name), and leave
 that page until the teacher says. If it is in a file you wrote, tell the
 teacher which file by its path, and stop using that file.
 
+**"Mark every paper" does not release a held page.** When the teacher
+says to mark every paper, or to build every sheet, while a page is held
+for what may be a name, mark everything else, build every sheet and the
+class results without that paper, and say in one line which paper is
+held, by identifier and page, and that it waits for a rescan or for the
+teacher to say that page may be read. A page is released only by the
+teacher's word about that page.
+
 ## 4. Where things live
 
 Two folders per course, both OUTSIDE this working folder:
@@ -152,7 +162,9 @@ did:
 
 Paths only, never a name, and never the teacher-only folder's path.
 `syncAccepted` lists the marking folder's path once the teacher has said
-its sync is fine; a folder not in the list is asked about again. This is
+it is kept in sync and that this is fine; a folder the teacher says is not
+kept in sync stays out of the list. A folder not in the list is asked
+about again. This is
 one of the places under a folder whose name starts with a dot that a
 Plantoir skill may write; leave everything else under `.internal` alone.
 Read it first next time: if it is there and its folder exists, say it back
@@ -168,7 +180,8 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   Skill folder.txt                          one line: where this skill's folder is, for the launchers
   Names request.json                        the step that needs names, asked for (section 12)
   Put names on the sheets - what it said.txt   what that step printed, for you to read
-  Scripts/                                  the scripts, copied from this skill and adapted
+  Scripts/                                  the scripts, copied from this skill and adapted (here, beside the
+                                            launchers, never inside an assessment's folder)
   <Assessment>/Box request.json             the blank test and the boxing script, for Box the papers
   <Assessment>/Box the papers - what it said.txt   what the boxing printed, for you to read
   <Assessment>/Redacted/Section N/          boxed papers, Student A.pdf, there only after the teacher's yes
@@ -246,10 +259,16 @@ in `launchers/` (below), and the `plantoir-test-authoring` skill's
 `scripts/check_kit.py`. Never copy the three scripts or change any of
 them: the launchers run the first two from this skill's folder, and you
 run `render_pages.py` from there too. **A changed `render_pages.py` stops the marking:**
-in this skill's folder, or a copy in the marking folder's `Scripts/`, it
-stops `--verify` and both of the teacher's steps with "Stopped: a marking
-file was changed". Never change it to get past its refusal, even when
-the teacher asks; say no with the reason. Plantoir puts the skill folder back as it shipped
+in either of this skill's homes (`.claude/skills/plantoir-marking/` and
+`.agents/skills/plantoir-marking/`), or as any copy in the marking folder,
+under its own name or another, it stops `--verify`, `--tidy` and both of
+the teacher's steps with "Stopped: a marking file was changed". Never
+copy it, rename it or change it to get past its refusal, even when the
+teacher asks; say no with the reason. **What the check cannot see:** a
+renderer written from scratch that shares none of its marks, a page turned
+into a picture by calling `pdftoppm` yourself, or anything run from outside
+the skill and marking folders. Nothing in these files stops that; this
+rule is what holds, so look at pages only through `render_pages.py`. Plantoir puts the skill folder back as it shipped
 only when it next refreshes the working folder, so before the first use in
 a session, and again after copying the launchers into the marking folder,
 check them:
@@ -261,12 +280,12 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `c2cf7b6dcdcdcd456eb28da8abecc7904a2848d1af6286951d27e5e2e70fb77c`  teacher_only.py
+- `ca31ca2ac5a5ecfdae55f13aedee142ef9a9125a6afbd3048f66e322c1e77f92`  teacher_only.py
 - `4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819`  render_pages.py
-- `e90e792cf9629fc71973ded47daec5cc244a2815126e9028eac0c79cd85f77c8`  Box the papers.command
-- `dee56b35ad263203ca975f174b30040fb58d6701fec0b20f176dcc48e2c19eb5`  Put names on the sheets.command
-- `b978d772bc04cc03024f5ef47890214ed73d9dcda46dbdca97f0d6eeb3b893d1`  Box the papers.bat
-- `4b36f5eb183bd42e19410b61130c89a7ce0b36adcf91d895cfd702538fea2721`  Put names on the sheets.bat
+- `81fc4581528e2a3e89f7470188a687ac1c3b5bd2f5057ce1e128a81d761c948e`  Box the papers.command
+- `9bb417da5659e2594750c2616b515af5ecf0108db309793dcb2c3144fa31d624`  Put names on the sheets.command
+- `2c4f3ab9ea68eee675eacebae14e7c6c7ccdd675c9ca84b146ca9063e6ca0106`  Box the papers.bat
+- `323334379544df3f6424cbebf8f460cd08c7f996afd2abcbe2c1c2eb6f5fa14f`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -602,11 +621,18 @@ It removes each picture `render_pages.py` listed in `Work/Made while
 marking.txt`, and nothing else, and says how many, never where. It looks
 nowhere outside the Work folder. **It cannot find a copy made anywhere else:**
 a picture you made another way, a copy in the system's temporary folder,
-and anything already sent to the AI service. The program you run in may
-also keep a command's output in temporary files of its own, outside the
-marking folder: say that to the teacher once, when the marking is done.
+and anything already sent to the AI service. It also checks
+`render_pages.py` as the teacher's steps do, so a change made after the
+last of them is still seen.
+**Tell the teacher once, when the marking is done, that the program you run in keeps copies of its own:**
+Claude Code and Codex keep each session, what was read in it included, in
+files of their own outside the marking folder (Claude Code under
+`~/.claude/projects/` and, for a command run in the background, in a
+temporary folder), and these scripts cannot see or remove them. Say where
+the program's own settings say to clear them, if you know; never say they
+are gone.
 **While it says "Not finished", the marking is not finished:** ask the
-teacher to remove what it counts, and run it again.
+teacher to put right what it says, and run it again.
 
 Look for `.claude/skills/plantoir-report-comments/SKILL.md` (or
 `.agents/skills/plantoir-report-comments/SKILL.md`) in this working folder;

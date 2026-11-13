@@ -2783,7 +2783,13 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   shows the points well, and that `%TEMP%` under a Windows user's profile
   is refused as the Mac's `/var/folders/.../T` is, are NOT MEASURED. The
   pins are byte for byte, so a `render_pages.py` checked out with CRLF
-  would stop every step: `.gitattributes` keeps it LF. They are checked out with
+  would stop every step: `.gitattributes` keeps it LF. Since the fourth trial
+  (09 → "The fourth trial, and what it changed") the check covers both
+  skill homes and any renamed copy in the marking folder, `--tidy` runs it
+  too, and Put names on the sheets shows the report-comments skill's four
+  points before a comments step; all plain Python, NOT MEASURED on
+  Windows, where the homes are found by the same `.claude` and `.agents`
+  folder names. They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft

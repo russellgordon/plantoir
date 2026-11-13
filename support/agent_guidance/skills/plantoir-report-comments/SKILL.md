@@ -33,8 +33,23 @@ teacher has changed it: it is theirs to call that.
 
 ## 2. Privacy first
 
-Before you read any marks record, say these four points to the teacher, in
-these words or very close to them:
+**The teacher reads these four points in the Put names on the sheets window, not from you.**
+The first report-comments step (`comment-facts`, section 7) shows them
+word for word before it asks for anything, takes the teacher's yes and
+records it in `<Term> Comments/Privacy points shown.json`, as Box the
+papers does for marking. Do not restate or paraphrase them in a reply. In
+your first reply, say in one sentence that the Put names on the sheets
+window will show them four things about their students' privacy, and ask
+them to read them there, in that window. **Read no marks record until the check says the teacher read them:**
+
+```text wrap
+python3 -B .claude/skills/plantoir-marking/scripts/teacher_only.py --points-shown "<marking folder>/<Term> Comments"
+```
+
+Until it does, copy `make_named_copies.py` as section 7 says, write the
+`comment-facts` request and ask the teacher to double-click Put names on
+the sheets; then run the check again. The points are here so that you
+know what the teacher has been told:
 
 ```text wrap
 Before we start, four things about your students' privacy:
@@ -62,7 +77,8 @@ one line:
   folder. Its check that its input is a terminal catches an accidental
   pipe and nothing more, so this rule is what holds.
 - **Never ask for, guess or write a student's pronouns or gender.** Section
-  6 says how a comment is written without them.
+  6 says how a comment is written without them. That holds in your replies
+  too: write the identifier ("Student A's options"), never "her" or "his".
 - **Never put a name into a draft**, even one quoted from a student's work
   (a game called after its maker, a signature on a page): leave the quoted
   words out, or describe them. If a name reached you anyway, do as
@@ -218,7 +234,7 @@ other placeholder too, and a pronoun placeholder the table cannot fill.
 so the script that puts the names in counts every comment again, and the
 count is the one that matters.
 
-Copy `make_named_copies.py` from `plantoir-marking`'s `scripts/` into the
+**Before the first request**, copy `make_named_copies.py` from `plantoir-marking`'s `scripts/` into the
 marking folder's `Scripts/` (if it is not there already; a copy made before
 report comments existed has no `--comments` and stops with "give --sheets":
 copy the shipped one again and redo that teacher's changes) and run its
@@ -234,9 +250,10 @@ and read what it printed in `Put names on the sheets - what it said.txt`
 in the marking folder. You never run a step that reads the table yourself,
 because you never know where the table is.
 
-1. **Before drafting**, have the longest first name's length found, as a
-   number (never the name), and the teacher's notes checked and copied to
-   you if there are any:
+1. **First, before you read any record**, have the four privacy points
+   shown (section 2), the longest first name's length found, as a number
+   (never the name), and the teacher's notes checked and copied to you if
+   there are any, all in one double-click:
 
    ```json
    {"do": "comment-facts", "term": "Term 1"}

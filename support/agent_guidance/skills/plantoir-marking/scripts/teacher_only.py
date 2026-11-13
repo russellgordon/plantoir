@@ -10,6 +10,8 @@ a .bat on Windows) check its SHA-256 and the runner's before they run it, and th
     python3 -I -B teacher_only.py --verify "<marking folder>/<Assessment>"   (the assistant, before any read)
     python3 -I -B teacher_only.py --tidy "<marking folder>/<Assessment>"
                                                            (the assistant, before it calls marking finished)
+    python3 -I -B teacher_only.py --points-shown "<marking folder>/<Term> Comments"
+                                                           (the assistant, before it reads a marks record for comments)
 
 Since the second trial (750d, 2026-11-13): Box the papers prints the four privacy points in its own window and
 takes the teacher's yes to them before it asks for the folder, and records that they were shown (an assistant
@@ -25,6 +27,13 @@ the system's temporary folder is refused by both of the teacher's steps and by -
 whose refusal of temporary folders an assistant edited away in its copy, is checked against the SHA-256 held
 here (RENDER_PAGES_SHA256) by both steps and by --verify, in the skill's folder and in the marking folder's
 Scripts/: a changed copy stops with a "Stopped:" line that says a marking file was changed.
+
+Since the fourth trial (750d, 2026-11-13): the check covers the file, not two paths. render_pages.py is checked in
+every skill home (this file's, the one "Skill folder.txt" names, and the other of .claude and .agents in the same
+working folder), and in the marking folder at any depth, where any Python file that renders pages as
+render_pages.py does (pdftoppm with one of RENDERER_MARKS) must be the shipped file; --tidy runs the same check.
+What no hash can see: an assistant that calls pdftoppm itself, or writes a renderer with none of the marks, or
+runs one from outside these folders. Nothing here stops that; the skill forbids it.
 
 #750, piece 750d. Russell, 2026-11-12: "script runs, teacher checks the papers, confirms names are redacted,
 then agent based marking begins. Simple." Six trials found an assistant's FIRST command could list the
@@ -110,6 +119,13 @@ RENDER_PAGES = "render_pages.py"
 # folders away and told no one).
 RENDER_PAGES_SHA256 = "4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819"
 LAST_STOP = " - last stop.txt"
+# The two sentences a "Stopped: a marking file was changed" line carries (contracts: teacherRun.checkedFiles).
+SAYS_THE_SKILL = ("render_pages.py in the plantoir-marking skill's own folder, in your working folder, is not the one "
+                  "Plantoir shipped. Plantoir puts the skill back as it shipped the next time it opens your working "
+                  "folder: open it in Plantoir, then double-click again, and ask your assistant what it changed.")
+SAYS_A_COPY = ("Copies of render_pages.py in the marking folder ({n}), under its own name or another, are not the one "
+               "Plantoir shipped. Ask your assistant to remove them (render_pages.py is run from the skill's folder, "
+               "never copied) and to tell you what it had changed.")
 ASK_POINTS = "Type yes when you have read these four points, or no to stop: "
 IDENTIFIER = re.compile(r"^Student [A-Z]{1,2}$")
 SECTION = re.compile(r"^Section \d+$")
@@ -138,8 +154,31 @@ PRIVACY_POINTS = [
     "The files I write stay on this computer, in the folders you choose. I never send, upload or publish "
     "anything; giving work back to students is yours to do.",
 ]
+# The report-comments skill's four points (contracts: teacherRun.commentPrivacyPoints), shown by Put names on the
+# sheets before a report-comments step asks for the folder (750d fourth trial: the two skills now handle the
+# points the same way).
+COMMENT_POINTS = [
+    "Whatever I read is sent to the AI service I run on, so that I can work on it. That includes the marks records "
+    "and feedback I draft the comments from. Please check that model training is turned off for the account you use "
+    "with me (on claude.ai: Settings, Privacy, \"Help improve Claude\"; on ChatGPT: Settings, Data controls, \"Improve "
+    "the model for everyone\", where offered; as of November 2026, so check the names), and that your school or board "
+    "allows this work to be processed by this service.",
+    "I work with identifiers only (Student A, Student B), and I write {first name} in every comment where the first "
+    "name goes. I never ask where your teacher-only folder is, and I never open your name mapping table, a class "
+    "list, your report system or an export from it, or anything in that folder. You put the first names in yourself "
+    "at the end, by double-clicking \"Put names on the sheets\" in your marking folder: it writes them into your "
+    "teacher-only folder and tells me only counts.",
+    "If I see what looks like a name anywhere, I will not repeat it in any message or file. I will tell you only the "
+    "identifier and where it is.",
+    "The files I write stay on this computer, in the folders you chose for marking. I never send, upload or enter "
+    "anything; putting the comments into your report system is yours to do.",
+]
+# The fourth trial: the window printed the points, which are in the assistant's voice ("Whatever I read"), under a
+# line that said the assistant does not repeat them. Now it says whose words they are.
+WINDOW_INTRODUCTION = ("Four things about your students' privacy, in your assistant's words (\"I\" is your assistant). "
+                       "Please read them here, in this window; your assistant does not say them again:")
 COVER_INTRODUCTION = ("These four things were shown in the Box the papers window before any paper was boxed, and you "
-                      "typed yes to them. They are printed here too:")
+                      "typed yes to them. They are in your assistant's words (\"I\" is your assistant):")
 LOOK_FOR = ("Look through every page of every paper after this one. Look for any part of a name, and anything else "
             "that says who wrote it (a signature, initials, a student number). The boxing does not check how each "
             "page was scanned: on a page scanned upside down the name line is at the foot, and on a page scanned "
@@ -201,28 +240,102 @@ def the_marking_folder_is_usable(marking):
                       "such as Marking. Ask your assistant to set the marking up there. Nothing was done")
 
 
+SKILL_HOMES = (".claude", ".agents")
+# What makes a script a page renderer, for a copy of render_pages.py under another name (750d fourth trial: an
+# edited copy as Scripts/render_local.py was not checked). Each is in render_pages.py; none is in the other
+# shipped scripts (redact_scans.py calls pdftoppm for JPEG pages only, and names none of the rest).
+RENDERER_MARKS = (b"-png", b"check_the_folder", b"render_pages", b"Made while marking")
+
+
+def skill_homes(marking):
+    """Every plantoir-marking skill folder the marking could be using: this file's own, the one the marking
+    folder's 'Skill folder.txt' names, and for each the other home in the same working folder (.claude and
+    .agents: Codex reads .agents, Claude Code reads .claude, and the fourth trial edited the one 'Skill
+    folder.txt' did not name)."""
+    found = []
+
+    def add(folder):
+        folder = Path(os.path.realpath(str(folder)))
+        if folder not in found:
+            found.append(folder)
+
+    add(SCRIPTS.parent)
+    try:
+        named = (Path(marking) / SKILL_FOLDER_FILE).read_text(encoding="utf-8").splitlines()[0].strip()
+    except (OSError, UnicodeDecodeError, IndexError):
+        named = ""
+    if named and Path(named).is_absolute() and Path(named).is_dir():
+        add(named)
+    for folder in list(found):
+        if folder.parent.name == "skills" and folder.parent.parent.name in SKILL_HOMES:
+            for home in SKILL_HOMES:
+                other = folder.parent.parent.parent / home / "skills" / folder.name
+                if other.is_dir():
+                    add(other)
+    return found
+
+
+def renders_pages(path):
+    """True for a Python file that renders pages as pictures as render_pages.py does."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return False
+    return b"pdftoppm" in data and any(mark in data for mark in RENDERER_MARKS)
+
+
 def changed_marking_files(marking):
-    """The names of the never-adapted marking files that are not as Plantoir shipped them: render_pages.py in this
-    skill's folder, and any copy of it in the marking folder's Scripts/. teacher_only.py and run_with_names.py are
-    checked by the launchers before this file runs."""
-    changed = []
-    for copy in (SCRIPTS / RENDER_PAGES, Path(marking) / "Scripts" / RENDER_PAGES):
-        is_the_skills = copy == SCRIPTS / RENDER_PAGES
-        if not is_the_skills and not (copy.exists() or copy.is_symlink()):
-            continue
-        if copy.is_symlink() or not copy.is_file() or sha256_of(copy) != RENDER_PAGES_SHA256:
-            changed.append(RENDER_PAGES + (" in the skill's folder" if is_the_skills else " in the marking folder's Scripts folder"))
-    return changed
+    """(skill homes with a changed render_pages.py, copies in the marking folder that are changed) as counts.
+    In every skill home render_pages.py must be the file Plantoir shipped, and any other script there that
+    renders pages is a change. In the marking folder, at any depth, every render_pages.py and every other Python
+    file that renders pages must be the shipped file. teacher_only.py and run_with_names.py are checked by the
+    launchers before this file runs. Counts only: a copy's name is the assistant's choice and is never printed."""
+    in_the_skill = 0
+    for home in skill_homes(marking):
+        scripts = home / "scripts"
+        shipped = scripts / RENDER_PAGES
+        changed = shipped.is_symlink() or not shipped.is_file() or sha256_of(shipped) != RENDER_PAGES_SHA256
+        if scripts.is_dir():
+            for entry in scripts.iterdir():
+                if entry.name in (RENDER_PAGES, "teacher_only.py", "run_with_names.py") or entry.suffix != ".py":
+                    continue
+                if entry.is_symlink() or (entry.is_file() and renders_pages(entry)):
+                    changed = True
+        if changed:
+            in_the_skill += 1
+    in_the_marking_folder = 0
+    for top, folders, files in os.walk(str(marking), followlinks=False):
+        for name in files:
+            path = Path(top) / name
+            if name != RENDER_PAGES and not name.endswith(".py"):
+                continue
+            if path.is_symlink():
+                if name == RENDER_PAGES:
+                    in_the_marking_folder += 1
+                continue
+            if name == RENDER_PAGES or renders_pages(path):
+                if sha256_of(path) != RENDER_PAGES_SHA256:
+                    in_the_marking_folder += 1
+    return in_the_skill, in_the_marking_folder
+
+
+def what_was_changed(marking):
+    """The sentence a Stopped line carries when a marking file was changed, or None."""
+    in_the_skill, in_the_marking_folder = changed_marking_files(marking)
+    if not in_the_skill and not in_the_marking_folder:
+        return None
+    parts = []
+    if in_the_skill:
+        parts.append(SAYS_THE_SKILL)
+    if in_the_marking_folder:
+        parts.append(SAYS_A_COPY.replace("{n}", str(in_the_marking_folder)))
+    return "a marking file was changed. " + " ".join(parts) + " Nothing was done"
 
 
 def the_marking_files_are_as_shipped(marking):
-    changed = changed_marking_files(marking)
+    changed = what_was_changed(marking)
     if changed:
-        raise Refusal("a marking file was changed: " + " and ".join(changed) + " is not the one Plantoir shipped, and "
-                      "it is never changed. Nothing was done. Ask your assistant to remove its copy from the marking "
-                      "folder's Scripts folder (it is run from the skill's folder) and to tell you what it had changed. "
-                      "If it still stops, Plantoir puts the skill back as it shipped the next time it opens your "
-                      "working folder")
+        raise Refusal(changed)
 
 
 def typed_path(typed, windows=None):
@@ -385,18 +498,18 @@ def papers_of_a_batch(holding):
     return papers
 
 
-def points_text():
-    return PRIVACY_HEADING + "\n" + "\n".join(f"{number}. {point}" for number, point in enumerate(PRIVACY_POINTS, start=1))
+def points_text(points=None):
+    points = PRIVACY_POINTS if points is None else points
+    return PRIVACY_HEADING + "\n" + "\n".join(f"{number}. {point}" for number, point in enumerate(points, start=1))
 
 
-def show_the_privacy_points(folder, ask, say):
+def show_the_privacy_points(folder, ask, say, points=None):
     """The four points, word for word, in the teacher's own window, and the teacher's yes to them, recorded in
     the assessment's folder: whichever assistant the teacher uses, the teacher has seen them before any paper
     reaches it. A no, or a closed window, stops everything."""
     say("")
-    say("Please read these four things about your students' privacy. They are shown here, in your own window, so "
-        "that you read them whichever assistant you use; your assistant does not repeat them:")
-    say(points_text())
+    say(WINDOW_INTRODUCTION)
+    say(points_text(points))
     say("")
     while True:
         answer = ask(ASK_POINTS)
@@ -408,15 +521,28 @@ def show_the_privacy_points(folder, ask, say):
     Path(folder).mkdir(parents=True, exist_ok=True)
     Path(folder, POINTS_RECORD).write_text(json.dumps({
         "shown": datetime.datetime.now().isoformat(timespec="seconds"),
-        "points": hashlib.sha256(points_text().encode("utf-8")).hexdigest()}, indent=1), encoding="utf-8")
+        "points": hashlib.sha256(points_text(points).encode("utf-8")).hexdigest()}, indent=1), encoding="utf-8")
 
 
-def points_were_shown(assessment):
+def points_were_shown(assessment, points=None):
     try:
         record = json.loads((Path(assessment) / POINTS_RECORD).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return record.get("points") == hashlib.sha256(points_text().encode("utf-8")).hexdigest()
+    return record.get("points") == hashlib.sha256(points_text(points).encode("utf-8")).hexdigest()
+
+
+def points_shown(folder):
+    """For report comments: exit 0 only when Put names on the sheets showed the report-comments skill's four
+    points in the teacher's window and the teacher typed yes to them, for this term's comments folder."""
+    if points_were_shown(folder, COMMENT_POINTS):
+        print("The teacher read the four privacy points in Put names on the sheets and typed yes; you may read the "
+              "marks records.")
+        return 0
+    print("Not yet: the teacher has not read the four privacy points in Put names on the sheets. Write the "
+          "comment-facts request and ask the teacher to double-click Put names on the sheets; read no marks record "
+          "until then.")
+    return 1
 
 
 def verify(assessment):
@@ -954,6 +1080,8 @@ def names(marking, ask, say):
                       "Nothing was done")
     what, writes_names, _steps = names_steps(request, marking, Path(THE_FOLDER))   # checks the request first
     say(f"Put names on the sheets: this will {what}.")
+    if request.get("do") in ("comment-facts", "comments"):
+        show_the_privacy_points(marking / f"{request['term']} Comments", ask, say, points=COMMENT_POINTS)
     teacher_only = ask_for_the_teacher_only_folder(marking, ask, say)
     what, writes_names, steps = names_steps(request, marking, teacher_only)
     if writes_names:
@@ -1044,6 +1172,12 @@ def tidy(assessment):
     temporary folders by name, printed every folder it matched, a teacher-only folder's name among them, and
     matched over 400 folders that were not the assistant's, so it could never finish). Exit 0 when it is done."""
     assessment = Path(assessment)
+    changed = what_was_changed(assessment.resolve().parent)
+    if changed:
+        # The fourth trial: an edit made after the last teacher step was never seen. --tidy, which the skill
+        # requires before the marking is called finished, runs the same check. Counts only, never a path.
+        print(f"Not finished: {changed}. Nothing was removed; run this again once it is put right.")
+        return 1
     work = assessment / WORK
     if work.is_symlink() or (work.exists() and not work.is_dir()):
         print("Not finished: the assessment's Work folder is not a plain folder, so nothing was removed. Ask the "
@@ -1134,6 +1268,8 @@ def interactive_input(prompt):
 def main(arguments):
     if len(arguments) == 2 and arguments[0] == "--verify":
         return verify(arguments[1])
+    if len(arguments) == 2 and arguments[0] == "--points-shown":
+        return points_shown(arguments[1])
     if len(arguments) >= 2 and arguments[0] == "--tidy":
         return tidy(arguments[1])   # anything after it (an earlier copy's --look-in) is not used
     if len(arguments) != 2 or arguments[0] not in ("box", "names"):
