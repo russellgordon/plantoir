@@ -8,13 +8,13 @@ You are marking one paper of ASSESSMENT for COURSE. Your paper is the identifier
 
 ## First, before reading anything
 
-Run the check that the teacher's yes is recorded for exactly the papers in the redacted folder:
+Run the check that the teacher typed yes for exactly the papers in the redacted folder:
 
 ```text wrap
-python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+python3 -B "<this working folder>/.claude/skills/plantoir-marking/scripts/teacher_only.py" --verify "<marking folder>/<Assessment>"
 ```
 
-If it does not say the teacher's yes is recorded, or does not name your identifier, read nothing and report
+If it does not say the teacher typed yes for these papers, or does not name your identifier, read nothing and report
 that in one line. Read only a paper it names.
 
 ## Read
@@ -40,7 +40,7 @@ a name, write only `NAME VISIBLE page N`.
 
 ## Never
 
-- Never repeat a name you see, in any message or file. Never open the teacher-only folder, the mapping
+- Never repeat a name you see, in any message or file. Never look for, list or open the teacher-only folder, the mapping
   table or an original scan.
 - Never invent a context involving firearms or ammunition in a focus item.
 - Never decide a ruling: flag it. Report back in one line: the identifier, the marks by category, the

@@ -1,6 +1,6 @@
 ---
 name: plantoir-report-comments
-description: Use when a teacher asks for report card comments, progress report comments or term comments for a class, in any course. Drafts three options per student from the marks records the plantoir-marking skill wrote, in the school's own report convention and within its character limit, with identifiers only; first names go in at the end by plantoir-marking's make_named_copies.py, which counts every comment again after they are in. Every comment is a draft the teacher reads, changes and owns.
+description: Use when a teacher asks for report card comments, progress report comments or term comments for a class, in any course. Drafts three options per student from the marks records the plantoir-marking skill wrote, in the school's own report convention and within its character limit, with identifiers only; first names go in at the end when the teacher double-clicks plantoir-marking's Put names on the sheets, which runs make_named_copies.py and counts every comment again after they are in. Every comment is a draft the teacher reads, changes and owns.
 ---
 
 # Report card comments from the marking records, with students' names kept on this computer
@@ -39,7 +39,7 @@ these words or very close to them:
 ```text wrap
 Before we start, four things about your students' privacy:
 1. Whatever I read is sent to the AI service I run on, so that I can work on it. That includes the marks records and feedback I draft the comments from. Please check that model training is turned off for the account you use with me (on claude.ai: Settings, Privacy, "Help improve Claude"; on ChatGPT: Settings, Data controls, "Improve the model for everyone", where offered; as of November 2026, so check the names), and that your school or board allows this work to be processed by this service.
-2. I work with identifiers only (Student A, Student B), and I write {first name} in every comment where the first name goes. I never open your name mapping table, a class list, your report system or an export from it, or anything in your teacher-only folder. A script puts the first names in at the end, into your teacher-only folder, and tells me only counts.
+2. I work with identifiers only (Student A, Student B), and I write {first name} in every comment where the first name goes. I never ask where your teacher-only folder is, and I never open your name mapping table, a class list, your report system or an export from it, or anything in that folder. You put the first names in yourself at the end, by double-clicking "Put names on the sheets" in your marking folder: it writes them into your teacher-only folder and tells me only counts.
 3. If I see what looks like a name anywhere, I will not repeat it in any message or file. I will tell you only the identifier and where it is.
 4. The files I write stay on this computer, in the folders you chose for marking. I never send, upload or enter anything; putting the comments into your report system is yours to do.
 ```
@@ -51,8 +51,12 @@ one line:
   export from it, or a past report card**, even when the teacher asks: the
   names would then be sent to the AI service. The scripts in section 7 do
   what is needed without them.
-- **Never open, list, render or search anything in the teacher-only
-  folder**, the named comments included.
+- **Never ask where the teacher-only folder is, and never search for, list or open it.**
+  The named comments are there; you are never told where it is, and the
+  teacher runs every step that reads it (section 7). Never list the folder
+  that holds the marking folder either: the teacher-only folder sits
+  beside it. If the teacher tells you its path anyway, do not use it,
+  write it down or repeat it.
 - **Never ask for, guess or write a student's pronouns or gender.** Section
   6 says how a comment is written without them.
 - **Never put a name into a draft**, even one quoted from a student's work
@@ -67,8 +71,8 @@ one line:
 ## 3. Where things are
 
 Read `courses/<CODE>/.internal/marking/marking.json`, which
-`plantoir-marking` section 4 writes: it gives the marking folder and the
-teacher-only folder. If it is not there, no marking has been done with that
+`plantoir-marking` section 4 writes: it gives the marking folder, and
+never the teacher-only folder. If it is not there, no marking has been done with that
 skill in this course: say so, and ask where the marks records are. Never
 set anything up inside this working folder.
 
@@ -80,14 +84,19 @@ set anything up inside this working folder.
   <Term> Comments/Comments.json                your drafts, identifiers only
   <Term> Comments/Comments - Drafts.md         the same drafts, for the teacher and the reviewer to read
   <Term> Comments/Teacher Notes.md             the teacher's own notes by identifier, only if they write some
-<teacher-only folder>/
+  Names request.json                           the step that needs names, asked for (section 7)
+  Put names on the sheets - what it said.txt   what that step printed, for you to read
+the teacher-only folder (you never see it):
   Name Mapping Table.csv                       never opened
   <Term> Comments/Named/Report Comments.csv    written by the script; never opened
   <Term> Comments/Named/Report Comments.md     the same, to read; never opened
 ```
 
 `<Term>` is the teacher's name for the reporting period (`Term 1`,
-`Midterm`). Keep only these files in `<Term> Comments/`.
+`Midterm`). Keep only these files in `<Term> Comments/`. The launcher
+"Put names on the sheets" is in the marking folder already if marking was
+set up there (`plantoir-marking` section 7); if it is not, copy it as that
+section says.
 
 ## 4. The shape: the school's convention, asked
 
@@ -159,15 +168,12 @@ first.
   discussion): say plainly that there is no record of it. If the teacher
   wants it in the comments, ask them to write notes by identifier, never
   with a name, in `<Term> Comments/Teacher Notes.md`. Before you read
-  them, check them through the runner (section 7), and read them only if
+  them, have them checked (section 7, step 1, which checks them as it
+  finds the longest first name), and read them only if
   it finds no word from the table. The check looks for every part of every
   name in the table, a two-letter first name too, and cannot see a
   nickname, initials or a name that is not in the table: ask the teacher to
   read the notes once for those before you open them.
-
-  ```text wrap
-  python3 -B .claude/skills/plantoir-marking/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --check-file "<marking folder>/<Term> Comments/Teacher Notes.md" --table "<teacher-only>/Name Mapping Table.csv"
-  ```
 
   If it names lines, tell the teacher the line numbers and do not open
   the file until they have changed them, or have told you, naming the
@@ -208,29 +214,40 @@ Copy `make_named_copies.py` from `plantoir-marking`'s `scripts/` into the
 marking folder's `Scripts/` (if it is not there already; a copy made before
 report comments existed has no `--comments` and stops with "give --sheets":
 copy the shipped one again and redo that teacher's changes) and run its
-`--self-test`, as `plantoir-marking` section 6 says; check the runner's
-SHA-256 as that section says before the first use in a session. **Every
-script that reads the name mapping table is run through
-`run_with_names.py`, never directly.**
+`--self-test`, as `plantoir-marking` section 6 says; check the pinned
+files' SHA-256 as that section says before the first use in a session.
+**Every script that reads the name mapping table is run through
+`run_with_names.py`, never directly.** The teacher's launcher runs these steps
+(`Put names on the sheets.command` on a Mac,
+`Put names on the sheets.bat` on Windows, each running
+`plantoir-marking`'s `teacher_only.py`): you write what is wanted in
+`<marking folder>/Names request.json`, ask the teacher to double-click it,
+and read what it printed in `Put names on the sheets - what it said.txt`
+in the marking folder. You never run a step that reads the table yourself,
+because you never know where the table is.
 
-1. **Before drafting**, find the longest first name's length, as a number
-   (never the name):
+1. **Before drafting**, have the longest first name's length found, as a
+   number (never the name), and the teacher's notes checked if there are
+   any:
 
-   ```text wrap
-   python3 -B .claude/skills/plantoir-marking/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --longest-first-name --table "<teacher-only>/Name Mapping Table.csv"
+   ```json
+   {"do": "comment-facts", "term": "Term 1"}
    ```
 
    `{first name}` is 12 characters. Draft each option to at most the limit
    less however much longer than 12 that name is, counted with the
    placeholders in.
-2. **After drafting and review** (section 8), put the names in:
+2. **After drafting and review** (section 8), have the names put in:
 
-   ```text wrap
-   python3 -B .claude/skills/plantoir-marking/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --comments "<marking folder>/<Term> Comments/Comments.json" --table "<teacher-only>/Name Mapping Table.csv" --out "<teacher-only>/<Term> Comments/Named" --limit 450 --count characters
+   ```json
+   {"do": "comments", "term": "Term 1", "limit": 450, "count": "characters"}
    ```
 
-   (the teacher's limit, and `--count bytes` when their system counts
-   bytes). It prints counts and identifiers only. It writes nothing at all
+   (the teacher's limit, and `"count": "bytes"` when their system counts
+   bytes). The launcher asks the teacher to type yes, then runs
+   `make_named_copies.py --comments` through the runner into `<Term>
+   Comments/Named` in the teacher-only folder. It prints counts and
+   identifiers only. It writes nothing at all
    when any draft needs fixing, and says which: a placeholder it does not
    know or cannot fill, a student it cannot find, a cite that is not that
    student's own record, or a draft that already holds a word from the
@@ -242,8 +259,7 @@ script that reads the name mapping table is run through
    either way, rewrite that option without the word, and do not repeat it.
    When it names a comment as over the limit, rewrite that option shorter
    and run it again, until it says every comment is within the limit.
-   Never trim a comment by cutting off its end. `--out` must be inside the
-   teacher-only folder that holds the mapping table. When a run is
+   Never trim a comment by cutting off its end. When a run is
    refused, the named files of an earlier run are renamed "earlier run, do
    not use", so the teacher never mistakes them for the current ones; tell
    the teacher. It also names, by identifier, any student of a drafted
@@ -289,8 +305,8 @@ length with the placeholders in.
 
 ## 9. Names in, on the teacher's word
 
-When the teacher has read the identifier drafts and says to, run step 2
-of section 7. The named comments are in the teacher-only folder, and
+When the teacher has read the identifier drafts and says to, ask for step
+2 of section 7. The named comments are in the teacher-only folder, and
 nothing in the teacher-only folder is opened, rendered or listed: tell the
 teacher where they are, that they hold the full names beside the
 identifiers for finding each student in the report system, and that each

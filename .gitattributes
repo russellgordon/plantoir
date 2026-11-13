@@ -86,3 +86,11 @@ website/updates/*.xml.signature  -text
 # is checked out with LF everywhere: the bytes on disk are the bytes git stores, which are the ones the
 # hash was taken from (750a fix review M5). scripts/test_marking_sheets.py checks the file has no CR.
 support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf
+
+# The teacher's own steps (#750, 750d) are pinned the same way: teacher_only.py and the two .command
+# launchers by their LF bytes everywhere, and the two .bat launchers by CRLF bytes everywhere, since cmd
+# reads a batch file's lines by CRLF (a label or a goto in a file with LF alone can be missed).
+# scripts/test_marking_teacher_run.py checks each file's line endings against these rules.
+support/agent_guidance/skills/plantoir-marking/scripts/teacher_only.py text eol=lf
+support/agent_guidance/skills/plantoir-marking/launchers/*.command text eol=lf
+support/agent_guidance/skills/plantoir-marking/launchers/*.bat text eol=crlf

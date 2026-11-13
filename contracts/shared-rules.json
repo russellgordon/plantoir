@@ -26710,7 +26710,17 @@
           "I draft; you decide.",
           "Before we start, four things about your students' privacy",
           "Whatever I read is sent to the AI service I run on",
-          "Please look through every page of it before I read anything: your look is what confirms the names are redacted, and I never open that file.",
+          "Your look is what confirms the names are redacted, and I never open that file.",
+          "I never ask where your teacher-only folder is",
+          "they reach the folder I read only after you have looked through every page of it and typed yes",
+          "Say them even when the teacher says they have read them",
+          "**Never ask where the teacher-only folder is, and never search for, list or open it.**",
+          "Never list the folder that holds the marking folder either",
+          "**Never run a launcher yourself.**",
+          "and never the teacher-only folder's path",
+          "a listing of the marking folder's parent folder shows the names of the files in it",
+          "A pin finds a well-meant change, such as an adapted copy; it would not catch someone who changed a file and every pin together.",
+          "Never run the script on a scan: you are never told where the scans are.",
           "A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.",
           "I will not repeat it in any message or file",
           "The files I write stay on this computer",
@@ -26725,12 +26735,10 @@
           "Never guess.",
           "It does NOT detect a page scanned upside down or shifted: the teacher sees that when looking through the papers.",
           "Any line that starts `Stopped:` means stop: nothing may be read",
-          "**Read no paper until the teacher has looked through the redacted papers and said yes.**",
-          "You never open that file yourself: a name the box missed would be in it.",
-          "a yes given before the papers were boxed does not count",
+          "**Read no paper until the teacher has looked through the redacted papers and typed yes.**",
+          "You never open the file they look through: it is in the teacher-only folder, and a name the box missed would be in it.",
           "**Before reading any paper, in any session, run the check**",
-          "The script cannot know who looked: it records that the teacher said yes.",
-          "**Run `--confirm` only straight after the teacher's own yes in this conversation, in reply to the ask, and never on your own judgement.**",
+          "The check cannot know who looked: it says the teacher typed yes in Box the papers, after the papers were put in one file.",
           "on a page scanned upside down the name line is at the foot, and on a page scanned shifted or shrunk part of the name can show just below the black box",
           "Both briefs begin by running `--verify`; a marker or reviewer whose check does not name its paper reads nothing.",
           "read only the files `--verify` names, never any other file in that folder",
@@ -26751,7 +26759,8 @@
           "Never call a draft final, finished or ready to submit",
           "Before we start, four things about your students' privacy",
           "Whatever I read is sent to the AI service I run on",
-          "I never open your name mapping table, a class list, your report system or an export from it, or anything in your teacher-only folder.",
+          "I never ask where your teacher-only folder is, and I never open your name mapping table, a class list, your report system or an export from it, or anything in that folder.",
+          "You never run a step that reads the table yourself, because you never know where the table is.",
           "**Never ask for, guess or write a student's pronouns or gender.**",
           "**Never put a name into a draft**, even one quoted from a student's work",
           "**ask what the school's report convention is**",
@@ -26771,7 +26780,7 @@
           "The files I write stay on this computer",
           "Please check that model training is turned off for the account you use with me",
           "**Never open the name mapping table, a class list, the report system",
-          "**Never open, list, render or search anything in the teacher-only folder**",
+          "**Never ask where the teacher-only folder is, and never search for, list or open it.**",
           "**Never write a name, a comment or a student's work into your memory",
           "even after the teacher has changed it",
           "cannot see a nickname, initials or a name that is not in the table",
@@ -38032,7 +38041,14 @@
           "scripts/redact_scans.py",
           "scripts/make_named_copies.py",
           "scripts/build_test_sheet.py",
-          "scripts/run_with_names.py"
+          "scripts/run_with_names.py",
+          "scripts/teacher_only.py"
+        ],
+        "launchers": [
+          "launchers/Box the papers.command",
+          "launchers/Put names on the sheets.command",
+          "launchers/Box the papers.bat",
+          "launchers/Put names on the sheets.bat"
         ],
         "templates": [
           "templates/Marking Settings.md",
@@ -38066,7 +38082,10 @@
         ],
         "uses": [
           "plantoir-marking/scripts/make_named_copies.py",
-          "plantoir-marking/scripts/run_with_names.py"
+          "plantoir-marking/scripts/run_with_names.py",
+          "plantoir-marking/scripts/teacher_only.py",
+          "plantoir-marking/launchers/Put names on the sheets.command",
+          "plantoir-marking/launchers/Put names on the sheets.bat"
         ],
         "mentionedBy": [
           "plantoir-marking"
@@ -38085,11 +38104,12 @@
       "rule": "Where marking lives (#750, 750a). Two folders per course, both chosen by the teacher and both outside the working folder: the marking folder (the assistant's: settings, adapted scripts, blanked papers, marks records, identifier sheets) and the teacher-only folder beside it (the mapping table, the originals, the check files, the named copies, the runner's quarantine), which only scripts write and the assistant never opens, lists or renders. The pointer `pointerFile.path` holds paths only and travels with the course (a backup, an archive, a restore) inside .internal, which is never built into a site. A marking folder inside the working folder is refused (Russell, 2026-11-12: it could be built into a site or copied with a course), by the skill's words and, since the 750a review (L5), by every script, which stops when a folder it is given has a courses/ and a .toolchain/ above it. A folder kept in sync by a service is said once and its path recorded in the list syncAccepted once the teacher says that is fine, so a new folder is asked about again (750a review L4); the assistant ASKS rather than infers, because a Mac's Desktop and Documents folders can be in iCloud with ordinary-looking paths (750 plan review M5). No rule about Documents (Russell, 2026-11-12).",
       "offered": {
         "marking": "~/Marking/<CODE>/",
-        "teacherOnly": "~/Marking/<CODE> - Teacher Only/"
+        "teacherOnly": "a folder beside the marking folder that the teacher makes and names (for example <CODE> - Teacher Only), whose path the assistant never asks for and never records (750d)"
       },
       "pointerFile": {
         "path": "courses/<CODE>/.internal/marking/marking.json",
-        "keys": ["folder", "teacherOnlyFolder", "syncAccepted", "teacherSaid", "recorded"]
+        "keys": ["folder", "syncAccepted", "teacherSaid", "recorded"],
+        "neverHolds": "the teacher-only folder's path (750d: the key teacherOnlyFolder was removed)"
       },
       "neverInside": "the working folder",
       "neverOpenedByTheAssistant": ["the teacher-only folder", "the name mapping table", "a class list", "a marks export from the school's system", "an original scan"],
@@ -38117,7 +38137,7 @@
       "mayChangeMark": "# MARK: - What you may change for this teacher",
       "mustNotChangeMark": "# MARK: - What must not change",
       "selfTest": "--self-test",
-      "notAStartingPoint": ["scripts/run_with_names.py", "plantoir-test-authoring: scripts/check_kit.py"],
+      "notAStartingPoint": ["scripts/run_with_names.py", "scripts/teacher_only.py", "launchers/Box the papers.command", "launchers/Put names on the sheets.command", "launchers/Box the papers.bat", "launchers/Put names on the sheets.bat", "plantoir-test-authoring: scripts/check_kit.py"],
       "runner": {
         "rule": "run_with_names.py reads the mapping table itself and builds every form a name could take (each name part of two letters or more as a whole word; the whole name, the parts run together with and without . - _, first initial and last name, e-mail addresses and their local part, handles, a repository address's user and repository, anywhere), compares without regard to case or accents (750a review M4), runs the command IN the watched folder so a relative path is watched (M5), and BEFORE it passes anything on looks at every new or changed file, folder and link there (not following links): its name, and what the standard library can read of it (UTF-8 and UTF-16 text, gzip, a zip's members such as an xlsx or docx, a PNG's text chunks, a PDF's text, metadata and XMP through Poppler). One holding a name, or a folder named by one, is moved whole to the teacher-only Quarantine/. It reports THREE counts, never one: read with no word from the table found (never called clean, 752 review H1), held a word from the table and moved, and could not be read so NOT checked and moved unread, by kind (a link, which is moved as a link and never followed; what a picture shows; a PDF Poppler cannot read, broken or locked, whose raw bytes are still searched; any other file that is not text), so the assistant cannot open an unread file, and the skill says never to (750a fix review H3, M1, M2: a link to the mapping table was 'read and clean', as were a broken PDF and big-endian UTF-16 with no mark); UTF-16 is read both ways; a name part of two or three letters counts only beside another part of the same name, a form of fewer than six letters only as a whole word, and only a folder the run made or wrote into is moved (M3: 'Ho, Ed' withheld 'finished', and an untouched 'June Exam' folder was moved); and it exits 1 when anything was withheld, moved or not checked (750a review H3: the first runner said 'checked, 0 held a name' of an xlsx, a gzip file, UTF-16 text, a PNG's text chunk and a PDF's title that each held one, and left folders named by a name behind). The skill names the runner's SHA-256 and has the assistant check it before use, since it can be edited in place until Plantoir next refreshes the folder (L6). It refuses a table or a quarantine folder inside the watched folder. It is a safety net, not a guarantee: it cannot know a name the table does not hold, see what a picture shows, or stop a script run without it or writing elsewhere (750 plan review R3). A name part that is also an ordinary word (May, Will) withholds every line holding that word too, which is the safe direction, and the runner says it may be a false alarm (L3). Since the 752 fix review (H1) its comparison is ONE block (\"The name comparison\") carried byte for byte in make_named_copies.py, so --check-file and --comments answer as it does; it finds whole words as \\w+, as runs of letters and split where a small letter meets a capital, and matches every part of six letters or more inside another word, so Ixo_feedback.txt and TestpartFeedback.txt are moved, which they were not before; its count line says how many were read and held none of the forms of the table's names, and its last line that a nickname or a name not in the table cannot be seen.",
         "says": "This is a safety net, not a guarantee"
@@ -38153,7 +38173,7 @@
           {"variant": "the last page landscape", "expect": "stopped"}
         ]
       },
-      "teacherFiles": ["Redacted papers to look through.pdf", "Batch.json", "Teacher confirmed.json", "Papers to name.pdf"],
+      "teacherFiles": ["Redacted papers to look through.pdf", "Papers to name.pdf"],
       "rejected": [
         "a full-width band (750 plan v1): measured, it either blanks the test's title or leaves no room for a shifted scan",
         "fractions of the page (the kit's tool): the box moves on legal paper",
@@ -38164,6 +38184,73 @@
         "a box only as wide as the name blank: a surname after a gap or on the Date line survived it (750a review H2); the box runs margin to margin, as the teacher's own tool's generous box does",
         "a check sheet of page tops: the teacher looks through the full papers instead (Russell, 2026-11-12); one file to look through is simpler than two",
         "Pillow, ImageMagick, PyMuPDF: not on a teacher's computer; Poppler and the standard library suffice"
+      ]
+    },
+    "teacherRun": {
+      "rule": "#750, piece 750d: the teacher runs the two steps that touch names. Six trials of the 750a skill with two outside assistants (Claude Code and Codex, 2026-11-13) found an assistant's FIRST command listing the teacher-only folder, before it had said anything, which put an invented student's name from a misnamed scan into its transcript; the skill's words had said never to. The adversarial review of the hardening plan then measured that every wall an assistant is asked to put up for itself can be taken down by it or is put up too late (Claude Code deny rules missed 7 of 17 listing shapes, rg --files among them; a Codex sandbox mode silently dropped a permissions profile). So the design changes who runs the steps, rather than adding checks: the assistant is never told where the teacher-only folder is. It records the marking folder only (`folders.pointerFile.keys`), copies the four `launchers` into the marking folder with `skillFolderFile` naming the skill folder, adapts the boxing script to the teacher's blank test and runs its self-test and --box-from on the blank only, and writes `boxRequest` (the blank, the adapted script, the options in `boxOptions` and nothing else, and optionally a whole class in one scan). The TEACHER double-clicks Box the papers. In its own window (a terminal: `teacher_only.py` refuses to run without one, and so does the launcher, since an assistant's command has none) it checks the SHA-256 of teacher_only.py and the runner, asks for the teacher-only folder (dragged into the window, or the system's own folder chooser on Return), boxes the originals through the adapted script and the runner into `holding` on the teacher's side, and teacher_only.py builds ONE file of exactly the holding folder, a cover first carrying `privacyHeading` and the four `privacyPoints` word for word, then each paper after a page naming its identifier. It prints identifiers and counts only, with the teacher-only folder's path put back as 'your teacher-only folder' in every line, and asks the teacher to type yes once they have looked through every page. Only on yes do the papers move into '<Assessment>/Redacted' in the marking folder, with `record` written LAST (identifiers and SHA-256, never a path); on no, or a closed window, nothing moves (`answerCases`). `teacher_only.py --verify '<marking folder>/<Assessment>'` is the assistant's check before any read and every brief's first step: it reads only the marking folder and exits 0 only when Redacted holds exactly what the record lists. The named step and every report-comments step that reads the table are the second launcher, the same way, from `namesRequest` (`namesRequestCases`), with what it printed written to the marking folder (`said`) for the assistant to read. THE LIMIT, said in the skill and doc 09: the pins detect a well-meant change, not a deliberate one (an assistant that edited a pinned file and every pin together would not be caught), and an assistant that set out to find the teacher-only folder could look for it; the protection is that the teacher starts these steps and the assistant is never told the path. `residualRisk` is the one Russell's ruling leaves.",
+      "launchers": ["Box the papers.command", "Put names on the sheets.command", "Box the papers.bat", "Put names on the sheets.bat"],
+      "pinned": ["scripts/run_with_names.py", "scripts/teacher_only.py", "launchers/Box the papers.command", "launchers/Put names on the sheets.command", "launchers/Box the papers.bat", "launchers/Put names on the sheets.bat"],
+      "skillFolderFile": "Skill folder.txt",
+      "boxRequest": "Box request.json",
+      "namesRequest": "Names request.json",
+      "said": ["Box the papers - what it said.txt", "Put names on the sheets - what it said.txt"],
+      "holding": "Holding",
+      "record": "Teacher looked.json",
+      "boxOptions": ["--label", "--box", "--dpi", "--identifiers"],
+      "privacyHeading": "Before we start, four things about your students' privacy:",
+      "privacyPoints": [
+        "Whatever I read is sent to the AI service I run on, so that I can work on it. That includes every boxed paper. Please turn off model training for the account you use with me (on claude.ai: Settings, Privacy, \"Help improve Claude\"; on ChatGPT: Settings, Data controls, \"Improve the model for everyone\", where offered; as of November 2026, so check the names), check what your provider keeps for your kind of account, and check that your school or board allows student work to be processed by this service.",
+        "I work with identifiers only (Student A, Student B). I never ask where your teacher-only folder is, and I never open your name mapping table, a class list, an original scan, or anything in that folder. You run the two steps that touch names yourself, by double-clicking a file in your marking folder. The first boxes the name line at the top of each page whose blank test has a name blank and puts all the boxed papers in one file for you; they reach the folder I read only after you have looked through every page of it and typed yes. Your look is what confirms the names are redacted, and I never open that file. A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.",
+        "If I see what looks like a name anywhere, I will not repeat it in any message or file. I will tell you only the identifier and the page, and leave that page until you say.",
+        "The files I write stay on this computer, in the folders you choose. I never send, upload or publish anything; giving work back to students is yours to do."
+      ],
+      "typedPathCases": [
+        {"typed": "/Users/teacher/Marking/ABC9X\\ -\\ Teacher\\ Only ", "windows": false, "folder": "/Users/teacher/Marking/ABC9X - Teacher Only", "why": "A folder dragged into a Mac's Terminal: each space written as a backslash and a space, and a space after it."},
+        {"typed": "'/Users/teacher/Marking/ABC9X - Teacher Only'", "windows": false, "folder": "/Users/teacher/Marking/ABC9X - Teacher Only", "why": "A path typed in single quotes."},
+        {"typed": "/Users/teacher/Marking/Teacher_Only", "windows": false, "folder": "/Users/teacher/Marking/Teacher_Only", "why": "A path typed as it is."},
+        {"typed": "\"C:\\Users\\teacher\\Marking\\ABC9X - Teacher Only\"", "windows": true, "folder": "C:\\Users\\teacher\\Marking\\ABC9X - Teacher Only", "why": "A folder dragged into a Windows console: the path in double quotes, its backslashes kept."},
+        {"typed": "C:\\Marking\\Teacher Only", "windows": true, "folder": "C:\\Marking\\Teacher Only", "why": "On Windows a backslash is a folder separator, never an escape."},
+        {"typed": "   ", "windows": false, "folder": "", "why": "Return alone: the system's folder chooser is shown instead."}
+      ],
+      "answerCases": [
+        {"answers": ["yes"], "moved": true},
+        {"answers": ["YES"], "moved": true},
+        {"answers": ["  Yes  "], "moved": true},
+        {"answers": ["no"], "moved": false},
+        {"answers": ["n"], "moved": false},
+        {"answers": ["y", "no"], "moved": false, "why": "Anything but yes or no is asked again; y is not yes."},
+        {"answers": ["yes please", "yes"], "moved": true, "why": "Asked again, then yes."},
+        {"answers": [], "moved": false, "why": "The window closed, or the input ended: nothing moves."}
+      ],
+      "boxOptionCases": [
+        {"options": ["--label", "Student Name"], "accepted": true},
+        {"options": ["--box", "0.3,0.2,8.2,0.9", "--dpi", "150"], "accepted": true},
+        {"options": ["--identifiers", "^Student [A-Z]{1,2}$"], "accepted": true},
+        {"options": ["--check-dir", "/somewhere"], "accepted": false, "why": "The boxing takes no folder from the request: every folder is the launcher's."},
+        {"options": ["--label"], "accepted": false, "why": "Options come in pairs."},
+        {"options": ["--label", "--box"], "accepted": false, "why": "A value that is itself an option is refused."},
+        {"options": ["--confirm", "Redacted"], "accepted": false, "why": "The teacher's yes is never the request's to give."}
+      ],
+      "namesRequestCases": [
+        {"request": {"do": "check-table"}, "accepted": true, "writesNames": false},
+        {"request": {"do": "sheets", "assessment": "Unit 1 Test"}, "accepted": true, "writesNames": true},
+        {"request": {"do": "sheets", "assessment": "../Unit 1 Test"}, "accepted": false, "why": "An assessment is one folder in the marking folder."},
+        {"request": {"do": "sheets", "assessment": "Not There"}, "accepted": false},
+        {"request": {"do": "comment-facts", "term": "Term 1"}, "accepted": true, "writesNames": false},
+        {"request": {"do": "comments", "term": "Term 1", "limit": 450, "count": "characters"}, "accepted": true, "writesNames": true},
+        {"request": {"do": "comments", "term": "Term 1"}, "accepted": false, "why": "No limit: the comments are counted after the names go in."},
+        {"request": {"do": "comments", "term": "Term 1", "limit": 450, "count": "words"}, "accepted": false},
+        {"request": {"do": "document", "assessment": "Unit 1 Test", "file": "Results/Class Results.tex"}, "accepted": true, "writesNames": true, "why": "For 750c's results document, so its merge needs no change to teacher_only.py."},
+        {"request": {"do": "grades", "assessment": "Unit 1 Test", "file": "../../Grades.csv"}, "accepted": false},
+        {"request": {"do": "publish"}, "accepted": false, "why": "Only the steps listed here."}
+      ],
+      "residualRisk": "Russell's ruling puts the teacher-only folder beside the marking folder, so a listing of the marking folder's PARENT folder shows the names of the files in it. Scans are named by identifier, so only a misnamed scan (or a file the teacher named after a student) would show a name that way. Nothing is built against it beyond the skill's words; the director asks whether the review's proposal covers it.",
+      "rejected": [
+        "deny rules and a sandbox profile written into each assistant's settings (the hardening plan's guard): measured by the plan review, Claude Code deny rules missed 7 of 17 listing shapes (rg --files, python3 -c, a relative glob), a Codex sandbox mode silently replaced the profile, the profile let the assistant rewrite its own wall, and the guard was installed by the party it locks, after the first command it was meant to stop",
+        "a three-word code printed on the combined file's cover and typed back: the assistant could read the cover through the runner, and the yes typed in a window the assistant did not start needs no code (plan review M1)",
+        "a script that writes into an assistant's configuration: a second, weaker path to the teacher's own files than the app's yes-sheet (plan review M2)",
+        "--confirm and --verify in the adaptable boxing script: Codex rewrote its copy and that copy's self-test in a trial, so the check of the teacher's look moved into the never-adapted teacher_only.py",
+        "remembering the teacher-only folder between runs: any file that held its path is a file an assistant could read, so the teacher chooses it every time"
       ]
     },
     "namedCopies": {

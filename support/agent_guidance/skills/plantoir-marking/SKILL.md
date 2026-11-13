@@ -1,6 +1,6 @@
 ---
 name: plantoir-marking
-description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and keeps students' names on this computer with scripts, boxes the name line on every scanned page whose blank test has a name blank, has the teacher look through the boxed papers and records their yes before any paper is read, drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by script, on the teacher's word.
+description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and never asks where the teacher-only folder is; the teacher double-clicks a file that boxes the name line on every scanned page whose blank test has a name blank, looks through the boxed papers, and types yes before any paper reaches the assistant; drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by a second file the teacher double-clicks.
 ---
 
 # Marking a test from scanned papers, with students' names kept on this computer
@@ -29,12 +29,15 @@ Every mark, level and comment I draft is a suggestion. Grading is your professio
 ## 2. Privacy first
 
 Before any student's work is opened, and before any scan is boxed, say
-these four points to the teacher, in these words or very close to them:
+these four points to the teacher, in these words or very close to them.
+Say them even when the teacher says they have read them: the same four
+points are on the first page of the file of boxed papers they look
+through, but that comes later.
 
 ```text wrap
 Before we start, four things about your students' privacy:
 1. Whatever I read is sent to the AI service I run on, so that I can work on it. That includes every boxed paper. Please turn off model training for the account you use with me (on claude.ai: Settings, Privacy, "Help improve Claude"; on ChatGPT: Settings, Data controls, "Improve the model for everyone", where offered; as of November 2026, so check the names), check what your provider keeps for your kind of account, and check that your school or board allows student work to be processed by this service.
-2. I work with identifiers only (Student A, Student B). I never open your name mapping table, a class list, an original scan, or anything in your teacher-only folder. Before I read a scan, a script boxes the name line at the top of each page whose blank test has a name blank, and puts all the boxed papers in one file for you. Please look through every page of it before I read anything: your look is what confirms the names are redacted, and I never open that file. A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.
+2. I work with identifiers only (Student A, Student B). I never ask where your teacher-only folder is, and I never open your name mapping table, a class list, an original scan, or anything in that folder. You run the two steps that touch names yourself, by double-clicking a file in your marking folder. The first boxes the name line at the top of each page whose blank test has a name blank and puts all the boxed papers in one file for you; they reach the folder I read only after you have looked through every page of it and typed yes. Your look is what confirms the names are redacted, and I never open that file. A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.
 3. If I see what looks like a name anywhere, I will not repeat it in any message or file. I will tell you only the identifier and the page, and leave that page until you say.
 4. The files I write stay on this computer, in the folders you choose. I never send, upload or publish anything; giving work back to students is yours to do.
 ```
@@ -42,15 +45,20 @@ Before we start, four things about your students' privacy:
 Then keep to these, and when asked to cross one, say no with its reason in
 one line:
 
+- **Never ask where the teacher-only folder is, and never search for, list or open it.**
+  You are never told where it is, and you never need to be: the teacher
+  runs the two steps that read it, by double-clicking a file (sections 7
+  and 12). Never list the folder that holds the marking folder either: the
+  teacher-only folder sits beside it, and a listing there shows the names
+  of the files in it. If the teacher tells you its path anyway, do not use
+  it, write it down or repeat it, and say you do not need it.
 - **Never open the name mapping table, a class list, or a marks export
   from the school's system**, even when the teacher asks: the names would
-  then be sent to the AI service. Offer the script that does the job
-  instead, run through the runner (section 6): `make_named_copies.py
-  --check-table` to say whether the table is right (counts only), or the
-  named step (section 12).
-- **Never open, list, render or search anything in the teacher-only
-  folder** (section 3): not the originals, not the check files, not the
-  named copies. Scripts write there; you never read there.
+  then be sent to the AI service. Offer the step that does the job
+  instead: "Put names on the sheets" with the check of the table (section
+  12), which answers in counts only, or the named step.
+- **Never run a launcher yourself.** "Box the papers" and "Put names on
+  the sheets" are the teacher's: they stop when an assistant runs them.
 - **Never write a name, or a student's work, into your memory, a note, a
   log, a brief, a summary, `.internal`, or anything under `courses/`.**
   Identifiers only, everywhere you write.
@@ -68,16 +76,19 @@ teacher which file by its path, and stop using that file.
 
 ## 4. Where things live
 
-Two folders per course, both chosen by the teacher, both OUTSIDE this
-working folder:
+Two folders per course, both OUTSIDE this working folder:
 
-- **the marking folder**, the one you work in: settings, adapted scripts,
-  boxed papers, marks records and identifier sheets. Offer
-  `~/Marking/<CODE>/` (in their home folder) as a default.
-- **the teacher-only folder**, beside it, which only scripts write and you
-  never open: the name mapping table, the original scans, the check files
-  and the named copies. Offer `~/Marking/<CODE> - Teacher Only/`, and let
-  the teacher choose where it goes.
+- **the marking folder**, the one you work in, chosen with the teacher:
+  settings, adapted scripts, the two launchers the teacher double-clicks,
+  the boxed papers once the teacher has said yes, marks records and
+  identifier sheets. Offer `~/Marking/<CODE>/` (in their home folder) as a
+  default.
+- **the teacher-only folder**, which the teacher makes beside it and names
+  as they like (for example `<CODE> - Teacher Only`), and which you are
+  never told about: the name mapping table, the original scans, the file
+  of boxed papers they look through, and the named copies. Tell the teacher
+  to make it and to put their name mapping table in it, and that you do
+  not need to know where it is: the launchers ask them for it each time.
 
 **Never set up a marking folder inside the working folder**, and refuse
 when asked: it could be built into a class website or copied with a
@@ -90,59 +101,75 @@ Google Drive, a school's own storage) stores the papers and the name table
 with that service too. The path often says so (`Library/Mobile Documents`,
 `CloudStorage`, `OneDrive`, `Dropbox`), but not always: a Mac's Desktop and
 Documents folders may be in iCloud while their paths look ordinary. So ask
-the teacher whether the folder they chose is kept in sync. If it is, say
+the teacher whether the marking folder they chose, and the place beside it
+where their teacher-only folder goes, are kept in sync. If they are, say
 once, in plain words, that the papers and the name table will be stored by
 that service as well, and let them decide (a school's own storage may be
 the approved place). When they say that is fine, record it, and do not
 raise it again for that folder.
 
-Record the two folders in `courses/<CODE>/.internal/marking/marking.json`,
+Record the marking folder in `courses/<CODE>/.internal/marking/marking.json`,
 creating the `marking` folder inside `.internal`, and tell the teacher you
 did:
 
 ```json
-{"folder": "/Users/name/Marking/SNC2D", "teacherOnlyFolder": "/Users/name/Marking/SNC2D - Teacher Only", "syncAccepted": [], "teacherSaid": "keep it in Marking in my home folder", "recorded": "2026-11-12"}
+{"folder": "/Users/name/Marking/SNC2D", "syncAccepted": [], "teacherSaid": "keep it in Marking in my home folder", "recorded": "2026-11-12"}
 ```
 
-Paths only, never a name. `syncAccepted` lists each synced folder's path
-once the teacher has said it is fine; a folder not in the list is asked
-about again. This is one of the places under a folder whose
-name starts with a dot that a Plantoir skill may write; leave everything
-else under `.internal` alone. Read it first next time: if it is there and
-its folders exist, say them back ("I'll keep your marking in ... and your
-teacher-only files in ..."); if not, ask again.
+Paths only, never a name, and never the teacher-only folder's path.
+`syncAccepted` lists the marking folder's path once the teacher has said
+its sync is fine; a folder not in the list is asked about again. This is
+one of the places under a folder whose name starts with a dot that a
+Plantoir skill may write; leave everything else under `.internal` alone.
+Read it first next time: if it is there and its folder exists, say it back
+("I'll keep your marking in ..."); if not, ask again.
 
 Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
 
 ```text wrap
 <marking folder>/
   Marking Settings.md                       this teacher's settings and the rulings they said yes to
+  Box the papers.command                    the launchers the teacher double-clicks (.bat on Windows)
+  Put names on the sheets.command
+  Skill folder.txt                          one line: where this skill's folder is, for the launchers
+  Names request.json                        the step that needs names, asked for (section 12)
+  Put names on the sheets - what it said.txt   what that step printed, for you to read
   Scripts/                                  the scripts, copied from this skill and adapted
-  <Assessment>/Redacted/Section N/          boxed papers, Student A.pdf
+  <Assessment>/Box request.json             the blank test and the boxing script, for Box the papers
+  <Assessment>/Box the papers - what it said.txt   what the boxing printed, for you to read
+  <Assessment>/Redacted/Section N/          boxed papers, Student A.pdf, there only after the teacher's yes
+  <Assessment>/Teacher looked.json          what the teacher said yes to: identifiers and SHA-256
   <Assessment>/Marks/Section N/             marks records, Student A.json
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
   <Assessment>/Briefs/                      the marker and reviewer briefs
   <Assessment>/Marking Rules Applied.md     every ruling, numbered
-<teacher-only folder>/
+the teacher-only folder (you never see it):
   Name Mapping Table.csv                    section, identifier, name (and optional columns)
   <Assessment>/Originals/Section N/         the scans, Student A.pdf
-  <Assessment>/Check/                       the redacted papers to look through, the record of the teacher's yes
+  <Assessment>/Holding/                     the boxed papers until the teacher's yes
+  <Assessment>/Check/                       the one file of boxed papers to look through
   <Assessment>/Named/                       the named copies
   Quarantine/                               anything the runner caught
 ```
 
 Because the marking folder is outside the working folder, the program you
 run in (Claude Code, Codex) asks the teacher's permission before you work
-there: say that before it happens. Ask for the marking folder only, never for the teacher-only
-folder; scripts reach that one, run as commands.
+there: say that before it happens. Ask for the marking folder only.
+
+**What this does not stop.** The teacher-only folder sits beside the
+marking folder, so a listing of the marking folder's parent folder shows
+the names of the files in it. Scans are named by identifier, so only a
+misnamed scan would show a name that way. That is one more reason never to
+list the folder that holds the marking folder.
 
 ## 5. What to have ready
 
 Say what is needed in your first reply, briefly:
 
 - the scans, one PDF per student named by identifier (`Student A.pdf`), in
-  `Originals/Section N/` in the teacher-only folder. A whole class scanned
-  in one file is fine too (section 7);
+  `<Assessment>/Originals/Section N/` in the teacher-only folder ("Box the
+  papers" makes that folder the first time, if it is not there). A whole
+  class scanned in one file is fine too (section 7);
 - the blank test, as printed, with nothing written on it (the kit's
   version PDF);
 - the marking kit from the `plantoir-test-authoring` skill (`Marking
@@ -151,10 +178,10 @@ Say what is needed in your first reply, briefly:
   format and check it with its `scripts/check_kit.py`;
 - the list of what was taught, or the course pages, for the links on the
   sheets;
-- the name mapping table, which you never open: a CSV with the columns
-  `section`, `identifier`, `name`, and optionally `first name`, `paper`,
-  `email`. If the teacher has none, tell them how to make it in a
-  spreadsheet, with an invented example:
+- the name mapping table, in the teacher-only folder, which you never
+  open: a CSV with the columns `section`, `identifier`, `name`, and
+  optionally `first name`, `paper`, `email`. If the teacher has none, tell
+  them how to make it in a spreadsheet, with an invented example:
 
   ```text wrap
   section,identifier,name,first name
@@ -176,35 +203,52 @@ script opens with two blocks: "What you may change for this teacher", and
 fails, do not run the script; fix it first. Say plainly that a self-test
 checks only the paths it knows, so it is a check, not a proof.
 
-Two files are NOT starting points: `scripts/run_with_names.py` (below) and
-the `plantoir-test-authoring` skill's `scripts/check_kit.py`. Run both from
-their skill folders, and never copy or change them. Plantoir puts the skill
-folder back as it shipped only when it next refreshes the working folder,
-so before the first use in a session, check the runner is the one that
-shipped:
+Some files are NOT starting points: `scripts/run_with_names.py`,
+`scripts/teacher_only.py`, the four launchers in `launchers/` (below), and
+the `plantoir-test-authoring` skill's `scripts/check_kit.py`. Never copy
+the two scripts or change any of them: the launchers run the two scripts
+from this skill's folder. Plantoir puts the skill folder back as it shipped
+only when it next refreshes the working folder, so before the first use in
+a session, and again after copying the launchers into the marking folder,
+check them:
 
 ```text wrap
-python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
+python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').read()).hexdigest() + '  ' + os.path.basename(path)) for path in sys.argv[1:]]" .claude/skills/plantoir-marking/scripts/run_with_names.py .claude/skills/plantoir-marking/scripts/teacher_only.py .claude/skills/plantoir-marking/launchers/*
 ```
 
-It must print `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`. If it does not, stop and tell the teacher
-the runner has been changed; do not run any script that reads the table.
+It must print these lines, in any order:
+
+- `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
+- `364fb9bb87b691d3f9c650e98f2c2180933a3daacda366cfd302d537ac2c87f1`  teacher_only.py
+- `8ad3b7da63ba81f8816ea998a0ac6b9d8f79254e7682a961a9b2cafb6a8a5f20`  Box the papers.command
+- `a6e57807c4d203388aebcbf82c25aef28d31c5139907abc24a438625a76f01b3`  Put names on the sheets.command
+- `c3ecf9c66cc82b4859886da597195947823ff261db897c2d8c20f0680266f7b7`  Box the papers.bat
+- `3899033a260d062a98340ddb6922d0313a306980f7b68418274f54f0b0d9579d`  Put names on the sheets.bat
+
+Run it on the copies in the marking folder too (give their paths). If any
+line differs, stop and tell the teacher which file has been changed; do
+not copy the launchers, and do not run any script that reads the table.
+A pin finds a well-meant change, such as an adapted copy; it would not
+catch someone who changed a file and every pin together. The protection is
+that the teacher starts these steps and you are never told where the
+teacher-only folder is.
 
 **Every script that reads the name mapping table is run through
-`run_with_names.py`, never directly.** It reads the table itself, runs the
-script in the marking folder with everything it prints captured, passes on
-only the lines that hold no word from the table (accents and case
-ignored), and moves any new file or folder in the marking folder that holds
-one, in its text or its name, to the teacher-only `Quarantine/` folder. Its
-last lines give three counts: files it read with no word from the table
-found in them, files that
-held a word from the table and were moved, and files it COULD NOT READ (a
-link, a picture, a PDF Poppler cannot read, anything else that is not
-text), which were not checked and were moved there unread. **Never open a
-file the runner could not read**: tell the teacher how many, of which
-kinds, and that they can look at them in the quarantine folder. It exits 1
-when anything was held back, moved or not checked. It is a safety net, not
-a guarantee: it catches the names in the table, in what the script printed
+`run_with_names.py`, never directly.** The launchers do that: you never
+run such a script yourself, because you never know where the table is. The
+runner reads the table itself, runs the script in the marking folder with
+everything it prints captured, passes on only the lines that hold no word
+from the table (accents and case ignored), and moves any new file or folder
+in the marking folder that holds one, in its text or its name, to the
+teacher-only `Quarantine/` folder. Its last lines, which you read in the
+launcher's "what it said" file, give three counts: files it read with no
+word from the table found in them, files that held a word from the table
+and were moved, and files it COULD NOT READ (a link, a picture, a PDF
+Poppler cannot read, anything else that is not text), which were not
+checked and were moved there unread. **Never open a file the runner could
+not read**: tell the teacher how many, of which kinds, and that they can
+look at them in the quarantine folder. It is a safety net, not a
+guarantee: it catches the names in the table, in what the script printed
 and what it wrote in the marking folder, and nothing else. Tell the
 teacher that, in those words, the first time. A line held back because it
 holds a word from the table that is also an everyday word (a name such as
@@ -216,19 +260,22 @@ not checkable: it, too, may be a false alarm.
 (`python3 -B`; `python` or `py` on Windows, where `python3` may not exist.
 `.agents/` works in place of `.claude/` in every path here.)
 
-## 7. Scans: box them, the teacher looks through them, then the papers
+## 7. Scans: the teacher boxes them, looks through them, then the papers
 
 Russell, 2026-11-12: "script runs, teacher checks the papers, confirms
-names are redacted, then agent based marking begins. Simple." The script
-places the boxes and puts the boxed papers in one file; the teacher's look
-through every page is what confirms the names are redacted.
+names are redacted, then agent based marking begins. Simple." You set the
+boxing up. The teacher runs it, in a window of its own, by double-clicking
+a file; their look through every page is what confirms the names are
+redacted, and only their yes in that window moves the boxed papers to
+where you read.
 
 1. **Copy `scripts/redact_scans.py`** into `Scripts/` and adapt it if the
    teacher's header is unusual. It finds the name blank on each page of
    the BLANK test, never a student's paper: a label such as Name, Student
    Name or Nom, in any case, followed by a place to write (a line,
    underscores, dots, a table cell, a frame). It boxes that whole line,
-   margin to margin, with room above it. Check what it finds first:
+   margin to margin, with room above it. Check what it finds on the blank
+   test, which holds no student's writing, then run its `--self-test`:
 
    ```text wrap
    python3 -B "<marking folder>/Scripts/redact_scans.py" --box-from "<blank test>.pdf"
@@ -239,71 +286,75 @@ through every page is what confirms the names are redacted.
    Name"`, or the box in inches from the top-left with `--box
    left,top,right,bottom`. Never guess. A blank test that is itself a scan
    has no text to read: give `--box`. You may render the blank test to
-   measure its name line (it holds no student's writing), or ask the
-   teacher; `--box-from` with `--box` shows the box before any paper is
-   boxed. A name blank in a footer is not
-   found, and a second name line (Partner Name) is not boxed.
-2. **A whole class in one scan:** split it first, into the teacher-only
-   folder. The script writes `Paper 01.pdf`, `Paper 02.pdf` ... in the
-   order scanned, and `Papers to name.pdf` (the first page of each) for the
-   teacher, who fills in a `paper` column in the mapping table. Then the
-   papers are renamed from that column, through the runner:
+   measure its name line, or ask the teacher; `--box-from` with `--box`
+   shows the box before any paper is boxed. A name blank in a footer is not
+   found, and a second name line (Partner Name) is not boxed. Never run the
+   script on a scan: you are never told where the scans are. Keep its
+   handling of a file not named like an identifier (left alone and
+   counted) as it is.
+2. **Set up the launchers**, once per marking folder: copy the two
+   launchers from `launchers/` beside this file into the marking folder
+   (on a Mac `Box the papers.command` and `Put names on the sheets.command`,
+   then make them runnable with `chmod +x`; on Windows the two `.bat`
+   files), write the full path of this skill's folder (the folder this file
+   is in) on one line into `<marking folder>/Skill folder.txt`, and check
+   the copies' SHA-256 (section 6).
+3. **Write `<marking folder>/<Assessment>/Box request.json`**, with the
+   blank test, your adapted script and the options `--box-from` settled
+   (only `--label`, `--box`, `--dpi` and `--identifiers`):
 
-   ```text wrap
-   python3 -B "<marking folder>/Scripts/redact_scans.py" --stack "<teacher-only>/<Assessment>/Whole class.pdf" --pages-per-paper 4 --into "<teacher-only>/<Assessment>/Originals/Section 1" --check-dir "<teacher-only>/<Assessment>/Check"
-   python3 -B <this skill>/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/redact_scans.py" --name-papers "<teacher-only>/Name Mapping Table.csv" --section 1 --into "<teacher-only>/<Assessment>/Originals/Section 1"
+   ```json
+   {"blank": "/Users/name/Teaching/SNC2D/Unit 2 Test/Version A.pdf", "script": "Scripts/redact_scans.py", "options": ["--label", "Student Name"]}
    ```
 
-3. **Box the papers.**
+   **A whole class in one scan:** add `"wholeClass": {"file": "Whole
+   class.pdf", "pagesPerPaper": 4, "section": 1}`, and tell the teacher to
+   put that file, so named, in the assessment's folder in their
+   teacher-only folder. The first double-click splits it into `Paper
+   01.pdf` and so on in the order scanned and writes `Papers to name.pdf`
+   (the first page of each) for them; they fill in a `paper` column in
+   their name mapping table, and the next double-click names the papers
+   from it and boxes them.
+4. **Ask the teacher to double-click it**, in these words or very close to
+   them:
 
    ```text wrap
-   python3 -B "<marking folder>/Scripts/redact_scans.py" "<teacher-only>/<Assessment>/Originals" "<marking folder>/<Assessment>/Redacted" --blank "<blank test>.pdf" --check-dir "<teacher-only>/<Assessment>/Check"
+   When your scans are in your teacher-only folder (one PDF per student, named Student A.pdf and so on, in "<Assessment>/Originals/Section 1"), please double-click "Box the papers" in your marking folder. It asks for your teacher-only folder in its own window, boxes the name line on every page, and opens one file of the boxed papers for you to look through; its first page has the four privacy points. Please look through every page of every paper. Look for any part of a name, and anything else that says who wrote it (a signature, initials, a student number). It does not check how each page was scanned: on a page scanned upside down the name line is at the foot, and on a page scanned shifted or shrunk part of the name can show just below the black box; and a name written anywhere else on a page is not boxed. Type yes in that window only when no part of a name shows, then tell me the papers are ready. If something shows, type no and tell me the identifier and page, never the name. I read nothing until then, and I never need to know where your teacher-only folder is.
    ```
 
-   It checks only that a paper's page count is a whole number of copies of
-   the blank test and that each page is the same way round, and nearly the
-   same shape, as its blank page; a paper that is not is stopped, with the
-   reason. It does NOT detect a page scanned upside down or shifted: the
-   teacher sees that when looking through the papers. It clears the last
-   batch first, writes the boxed papers into `Redacted/`, and writes ONE
-   file, `Redacted papers to look through.pdf`, in the teacher-only check
-   folder: every boxed paper, in order, each after a page naming its
-   identifier. Any line that starts `Stopped:` means stop: nothing may be
-   read, as when Poppler is missing.
-4. **Stop: the teacher looks through every page, then says yes.** Ask the
-   teacher, in these words or very close to them:
+   Then wait. **Read no paper until the teacher has looked through the
+   redacted papers and typed yes.** You never open the file they look
+   through: it is in the teacher-only folder, and a name the box missed
+   would be in it. Nothing reaches the marking folder's `Redacted/` until
+   their yes, and on a no nothing moves.
+5. **Before reading any paper, in any session, run the check**, and if it
+   does not say the teacher typed yes for these papers (no papers yet, a
+   new batch, a changed or added file of any kind, or no record), ask the
+   teacher to double-click "Box the papers" again:
 
    ```text wrap
-   Please open "Redacted papers to look through.pdf" in your check folder and look through every page of every paper. Look for any part of a name, and anything else that says who wrote it (a signature, initials, a student number). I do not check how each page was scanned: on a page scanned upside down the name line is at the foot, and on a page scanned shifted or shrunk part of the name can show just below the black box; and a name written anywhere else on a page is not boxed. Then tell me "yes, the names are redacted on every page", or the identifier and page where something shows. I will read no paper until you do.
+   python3 -B .claude/skills/plantoir-marking/scripts/teacher_only.py --verify "<marking folder>/<Assessment>"
    ```
 
-   **Read no paper until the teacher has looked through the redacted
-   papers and said yes.** You never open that file yourself: a name the box
-   missed would be in it. "Yes" means every page of every paper in this
-   batch, looked at after the boxing ran; a yes given before the papers
-   were boxed does not count. When the teacher says yes, record it, then
-   check it. The script cannot know who looked: it records that the
-   teacher said yes. **Run `--confirm` only straight after the teacher's
-   own yes in this conversation, in reply to the ask, and never on your own
-   judgement.**
-
-   ```text wrap
-   python3 -B "<marking folder>/Scripts/redact_scans.py" --confirm "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
-   ```
-
-   **Before reading any paper, in any session, run the check**, and if it
-   does not say the teacher's look is recorded for these papers (a new
-   batch, a changed file, a re-run, or no record), ask the teacher again:
-
-   ```text wrap
-   python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
-   ```
+   It reads only the marking folder. The check cannot know who looked: it
+   says the teacher typed yes in Box the papers, after the papers were put
+   in one file. `<Assessment>/Box the papers - what it said.txt` says what
+   the boxing printed: which papers were stopped and why, and how many
+   files were left alone because they were not named like an identifier.
+   Tell the teacher, by identifier and count. Any line that starts
+   `Stopped:` means stop: nothing may be read, as when Poppler is missing.
 
    If the teacher says no (a name shows on Student C, page 2): they rescan
-   that paper, or you move the box with `--box` and run the boxing again;
-   either way the teacher looks again. A paper boxed by hand goes into the
-   originals folder in place of the scan and is boxed with the rest. Never
-   loosen the shape tolerance in the script to let a paper through.
+   that paper, or you move the box (`--box` in `Box request.json`), and
+   they double-click again; either way they look again. A paper boxed by
+   hand goes into the originals folder in place of the scan and is boxed
+   with the rest. Never loosen the shape tolerance in the script to let a
+   paper through.
+
+The boxing checks only that a paper's page count is a whole number of
+copies of the blank test and that each page is the same way round, and
+nearly the same shape, as its blank page; a paper that is not is stopped,
+with the reason. It does NOT detect a page scanned upside down or shifted: the teacher sees that when looking through the papers.
 
 **What the box does not do.** It covers the name line at the top of each
 page whose blank test has a name blank, and nothing else. A name written
@@ -313,11 +364,11 @@ the AI service you run on. Say it that way; never say a name is covered,
 removed or safe.
 
 **If the script cannot run, stop.** If Poppler (`pdftoppm`, `pdfinfo`,
-`pdftotext`, `pdfunite`, `pdfseparate`) is missing, the script says which
-and reads nothing; if Python is missing, the command fails. Tell the
-teacher, in plain words, what to install (on a Mac with Homebrew,
-`brew install poppler`; for the sheets, `brew install tectonic`), and
-wait. Never read an original, and never box a page any other way.
+`pdftotext`, `pdfunite`, `pdfseparate`) is missing, the launcher says so
+in the teacher's window and moves nothing; if Python is missing, it says
+that. Tell the teacher, in plain words, what to install (on a Mac with
+Homebrew, `brew install poppler`; for the sheets, `brew install
+tectonic`), and wait. Never read an original, and never box a page any other way.
 
 ## 8. Settings and rulings: whose marking this is
 
@@ -359,7 +410,7 @@ apply it to every paper.
 
 ## 9. Marking the papers
 
-Mark from the boxed papers in `Redacted/` only, and only when `--verify` says the teacher's yes is recorded for them (section 7): read only the files `--verify` names, never any other file in that folder. For each paper, copy the
+Mark from the boxed papers in `Redacted/` only, and only when `teacher_only.py --verify` says the teacher typed yes for them (section 7): read only the files `--verify` names, never any other file in that folder. For each paper, copy the
 kit's `marks-template.json` to `Marks/Section N/Student A.json` and fill
 it in, as the kit's `FORMAT.md` says. `earned` is 0 or 1 (0.5 only where
 `Marking Settings.md` records `- Half marks: yes`); every point that
@@ -429,18 +480,27 @@ answer is left off the sheet; say which.
 
 ## 12. Names in, at the end, and tuning written down
 
-When the teacher has read and decided on every sheet and says to, make the
-named copies through the runner:
+When the teacher has read and decided on every sheet and says to, copy
+`scripts/make_named_copies.py` into `Scripts/` (and run its
+`--self-test`), write `<marking folder>/Names request.json`:
 
-```text wrap
-python3 -B <this skill>/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --table "<teacher-only>/Name Mapping Table.csv" --sheets "<marking folder>/<Assessment>/Sheets" --out "<teacher-only>/<Assessment>/Named"
+```json
+{"do": "sheets", "assessment": "Unit 2 Test"}
 ```
 
-It prints counts and identifiers only. "Render every page and look"
-applies to the identifier drafts only: nothing in the teacher-only folder
-is opened, rendered or listed, the named copies included. If a named copy
-fails, build the identifier draft of the same student again, fix that, and
-run the named step again.
+and ask the teacher to double-click "Put names on the sheets" in the
+marking folder. It asks for their teacher-only folder, says what it will
+do, asks them to type yes, and makes the named copies through the runner
+into `<Assessment>/Named` in the teacher-only folder. What it printed
+(counts and identifiers only) is in `Put names on the sheets - what it
+said.txt` in the marking folder: read that, and tell the teacher. The same
+step with `{"do": "check-table"}` answers "is my table right?" in counts
+only.
+
+"Render every page and look" applies to the identifier drafts only:
+nothing in the teacher-only folder is opened, rendered or listed, the
+named copies included. If a named copy fails, build the identifier draft
+of the same student again, fix that, and ask for the named step again.
 
 Everything the teacher tunes (a wording, a ruling, a setting) is written
 down the first time, in `Marking Settings.md` when it is for every

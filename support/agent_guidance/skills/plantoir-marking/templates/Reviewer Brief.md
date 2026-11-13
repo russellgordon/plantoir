@@ -8,13 +8,13 @@ wrong, unfair or inconsistent with the rulings; "nothing to change" is an accept
 
 ## First, before reading anything
 
-Run the check that the teacher's yes is recorded for exactly the papers in the redacted folder:
+Run the check that the teacher typed yes for exactly the papers in the redacted folder:
 
 ```text wrap
-python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+python3 -B "<this working folder>/.claude/skills/plantoir-marking/scripts/teacher_only.py" --verify "<marking folder>/<Assessment>"
 ```
 
-If it does not say the teacher's yes is recorded, or does not name your identifier, read nothing and report
+If it does not say the teacher typed yes for these papers, or does not name your identifier, read nothing and report
 that in one line. Read only a paper it names.
 
 ## Read
@@ -37,4 +37,4 @@ record; the lead decides.
 
 ## Never
 
-- Never repeat a name you see; write `NAME VISIBLE page N`. Never open the teacher-only folder.
+- Never repeat a name you see; write `NAME VISIBLE page N`. Never look for, list or open the teacher-only folder.

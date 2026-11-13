@@ -4,17 +4,18 @@ The plantoir-marking skill's scan redaction (#750, piece 750a): scripts/redact_s
 
 Russell, 2026-11-12, on #750: "script runs, teacher checks the papers, confirms names are redacted, then
 agent based marking begins. Simple." and "Teacher confirms full redacted papers." The script places boxes
-from the BLANK test, makes the teacher's look easy (one combined PDF of the redacted papers, in the
-teacher-only folder), records the teacher's yes against exactly those files, and says only what is true.
+from the BLANK test into a holding folder on the teacher's side, and says only what is true. Since 750d the
+combined file, the teacher's yes and the move to where the assistant reads belong to the pinned
+teacher_only.py and its launcher, tested in scripts/test_marking_teacher_run.py.
 
 Every paper here has ANSWERS written down every page to the bottom (the review of the second fixes found
 the old line-up stopped 8 of 8 such papers), on two layouts: the house style's Quiz (the title just under
 the name line) and a plain one with its name blank drawn six ways. Each case of contracts/shared-rules.json
 -> assessment -> redaction -> scanCases is built from the blank with an invented name written on each page's
 name line, and must be written or stopped as the case says; where `nameInsideTheBox` is true, none of the
-name's ink may show outside the box. The other cases: the box read from each blank (boxCases), the combined
-PDF, a previous batch cleared, the teacher's yes recorded and checked, a failed write leaving nothing to
-read, no line claiming a name is covered, the box black with nothing under it, a name in the body left as
+name's ink may show outside the box. The other cases: the box read from each blank (boxCases), a previous
+batch cleared from the holding folder, a failed write leaving nothing in it, the old --confirm and --verify
+refused with where they went, no line claiming a name is covered, the box black with nothing under it, a name in the body left as
 it is, files not named like an identifier, the stack split, a working folder refused, and the self-test.
 
 Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate); every case skips, saying so, where it is
@@ -46,7 +47,6 @@ MISSING = [tool for tool in TOOLS if shutil.which(tool) is None]
 SKIP_REASON = "Poppler is not installed here (" + ", ".join(MISSING) + " not found); the redaction cases need it"
 DPI = 100
 INVENTED = ("Testpupil", "Alphaname")
-COMBINED = "Redacted papers to look through.pdf"
 
 
 def redaction():
@@ -330,19 +330,6 @@ class ScanCaseTests(unittest.TestCase):
             self.assertIn("boxed", self.line_for(layout, "Student A"))
             self.assertNotIn("stopped", self.line_for(layout, "Student A"))
 
-    def test_one_combined_file_holds_every_written_paper_in_order(self):
-        for layout in BLANKS:
-            check = self.root / layout / "Teacher only" / "Check"
-            redacted = self.root / layout / "Redacted"
-            written = sorted(redacted.rglob("*.pdf"))
-            self.assertEqual(sorted(path.name for path in check.iterdir()), ["Batch.json", COMBINED])
-            pages = sum(page_count(path) for path in written)
-            self.assertEqual(page_count(check / COMBINED), pages + len(written), "a page naming each paper, then the paper")
-            text = pdf_words(check / COMBINED)
-            positions = [text.find(f"Section 1/{path.stem}") for path in written]
-            self.assertNotIn(-1, positions)
-            self.assertEqual(positions, sorted(positions))
-
     def test_nothing_it_says_claims_a_name_is_covered(self):
         for layout in BLANKS:
             said = (self.runs[layout][1].stdout + self.runs[layout][1].stderr).casefold()
@@ -481,133 +468,71 @@ class BoxTests(unittest.TestCase):
 
 
 @unittest.skipIf(MISSING, SKIP_REASON)
-class BatchAndRecordTests(unittest.TestCase):
+class HoldingFolderTests(unittest.TestCase):
+    """The boxing writes into a holding folder on the teacher's side (750d), clearing it first."""
 
     def setUp(self):
         self.root = Path(tempfile.mkdtemp(prefix="marking-batch-"))
         self.addCleanup(shutil.rmtree, self.root, True)
-        self.originals = self.root / "Originals"
+        self.originals = self.root / "Teacher only" / "Unit Test" / "Originals"
         build_scans(BLANK_LETTER, self.originals, {"upright, answers on every page", "grey and speckled"})
-        self.redacted = self.root / "Redacted"
-        self.check = self.root / "Teacher only" / "Check"
+        self.holding = self.root / "Teacher only" / "Unit Test" / "Holding"
 
     def box(self):
-        return run_script(SCRIPT, self.originals, self.redacted, "--blank", BLANK_LETTER, "--check-dir", self.check)
+        return run_script(SCRIPT, self.originals, self.holding, "--blank", BLANK_LETTER)
 
-    def test_the_teachers_yes_is_recorded_against_exactly_this_batch(self):
-        early = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        self.assertEqual(early.returncode, 1, "a yes before the papers are boxed does not count")
-        self.assertIn("A yes given before the papers were boxed does not count", early.stdout)
+    def test_a_new_batch_clears_the_last_one(self):
         self.box()
-        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
-        confirmed = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        self.assertEqual(confirmed.returncode, 0, confirmed.stdout)
-        verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
-        self.assertEqual(verified.returncode, 0, verified.stdout)
-        record = json.loads((self.check / "Teacher confirmed.json").read_text(encoding="utf-8"))
-        self.assertEqual(sorted(record), ["confirmed", "papers"], "names, SHA-256 and the date, and nothing else")
-        paper = self.redacted / "Section 1" / "Student A.pdf"
-        paper.write_bytes(paper.read_bytes() + b"\n")
-        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1,
-                         "a changed file needs the teacher to look again")
-
-    def test_a_new_batch_clears_the_last_one_and_its_record(self):
-        self.box()
-        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
         os.remove(self.originals / "Section 1" / "Student B.pdf")
+        planted = self.holding / "Section 1" / "Student Q.PDF"
+        planted.write_bytes((self.originals / "Section 1" / "Student A.pdf").read_bytes())
         self.box()
-        self.assertEqual(sorted(path.name for path in self.redacted.rglob("*.pdf")), ["Student A.pdf"],
-                         "a paper from the last batch never stands in for this one")
-        stale = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
-        self.assertEqual(stale.returncode, 1, "a new batch needs a new look")
-        self.assertIn("Not confirmed", stale.stdout)
+        self.assertEqual(sorted(path.name for path in self.holding.rglob("*") if path.is_file()), ["Student A.pdf"],
+                         "nothing from the last batch, of any name or kind, stands in for this one")
 
-    def test_a_stale_record_is_refused(self):
-        # A record left from an earlier batch must not stand for this one: --verify reads the files.
-        self.box()
-        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        old_record = (self.check / "Teacher confirmed.json").read_bytes()
-        os.remove(self.originals / "Section 1" / "Student B.pdf")
-        self.box()
-        (self.check / "Teacher confirmed.json").write_bytes(old_record)
-        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
-
-    def test_a_failure_while_writing_leaves_nothing_to_read(self):
-        # 750a fix review 2, M2: the combined file failed after the papers were written, and they stayed.
+    def test_a_failure_while_writing_leaves_nothing_in_the_holding_folder(self):
         self.box()
         fake = self.root / "bin"
         fake.mkdir()
-        (fake / "pdfunite").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-        (fake / "pdfunite").chmod(stat.S_IRWXU)
+        (fake / "pdftoppm").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        (fake / "pdftoppm").chmod(stat.S_IRWXU)
         environment = dict(os.environ, PATH=str(fake) + os.pathsep + os.environ.get("PATH", ""))
-        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.originals), str(self.redacted), "--blank",
-                                 str(BLANK_LETTER), "--check-dir", str(self.check)], capture_output=True, text=True,
-                                env=environment)
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.originals), str(self.holding), "--blank",
+                                 str(BLANK_LETTER)], capture_output=True, text=True, env=environment)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("none may be read", result.stdout)
-        self.assertEqual(list(self.redacted.rglob("*.pdf")), [], "no paper is left where the assistant reads")
-        self.assertFalse((self.check / COMBINED).exists(), "no old combined file stands in for this batch")
+        self.assertIn("Stopped:", result.stdout)
+        self.assertEqual(list(self.holding.rglob("*.pdf")), [], "no paper is left for Box the papers to put together")
 
-    def test_any_file_the_record_does_not_list_is_refused(self):
-        # 750a fix review 3, M1: an unboxed original copied in as Student Q.PDF, or a .png, passed the check.
-        self.box()
-        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        original = (self.originals / "Section 1" / "Student A.pdf").read_bytes()
-        for planted in ("Section 1/Student Q.PDF", "Section 1/Student Q.png"):
-            path = self.redacted / planted
-            path.write_bytes(original)
-            verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
-            self.assertEqual(verified.returncode, 1, f"{planted} must not pass the check")
-            os.remove(path)
-        (self.redacted / "Section 1" / "Student Q.PDF").write_bytes(original)
-        self.box()
-        self.assertFalse((self.redacted / "Section 1" / "Student Q.PDF").exists(), "a new run clears every file")
-
-    def test_the_record_line_says_what_was_recorded_and_no_more(self):
-        # 750a fix review 3, M2: the script cannot know who looked.
-        self.box()
-        confirmed = run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        self.assertIn("Recorded the teacher's yes for these 2 papers", confirmed.stdout)
-        self.assertIn("cannot know who looked", confirmed.stdout)
-        self.assertNotIn("looked through", confirmed.stdout)
-        verified = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
-        self.assertIn("read only these: Section 1/Student A; Section 1/Student B.", verified.stdout)
-
-    def test_a_run_that_stops_early_leaves_the_last_batch_unreadable(self):
+    def test_a_run_that_stops_early_leaves_the_holding_folder_empty(self):
         # 750a fix review 3, L1: a missing blank stopped the run before the last batch was cleared.
         self.box()
-        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
-        result = run_script(SCRIPT, self.originals, self.redacted, "--blank", self.root / "missing.pdf", "--check-dir", self.check)
+        result = run_script(SCRIPT, self.originals, self.holding, "--blank", self.root / "missing.pdf")
         self.assertEqual(result.returncode, 1)
-        self.assertEqual(list(self.redacted.rglob("*")), [])
-        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
+        self.assertEqual(list(self.holding.rglob("*")), [])
 
-    def test_the_check_needs_its_folder_said_plainly(self):
-        result = run_script(SCRIPT, "--verify", self.redacted)
-        self.assertIn("--check-dir is needed", result.stdout)
-        self.assertEqual(result.returncode, 1)
-
-    def test_papers_go_in_class_list_order(self):
-        # 750a fix review 3, L5: Student AA sorted before Student B.
-        section = self.originals / "Section 1"
-        (section / "Student AA.pdf").write_bytes((section / "Student A.pdf").read_bytes())
+    def test_a_failed_write_leaves_nothing_in_the_holding_folder(self):
         self.box()
-        text = pdf_words(self.check / COMBINED)
-        self.assertLess(text.find("Section 1/Student B"), text.find("Section 1/Student AA"))
-
-    def test_a_failed_write_leaves_nothing_to_read(self):
-        self.box()
-        self.assertTrue(list(self.redacted.rglob("*.pdf")))
-        for path in self.check.iterdir():
-            os.remove(path)
-        self.check.chmod(stat.S_IRUSR | stat.S_IXUSR)
+        self.assertTrue(list(self.holding.rglob("*.pdf")))
+        beside = self.holding.parent
+        beside.chmod(stat.S_IRUSR | stat.S_IXUSR)
         try:
             result = self.box()
         finally:
-            self.check.chmod(stat.S_IRWXU)
+            beside.chmod(stat.S_IRWXU)
         self.assertEqual(result.returncode, 1)
         self.assertIn("none may be read", result.stdout)
-        self.assertEqual(list(self.redacted.rglob("*.pdf")), [], "no paper is left where the assistant reads")
+        self.assertEqual(list(self.holding.rglob("*.pdf")), [])
+
+    def test_the_teachers_yes_is_no_longer_this_scripts(self):
+        # 750d: --confirm and --verify moved to the never-adapted teacher_only.py (a trial assistant rewrote
+        # its copy of this script and that copy's self-test).
+        for flag in ("--confirm", "--verify"):
+            result = run_script(SCRIPT, flag, self.holding, "--check-dir", self.root / "Check")
+            self.assertEqual(result.returncode, 1, flag)
+            self.assertIn("teacher_only.py --verify", result.stdout, flag)
+        source = SCRIPT.read_text(encoding="utf-8")
+        for gone in ("Teacher confirmed.json", "Batch.json", "Redacted papers to look through.pdf"):
+            self.assertNotIn(gone, source)
 
 
 @unittest.skipIf(MISSING, SKIP_REASON)

@@ -176,7 +176,7 @@ class SkillFileTests(unittest.TestCase):
 
     def test_every_listed_file_is_there(self):
         guidance = self.guidance()
-        for relative in guidance["scripts"] + guidance["templates"] + guidance["references"]:
+        for relative in guidance["scripts"] + guidance["launchers"] + guidance["templates"] + guidance["references"]:
             self.assertTrue((SKILL / relative).is_file(), relative)
         self.assertIn(guidance["runner"], guidance["scripts"])
 
@@ -187,8 +187,9 @@ class SkillFileTests(unittest.TestCase):
             source = (SKILL / relative).read_text(encoding="utf-8")
             self.assertIn(privacy["mustNotChangeMark"], source, relative)
             self.assertNotIn("traceback.print", source, relative)
-            if relative == guidance["runner"]:
-                self.assertNotIn(privacy["mayChangeMark"], source, "the runner is never adapted")
+            if relative in privacy["notAStartingPoint"]:
+                # the runner and teacher_only.py (750d) are never adapted
+                self.assertNotIn(privacy["mayChangeMark"], source, f"{relative} is never adapted")
             else:
                 self.assertIn(privacy["mayChangeMark"], source, relative)
                 self.assertIn(privacy["selfTest"], source, relative)
@@ -215,7 +216,8 @@ class SkillFileTests(unittest.TestCase):
             text = (SKILL / name).read_text(encoding="utf-8")
             first = text.index("## First, before reading anything")
             self.assertLess(first, text.index("## Read"), name)
-            self.assertIn("redact_scans.py\" --verify", text, name)
+            self.assertIn("teacher_only.py\" --verify", text, name)
+            self.assertNotIn("<teacher-only>", text, name)
             self.assertIn("read nothing and report", text, name)
             self.assertNotIn("blanked", text, name)
 
@@ -225,7 +227,8 @@ class SkillFileTests(unittest.TestCase):
         import hashlib
         runner = SKILL / self.guidance()["runner"]
         digest = hashlib.sha256(runner.read_bytes()).hexdigest()
-        self.assertIn("It must print `" + digest + "`", (SKILL / "SKILL.md").read_text(encoding="utf-8"))
+        # Since 750d the skill lists every pinned file's SHA-256 (test_marking_teacher_run.py checks the rest).
+        self.assertIn("- `" + digest + "`  run_with_names.py", (SKILL / "SKILL.md").read_text(encoding="utf-8"))
         # 750a fix review M5: the pin is of LF bytes, and .gitattributes checks this one file out with LF on
         # every platform, so a Windows checkout under core.autocrlf hashes the same.
         self.assertNotIn(b"\r", runner.read_bytes())

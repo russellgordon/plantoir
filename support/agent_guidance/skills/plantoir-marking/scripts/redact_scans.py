@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Box the name line on every scanned page that has a name blank, and put the boxed papers in ONE file for
-the teacher to look through. The teacher's look is what confirms the names are redacted.
+"""Box the name line on every scanned page that has a name blank. The teacher's look is what confirms the names
+are redacted.
 
 Part of the plantoir-marking skill. A STARTING POINT: copy it into the marking folder's Scripts/ folder,
 adjust it to this teacher's header (see the two MARK blocks below), run --self-test, and only then use it.
+The assistant runs only --self-test and --box-from (on the BLANK test); the boxing itself, the split of a
+whole class and the naming of its papers are run by the teacher's "Box the papers" launcher (#750, 750d),
+through teacher_only.py and the runner, because they read the teacher-only folder:
 
-    python3 -B redact_scans.py ORIGINALS REDACTED --blank BLANK.pdf --check-dir CHECK [--label "Name"]
-                               [--box x0,y0,x1,y1] [--dpi 150] [--identifiers REGEX]
-    python3 -B redact_scans.py --box-from BLANK.pdf [--label "Name"]
-    python3 -B redact_scans.py --confirm REDACTED --check-dir CHECK      (only on the teacher's yes)
-    python3 -B redact_scans.py --verify REDACTED --check-dir CHECK       (before reading any paper)
-    python3 -B redact_scans.py --stack STACK.pdf --pages-per-paper N --into FOLDER --check-dir CHECK
-    python3 -B redact_scans.py --name-papers TABLE --section N --into FOLDER
+    python3 -B redact_scans.py --box-from BLANK.pdf [--label "Name"] [--box x0,y0,x1,y1]
     python3 -B redact_scans.py --self-test
+    python3 -B redact_scans.py ORIGINALS HOLDING --blank BLANK.pdf [--label "Name"]      (Box the papers)
+                               [--box x0,y0,x1,y1] [--dpi 150] [--identifiers REGEX]
+    python3 -B redact_scans.py --stack STACK.pdf --pages-per-paper N --into FOLDER --check-dir CHECK   (Box the papers)
+    python3 -B redact_scans.py --name-papers TABLE --section N --into FOLDER                         (Box the papers)
 
 Russell, 2026-11-12, on #750: "script runs, teacher checks the papers, confirms names are redacted, then
 agent based marking begins. Simple." and "Teacher confirms full redacted papers." So the script does three
@@ -25,20 +26,14 @@ things and claims nothing more:
      blank's, and each page is the same way round (portrait or landscape) and of nearly the same shape as
      its blank page. Anything else stops that paper, with a plain reason. It does NOT detect a page that
      is upside down or shifted: the teacher sees that when looking through the papers.
-  3. It writes the boxed papers into REDACTED and ONE combined PDF of all of them, each paper after a page
-     naming its identifier, into CHECK (the TEACHER-ONLY folder), for the teacher to look through. Nothing
-     is put where the assistant reads until every paper and the combined PDF are written; a previous
-     batch's papers and record are cleared first, so they can never stand in for this one.
---confirm records the teacher's yes against exactly the files of this batch (their names and SHA-256, and
-the date); --verify checks the record still matches the files in REDACTED. The assistant runs --verify
-before reading any paper, in any session, and asks the teacher again when it fails.
+  3. It writes the boxed papers into HOLDING, a folder on the teacher's side, clearing it first, so a previous
+     batch can never stand in for this one; the papers are written beside it and moved in only when all
+     are written. Box the papers then puts exactly those papers in ONE file for the teacher (the pinned
+     teacher_only.py, never this file), and moves them to where the assistant reads only on the teacher's yes.
 
 Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate) and the Python standard library.
 """
 import csv
-import datetime
-import hashlib
-import json
 import os
 import re
 import shutil
@@ -62,9 +57,6 @@ DPI = 150                        # pixels per inch for the boxed pages
 JPEG_QUALITY = 75
 IDENTIFIER = r"^Student [A-Z]{1,2}$"
 SECTION = r"^Section \d+$"
-COMBINED = "Redacted papers to look through.pdf"
-BATCH = "Batch.json"
-RECORD = "Teacher confirmed.json"
 PAPERS_TO_NAME = "Papers to name.pdf"
 
 # MARK: - What must not change
@@ -72,10 +64,10 @@ PAPERS_TO_NAME = "Papers to name.pdf"
 #   never print a file name that is not an identifier (or a Section / Paper label this script made);
 #   capture every program's output and print only counts and identifiers; refuse (exit 1, with an
 #   identifier-only message) when anything is unexpected; never render the box's own pixels into a boxed
-#   page; never say a name is covered, removed or safe (the teacher's look confirms it); never put a paper
-#   where the assistant reads until the whole batch and its combined PDF are written; never write inside a
-#   Plantoir working folder; never record a yes before the combined PDF exists, or for files it does not
-#   match; and these shape tolerances, which are generous on purpose:
+#   page; never say a name is covered, removed or safe (the teacher's look confirms it); write boxed papers
+#   only into the folder it is given, and only once the whole batch is written; leave a file not named like
+#   an identifier alone and count it, never stop the batch for it (the teacher's look is the check); never
+#   write inside a Plantoir working folder; and these shape tolerances, which are generous on purpose:
 SHAPE_TOLERANCE = 0.06           # how far a page's height-to-width ratio may differ from its blank page's
 
 TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
@@ -415,7 +407,7 @@ def shape_problem(number, size_pt, blank_number, blank_size_pt):
 
 
 def separator(writer, caption):
-    """A page that names the paper after it, in the combined file."""
+    """A page that names the paper after it, in Papers to name.pdf."""
     content = b"BT /F1 28 Tf 72 640 Td (%s) Tj ET\n" % pdf_text(caption)
     writer.page(612, 792, {}, content, with_font=True)
 
@@ -432,39 +424,10 @@ def combine(entries, path, folder):
     run(["pdfunite"] + parts + [str(path)])
 
 
-def sha256_of(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def papers_in(redacted):
-    """{relative path: SHA-256, or "link" or "folder"} of EVERY entry in the redacted folder, whatever its name,
-    case or type (750a fix review 3, M1: an unboxed original copied in as Student Q.PDF, or a .png, passed
-    the check when only *.pdf was listed). Links are listed as links, never followed."""
-    found = {}
-    for top, folders, files in os.walk(redacted, followlinks=False):
-        for name in folders + files:
-            path = Path(top) / name
-            relative = str(path.relative_to(redacted))
-            if path.is_symlink():
-                found[relative] = "link"
-            elif path.is_dir():
-                found[relative] = "folder"
-            else:
-                found[relative] = sha256_of(path)
-    return dict(sorted(found.items()))
-
-
-def clear_previous_batch(redacted, check):
-    """Take away a previous batch's record, papers, combined file and anything else in the redacted folder, so
-    nothing from before can stand in for this batch. The record goes first, so even a clear that fails part
-    way leaves no recorded yes for what is left (the papers are copies: the originals are teacher-only)."""
+def clear_previous_batch(redacted):
+    """Take away everything in the holding folder, so nothing from before can stand in for this batch (the
+    papers are copies: the originals are teacher-only)."""
     problem = False
-    for name in (RECORD, COMBINED, BATCH):
-        try:
-            if (Path(check) / name).exists():
-                os.remove(Path(check) / name)
-        except OSError:
-            problem = True
     for entry in sorted(Path(redacted).iterdir()) if Path(redacted).is_dir() else []:
         try:
             if entry.is_dir() and not entry.is_symlink():
@@ -477,11 +440,11 @@ def clear_previous_batch(redacted, check):
         raise Refusal("the last batch could not all be cleared away; no paper was written, and none may be read")
 
 
-def redact_folder(originals, redacted, blank, check_dir, labels, given_box, identifier):
-    refuse_inside_a_working_folder(redacted, check_dir)
-    redacted, check = Path(redacted), Path(check_dir)
+def redact_folder(originals, redacted, blank, labels, given_box, identifier):
+    refuse_inside_a_working_folder(redacted)
+    redacted = Path(redacted)
     # The last batch goes FIRST, before any other check can stop the run (750a fix review 3, L1).
-    clear_previous_batch(redacted, check)
+    clear_previous_batch(redacted)
     need_tools()
     for folder_path, what in ((originals, "the originals folder"), (blank, "the blank test")):
         if not Path(folder_path).exists():
@@ -494,10 +457,10 @@ def redact_folder(originals, redacted, blank, check_dir, labels, given_box, iden
         blank_sizes = page_sizes(blank)
         found, left_alone = identifier_files(originals, identifier)
         try:
-            check.mkdir(parents=True, exist_ok=True)
-            holding = Path(tempfile.mkdtemp(prefix=".holding-", dir=check))
+            holding = Path(tempfile.mkdtemp(prefix=".holding-", dir=redacted.parent))
         except OSError:
-            raise Refusal("the check folder could not be written to; no paper was written, and none may be read")
+            raise Refusal("the folder beside the holding folder could not be written to; no paper was written, and "
+                          "none may be read")
         try:
             for label_text, source in found:
                 try:
@@ -527,20 +490,13 @@ def redact_folder(originals, redacted, blank, check_dir, labels, given_box, iden
                 target.parent.mkdir(parents=True, exist_ok=True)
                 writer.write(target)
                 written.append((label_text, target, len(sizes), boxed))
-            if written:
-                combine([(label_text, target) for label_text, target, _pages, _boxed in written], holding / COMBINED, folder)
-            # Everything is written: only now does anything go where it is read.
+            # Everything is written: only now does anything go into the holding folder.
             for label_text, target, _pages, _boxed in written:
                 final = redacted / (label_text + ".pdf")
                 final.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(target), str(final))
-            if written:
-                shutil.move(str(holding / COMBINED), str(check / COMBINED))
-                (check / BATCH).write_text(json.dumps({"written": datetime.datetime.now().isoformat(timespec="seconds"),
-                                                       "combined": sha256_of(check / COMBINED),
-                                                       "papers": papers_in(redacted)}, indent=1), encoding="utf-8")
         except (OSError, Refusal):
-            clear_previous_batch(redacted, check)
+            clear_previous_batch(redacted)
             raise Refusal("the boxed papers could not all be written; none was left where they are read, and none "
                           "may be read")
         finally:
@@ -554,50 +510,10 @@ def redact_folder(originals, redacted, blank, check_dir, labels, given_box, iden
     pages = sum(entry[2] for entry in written)
     boxed = sum(entry[3] for entry in written)
     print(f"{len(written)} papers written, {pages} pages, {boxed} of them boxed; {stopped} papers stopped. "
-          + (f"All of them are in one file for the teacher to look through: '{COMBINED}' in the check folder. "
-             if written else "")
-          + "The teacher's look is what confirms the names are redacted: no paper is read until the teacher has "
-            "looked through every page and said yes. A name written anywhere else on a page is not boxed and would "
-            "be seen, and every page the assistant reads goes to its service.")
+          "The teacher's look is what confirms the names are redacted: no paper reaches the assistant until the "
+          "teacher has looked through every page and typed yes. A name written anywhere else on a page is not boxed "
+          "and would be seen, and every page the assistant reads goes to its service.")
     return 0 if stopped == 0 else 1
-
-
-# ---------------------------------------------------------------- the teacher's yes
-
-
-def confirm(redacted, check_dir):
-    """Record the teacher's yes against exactly this batch: only after the combined file exists."""
-    check = Path(check_dir)
-    if not (check / COMBINED).exists() or not (check / BATCH).exists():
-        raise Refusal("there is no combined file for the teacher to have looked through yet: run the boxing first. "
-                      "A yes given before the papers were boxed does not count. Nothing was recorded")
-    batch = json.loads((check / BATCH).read_text(encoding="utf-8"))
-    if batch.get("papers") != papers_in(redacted) or batch.get("combined") != sha256_of(check / COMBINED):
-        raise Refusal("the papers in the redacted folder are not the ones the combined file was made from: run the "
-                      "boxing again and ask the teacher to look again. Nothing was recorded")
-    record = {"confirmed": datetime.datetime.now().isoformat(timespec="seconds"), "papers": batch["papers"]}
-    (check / RECORD).write_text(json.dumps(record, indent=1), encoding="utf-8")
-    papers = [name for name, kind in batch["papers"].items() if kind not in ("link", "folder")]
-    print(f"Recorded the teacher's yes for these {len(papers)} papers. (This script cannot know who looked: it is "
-          "run only on the teacher's own yes, in reply to the ask.)")
-    return 0
-
-
-def verify(redacted, check_dir):
-    """Exit 0 only when the teacher's recorded yes is for exactly the papers now in the redacted folder."""
-    record_path = Path(check_dir) / RECORD
-    now = papers_in(redacted)
-    if record_path.exists():
-        record = json.loads(record_path.read_text(encoding="utf-8"))
-        if record.get("papers") == now and now:
-            papers = [name[:-4] for name, kind in now.items() if kind not in ("link", "folder") and name.endswith(".pdf")]
-            print(f"The teacher's yes is recorded for these {len(papers)} papers ({record.get('confirmed', '')}); read "
-                  "only these: " + "; ".join(papers) + ".")
-            return 0
-    print("Not confirmed: no teacher's yes is recorded for exactly what is now in the redacted folder (a new batch, "
-          "a changed or added file of any kind, or no record). Ask the teacher to look through '{COMBINED}' and say yes; read no paper "
-          "until then.")
-    return 1
 
 
 # ---------------------------------------------------------------- a whole class in one scan
@@ -768,18 +684,14 @@ def self_test():
         paper(originals / "Student A.pdf", False)
         paper(originals / "Student B.pdf", True)
         paper(originals / (invented[0] + " " + invented[1] + ".pdf"), False)
-        check = root_path / "Teacher only" / "Check"
-        redacted = root_path / "Redacted"
+        holding = root_path / "Teacher only" / "Holding"
 
         def script(*arguments):
             result = subprocess.run([sys.executable, "-B", os.path.abspath(__file__), *map(str, arguments)],
                                     capture_output=True, text=True)
             return result.stdout + result.stderr, result.returncode
 
-        said, _code = script(root_path / "Originals", redacted, "--blank", blank, "--check-dir", check)
-        early, early_code = script("--verify", redacted, "--check-dir", check)
-        script("--confirm", redacted, "--check-dir", check)
-        late, late_code = script("--verify", redacted, "--check-dir", check)
+        said, _code = script(root_path / "Originals", holding, "--blank", blank)
         problems = []
         if any(token.casefold() in said.casefold() for token in invented):
             problems.append("an invented name reached the output")
@@ -789,16 +701,14 @@ def self_test():
             problems.append("the landscape paper was not stopped")
         if "1 files or folders not named like an identifier were left alone" not in said:
             problems.append("the file not named like an identifier was not counted")
-        if not (check / COMBINED).exists():
-            problems.append("the combined file was not written")
-        if early_code != 1 or late_code != 0:
-            problems.append("the teacher's yes was not recorded and checked as it should be")
+        if sorted(path.name for path in holding.rglob("*.pdf")) != ["Student A.pdf"]:
+            problems.append("the holding folder does not hold exactly the boxed paper")
         if problems:
             print("self-test FAILED: " + "; ".join(problems))
             return 1
-    print("self-test passed: an invented paper boxed and combined, a landscape one stopped, a file not named like an "
-          "identifier counted and never named, and the teacher's yes recorded and checked. This checks the paths "
-          "the test knows; it is no guarantee about changes it does not reach.")
+    print("self-test passed: an invented paper boxed into the holding folder, a landscape one stopped, and a file not "
+          "named like an identifier counted and never named. This checks the paths the test knows; it is no "
+          "guarantee about changes it does not reach, and the teacher's look is the proof.")
     return 0
 
 
@@ -831,13 +741,9 @@ def main(arguments):
             else:
                 print(f"page {number}: box in inches " + ",".join(f"{value:.2f}" for value in box_in))
         return 0
-    if (option(arguments, "--confirm") is not None or option(arguments, "--verify") is not None) and \
-            option(arguments, "--check-dir") is None:
-        raise Refusal("--check-dir is needed: the teacher-only check folder, where the record of the teacher's yes is kept")
-    if option(arguments, "--confirm") is not None:
-        return confirm(option(arguments, "--confirm"), option(arguments, "--check-dir"))
-    if option(arguments, "--verify") is not None:
-        return verify(option(arguments, "--verify"), option(arguments, "--check-dir"))
+    if option(arguments, "--confirm") is not None or option(arguments, "--verify") is not None:
+        raise Refusal("the teacher's yes is no longer this script's: Box the papers asks for it, and teacher_only.py "
+                      "--verify checks it")
     if option(arguments, "--stack") is not None:
         return split_stack(option(arguments, "--stack"), int(option(arguments, "--pages-per-paper", "0")),
                            option(arguments, "--into"), option(arguments, "--check-dir"))
@@ -854,10 +760,9 @@ def main(arguments):
             skip = True
             continue
         positional.append(argument)
-    if len(positional) != 2 or option(arguments, "--blank") is None or option(arguments, "--check-dir") is None:
-        raise Refusal("give the originals folder, the redacted folder, --blank and --check-dir")
-    return redact_folder(positional[0], positional[1], option(arguments, "--blank"),
-                         option(arguments, "--check-dir"), labels, given_box, identifier)
+    if len(positional) != 2 or option(arguments, "--blank") is None:
+        raise Refusal("give the originals folder, the holding folder and --blank")
+    return redact_folder(positional[0], positional[1], option(arguments, "--blank"), labels, given_box, identifier)
 
 
 if __name__ == "__main__":
