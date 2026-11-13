@@ -1078,7 +1078,7 @@ fi
 # This check stays for the checkout: this script's own image is built from the
 # working tree, whose `COPY support/` and `COPY contracts/` would bake a stray
 # cache in, and the line below names the hand run that wrote it.
-_bytecode_found="$(find patches scripts support contracts \( -name '__pycache__' -o -name '*.pyc' \) -print 2>/dev/null)"
+_bytecode_found="$(find patches scripts support contracts \( -name '__pycache__' -o -name '*.pyc' -o -name '*.pyo' \) -print 2>/dev/null)"
 if [ -z "$_bytecode_found" ]; then
   pass "no bytecode left in patches/, scripts/, support/ or contracts/, which ship inside the app"
 else

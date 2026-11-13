@@ -10023,8 +10023,9 @@ twelve thousand files and changed none wrote no line.
     byte. So the inputs are declared, the output is declared, and sandboxing
     is not turned off.
   - **Compiled Python first (#747).** Before it fingerprints anything, the
-    phase deletes every `__pycache__` folder and `.pyc` file under the
-    bundle's four folders and prints `removed N compiled Python files`, so
+    phase deletes every `__pycache__` folder and `.pyc` or `.pyo` file under
+    the bundle's four folders, never through a link (a linked recipe folder
+    fails the build), and prints `removed N compiled Python files`, so
     no cache a hand-run test left in the checkout reaches the app, a
     working folder or the image tag
     ([03 → Compiled Python is not part of the recipe](03-launcher-scripts.md#compiled-python-is-not-part-of-the-recipe-github-747)).

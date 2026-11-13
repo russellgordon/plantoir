@@ -21,8 +21,20 @@ if [[ ! -d "${RESOURCES}/scripts" ]]; then
   exit 1
 fi
 
-found="$(cd "${RESOURCES}" && find patches scripts support contracts \
-  \( -name '__pycache__' -o -name '*.pyc' \) -print 2>/dev/null || true)"
+for folder in patches scripts support contracts; do
+  if [[ ! -d "${RESOURCES}/${folder}" || -L "${RESOURCES}/${folder}" ]]; then
+    echo "❌ ${RESOURCES}/${folder} is missing or is not a real folder, so the bundle cannot be checked."
+    exit 1
+  fi
+done
+
+# find's own errors are shown and fail the check: a folder it cannot read is
+# a folder nobody has looked in.
+if ! found="$(cd "${RESOURCES}" && find patches scripts support contracts \
+  \( -name '__pycache__' -o -name '*.pyc' -o -name '*.pyo' \) -print)"; then
+  echo "❌ The toolchain the app carries could not be read in full, so it is not a bundle to ship."
+  exit 1
+fi
 
 if [[ -n "${found}" ]]; then
   echo "${found}"

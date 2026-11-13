@@ -320,6 +320,32 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("scripts/stray.pyc", result.stdout)
         self.assertEqual(run(check, str(self.folder / "bytecode-nothing")).returncode, 1)
+        old_name = self.toolchain_app("bytecode-pyo")
+        (old_name / "Contents" / "Resources" / "patches" / "old.pyo").write_bytes(b"\x00")
+        result = run(check, str(old_name))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("patches/old.pyo", result.stdout)
+
+    def test_a_folder_the_bytecode_check_cannot_read_fails_it(self) -> None:
+        check = str(RELEASE / "check-no-bytecode.sh")
+        app = self.toolchain_app("bytecode-unreadable")
+        locked = app / "Contents" / "Resources" / "support" / "locked"
+        locked.mkdir()
+        locked.chmod(0o000)
+        try:
+            result = run(check, str(app))
+        finally:
+            locked.chmod(0o755)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Permission denied", result.stderr)
+
+    def test_a_recipe_folder_that_is_a_link_fails_the_bytecode_check(self) -> None:
+        check = str(RELEASE / "check-no-bytecode.sh")
+        app = self.toolchain_app("bytecode-link")
+        contracts = app / "Contents" / "Resources" / "contracts"
+        shutil.rmtree(contracts)
+        contracts.symlink_to(self.folder)
+        self.assertEqual(run(check, str(app)).returncode, 1)
 
     # MARK: publish.sh calls them, in order
 

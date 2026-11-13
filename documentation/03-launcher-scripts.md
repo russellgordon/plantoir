@@ -594,7 +594,7 @@ into every working folder) means a new tag, a local rebuild on the next
 run, and a recreated container. The hash covers only recipe files: the
 `find` prunes `.git`, `courses`, `mac-app`, `node_modules`,
 `.merged_output`, `.verify-export.*` and `__pycache__`, and skips
-`.DS_Store` and `*.pyc`, so build outputs never steer the tag (from the
+`.DS_Store`, `*.pyc` and `*.pyo`, so build outputs never steer the tag (from the
 repository root they once did, at the cost of minutes of checksumming per
 run). The old pull-and-compare update machinery (`--update-image`, digest
 checks, the update prompt) is gone.
@@ -629,7 +629,9 @@ recipe a new image name, and every Mac builds the image again for nothing.
 
 1. **The launchers skip it.** `toolchain_hash` (byte-identical in
    `setup.sh`, `preview.sh` and `deploy.sh`) prunes `__pycache__` and skips
-   `*.pyc`. A context with neither hashes exactly as it did before: measured
+   `*.pyc` and `*.pyo` (Python 2's name; Python 3 never writes one). Anything
+   else left in the recipe folders, an editor's swap file for one, is part
+   of the hash, as it always has been. A context with none hashes exactly as it did before: measured
    `d096a1f5` on the 1.9.3 copy, before and after, and still `d096a1f5`
    (`747b0982` for `support/swift`) with the strays planted. So the prune
    renames no teacher's image by itself; the release that carries it does,
@@ -638,14 +640,21 @@ recipe a new image name, and every Mac builds the image again for nothing.
    cannot disagree with the launchers.
 2. **The build phase removes it from the bundle.** `write_toolchain_hashes.py`
    ([09 → Comparing without reading (#663)](09-mac-app.md#comparing-without-reading-663-2026-10-24))
-   deletes every `__pycache__` and `.pyc` under the bundle's four folders
-   before it fingerprints them, and says how many. The checkout is never
-   touched. Measured on this worktree's Debug build with 20 stray `.pyc` in
+   deletes every `__pycache__`, `.pyc` and `.pyo` under the bundle's four
+   folders before it fingerprints them, and says how many. It never follows
+   a link: a recipe folder in the bundle that is a link fails the build
+   (measured on a scratch tree before this rule: the delete followed a
+   linked `scripts/` and removed the caches at its target, outside the
+   bundle), and a linked folder further down is not descended. Xcode copies
+   a folder reference as real folders, so the checkout is never touched.
+   Measured on this worktree's Debug build with 20 stray `.pyc` in
    `scripts/__pycache__`: "removed 20 compiled Python files", and the bundle
    held none afterwards.
 3. **publish.sh refuses a bundle that still has it.**
    `release/check-no-bytecode.sh` reads the staged copy after the build, in
-   every mode, and names each file it finds. It should never fire after (2);
+   every mode, and names each file it finds. A recipe folder that is missing
+   or a link, or one `find` cannot read, fails it too, with `find`'s own
+   error shown. It should never fire after (2);
    it is the release's own proof.
 
 `verify.sh` step 0.5 also fails when the checkout's `patches/`, `scripts/`,

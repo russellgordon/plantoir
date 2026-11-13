@@ -30,6 +30,7 @@ Pure stdlib, no Docker, no network. Run with:
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -129,6 +130,7 @@ def plant_bytecode(root):
     (root / "support" / "swift" / "__pycache__" / "runner.cpython-311.pyc").write_bytes(b"\x00\x02")
     (root / "stray.pyc").write_bytes(b"\x00\x03")
     (root / "contracts" / "loose.pyc").write_bytes(b"\x00\x04")
+    (root / "patches" / "old.pyo").write_bytes(b"\x00\x05")
 
 
 class TheBuildPhaseStripsBytecode(unittest.TestCase):
@@ -156,10 +158,12 @@ class TheBuildPhaseStripsBytecode(unittest.TestCase):
         self.assertFalse((self.resources / "scripts" / "__pycache__").exists())
         self.assertFalse((self.resources / "support" / "swift" / "__pycache__").exists())
         self.assertFalse((self.resources / "contracts" / "loose.pyc").exists())
+        self.assertFalse((self.resources / "patches" / "old.pyo").exists())
         for path in self.manifest_paths():
             self.assertNotIn("__pycache__", path)
             self.assertFalse(path.endswith(".pyc"), path)
-        self.assertIn("removed 3 compiled Python files", result.stdout)
+            self.assertFalse(path.endswith(".pyo"), path)
+        self.assertIn("removed 4 compiled Python files", result.stdout)
 
     def test_the_recipe_itself_is_kept_and_listed(self):
         plant_bytecode(self.resources)
@@ -174,6 +178,31 @@ class TheBuildPhaseStripsBytecode(unittest.TestCase):
         result = self.run_the_phase()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("removed", result.stdout)
+
+    def test_a_recipe_folder_that_is_a_link_is_refused_and_nothing_outside_is_removed(self):
+        # Measured before the fix: the phase followed a linked scripts/ and
+        # deleted the caches at the link's target, outside the bundle.
+        outside = Path(tempfile.mkdtemp(prefix="plantoir-747-outside-"))
+        self.addCleanup(shutil.rmtree, outside, True)
+        (outside / "__pycache__").mkdir()
+        (outside / "__pycache__" / "x.pyc").write_bytes(b"\x00")
+        (outside / "y.pyc").write_bytes(b"\x00")
+        shutil.rmtree(self.resources / "scripts")
+        os.symlink(outside, self.resources / "scripts")
+        result = self.run_the_phase()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("is a link", result.stderr)
+        self.assertTrue((outside / "__pycache__" / "x.pyc").exists())
+        self.assertTrue((outside / "y.pyc").exists())
+
+    def test_a_linked_folder_further_down_is_not_followed(self):
+        outside = Path(tempfile.mkdtemp(prefix="plantoir-747-outside-"))
+        self.addCleanup(shutil.rmtree, outside, True)
+        (outside / "__pycache__").mkdir()
+        (outside / "__pycache__" / "x.pyc").write_bytes(b"\x00")
+        os.symlink(outside, self.resources / "support" / "linked")
+        self.assertEqual(self.run_the_phase().returncode, 0)
+        self.assertTrue((outside / "__pycache__" / "x.pyc").exists())
 
     def test_a_file_at_the_top_of_the_bundle_is_not_its_business(self):
         # Only the four recipe folders are the phase's to change. A .pyc at the
