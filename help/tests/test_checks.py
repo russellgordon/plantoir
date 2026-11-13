@@ -108,6 +108,23 @@ class StructureTests(unittest.TestCase):
         self.fixture.replace("help/tone.json", '"pages": ["python-page"]', '"pages": ["no-page"]')
         self.refused("names page no-page, which is not in the outline")
 
+    def test_a_placeholder_with_no_shows_is_a_warning(self) -> None:
+        self.fixture.replace("help/scenes.json", '"shows": "The fixture window with its sidebar"', '"shows": ""')
+        code, output = self.fixture.run("--check")
+        self.assertEqual(code, 0, output)
+        self.assertIn("scene first-steps-1 has no `shows` yet", output)
+
+    def test_a_webp_header_gives_the_picture_its_size(self) -> None:
+        from helpbook.render import webp_size
+
+        lossless = self.fixture.repo / "lossless.webp"
+        bits = (1199) | (799 << 14)
+        chunk = b"\x2f" + bits.to_bytes(4, "little") + b"\x00" * 8
+        body = b"WEBP" + b"VP8L" + len(chunk).to_bytes(4, "little") + chunk
+        lossless.write_bytes(b"RIFF" + len(body).to_bytes(4, "little") + body)
+        self.assertEqual(webp_size(lossless), (1200, 800))
+        self.assertEqual(webp_size(self.fixture.help_dir / "pictures" / "first-steps-2-light.webp"), (1600, 1000))
+
     def test_check_writes_nothing(self) -> None:
         code, output = self.fixture.run("--check")
         self.assertEqual(code, 0, output)
