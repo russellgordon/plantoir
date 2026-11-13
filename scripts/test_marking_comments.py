@@ -120,12 +120,12 @@ def written_rows(out):
 
 
 # The 752 fix review's corpus (h1.py), and more: a name in every shape a teacher or a script might write one,
-# and lines that hold none. Invented names; Max, May, Will, Mark and Ed are the everyday-word names the review
+# and lines that hold none. Invented names; Rob, May, Will, Mark and Ed are the everyday-word names the review
 # asked about, held as a false alarm on purpose (a missed name is worse than a false alarm).
 CORPUS = [
     "Ixo led the group project well.", "Ixo's answers were neat.", "IxoNg compared answers.", "AnaLi worked on B2.",
     "ana.li worked on B2.", "Ixo2 was absent.", "Ixo_notes were filed.", "See Mark_feedback.pdf for detail.",
-    "Bix was helpful in class.", "Contact an77 about the retest.", "Max marks for part B.", "Full marks in May.",
+    "Bix was helpful in class.", "Contact an77 about the retest.", "Rob marks for part B.", "Full marks in May.",
     "The mark scheme was followed.", "Mark scheme applied to every question.", "She showed the will to keep going.",
     "Will check the units next time.", "Ed. note: question 4 was re-marked.", "Li is the symbol for lithium.",
     "An answer was missing in part C.", "Ana answered every part.", "The ratio is ng per mL.", "Ng worked hard.",
@@ -227,7 +227,7 @@ class CommentNameCaseTests(unittest.TestCase):
         table_text = ("section,identifier,name,first name,preferred name,email\n"
                       '1,Student A,"Testfamily, Ixo",Ixo,,ixo.testfamily@example.org\n'
                       '1,Student B,"Ng, Alphaname",Alphaname,,an77@example.org\n'
-                      '1,Student C,"Quillfamily, Max",Max,,\n'
+                      '1,Student C,"Quillfamily, Rob",Rob,,\n'
                       '1,Student D,"Plumfamily, May",May,,\n'
                       '1,Student E,"Zedfamily, Mark",Mark,Bix,\n'
                       '1,Student F,"Li, Ana",Ana,,\n'

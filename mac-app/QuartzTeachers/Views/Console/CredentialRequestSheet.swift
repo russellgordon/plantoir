@@ -35,7 +35,17 @@ struct CredentialRequestSheet: View {
     /// Whitespace either side of a pasted code is invisible and breaks the
     /// sign-in, so it never reaches the launcher.
     var tidiedAnswer: String {
-        return answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CredentialRequestSheet.answerToSend(answer, for: request)
+    }
+
+    /// What is sent for an answer. A unit plan's password is sent exactly as
+    /// typed, spaces at either end included, as the command line keeps it
+    /// (#709); everything else is a code whose surrounding spaces are noise.
+    static func answerToSend(_ typed: String, for request: CredentialRequest) -> String {
+        if request.name == CredentialRequest.unitPlanPassword.name {
+            return typed
+        }
+        return typed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Body

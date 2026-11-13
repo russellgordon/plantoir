@@ -178,9 +178,18 @@ struct NewCourseWizardView: View {
     /// example lands beside last year's rather than clashing in Other.
     @State var referenceSchoolYear: Int?
 
+    /// The group the teacher made that a course kept for reference goes in
+    /// (#572, third piece), or nil for "Its school year". The picker is
+    /// drawn only when the teacher has made a group.
+    @State var referenceGroupID: String?
+
     /// The day the year list is built from, fixed for the life of the sheet
     /// so the list cannot change under the teacher.
     let today: CalendarDay
+
+    /// The warning before a reference course is replaced, while it is up
+    /// (#572, second piece).
+    @State var replaceWarning: ReferenceReplacer.Warning?
 
     /// What the progress header is called — the wizard creates a course,
     /// but the same sheet also adds the example course.
@@ -339,8 +348,60 @@ struct NewCourseWizardView: View {
             existingFolderNames: courseFolderNamesHere,
             keepsForReference: makesAReferenceCourse,
             schoolYear: referenceSchoolYear,
-            shelved: workspace.shelvedReferenceCourses(on: today)
+            shelved: workspace.shelvedReferenceCourses(on: today),
+            madeGroup: chosenReferenceGroup
         )
+    }
+
+    /// The made group the Group picker chose, as the shelf has it now, or
+    /// nil for "Its school year" (and for a group removed since).
+    var chosenReferenceGroup: ReferenceShelf.MadeGroup? {
+        guard let referenceGroupID else {
+            return nil
+        }
+        return workspace.referenceShelf.arrangement.group(withID: referenceGroupID)
+    }
+
+    /// Where the course would sit on the shelf.
+    var referencePlace: ReferenceShelf.Place {
+        if let chosenReferenceGroup {
+            return .made(chosenReferenceGroup.id)
+        }
+        return ReferenceShelf.Place.forYear(referenceSchoolYear)
+    }
+
+    /// The course on the shelf a reference course of this code and year
+    /// would clash with, when the wizard is making one: the course Replace
+    /// It… would replace. Nil otherwise.
+    var referenceCourseInTheWay: ReferenceCourseRule.Shelved? {
+        if !makesAReferenceCourse {
+            return nil
+        }
+        return ReferenceCourseRule.courseInTheWay(
+            placing: courseCode,
+            in: referencePlace,
+            among: workspace.shelvedReferenceCourses(on: today)
+        )
+    }
+
+    /// Replace It…: the refusal, or the warning (`ReferenceReplacer.offer`).
+    func offerToReplace(_ folderName: String) {
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return
+        }
+        let world: ReferenceReplacer.World = ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+        Task { @MainActor in
+            let offer: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
+                toReplace: folderName, coursesDirectoryURL: coursesDirectoryURL, world: world
+            )
+            switch offer {
+            case .refused(let sentence):
+                validationProblem = sentence
+            case .warn(let warning):
+                validationProblem = nil
+                replaceWarning = warning
+            }
+        }
     }
 
     /// Every course folder in this working folder, live and reference.
@@ -407,9 +468,25 @@ struct NewCourseWizardView: View {
                         ForEach(SchoolYear.offeredStartingYears(on: today), id: \.self) { year in
                             Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
                         }
-                        Text(SchoolYear.otherGroupName).tag(Int?.none)
+                        Text(workspace.referenceShelf.arrangement.noYearTitle).tag(Int?.none)
                     }
                     .accessibilityIdentifier("referenceSchoolYearPicker")
+                    // Only when there is a group to choose (plan review M8:
+                    // the wizard is the one door with a Group picker; every
+                    // other door files by year, and Move to Group does the
+                    // rest).
+                    if !workspace.referenceShelf.arrangement.groups.isEmpty {
+                        Picker(ReferenceGroupWording.groupPickerLabel, selection: $referenceGroupID) {
+                            Text(ReferenceGroupWording.groupPickerDefault).tag(String?.none)
+                            ForEach(
+                                ReferenceShelf.madeGroupsInOrder(workspace.referenceShelf.arrangement.groups),
+                                id: \.id
+                            ) { group in
+                                Text(group.name).tag(String?.some(group.id))
+                            }
+                        }
+                        .accessibilityIdentifier("referenceGroupPicker")
+                    }
                 }
             }
         case .offerUnderTheRefusal:
@@ -734,6 +811,9 @@ struct NewCourseWizardView: View {
     var body: some View {
         wizardContent
             .frame(width: 680, height: 620)
+            .replaceReferenceCourseAlert($replaceWarning) { folderName in
+                startCreation(replacing: folderName)
+            }
             // Resolves the anchor `CourseCodePickerView` published for the
             // code field into an actual rect via THIS outer
             // `GeometryReader`'s proxy, then draws the popup as a sibling
@@ -1012,10 +1092,23 @@ struct NewCourseWizardView: View {
                         // wears — a duplicate code is the usual reason a
                         // filled-in form still won't submit, so it must
                         // never be a mystery.
-                        Text(problem)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("courseCodeWarning")
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(problem)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("courseCodeWarning")
+                            // Beside the shelf rule's refusal, and only
+                            // there (#572): the one answer to it.
+                            if let inTheWay = referenceCourseInTheWay {
+                                Spacer(minLength: 0)
+                                Button(ReferenceReplaceWording.replaceButton) {
+                                    offerToReplace(inTheWay.folderName)
+                                }
+                                .controlSize(.small)
+                                .accessibilityIdentifier("replaceReferenceCourseButton")
+                            }
+                        }
                     } else {
                         ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
@@ -1832,7 +1925,10 @@ struct NewCourseWizardView: View {
         return RemovalTrail.inNewCourse(typedCode: courseCode, list: list)
     }
 
-    func startCreation() {
+    /// - Parameter confirmedReplace: the reference course the teacher chose
+    ///   to replace in the warning (#572), for THIS press only; Create
+    ///   itself passes nothing, so it never replaces anything.
+    func startCreation(replacing confirmedReplace: String? = nil) {
         validationProblem = nil
 
         let code: String = courseCode.trimmingCharacters(in: .whitespaces).uppercased()
@@ -1840,10 +1936,22 @@ struct NewCourseWizardView: View {
             validationProblem = "Enter a course code."
             return
         }
-        // The same check the live warning under the field uses.
+        // The same check the live warning under the field uses. The shelf
+        // rule's refusal is answered by a replace the teacher confirmed, and
+        // only for the course it names (#572).
+        let replacesTheCourseInTheWay: Bool = confirmedReplace != nil
+            && referenceCourseInTheWay?.folderName == confirmedReplace
         if let problem = courseCodeProblem {
-            validationProblem = problem
-            return
+            let shelfSentence: String? = ReferenceCreation.shelfTrouble(
+                typed: courseCode,
+                schoolYear: referenceSchoolYear,
+                shelved: workspace.shelvedReferenceCourses(on: today),
+                madeGroup: chosenReferenceGroup
+            )?.sentence
+            if !replacesTheCourseInTheWay || problem != shelfSentence {
+                validationProblem = problem
+                return
+            }
         }
         if let problem = NewCourseWizardView.sectionNumbersProblem(sectionNumbersText) {
             validationProblem = problem
@@ -1884,7 +1992,10 @@ struct NewCourseWizardView: View {
                 schoolYear: referenceSchoolYear,
                 workspaceURL: workspaceURL,
                 existingFolderNames: courseFolderNamesHere,
-                shelved: workspace.shelvedReferenceCourses(on: today)
+                shelved: workspace.shelvedReferenceCourses(on: today),
+                replacing: replacesTheCourseInTheWay ? confirmedReplace : nil,
+                replaceWorld: ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening),
+                madeGroupID: chosenReferenceGroup?.id
             )
             return
         }

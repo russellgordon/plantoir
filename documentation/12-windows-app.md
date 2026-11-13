@@ -5580,6 +5580,62 @@ Not yet on Windows. The mac's write-up, with what was measured and rejected, is
   names inside and makes links as links; the contract's checks refuse all
   three either way.
 
+### Owed: replacing a reference course after a warning and a backup (#572, second piece)
+
+Not yet on Windows. The mac's write-up, with what was measured and rejected,
+is `09-mac-app.md` → "Replacing a reference course (#572)"; every rule is a
+case in `shared-rules.json` → `referenceCourses.replacing`, and the `windows`
+issue for #572's second piece lists the work.
+
+- **Inherited free:** nothing in the shared Python. A backup the mac made
+  while replacing is an ordinary teacher-kind `<FOLDER>_backup_<stamp>.zip`,
+  which Windows already lists and restores.
+- **Owed:** Replace It… beside the shelf rule's refusal at the three doors,
+  the warning, `ReferenceReplacer`'s order (`sequence.cases`), the backup
+  check against the zip's listing (`backupCheck`), the Obsidian refusal
+  (`obsidianCases`), the sweep of `.plantoir-replacing-<FOLDER>` at the top of
+  a folder's reading (`sweepCases`; on Windows "unlocked first" means removing
+  the DENY entries first), and four trail events, one of them "course
+  restored from a backup" on EVERY whole-course restore (check whether
+  `CourseRestorer.cs` writes one today).
+- **To measure on Windows rather than copy:** what the zip reader there
+  gives for a name outside ASCII (the mac's `zipinfo` prints `?`, which is
+  why the mac reads names with `tar`; `backupCheck.realNames`), and whether
+  `Directory.Move` of a folder whose files carry the DENY entries succeeds, as a rename of a locked
+  tree does on APFS; the order depends on it.
+
+
+### Owed: groups on the reference shelf (#572, third piece)
+
+Not yet on Windows. The mac's write-up, with what was measured and rejected,
+is `09-mac-app.md` → "Groups on the reference shelf (#572)"; the rules are
+`shared-rules.json` → `referenceCourses.groups`, the file is
+`file-formats.json` → `referenceShelf`, and the `windows` issue for #572's
+third piece lists the work.
+
+- **Inherited free:** nothing in the shared Python. Until Windows reads
+  `courses/.internal/reference-shelf.json`, a folder arranged on a Mac shows
+  the year layout there: harmless, but the two machines disagree about where
+  a course is.
+- **Owed:** reading and writing the file as `referenceShelf` says (an
+  unreadable or newer file is never written; unknown keys and entries are
+  kept; one lock and an atomic write per change); `SidebarPane.Reference.cs`
+  drawing year groups, made groups A to Z and the renamable no-year group;
+  New Group…, Rename Group…, Remove Group (its courses go back to their
+  years) and Move to Group ▸ on the row and in the Course menu; the Group
+  picker in the wizard's reference mode only; the shelf rule by group; the
+  placement every arriving door writes and Remove Course… forgets
+  (`groups.arrivals`, plan review H2); the summary's group line; fold state
+  for made groups; Start the Groups Again… for an arrangement that cannot
+  be read (`referenceShelf.startingAgain`: moved aside, never deleted; a newer
+  version's file never moved); the name cleaned by `courseNameCharacters`,
+  #780's rule, before it is checked (`char.IsControl` alone is not it); six
+  trail events.
+- **To decide on Windows rather than copy:** the lock. The mac takes an
+  exclusive `flock` on `courses/.internal`; Windows needs its own exclusive
+  open (a lock file opened with `FileShare.None`, say), and it must be one
+  every Windows process takes, the MCP server included.
+
 ## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
 
 What a Windows implementer needs that the mac's write-up cannot give; the
@@ -12463,3 +12519,21 @@ proves when it is asked, not what the window shows).
 
 **For the mac: nothing to do** (`11-release-strategy.md` → "What the mac must
 KNOW about #700").
+
+## Sharing unit plans (#709): what Windows owes
+
+The mac shares a course's unit plans to Cloudflare Pages from the Planning
+tab (`documentation/07-deployment.md` → "Sharing a unit plan (#709)" says
+why, what was measured and what was rejected; `documentation/09-mac-app.md`
+the app's half). Windows inherits the shared Python free: `scripts/unit_plan_site.py`,
+`scripts/share_plan.py` and their tests, which `PythonToolchainTests` already
+runs (the worker cases need node, which the runtime carries). It owes
+`deploy.ps1 -Plans` with its flags and the plans guard, the credential item
+in Credential Manager handed over through a file only the user can read,
+the share bar with `unitPlanning.share.words`, `modeCases`, `warningCases`
+and `deployArguments.planShareCases`, the three trail events, the two
+`LogRedactor` rules (`problemReportRedaction.cases`), the reference copy
+moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
+`windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
+until done.
+

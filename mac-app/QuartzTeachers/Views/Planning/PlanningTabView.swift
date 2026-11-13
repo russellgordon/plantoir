@@ -136,6 +136,8 @@ struct PlanningTabView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .accessibilityIdentifier("planningWebView")
                     }
+                    // Sharing the plans (#709), below the plan it shares.
+                    PlanShareBar(course: course, folder: folder)
                 }
             }
         }

@@ -60,6 +60,9 @@ nonisolated enum SubjectMenuRules {
         case revertCourseSettings
         case rename
         case setSchoolYear
+        /// Move to Group ▸ (#572, third piece): a submenu, live where Set
+        /// School Year is, and acting on the same course.
+        case moveToGroup
         case keepACopyForReference
         case backUpNow
         case restoreFromBackup
@@ -206,6 +209,9 @@ nonisolated enum SubjectMenuRules {
             }
             if !isLive {
                 enabled.insert(.setSchoolYear)
+                // Moving a course between groups writes nothing in it, so
+                // it is live whatever the course is doing.
+                enabled.insert(.moveToGroup)
             }
             if isLive && !situation.busy {
                 enabled.insert(.keepACopyForReference)

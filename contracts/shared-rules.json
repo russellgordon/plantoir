@@ -453,6 +453,36 @@
         "why": "The ONE thing a frozen course still lets a teacher change, so rule 5 applies to it like any other feature. It names both the code and the folder because those two deliberately differ on a reference course, and a report saying 'ICS3U moved' would not say WHICH of the three ICS3Us on the shelf did. Not written when the sheet is cancelled, and not written when the write fails - the teacher is told about that in a sentence of its own."
       },
       {
+        "carries": "the group's name, quoted: the teacher's own words, like a course or folder name",
+        "event": "reference group made",
+        "why": "Added for #572's third piece: a teacher can make groups on the Reference Courses shelf. A course 'missing' from the shelf is often in a group the teacher forgot making, and this is the line that says it was made. The name passes through LogRedactor like every line, so a name that happens to look like a credential is taken out."
+      },
+      {
+        "carries": "the group's old and new names, and whether it was the group for courses with no school year (Other until renamed). A year group is never renamed",
+        "event": "reference group renamed",
+        "why": "Added for #572's third piece. A renamed group is the same group with a different row title, and 'where did my Examples group go' is answered only by this line. Not written when the name typed is the name it already had."
+      },
+      {
+        "carries": "the group's name and how many courses went back to the groups their school years put them in, and that no course was removed",
+        "event": "reference group removed",
+        "why": "Added for #572's third piece. Removing a group sends its courses back to their years, so a teacher who finds a course in 2025-26 that they had filed elsewhere can be shown that the group was removed. Never written for a removal that was refused; that one leaves 'reference groups not changed'."
+      },
+      {
+        "carries": "the code the course shows, its folder, and the group it came from and the group it went to, by name",
+        "event": "reference course moved to a group",
+        "why": "Added for #572's third piece. Nothing on disk moves when a course changes group, so this line is the only record of where a course went. Not written when the course was already in that group."
+      },
+      {
+        "carries": "what was asked (make, rename or remove a group, move a course, or record which group an arriving course is in) and the sentence the teacher read: a name already on the shelf, a clash with another course of the same code, or that the shelf's groups could not be read, were arranged by a newer Plantoir, or could not be saved",
+        "event": "reference groups not changed",
+        "why": "Added for #572's third piece. Every group act is a button pressed, and rule 5 says one pressed and refused leaves a line; the sentence is what the teacher saw. The name rule's live sentence under the field is not a press and writes nothing; the press itself does."
+      },
+      {
+        "carries": "the name the unreadable arrangement was kept under beside the new one (reference-shelf.unreadable-<stamp>.json), never what it held",
+        "event": "reference groups started again",
+        "why": "Added for #572's third piece (implementation review M2). Start the Groups Again moves an arrangement that cannot be read aside and gives the teacher the year layout back. The kept name is the way back to whatever it held, and 'my groups vanished' is answered by this line."
+      },
+      {
         "carries": "the course, how many pages had to be locked again, and how many would not stay locked",
         "event": "reference course pages locked again",
         "why": "Written ONLY when a pass actually did something, so a folder in a steady state leaves no lines at all. It is the answer to the one report this feature can produce that would otherwise be unexplainable: 'my reference course let me edit a page'. A count of 37 after a restore is a backup coming back unlocked, because a zip carries the mode and not the flag; a handful that would not stay locked, over and over, is usually a folder kept in a cloud drive whose file provider clears the locked bit while a file uploads - but the LINE says only the count, deliberately, because a volume with no support for the flag at all produces the same count and naming a cause would be a confident wrong diagnosis. Neither is a failure to put in front of the teacher, and neither is retried after a delay - the next pass is the mechanism."
@@ -486,7 +516,7 @@
         "why": "Written per COURSE, because a run of four that imports three is the ordinary shape of this and 'the import failed' is exactly the report that cannot be looked into. Without it, a teacher who ticked four courses and found three has nothing to point at, and the one that is missing is the one they will ask about."
       },
       {
-        "carries": "the folder a NEW reference course was given, the code it shows, its school year and how many sections, and that it began from the ready-made pages written for it",
+        "carries": "the folder a NEW reference course was given, the code it shows, its school year and how many sections, and that it began from the ready-made pages written for it; and, since #572's third piece, the group the teacher made that the wizard's Group picker put it in, by name, when one was chosen",
         "event": "course created for reference",
         "why": "Added for #572: the New Course wizard can make a course straight onto the Reference Courses shelf, beside a live course of the same code. The ordinary 'course created' line is written BEFORE setup runs and names the code alone, so for this course it would read as the live one; this line is written after the course is on the shelf, and names its folder. 'My new reference course is wrong' is the report it answers."
       },
@@ -504,6 +534,26 @@
         "carries": "which course an unfinished import was going to be",
         "event": "unfinished import for reference tidied away",
         "why": "A reference course is built under a hidden name and renamed into place last, so an import the app never finished leaves a folder nothing can see - and therefore nothing would ever remove. This is the line that says the disk space came back, and the answer to 'my import did not finish and now there is no trace of it'."
+      },
+      {
+        "carries": "the folder of the reference course replaced, the code it shows and its group, where the new course came from (a new course made from the ready-made pages, a copy of a live course, or a course imported from a folder or zip, by its name), what the old one held (sections, files, pages, size), and the backup's FILE NAME; a second clause when the old course's own folder could not be removed yet. Never anything written on a page",
+        "event": "reference course replaced",
+        "why": "Added for #572's second piece: a teacher can now replace a course on the Reference Courses shelf after a warning. 'Where did my old ICS3U go?' is the report this answers, and the backup's file name is the way back, so it is the one thing the line must carry."
+      },
+      {
+        "carries": "the folder, the code it shows and its group when it was a reference course, where the new course came from, and the sentence the teacher read (only a reference course can be replaced, it is previewing or being backed up, it is open in Obsidian, it could not be backed up, it could not be replaced, it could not be put back yet), with what failed in brackets: the code the backup stopped with, the backup's FILE NAME and a COUNT of the files it did not hold (never their names, which are page titles), or a rename's reason",
+        "event": "reference course could not be replaced",
+        "why": "Added for #572. Written for every way a confirmed replace ends without one, so 'I pressed Replace and the old one is still there' or 'the new one never appeared' can be answered; the bracketed detail is what tells a full disk from a backup that did not hold the course."
+      },
+      {
+        "carries": "the folder of a reference course whose replace did not finish, and what was done: renamed back to its own folder, its old copy removed because the new course was in place and a backup was OPENED and found to hold it (by the backup's FILE NAME), or that it could not be renamed back yet",
+        "event": "unfinished replace of a reference course put right",
+        "why": "Added for #572 (plan review M1). A quit or a crash part way through a replace leaves the old course in a hidden folder nothing can see. The next reading of the working folder puts it back, and this is the line that says so: without it, a course that vanished and reappeared would have no explanation."
+      },
+      {
+        "carries": "the code a course shows and its folder, the backup's FILE NAME, the archive made of the course as it was first (or that there was none), and whether the course that came back is kept for reference; for a whole course put back from Archived, the archive's FILE NAME, which that restore uses up (implementation review L5)",
+        "event": "course restored from a backup",
+        "why": "Added for #572: a whole-course restore from Backups wrote no line at all (only a section's restore did), and it is now how a replaced reference course comes back. Written for EVERY whole-course restore, live or reference, once the restore has happened; a refused restore writes nothing."
       },
       {
         "carries": "the course the pages came FROM by its folder name, the course and folder they landed in, how many pages and pictures were created, reused, brought in under a new name and left alone, how many could not be removed and must not be deployed, how many were copied hidden because the settings they came with could not be read (since #188/#186, 2026-09-25 - a source closed only by INDENTED dashes is copied hidden rather than refused), and the backup's file name",
@@ -561,7 +611,7 @@
       {
         "carries": "the course, the section, how many seconds it waited, what the other program held and its process id - or, on Windows since #477, that Plantoir was getting the working folder ready and that copy's process id, or both obstacles in one line - and whether it then went ahead or stood down",
         "event": "scheduled publish waited for the course",
-        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac does not wait for a copy (its scheduled run does not mirror the tools); whether it should is a mac issue, not a contract case, by Russell's ruling on #477."
+        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac's run waits for a copy too since #748 part 4, before and after its own copy, for up to five minutes, and records that wait on its own event ('scheduled deploy got its folder ready'), never on this one, because it is not a wait for the course; it is not a contract case for both platforms, by Russell's ruling on #477, and scheduledRunGetsItsFolderReady.platformDifferences says how the two differ."
       },
       {
         "event": "scheduled deploy waited for its earlier deploy",
@@ -1135,6 +1185,44 @@
         },
         "couldNotOpenLine": "{course} · could not open {what} in the browser",
         "why": "#803: Open in Browser on the Planning tab (unitPlanning.tab.openInBrowser) sends a plan out of Plantoir, to an app a report cannot see into, so a report of 'my plan looks wrong in Safari' or 'nothing happened' needs a line saying the button was pressed and whether the browser took the page. Written once the browser has answered. A refusal writes nothing: the button is dimmed and says why, and the alert at a click says it again. The kind of page and never its name, because a unit's folder name is made from its title, the teacher's own words (rule 5)."
+      },
+      {
+        "event": "unit plans shared",
+        "carries": "the course, the school year, how many units, with a password or open to anyone with the link, answer keys left out, what a flood would do (protected only, from the marker's failClosed), and that an earlier copy could not be removed. NEVER the address (its random suffix is a line of defence, and the trail goes into problem reports), a username or a password. Written by the app from share_plan.py's PLANTOIR_PLAN_SHARED: line (PlanShareReport).",
+        "line": "{course} · unit plans for {year} shared to Cloudflare Pages, {units}, {with a password | open to anyone with the link}{, answer keys left out}{, the plans close if flooded | , the plans would open if flooded}{, an earlier copy could not be removed}",
+        "why": "#709. A shared plan is something a teacher's colleagues can open from anywhere, and 'my colleague says the plans ask for no password' or 'the answer keys are not there' is answerable only from what the share did. The warning and a changed password are not on the line: the marker does not carry them (a known gap, documentation/09-mac-app.md)."
+      },
+      {
+        "event": "unit plan share refused",
+        "carries": "the course and why, in plain words by the refusal's key (unitPlanning.share.refusals), with the problem count for checkFound. Written by the app from PLANTOIR_PLAN_REFUSED:, and by deploy.sh itself when the plans were already being shared.",
+        "line": "{course} · unit plans not shared: {reason}",
+        "launcherLineWhenAlreadySharing": "{course} · unit plans not shared: they were already being shared",
+        "why": "#709. A share that did not happen says so in the console, which is gone once the sheet is closed."
+      },
+      {
+        "event": "unit plan sharing stopped",
+        "carries": "the course, the school year, and how it ended: deleted, already gone, or failed with the address still working. Never the address.",
+        "line": "{course} · stopped sharing the {year} unit plans ({deleted | already gone | failed, so the address still works | not confirmed, so the address may still work})",
+        "why": "#709. 'I stopped sharing and my colleague can still open it' is answerable only if the trail says whether the delete worked."
+      },
+      {
+        "event": "scheduled deploy got its folder ready",
+        "carries": "the course and the section, after the course's own prefix ({course}/{section} · ); which case of scheduledRunGetsItsFolderReady.cases it was (the line key); how many files were brought up to date and how many seconds the copy took; whether that means the website builder is built again; for a copy that could not finish, how many files failed and the first one with its error; and how long the run waited for another program's copy of the tools, with that program's process id. Never a path: the working folder is the course's.",
+        "lines": {
+          "broughtUpToDate": "a scheduled deploy copied {n} file(s) of Plantoir's tools into the working folder first, in {seconds} s{builder}, and went ahead",
+          "builderClause": ", so the website builder is built again for them unless this version of Plantoir has built it already",
+          "alreadyUpToDate": "a scheduled deploy found the working folder's tools already up to date, and went ahead",
+          "foundNothingToChange": "a scheduled deploy found nothing of its own to change in the working folder's tools, and went ahead",
+          "couldNotFinish": "a scheduled deploy could not bring all of the working folder's tools up to date ({failed} file(s) could not be copied or removed, {n} brought up to date, first: {first}){builder}, and went ahead with them as they were",
+          "appCarriesNoTools": "a scheduled deploy found none of Plantoir's own tools to bring the working folder up to date with, and went ahead with the folder's tools as they were",
+          "waitedClause": "; it first waited {waited} seconds for another program (process {pid}) to finish getting the working folder ready",
+          "stoppedWaitingClause": "; it stopped waiting after {waited} seconds for another program (process {pid}) that was still getting the working folder ready"
+        },
+        "why": "#748 part 4. The first scheduled deploy after an update is the one run that copies the new version's tools into a folder nobody has opened since, and it is also the one that then builds the website builder again, which makes it minutes slower than the run before it. A deploy that went out late, with a builder built again, looks from outside like a Mac that was slow for no reason; and one whose copy failed and went ahead with the old tools looks like a deploy that ignored the update. This line says which. Not written for the ordinary run that compares every file and changes nothing, and waits for nobody, which is every run but the first after an update: a line on every run would be noise in the one place a teacher's report is read. scheduledRunGetsItsFolderReady carries the cases and why the run goes ahead in every one of them.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Windows' run has done the same since #477 (2026-10-15) and records it under the two events it already had: 'working folder tools copied' ('got the working folder ready for a scheduled deploy', a failure ending 'the scheduled deploy stood down') and 'scheduled publish waited for the course' for the wait. The mac gives it an event of its own because its run never stands down for the copy (scheduledRunGetsItsFolderReady.platformDifferences), so its line says something Windows' lines do not: that it went ahead with the tools as they were. Nothing is owed by Windows."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -3004,6 +3092,21 @@
         "expect": "Netlify token missing",
         "input": "Netlify token missing",
         "why": "KEPT. A sentence that merely says the word 'token' is not a secret, and turning the product's own error messages into holes would make failures unreadable. The rule needs a value after a separator before it removes anything."
+      },
+      {
+        "expect": "curl -H 'Authorization: Basic [removed: token] https://plans.example",
+        "input": "curl -H 'Authorization: Basic Y29sbGVhZ3VlOlN1bmZsb3dlci00Mg==' https://plans.example",
+        "why": "#709: a protected unit plan's username and password travel as a Basic Authorization header, base64 and not encrypted. Anchored on the header's own name."
+      },
+      {
+        "expect": "Opening https://[removed: token]@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
+        "input": "Opening https://colleague:Sunflower-42@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
+        "why": "#709: a username and password written into an address. Before the email rule, which would otherwise take the password and the host for an address and leave the username behind."
+      },
+      {
+        "expect": "Shared Basic French unit plans and Basic Skills.",
+        "input": "Shared Basic French unit plans and Basic Skills.",
+        "why": "#709 review L4: a rule for 'Basic' that is not anchored on Authorization: mangles a course called Basic French."
       }
     ],
     "note": "What is taken OUT of a problem report before it is written to disk, and - just as important - what is KEPT. Redaction happens as the file is written, never as it is sent: a report that is only safe when it leaves by the right button leaks the first time somebody opens the folder it sits in, and writing it safe is what lets a teacher open the file and see for themselves what they are about to send. The rules lean towards removing too much, because removing a build hash by mistake costs a moment of puzzlement while a surviving token costs the teacher their account - but the four KEPT cases below are load-bearing, and a redactor that swallows them produces reports nobody can diagnose from. There is no way to switch this off in a development build: a redactor that is off while it is being worked on is a redactor nobody has run.",
@@ -14799,7 +14902,7 @@
       ]
     },
     "codeUniqueWithinAGroup": {
-      "rule": "Within one school-year group — including 'Other' — no two reference courses may share a course code. Refused with a sentence when a course is put on the shelf and again when its year is changed. The courses a teacher TEACHES are in no group at all and are never consulted.",
+      "rule": "Within one GROUP — a school-year group, the no-year group ('Other' until the teacher renames it), or a group the teacher made (#572, third piece, referenceCourses.groups) — no two reference courses may share a course code. A course in a made group is in no year group, so it never blocks a course of its code from its year. Refused with a sentence when a course is put on the shelf, when its year is changed (for a course in its year group; one in a made group stays in it, groups.setSchoolYear), and when it is moved to another group. The courses a teacher TEACHES are in no group at all and are never consulted. A case's shelf entry and its placing may carry madeGroup, a made group's NAME, which a runner turns into one id per name; expectSentence names the sentence (codeAlreadyInThatGroup for a made group).",
       "why": "Three rows all saying ICS3U under one year is a teacher's mistake made permanent; the same three under 2024–25, 2025–26 and 'Other' is exactly what they meant. It is also what makes 'take a fresh copy' an ordered act — delete the reference copy first, then copy again — rather than a way to end up with two of the same thing.",
       "cases": [
         {
@@ -14848,7 +14951,12 @@
           "ignoringFolderName": "ICS3U-2025",
           "expect": "allowed",
           "why": "Changing a course's school year must not find the course itself sitting where it is about to move from."
-        }
+        },
+        { "name": "the same code in one made group", "shelf": [{"code": "ICS3U", "year": null, "folderName": "ICS3U-REF", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "From colleagues"}, "expect": "refused", "expectSentence": "codeAlreadyInThatGroup", "why": "A made group is a group like any other, whatever years its courses carry." },
+        { "name": "the same code in a made group and in a year group", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025}, "expect": "allowed", "why": "ICS3U-2025 sits in From colleagues, so 2025–26 holds no ICS3U: a course in a made group is in no year group." },
+        { "name": "the same code in two made groups", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "Exemplars"}, "expect": "allowed" },
+        { "name": "into a year group whose code sits in a made group too", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025"}, {"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025-2", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025}, "expect": "refused", "expectSentence": "codeAlreadyInThatYear", "why": "The one left in 2025–26 still counts; the year sentence is unchanged." },
+        { "name": "moving a course into the made group it is in", "shelf": [{"code": "ICS3U", "year": 2025, "folderName": "ICS3U-2025", "madeGroup": "From colleagues"}], "placing": {"code": "ICS3U", "year": 2025, "madeGroup": "From colleagues"}, "ignoringFolderName": "ICS3U-2025", "expect": "allowed" }
       ]
     },
     "neutralises": {
@@ -15185,7 +15293,7 @@
       "howTheWriteGateIsChosen": "On the tool's OWN readOnly flag, never a hand-kept list of names - the same reasoning the window binding uses for gating on the schema. The three exemptions above are DATA rather than code, and a test asserts that the non-readOnly tools minus those three are exactly the set the gate refuses, so adding a tool fails the suite rather than opening a hole. And it is never gated on 'is this the course the session greeted': there is no such binding over MCP, and inventing one here to then except it would remove a capability that is the point of having a reference course at all."
     },
     "interface": {
-      "group": "Reference Courses, folded into school-year sub-groups inside it. Newest year first, 'Other' last, and a group with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar. Every group's fold state is remembered with the folder, the outer one and each year, the same way Archived and Backups already are.",
+      "group": "Reference Courses, folded into groups inside it: school years newest first, then the groups the teacher made A to Z (#572, third piece), then 'Other' (the group for courses with no school year, renamable) last. A school-year group or Other with nothing in it is NOT DRAWN - an empty '2023-24' is a row that teaches a teacher to stop reading the sidebar; a group the teacher MADE is drawn even when empty, since they just made it (referenceCourses.groups.rule). The outer group is drawn when it holds a course or a made group. Every group's fold state is remembered with the folder, the outer one, each year and each made group, the same way Archived and Backups already are.",
       "withheldNotRefused": "Every act that would CHANGE a reference course is not offered at all - hidden, never greyed. A greyed control that can never become available is a standing invitation to wonder what is wrong, and this sidebar already follows that rule for Schedule/Cancel Deploy. The refusals stay underneath: a teacher meets the absence, and any other caller meets the refusal.",
       "whatIsWithheld": [
         "the section window's Deploy button",
@@ -15209,7 +15317,8 @@
         "Open in Obsidian, with the calm note in front of it the first time",
         "Back Up Now - it only READS the course, and a restored backup is still a reference course",
         "Remove - unlocks first, same confirmation, same words",
-        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page"
+        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page",
+        "Move to Group - which group it sits in on the shelf (#572, third piece, referenceCourses.groups). Like the school year it is a fact about the shelf, not the course: nothing in the course is written, and it is not even in the course's settings"
       ],
       "theCalmNote": "Shown when the copy is made AND before the teacher opens the course in Obsidian - once per course, remembered. In FRONT of them rather than after, because what Obsidian shows somebody typing into a locked page could not be measured and silent loss is not ruled out. It claims no more than wording.pagesAreLocked says: not that the pages cannot be changed (the lock is per-Mac and a cloud folder strips it while files upload), and not that the teacher will be TOLD when an edit fails. No warning icon, no 'cannot', no 'error'.",
       "theLocalAssistant": "Not offered on a reference course and told nothing about one. The menu item is not drawn; a window request naming one opens no window, which also closes the deploy approval card as a door by construction; and list_courses does not list them to the LOCAL client - which matters because 'what courses do i have?' is matched in code and its answer is shown to the teacher.",
@@ -15229,6 +15338,7 @@
       "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can put it online. {course} keeps them.",
       "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
       "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
+      "codeAlreadyInThatGroup": "You already have a {code} kept for reference in {group}. Choose a different group.",
       "groupTitle": "Reference Courses",
       "keepACopyMenuItem": "Keep a Copy for Reference…",
       "setSchoolYearMenuItem": "Set School Year…",
@@ -18285,7 +18395,7 @@
     "creating": {
       "appliesOn": ["mac", "windows"],
       "note": "Making a NEW course straight onto the Reference Courses shelf from the New Course wizard, even when a live course has its code (#572, first piece). Three doors and one path (Russell, 2026-11-12): the wizard's toggle, the offer under the taken-code refusal, and New Reference Course... on the Reference Courses heading, which opens the same wizard with the toggle on.",
-      "rule": "In order: (1) the shelf rule for the chosen year, again at the act; (2) the folder name is ReferenceCourseRule.proposedFolderName's (CODE-YYYY, or CODE-REF for Other, -2 to -9 on a clash), and a folder of that name already there refuses; (3) the hidden staging folder is CLAIMED (ReferenceStaging.claim, the claim and lease every reference door takes); (4) the wizard's settings are written into it already marked kept_for_reference with reference_school_year, prepopulate_example_content true, use_skeleton false and the destination neutralised (settingsWritten), so the folder is a reference course for the whole of the run; (5) the real setup runs INSIDE it (course-management.json courseCode.setupIntoStaging), with the ordinary answer pump and progress steps; (6) on success, and only when the ready-made pages are there (setup said 'Example content installed' AND a page other than a folder's front page is in the folder), ReferenceCopier.makeIntoAReferenceCourse and one rename to courses/<FOLDER>; (7) otherwise, or on Cancel, the staging folder is removed and nothing is added. Cancel stops setup.sh on this Mac; the setup it started inside the website builder is a separate process the app does not signal, and it waits at its next question, which nobody answers, or runs to its end if none is left. Anything it writes after Cancel lands in a hidden folder with no claim and no lease, which the next sweep removes; the live course is out of its reach, because every path it writes is under the staging folder; (8) the claim is given back last, however it ended. The live course of the same code is never opened, written, backed up or renamed by any step. 'course created' is NOT written for this path; 'course created for reference' or 'course could not be created for reference' is, once. No groups file is written and no replace is offered: those are #572's second and third pieces.",
+      "rule": "In order: (1) the shelf rule for the chosen year, again at the act; (2) the folder name is ReferenceCourseRule.proposedFolderName's (CODE-YYYY, or CODE-REF for Other, -2 to -9 on a clash), and a folder of that name already there refuses; (3) the hidden staging folder is CLAIMED (ReferenceStaging.claim, the claim and lease every reference door takes); (4) the wizard's settings are written into it already marked kept_for_reference with reference_school_year, prepopulate_example_content true, use_skeleton false and the destination neutralised (settingsWritten), so the folder is a reference course for the whole of the run; (5) the real setup runs INSIDE it (course-management.json courseCode.setupIntoStaging), with the ordinary answer pump and progress steps; (6) on success, and only when the ready-made pages are there (setup said 'Example content installed' AND a page other than a folder's front page is in the folder), ReferenceCopier.makeIntoAReferenceCourse and one rename to courses/<FOLDER>; (7) otherwise, or on Cancel, the staging folder is removed and nothing is added. Cancel stops setup.sh on this Mac; the setup it started inside the website builder is a separate process the app does not signal, and it waits at its next question, which nobody answers, or runs to its end if none is left. Anything it writes after Cancel lands in a hidden folder with no claim and no lease, which the next sweep removes; the live course is out of its reach, because every path it writes is under the staging folder; (8) the claim is given back last, however it ended. The live course of the same code is never opened, written, backed up or renamed by any step. 'course created' is NOT written for this path; 'course created for reference' or 'course could not be created for reference' is, once. No groups file is written (#572's third piece). Where the shelf rule refuses, the wizard offers Replace It... beside the sentence, and a confirmed replace finishes through referenceCourses.replacing instead of the last rename.",
       "why": "GitHub #572: a teacher who has last year's ICS3U on the shelf, or this year's live ICS3U, wants the newer ready-made ICS3U beside it to read and copy from. Making it in the staging folder is the same answer every other reference door gives to 'nothing under courses/ is ever a course that is not yet a reference course'. The pages check is plan review H3: an ordinary course without its pages is a nuisance a teacher repairs, a locked reference course without them is worthless, and the trail would have said it was made from them.",
       "rejected": "Making a live course, keeping a copy and removing the live one: impossible when the code is taken (the point of the issue), and otherwise a deployable course in the sidebar for the length of the run, a 'course created' line for a course that then vanishes, and an archive nobody asked for. Offering the choice for a code with no ready-made pages: the result would be a locked skeleton nobody can read from or add to (the plan review's first question; the director took its recommendation on 2026-11-12). An editable folder name: Import does not offer one either. Stopping the setup inside the website builder on Cancel: the app does not hold that process and could reach it only by sending a keystroke into the run and hoping, which could not be measured without the builder; the rule says what Cancel does instead.",
       "whenOffered": {
@@ -18344,6 +18454,1042 @@
         "rule": "{code} is the code a TEACHER reads, upper case. The offer line is said under the existing taken-code refusal, whose sentence is unchanged (course-management.json courseCode.problems). The menu item ends in a real ellipsis character in both apps.",
         "machineryCheck": "No 'staging', 'setup', 'script', 'container', 'toolchain' or 'folder name' in any sentence here."
       }
+    },
+    "groups": {
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "note": "Groups on the Reference Courses shelf (#572, third piece): a teacher can make groups of their own, rename them, remove them, and move a reference course into one. Russell's ruling of 2026-11-12: groups are FLAT; year groups keep their names; 'Other' (the group for courses with no school year) and groups the teacher makes can be renamed. Scope as amended by the plan review: placements are written explicitly at every arrival and pruned at removal (H2), and the Group picker is in the New Course wizard only (M8). The file is file-formats.json -> referenceShelf.",
+      "rule": "Three kinds of group, one list. A YEAR group is derived from reference_school_year (schoolYearRead), is named by SchoolYear's label, is never stored, never renamed, and not drawn when it holds nothing. The NO-YEAR group holds a course with no school year; it is derived and not drawn when empty, but its NAME is stored (noYearGroupName) and the teacher can change it, 'Other' until they do. A MADE group is stored with an id and a name, and is drawn even when EMPTY: an empty one is something the teacher just made and may want to fill or remove. A course is in a made group only when the file's placements put it there and that group exists; otherwise it is in its year group or the no-year group. With no file the shelf is EXACTLY the shelf before groups, which is the whole of the migration: nothing is converted and no file is written into a folder whose teacher has made no group. GROUPS ARE A VIEW: no group act renames, moves, removes or writes into a course folder, and nothing on disk moves when a course changes group.",
+      "order": "Year groups newest first; then made groups A to Z by name, compared as Finder compares (localised, case-insensitive, numbers by value), with the id breaking a tie; then the no-year group last. No hand ordering. While the sidebar's filter field narrows the list, an EMPTY made group is not drawn either, so a filtered shelf shows only what matched.",
+      "setSchoolYear": "Set School Year... keeps its meaning for a course in its year group (it moves to the new year, and the shelf rule is asked of the new year, as before). For a course in a made group it changes the year its summary shows and leaves it where it is, so no year group is asked.",
+      "theSummary": "The read-only summary of a course in a made group shows that group by name, under wording.summaryGroupLabel. A course in its year group or the no-year group shows nothing more: its school year already says where it is.",
+      "foldState": "Remembered per window with the folder, beside the years: the year and no-year groups keep the remembered starting years (the no-year group as 0) exactly as before, and made groups are remembered by id under a key of their own, so an entry written before groups restores as it did.",
+      "whereItIsOffered": [
+        "New Group...: on the Reference Courses heading's menu, beside New Reference Course..., and inside every Move to Group submenu (it makes the group and moves that course into it).",
+        "Rename Group...: on a made group's row and on the no-year group's row. A year group offers neither Rename nor Remove: its name is its year.",
+        "Remove Group: on a made group's row only. An empty group goes at once; one that holds courses is asked about first (removeGroupAskingMenuItem, removeGroupTitle, and removeGroupMessageOne or removeGroupMessageMany by how many it holds), and its courses go back to their year groups or the no-year group. Cancel is that question's default button.",
+        "Start the Groups Again...: on the Reference Courses heading's menu ONLY while the arrangement cannot be read (file-formats.json -> referenceShelf.startingAgain), under the sentence couldNotReadGroups, and asked first (startAgainTitle, startAgainMessage; Cancel is the default). It moves the unreadable arrangement aside under a dated name, never deleting it, and the shelf is the year layout with every control working again. While a NEWER Plantoir's arrangement is there, the heading's menu says arrangedByANewerPlantoir instead and offers nothing: an older app never moves a newer one's file.",
+        "Move to Group: a submenu on a reference course's row and in the menu bar's Course menu after Set School Year... (live where Set School Year is: subjectMenus item moveToGroup), so a teacher can reach it from the keyboard through menu search. It lists where the course's school year puts it first, named by what it is (the year label or the no-year group's name), then every made group A to Z, then a divider and New Group.... The group the course is in now carries a checkmark and does nothing.",
+        "The Group picker: in the New Course wizard's reference mode ONLY (plan review M8), drawn only when the teacher has made at least one group, defaulting to wording.groupPickerDefault. Every other door (Import, Keep a Copy, Restore from Archived, a backup restored where its course is gone) lands the course by its school year, and Move to Group does the rest."
+      ],
+      "notOffered": [
+        "Nested groups (Russell, 2026-11-12: flat).",
+        "Renaming a year group (Russell, 2026-11-12).",
+        "Drag and drop between groups, and hand ordering of groups.",
+        "Any assistant tool: the local assistant and the MCP surface gain no group tool, and no tool description moves."
+      ],
+      "nameRule": {
+        "rule": "The name is cleaned first by the SAME rule as a course's name, courseNameCharacters (#780): its controls become a space, the bidirectional controls are removed, and the zero-width joiner and non-joiner, the marks and every other character are kept, so an emoji joined by U+200D and a Persian word with U+200C come through whole. Then every run of white space (Unicode White_Space) becomes one space and the ends are trimmed, so a pasted line break is a space, not a refusal. Then: empty -> nameIsEmpty; more than mostCharacters characters (grapheme clusters: what a reader sees as one character) -> nameIsTooLong; a name that READS AS A SCHOOL YEAR, past, present or future (four digits, a dash, then the last two digits of the next year: SchoolYear's label shape for any year, not only the offered ones) -> nameIsAYear, because the shelf draws that year's own group the day a course is filed under it; the same as a name already on the shelf (the no-year group's, or a made group's) -> nameIsTaken with that name as the shelf spells it. Names are compared with case, accents and width folded and every dash read as an en dash, so '2025-26' reads as the year 2025–26. The group being renamed is never in its own way: its own name, in any case, is allowed. Checked live under the field and again at the button.",
+        "mostCharacters": 40,
+        "onDay": "2026-09-20",
+        "cases": [
+          {
+            "name": "empty",
+            "typed": "",
+            "expect": "empty"
+          },
+          {
+            "name": "only spaces",
+            "typed": "   ",
+            "expect": "empty"
+          },
+          {
+            "name": "forty characters is allowed",
+            "typed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "expect": null,
+            "expectName": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          },
+          {
+            "name": "forty-one is too long",
+            "typed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "expect": "tooLong"
+          },
+          {
+            "name": "the ends are trimmed",
+            "typed": "  Examples  ",
+            "expect": null,
+            "expectName": "Examples"
+          },
+          {
+            "name": "a pasted line break is a space",
+            "typed": "From\ncolleagues",
+            "expect": null,
+            "expectName": "From colleagues"
+          },
+          {
+            "name": "a year label",
+            "typed": "2025–26",
+            "expect": "isAYear"
+          },
+          {
+            "name": "a year label typed with a hyphen",
+            "typed": "2025-26",
+            "expect": "isAYear"
+          },
+          {
+            "name": "an offered year nobody has a course in",
+            "typed": "2022–23",
+            "expect": "isAYear",
+            "why": "The shelf draws that group the day a course is filed under it, and two rows called 2022–23 could not be told apart."
+          },
+          {
+            "name": "next year's name, not offered yet",
+            "typed": "2027–28",
+            "expect": "isAYear",
+            "why": "Made on 2026-09-20 it would pass a list of today's years, and from August 2027 it would sit beside the year group of the same name (implementation review L3)."
+          },
+          { "name": "a year at the turn of a century", "typed": "2099-00", "expect": "isAYear" },
+          { "name": "four digits and two that are not the next year", "typed": "2025–27", "expect": null, "expectName": "2025–27" },
+          { "name": "an emoji joined with a zero-width joiner is kept whole", "typed": "👩‍🏫 Exemplars", "expect": null, "expectName": "👩‍🏫 Exemplars", "expectCharacters": 11, "why": "Foundation's controlCharacters set holds U+200D, and spacing it split the teacher emoji in two (implementation review M1). courseNameCharacters keeps it." },
+          { "name": "a Persian word keeps its zero-width non-joiner", "typed": "می‌خواهم", "expect": null, "expectName": "می‌خواهم" },
+          { "name": "a right-to-left override is removed, not spaced", "typed": "A\u202eB", "expect": null, "expectName": "AB" },
+          {
+            "name": "the no-year group in another case",
+            "typed": "other",
+            "expect": {
+              "taken": "Other"
+            }
+          },
+          {
+            "name": "a made group in another case",
+            "groups": [
+              "From colleagues"
+            ],
+            "typed": "from COLLEAGUES",
+            "expect": {
+              "taken": "From colleagues"
+            }
+          },
+          {
+            "name": "renaming a made group to its own name in another case",
+            "groups": [
+              "From colleagues"
+            ],
+            "renaming": "From colleagues",
+            "typed": "from colleagues",
+            "expect": null,
+            "expectName": "from colleagues"
+          },
+          {
+            "name": "renaming the no-year group to a made group's name",
+            "groups": [
+              "Examples"
+            ],
+            "renaming": "noYear",
+            "typed": "Examples",
+            "expect": {
+              "taken": "Examples"
+            }
+          },
+          {
+            "name": "renaming the no-year group to its own name",
+            "renaming": "noYear",
+            "typed": "Other",
+            "expect": null,
+            "expectName": "Other"
+          },
+          {
+            "name": "a renamed no-year group's name is in the way",
+            "noYearGroupName": "Example courses",
+            "typed": "Example Courses",
+            "expect": {
+              "taken": "Example courses"
+            }
+          },
+          {
+            "name": "Other is free once the no-year group is renamed",
+            "noYearGroupName": "Example courses",
+            "typed": "Other",
+            "expect": null,
+            "expectName": "Other"
+          }
+        ]
+      },
+      "orderCases": [
+        {
+          "name": "no file: the shelf as it was",
+          "file": null,
+          "courses": [
+            {
+              "folder": "ICS3U-2024",
+              "code": "ICS3U",
+              "year": 2024
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            },
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": [
+            "2025–26",
+            "2024–25",
+            "Other"
+          ]
+        },
+        {
+          "name": "years, made groups A to Z, a renamed no-year group last, an empty made group drawn",
+          "file": {
+            "version": 1,
+            "noYearGroupName": "Example courses",
+            "groups": [
+              {
+                "id": "g-zeta0001",
+                "name": "Zeta"
+              },
+              {
+                "id": "g-alpha001",
+                "name": "alpha"
+              },
+              {
+                "id": "g-beta0001",
+                "name": "Beta"
+              }
+            ],
+            "placements": {
+              "ICS4U-2024": "g-zeta0001",
+              "ICD2O-2025": "g-alpha001"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            },
+            {
+              "folder": "ICS4U-2024",
+              "code": "ICS4U",
+              "year": 2024
+            },
+            {
+              "folder": "ICD2O-2025",
+              "code": "ICD2O",
+              "year": 2025
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": [
+            "2025–26",
+            "alpha",
+            "Beta",
+            "Zeta",
+            "Example courses"
+          ],
+          "why": "2024–25 is not drawn: its one course is in Zeta. Beta is drawn although empty."
+        },
+        {
+          "name": "an empty made group is not drawn while the filter narrows the list",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-beta0001",
+                "name": "Beta"
+              }
+            ],
+            "placements": {}
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "drawsEmptyMadeGroups": false,
+          "expect": [
+            "2025–26"
+          ]
+        },
+        {
+          "name": "numbers in names sort by value",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-00000010",
+                "name": "Unit 10"
+              },
+              {
+                "id": "g-00000002",
+                "name": "Unit 2"
+              }
+            ],
+            "placements": {}
+          },
+          "courses": [],
+          "expect": [
+            "Unit 2",
+            "Unit 10"
+          ]
+        }
+      ],
+      "placementCases": [
+        {
+          "name": "no file",
+          "file": null,
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            },
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26",
+            "ADA1O-REF": "Other"
+          }
+        },
+        {
+          "name": "a placed course is in its group, and leaves its year",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "From colleagues"
+          }
+        },
+        {
+          "name": "a placement naming a group that is not there",
+          "file": {
+            "version": 1,
+            "groups": [],
+            "placements": {
+              "ICS3U-2025": "g-gone0000"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          },
+          "why": "A group removed by hand, or by another Mac, leaves its courses where their school years put them."
+        },
+        {
+          "name": "a placement for a folder that is not there",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS4U-2023": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          }
+        },
+        {
+          "name": "a placed course with no school year",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ADA1O-REF": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ADA1O-REF": "From colleagues"
+          }
+        },
+        {
+          "name": "a renamed no-year group",
+          "file": {
+            "version": 1,
+            "noYearGroupName": "Example courses",
+            "groups": [],
+            "placements": {}
+          },
+          "courses": [
+            {
+              "folder": "ADA1O-REF",
+              "code": "ADA1O",
+              "year": null
+            }
+          ],
+          "expect": {
+            "ADA1O-REF": "Example courses"
+          }
+        },
+        {
+          "name": "an unreadable file: the shelf as it was",
+          "file": "unreadable",
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "2025–26"
+          }
+        },
+        {
+          "name": "a file from a newer Plantoir: what is understood is shown",
+          "file": {
+            "version": 2,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues",
+                "colour": "blue"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "courses": [
+            {
+              "folder": "ICS3U-2025",
+              "code": "ICS3U",
+              "year": 2025
+            }
+          ],
+          "expect": {
+            "ICS3U-2025": "From colleagues"
+          }
+        }
+      ],
+      "moveCases": {
+        "rule": "Move to Group puts one reference course in a made group, or back where its school year puts it (its own year group, or the no-year group when it has none; another year is Set School Year's). The shelf rule (codeUniqueWithinAGroup) is asked of the target, ignoring the course itself, and a refusal says the rule's sentence. Moving a course to the group it is in changes nothing and writes no line. Run against REAL folders: every course folder is byte-identical afterwards, whatever the case.",
+        "cases": [
+          {
+            "name": "into a made group",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {}
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "moved",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues"
+            },
+            "trail": "reference course moved to a group"
+          },
+          {
+            "name": "back to its school year",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "moved",
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "expectPlacements": {},
+            "trail": "reference course moved to a group"
+          },
+          {
+            "name": "into a made group that has that code",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-REF": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-REF",
+                "code": "ICS3U",
+                "year": null
+              },
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "refused",
+            "sentence": "codeAlreadyInThatGroup",
+            "expectGroups": {
+              "ICS3U-REF": "From colleagues",
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference groups not changed"
+          },
+          {
+            "name": "back to a year that has that code now",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ICS3U-2025-2",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "refused",
+            "sentence": "codeAlreadyInThatYear",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues",
+              "ICS3U-2025-2": "2025–26"
+            },
+            "trail": "reference groups not changed",
+            "why": "While ICS3U-2025 sat in From colleagues, a second ICS3U came into 2025–26. Moving the first back would put two in one group."
+          },
+          {
+            "name": "to the group it is in",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "made": "From colleagues"
+              }
+            },
+            "expect": "unchanged",
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues"
+            },
+            "trail": null
+          },
+          {
+            "name": "with the file unreadable",
+            "file": "unreadable",
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "move": {
+              "folder": "ICS3U-2025",
+              "to": {
+                "year": 2025
+              }
+            },
+            "expect": "refused",
+            "sentence": "couldNotReadGroups",
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference groups not changed",
+            "why": "Every change is refused while the file cannot be read, before anything is decided, and the file is left byte-identical (file-formats.json -> referenceShelf.writingCases). The sidebar greys Move to Group then, so this is the guard behind the greying."
+          }
+        ]
+      },
+      "removeCases": {
+        "rule": "Remove Group takes a made group off the shelf and its placements with it: every course in it goes back to its year group or the no-year group. NO COURSE IS REMOVED, renamed or changed, and every course folder is byte-identical afterwards. Refused, with removeWouldClash, when one of its courses would land beside another course of the same code; nothing is changed then. Run against REAL folders.",
+        "cases": [
+          {
+            "name": "an empty group",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {}
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "removed",
+            "expectGroupNames": [],
+            "expectGroups": {
+              "ICS3U-2025": "2025–26"
+            },
+            "trail": "reference group removed"
+          },
+          {
+            "name": "a group holding two courses: they go back where their school years put them",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                },
+                {
+                  "id": "g-keep0001",
+                  "name": "Kept"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e",
+                "ADA1O-REF": "g-3f9a1c2e",
+                "ICS4U-2024": "g-keep0001"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ADA1O-REF",
+                "code": "ADA1O",
+                "year": null
+              },
+              {
+                "folder": "ICS4U-2024",
+                "code": "ICS4U",
+                "year": 2024
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "removed",
+            "expectGroupNames": [
+              "Kept"
+            ],
+            "expectGroups": {
+              "ICS3U-2025": "2025–26",
+              "ADA1O-REF": "Other",
+              "ICS4U-2024": "Kept"
+            },
+            "trail": "reference group removed"
+          },
+          {
+            "name": "a course that would clash in its year",
+            "file": {
+              "version": 1,
+              "groups": [
+                {
+                  "id": "g-3f9a1c2e",
+                  "name": "From colleagues"
+                }
+              ],
+              "placements": {
+                "ICS3U-2025": "g-3f9a1c2e"
+              }
+            },
+            "courses": [
+              {
+                "folder": "ICS3U-2025",
+                "code": "ICS3U",
+                "year": 2025
+              },
+              {
+                "folder": "ICS3U-2025-2",
+                "code": "ICS3U",
+                "year": 2025
+              }
+            ],
+            "remove": "From colleagues",
+            "expect": "refused",
+            "sentence": "removeWouldClash",
+            "expectGroupNames": [
+              "From colleagues"
+            ],
+            "expectGroups": {
+              "ICS3U-2025": "From colleagues",
+              "ICS3U-2025-2": "2025–26"
+            },
+            "trail": "reference groups not changed"
+          },
+          {
+            "name": "a group whose id appears twice in the file does not come back under its other name",
+            "file": {"version": 1, "groups": [{"id": "g-4", "name": "Kept"}, {"id": "g-4", "name": "Twice"}], "placements": {}},
+            "courses": [{"folder": "ICS3U-2025", "code": "ICS3U", "year": 2025}],
+            "remove": "Kept",
+            "expect": "removed",
+            "expectGroupNames": [],
+            "expectGroups": {"ICS3U-2025": "2025–26"},
+            "trail": "reference group removed",
+            "why": "The reader shows the first entry with an id and keeps a repeat aside (file-formats.json -> referenceShelf.readingCases). Removing the group takes the kept entry with that id too; before, the next reading brought it back as Twice (implementation review L2)."
+          }
+        ]
+      },
+      "arrivals": {
+        "rule": "Every door that lands a course writes its placement EXPLICITLY at the moment it lands, before the course becomes visible (plan review H2): the made group the wizard's Group picker chose, or NO placement. A folder name freed by a removal is the name the next course of that code and year is given (ReferenceCourseRule.proposedFolderName takes the first free one), so a placement that outlived its course would file a stranger in its group, where the shelf rule never looked. Remove Course... forgets the placement of the course it removes. Two doors KEEP the placement, because the course keeps its folder: a replace (the replacement takes the replaced course's folder name and so its group, referenceCourses.replacing) and a backup restored where its course still is (it replaces the contents in place). A placement is also dropped on any change to the file once its folder is not there, unless a hidden folder of a replace or an import of that name is (folderIsThere in file-formats.json -> referenceShelf.writing). A folder with no file gets no file from an arrival.",
+        "cases": [
+          {
+            "door": "the New Course wizard, a made group chosen",
+            "writes": "placement",
+            "where": "ReferenceCreation.finish"
+          },
+          {
+            "door": "the New Course wizard, Its school year",
+            "writes": "noPlacement",
+            "where": "ReferenceCreation.finish"
+          },
+          {
+            "door": "the New Course wizard replacing a course",
+            "writes": "kept",
+            "where": "ReferenceCreation.finishByReplacing"
+          },
+          {
+            "door": "Import Courses for Reference...",
+            "writes": "noPlacement",
+            "where": "ReferenceImporter.land"
+          },
+          {
+            "door": "Import Courses for Reference... replacing a course",
+            "writes": "kept",
+            "where": "ReferenceImporter.land"
+          },
+          {
+            "door": "Keep a Copy for Reference...",
+            "writes": "noPlacement",
+            "where": "ReferenceCopier.makeTheCopy"
+          },
+          {
+            "door": "Keep a Copy for Reference... replacing a course",
+            "writes": "kept",
+            "where": "ReferenceCopier.keepACopy"
+          },
+          {
+            "door": "Restore from Archived (a whole course)",
+            "writes": "noPlacement",
+            "where": "CourseRestorer.restore"
+          },
+          {
+            "door": "Restore from Backup, its course gone",
+            "writes": "noPlacement",
+            "where": "CourseRestorer.restoreBackup"
+          },
+          {
+            "door": "Restore from Backup, its course still there",
+            "writes": "kept",
+            "where": "CourseRestorer.restoreBackup"
+          },
+          {
+            "door": "Remove Course...",
+            "writes": "forgotten",
+            "where": "CourseArchiver.archiveAndRemoveCourse"
+          }
+        ],
+        "recycledFolderNameCases": [{
+          "name": "a recycled folder name does not inherit a placement",
+          "file": {
+            "version": 1,
+            "groups": [
+              {
+                "id": "g-3f9a1c2e",
+                "name": "From colleagues"
+              }
+            ],
+            "placements": {
+              "ICS3U-2025": "g-3f9a1c2e"
+            }
+          },
+          "steps": [
+            "remove ICS3U-2025 (Remove Course...)",
+            "import another ICS3U for 2025–26, given the freed name ICS3U-2025"
+          ],
+          "expectGroups": {
+            "ICS3U-2025": "2025–26"
+          },
+          "expectPlacements": {}
+        }]
+      },
+      "twoAtOnce": "Every change is read, decided and written under ONE lock on courses/.internal (on the mac an exclusive flock, taken by every window and every process, the MCP server included), and the file is read FRESH inside it, so two windows changing groups at once queue rather than undo each other, and the shelf rule is asked of where every course is at that moment. The file is written atomically: a temporary file renamed over the old one, so a reader never sees half a file. Two machines writing through a synced folder at the same moment: the later write wins, which costs at most one rename or one move. Another window on the same folder redraws its shelf when a change is written.",
+      "wording": {
+        "newGroupMenuItem": "New Group…",
+        "newGroupTitle": "New Group",
+        "nameLabel": "Name",
+        "createButton": "Create",
+        "renameGroupMenuItem": "Rename Group…",
+        "renameGroupTitle": "Rename Group",
+        "renameButton": "Rename",
+        "removeGroupMenuItem": "Remove Group",
+        "removeGroupAskingMenuItem": "Remove Group…",
+        "removeGroupTitle": "Remove the group {group}?",
+        "removeGroupMessageNone": "It holds no course, so nothing else changes.",
+        "removeGroupMessageOne": "Its course goes back to the group its school year puts it in. No course is removed, and nothing in it changes.",
+        "removeGroupMessageMany": "Its {count} courses go back to the groups their school years put them in. No course is removed, and nothing in them changes.",
+        "removeButton": "Remove Group",
+        "cancelButton": "Cancel",
+        "removeWouldClash": "{group} was not removed: its {course} would go back to {target}, which already has one. Move one of them to another group first.",
+        "couldNotRemoveTitle": "Could not remove {group}",
+        "moveToGroupMenuItem": "Move to Group",
+        "couldNotMoveTitle": "Could not move {course}",
+        "groupPickerLabel": "Group",
+        "groupPickerDefault": "Its school year",
+        "summaryGroupLabel": "Group",
+        "nameIsEmpty": "Give the group a name.",
+        "nameIsTooLong": "A group name can be at most 40 characters.",
+        "nameIsAYear": "A school year has a group of its own. Choose a name that is not a school year.",
+        "nameIsTaken": "There is already a group called {name}.",
+        "couldNotReadGroups": "The arrangement of the groups on the reference shelf cannot be read, so nothing was changed. Start the Groups Again, on the Reference Courses heading’s menu, sets them up afresh.",
+        "startAgainMenuItem": "Start the Groups Again…",
+        "startAgainTitle": "Start the groups on the reference shelf again?",
+        "startAgainMessage": "Their arrangement cannot be read. Starting again puts every reference course back in the group its school year puts it in, with no groups of your own. Nothing in any course changes, and what could not be read is kept beside the new arrangement.",
+        "startAgainButton": "Start Again",
+        "couldNotStartAgainTitle": "Could not start the groups again",
+        "arrangedByANewerPlantoir": "The reference shelf’s groups were last arranged by a newer version of Plantoir, so this one leaves them as they are.",
+        "couldNotSaveGroups": "The reference shelf’s groups could not be saved, so nothing was changed.",
+        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {count} a number of courses, two or more (removeGroupMessageOne says one, removeGroupMessageNone none; never '(s)'). The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Cancel is the default button of the removal question and of the start-again question, as it is of the replace warning. couldNotReadGroups says no 'try again in a moment', because waiting does not help a hand-edited or foreign-written copy; it names the way out. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
+        "machineryCheck": "No 'file', 'JSON', 'placement', 'id', 'folder name', 'script' or 'container' in any sentence here."
+      },
+      "rejected": "Converting today's layout into a stored list on first open: it would write a file into every working folder on every Mac on upgrade, an older Plantoir and Windows would then disagree with the file, and year labels stored as names drift from reference_school_year the first time a year is set; deriving years and storing only what the teacher made gives the same picture with nothing to convert. The group in each course's course_config.json: a group must exist with no course in it, which a per-course key cannot say, and the arrangement belongs to the folder. Keeping placements when a course is removed so it comes back into its group (the plan's first answer): a freed folder name is reused by the next course of that code and year, which would inherit the group (plan review H2). Remove Group withheld while the group holds a course (the plan's first answer): the teacher would have to move every course out by hand to get rid of a group, when sending them back to their years is exactly what removing it means; asked first instead. The Group picker at every door (plan review M8). A confirmation for an EMPTY group: nothing is lost. Renamable year groups, nested groups, hand ordering and drag and drop (Russell, 2026-11-12, and section 10 of the plan)."
+    },
+    "replacing": {
+      "appliesOn": ["mac", "windows"],
+      "note": "Replacing a course on the Reference Courses shelf with a new one, after a warning and a backup (#572, second piece). Offered beside the shelf rule's refusal (codeUniqueWithinAGroup) at three doors: the New Course wizard with Keep this course for reference on, Keep a Copy for Reference..., and an import of ONE course (Import Courses for Reference..., a folder or a backup or archive zip). Russell's ruling of 2026-11-12 (all of #572 in v1.9.4); scope as amended by the plan review (M6: no batch replace at Import; M7: no Restore from Backup submenu on the shelf row; M9: the warning says what the backup is called, where it is, and what restoring it does).",
+      "rule": "In order. (0) The door makes the NEW course first, exactly as it would with nothing in the way, under the hidden staging name of the OLD course's folder (.plantoir-importing-<OLD>), claimed and leased by ReferenceStaging.claim, and already marked, neutralised and locked. Nothing of the old course is touched until it exists. (1) Refuse anything that is not a reference course directly inside courses/ (kept_for_reference read from disk, never from a window's list), a course that is previewing, publishing, being copied, read from by a Copy a Page pass (implementation review L3) or held by a Claude or Codex session (replaceWhileBusy), and a course Obsidian holds (obsidianCases); an aside folder of that name already there refuses too (an earlier replace not yet settled). (2) Back the old course up as an ordinary TEACHER-kind backup (<OLD>_backup_<stamp>.zip, never pruned, listed by both apps). From here to the end of the act the course counts as being copied, so nothing else starts on it. (3) CHECK the backup (backupCheck): its listing must hold every file of the course on disk. (4) Ask (1) again, because the backup took time. (5) Rename the old course aside to .plantoir-replacing-<OLD>, one rename inside courses/, which works on a locked tree and keeps its lock. (6) Rename the new course to <OLD>: the replacement takes the replaced course's FOLDER NAME and so its group. If that fails, the old course is renamed back first, then the new one removed. (7) Remove the aside folder, unlocked first, and the old built website. Every failure before (5) leaves the old course exactly where it was, and every failure removes the staged new course. Nothing on any failure path deletes the old course; its only removal is (7), after the new one is in place with a checked backup on disk. A quit or a crash between (5) and (7) leaves the aside folder, which the next reading of the working folder settles (sweepCases).",
+      "why": "GitHub #572: 'the newer ICS3U example instead of last year's', within a group, carefully. The worst fault is a teacher's reference course gone with no way back: deleted or half-moved while the new one failed, a backup that does not hold it, or a roll-back that fails silently. Making the new course first means a failed setup, copy or import costs nothing. The checked backup is plan review M3: a zip nobody opened is not a backup, and every zip of a course leaves out names (build, out, dist, node_modules...) that can be a teacher's own folders in a course an older Plantoir or Windows made. The Obsidian refusal is M2: the folder is swapped, and Obsidian's file watcher is anchored to it. The old folder name is what makes Restore the ordinary in-place restore: it archives the replacement and puts the old course back; a new folder name would land the restored course beside the new one in the same group, which codeUniqueWithinAGroup forbids.",
+      "whereOffered": [
+        "The New Course wizard, with Keep this course for reference on: beside the shelf rule's sentence under the course code.",
+        "Keep a Copy for Reference...: beside the shelf rule's sentence for the chosen school year.",
+        "Import Courses for Reference..., when the sheet holds ONE course: beside that row's shelf rule sentence."
+      ],
+      "whereNotOffered": [
+        "A row in an import of several courses: it keeps the sentence and nothing else (plan review M6).",
+        "Set School Year...: it moves a course that exists, and a clash there is two real courses.",
+        "A clash with another row of the same import sheet, which is not on the shelf yet.",
+        "A drag, a menu of its own, or the assistant: no tool can replace a course, and none is added.",
+        "A live course: the act refuses one (onlyAReferenceCourse) whatever a door asks."
+      ],
+      "onlyAReferenceCourse": {
+        "rule": "Only a folder directly inside courses/ whose course_config.json says kept_for_reference: true is replaced. Anything else is refused with notOnTheShelf, and the staged course is removed.",
+        "cases": [
+          { "name": "a reference course", "folder": "ICS3U-2025", "keptForReference": true, "expect": "replaces" },
+          { "name": "the LIVE course of the same code", "folder": "ICS3U", "keptForReference": false, "expect": "notOnTheShelf" },
+          { "name": "a folder that is not there", "folder": "ICS3U-2019", "keptForReference": null, "expect": "notOnTheShelf" },
+          { "name": "a hidden folder", "folder": ".plantoir-importing-ICS3U-2025", "keptForReference": true, "expect": "notOnTheShelf" },
+          { "name": "the backups folder", "folder": "_backups", "keptForReference": null, "expect": "notOnTheShelf" }
+        ]
+      },
+      "obsidianCases": {
+        "rule": "Obsidian holds the course when the open-state rule says it is open or cannot tell (obsidianFigureAddOns openStateCases, #742), or when a vault marked open sits INSIDE the course (FolderActions.openVaultWouldBeStranded). A vault that CONTAINS the course does not hold it: its own root does not move, and Obsidian follows a rename inside a vault. Asked at (1) and again at (4).",
+        "coursePath": "/Users/teacher/Class Websites/courses/ICS3U-2025",
+        "cases": [
+          { "name": "Obsidian is not running", "obsidianRunning": false, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses/ICS3U-2025", "open": true } } }, "expect": false },
+          { "name": "the course is open as a vault", "obsidianRunning": true, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses/ICS3U-2025", "open": true } } }, "expect": true },
+          { "name": "the course is a vault that is not open", "obsidianRunning": true, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses/ICS3U-2025", "open": false } } }, "expect": false },
+          { "name": "a vault inside the course is open", "obsidianRunning": true, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses/ICS3U-2025/section1", "open": true } } }, "expect": true },
+          { "name": "the whole courses folder is open as one vault", "obsidianRunning": true, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses", "open": true } } }, "expect": false },
+          { "name": "another course with a longer name is open", "obsidianRunning": true, "registry": { "vaults": { "a": { "path": "/Users/teacher/Class Websites/courses/ICS3U-2025-2", "open": true } } }, "expect": false },
+          { "name": "no registry at all", "obsidianRunning": true, "registry": null, "expect": false },
+          { "name": "a registry that cannot be read", "obsidianRunning": true, "registry": "unreadable", "expect": true }
+        ]
+      },
+      "backupCheck": {
+        "rule": "The backup's listing must name every file of the course on disk, by its path from courses/ (<OLD>/section1/index.md), compared in one Unicode form (NFC). The listing is read with TWO tools (implementation review H1, measured): zipinfo -1 must exit 0, which reads the central directory and so refuses a truncated zip, but macOS's ZipInfo 3.00 prints every byte outside ASCII as '?' under every locale; the names are tar -tf's (bsdtar) under LC_ALL=en_US.UTF-8, which spells them as stored but streams the local headers and listed a zip cut to 300 bytes as whole; and the two counts must agree. Folders need no entry of their own. Allowed to be missing: .DS_Store at any depth; .merged_output (the link to the built website, rebuilt from the pages) at the TOP of the course only, since a teacher's own section1/.merged_output deeper down is theirs (implementation review L7); and Plantoir's own Obsidian add-on folders under .obsidian/plugins, by their marker (ObsidianFigureAddOns.backupExclusions). NOTHING else that CourseArchiver.excludedFromArchives leaves out is allowed: a course holding a folder called build, out, dist, node_modules, .git or a cache with files in it fails the check, and is not replaced. A listing that cannot be read, or a folder of the course that cannot be read, fails it too. On a failure the backup is KEPT, because it holds most of the course and removing it would be a delete on a failure path, and it is SAID (wording.backupIsIncomplete names its row in Backups), so a second try never leaves one nobody was told of (implementation review M1). The trail names the backup's file and gives a COUNT of the files it does not hold, never their names: a page's file name is its title (implementation review L6).",
+        "realNames": ["Th\u00e8me.md", "The\u0300me.md", "Canada\u2019s Place in the World.md", "Wave\u2013Particle Duality.md", "\u6388\u696d \ud83e\uddea.md", "A2. Relating the Graph of y = x\u00b2 and Its Transformations.md"],
+        "realNamesRule": "Each name is a page in a course backed up by the REAL archiver and checked through the default check, never a listing typed by hand: an accent in NFC and in NFD, a curly apostrophe, an en dash, CJK with an emoji, and a page the MPM2D payload ships. Each must hold the course. Each was refused before the two-tool listing.",
+        "unreadableZips": [
+          { "name": "an empty file", "bytes": 0, "expect": "couldNotBeRead" },
+          { "name": "a real backup cut to 300 bytes", "cutTo": 300, "expect": "couldNotBeRead", "why": "tar alone listed it as whole (measured)." }
+        ],
+        "why": "Plan review M3. Plantoir's own copiers leave those names behind, so a reference course Plantoir made is safe; one an older Plantoir or Windows made may hold a teacher's folder of that name, and replacing it on the strength of a zip that left it out would lose it with the backup saying all was well.",
+        "cases": [
+          { "name": "a backup that holds the course", "onDisk": ["section1/index.md", "section1/Lesson 1.md", "Media/picture.png"], "inZip": ["ICS3U-2025/", "ICS3U-2025/section1/", "ICS3U-2025/section1/index.md", "ICS3U-2025/section1/Lesson 1.md", "ICS3U-2025/Media/", "ICS3U-2025/Media/picture.png"], "expect": "holdsTheCourse" },
+          { "name": "a backup without one page", "onDisk": ["section1/index.md", "section1/Lesson 1.md"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "isMissing" },
+          { "name": "a teacher's folder called build that the zip left out", "onDisk": ["section1/index.md", "build/Notes.md"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "isMissing" },
+          { "name": "Finder's .DS_Store and the built website's link are not needed", "onDisk": ["section1/index.md", ".DS_Store", "section1/.DS_Store"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "holdsTheCourse" },
+          { "name": "a name the disk and the zip spell in two Unicode forms", "onDisk": ["Thème/index.md"], "inZip": ["ICS3U-2025/Thème/index.md"], "expect": "holdsTheCourse" },
+          { "name": "an empty folder", "onDisk": ["section1/index.md", "Empty/"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "holdsTheCourse" },
+          { "name": "the built website's link at the top is not needed", "onDisk": ["section1/index.md", ".merged_output/index.html"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "holdsTheCourse" },
+          { "name": "a teacher's own .merged_output deeper down is needed", "onDisk": ["section1/index.md", "section1/.merged_output/keep.md"], "inZip": ["ICS3U-2025/section1/index.md"], "expect": "isMissing" }
+        ]
+      },
+      "sequence": {
+        "rule": "What runs, in order, for each way the act can go, and what is on disk afterwards. Steps: backUp, checkTheBackUp, asideOld, renameNew, putAsideBack, removeAside, removeStaged; a step that fails is written <step>:fails. 'old' is where the old course is afterwards: inPlace (courses/<OLD>, the old course), aside (.plantoir-replacing-<OLD>, which the next reading puts back), or backupOnly (only in its backup, the new course in its place). 'new' is inPlace (courses/<OLD> holds the new course) or gone. 'said' is a key of wording, or null; 'trail' the event written.",
+        "cases": [
+          { "name": "it is replaced", "expect": { "steps": ["backUp", "checkTheBackUp", "asideOld", "renameNew", "removeAside"], "old": "backupOnly", "new": "inPlace", "said": null, "trail": "reference course replaced" } },
+          { "name": "a LIVE course is asked for", "live": true, "expect": { "steps": ["removeStaged"], "old": "inPlace", "new": "gone", "said": "notOnTheShelf", "trail": "reference course could not be replaced" } },
+          { "name": "it is previewing", "busy": "atTheStart", "expect": { "steps": ["removeStaged"], "old": "inPlace", "new": "gone", "said": "replaceWhileBusy", "trail": "reference course could not be replaced" } },
+          { "name": "it is open in Obsidian", "obsidian": "atTheStart", "expect": { "steps": ["removeStaged"], "old": "inPlace", "new": "gone", "said": "openInObsidian", "trail": "reference course could not be replaced" } },
+          { "name": "the backup cannot be made (the disk is full)", "failAt": "backUp", "expect": { "steps": ["backUp:fails", "removeStaged"], "old": "inPlace", "new": "gone", "said": "couldNotBackUp", "trail": "reference course could not be replaced" } },
+          { "name": "the backup does not hold the course", "failAt": "checkTheBackUp", "expect": { "steps": ["backUp", "checkTheBackUp:fails", "removeStaged"], "old": "inPlace", "new": "gone", "said": "backupIsIncomplete", "backup": "kept", "trail": "reference course could not be replaced" } },
+          { "name": "the course leaves the shelf while it is backed up", "leavesTheShelf": "afterTheBackUp", "expect": { "steps": ["backUp", "checkTheBackUp", "removeStaged"], "old": "inPlace", "new": "gone", "said": "notOnTheShelf", "trail": "reference course could not be replaced" } },
+          { "name": "an earlier replace of it is not settled yet", "asideAlreadyThere": true, "expect": { "steps": ["removeStaged"], "old": "inPlace", "new": "gone", "said": "couldNotReplace", "trail": "reference course could not be replaced" } },
+          { "name": "a preview starts while it is backed up", "busy": "afterTheBackUp", "expect": { "steps": ["backUp", "checkTheBackUp", "removeStaged"], "old": "inPlace", "new": "gone", "said": "replaceWhileBusy", "trail": "reference course could not be replaced" } },
+          { "name": "Obsidian opens it while it is backed up", "obsidian": "afterTheBackUp", "expect": { "steps": ["backUp", "checkTheBackUp", "removeStaged"], "old": "inPlace", "new": "gone", "said": "openInObsidian", "trail": "reference course could not be replaced" } },
+          { "name": "the old course cannot be moved aside", "failAt": "asideOld", "expect": { "steps": ["backUp", "checkTheBackUp", "asideOld:fails", "removeStaged"], "old": "inPlace", "new": "gone", "said": "couldNotReplace", "trail": "reference course could not be replaced" } },
+          { "name": "the new course cannot be renamed in", "failAt": "renameNew", "expect": { "steps": ["backUp", "checkTheBackUp", "asideOld", "renameNew:fails", "putAsideBack", "removeStaged"], "old": "inPlace", "new": "gone", "said": "couldNotReplace", "trail": "reference course could not be replaced" } },
+          { "name": "the new course cannot be renamed in, and the old one cannot be put back", "failAt": "renameNewAndPutAsideBack", "expect": { "steps": ["backUp", "checkTheBackUp", "asideOld", "renameNew:fails", "putAsideBack:fails", "removeStaged"], "old": "aside", "new": "gone", "said": "couldNotPutBackYet", "trail": "reference course could not be replaced" } },
+          { "name": "the old course's own folder cannot be removed", "failAt": "removeAside", "expect": { "steps": ["backUp", "checkTheBackUp", "asideOld", "renameNew", "removeAside:fails"], "old": "aside", "new": "inPlace", "said": null, "trail": "reference course replaced" }, "why": "Not a failed replace: the new course is in place and the backup is checked. The aside folder is settled by the next reading (sweepCases)." }
+        ]
+      },
+      "twoAtOnce": {
+        "rule": "Keep a Copy asks the shelf rule again when Replace is pressed, as the wizard's prepare and the import do (implementation review L4): the course in the way must still be the one the teacher was warned about, or nothing is made (wording.notTheCourseInTheWay). A replace claims the OLD folder's staging name for the whole act, so a second replace of the same course (another window, another copy of Plantoir) is refused at its claim with referenceCourses.wording.copyAlreadyBeingMade or importing.wording.alreadyBeingImported, and makes nothing. A replace never starts while the old course is being copied, and holds it as being copied until the swap is over, so a removal, a restore or a backup of it waits.",
+        "why": "Two replaces of one course would both back it up, and the second would find its old course gone from under it."
+      },
+      "sweepCases": {
+        "rule": "Each .plantoir-replacing-<OLD> in courses/ is settled when the working folder is read, BEFORE the courses are listed, unless somebody is still replacing it (this app's claim on <OLD>, or a live <OLD>.import.<pid>.lease). <OLD> free: renamed BACK to <OLD>, never removed. <OLD> holds a course and a backup in courses/_backups/<OLD>/, OPENED, holds every file of the old copy (backupCheck, against the aside folder under the name <OLD>; implementation review L1): removed, unlocked first. A file merely NAMED like a backup is not trusted. Otherwise: left alone. The check runs only for a leftover, so an ordinary reading runs no zip tool. Only a name beginning with the whole prefix, dash included, is touched. The staged new course (.plantoir-importing-<OLD>) is the staging sweep's, as for any unfinished import. One 'unfinished replace of a reference course put right' line per folder settled.",
+        "cases": [
+          { "name": "the app stopped after the old course was moved aside", "before": [".plantoir-replacing-ICS3U-2025", ".plantoir-importing-ICS3U-2025"], "backup": "holdsIt", "someoneIsReplacingIt": false, "expect": { "after": ["ICS3U-2025"], "theOldCourseIsBack": true, "trail": ["unfinished replace of a reference course put right", "unfinished import for reference tidied away"] } },
+          { "name": "the app stopped after the new course was renamed in", "before": ["ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "backup": "holdsIt", "someoneIsReplacingIt": false, "expect": { "after": ["ICS3U-2025"], "theOldCourseIsBack": false, "trail": ["unfinished replace of a reference course put right"] } },
+          { "name": "the same, with only a file named like a backup that does not hold it", "before": ["ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "backup": "doesNotHoldIt", "someoneIsReplacingIt": false, "expect": { "after": ["ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "theOldCourseIsBack": false, "trail": [] } },
+          { "name": "the same, with the backup deleted by hand", "before": ["ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "backup": "none", "someoneIsReplacingIt": false, "expect": { "after": ["ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "theOldCourseIsBack": false, "trail": [] } },
+          { "name": "a replace still running", "before": [".plantoir-replacing-ICS3U-2025", ".plantoir-importing-ICS3U-2025"], "backup": "holdsIt", "someoneIsReplacingIt": true, "expect": { "after": [".plantoir-importing-ICS3U-2025", ".plantoir-replacing-ICS3U-2025"], "theOldCourseIsBack": false, "trail": [] } },
+          { "name": "a teacher's own folders that only look like it", "before": [".plantoir-replacing", "plantoir-replacing-ICS3U-2025", ".plantoir-replacingICS3U"], "backup": "none", "someoneIsReplacingIt": false, "expect": { "after": [".plantoir-replacing", ".plantoir-replacingICS3U", "plantoir-replacing-ICS3U-2025"], "theOldCourseIsBack": false, "trail": [] } }
+        ]
+      },
+      "wording": {
+        "replaceButton": "Replace It…",
+        "title": "Replace {course} in {group}?",
+        "body": "{course} in {group} holds {sections}, {pages} and {size}, and was kept on {date}. Plantoir backs it up first, and the backup is listed in Backups in the sidebar as {folder}. Restoring that backup puts this {course} back in place of the new one.",
+        "bodyWithoutADate": "{course} in {group} holds {sections}, {pages} and {size}. Plantoir backs it up first, and the backup is listed in Backups in the sidebar as {folder}. Restoring that backup puts this {course} back in place of the new one.",
+        "confirmButton": "Replace",
+        "cancelButton": "Cancel",
+        "replaceWhileBusy": "{course} is previewing or being backed up right now. Wait for that to finish, then replace it.",
+        "openInObsidian": "{course} is open in Obsidian. Close it there first, then replace it.",
+        "notOnTheShelf": "Only a course kept for reference can be replaced, and {course} is not one.",
+        "couldNotBackUp": "{course} could not be backed up, so it was not replaced.",
+        "backupIsIncomplete": "{course} was not replaced, and it is exactly as it was: some of its files could not go into a backup. The backup that was made is in Backups in the sidebar as {folder}, without those files. Keep {course} and choose another school year for the new one, or delete that backup if you do not need it.",
+        "notTheCourseInTheWay": "{folder} is no longer in the way in that school year, so nothing was replaced. Look at the choices again.",
+        "couldNotReplace": "{course} could not be replaced. It is as it was.",
+        "couldNotPutBackYet": "{course} could not be replaced, and it could not be put back straight away. Plantoir puts it back the next time this working folder is opened, and its backup is in Backups in the sidebar.",
+        "replacedNote": "The {course} in {group} was replaced. Its backup is in Backups in the sidebar as {folder}.",
+        "rule": "{course} is the code a teacher reads (ICS3U); {group} the shelf group (a school year label such as 2025–26, or Other); {folder} the course's folder, which is the name its row carries in Backups; {sections} and {pages} are '1 section' / '3 sections' and '1 page' / '40 pages'; {size} the import sheet's size; {date} the day the folder was made, long style. bodyWithoutADate when that day cannot be read. Cancel is the default button; Replace is the destructive one. replacedNote is said in the import sheet's summary; the wizard and Keep a Copy select the course on the shelf instead.",
+        "machineryCheck": "No 'staging', 'aside', 'zip', 'folder name', 'script' or 'container' in any sentence here."
+      },
+      "rejected": "A Restore from Backup submenu on the shelf row (plan review M7): Backups already has Restore from Backup..., and it now leaves a trail line. A per-row tick and one alert for several courses at Import (M6): nobody asked for it, and a refused row in a run of several keeps its sentence. A new backup suffix such as _replaced: a Windows machine sharing the folder would not list a name it cannot parse, so the backup would be invisible in the one place it must be found; a teacher kind is accurate (the teacher pressed Replace) and never pruned. The replacement keeping its own new folder name: Restore would land the old course beside the new one in one group. Removing the old course first and then renaming the new one in: a moment with neither. Emptying the old folder and moving the new one's contents in, the way a backup restore keeps Obsidian's vault: it would make the swap many moves instead of one rename, with a half-old, half-new course on disk if any of them failed; refusing while Obsidian holds the course is the plan review's first answer (M2). Completing an unfinished replace with the staged new course on the next launch: it was not checked again, and putting the old course back is the direction that cannot lose anything. Checking the backup by unpacking it again: it doubles the time of a backup measured at 9.7 s for a 467 MB course, and the listing answers the question asked, which is whether every file is in it."
     }
   },
   "copyingAPageBetweenCourses": {
@@ -25362,6 +26508,7 @@
       "revertCourseSettings",
       "rename",
       "setSchoolYear",
+      "moveToGroup",
       "keepACopyForReference",
       "backUpNow",
       "restoreFromBackup",
@@ -25695,6 +26842,7 @@
           "courseOpenInObsidian",
           "courseShowInFinder",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
@@ -25718,6 +26866,7 @@
           "backUpNow",
           "copyAPage",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
@@ -25897,6 +27046,7 @@
           "backUpNow",
           "copyAPage",
           "importCoursesForReference",
+          "moveToGroup",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
@@ -35269,7 +36419,7 @@
     "knownLimits": "The alert's count is changed.new against the previous BUILD; a deploy of an old build that is newly refused re-counts that build's own new rows beside the refusal. A section built by a copy of Plantoir from before #717 has no record until it is built again, and shows no marker meanwhile. A deploy that does not rebuild (a public/ that was already deploy-fresh) leaves the record as the build that made it wrote it. A self-check question is identified by its place (`n`), not its content (kindsRule): inserting a question above a broken one reads as one new problem and one gone, and raises the alert. A row the site adds after the build's alert was answered raises nothing (alert.rule)."
   },
   "unitPlanning": {
-    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan's pages; it keeps assets/ the app's own (tab.assetsMirror). It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and to know which plans the course page's Planning tab offers (tab, #708). Sharing (#709) is a later sub-key of this one.",
+    "rule": "A course's unit plans (#707) are a small site of their own, for the teacher and the colleagues they plan with and never for students, written by an outside assistant through the `plantoir-unit-planning` skill (agentGuidance below) into `folder`, one sub-folder per unit, laid out as siteLayout says. The app never writes a plan's pages; it keeps assets/ the app's own (tab.assetsMirror). It READS each unit's plan.json (planFile) to name the plans in a Revise door's opening message (app-rules.json -> outsideAgents.greetingUnitPlans), and to know which plans the course page's Planning tab offers (tab, #708). Sharing (#709) is its sub-key share.",
     "folder": "courses/<CODE>/.internal/planning",
     "siteLayout": {
       "index.html": "the course's list of plans, one card per unit (from the template's index.html)",
@@ -35462,7 +36612,7 @@
     },
     "appendOnly": "A rule in either stylesheet is never removed or renamed by a later release; changes are added at the end. Each sheet is the example page's own <style> block byte for byte (scripts/fixtures/unit_plan/), after Plantoir's comment and its @font-face rules, with ONE edit: a --ok colour token in :root and both dark blocks, and the reviewed mark's fixed green replaced by var(--ok) (Russell's ruling 2, 2026-11-01: the one change to the exact look). scripts/test_unit_plan_template.py proves the sheet equals its fixture once those are taken out, that the colour tokens and dark blocks are the same in both sheets, and that every class every shipped release defined still has a rule (scripts/fixtures/unit_plan/classes-shipped.json).",
     "agentGuidance": {
-      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); it says nothing about sharing until #709. The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
+      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); since #709 it says the plans are shared from the Planning tab, that a share without a password leaves answer keys out, and that the assistant never shares or deploys them (unitPlanning.share). The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
       "skill": "plantoir-unit-planning",
       "template": [
         "template/index.html",
@@ -35632,7 +36782,7 @@
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
     ],
     "tab": {
-      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Sharing a plan is not part of this tab yet (#709).",
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
       "tabCases": {
         "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
         "cases": [
@@ -36461,7 +37611,7 @@
         "openInBrowserNotAPage": "Only a page of the plan or one of its PDFs can be opened in your browser.",
         "openInBrowserNoBrowser": "No web browser is set on this Mac, so the page was not opened."
       },
-      "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. Nothing here says sharing: #709 adds it.",
+      "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. The share bar's words are unitPlanning.share.words (#709).",
       "saveOnPlanning": {
         "rule": "Course > Save on the Planning tab is the settings form's own Save, offered whenever the course has unsaved changes (held back or not), and never silent (708 fix review 2, L3). After it runs: saved with nothing more to say, the Planning tab shows the form's own confirmation (the mac's 'Saved ✓') for as long as the form would; refused (a held-back Save, with the form's reason), failed (a write error), or saved with a notice to read (a preview or deploy of the course running, another window's change replaced), the page goes to the Settings tab, where the form shows its own sentence beside the field. Revert is dimmed on Planning with words.revertOnPlanning under it, which VoiceOver reads with the menu.",
         "cases": [
@@ -36540,6 +37690,1273 @@
         "Open in Browser opening the unit chosen in the popup rather than the page on screen (#803): after a link to the correlation page or a PDF, the teacher means what they are looking at",
         "Open in Browser serving the plan over a local web server (#803): measured, every page, stylesheet, font and PDF resolves from a file: address in Chromium, WebKit and Firefox, and a server would have to be running for the page to open",
         "the trail naming the unit or the page Open in Browser opened (#803): a unit's folder name is made from its title, the teacher's own words; the kind of page is what a report needs"
+      ]
+    },
+    "share": {
+      "rule": "Share (#709): the course's unit plans go to Cloudflare Pages as a small website of their own, one per school year, open to anyone with the address or protected by a username and password, from the Planning tab's share bar (mac first). deploy.sh <CODE> --plans runs scripts/share_plan.py, which checks the planning folder (checkKinds), stages it by allowlist (stageCases), creates or reuses the year's project (names), sets fail closed and reads it back (failClosed), deploys, proves the address answers as this share promises before saying it is shared (proof), deletes every older deployment (oldDeployments), and writes the year's marker (markerFile). Stop Sharing deletes the year's project. Nothing about a plan is ever sent to Netlify, and the local assistant has no tool that shares one.",
+      "host": {
+        "value": "cloudflare_pages",
+        "why": "Russell, 2026-11-12: Cloudflare Pages only. Netlify's free plan has no password protection, so a protected plan could not be promised there; a Pages project can run a small program (_worker.js) that asks for the username and password before any file is sent, and the teacher's existing Pages: Edit token makes it.",
+        "rejected": [
+          "Netlify, in any form, including probing a site for password protection and refusing on a free plan (707d, dropped 2026-11-12)",
+          "both hosts at once (Russell, 2026-11-01: one host)",
+          "Cloudflare Access: set up in the dashboard, an email PIN, not makeable with the teacher's token, and its preview-only switch does not cover *.pages.dev"
+        ]
+      },
+      "checkKinds": [
+        "noPlans",
+        "badSlug",
+        "excludedName",
+        "unitNotListed",
+        "brokenLink",
+        "externalUrl",
+        "noNoindex",
+        "wrongSheet",
+        "missingClass",
+        "noRobots",
+        "tooLarge"
+      ],
+      "checkKindsWhy": "Each is a rule the plantoir-unit-planning skill already asks an assistant to keep (its section 10), checked again before anything leaves the Mac, because a broken plan shared is a broken plan a colleague opens. externalUrl is about what a page LOADS (a stylesheet, a script, an image, a frame, a font, an @import or url()): a link a reader clicks to a page on the web is allowed, as the Planning tab's navigationCases allow it.",
+      "checkCases": {
+        "rule": "Each case starts from the skill's template (support/agent_guidance/skills/plantoir-unit-planning/template) copied as a planning folder, applies `change`, and expects exactly the problem kinds `expect`, in checkKinds order (an empty list is a plan that shares).",
+        "cases": [
+          {
+            "name": "the template as it ships",
+            "change": {},
+            "expect": []
+          },
+          {
+            "name": "no unit folder",
+            "change": {
+              "remove": [
+                "unit"
+              ]
+            },
+            "expect": [
+              "noPlans",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a unit folder with a capital letter",
+            "change": {
+              "rename": {
+                "unit": "Unit-1"
+              }
+            },
+            "expect": [
+              "noPlans",
+              "badSlug",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a folder a backup leaves out",
+            "change": {
+              "write": {
+                "unit/build/note.txt": "x"
+              }
+            },
+            "expect": [
+              "excludedName"
+            ]
+          },
+          {
+            "name": "a second unit the list of plans does not name",
+            "change": {
+              "copy": {
+                "unit": "unit-2"
+              }
+            },
+            "expect": [
+              "unitNotListed"
+            ]
+          },
+          {
+            "name": "a link to a PDF that is not there",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Missing%20Sheet.pdf\">x</a>"
+              }
+            },
+            "expect": [
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a link to a PDF with a space and a comma that is there",
+            "change": {
+              "write": {
+                "unit/pdfs/Quiz 1, Part A.pdf": "%PDF-1.4"
+              },
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Quiz%201%2C%20Part%20A.pdf\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a stylesheet from the internet",
+            "change": {
+              "append": {
+                "unit/index.html": "<link rel=\"preload\" href=\"https://fonts.example.org/a.css\">"
+              }
+            },
+            "expect": [
+              "externalUrl"
+            ]
+          },
+          {
+            "name": "a link a reader clicks to a page on the web",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"https://www.example.org/curriculum\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a page with no robots meta",
+            "change": {
+              "replace": {
+                "unit/correlation.html": [
+                  "<meta name=\"robots\" content=\"noindex, nofollow\">",
+                  ""
+                ]
+              }
+            },
+            "expect": [
+              "noNoindex"
+            ]
+          },
+          {
+            "name": "a plan page linking no stylesheet",
+            "change": {
+              "replace": {
+                "unit/index.html": [
+                  "href=\"../assets/plan.css\"",
+                  "href=\"../assets/other.css\""
+                ]
+              }
+            },
+            "expect": [
+              "brokenLink",
+              "wrongSheet"
+            ]
+          },
+          {
+            "name": "a class the sheet has no rule for",
+            "change": {
+              "append": {
+                "unit/index.html": "<p class=\"invented-class-name\">x</p>"
+              }
+            },
+            "expect": [
+              "missingClass"
+            ]
+          },
+          {
+            "name": "robots.txt missing",
+            "change": {
+              "remove": [
+                "robots.txt"
+              ]
+            },
+            "expect": [
+              "noRobots"
+            ]
+          },
+          {
+            "name": "robots.txt with CRLF line endings is still the two lines",
+            "change": {
+              "write": {
+                "robots.txt": "User-agent: *\r\nDisallow: /\r\n"
+              }
+            },
+            "expect": []
+          }
+        ]
+      },
+      "stage": {
+        "allowedSuffixes": [
+          ".html",
+          ".css",
+          ".woff2",
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
+        ],
+        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). Every share adds _worker.js (worker, edgeCache); an open share adds _headers (X-Robots-Tag) as well, which is what the static files would carry if the worker were ever passed by.",
+        "why": "An allowlist rather than a list of what to leave out: a teacher's plan.json, a .tex, an .htaccess or .htpasswd, and a _headers, _redirects, _routes.json or _worker.js of their own (which Cloudflare would obey) are never uploaded, and a new kind of file is left out until somebody decides it belongs."
+      },
+      "stageCases": {
+        "rule": "Each case stages the template with `add` written into it first, with `includeAnswerKeys` as given and the app's assets standing in for the plan's, and expects every path in `copied` to be in the staged folder, every path in `notCopied` not to be, and `answerKeysLeftOut` answer keys counted.",
+        "cases": [
+          {
+            "name": "an open share leaves an answer key out",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf",
+              "unit/pdfs/Quiz 1.pdf"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/pdfs/Quiz 1.pdf",
+              "404.html",
+              "robots.txt",
+              "index.html",
+              "unit/index.html",
+              "unit/correlation.html",
+              "assets/plan.css"
+            ],
+            "notCopied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "answerKeysLeftOut": 1
+          },
+          {
+            "name": "a protected share keeps it",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "includeAnswerKeys": true,
+            "copied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own host files and notes never go",
+            "add": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/plan.json"
+            ],
+            "notCopied": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json",
+              "unit/plan.json"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "a folder a backup leaves out is not copied",
+            "add": [
+              "unit/node_modules/a.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [],
+            "notCopied": [
+              "unit/node_modules/a.html"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own 404.html is replaced",
+            "add": [
+              "404.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "404.html"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          }
+        ],
+        "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
+      },
+      "answerKeys": {
+        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, with its accents folded (Corrigé reads as corrige), in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
+        "appliesTo": [
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
+        ],
+        "anywhere": [
+          "answer",
+          "solution",
+          "markingguide",
+          "markingscheme",
+          "markscheme",
+          "corrige",
+          "reponse"
+        ],
+        "wholeWords": [
+          "key",
+          "keys",
+          "soln",
+          "solns",
+          "ans"
+        ],
+        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists). Widened again on the fix review: Mark Scheme and Markscheme, Soln and Solns, Ans, and the French Corrigé and Réponses (Ontario's French-language courses), with accents folded before the letters are read.",
+        "cases": [
+          {
+            "name": "Quiz 1 - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit Test - Version A - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Review - with Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Worksheet 3 - Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "quiz 1 - solutions.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 – Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 — Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1-Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz_1_Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Solution.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test KEY.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "test-key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "AnswerKey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "answerkey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz1Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions Manual Notes.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Lab Keys.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Answers.png",
+            "answerKey": true
+          },
+          {
+            "name": "Answers.txt",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Solutions.jpg",
+            "answerKey": true
+          },
+          {
+            "name": "Worksheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keyboard Shortcuts.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Monkey Puzzle.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Unit 1 Notes.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "solutions.html",
+            "answerKey": false
+          },
+          {
+            "name": "answers.css",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 - Solutions.tex",
+            "answerKey": false
+          },
+          {
+            "name": "Key Concepts.woff2",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 Mark Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Markscheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 2 Soln.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test Solns.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 3 Ans.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Corrigé.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Corrige - Test 2.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Réponses du test.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "reponses.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 CORRIGÉ.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Hockey Drills.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keystone Species.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answering Questions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Key Terms.pdf",
+            "answerKey": true
+          }
+        ]
+      },
+      "openShareLists": {
+        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "sharedHeading": "These files will be shared with anyone who has the address:",
+        "leftOutHeading": "These files are left out:",
+        "none": "(none)",
+        "byName": "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it.",
+        "question": "Share these files with anyone who has the address? [y/N]: ",
+        "nonInteractive": "Sharing as the lists say, because nobody is here to look at them.",
+        "declined": "Nothing was shared.",
+        "markers": {
+          "begin": "PLANTOIR_PLAN_LISTS_BEGIN:",
+          "shared": "PLANTOIR_PLAN_LISTS_SHARED:",
+          "leftOut": "PLANTOIR_PLAN_LISTS_LEFT_OUT:",
+          "end": "PLANTOIR_PLAN_LISTS_END:",
+          "rule": "Each file is printed twice: once in the lists a person reads at a terminal, and once as a marker line, `shared` or `leftOut` followed by one space and the file's place in the plan site (a line break in a name written as a space), between `begin` and `end` (each ending in a colon, so every reader's one rule for a machine line, PLANTOIR_ and capitals then a colon, keeps all four out of the console). The app reads only the marker lines, keeps them out of the console, and shows them in the open share's own sheet; it never reads the console's own lines for the lists."
+        },
+        "sheetTitle": "Share these files?",
+        "shareButton": "Share"
+      },
+      "interruptionCases": {
+        "rule": "A share or a Stop Sharing that stops part way (the console's Cancel, Quit, a crash) leaves a marker that says no MORE than the site does (review H1): the bar never shows protected, and never not shared, while the address may answer with the plans. share_plan.py writes the marker before the upload with `state` sending, the address, `protected` false, and the answer keys in when this share or the one before carried them; after the proof with `state` shared and `oldCopies` counted before the deletes; and before a Stop Sharing with `state` stopping. Each case interrupts at `point`, after the share before it (`before`: none, open or protected), and expects the marker's state, protected and address, what the bar shows (barCases), and what the next share does. `keysLeftOutLine` is whether the bar would say answer keys were left out (answerKeysLeftOut above 0 on an open marker): never while the address may still serve one (fix review M1).",
+        "cases": [
+          {
+            "name": "a first share stopped after its project was made",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "afterTheProject",
+            "marker": {
+              "state": null,
+              "protected": false,
+              "address": false
+            },
+            "bar": "notShared",
+            "nextShare": "reuses the project's name; nothing was sent, so nothing can be open"
+          },
+          {
+            "name": "a first open share stopped before its upload",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "beforeTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "a first open share stopped during its proof",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "Remove Password stopped after its upload",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "afterTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "Remove Password stopped during its proof",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "a protected share stopped during its proof",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "protected, as last asked"
+          },
+          {
+            "name": "a protected share stopped during the deletes",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": true,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "protected",
+            "nextShare": "protected, and it deletes the older copy"
+          },
+          {
+            "name": "Stop Sharing stopped after the delete",
+            "before": "open",
+            "choice": "stop",
+            "point": "duringStopSharing",
+            "marker": {
+              "state": "stopping",
+              "protected": false,
+              "address": true
+            },
+            "bar": "stopping",
+            "nextShare": "Stop Sharing again"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during its proof",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true,
+              "keysLeftOutLine": false
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share without the keys, which deletes the copy that held them"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during the deletes",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": false,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "open",
+            "nextShare": "deletes the older copy that still holds the keys; until then the bar shows oldCopyStillThere"
+          }
+        ]
+      },
+      "barCases": {
+        "rule": "What the share bar shows for a school year's marker (PlanSharing.barStatus): no marker, or one with no address, is notShared; state sending is unfinished (words.lastShareUnfinished, with Share Again and Stop Sharing); state stopping is stopping (words.stopUnconfirmed, with Stop Sharing); otherwise protected (words.withPassword) or open (words.openToAnyone). oldCopiesLine is true when the marker's oldCopies is above 0: refusals.oldCopyStillThere is shown under the status until a later share deletes the older copy (review M2).",
+        "cases": [
+          {
+            "marker": null,
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "name": "x",
+              "subdomain": "x.pages.dev",
+              "year": 2026
+            },
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "sending",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 1
+            },
+            "bar": "unfinished",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "stopping",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "stopping",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "open",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "open",
+              "oldCopies": 2
+            },
+            "bar": "open",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          }
+        ]
+      },
+      "stopCases": {
+        "rule": "What Stop Sharing says, from what the address answers after the delete (fix review M2). It says stopped only on an answer that PROVES the site is gone: 522 or 530 (measured after a delete), or the name no longer resolving. Anything else is unknown (no answer at all, a timeout, a school filter's 403, a 5xx, a 404) and is fetched again every 2 s for up to 30 s; 200, 401 or any answer carrying X-Plantoir-Share is the plans still answering. Not proven by 30 s: words.stopUnconfirmed, the outcome unconfirmed, exit 1, the marker kept as stopping, the row kept with Stop Sharing, and the saved username and password kept (deploy.sh deletes them only after a Stop Sharing that exited 0). `delete` is what Cloudflare answered to the delete; `answers` is what the address says, in order, the last repeated.",
+        "cases": [
+          {
+            "name": "530 straight after the delete",
+            "delete": "deleted",
+            "answers": [
+              "530"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the plans for a moment, then 522",
+            "delete": "deleted",
+            "answers": [
+              "200",
+              "522"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the name no longer resolves",
+            "delete": "deleted",
+            "answers": [
+              "nameNotFound"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "no answer at all: offline",
+            "delete": "deleted",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a school filter's 403",
+            "delete": "deleted",
+            "answers": [
+              "403"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 502",
+            "delete": "deleted",
+            "answers": [
+              "502"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 404",
+            "delete": "deleted",
+            "answers": [
+              "404"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the plans still answer: another account",
+            "delete": "alreadyGone",
+            "answers": [
+              "200"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address is offline",
+            "delete": "alreadyGone",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address answers 530",
+            "delete": "alreadyGone",
+            "answers": [
+              "530"
+            ],
+            "outcome": "alreadyGone"
+          }
+        ]
+      },
+      "worker": {
+        "rule": "EVERY share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged); every request reaches it first. It answers only the files the share staged (a list written into it; a path is shared when it, it plus .html, or it plus /index.html is listed, and a path ending in / when its index.html is), with 404, the staged 404.html and Cache-Control: no-store for anything else, /_worker.js included. A protected share's worker also keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once; and without the right Authorization answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\" for every path, robots.txt and a missing path included. Every answer carries X-Robots-Tag: noindex, nofollow and Cache-Control: no-store (private, no-store when protected). Every answer, 401, 404 and 200 alike, carries X-Plantoir-Share: the share's own random id (proof).",
+        "why": "Salted SHA-256 rather than a slow hash: the worker's source is readable only inside the teacher's Cloudflare account, and the password is one made for colleagues, not the teacher's own (the dialog says so). PBKDF2 at 100,000 iterations measured 16.1 ms against a 10 ms CPU limit; at about 10,000, 2.0 ms, the upgrade if that ever changes. Measured: the static file server answers /_worker.js with 404, not the source, so even a bypassed worker does not hand out the salt and hash."
+      },
+      "workerCases": {
+        "rule": "Run under node against the worker written for a share holding index.html, unit/index.html, unit/correlation.html, unit/pdfs/Quiz 1, Solutions.pdf, robots.txt and 404.html, with a stand-in ASSETS that answers 200 for every path. `mode` is protected (username `colleague`, password `correct horse 7`) or open; `auth` is none, wrong or right.",
+        "cases": [
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "wrong",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/correlation",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/robots.txt",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true
+          },
+          {
+            "mode": "protected",
+            "path": "/_worker.js",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/%E0%A4%A",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          }
+        ]
+      },
+      "edgeCache": {
+        "rule": "Why every share runs the worker, open ones too: Cloudflare's edge cache answers a file a later share left out from its old address. The worker runs before the cache and answers only the files the current share holds.",
+        "measured": "2026-11-12, the teacher's free account, through share_plan.py: an open share with the answer key included, the key fetched, then an open share without it and with no worker: the key went on answering 200 from the edge (cf-cache-status HIT, Cache-Control public, s-maxage=604800) at every sample for 90 s, while the same address with a query string answered 404. The first full run met it after Remove Password: the key colleagues had opened with the password answered 200 to anyone. With the worker on every share, the same sequence answered 404 at 0.3 s and at every sample to 37 s, and a changed page was served changed at once.",
+        "cost": "Every request to an open plan site now counts against the Workers Free plan's 100,000 a day, which a teacher's colleagues will not reach; at the limit an open site closes (fail closed) rather than opening, so it is unreachable until midnight UTC, not exposed."
+      },
+      "openHeaders": "/*\n  X-Robots-Tag: noindex, nofollow\n",
+      "schoolYear": {
+        "rolloverMonth": 8,
+        "rule": "One plan site per school year (Russell, 2026-11-12). The year is the calendar year the school year starts in, rolling over on 1 August, as SchoolYear.startingYear on the mac and Timetable.AcademicYearStarting on Windows; it is written in a name as its label, 2026-27.",
+        "cases": [
+          {
+            "day": "2026-07-31",
+            "year": 2025,
+            "label": "2025-26"
+          },
+          {
+            "day": "2026-08-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2026-12-31",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2027-01-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2099-09-01",
+            "year": 2099,
+            "label": "2099-00"
+          }
+        ]
+      },
+      "names": {
+        "maxLength": 58,
+        "suffixLength": 8,
+        "rule": "<code>-plans-<year label>-<surname>-<suffix>, lowercase letters, digits and dashes, at most maxLength characters (Cloudflare refuses 59, a capital and an underscore with code 8000003, measured). The suffix is suffixLength characters from a-z and 0-9, on EVERY plan site, protected or not (Russell, 2026-11-12), so the address never changes when a password is added or removed. The suffix is never cut: the surname is shortened first, then dropped, and only then the code. A name Cloudflare says is taken in this account (409, code 8000002) gets a new suffix, at most three tries. The address is always read from the project's `subdomain`, never built from the name: Cloudflare may add characters to a name taken elsewhere.",
+        "cases": [
+          {
+            "code": "MPM2D",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "k3x9qa8m",
+            "name": "mpm2d-plans-2026-27-gordon-k3x9qa8m"
+          },
+          {
+            "code": "AP CALC",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "abcd1234",
+            "name": "ap-calc-plans-2026-27-gordon-abcd1234"
+          },
+          {
+            "code": "ICS3U",
+            "year": 2027,
+            "surname": null,
+            "suffix": "zz99yy88",
+            "name": "ics3u-plans-2027-28-zz99yy88"
+          },
+          {
+            "code": "SNC2D",
+            "year": 2026,
+            "surname": "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop",
+            "suffix": "a1b2c3d4",
+            "name": "snc2d-plans-2026-27-abcdefghijklmnopqrstuvwxyzabc-a1b2c3d4"
+          },
+          {
+            "code": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "q1w2e3r4",
+            "name": "abcdefghijklmnopqrstuvwxyzabcdefghi-plans-2026-27-q1w2e3r4"
+          },
+          {
+            "code": "ENG4U",
+            "year": 2099,
+            "surname": "côté",
+            "suffix": "00000000",
+            "name": "eng4u-plans-2099-00-ct-00000000"
+          }
+        ],
+        "note": "The last case is the name part's own rule (letters and digits only); deploy.py's sanitize_last_name has already folded côté to cote before it is saved, so a real surname never reaches it with an accent."
+      },
+      "modeCases": {
+        "rule": "Whether a share is protected, from the year's marker (`marker` is true when its `asked` is protected, false when open, null when there is no marker) and the flag given. Protection is sticky: a share with neither flag keeps what the marker says, and only --remove-password opens a protected site.",
+        "cases": [
+          {
+            "marker": null,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": null,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": false,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": false,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": null,
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": "--remove-password",
+            "protected": false
+          },
+          {
+            "marker": true,
+            "flag": "--protect",
+            "protected": true
+          }
+        ]
+      },
+      "warningCases": {
+        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
+        "cases": [
+          {
+            "marker": null,
+            "choice": "shareOpen",
+            "warn": true
+          },
+          {
+            "marker": null,
+            "choice": "shareProtected",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "removePassword",
+            "warn": true
+          },
+          {
+            "marker": true,
+            "choice": "changePassword",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "addPassword",
+            "warn": false
+          }
+        ]
+      },
+      "failClosed": {
+        "rule": "On EVERY share, open or protected (the director's ruling, 2026-11-12: it costs one call, and a later protected share never runs with the default), PATCH /accounts/{account}/pages/projects/{name} with {\"deployment_configs\":{\"production\":{\"fail_open\":false},\"preview\":{\"fail_open\":false}}}, then GET the project. failClosed is true only when the GET shows false on BOTH environments. A PATCH or GET that fails records failClosed false and the share goes on: the teacher reads words.floodOpen beside a protected address, and the random suffix is the fallback (Russell, 2026-11-01, refined). A new project is also created with the same deployment_configs in its POST.",
+        "measured": "2026-11-12 on the teacher's free account with the teacher's Pages: Edit token: a new project starts with fail_open true on both; the PATCH answers 200 and a GET shows false on both, nothing else changed; it survives every later deploy; a malformed PATCH answers 400 (8000006) and changes nothing.",
+        "notMeasured": "The flood itself (ruled out by Russell). That the API's deployment_configs.*.fail_open IS the dashboard's Settings > Runtime > Fail open / closed is inferred from its name, its per-environment place, and its default of true; the API reference still describes it as 'Whether to fail open when the deployment config cannot be applied'. words.floodClosed therefore says what Cloudflare's own page says fail closed does, no more.",
+        "documentation": [
+          {
+            "page": "developers.cloudflare.com/pages/functions/routing/",
+            "updated": "2026-09-18",
+            "says": "\"Fail open\" means that static assets will continue to be served, even if Pages Functions would ordinarily have run first. \"Fail closed\" means an error page will be returned, rather than static assets."
+          },
+          {
+            "page": "developers.cloudflare.com/pages/functions/pricing/",
+            "updated": "2026-09-08",
+            "says": "The free plan daily request limit resets at midnight UTC."
+          },
+          {
+            "page": "developers.cloudflare.com/workers/platform/limits/",
+            "updated": "2026-10-29",
+            "says": "Accounts on the Workers Free plan have a daily request limit of 100,000 requests, resetting at midnight UTC."
+          }
+        ]
+      },
+      "proof": {
+        "rule": "Nothing is called shared until the address answers as the share promises, and only an answer from THIS share's deployment counts: each share writes a fresh random id into its worker, which sends it as X-Plantoir-Share on every answer, and the proof requires it (review M1: when the old and the new deployment answer alike, the status codes cannot tell them apart). Fetched without a password every 2 s for up to 60 s: a protected share needs 401 with a WWW-Authenticate: Basic header, then 200 with the password, and the project's canonical_deployment.uses_functions true; an open share needs 200. A protected share that fails any of these by 60 s is refusals.notProtectedYet, the marker records protected false, and the address is not shown as protected.",
+        "measured": "The main address answered the new deployment 0.2 to 2.2 s after wrangler returned, every time (2026-11-12); one open re-share still met the old protected deployment for 2.2 s."
+      },
+      "oldDeployments": {
+        "rule": "After the proof, every deployment of the project but the canonical one is deleted (GET .../deployments, then DELETE .../deployments/{id}?force=true). A delete that fails: the plans are shared as asked, refusals.oldCopyStillThere is said, the marker keeps oldCopies, and the next share tries again.",
+        "why": "Measured 2026-11-12 (S3): every deploy is also a deployment with an address of its own, and after an open share was re-shared protected, the OLD open deployment's own address still served the list of plans and a PDF with 200 and no password, while the main address answered 401. After its delete the old address answered 404 within 10 s (S4). The active production deployment cannot be deleted (400, 8000034)."
+      },
+      "markerFile": {
+        "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
+        "keys": [
+          "name",
+          "subdomain",
+          "address",
+          "year",
+          "state",
+          "asked",
+          "protected",
+          "failClosed",
+          "answerKeys",
+          "answerKeysLeftOut",
+          "lastShared",
+          "units",
+          "oldCopies"
+        ],
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded. `state` is sending (written before the upload: the share has not been proved, so the bar says it may be open), shared (proved), or stopping (a Stop Sharing that has not been confirmed); interruptionCases says what each leaves behind."
+      },
+      "credential": {
+        "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a fresh file for each share, 0600 inside its own 0700 folder (/tmp/plan_cred.XXXXXX/cred, made by mktemp -d), named to share_plan.py by --credential-file (a path, never the secret); share_plan.py deletes the file and the folder as soon as it has read them and again on every way out, so two courses shared at once never read each other's (review M4). The password is used exactly as typed, spaces at either end included; neither the username nor the password is echoed into the console (both are read without echo). Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
+        "usernamePattern": "^[A-Za-z0-9._-]{1,32}$",
+        "passwordRule": "8 to 64 printable ASCII characters (space to ~)"
+      },
+      "stopSharing": {
+        "rule": "--plans --stop-sharing [--year YYYY] marks the year's marker stopping, then deletes the year's project (DELETE .../pages/projects/{name}); if the delete is refused, the deployments are deleted one by one and it is tried once more, and a refusal puts the marker back (words.stopFailed). After a delete, or a 404, the address is fetched every 2 s for up to 30 s, and stopped is said only once it no longer answers with the plans (200, 401, or any answer carrying X-Plantoir-Share): a 404 from the delete alone proves nothing, since the token may now reach another account (review M5). Still answering at 30 s: words.stopUnconfirmed, the marker kept as stopping, the outcome unconfirmed, and the bar keeps the row with Stop Sharing.",
+        "measured": "2026-11-12: a project holding 2 deployments deleted with 200 and nothing deleted first; the address answered 530 or 522 within 5 s, stopped resolving after about 100 s, and never answered 200 again in 3 minutes. A deleted project's *.pages.dev name could later be taken by another account; the suffix makes that a matter of chance, not of guessing (not measured: it needs a second account)."
+      },
+      "markers": {
+        "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n>",
+        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>] (notConfirmed when the teacher said no to the open share's lists)",
+        "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed|unconfirmed>",
+        "rule": "Printed by share_plan.py for the app to read and keep out of the console (app-rules.json -> markerOrigins, origin shared-python). <CODE+> is the course with its one permitted space written +, as every other marker writes it."
+      },
+      "words": {
+        "sharedThroughCloudflare": "Unit plans are shared as a small website of their own on Cloudflare Pages, one for each school year.",
+        "netlifyTeacher": "Your class websites go to Netlify, but unit plans are shared through Cloudflare Pages, because Netlify's free plan cannot ask for a password. The first time, you will be asked for a Cloudflare token.",
+        "protect": "Protect with a Username and Password",
+        "includeAnswerKeys": "Include Answer Keys",
+        "share": "Share Unit Plans",
+        "shareAgain": "Share Again",
+        "changePassword": "Change Password…",
+        "addPassword": "Add a Password…",
+        "removePassword": "Remove Password…",
+        "stopSharing": "Stop Sharing",
+        "copyLink": "Copy Link",
+        "withPassword": "Shared with a username and password.",
+        "openToAnyone": "Open to anyone with the address.",
+        "lastShared": "Last shared {when}.",
+        "answerKeysLeftOut": "{n} answer key(s) left out. Protect the plans with a password, or tick Include Answer Keys, to share them.",
+        "crawlerWarningTitle": "Share without a password?",
+        "crawlerWarning": "Anyone with the address can open these plans{answerKeysClause}. Plantoir asks search engines and AI crawlers not to read or keep them, but they can ignore that, so treat anything here as possibly searchable. To require a password, choose Protect with a Username and Password.",
+        "answerKeysClause": ", including the answer keys you chose to include",
+        "shareAnyway": "Share Without a Password",
+        "floodClosed": "If someone floods this address with requests, Cloudflare closes the plans until midnight UTC rather than opening them.",
+        "floodOpen": "Cloudflare did not accept the setting that keeps the plans closed if this address is flooded with requests. If that happened, anyone with the address could open the plans until midnight UTC. The address ends in random letters, so it is hard to guess.",
+        "stopTitle": "Stop sharing the {year} unit plans?",
+        "stopMessage": "The address {address} stops working within a minute, and anyone you gave it to can no longer open the plans. Your plans stay on this Mac.",
+        "stopFailed": "Plantoir could not stop sharing these plans, so the address still works. Try Stop Sharing again in a few minutes.",
+        "notSharedHere": "This page is not shared at this address.",
+        "earlierYear": "{year}: {address}",
+        "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with.",
+        "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished.",
+        "consoleSheetTitle": "Sharing unit plans",
+        "lastShareUnfinished": "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing.",
+        "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
+      },
+      "refusals": {
+        "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",
+        "tooLarge": "These plans were not shared, because a file in them is larger than the 25 MB Cloudflare Pages takes.",
+        "noPassword": "These plans were not shared, because no username and password were given for them.",
+        "notProtectedYet": "These plans were sent, but Plantoir could not confirm that the address asks for the password, so they are not shown as protected and may be open to anyone with the address. Share Again in a minute.",
+        "oldCopyStillThere": "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more.",
+        "stillSharing": "These unit plans are already being shared, so they cannot be shared again until that has finished.",
+        "notToAFolder": "Unit plans are shared through Cloudflare Pages, not to a folder.",
+        "netlifyNever": "Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password.",
+        "notAnsweringYet": "These plans were sent, but their address did not answer yet, so Plantoir cannot say they are shared. Share Again in a minute.",
+        "cloudflareSaidNo": "Cloudflare did not take these plans, so they were not shared. The reason Cloudflare gave is above.",
+        "referenceCourse": "referenceCourses.refusal.sentence, unchanged",
+        "notConfirmed": "Nothing was shared."
+      },
+      "trail": {
+        "rule": "Three events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."
+      },
+      "rejected": [
+        "one site per course with no year (707c's assumption; Russell, 2026-11-12: one per school year)",
+        "the random suffix only on open sites (Russell, 2026-11-12: on every plan site)",
+        "the address built from the project name: subdomain can differ",
+        "leaving old deployments up: each keeps an address of its own, measured serving an open copy after a protected share",
+        "a share without --protect removing the password: protection is sticky, and only --remove-password drops it, after the warning",
+        "functions/_middleware.js instead of _worker.js: wrangler takes functions/ from the folder it runs in, not the uploaded one",
+        "PBKDF2 at 100,000 iterations: 16.1 ms against a 10 ms CPU limit",
+        "the credential in argv (beyond the Keychain store's instant), an environment variable, a file under courses/, or the marker",
+        "staging under the builds root: a temp folder in the website builder is never backed up and needs no link",
+        "a new work-lease kind for sharing: publish already means sending something somewhere to every reader of a lease",
+        "the account id or project id in the marker: every call is by name",
+        "answer keys guessed from other words in a file name (Solutions Manual Notes.pdf): only the skills' own endings count",
+        "deploy.py --plans: its --section is required and the plans path shares none of its section logic",
+        "a share tool for the local assistant or an MCP client: it would move the tool surface, and sharing is the teacher's act",
+        "a flood test on any account (Russell, 2026-11-12)"
       ]
     }
   },
@@ -37149,6 +39566,99 @@
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
       "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+    ]
+  },
+  "scheduledRunGetsItsFolderReady": {
+    "rule": "A scheduled deploy brings its working folder's launchers (setup.sh, preview.sh, deploy.sh at the folder's top) and .toolchain/ up to date from the tools of the Plantoir that runs it, before any of them runs, and then goes ahead in every case. The trail says what it did (activityTrail.mustRecord, 'scheduled deploy got its folder ready'), except for the ordinary run that finds nothing to change and waits for nobody.",
+    "order": "Lateness, the wait for an earlier deploy of the section, the wait for the course (which takes the run's build and publish leases), whether the job still stands, the settings as they are now (theDestination.order, unchanged), the wrapper written from them; then, only when the run will deploy and holding its leases: wait for another program's live copy, copy (the launchers, then .toolchain/, the window's order), wait again; then the wrapper runs. A run that stands down for its settings copies nothing. A plist from before v1.2.0 names no section and so no folder, and copies nothing, as it reads no settings.",
+    "theGuard": "Windows' marker, by name and body: courses/.internal/activity/toolchain-copying.<pid>, the lease body (process id, name, moment, start time), judged by the same liveness rule, written only when courses/ exists. Two copies on the mac write it while they run: the .toolchain/ copy a window or the assistant's server starts off the main actor (ToolchainReadiness.ensure), and the run's whole copy, launchers included. The window's launcher refresh (milliseconds), the synchronous copy (initializeWorkspace and the suite) and BuilderWarmUp (a folder of its own) do not. Only the run reads it: it waits while another program's marker is live before its own copy and again after, until five minutes have passed since it began waiting, then goes ahead. Each file is written whole to a temporary file and moved into place, so a launcher already running reads the file it opened and a launcher started now reads the old one or the new one, never part of one.",
+    "whyItAlwaysGoesAhead": "Because the alternative is a deploy that does not happen. A deploy that silently does not happen at 6:30 is the worst outcome; a deploy that goes ahead with the tools as they were and says so is better. In every case that cannot copy, the folder's tools are the ones the window last left there: nothing written at all (a folder that cannot be written, no tools in Plantoir) leaves the old set whole, which is exactly what every scheduled run used before #748. A copy that failed part way leaves some files new; the launchers then build from what is there, and if that build fails, the build leg and the destinations record it (scheduledPublishStopped) and the notification says so, so the run is never silent. Standing down would turn every one of these into a run that publishes nothing, the case where the copy did no harm included.",
+    "measured": "Apple M4 Pro, macOS 26.6, 2026-11-13, the app's own recipe (13,023 files, 83 MB), with an unrelated verify.sh running on the same Mac. The run's copy when nothing is stale: 0.84 to 0.86 s (3 runs), 3.9 to 6.6 s at background priority (taskpolicy -b). After an update (91 files changed, removed or added, every file restamped, the bundle's fingerprints valid): 1.33 to 1.47 s, 5.3 to 6.1 s at background priority. Into an empty folder: 4.1 to 4.7 s, 10.6 to 14.3 s. Two copies started at the same instant into one folder, before #748: after an update, one of the two counted 18 or 19 files as FAILED in each of 5 runs; into an empty folder, 5 of 8 runs had a failure; every one a file the other copy had already removed (or the other's temporary file), and the folder ended byte for byte right every time. With a file already gone not counted as a failure: 0 failures in 13 runs (5 after an update, 8 into an empty folder). A launcher replaced by a temporary file and a move while /bin/bash ran it: bash finished the old text; replaced in place: bash ran the new text from the middle. documentation/09-mac-app.md has the website builder's own rebuild time.",
+    "rejected": [
+      "Standing down when the copy fails (Windows' choice): it turns a copy that did no harm into a deploy that publishes nothing.",
+      "Waiting for the copy with no limit: a stuck copy would hold the deploy for ever, and the other copy writes the same bytes.",
+      "Leaving the folder alone and saying 'open the folder once after an update' in the notes: nobody reads the notes at 6:30, and Russell ruled the part in.",
+      "Rewriting every working folder's tools at the first launch after an update: the app does not know every folder, and a folder opened then is mirrored anyway.",
+      "A lock file the kernel releases (flock): a new mechanism beside the marker Windows already writes, and the marker's liveness rule already ignores a marker whose program is gone.",
+      "Making the window's copy take turns with the run's, as Windows does: on the mac two copies at once are measured to write the same bytes once an already-gone file is not a failure, and the window must never wait on a run that may itself be waiting for the course."
+    ],
+    "platformDifferences": "Mac: the run goes ahead in every case, waits up to five minutes in all for other copies, and writes its own event. Windows (#477): a failed copy, or one still waiting its turn when the run's ten minutes are up, stands the run down couldNotRunAsSetNow with wording.wrapperCouldNotBeWritten; its copies take turns because two writers failed with sharing violations on NTFS; its lines go under 'working folder tools copied' and 'scheduled publish waited for the course'. Both copy before the wrapper runs, and both write and honour the same marker.",
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "Windows' run already copies (#477) and decides differently on purpose, by Russell's ruling on #477 that this is not a contract case for both platforms: Windows stands down where the mac goes ahead. Windows' suite does not run these cases.",
+    "howToRunACase": "Build ScheduledRunFolderRefresh.Report from given (toolsChanged and toolsFailed are the .toolchain/ mirror's changed and failed counts; launchersRefreshed and launchersFailed are how many launchers at the folder's top were replaced or could not be; waitedFor is the other program's process id or null, waitedSeconds the seconds waited), call ScheduledRunFolderRefresh.decide, and compare every field of expect. When line is not none, trailLine must be the matching lines entry with the clauses expect names, and none of the others. A line written after the run stopped waiting says only what this run saw and did, so it never says the tools are up to date (the 748b review's LOW 4).",
+    "cases": [
+      {
+        "name": "every run but the first after an update: nothing stale, nobody else copying",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the first run after an update: the launchers and the tools brought up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher at the folder's top differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "only the tools differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 3, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "a folder that cannot be written: nothing could be copied",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 0, "toolsFailed": 91, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the disk filled part way through",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 40, "toolsFailed": 51, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher could not be replaced",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "Plantoir carries no tools to copy: nothing is copied, nothing is removed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": false, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "appCarriesNoTools", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "not a working folder at all (no preview.sh): nothing to bring up to date",
+        "given": {"isAWorkingFolder": false, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for a window's copy, which left nothing to do",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 3, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "alreadyUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for another program's copy, then brought the rest up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 5, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 2, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "another program was still copying after five minutes: the run copied anyway, found nothing of its own to change, and went ahead (never 'already up to date': the other copy may still be changing the folder)",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "foundNothingToChange", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "another program was still copying after five minutes, and the run's own copy changed files: it says what it copied, no more",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 7, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "stopped waiting, and its own copy could not finish",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 2, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      }
     ]
   }
 }

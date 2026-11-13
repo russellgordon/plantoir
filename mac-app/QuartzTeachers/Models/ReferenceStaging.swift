@@ -83,13 +83,13 @@ enum ReferenceStaging {
     /// Distinctive on purpose: the sweep below REMOVES what it matches, and a
     /// teacher's own dot-folder — `.obsidian`, `.internal`, `.git` — must
     /// never be mistaken for one of ours.
-    static let prefix: String = ".plantoir-importing-"
+    nonisolated static let prefix: String = ".plantoir-importing-"
 
     // MARK: - Functions
 
     /// The hidden name a course is built under before it is given its real
     /// one.
-    static func stagingName(for folderName: String) -> String {
+    nonisolated static func stagingName(for folderName: String) -> String {
         return ReferenceStaging.prefix + folderName
     }
 
