@@ -13,7 +13,8 @@
 # the release notes.
 #
 # The version comes from ONE place in mac-app:
-# MARKETING_VERSION in project.yml (which matches <Version> in Plantoir.csproj).
+# MARKETING_VERSION in project.yml, raised on `dev` when work on a release
+# starts and checked against the tag at the cut (RELEASING.md, #861).
 #
 # The BUILD number is derived here rather than stored anywhere, because its
 # only job is to name BITS uniquely: two artifacts must never share a name,
