@@ -1,6 +1,6 @@
 ---
 name: plantoir-marking
-description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and keeps students' names on this computer with scripts, boxes the name line on every scanned page whose blank test has a name blank, has the teacher look through the boxed papers and records their yes before any paper is read, drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by script, on the teacher's word.
+description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and keeps students' names on this computer with scripts, boxes the name line on every scanned page whose blank test has a name blank, has the teacher look through the boxed papers and records their yes before any paper is read, drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost, and builds the class's results from the marks records. Names go onto the sheets and results only at the end, by script, on the teacher's word.
 ---
 
 # Marking a test from scanned papers, with students' names kept on this computer
@@ -12,7 +12,8 @@ file is managed by Plantoir and is replaced when Plantoir updates; do not
 edit it, and never write anything inside this skill's folder (it is
 replaced whole, and a file written here is lost). Copy from it instead.
 
-This skill marks tests and quizzes written on paper. It does not describe
+This skill marks tests and quizzes written on paper, and builds the
+class's results from those marks (section 15). It does not describe
 marking anything else yet: if the teacher asks for that, say so plainly,
 and do not do it from this skill.
 
@@ -123,11 +124,13 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
   <Assessment>/Briefs/                      the marker and reviewer briefs
   <Assessment>/Marking Rules Applied.md     every ruling, numbered
+  <Assessment>/Records/Section N/           level records, only if there are any (section 15)
+  <Assessment>/Results/                     the class's results, identifiers only (section 15)
 <teacher-only folder>/
   Name Mapping Table.csv                    section, identifier, name (and optional columns)
   <Assessment>/Originals/Section N/         the scans, Student A.pdf
   <Assessment>/Check/                       the redacted papers to look through, the record of the teacher's yes
-  <Assessment>/Named/                       the named copies
+  <Assessment>/Named/                       the named copies, the named results included
   Quarantine/                               anything the runner caught
 ```
 
@@ -469,3 +472,47 @@ nothing about report comments.
 
 If the teacher asks what you can help with, answer plainly from what this
 skill describes, and claim nothing it does not.
+
+## 15. Class results
+
+When the marks are final, or the teacher asks how the class did, build the
+class's results with `scripts/class_results.py`, copied into `Scripts/`
+and self-tested like the others (section 6). It reads no mapping table, so
+it runs directly, not through the runner. `reference/results.md` beside
+this file says what it reads, what it writes and how the numbers are made.
+
+```text wrap
+python3 -B "<marking folder>/Scripts/class_results.py" --assessment "<marking folder>/<Assessment>" --kit "<kit>/answers.json" --checker "<this working folder>/.claude/skills/plantoir-test-authoring/scripts/check_kit.py" --settings "<marking folder>/Marking Settings.md"
+```
+
+It writes `Class Results.pdf` and a grade table per assessment into
+`<Assessment>/Results/`, identifiers only (`--assessment` again, each with
+its own `--kit`, and `--out` for a term's results across assessments). It
+reads level records in `Records/` only if that folder is there, and the
+document says plainly which parts it had no records for. Render every page
+and look, as for the sheets.
+
+- **The scale is the teacher's.** Levels come from the `- Levels scale:`
+  line of `Marking Settings.md`. Never fill in the levels scale yourself:
+  ask the teacher, and record their answer with their words and the date.
+- **A sheet whose totals no longer match its marks record stops the
+  build**, naming the identifier and both numbers: build that student's
+  sheets again, tell the teacher which student was affected, and run it
+  again. Never edit the numbers in a document by hand.
+- **After any change to a mark or a level, run `class_results.py`
+  again.** The documents do not change by themselves; each says when it was
+  built and from which records. Report what it printed; never say the
+  results are correct or complete.
+
+The named copy of the document, and the named grade table for the school's
+report system, are made only on the teacher's word, through the runner,
+into the teacher-only folder, and you never open them:
+
+```text wrap
+python3 -B <this skill>/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --document "<marking folder>/<Assessment>/Results/Class Results.tex" --table "<teacher-only>/Name Mapping Table.csv" --out "<teacher-only>/<Assessment>/Named"
+python3 -B <this skill>/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --grades "<marking folder>/<Assessment>/Results/Grades - <Assessment>.csv" --table "<teacher-only>/Name Mapping Table.csv" --out "<teacher-only>/<Assessment>/Named"
+```
+
+Charts, a test beside an assignment, and a marking summary with the
+teacher's own notes are not built by the script: `reference/results.md`
+says how to make them yourself, identifiers only.
