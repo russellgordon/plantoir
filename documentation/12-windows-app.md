@@ -2771,11 +2771,19 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   window and takes a yes to them before the folder; the report-comments
   notes are kept in the teacher-only folder and reach the marking folder
   only as `Teacher Notes (checked).md`; `scripts/render_pages.py` writes
-  pages only into an assessment's `Work` folder, and `teacher_only.py
-  --tidy` looks for copies in `tempfile.gettempdir()` and `%TEMP%`'s
-  equivalent (`TMPDIR` where set). All three are plain Python and run on
-  Windows unchanged; that the console shows the points well, and what
-  `--tidy` finds under a Windows `%TEMP%`, are NOT MEASURED. They are checked out with
+  pages only into an assessment's `Work` folder. Since the third trial (09
+  → "The third trial, and what it changed"): `--tidy` removes only the
+  pictures `render_pages.py` listed in `Work/Made while marking.txt` and
+  prints no path; both teacher steps and `--verify` refuse a marking folder
+  inside the system's temporary folder (`tempfile.gettempdir()`, which is
+  `%TEMP%` on Windows, and `TMPDIR` where set); and they stop when
+  `render_pages.py`, in the skill's folder or the marking folder's
+  `Scripts\`, is not the file whose SHA-256 `teacher_only.py` holds. All
+  of it is plain Python and runs on Windows unchanged; that the console
+  shows the points well, and that `%TEMP%` under a Windows user's profile
+  is refused as the Mac's `/var/folders/.../T` is, are NOT MEASURED. The
+  pins are byte for byte, so a `render_pages.py` checked out with CRLF
+  would stop every step: `.gitattributes` keeps it LF. They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft

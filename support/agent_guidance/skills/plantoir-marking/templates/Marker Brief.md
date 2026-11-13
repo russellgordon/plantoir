@@ -41,7 +41,7 @@ a name, write only `NAME VISIBLE page N`.
 ## Never
 
 - Never write a copy of a page, a paper or a sheet anywhere but `<marking folder>/<Assessment>/Work/`, never the
-  system's temporary folder: to see a page as a picture, use `Scripts/render_pages.py ... --into` that folder.
+  system's temporary folder: to see a page as a picture, use `"<this working folder>/.claude/skills/plantoir-marking/scripts/render_pages.py" ... --into` that folder, as it shipped (never a copy, never changed).
 
 - Never repeat a name you see, in any message or file. Never look for, list or open the teacher-only folder, the mapping
   table or an original scan.

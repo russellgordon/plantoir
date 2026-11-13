@@ -94,3 +94,7 @@ support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eo
 support/agent_guidance/skills/plantoir-marking/scripts/teacher_only.py text eol=lf
 support/agent_guidance/skills/plantoir-marking/launchers/*.command text eol=lf
 support/agent_guidance/skills/plantoir-marking/launchers/*.bat text eol=crlf
+
+# render_pages.py (750d, after the third trial) is never adapted either, and teacher_only.py holds its
+# SHA-256: a copy with CRLF would stop every one of the teacher's steps, so it is LF everywhere too.
+support/agent_guidance/skills/plantoir-marking/scripts/render_pages.py text eol=lf

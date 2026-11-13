@@ -7,7 +7,7 @@
 # (teacher_only.py and run_with_names.py, in the skill folder named in "Skill folder.txt") before it runs them.
 STEP="box"
 TITLE="Box the papers"
-TEACHER_ONLY_SHA256="cc5f8cb850cfe07f6445391cac90797ee890772bf2e4d0537af63a6651224ebc"
+TEACHER_ONLY_SHA256="c2cf7b6dcdcdcd456eb28da8abecc7904a2848d1af6286951d27e5e2e70fb77c"
 RUNNER_SHA256="41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb"
 CHECK="import hashlib,os,sys;a=sys.argv[1:];c=sum(1 for i in range(0,len(a),2) if not os.path.isfile(a[i]) or hashlib.sha256(open(a[i],'rb').read()).hexdigest()!=a[i+1]);print('Stopped: '+str(c)+' of the two scripts this step runs are not the ones Plantoir shipped, so nothing was run. Ask your assistant to copy the launchers again from the plantoir-marking skill. If it still stops, Plantoir puts the skill back as it shipped the next time it opens your working folder.') if c else None;sys.exit(1 if c else 0)"
 

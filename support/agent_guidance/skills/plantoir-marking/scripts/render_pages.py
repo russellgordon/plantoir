@@ -3,15 +3,19 @@
 
 Part of the plantoir-marking skill (#750, 750d, after the second trial: an assistant rendered every boxed
 paper into /tmp, outside the marking folder, where a name written in one page's body sat in a folder anyone on
-the computer could read). A STARTING POINT, like the others: copy it into the marking folder's Scripts/ folder,
-adapt it if you must, run --self-test, and only then use it.
+the computer could read). NOT a starting point since the third trial: an assistant edited its copy's refusal
+of temporary folders away, to get past it, and told no one. So it is run from the skill's folder as it
+shipped, never copied into Scripts/ to be changed, and never adapted. teacher_only.py holds its SHA-256: a
+changed copy, in the skill's folder or in the marking folder's Scripts/, stops --verify and both of the
+teacher's steps with a "Stopped:" line that says a marking file was changed.
 
     python3 -B render_pages.py "<marking folder>/<Assessment>/Redacted/Section 1/Student A.pdf" --into "<marking folder>/<Assessment>/Work" [--dpi 80] [--first 1] [--last 2]
     python3 -B render_pages.py --self-test
 
-It writes "<Work>/<the PDF's name>/page-N.png" and prints the paths of the pictures it wrote, which hold no
-name of a student (the PDF is named by identifier). It refuses a folder that is not called Work, one inside a
-Plantoir working folder, and one inside the system's temporary folders. Needs Poppler's pdftoppm.
+It writes "<Work>/<the PDF's name>/page-N.png", prints the paths of the pictures it wrote, which hold no
+name of a student (the PDF is named by identifier), and adds each to "<Work>/Made while marking.txt", the
+list teacher_only.py --tidy removes them from at the end. It refuses a folder that is not called Work, one
+inside a Plantoir working folder, and one inside the system's temporary folders. Needs Poppler's pdftoppm.
 """
 import os
 import shutil
@@ -20,14 +24,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-# MARK: - What you may change for this teacher
-#   the resolution, the page range, the picture format and the wording of the lines it prints.
-DPI = 80
-
 # MARK: - What must not change
-#   write only into a folder called Work, never inside a Plantoir working folder or a temporary folder of the
-#   system; never print a file name that is not an identifier or a page number; never a traceback.
+#   This file is never adapted (the resolution and the page range are options). Write only into a folder
+#   called Work, never inside a Plantoir working folder or a temporary folder of the system; record each
+#   picture in the Work folder's list; never print a file name that is not an identifier or a page number;
+#   never a traceback.
+DPI = 80
 WORK = "Work"
+MADE = "Made while marking.txt"
 
 
 class Refusal(Exception):
@@ -87,9 +91,21 @@ def render(pdf, into, dpi, first, last, allow_temporary=False):
     if result.returncode != 0:
         raise Refusal("pdftoppm could not read that PDF; nothing more was written")
     written = sorted(target.glob("page-*.png"))
+    record(Path(into), written)
     for path in written:
         print(path)
     return 0
+
+
+def record(work, written):
+    """Add each picture, as a path inside the Work folder, to the list --tidy removes them from."""
+    listed = work / MADE
+    already = set(listed.read_text(encoding="utf-8").splitlines()) if listed.is_file() else set()
+    with open(listed, "a", encoding="utf-8") as handle:
+        for path in written:
+            relative = path.relative_to(work).as_posix()
+            if relative not in already:
+                handle.write(relative + "\n")
 
 
 def option(arguments, name, default=None):

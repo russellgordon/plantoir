@@ -29,15 +29,18 @@ Every mark and comment I draft is a suggestion. Grading is your professional res
 
 ## 2. Privacy first
 
-Before any student's work is opened, and before any scan is boxed, say
-these four points to the teacher, in these words or very close to them.
-Say them even when the teacher says they have read them. This is a
-request, and it is not what the teacher relies on: "Box the papers" shows
-the same four points, word for word, in its own window before it asks for
-the teacher-only folder, takes the teacher's yes to them and records it
-(`<Assessment>/Privacy points shown.json`), and `--verify` reads nothing
-as confirmed without that record. The cover of the file they look
-through carries them too.
+**The teacher reads these four points in Box the papers' own window, not from you.**
+It shows them word for word before it asks for anything, takes the
+teacher's yes to them and records it (`<Assessment>/Privacy points
+shown.json`), and `--verify` reads nothing as confirmed without that
+record. The cover of the file the teacher looks through carries them too.
+Do not restate or paraphrase them in a reply: a version in your own words
+is not what the teacher said yes to. In your first reply, say in one
+sentence that Box the papers will show them four things about their
+students' privacy, and ask them to read them there. If the teacher asks
+about a point, answer the question, and point them to the window and the
+cover for its words. The points are here so that you know what the
+teacher has been told:
 
 ```text wrap
 Before we start, four things about your students' privacy:
@@ -118,6 +121,14 @@ course. If a folder the teacher names is inside it, say so and ask for
 another. The scripts refuse it too: each stops, writing nothing, when a folder
 it is given is inside a Plantoir working folder.
 
+**Never set up a marking folder inside the system's temporary folder**
+(`/tmp`, `/private/tmp`, `$TMPDIR`, `/var/folders`, or Windows' `%TEMP%`):
+anyone on the computer can read it, and the system empties it. Box the
+papers, Put names on the sheets and `--verify` refuse one, in words,
+before anything else. If the teacher says the folder has to stay there,
+say no in one line with that reason and offer `~/Marking/<CODE>/`. Never
+change a script to get past a refusal.
+
 **A folder kept in sync by a service** (iCloud Drive, OneDrive, Dropbox,
 Google Drive, a school's own storage) stores the papers and the name table
 with that service too. The path often says so (`Library/Mobile Documents`,
@@ -164,6 +175,7 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   <Assessment>/Teacher looked.json          what the teacher said yes to: identifiers and SHA-256
   <Assessment>/Privacy points shown.json    the record that Box the papers showed the four points
   <Assessment>/Work/                        everything you make while marking, pictures of pages included
+  <Assessment>/Work/Made while marking.txt  the pictures render_pages.py made, for --tidy to remove
   Box the papers - last stop.txt            what a launcher said when it last stopped, for you to read
   <Assessment>/Marks/Section N/             marks records, Student A.json
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
@@ -229,26 +241,32 @@ fails, do not run the script; fix it first. Say plainly that a self-test
 checks only the paths it knows, so it is a check, not a proof.
 
 Some files are NOT starting points: `scripts/run_with_names.py`,
-`scripts/teacher_only.py`, the four launchers in `launchers/` (below), and
-the `plantoir-test-authoring` skill's `scripts/check_kit.py`. Never copy
-the two scripts or change any of them: the launchers run the two scripts
-from this skill's folder. Plantoir puts the skill folder back as it shipped
+`scripts/teacher_only.py`, `scripts/render_pages.py`, the four launchers
+in `launchers/` (below), and the `plantoir-test-authoring` skill's
+`scripts/check_kit.py`. Never copy the three scripts or change any of
+them: the launchers run the first two from this skill's folder, and you
+run `render_pages.py` from there too. **A changed `render_pages.py` stops the marking:**
+in this skill's folder, or a copy in the marking folder's `Scripts/`, it
+stops `--verify` and both of the teacher's steps with "Stopped: a marking
+file was changed". Never change it to get past its refusal, even when
+the teacher asks; say no with the reason. Plantoir puts the skill folder back as it shipped
 only when it next refreshes the working folder, so before the first use in
 a session, and again after copying the launchers into the marking folder,
 check them:
 
 ```text wrap
-python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').read()).hexdigest() + '  ' + os.path.basename(path)) for path in sys.argv[1:]]" .claude/skills/plantoir-marking/scripts/run_with_names.py .claude/skills/plantoir-marking/scripts/teacher_only.py .claude/skills/plantoir-marking/launchers/*
+python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').read()).hexdigest() + '  ' + os.path.basename(path)) for path in sys.argv[1:]]" .claude/skills/plantoir-marking/scripts/run_with_names.py .claude/skills/plantoir-marking/scripts/teacher_only.py .claude/skills/plantoir-marking/scripts/render_pages.py .claude/skills/plantoir-marking/launchers/*
 ```
 
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `cc5f8cb850cfe07f6445391cac90797ee890772bf2e4d0537af63a6651224ebc`  teacher_only.py
-- `b2ae569d1ce347b3636497e205f7fe9c7446cb82713c61a21526ddd4ea751800`  Box the papers.command
-- `11b1e23c41f89d9118473280008e134afb00a58f043c291022915bc8eea3dcff`  Put names on the sheets.command
-- `e82aa624e48b42a213dfe73fb0d409477ae79a7a936c9d4fe3045e8c25f77d81`  Box the papers.bat
-- `a9099a6c40f8335f3092aed9ffb50b9bd98400a2864de13c1f2bc6b58136a0ee`  Put names on the sheets.bat
+- `c2cf7b6dcdcdcd456eb28da8abecc7904a2848d1af6286951d27e5e2e70fb77c`  teacher_only.py
+- `4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819`  render_pages.py
+- `e90e792cf9629fc71973ded47daec5cc244a2815126e9028eac0c79cd85f77c8`  Box the papers.command
+- `dee56b35ad263203ca975f174b30040fb58d6701fec0b20f176dcc48e2c19eb5`  Put names on the sheets.command
+- `b978d772bc04cc03024f5ef47890214ed73d9dcda46dbdca97f0d6eeb3b893d1`  Box the papers.bat
+- `4b36f5eb183bd42e19410b61130c89a7ce0b36adcf91d895cfd702538fea2721`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -513,16 +531,18 @@ It writes `Student A - Feedback.pdf` (for the student) and `Student A -
 Marks by Question.pdf` (for the teacher), identifiers only, and their
 `.tex`. `reference/test-sheets.md` says what the sheet holds and why. Render
 every page of every draft into the assessment's `Work` folder, with
-`scripts/render_pages.py` copied into `Scripts/` and self-tested like the
-others, and look at each one before handing over:
+`scripts/render_pages.py` run from this skill's folder as it shipped
+(never copied, never changed: section 6), and look at each one before
+handing over:
 
 ```text wrap
-python3 -B "<marking folder>/Scripts/render_pages.py" "<marking folder>/<Assessment>/Sheets/Section 1/Student A - Feedback.pdf" --into "<marking folder>/<Assessment>/Work"
+python3 -B .claude/skills/plantoir-marking/scripts/render_pages.py "<marking folder>/<Assessment>/Sheets/Section 1/Student A - Feedback.pdf" --into "<marking folder>/<Assessment>/Work"
 ```
 
 The same command, given a boxed paper, is how you look at a page as a
 picture. It refuses any folder that is not called `Work`, and the
-system's temporary folders.
+system's temporary folders, and lists each picture it makes in
+`Work/Made while marking.txt` for `--tidy`.
 
 **Links into the course site.** A focus item's `topics` name pages in the
 kit. Each page's address is the section's site address (the section's own
@@ -571,20 +591,22 @@ subject matter are quoted as they are.
 
 ## 14. When the marking is done
 
-Before you call the marking finished, look for copies of this
-assessment's papers, sheets or pictures of them outside the marking
-folder:
+Before you call the marking finished, remove the pictures of pages you
+made:
 
 ```text wrap
 python3 -B .claude/skills/plantoir-marking/scripts/teacher_only.py --tidy "<marking folder>/<Assessment>"
 ```
 
-It looks in the system's temporary folders for files named with the
-assessment's or the marking folder's name, or with the same bytes as a
-paper, a sheet, a marks record or a file in `Work`. **While it says "Not finished", the marking is not finished:** remove what it
-found (you made it) or ask the teacher to, and run it again. Say plainly
-what it cannot find: a picture named some other way, a copy anywhere else,
-and anything already sent to the AI service.
+It removes each picture `render_pages.py` listed in `Work/Made while
+marking.txt`, and nothing else, and says how many, never where. It looks
+nowhere outside the Work folder. **It cannot find a copy made anywhere else:**
+a picture you made another way, a copy in the system's temporary folder,
+and anything already sent to the AI service. The program you run in may
+also keep a command's output in temporary files of its own, outside the
+marking folder: say that to the teacher once, when the marking is done.
+**While it says "Not finished", the marking is not finished:** ask the
+teacher to remove what it counts, and run it again.
 
 Look for `.claude/skills/plantoir-report-comments/SKILL.md` (or
 `.agents/skills/plantoir-report-comments/SKILL.md`) in this working folder;

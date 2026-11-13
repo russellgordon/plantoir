@@ -129,6 +129,20 @@ class SheetTests(unittest.TestCase):
                          ["Student A - Feedback.pdf", "Student A - Feedback.tex",
                           "Student A - Marks by Question.pdf", "Student A - Marks by Question.tex"])
 
+    def test_the_teacher_sheets_title_prints_its_middle_dot(self):
+        # The third trial: the title line appended a raw middle dot after esc(), which the sheet's font encoding
+        # printed as another letter ("Unit 1 Test: Dice Games \u016f Marks by question"). Both Claude runs fixed
+        # their copies; Codex shipped it.
+        result = build(self.kit, self.marks, self.out)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        tex = (self.out / "Student A - Marks by Question.tex").read_text(encoding="utf-8")
+        title = [line for line in tex.splitlines() if line.startswith("{\\Large\\bfseries\\sffamily ")]
+        self.assertEqual(len(title), 1, tex)
+        self.assertNotIn("\u00b7", title[0], "no raw middle dot outside math")
+        self.assertIn("$\\cdot$ Marks by question", title[0])
+        text = pdf_text(self.out / "Student A - Marks by Question.pdf")
+        self.assertNotIn("\u016f", text)
+
     def test_a_lost_mark_with_no_reason_is_refused(self):
         self.marks["points"]["B1.3"]["studentNote"] = ""
         result = build(self.kit, self.marks, self.out)

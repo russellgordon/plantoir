@@ -468,7 +468,7 @@ def teacher_tex(sheet, school):
     marks_line = " $\\cdot$ ".join(f"{esc(category['key'])} {marks_text(earned, out_of)}"
                                    for category, earned, out_of in sheet.category_marks())
     tex = preamble(kit["test"] + " · Marks by question (teacher only)", kit["course"], school)
-    tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"]) + " · Marks by question}\\par\\vspace{2pt}\n"
+    tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"] + " · Marks by question") + "}\\par\\vspace{2pt}\n"
     tex += "{\\large\\bfseries\\sffamily " + marks_line + "}\\par\\vspace{2pt}\n"
     tex += "\\studentline{" + esc(sheet.identifier) + "}\n"
     tex += ("{\\small\\sffamily Section " + esc(sheet.marks.get("section", "")) + " $\\cdot$ Version "

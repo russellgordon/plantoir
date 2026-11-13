@@ -8,15 +8,23 @@ a .bat on Windows) check its SHA-256 and the runner's before they run it, and th
     python3 -I -B teacher_only.py box MARKING_FOLDER       (run by "Box the papers", in the teacher's window)
     python3 -I -B teacher_only.py names MARKING_FOLDER     (run by "Put names on the sheets")
     python3 -I -B teacher_only.py --verify "<marking folder>/<Assessment>"   (the assistant, before any read)
-    python3 -I -B teacher_only.py --tidy "<marking folder>/<Assessment>" [--look-in FOLDER ...]
+    python3 -I -B teacher_only.py --tidy "<marking folder>/<Assessment>"
                                                            (the assistant, before it calls marking finished)
 
 Since the second trial (750d, 2026-11-13): Box the papers prints the four privacy points in its own window and
 takes the teacher's yes to them before it asks for the folder, and records that they were shown (an assistant
 did not say them in two runs); the teacher's notes for report comments are kept in the teacher-only folder and
 reach the marking folder only as a checked copy this file writes (an assistant read the notes before the name
-check had run); and --tidy looks in the system's temporary folders for copies of this assessment's papers and
-sheets (an assistant rendered every boxed paper into /tmp).
+check had run).
+
+Since the third trial (750d, 2026-11-13): --tidy removes only the pictures render_pages.py listed in
+"<Assessment>/Work/Made while marking.txt", and prints counts and never a path (it used to look through the
+system's temporary folders by name, printed every folder it matched, a teacher-only folder's name among them,
+and matched over 400 folders that were not the assistant's, so it could never finish). A marking folder inside
+the system's temporary folder is refused by both of the teacher's steps and by --verify. And render_pages.py,
+whose refusal of temporary folders an assistant edited away in its copy, is checked against the SHA-256 held
+here (RENDER_PAGES_SHA256) by both steps and by --verify, in the skill's folder and in the marking folder's
+Scripts/: a changed copy stops with a "Stopped:" line that says a marking file was changed.
 
 #750, piece 750d. Russell, 2026-11-12: "script runs, teacher checks the papers, confirms names are redacted,
 then agent based marking begins. Simple." Six trials found an assistant's FIRST command could list the
@@ -70,7 +78,9 @@ from pathlib import Path
 #   the teacher types yes in this window, and only the papers it put in the file the teacher looked through;
 #   it stops when its input is not a terminal (that catches an accidental pipe, nothing more); it moves to the
 #   teacher's Quarantine, never deleting, anything the boxing step wrote outside the folder it was given, and
-#   stops; and it never says a name is covered, removed or safe.
+#   stops; it refuses a marking folder inside the system's temporary folder, and stops when render_pages.py is
+#   not the file whose SHA-256 it holds; --tidy removes only files listed in the Work folder's list that are
+#   inside the Work folder, and prints no path; and it never says a name is covered, removed or safe.
 
 SCRIPTS = Path(__file__).resolve().parent
 RUNNER = SCRIPTS / "run_with_names.py"
@@ -93,6 +103,12 @@ NOTES = "Teacher Notes.md"
 CHECKED_NOTES = "Teacher Notes (checked).md"
 CHECKED_MARK = "<!-- Checked by Put names on the sheets"
 WORK = "Work"
+MADE = "Made while marking.txt"          # render_pages.py's list of the pictures it wrote, inside Work
+RENDER_PAGES = "render_pages.py"
+# The SHA-256 of render_pages.py as Plantoir ships it. This file is pinned by both launchers, so the value cannot
+# be changed without that being seen too (750d third trial: an assistant edited its copy's refusal of temporary
+# folders away and told no one).
+RENDER_PAGES_SHA256 = "4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819"
 LAST_STOP = " - last stop.txt"
 ASK_POINTS = "Type yes when you have read these four points, or no to stop: "
 IDENTIFIER = re.compile(r"^Student [A-Z]{1,2}$")
@@ -122,8 +138,8 @@ PRIVACY_POINTS = [
     "The files I write stay on this computer, in the folders you choose. I never send, upload or publish "
     "anything; giving work back to students is yours to do.",
 ]
-COVER_INTRODUCTION = ("Your assistant was asked to tell you these four things before it read any paper. They are "
-                      "printed here so that you read them whichever assistant you use:")
+COVER_INTRODUCTION = ("These four things were shown in the Box the papers window before any paper was boxed, and you "
+                      "typed yes to them. They are printed here too:")
 LOOK_FOR = ("Look through every page of every paper after this one. Look for any part of a name, and anything else "
             "that says who wrote it (a signature, initials, a student number). The boxing does not check how each "
             "page was scanned: on a page scanned upside down the name line is at the foot, and on a page scanned "
@@ -154,6 +170,59 @@ def inside_a_working_folder(path):
         if (folder / "courses").is_dir() and (folder / ".toolchain").is_dir():
             return True
     return False
+
+
+def temporary_folders():
+    found = []
+    for folder in (tempfile.gettempdir(), os.environ.get("TMPDIR", ""), "/tmp", "/private/tmp", "/var/tmp"):
+        if folder and os.path.isdir(folder) and os.path.realpath(folder) not in found:
+            found.append(os.path.realpath(folder))
+    return found
+
+
+def inside_a_temporary_folder(path):
+    """True when the path is inside one of the system's temporary folders, which anyone on the computer can read
+    and the system empties (750d third trial: a marking folder there was accepted at set-up, and then
+    render_pages.py refused every Work folder in it, so one assistant edited that refusal away)."""
+    for folder in temporary_folders():
+        if inside(path, folder):
+            return True
+    return False
+
+
+def the_marking_folder_is_usable(marking):
+    """A Refusal, worded for the teacher, when the marking folder is in a place marking is never kept."""
+    if inside_a_working_folder(marking):
+        raise Refusal("this marking folder is inside the Plantoir working folder; marking is kept outside it. "
+                      "Nothing was done")
+    if inside_a_temporary_folder(marking):
+        raise Refusal("this marking folder is inside the system's temporary folder, which anyone on this computer can "
+                      "read and which the system empties. Marking is kept in a folder you choose in your home folder, "
+                      "such as Marking. Ask your assistant to set the marking up there. Nothing was done")
+
+
+def changed_marking_files(marking):
+    """The names of the never-adapted marking files that are not as Plantoir shipped them: render_pages.py in this
+    skill's folder, and any copy of it in the marking folder's Scripts/. teacher_only.py and run_with_names.py are
+    checked by the launchers before this file runs."""
+    changed = []
+    for copy in (SCRIPTS / RENDER_PAGES, Path(marking) / "Scripts" / RENDER_PAGES):
+        is_the_skills = copy == SCRIPTS / RENDER_PAGES
+        if not is_the_skills and not (copy.exists() or copy.is_symlink()):
+            continue
+        if copy.is_symlink() or not copy.is_file() or sha256_of(copy) != RENDER_PAGES_SHA256:
+            changed.append(RENDER_PAGES + (" in the skill's folder" if is_the_skills else " in the marking folder's Scripts folder"))
+    return changed
+
+
+def the_marking_files_are_as_shipped(marking):
+    changed = changed_marking_files(marking)
+    if changed:
+        raise Refusal("a marking file was changed: " + " and ".join(changed) + " is not the one Plantoir shipped, and "
+                      "it is never changed. Nothing was done. Ask your assistant to remove its copy from the marking "
+                      "folder's Scripts folder (it is run from the skill's folder) and to tell you what it had changed. "
+                      "If it still stops, Plantoir puts the skill back as it shipped the next time it opens your "
+                      "working folder")
 
 
 def typed_path(typed, windows=None):
@@ -227,6 +296,9 @@ def ask_for_the_teacher_only_folder(marking, ask, say):
     if inside_a_working_folder(folder):
         raise Refusal(THE_FOLDER + " is inside the Plantoir working folder, where it could be built into a "
                       "class website or copied with a course; move it outside. Nothing was done")
+    if inside_a_temporary_folder(folder):
+        raise Refusal(THE_FOLDER + " is inside the system's temporary folder, which anyone on this computer can read "
+                      "and which the system empties; keep it in your home folder. Nothing was done")
     if not (folder / TABLE).is_file():
         raise Refusal(f"{THE_FOLDER} has no '{TABLE}' in it; put your name mapping table there and double-click "
                       "again. Nothing was done")
@@ -322,7 +394,8 @@ def show_the_privacy_points(folder, ask, say):
     the assessment's folder: whichever assistant the teacher uses, the teacher has seen them before any paper
     reaches it. A no, or a closed window, stops everything."""
     say("")
-    say("Your assistant is asked to tell you these four things. Here they are, word for word:")
+    say("Please read these four things about your students' privacy. They are shown here, in your own window, so "
+        "that you read them whichever assistant you use; your assistant does not repeat them:")
     say(points_text())
     say("")
     while True:
@@ -350,6 +423,12 @@ def verify(assessment):
     """Exit 0 only when '<Assessment>/Redacted' holds exactly the papers the teacher typed yes for, after the four
     privacy points were shown in the teacher's window."""
     assessment = Path(assessment)
+    try:
+        the_marking_folder_is_usable(assessment.resolve().parent)
+        the_marking_files_are_as_shipped(assessment.resolve().parent)
+    except Refusal as refusal:
+        print(f"Stopped: {refusal}. Read no paper.")
+        return 1
     record_path = assessment / RECORD
     now = papers_in(assessment / REDACTED)
     if record_path.is_file() and now and points_were_shown(assessment):
@@ -736,9 +815,8 @@ def a_whole_class_first(request, teacher_only, assessment, marking, script, say,
 def box(marking, ask, say):
     """Box the papers: everything up to the teacher's yes happens on the teacher's side."""
     marking = Path(marking).resolve()
-    if inside_a_working_folder(marking):
-        raise Refusal("this marking folder is inside the Plantoir working folder; marking is kept outside it. "
-                      "Nothing was done")
+    the_marking_folder_is_usable(marking)
+    the_marking_files_are_as_shipped(marking)
     assessment, request = box_request(marking, ask, say)
     script = request.get("script", "Scripts/redact_scans.py")
     if not inside_one_folder(script) or not (marking / script).is_file() or not inside(marking / script, marking / "Scripts"):
@@ -865,9 +943,8 @@ def names_steps(request, marking, teacher_only):
 def names(marking, ask, say):
     """Put names on the sheets, and the other steps that read the name mapping table."""
     marking = Path(marking).resolve()
-    if inside_a_working_folder(marking):
-        raise Refusal("this marking folder is inside the Plantoir working folder; marking is kept outside it. "
-                      "Nothing was done")
+    the_marking_folder_is_usable(marking)
+    the_marking_files_are_as_shipped(marking)
     if not (marking / NAMES_REQUEST).is_file():
         raise Refusal("your assistant has not asked for a step that needs names yet. Nothing was done")
     request = read_json(marking / NAMES_REQUEST, NAMES_REQUEST)
@@ -960,69 +1037,87 @@ def release_the_notes(teacher_only, marking, folder, say, said):
     return 0
 
 
-def temporary_folders():
-    found = []
-    for folder in (tempfile.gettempdir(), os.environ.get("TMPDIR", ""), "/tmp", "/private/tmp", "/var/tmp"):
-        if folder and os.path.isdir(folder) and os.path.realpath(folder) not in found:
-            found.append(os.path.realpath(folder))
-    return found
-
-
-def folded_name(text):
-    return re.sub(r"[\W_]", "", text).casefold()
-
-
-def tidy(assessment, look_in):
-    """Look in the system's temporary folders (or those given) for copies of this assessment's papers, sheets and
-    pictures of them, outside the marking folder: by SHA-256 against every file under Redacted, Sheets, Marks and
-    Work, and by name against the assessment's and the marking folder's own names. Prints counts and the folders
-    found, exit 1 when any are there."""
-    assessment = Path(assessment).resolve()
-    marking = assessment.parent
-    targets = {}
-    for part in (REDACTED, "Sheets", "Marks", WORK):
-        for top, _folders, files in os.walk(assessment / part):
-            for name in files:
-                path = Path(top) / name
-                try:
-                    targets.setdefault(path.stat().st_size, set()).add(sha256_of(path))
-                except OSError:
-                    continue
-    slugs = [slug for slug in (folded_name(assessment.name), folded_name(marking.name)) if len(slug) >= 4]
-    roots = [os.path.realpath(folder) for folder in look_in] if look_in else temporary_folders()
-    found = []
-    for root in roots:
-        for top, folders, files in os.walk(root, followlinks=False):
-            here = Path(top)
-            if inside(here, marking):
-                folders[:] = []
-                continue
-            for name in list(folders):
-                if any(slug in folded_name(name) for slug in slugs):
-                    found.append(here / name)
-                    folders.remove(name)
-            for name in files:
-                path = here / name
-                if any(slug in folded_name(name) for slug in slugs):
-                    found.append(path)
-                    continue
-                try:
-                    size = path.lstat().st_size
-                    if size in targets and not path.is_symlink() and sha256_of(path) in targets[size]:
-                        found.append(path)
-                except OSError:
-                    continue
-    places = sorted({str(path if path.is_dir() else path.parent) for path in found})
-    if found:
-        print(f"Not finished: {len(found)} copies of this assessment's papers, sheets or pictures of them are outside the "
-              f"marking folder, in {len(places)} folders: " + "; ".join(places) + ". Every copy of student work stays "
-              f"in the marking folder ('{assessment.name}/{WORK}' for anything you make). Remove these, or ask the "
-              "teacher to, and run this again before you call the marking finished.")
+def tidy(assessment):
+    """Remove the pictures render_pages.py made while marking, and nothing else: each file listed in
+    '<Assessment>/Work/Made while marking.txt' that is a plain file inside that Work folder (never a link, never
+    through one). Prints counts only, never a path (750d third trial: the old --tidy looked through the system's
+    temporary folders by name, printed every folder it matched, a teacher-only folder's name among them, and
+    matched over 400 folders that were not the assistant's, so it could never finish). Exit 0 when it is done."""
+    assessment = Path(assessment)
+    work = assessment / WORK
+    if work.is_symlink() or (work.exists() and not work.is_dir()):
+        print("Not finished: the assessment's Work folder is not a plain folder, so nothing was removed. Ask the "
+              "teacher to look at it.")
         return 1
-    print(f"No copy of this assessment's papers or sheets found in: " + "; ".join(roots) + ". This looks only there, "
-          "only by the assessment's and the marking folder's names and by identical bytes: a picture rendered from a "
-          "page and named some other way, a copy anywhere else, and anything already sent to the AI service cannot "
-          "be found by it.")
+    if not work.is_dir():
+        print("Done: this assessment has no Work folder, so there was nothing to remove. --tidy looks nowhere else: "
+              "a copy made anywhere else, and anything already sent to the AI service, cannot be found by it.")
+        return 0
+    real_work = Path(os.path.realpath(str(work)))
+    listed = work / MADE
+    entries = []
+    if listed.is_file() and not listed.is_symlink():
+        try:
+            entries = listed.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            print("Not finished: the list of what was made could not be read, so nothing was removed. Ask the teacher "
+                  "to look at the Work folder.")
+            return 1
+    removed, gone, refused, failed = 0, 0, 0, 0
+    folders = set()
+    for entry in entries:
+        if not entry.strip():
+            continue
+        if not inside_one_folder(entry):
+            refused += 1
+            continue
+        path = work / entry
+        through_a_link = False
+        for parent in [path] + list(path.parents):
+            if parent == work:
+                break
+            if parent.is_symlink():
+                through_a_link = True
+                break
+        if through_a_link:
+            refused += 1
+            continue
+        if not path.exists():
+            gone += 1
+            continue
+        if not path.is_file() or not inside(path, real_work):
+            refused += 1
+            continue
+        try:
+            os.remove(path)
+            removed += 1
+            folders.add(path.parent)
+        except OSError:
+            failed += 1
+    for folder in sorted(folders, key=lambda folder: len(folder.parts), reverse=True):
+        try:
+            if folder != work and inside(folder, real_work) and not folder.is_symlink() and not any(folder.iterdir()):
+                os.rmdir(folder)
+        except OSError:
+            pass
+    if failed == 0 and listed.is_file() and not listed.is_symlink():
+        os.remove(listed)
+    left = 0
+    for _top, _folders, files in os.walk(work, followlinks=False):
+        left += len(files)
+    summary = f"Removed {removed} pictures the marking made in the Work folder"
+    if gone:
+        summary += f"; {gone} listed were already gone"
+    if refused:
+        summary += f"; {refused} listed lines were not a picture inside the Work folder, so they were left alone"
+    summary += (f". {left} other files are in the Work folder, which the marking did not list; they were left where "
+                "they are, inside the marking folder.") if left else "."
+    if failed:
+        print(f"Not finished: {failed} listed pictures could not be removed. {summary} Ask the teacher to remove the "
+              "Work folder's pictures, then run this again.")
+        return 1
+    print(f"Done. {summary} --tidy looks nowhere else: a copy made anywhere else (the system's temporary folder "
+          "included), and anything already sent to the AI service, cannot be found by it.")
     return 0
 
 
@@ -1040,12 +1135,7 @@ def main(arguments):
     if len(arguments) == 2 and arguments[0] == "--verify":
         return verify(arguments[1])
     if len(arguments) >= 2 and arguments[0] == "--tidy":
-        look_in = []
-        rest = arguments[2:]
-        while rest[:1] == ["--look-in"] and len(rest) >= 2:
-            look_in.append(rest[1])
-            rest = rest[2:]
-        return tidy(arguments[1], look_in)
+        return tidy(arguments[1])   # anything after it (an earlier copy's --look-in) is not used
     if len(arguments) != 2 or arguments[0] not in ("box", "names"):
         print(__doc__)
         return 0
