@@ -1006,6 +1006,16 @@ else
   cat /tmp/verify_baked_modules_test.log
 fi
 
+# The same question of the scripts this file RUNS in the image, test modules
+# included: each finds what it imports among the baked scripts and its own
+# run's mounts (#883). Also before the image build, and on Windows too.
+if (cd scripts && python3 test_image_runs_find_their_modules.py) >/tmp/verify_image_runs_modules_test.log 2>&1; then
+  pass "every script this run starts in the image finds the modules it imports there, baked or mounted (scripts/test_image_runs_find_their_modules.py, #883)"
+else
+  fail "a script this run starts in the image imports a module that is neither baked nor mounted (scripts/test_image_runs_find_their_modules.py, #883)"
+  cat /tmp/verify_image_runs_modules_test.log
+fi
+
 if (cd scripts && python3 test_stop_preview.py) >/tmp/verify_stop_preview_test.log 2>&1; then
   pass "a build for publishing stops only THIS section's preview (scripts/test_stop_preview.py)"
 else
@@ -1395,11 +1405,17 @@ fi
 # deploy and no page of the site carries it. The three launchers are
 # mounted because the test reads deploy.sh's folder publish and runs each
 # one's clear of a course's built sites (#789), and the image carries no
-# launcher at /opt. The site's own map is test_coverage_maps.py, in step 0.
+# launcher at /opt. test_deploy_non_interactive.py is mounted beside it
+# because that clear test borrows its way of finding a bash that can run the
+# launchers (Git Bash on Windows, where plain bash is the WSL launcher), and
+# the image bakes no test file (#883; test_image_runs_find_their_modules.py
+# fails when a run here imports something it is not given). The site's own
+# map is test_coverage_maps.py, in step 0.
 echo ""
 echo "🔎 Checking the coverage map Plantoir shows for a section…"
 if docker run --rm \
   --mount "$(bind_mount_argument "$(pwd)/scripts/test_coverage_tab.py" /opt/scripts/test_coverage_tab.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_deploy_non_interactive.py" /opt/scripts/test_deploy_non_interactive.py),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/preview.sh" /opt/preview.sh),readonly" \
   --mount "$(bind_mount_argument "$(pwd)/setup.sh" /opt/setup.sh),readonly" \

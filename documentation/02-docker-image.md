@@ -217,6 +217,26 @@ The image is layered as follows (in order):
    with `ast` and fails if one is missing. `verify.sh` runs it BEFORE the image
    build, because it answers in a tenth of a second what the build answers in
    three minutes.
+
+   **The same trap holds for the tests `verify.sh` runs in the image** (#883).
+   No `test_*.py` is baked: each `docker run` in `verify.sh` mounts the test
+   it starts beside the baked scripts, plus any other file that test needs.
+   On 2026-11-13 `test_coverage_tab.py` began importing
+   `test_deploy_non_interactive` to borrow its way of finding a bash that can
+   run the launchers (on Windows plain `bash` is the WSL launcher). The Mac
+   working copy and Windows' suite were green, and in the image it stopped with
+   `ModuleNotFoundError`, which held `verify.sh` red on `dev`. The fix mounts
+   `test_deploy_non_interactive.py` in that run. Rejected: moving the helper
+   into a baked product module, which would ship test code to every teacher
+   and change the image for no teacher-visible reason; and baking the test
+   file in the `Dockerfile`, the first `test_*.py` it would carry. Measured
+   then: 25 runs in `verify.sh` start a script in the image, and that one
+   import was the only one missing. `scripts/test_image_runs_find_their_modules.py`
+   reads the `Dockerfile`'s `COPY` list and each run's mounts as text, follows
+   every import from module to module with `ast`, and fails when one is
+   neither baked nor mounted. It needs no Docker, so Windows'
+   `PythonToolchainTests` runs it as well, and `verify.sh` runs it before the
+   image build.
 10. **Copy `support/` → `/opt/support/`** — data files consumed by the
    scripts:
    - `ontario_secondary_courses.json` — 1,930 Ontario course codes mapped to
