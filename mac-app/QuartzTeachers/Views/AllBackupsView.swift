@@ -80,7 +80,7 @@ struct AllBackupsView: View {
                     // Disabled when nothing selected can go — including a
                     // selection of held backups only (the delete would keep
                     // them all, so there is nothing to confirm).
-                    // Held includes a Claude or Codex session's backup elsewhere
+                    // Held includes a Claude, Codex or GitHub Copilot session's backup elsewhere
                     // (#458), read when the pane draws: one listing of the
                     // activity folder, and the confirmation reads it again.
                     .disabled(!canDelete(selectedItems))
@@ -188,7 +188,7 @@ struct AllBackupsView: View {
     // MARK: - Functions
 
     /// Whether anything in `items` can be deleted: not a backup an open
-    /// assistant conversation or a Claude or Codex session holds.
+    /// assistant conversation or a Claude, Codex or GitHub Copilot session holds.
     func canDelete(_ items: [BackupItem]) -> Bool {
         return WorkspaceModel.deletableCount(
             of: items,

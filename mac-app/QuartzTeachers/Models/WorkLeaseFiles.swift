@@ -68,7 +68,7 @@ nonisolated enum WorkLeaseFiles {
         case anOutsideDeploy
     }
 
-    /// What a CHANGE asked for by an outside assistant (Claude or Codex,
+    /// What a CHANGE asked for by an outside assistant (Claude, Codex or GitHub Copilot,
     /// through `Plantoir --mcp-stdio`) meets in the other programs' leases
     /// (#433). Not a question about building: the change writes pages, and
     /// what it is held back by is a site actually being built.

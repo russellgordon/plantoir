@@ -34,15 +34,20 @@ nonisolated enum PlanningTab {
     // MARK: - Functions
 
     /// `tabCases`: the Settings | Planning tabs are on a course's page only
-    /// while Claude Code or Codex is installed, and never on a course kept
-    /// for reference. With neither installed the course page is exactly what
-    /// it was before #708: no tabs, no hint (Russell, 2026-11-01: absent,
-    /// never disabled).
-    static func isShown(claudeIsInstalled: Bool, codexIsInstalled: Bool, courseIsKeptForReference: Bool) -> Bool {
+    /// while Claude Code, Codex or GitHub Copilot (#783) is installed, and
+    /// never on a course kept for reference. With none installed the course
+    /// page is exactly what it was before #708: no tabs, no hint (Russell,
+    /// 2026-11-01: absent, never disabled).
+    static func isShown(
+        claudeIsInstalled: Bool,
+        codexIsInstalled: Bool,
+        copilotIsInstalled: Bool,
+        courseIsKeptForReference: Bool
+    ) -> Bool {
         if courseIsKeptForReference {
             return false
         }
-        return claudeIsInstalled || codexIsInstalled
+        return claudeIsInstalled || codexIsInstalled || copilotIsInstalled
     }
 
     /// `choiceCases` → `choices`: what the unit popup offers, in order. All
@@ -608,6 +613,7 @@ nonisolated enum PlanAUnit {
     /// `planAUnit.buttons`.
     static let claudeButtonTitle: String = "Plan a Unit with Claude…"
     static let codexButtonTitle: String = "Plan a Unit with Codex…"
+    static let copilotButtonTitle: String = "Plan a Unit with GitHub Copilot…"
 
     /// `planAUnit.trailLine`, after the course and the separator.
     static let trailLine: String = "asked {assistant} to plan a unit from the Planning tab"
@@ -644,6 +650,8 @@ nonisolated enum PlanAUnit {
             return claudeButtonTitle
         case .codex:
             return codexButtonTitle
+        case .copilot:
+            return copilotButtonTitle
         }
     }
 

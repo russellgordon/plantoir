@@ -101,7 +101,7 @@ nonisolated enum ActivityTrail {
         /// ID is missing or not a whole ID — never the ID.
         case deployRefusedForTheAccountID = "deploy refused for the Cloudflare Account ID"
         case assistantOpened = "assistant opened"
-        /// A Claude or Codex session opened from Plantoir's door is holding the course
+        /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
         /// it takes its `assist` lease. Carries the course only. It answers
         /// "why is Rename greyed?" — `assistant opened` says a door was
@@ -1033,7 +1033,7 @@ nonisolated enum ActivityTrail {
         /// too when the other program is a copy of the app; the
         /// `--mcp-stdio` and scheduled processes write no opening line.
         case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
-        /// An outside assistant (Claude or Codex) changed a course, asked for
+        /// An outside assistant (Claude, Codex or GitHub Copilot) changed a course, asked for
         /// a rebuild, or deployed, while a preview of that course was open in
         /// Plantoir (#433). A change or a rebuild left the open preview
         /// exactly as it was — not rebuilt; a deploy went ahead and may have

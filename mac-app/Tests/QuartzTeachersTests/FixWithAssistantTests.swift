@@ -106,7 +106,8 @@ final class FixWithAssistantTests: XCTestCase {
     /// or `buttonIsShown` ignores the reference course.
     func testButtonCases() throws {
         let cases: [[String: Any]] = try XCTUnwrap(try FixWithAssistantTests.fixWith()["buttonCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        XCTAssertGreaterThanOrEqual(cases.count, 9)
+        var sawCopilotAlone: Bool = false
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
@@ -151,11 +152,41 @@ final class FixWithAssistantTests: XCTestCase {
                 ),
                 expect["codexShown"] as? Bool, name
             )
+            let copilotInstalled: Bool = try XCTUnwrap(testCase["copilotInstalled"] as? Bool, "\(name) (#783)")
+            XCTAssertEqual(
+                FixWithAssistant.buttonIsShown(
+                    assistantIsInstalled: copilotInstalled,
+                    courseIsKeptForReference: reference
+                ),
+                expect["copilotShown"] as? Bool, name
+            )
+            if copilotInstalled && (expect["copilotShown"] as? Bool) == true
+                && (expect["claudeShown"] as? Bool) == false && (expect["codexShown"] as? Bool) == false {
+                sawCopilotAlone = true
+            }
             XCTAssertEqual(handover.hasRows, expect["enabled"] as? Bool, name)
             XCTAssertEqual(handover.rows.count, expect["handedOver"] as? Int, name)
             XCTAssertEqual(handover.unticked, expect["unticked"] as? Int, name)
             XCTAssertEqual(handover.fixedInTheSource, expect["fixedInTheSource"] as? Int, name)
         }
+        XCTAssertTrue(sawCopilotAlone, "a case with GitHub Copilot the only button (#783)")
+    }
+
+    /// The buttons are listed in the order the doors are shown, Claude,
+    /// Codex, then GitHub Copilot (Russell, 2026-11-13), and that order is
+    /// `Assistant.allCases`, which anything that lists the doors iterates
+    /// (#855). MUST FAIL if a case is declared out of order.
+    func testTheDoorsAreInTheContractsOrder() throws {
+        var keys: [String] = []
+        for button in try XCTUnwrap(try FixWithAssistantTests.fixWith()["buttons"] as? [[String: Any]]) {
+            keys.append(try XCTUnwrap(button["key"] as? String))
+        }
+        var declared: [String] = []
+        for assistant in FixWithAssistant.Assistant.allCases {
+            declared.append(assistant.rawValue)
+        }
+        XCTAssertEqual(keys, declared)
+        XCTAssertEqual(declared, ["claude", "codex", "copilot"])
     }
 
     /// `fixWith.greetingCases`: no message for nothing, the exact message for
@@ -223,6 +254,7 @@ final class FixWithAssistantTests: XCTestCase {
         ))
         let machineryWords: [String] = [
             "toolchain", "script", "docker", "container", "token", "model", "terminal", "mcp", "claude", "codex",
+            "copilot",
         ]
         let lowered: String = greeting.text.lowercased()
         for word in machineryWords {
@@ -230,7 +262,9 @@ final class FixWithAssistantTests: XCTestCase {
         }
         for assistant in FixWithAssistant.Assistant.allCases {
             let title: String = assistant.buttonTitle.lowercased()
-            for word in ["toolchain", "script", "docker", "container", "token", "model", "terminal"] {
+            // "cli" since #783: GitHub's product is called "Copilot CLI",
+            // and the button says "GitHub Copilot".
+            for word in ["toolchain", "script", "docker", "container", "token", "model", "terminal", "cli", "mcp"] {
                 XCTAssertFalse(title.contains(word), title)
             }
         }
@@ -337,8 +371,13 @@ final class FixWithAssistantTests: XCTestCase {
             workspacePath: "/Users/teacher/Teaching", courseCode: "FIX_PLAIN_TEST", courseName: "",
             claudePath: "/usr/local/bin/claude", serverPath: "/Applications/Plantoir.app/Contents/MacOS/Plantoir"
         )
+        let copilotScript: String = try CopilotLauncher.prepareSession(
+            workspacePath: "/Users/teacher/Teaching", courseCode: "FIX_COPILOT_TEST", courseName: "",
+            copilotPath: "/opt/homebrew/bin/copilot", serverPath: "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
+            greeting: message
+        )
         defer {
-            for path in [codexScript, claudeScript, plainScript] {
+            for path in [codexScript, claudeScript, plainScript, copilotScript] {
                 try? FileManager.default.removeItem(atPath: path)
             }
             for code in ["FIX_CLAUDE_TEST", "FIX_PLAIN_TEST"] {
@@ -346,10 +385,16 @@ final class FixWithAssistantTests: XCTestCase {
                     try? FileManager.default.removeItem(at: folder.appendingPathComponent("mcp-\(code).json"))
                 }
             }
+            if let folder = try? ClaudeCodeLauncher.supportDirectory() {
+                try? FileManager.default.removeItem(at: folder.appendingPathComponent("mcp-FIX_COPILOT_TEST-copilot.json"))
+            }
         }
         let sent: String = ClaudeCodeLauncher.escapeForShell("I'm a teacher: fix 'this' please")
         XCTAssertTrue(try String(contentsOfFile: codexScript, encoding: .utf8).hasSuffix(" " + sent))
         XCTAssertTrue(try String(contentsOfFile: claudeScript, encoding: .utf8).hasSuffix(" " + sent))
+        // The Copilot door's command line is not the script's last line (it
+        // is followed by the stopped-at-once check), so it is found by -i.
+        XCTAssertTrue(try String(contentsOfFile: copilotScript, encoding: .utf8).contains(" -i " + sent + "\n"))
         let plain: String = ClaudeCodeLauncher.escapeForShell(
             ClaudeCodeLauncher.greeting(courseCode: "FIX_PLAIN_TEST", courseName: "")
         )
@@ -481,6 +526,7 @@ final class FixWithAssistantTests: XCTestCase {
         XCTAssertFalse(view.contains(".isAvailable"), "never asked on the disk while the table draws")
         XCTAssertTrue(view.contains("presence.claudeIsInstalled"))
         XCTAssertTrue(view.contains("presence.codexIsInstalled"))
+        XCTAssertTrue(view.contains("presence.copilotIsInstalled"))
         XCTAssertTrue(view.contains("courseIsKeptForReference: course.isKeptForReference"))
         XCTAssertTrue(view.contains(".disabled(!handover.hasRows)"))
         let fix: String = try FixWithAssistantTests.body(of: "func fix(with assistant:", in: view)

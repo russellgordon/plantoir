@@ -912,7 +912,7 @@ final class AppRulesContractTests: XCTestCase {
         let rules: [String: Any] = try AppRulesContractTests.readRules()
         let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
         let agents: [[String: Any]] = try XCTUnwrap(section["agents"] as? [[String: Any]])
-        XCTAssertEqual(agents.count, 2, "Both doors are described here, not only the new one.")
+        XCTAssertEqual(agents.count, 3, "Every door is described here, not only the newest (GitHub Copilot, #783).")
 
         // Fixed, deliberately plain values: this test is about the SHAPE of
         // what each door passes, and CodexLauncherTests is where the awkward
@@ -944,6 +944,7 @@ final class AppRulesContractTests: XCTestCase {
             let macHandsOverWith: String = try XCTUnwrap(agent["macHandsOverWith"] as? String)
 
             let scriptPath: String
+            let toolPath: String
             let actualMenuItem: String
             let actualDidNotOpenTitle: String
             let actualCouldNotStart: String
@@ -963,10 +964,11 @@ final class AppRulesContractTests: XCTestCase {
                     serverPath: server
                 )
                 tokens["{config}"] = configPath
+                toolPath = "/usr/local/bin/claude"
                 scriptPath = try ClaudeCodeLauncher.writeLauncherScript(
                     workspacePath: folder,
                     courseCode: courseCode,
-                    claudePath: "/usr/local/bin/claude",
+                    claudePath: toolPath,
                     configPath: configPath,
                     prompt: greeting
                 )
@@ -975,10 +977,11 @@ final class AppRulesContractTests: XCTestCase {
                 actualCouldNotStart = ClaudeCodeLauncher.couldNotStartSentence(courseCode: courseCode)
                 actualTrailLine = ClaudeCodeLauncher.trailSentence(courseCode: courseCode)
             case "codex":
+                toolPath = "/opt/homebrew/bin/codex"
                 scriptPath = try CodexLauncher.writeLauncherScript(
                     workspacePath: folder,
                     courseCode: courseCode,
-                    codexPath: "/opt/homebrew/bin/codex",
+                    codexPath: toolPath,
                     serverPath: server,
                     prompt: greeting
                 )
@@ -986,6 +989,25 @@ final class AppRulesContractTests: XCTestCase {
                 actualDidNotOpenTitle = CodexLauncher.didNotOpenTitle
                 actualCouldNotStart = CodexLauncher.couldNotStartSentence(courseCode: courseCode)
                 actualTrailLine = CodexLauncher.trailSentence(courseCode: courseCode)
+            case "copilot":
+                let configPath: String = try CopilotLauncher.writeConfig(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    serverPath: server
+                )
+                tokens["{config}"] = configPath
+                toolPath = "/opt/homebrew/bin/copilot"
+                scriptPath = try CopilotLauncher.writeLauncherScript(
+                    workspacePath: folder,
+                    courseCode: courseCode,
+                    copilotPath: toolPath,
+                    configPath: configPath,
+                    prompt: greeting
+                )
+                actualMenuItem = CopilotLauncher.menuItemTitle
+                actualDidNotOpenTitle = CopilotLauncher.didNotOpenTitle
+                actualCouldNotStart = CopilotLauncher.couldNotStartSentence(courseCode: courseCode)
+                actualTrailLine = CopilotLauncher.trailSentence(courseCode: courseCode)
             default:
                 XCTFail("The contract describes a door \"\(key)\" this app does not implement.")
                 continue
@@ -1010,8 +1032,16 @@ final class AppRulesContractTests: XCTestCase {
             for argument in expectedArguments {
                 expectedArgv.append(AppRulesContractTests.filled(argument, with: tokens))
             }
+            // The line that starts the tool: the last line for Claude and
+            // Codex, and for GitHub Copilot the one before the check that
+            // says it stopped at once (#783).
             let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
-            let commandLine: String = try XCTUnwrap(script.components(separatedBy: "\n").last)
+            var commandLine: String = ""
+            for line in script.components(separatedBy: "\n")
+            where line.hasPrefix(ClaudeCodeLauncher.escapeForShell(toolPath) + " ") {
+                commandLine = line
+            }
+            XCTAssertFalse(commandLine.isEmpty, "\(key): no line starts the tool\n\(script)")
             var argv: [String] = try XCTUnwrap(AppRulesContractTests.splitShellWords(commandLine))
             XCTAssertFalse(argv.isEmpty, key)
             argv.removeFirst()
@@ -1040,7 +1070,7 @@ final class AppRulesContractTests: XCTestCase {
                 filledEnvironment[name] = AppRulesContractTests.filled(value, with: tokens)
             }
             switch key {
-            case "claude":
+            case "claude", "copilot":
                 let configPath: String = try XCTUnwrap(tokens["{config}"])
                 let configuration: [String: Any] = try XCTUnwrap(
                     try JSONSerialization.jsonObject(with: try Data(contentsOf: URL(fileURLWithPath: configPath)))
@@ -1049,8 +1079,31 @@ final class AppRulesContractTests: XCTestCase {
                 let servers: [String: Any] = try XCTUnwrap(configuration["mcpServers"] as? [String: Any])
                 let plantoir: [String: Any] = try XCTUnwrap(servers["plantoir"] as? [String: Any])
                 let environment: [String: String] = (plantoir["env"] as? [String: String]) ?? [:]
-                XCTAssertEqual(environment, filledEnvironment, "The Claude door's server environment")
+                XCTAssertEqual(environment, filledEnvironment, "The \(key) door's server environment")
                 XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode])
+                if key == "copilot" {
+                    // The whole file is the contract's connectionFile, filled
+                    // in: the server's name, type, command, folder, course,
+                    // every tool and the timeout (#783, plan review H1).
+                    let shape: [String: Any] = try XCTUnwrap(agent["connectionFile"] as? [String: Any])
+                    let expected: Any = AppRulesContractTests.filledJSON(shape, with: tokens)
+                    XCTAssertEqual(
+                        configuration as NSDictionary, try XCTUnwrap(expected as? [String: Any]) as NSDictionary,
+                        "The GitHub Copilot door's connection file"
+                    )
+                    let identity: [String: Any] = try XCTUnwrap(agent["identity"] as? [String: Any])
+                    XCTAssertEqual(identity["signedIdentifier"] as? String, CopilotLauncher.signedIdentifier)
+                    XCTAssertEqual(identity["signedTeam"] as? String, CopilotLauncher.signedTeam)
+                    XCTAssertEqual(identity["requirement"] as? String, CopilotLauncher.signatureRequirement)
+                    XCTAssertEqual(identity["npmPackage"] as? String, CopilotLauncher.npmPackage)
+                    let stoppedAtOnce: [String: Any] = try XCTUnwrap(agent["stoppedAtOnce"] as? [String: Any])
+                    XCTAssertEqual(stoppedAtOnce["sentence"] as? String, CopilotLauncher.stoppedAtOnceSentence)
+                    XCTAssertEqual(stoppedAtOnce["withinSeconds"] as? Int, CopilotLauncher.stoppedAtOnceSeconds)
+                    XCTAssertTrue(
+                        script.contains(ClaudeCodeLauncher.escapeForShell(CopilotLauncher.stoppedAtOnceSentence)),
+                        script
+                    )
+                }
             default:
                 // Read the environment back out of the arguments the tool
                 // RECEIVES: every `-c mcp_servers.plantoir.env.<NAME>="<value>"`.
@@ -1162,6 +1215,29 @@ final class AppRulesContractTests: XCTestCase {
             words.append(current)
         }
         return words
+    }
+
+    /// `filled` through a JSON value: every string in it, at any depth, with
+    /// numbers and booleans left as they are.
+    private static func filledJSON(_ value: Any, with tokens: [String: String]) -> Any {
+        if let text = value as? String {
+            return filled(text, with: tokens)
+        }
+        if let list = value as? [Any] {
+            var filledList: [Any] = []
+            for item in list {
+                filledList.append(filledJSON(item, with: tokens))
+            }
+            return filledList
+        }
+        if let table = value as? [String: Any] {
+            var filledTable: [String: Any] = [:]
+            for (name, item) in table {
+                filledTable[name] = filledJSON(item, with: tokens)
+            }
+            return filledTable
+        }
+        return value
     }
 
     /// Substitute the contract's `{tokens}` without a regular expression, so

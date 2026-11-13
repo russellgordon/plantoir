@@ -76,7 +76,7 @@ struct ProblemsTableView: View {
     /// Which door's alert `doorProblem` is.
     @State var doorThatFailed: FixWithAssistant.Assistant = .claude
 
-    /// A Claude or Codex session already open on the course, or the course
+    /// A Claude, Codex or GitHub Copilot session already open on the course, or the course
     /// busy: the refusal Revise With ▸ makes at the click (#458).
     @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
 
@@ -107,6 +107,13 @@ struct ProblemsTableView: View {
     var showsCodex: Bool {
         return FixWithAssistant.buttonIsShown(
             assistantIsInstalled: presence.codexIsInstalled,
+            courseIsKeptForReference: course.isKeptForReference
+        )
+    }
+
+    var showsCopilot: Bool {
+        return FixWithAssistant.buttonIsShown(
+            assistantIsInstalled: presence.copilotIsInstalled,
             courseIsKeptForReference: course.isKeptForReference
         )
     }
@@ -160,14 +167,14 @@ struct ProblemsTableView: View {
                 .width(min: 90, ideal: 130)
             }
             .accessibilityIdentifier("problemsTable")
-            if showsClaude || showsCodex {
+            if showsClaude || showsCodex || showsCopilot {
                 fixButtons
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(.background)
         .alert(
-            doorThatFailed == .claude ? ClaudeCodeLauncher.didNotOpenTitle : CodexLauncher.didNotOpenTitle,
+            doorThatFailed.didNotOpenTitle,
             isPresented: Binding(
                 get: { doorProblem != nil },
                 set: { showing in
@@ -202,7 +209,8 @@ struct ProblemsTableView: View {
         }
     }
 
-    /// Fix with Claude… and Fix with Codex…, trailing under the table.
+    /// Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot…,
+    /// trailing under the table, in that order.
     var fixButtons: some View {
         HStack(spacing: 8) {
             Spacer()
@@ -218,6 +226,13 @@ struct ProblemsTableView: View {
                     fix(with: .codex)
                 }
                 .accessibilityIdentifier("fixWithCodex")
+                .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
+            }
+            if showsCopilot {
+                Button(FixWithAssistant.copilotButtonTitle) {
+                    fix(with: .copilot)
+                }
+                .accessibilityIdentifier("fixWithCopilot")
                 .accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))
             }
         }
@@ -263,7 +278,7 @@ struct ProblemsTableView: View {
     /// message, after the refusal Revise With ▸ makes at the click; and, once
     /// it has opened, says so on the trail.
     func fix(with assistant: FixWithAssistant.Assistant) {
-        let item: CourseActivity.ReviseItem = assistant == .claude ? .claude : .codex
+        let item: CourseActivity.ReviseItem = CourseActivity.reviseItem(for: assistant)
         if let refusal = workspace.reviseRefusal(item: item, courseCode: course.code, sectionNumber: nil) {
             reviseRefusal = refusal
             return
@@ -294,6 +309,13 @@ struct ProblemsTableView: View {
                 courseName: course.configuration.courseName,
                 greeting: greeting.text
             )
+        case .copilot:
+            opened = CopilotLauncher.open(
+                workspacePath: folder.path,
+                courseCode: course.code,
+                courseName: course.configuration.courseName,
+                greeting: greeting.text
+            )
         }
         if opened {
             FixWithAssistant.noteOnTheTrail(
@@ -306,11 +328,7 @@ struct ProblemsTableView: View {
             return
         }
         doorThatFailed = assistant
-        if assistant == .claude {
-            doorProblem = ClaudeCodeLauncher.couldNotStartSentence(courseCode: course.code)
-        } else {
-            doorProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
-        }
+        doorProblem = CourseActivity.couldNotStartSentence(for: assistant, courseCode: course.code)
     }
 
     func tickBinding(for rowID: String) -> Binding<Bool> {

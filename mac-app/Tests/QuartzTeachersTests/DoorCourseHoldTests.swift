@@ -177,6 +177,7 @@ final class DoorCourseHoldTests: XCTestCase {
         let doors: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold", "whichDoors"])
         XCTAssertEqual(doors["claude"] as? Bool, true)
         XCTAssertEqual(doors["codex"] as? Bool, true, "Russell, #458, 2026-10-07: both doors hold their course.")
+        XCTAssertEqual(doors["copilot"] as? Bool, true, "#783: the GitHub Copilot door holds its course too.")
     }
 
     /// The server takes the lease on the course the door named, as the folder
@@ -391,7 +392,7 @@ final class DoorCourseHoldTests: XCTestCase {
             problem.contains(AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1)), problem
         )
         let trail: String = trailText(in: made.root)
-        XCTAssertTrue(trail.contains("which a Claude or Codex session still open made"), trail)
+        XCTAssertTrue(trail.contains("which an assistant session still open made"), trail)
     }
 
     // MARK: - Protection 2: a second session is refused
@@ -417,6 +418,8 @@ final class DoorCourseHoldTests: XCTestCase {
                 which = .claude
             case "codex":
                 which = .codex
+            case "copilot":
+                which = .copilot
             case "local":
                 which = .localAssistant
             default:
@@ -616,6 +619,32 @@ final class DoorCourseHoldTests: XCTestCase {
             for word in ["toolchain", "script", "docker", "container", "lease", "process", "server", "mcp",
                          "deploy", "publish", "model", "token"] {
                 XCTAssertFalse(lowered.contains(word), "'\(word)' in: \(text)")
+            }
+        }
+    }
+
+    /// Russell, #783, 2026-11-13: the sentences that say a course is busy
+    /// because an outside assistant is working on it name NO assistant, so
+    /// they never need rewording when another door is added; nor does the
+    /// trail line the server writes, which cannot tell the doors apart.
+    /// MUST FAIL on the "Claude or Codex" sentences they replaced.
+    func testTheHoldSentencesNameNoAssistant() {
+        let every: [String] = [
+            AssistWording.availableOnceYouFinishRevisingWithClaude,
+            AssistWording.finishTheClaudeSessionFirst,
+            AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "rename"),
+            AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "restore"),
+            AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "add the section"),
+            AssistWording.backupsKeptForAClaudeSession(course: "ICS3U", count: 1),
+            AssistWording.backupsKeptForAClaudeSession(course: "ICS3U", count: 2),
+            AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1),
+            AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 2),
+            AssistMCPServer.holdingTrailLine(courseCode: "ICS3U"),
+        ]
+        for text in every {
+            let lowered: String = text.lowercased()
+            for name in ["claude", "codex", "copilot", "github"] {
+                XCTAssertFalse(lowered.contains(name), "'\(name)' in: \(text)")
             }
         }
     }

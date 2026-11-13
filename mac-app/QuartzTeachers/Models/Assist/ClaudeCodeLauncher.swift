@@ -87,18 +87,59 @@ nonisolated enum ClaudeCodeLauncher {
     /// where they always do — so the list is written once with the name as a
     /// parameter rather than copied with one word changed.
     static func findCommandLineTool(named name: String) -> String? {
-        if let onPath = onPath(name) {
-            return onPath
+        for candidate in commandLineToolCandidates(named: name) {
+            if FileManager.default.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// The first of `candidates` that is executable AND passes `accepting`,
+    /// or nil. The Copilot door's search (#783): a `copilot` on the list may
+    /// be another maker's program (Homebrew's own `copilot` formula is AWS's
+    /// tool, and writes the same `/opt/homebrew/bin/copilot`), so a candidate
+    /// that is not GitHub's is skipped and the search goes on down the list.
+    static func firstCommandLineTool(
+        among candidates: [String],
+        accepting isTheRightProgram: (String) -> Bool
+    ) -> String? {
+        for candidate in candidates {
+            if !FileManager.default.isExecutableFile(atPath: candidate) {
+                continue
+            }
+            if isTheRightProgram(candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// Every place a command-line assistant called `name` is looked for, in
+    /// order: each folder on PATH, then the places its own installers put it
+    /// (`contracts/app-rules.json` → `outsideAgents.searchedForInOrder`).
+    /// `findCommandLineTool(named:)` takes the first that is executable,
+    /// which is what it always did: PATH first, then the list.
+    static func commandLineToolCandidates(named name: String) -> [String] {
+        var candidates: [String] = []
+        if let pathVariable = ProcessInfo.processInfo.environment["PATH"] {
+            for directory in pathVariable.components(separatedBy: ":") {
+                let trimmed: String = directory.trimmingCharacters(in: .whitespacesAndNewlines)
+                candidates.append((trimmed as NSString).appendingPathComponent(name))
+            }
         }
 
         let homeDirectory: URL = RealHome.forFiles
-        var candidates: [String] = [
+        let installerPlaces: [String] = [
             homeDirectory.appendingPathComponent(".local/bin/\(name)").path,
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
             homeDirectory.appendingPathComponent(".npm-global/bin/\(name)").path,
             homeDirectory.appendingPathComponent(".bun/bin/\(name)").path,
         ]
+        for place in installerPlaces {
+            candidates.append(place)
+        }
 
         let nvmNodeDirectory: URL = homeDirectory.appendingPathComponent(".nvm/versions/node")
         if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmNodeDirectory.path) {
@@ -107,13 +148,7 @@ nonisolated enum ClaudeCodeLauncher {
                 candidates.append(nvmToolPath)
             }
         }
-
-        for candidate in candidates {
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        return nil
+        return candidates
     }
 
     /// The MCP server, which is the Plantoir binary itself answering `--mcp-stdio`.

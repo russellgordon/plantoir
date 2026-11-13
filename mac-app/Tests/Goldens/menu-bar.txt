@@ -3,7 +3,7 @@
 # enablement NOT pinned (SubjectMenuRules and contracts/shared-rules.json ->
 # subjectMenus pin that). View shows only its own group (Back to Reload Page),
 # not the system's tab, toolbar and full-screen items around it.
-# A line tagged [if claude] / [if codex] / [if local] / [if any reviser] is
+# A line tagged [if claude] / [if codex] / [if copilot] / [if local] / [if any reviser] is
 # expected only on a Mac that has it: presence follows the Mac.
 # Open in Obsidian's key (Shift-Command-O) is checked on its own: it moves to
 # whichever of the two items is live.
@@ -49,6 +49,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Revise With  [if any reviser]
     Claude…  [if claude]
     Codex…  [if codex]
+    GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
   ----
   Open in Obsidian
@@ -85,6 +86,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Revise With  [if any reviser]
     Claude…  [if claude]
     Codex…  [if codex]
+    GitHub Copilot…  [if copilot]
     Local AI Assistant…  [if local]
   ----
   Open in Obsidian

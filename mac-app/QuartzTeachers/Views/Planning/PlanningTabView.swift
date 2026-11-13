@@ -27,7 +27,7 @@ final class PlanningTabModel {
 /// The course page's Planning tab (#708): the course's unit plans, shown
 /// from `courses/<CODE>/.internal/planning/` on this Mac, with a popup of
 /// units, Back, Forward, Reload and Open in Browser; or, while there are none, an offer to
-/// plan one with Claude or Codex.
+/// plan one with Claude, Codex or GitHub Copilot.
 ///
 /// Drawn OVER the course's settings by `CourseDetailView`, never instead of
 /// them, so a half-typed setting is still there after a look at the plan.
@@ -59,7 +59,7 @@ struct PlanningTabView: View {
     /// Which door's alert `doorProblem` is.
     @State var doorThatFailed: FixWithAssistant.Assistant = .claude
 
-    /// A Claude or Codex session already open on the course, or the course
+    /// A Claude, Codex or GitHub Copilot session already open on the course, or the course
     /// busy: the refusal Revise With ▸ makes at the click (#458).
     @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
 
@@ -171,7 +171,7 @@ struct PlanningTabView: View {
             }
         }
         .alert(
-            doorThatFailed == .claude ? ClaudeCodeLauncher.didNotOpenTitle : CodexLauncher.didNotOpenTitle,
+            doorThatFailed.didNotOpenTitle,
             isPresented: Binding(
                 get: { doorProblem != nil },
                 set: { (showing: Bool) in
@@ -293,6 +293,12 @@ struct PlanningTabView: View {
                     }
                     .accessibilityIdentifier("planAUnitWithCodex")
                 }
+                if presence.copilotIsInstalled {
+                    Button(PlanAUnit.copilotButtonTitle) {
+                        planAUnit(with: .copilot)
+                    }
+                    .accessibilityIdentifier("planAUnitWithCopilot")
+                }
             }
         }
         // A container with its own identifier, keeping its controls' (#832).
@@ -400,7 +406,7 @@ struct PlanningTabView: View {
     /// refusal Revise With ▸ makes at the click; and, once it has opened,
     /// says so on the trail.
     func planAUnit(with assistant: FixWithAssistant.Assistant) {
-        let item: CourseActivity.ReviseItem = assistant == .claude ? .claude : .codex
+        let item: CourseActivity.ReviseItem = CourseActivity.reviseItem(for: assistant)
         if let refusal = workspace.reviseRefusal(item: item, courseCode: course.code, sectionNumber: nil) {
             reviseRefusal = refusal
             return
@@ -424,16 +430,19 @@ struct PlanningTabView: View {
                 courseName: course.configuration.courseName,
                 greeting: message
             )
+        case .copilot:
+            opened = CopilotLauncher.open(
+                workspacePath: folder.path,
+                courseCode: course.code,
+                courseName: course.configuration.courseName,
+                greeting: message
+            )
         }
         if opened {
             PlanAUnit.noteOnTheTrail(courseCode: course.code, assistant: assistant)
             return
         }
         doorThatFailed = assistant
-        if assistant == .claude {
-            doorProblem = ClaudeCodeLauncher.couldNotStartSentence(courseCode: course.code)
-        } else {
-            doorProblem = CodexLauncher.couldNotStartSentence(courseCode: course.code)
-        }
+        doorProblem = CourseActivity.couldNotStartSentence(for: assistant, courseCode: course.code)
     }
 }

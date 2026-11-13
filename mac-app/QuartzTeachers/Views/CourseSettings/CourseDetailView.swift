@@ -72,6 +72,7 @@ struct CourseDetailView: View {
         return PlanningTab.isShown(
             claudeIsInstalled: presence.claudeIsInstalled,
             codexIsInstalled: presence.codexIsInstalled,
+            copilotIsInstalled: presence.copilotIsInstalled,
             courseIsKeptForReference: course.isKeptForReference
         )
     }

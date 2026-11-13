@@ -133,7 +133,7 @@ enum AssistMCPServer {
 
     /// The trail line for a session that holds its course (#458).
     nonisolated static func holdingTrailLine(courseCode: String) -> String {
-        return "a Claude or Codex session started from Plantoir is holding \(courseCode) while it is open"
+        return "an assistant session started from Plantoir is holding \(courseCode) while it is open"
     }
 
     /// Read requests from stdin, write replies to stdout, until stdin closes.

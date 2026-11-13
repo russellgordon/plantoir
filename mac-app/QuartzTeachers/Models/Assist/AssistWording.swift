@@ -383,7 +383,7 @@ nonisolated enum AssistWording {
     /// conversation saved a copy of the course (#412). Names the banner's own
     /// button (`AssistSectionRestore.buttonTitle`). Not said to an outside
     /// assistant: the button is in Plantoir's assistant window, which a
-    /// Claude or Codex session does not have.
+    /// Claude, Codex or GitHub Copilot session does not have.
     static func restoreSectionPutsItBack(section: String) -> String {
         // The button's own title, spelled out so the contract can show
         // {section}; a test pins it to `AssistSectionRestore.buttonTitle`.
@@ -401,7 +401,7 @@ nonisolated enum AssistWording {
              + "particular pages, name them."
     }
 
-    /// Said to an outside assistant (Claude or Codex) whose change, rebuild
+    /// Said to an outside assistant (Claude, Codex or GitHub Copilot) whose change, rebuild
     /// or deploy was held back because Plantoir is BUILDING the course's
     /// website — a preview that is still being built, or a deploy (#433).
     /// Nothing was written, and it says so: a preview that is only open does
@@ -2059,24 +2059,25 @@ nonisolated enum AssistWording {
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."
 
-    // MARK: - A Claude or Codex session holding its course (#458)
+    // MARK: - An outside assistant's session holding its course (#458, #783)
 
-    /// Under the greyed items while a Claude or Codex session opened from
-    /// Plantoir is open on this course: the three Revise items, Rename Course
-    /// and Add Section…. Menu-length, in the shape of
-    /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
-    /// with "or Codex" added, so one sentence greys the same items on both
-    /// platforms — Windows' Codex door holds its course too, since #468.
+    /// Under the greyed items while a session opened from Plantoir through
+    /// one of the outside doors (Claude, Codex or GitHub Copilot) is open on
+    /// this course: the Revise items, Rename Course and Add Section….
+    /// Menu-length, in the shape of `CourseActivity.busyDescription`'s lines.
     ///
-    /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
-    /// BOTH doors name their course to the server, which holds it. The
-    /// server cannot tell which door started it, so one sentence names both;
-    /// Windows said "with Claude" while only its Claude door held a course.
+    /// **These sentences name no assistant** (Russell's ruling on #783,
+    /// 2026-11-13), so they never need rewording when another door is added.
+    /// The server cannot tell which door started it (#458), so a sentence
+    /// that named one would be a guess; from #458 until #783 they said
+    /// "Claude or Codex". The key names keep "Claude" because Windows reads
+    /// them from `contracts/assist-wording.json` by name, and renaming nine
+    /// keys would turn every reader red for nothing.
     static let availableOnceYouFinishRevisingWithClaude: String =
-        "Available once you finish revising with Claude or Codex"
+        "Available once you finish the assistant session on this course"
 
     /// The title of the alert a Revise item gives when it is clicked while a
-    /// Claude or Codex session is open on the course — the click-time
+    /// session from an outside door is open on the course — the click-time
     /// re-check behind the greyed menu, since a session can start between the
     /// menu opening and the click. Windows' title for its own second-session refusal.
     static func courseIsAlreadyBeingRevised(course: String) -> String {
@@ -2085,33 +2086,33 @@ nonisolated enum AssistWording {
 
     /// The message under `courseIsAlreadyBeingRevised`.
     static let finishTheClaudeSessionFirst: String =
-        "A Claude or Codex session is working on this course already. Finish that session, then start again here."
+        "An assistant session opened from Plantoir is working on this course already. Finish that session, then start again here."
 
     /// What Rename Course, Restore and Add Section say when they are asked
-    /// for while a Claude or Codex session is open on the course — the
+    /// for while a session from an outside door is open on the course — the
     /// click-time check behind the greyed menu item. `then` is the act, in a teacher's
     /// words: "rename", "restore", "add the section".
     static func claudeIsRevisingTheCourse(course: String, then act: String) -> String {
-        return "A Claude or Codex session is working on \(course) right now. Finish that session, then \(act)."
+        return "An assistant session opened from Plantoir is working on \(course) right now. Finish that session, then \(act)."
     }
 
-    /// The delete-several confirmation's sentence for backups a Claude or
-    /// Codex session still open on a course made — and which are therefore kept.
+    /// The delete-several confirmation's sentence for backups a session from
+    /// an outside door, still open on a course, made — and which are therefore kept.
     /// `count` is how many of the chosen backups that session holds.
     static func backupsKeptForAClaudeSession(course: String, count: Int) -> String {
         if count == 1 {
-            return "One of these is kept: a Claude or Codex session still open on \(course) made it."
+            return "One of these is kept: an assistant session still open on \(course) made it."
         }
-        return "\(count) of these are kept: a Claude or Codex session still open on \(course) made them."
+        return "\(count) of these are kept: an assistant session still open on \(course) made them."
     }
 
-    /// What a delete that kept a Claude or Codex session's backup tells the teacher
+    /// What a delete that kept an outside session's backup tells the teacher
     /// afterwards, and what the single "Delete Backup…" says at once.
     static func finishTheClaudeSessionToDeleteItsBackup(course: String, count: Int) -> String {
         if count == 1 {
-            return "Finish the Claude or Codex session working on \(course) first. It made this backup, so it was kept."
+            return "Finish the assistant session working on \(course) first. It made this backup, so it was kept."
         }
-        return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
+        return "Finish the assistant session working on \(course) first. It made these backups, so they were kept."
     }
 
     // MARK: - The Section menu (#457 batch B)

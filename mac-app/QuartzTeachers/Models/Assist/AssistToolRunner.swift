@@ -52,7 +52,7 @@ final class AssistToolRunner {
     ///
     /// The tools are one surface with two clients, and this is the ONE thing
     /// that differs beyond the length of the list: a reference course is not
-    /// shown to the local model at all (decision d), while a Claude or Codex
+    /// shown to the local model at all (decision d), while a Claude, Codex or GitHub Copilot
     /// session is told about it on purpose, because reading one is the point
     /// of keeping it. `list_courses` is the only tool that asks.
     ///
@@ -474,7 +474,7 @@ final class AssistToolRunner {
     /// no such binding over MCP — a session is scoped to the working folder —
     /// and inventing one here in order to except it would take away the
     /// capability a reference course exists for, which is being READ by a
-    /// Claude or Codex session working in the live course.
+    /// Claude, Codex or GitHub Copilot session working in the live course.
     private func courseKeptForReference(namedIn call: AssistToolCall) -> Course? {
         guard let tool = definition(named: call.function.name) else {
             return nil
@@ -3337,7 +3337,7 @@ final class AssistToolRunner {
         // to do to obey is talking about itself.
         //
         // An outside assistant is the exception (#433): the teacher may not
-        // be looking at Plantoir at all, and Claude or Codex has no window to
+        // be looking at Plantoir at all, and Claude, Codex or GitHub Copilot has no window to
         // see, so a preview its deploy closed is said in the same success
         // sentence, plainly. "If" because leases name the course and not the
         // section: the open preview may be of another section, which the

@@ -3497,13 +3497,104 @@
 
         ],
         "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
+      },
+      {
+        "arguments" : [
+          "--additional-mcp-config",
+          "@{config}",
+          "--disable-builtin-mcps",
+          "-i",
+          "{greeting}"
+        ],
+        "argumentsNote" : "The connection file after @ (an ABSOLUTE path: a relative one is read against Copilot's own folder), GitHub's own servers turned off, and the greeting sent as the first turn of an interactive session (-i). No permission flag of any kind (Russell, 2026-11-13): no --allow-tool, --deny-tool, --allow-all-*, --no-ask-user or --yolo. Copilot asks the teacher in its own window before each Plantoir tool that changes something, before each command a printable handout needs (tectonic, pdftoppm, mkdir), and before deploying, as the other two doors do; the teacher can answer that it need not ask again in this folder. What Plantoir cannot see, and so cannot promise: a teacher's or a school's own Copilot settings can let it act without asking - an approval saved earlier (~/.copilot/permissions-config.json), defaultPermissionMode allow-all, COPILOT_ALLOW_ALL=true, or an organisation's 'assisted' mode, whose judge reads each tool's hints (deploy_section's destructiveHint is false). The same is true of Codex's 'Always allow'. No -C: the script's own cd sets the folder, and -C arrived only in 1.0.42 (flagsWhy).",
+        "connectionFile" : {
+          "mcpServers" : {
+            "plantoir" : {
+              "args" : [
+                "--mcp-stdio",
+                "{folder}"
+              ],
+              "command" : "{server}",
+              "env" : {
+                "PLANTOIR_DOOR_COURSE" : "{course}"
+              },
+              "timeout" : 1800000,
+              "tools" : [
+                "*"
+              ],
+              "type" : "local"
+            }
+          }
+        },
+        "connectionFileWhy" : "A file, written with a JSON writer and never by joining strings, rather than the inline JSON form --additional-mcp-config also takes: the inline form puts a string full of double quotes inside a shell argument on the mac and inside cmd /k quoting for npm's copilot.cmd on Windows, where #736 already spent a release on quoting. Its own name, mcp-{course}-copilot.json, and not Claude's mcp-{course}.json, for the reason scriptNameCarriesTheAgentWhy gives. type 'local' is the form measured in the trial (2026-11-13, 38 of 38 tools worked); Copilot 1.0.108's schema calls it a legacy alias of 'stdio', which an older Copilot may not know. tools ['*'] is every tool. timeout is timeoutWhy.",
+        "couldNotStart" : "Plantoir couldn’t start a GitHub Copilot session for {course}. If GitHub Copilot was updated or moved recently, restarting Plantoir may be enough.",
+        "didNotOpenTitle" : "GitHub Copilot didn’t open",
+        "executable" : "copilot",
+        "flagsWhy" : {
+          "--additional-mcp-config" : "Adds Plantoir's server for this session only. It predates Copilot's oldest changelog entry (0.0.328). Copilot reads, in order, the teacher's ~/.copilot/mcp-config.json, the folder's .mcp.json or .github/mcp.json, plugins, then this flag, and the later one wins on a name, so Plantoir's 'plantoir' is the one used.",
+          "--disable-builtin-mcps" : "Turns off GitHub's own repository server (github-mcp-server): tools about repositories and pull requests in every choice the model makes are how routing degrades, and a course session has no business acting on a teacher's repositories. It also predates the oldest changelog entry. Measured 2026-11-13 with copilot mcp list: with the flag github-mcp-server is listed 'disabled' and computer-use, a local built-in, is still listed.",
+          "-i" : "Starts an interactive session with the greeting already sent (-p is the one-shot form, which cannot ask the teacher anything)."
+        },
+        "folderTrust" : "The first time Copilot is started in a folder it asks whether to trust it (Yes, Yes and remember, No; No ends the session). Plantoir does not answer it for the teacher, as it does not for Claude Code, which asks the same kind of question.",
+        "handover" : "a configuration file written for this one session, named after the course and the agent",
+        "helpAnchors" : {
+          "door" : "copilot",
+          "educationBenefits" : "github-education",
+          "why" : "The Help book's page ids (#839's outline, one anchor a page). Russell, 2026-11-13: wherever Plantoir offers GitHub Copilot to a teacher who does not have it, it links the github-education page. This door is shown only while Copilot is installed (hiddenWhenNotInstalled), so it offers Copilot to nobody who lacks it; the first such offer is #855's set-up item, which links github-education."
+        },
+        "identity" : {
+          "rule" : "A copilot found on the search list (searchedForInOrder) is used only when it is GitHub's: either its path, links followed, lies inside an npm install of npmPackage (…/node_modules/@github/copilot/…), or it is a program signed with signedIdentifier and signedTeam under an Apple-issued certificate (requirement). Any other copilot is passed over and the search goes on down the list; none left means no door.",
+          "signedIdentifier" : "copilot",
+          "signedTeam" : "VEKTX9H2N7",
+          "requirement" : "identifier \"copilot\" and anchor apple generic and certificate leaf[subject.OU] = \"VEKTX9H2N7\"",
+          "npmPackage" : "@github/copilot",
+          "why" : "Homebrew's own copilot formula is a different vendor's program (Amazon's ECS and Fargate tool, deprecated but installable until 2027-07-06) and writes the same /opt/homebrew/bin/copilot as GitHub's cask copilot-cli (measured, brew info, 2026-11-13). Without this check a teacher who typed brew install copilot would be shown GitHub Copilot… and the door would open a program that stops at once on --additional-mcp-config. This checks which program it is, never whether anybody is signed in (neverProbedForSignIn still holds). #855 calls the same check after it installs Copilot.",
+          "measured" : "2026-11-13, this Mac (Apple silicon, macOS 26): codesign -dv on the cask's binary (1.0.105, which runs 1.0.108) gives Identifier=copilot, TeamIdentifier=VEKTX9H2N7. The check with the program's pages left unhashed (kSecCSDoNotValidateExecutable) took 6 to 10 ms on the 196 MB binary against 0.51 to 0.55 s for a full check, so it runs at launch and on activation with no cache; it refused an unsigned script, Claude Code's own signed program and /bin/ls. Not yet measured: whether GitHub's install script's binary in {home}/.local/bin carries the same identifier and team (it downloads the same release; an npm install is recognised by its path either way).",
+          "onWindows" : "Windows owes its own form of the same check (the windows issue for #783): Homebrew does not exist there, but any copilot.exe on PATH is not proof of GitHub's."
+        },
+        "isolatesTheTeachersOwnServers" : false,
+        "isolationNote" : "Copilot has no equivalent of --strict-mcp-config: --additional-mcp-config ADDS to the teacher's own configuration, so their own MCP servers load beside Plantoir's, as with Codex. Copilot also reads the teacher's own instructions and personal skills (~/.agents/skills), as Claude Code reads ~/.claude; neither door can stop an assistant reading its owner's own set-up. A teacher who once turned Plantoir's server off in Copilot (/mcp disable plantoir, saved in disabledMcpServers) gets sessions with no Plantoir tools: --enable-mcp-server would turn it on for one run but arrived only in 1.0.80, so it is not passed, and Help names the case.",
+        "key" : "copilot",
+        "macHandsOverWith" : "launch-{course}-copilot.command",
+        "measured" : "Copilot CLI 1.0.108 (Homebrew cask copilot-cli, auto-updated past the cask's 1.0.105), this Mac, 2026-11-13. The trial (copilot-trial/RESULTS.md, section 4) started it with this connection file shape and all 38 tools worked, named plantoir-{tool} and found through Copilot's own tool search; AGENTS.md, CLAUDE.md and the skills under .claude/skills and .agents/skills were read with no change. Measured here without starting a session: an unknown flag prints 'unexpected argument' and exits 1 in 0.07 s; copilot mcp list does NOT read --additional-mcp-config (it lists only the teacher's and the built-in servers), so the file is checked against Copilot's own schema (schemas/api.schema.json, McpServerConfigStdio: command required, no other keys allowed beyond the schema's) rather than by listing.",
+        "menuItem" : "GitHub Copilot…",
+        "namesToolsAs" : "plantoir-{tool}",
+        "oldestVersionMeasured" : "1.0.108",
+        "rejected" : [
+          "The inline JSON form of --additional-mcp-config (connectionFileWhy).",
+          "Sharing Claude's mcp-{course}.json: two doors launched seconds apart would rewrite the file the other's window has not yet read.",
+          "-C <folder> (added in 1.0.42): an older Copilot stops at once on it, and the script's cd does the same job.",
+          "--enable-mcp-server plantoir (1.0.80): raises the oldest version that works for one rare case (isolationNote).",
+          "--allow-all-mcp-server-instructions: it would include instructions from every server the teacher has, not only Plantoir's; the greeting and list_courses carry the same facts as Plantoir's instructions.",
+          "Pre-allowing Plantoir's read-only tools or the three handout commands: Russell, 2026-11-13, Plantoir passes no permissions.",
+          "A separate COPILOT_HOME, to keep the teacher's own servers and skills out: it would also hide their sign-in, trusted folders and saved approvals, so every session would start signed out.",
+          "--no-custom-instructions: it also turns off AGENTS.md, which is Plantoir's guidance.",
+          "--secret-env-vars: it does not stop Copilot's own sign-in reading GH_TOKEN, so it is no answer to the Windows environment note.",
+          "Accepting any executable called copilot (identity.why)."
+        ],
+        "serverEnvironment" : {
+          "PLANTOIR_DOOR_COURSE" : "{course}"
+        },
+        "serverEnvironmentWhy" : "Written as env beside args in mcp-{course}-copilot.json, as the Claude door writes it, so the server holds an assist lease on the course the door was opened from (shared-rules.json -> doorCourseHold.whichDoors.copilot). The argv stays the folder alone (serverArguments).",
+        "stoppedAtOnce" : {
+          "sentence" : "GitHub Copilot stopped as soon as it started. It may need updating: open it once on its own, or ask for help.",
+          "withinSeconds" : 10,
+          "why" : "The door has already said it opened (the trail line is written when the window is handed over), so a Copilot that stops at once - an argument it does not know, a start-up failure - would otherwise leave a window holding Copilot's own 'unexpected argument' error, which names its help and tells a teacher nothing. The mac's script prints this sentence after Copilot exits with a failure within withinSeconds of starting; measured, an unknown flag exits 1 in 0.07 s. The window's own text, so rule 1 applies. Not measured: what Copilot's exit status is when the teacher answers No to folderTrust within the first seconds (the hand test). Claude's and Codex's doors have the same gap and are not changed here."
+        },
+        "timeoutWhy" : "Copilot's timeout on a local server, in milliseconds, covers tool discovery and every tool call (its schema: 'Timeout in milliseconds for tool discovery and tool calls'). With none, 1.0.108 falls back to 60 seconds (W0=6e4 in cli-main.js's callTool, read from the bundle 2026-11-13, not yet measured with a slow tool), and deploy_section is awaited and a first deploy takes minutes: Copilot would tell the model the deploy failed while Plantoir was still deploying. 1800000 is thirty minutes, as Codex's tool_timeout_sec=1800.",
+        "trailLine" : "started GitHub Copilot for {course}",
+        "writesForTheConnection" : [
+          "mcp-{course}-copilot.json"
+        ],
+        "writesNothingElse" : "Both files are in the app's own data directory. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Copilot configuration.",
+        "onWindows" : "Windows starts copilot.exe by argument vector, or npm's copilot.cmd through cmd /k as its other doors do, and passes the same arguments with the file's path; it must never ADD a GitHub token (COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN) to the child's environment, since Copilot signs in from any of them ahead of the teacher's stored sign-in. The mac never passes Plantoir's environment on: the script runs in the teacher's own Terminal or iTerm."
       }
     ],
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. What points a session at one course is the greeting. Both doors ALSO name their course to the server, in its environment (doorCourseVariable) - to HOLD it, never to narrow: the server takes an assist lease on it (shared-rules.json -> doorCourseHold), and every course stays reachable. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
     "doorCourseVariable" : "PLANTOIR_DOOR_COURSE",
     "doorCourseVariableWhy" : "The one name both platforms read: both doors write it into their server's environment (each agent's serverEnvironment: the Claude door in its configuration's env, the Codex door as a -c override), and the server - Plantoir --mcp-stdio on the mac since #458, plantoir-mcp on Windows since #430 - holds an assist lease on that course when the folder has it. An environment variable rather than an argument because the argv is the folder alone (serverArguments) and #430's trap was a course in the argv being read as a lock.",
     "fixWith" : {
-      "note" : "Fix with Claude… and Fix with Codex… on a section's Problems tab (#717 part two, 717b; Russell's rulings 3, 5 and 6 on #717): the problems a teacher ticked, handed to an outside assistant through the SAME two doors as Revise With ▸ (agents, above), with an opening message that lists them in place of the plain greeting. AUTHORED, not generated. The rows' own words are the record's `prompt` (shared-rules.json -> sectionProblems.prompt), used verbatim.",
+      "note" : "Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot… on a section's Problems tab (#717 part two, 717b; Russell's rulings 3, 5 and 6 on #717; the third door #783): the problems a teacher ticked, handed to an outside assistant through the SAME doors as Revise With ▸ (agents, above), with an opening message that lists them in place of the plain greeting. AUTHORED, not generated. The rows' own words are the record's `prompt` (shared-rules.json -> sectionProblems.prompt), used verbatim.",
       "buttons" : [
         {
           "key" : "claude",
@@ -3512,15 +3603,19 @@
         {
           "key" : "codex",
           "title" : "Fix with Codex…"
+        },
+        {
+          "key" : "copilot",
+          "title" : "Fix with GitHub Copilot…"
         }
       ],
-      "where" : "Under the table on the section's Problems tab, Claude's first.",
+      "where" : "Under the table on the section's Problems tab, in the order of buttons: Claude's first, GitHub Copilot's last (Russell, 2026-11-13: after Codex).",
       "shownWhen" : "A button is shown only while its assistant is installed (the door's own test, hiddenWhenNotInstalled - hidden, never greyed) and never on a course kept for reference, which no door opens on. Each is shown or hidden independently.",
       "enabledWhen" : "At least one row is handed over: ticked (a row nobody unticked is ticked, sectionProblems ruling 6) and not fixed in the source.",
       "notEnabledHelp" : "Tick a problem this section still has to hand it over.",
       "notEnabledHelpWhy" : "Proposed from Windows with #736 (2026-11-11): while the buttons cannot be pressed, Windows gives each this as its help text, which Narrator reads with the button, because a greyed button alone tells somebody who cannot see it nothing about why. The mac owes the same sentence as the buttons' accessibility hint while they are disabled.",
       "fixedInTheSourceIsLeftOut" : "A ticked row that another section's later build shows fixed in the source (sectionProblems.rowState) is LEFT OUT of the message: the page is already right, and this section needs only a build. An assistant asked to fix it would find nothing wrong, and might change something that is not broken looking for it.",
-      "atTheClick" : "The same refusal Revise With ▸ makes at the click (a Claude or Codex session already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
+      "atTheClick" : "The same refusal Revise With ▸ makes at the click (a session from any outside door already open on the course, or the course busy) is made here, in its own words, and nothing opens.",
       "opensAt" : "The working folder, as both doors always do: that is where the skills and the guidance are. The message names each page by its place from there, courses/<COURSE>/<page>.md.",
       "fixGreeting" : {
         "openingOne" : "I'm a teacher working on {course} in Plantoir. The last {occasion} of Section {section} found a problem on its website that I'd like your help to fix: ",
@@ -3587,9 +3682,10 @@
       ],
       "buttonCases" : [
         {
-          "name" : "both assistants installed, one problem ticked",
+          "name" : "every assistant installed, one problem ticked",
           "claudeInstalled" : true,
           "codexInstalled" : true,
+          "copilotInstalled" : true,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3600,6 +3696,7 @@
           "expect" : {
             "claudeShown" : true,
             "codexShown" : true,
+            "copilotShown" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3610,6 +3707,7 @@
           "name" : "only Claude installed: only its button",
           "claudeInstalled" : true,
           "codexInstalled" : false,
+          "copilotInstalled" : false,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3620,6 +3718,7 @@
           "expect" : {
             "claudeShown" : true,
             "codexShown" : false,
+            "copilotShown" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3630,6 +3729,7 @@
           "name" : "only Codex installed: only its button",
           "claudeInstalled" : false,
           "codexInstalled" : true,
+          "copilotInstalled" : false,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3640,6 +3740,7 @@
           "expect" : {
             "claudeShown" : false,
             "codexShown" : true,
+            "copilotShown" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3647,9 +3748,10 @@
           }
         },
         {
-          "name" : "neither installed: no button, and no sign either exists",
+          "name" : "only GitHub Copilot installed: only its button (#783)",
           "claudeInstalled" : false,
           "codexInstalled" : false,
+          "copilotInstalled" : true,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3660,6 +3762,29 @@
           "expect" : {
             "claudeShown" : false,
             "codexShown" : false,
+            "copilotShown" : true,
+            "enabled" : true,
+            "handedOver" : 1,
+            "unticked" : 0,
+            "fixedInTheSource" : 0
+          }
+        },
+        {
+          "name" : "none installed: no button, and no sign any exists",
+          "claudeInstalled" : false,
+          "codexInstalled" : false,
+          "copilotInstalled" : false,
+          "keptForReference" : false,
+          "rows" : [
+            {
+              "ticked" : true,
+              "state" : "current"
+            }
+          ],
+          "expect" : {
+            "claudeShown" : false,
+            "codexShown" : false,
+            "copilotShown" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3670,6 +3795,7 @@
           "name" : "a course kept for reference: no button",
           "claudeInstalled" : true,
           "codexInstalled" : true,
+          "copilotInstalled" : true,
           "keptForReference" : true,
           "rows" : [
             {
@@ -3680,6 +3806,7 @@
           "expect" : {
             "claudeShown" : false,
             "codexShown" : false,
+            "copilotShown" : false,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 0,
@@ -3690,6 +3817,7 @@
           "name" : "every problem unticked: shown, not enabled",
           "claudeInstalled" : true,
           "codexInstalled" : true,
+          "copilotInstalled" : true,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3704,6 +3832,7 @@
           "expect" : {
             "claudeShown" : true,
             "codexShown" : true,
+            "copilotShown" : true,
             "enabled" : false,
             "handedOver" : 0,
             "unticked" : 2,
@@ -3714,6 +3843,7 @@
           "name" : "the only ticked problem is fixed in the source: left out, so not enabled",
           "claudeInstalled" : true,
           "codexInstalled" : true,
+          "copilotInstalled" : true,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3724,6 +3854,7 @@
           "expect" : {
             "claudeShown" : true,
             "codexShown" : true,
+            "copilotShown" : true,
             "enabled" : false,
             "handedOver" : 0,
             "unticked" : 0,
@@ -3734,6 +3865,7 @@
           "name" : "ticked, fixed in the source and unticked together: only the first is handed over",
           "claudeInstalled" : true,
           "codexInstalled" : true,
+          "copilotInstalled" : true,
           "keptForReference" : false,
           "rows" : [
             {
@@ -3752,6 +3884,7 @@
           "expect" : {
             "claudeShown" : true,
             "codexShown" : true,
+            "copilotShown" : true,
             "enabled" : true,
             "handedOver" : 1,
             "unticked" : 1,
@@ -3759,7 +3892,7 @@
           }
         }
       ],
-      "buttonCasesHow" : "rows lists the record's rows in order, each ticked or not, in the state sectionProblems.rowState gives it. expect: whether each button is shown, whether the buttons are enabled (they are enabled together), and how many rows are handed over, unticked, and left out as fixed in the source.",
+      "buttonCasesHow" : "claudeInstalled, codexInstalled and copilotInstalled say which assistants are installed (copilotInstalled since #783; a reader that predates it treats it as false). rows lists the record's rows in order, each ticked or not, in the state sectionProblems.rowState gives it. expect: whether each button is shown (claudeShown, codexShown, copilotShown), whether the buttons are enabled (they are enabled together), and how many rows are handed over, unticked, and left out as fixed in the source.",
       "greetingCases" : [
         {
           "name" : "one problem on a page every section shares",
@@ -4488,13 +4621,13 @@
     },
     "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file. Since 1.9.3 (#736) both its doors start the program DIRECTLY when it is an .exe - by argument vector, with no command interpreter and no Windows Terminal in front, in a console window of its own (Windows Terminal anyway where it is the default terminal) - and through cmd.exe /v:off /s /k when it is an npm .cmd shim, with cmd's metacharacters escaped per parse and every % followed by a quote. Until 1.9.3 the Claude door ran wt.exe -d <folder> cmd /k with a hand-joined line, which left the greeting, and the course's name in it, outside cmd's quotes; and Windows Terminal itself was measured expanding %NAME% and re-joining arguments with its own quoting, which is why it is no longer in front of either door (documentation/12-windows-app.md -> 'What the outside doors hand to Windows, and how'). The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
-    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",
+    "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: a teacher sees an item for each assistant installed, in the order Claude, Codex, GitHub Copilot, and with none installed sees no sign that any exists.",
     "menuItemWhy" : "Each agent's menuItem is the item's title INSIDE Revise With ▸ — in the menu bar's Course and Section menus and, since the HIG sweep (#457 item 4, 2026-10-08), in every course and section row's context menu as well, so one command has one name everywhere (HIG: stable command names). Until the sweep the row's context menu showed it at the top level as 'Revise with Claude…' / 'Revise with Codex…' while the menu bar said Revise With ▸ Claude…, and this key held the context menu's words. 'Revise with Claude' is still the command's name in a SENTENCE (shared-rules.json -> workspaceWait's agent names, the support page); only the menu item's title moved. Windows draws its own menu, so it chooses where the item sits, but the item's words are these.",
     "neverInstalled" : "Plantoir never installs an outside assistant and never offers to. These are developer tools with accounts, sign-ins and their own update paths; an app that puts one onto a teacher's machine has taken on a support surface nobody wants, and the teacher has not agreed to it. The door opens onto something they chose to install themselves.",
     "neverProbedForSignIn" : "Finding the tool says nothing about whether the teacher is signed in to it, and the door does not try to find out: that would mean running the tool while a context menu is being drawn. A teacher who is signed out meets their assistant's own sign-in step inside the terminal, which is where it belongs.",
     "note" : "The OUTSIDE doors: handing one course to a command-line assistant the teacher already has on their own machine, so it can work on their pages through Plantoir's MCP server. Distinct from the assistant Plantoir carries itself (contracts/assist-cases.json), which runs on the teacher's machine with no account and no CLI. AUTHORED, not generated. This block is the first contract data either door has ever had: it arrived on the mac with issue #205, which added the Codex door, and it describes BOTH doors so that the Claude half states what the two apps already do rather than leaving it written down nowhere.",
     "planAUnit" : {
-      "atTheClick" : "The refusal Revise With makes at the click (WorkspaceModel.reviseRefusal on the mac: a Claude or Codex session already open on the course, or the in-app assistant on it), in its own alert; otherwise the door opens with message as its opening message, which replaces the greeting (so no unit-planning reminder, no reference-courses sentence). A door that did not open shows the door's own could-not-start sentence and writes no trail line.",
+      "atTheClick" : "The refusal Revise With makes at the click (WorkspaceModel.reviseRefusal on the mac: a session from any outside door already open on the course, or the in-app assistant on it), in its own alert; otherwise the door opens with message as its opening message, which replaces the greeting (so no unit-planning reminder, no reference-courses sentence). A door that did not open shows the door's own could-not-start sentence and writes no trail line.",
       "buttons" : [
         {
           "assistant" : "claude",
@@ -4503,6 +4636,10 @@
         {
           "assistant" : "codex",
           "title" : "Plan a Unit with Codex…"
+        },
+        {
+          "assistant" : "copilot",
+          "title" : "Plan a Unit with GitHub Copilot…"
         }
       ],
       "courseIsNamedAs" : "{course} is the course's code, then its name in brackets when the name is not empty and differs from the code: the name on one line (every run of white space one space, as greetingUnitPlans.nameForm says), cut to fixWith.courseNameMaxCharacters with the last one an ellipsis. Then fixWith.replaceInTheMessage over the whole message (a double quote becomes an apostrophe, a semicolon a comma), so it is one shell argument on the mac and one cmd argument on Windows. {howITeach} is greetingHowITeachSentence, verbatim.",
@@ -4559,7 +4696,7 @@
       "{home}/.bun/bin",
       "{home}/.nvm/versions/node/*/bin"
     ],
-    "searchedForWhy" : "PATH alone is not enough and the explicit list does nearly all of the work: an app launched from the Dock inherits launchd's minimal PATH, so the tool is usually not on it even when the teacher's own shell finds it at once. Both doors search the same directories with only the tool's name changed - Codex's official installer writes into {home}/.local/bin, which is already the first place looked. This is the first thing somebody will try to simplify away.",
+    "searchedForWhy" : "PATH alone is not enough and the explicit list does nearly all of the work: an app launched from the Dock inherits launchd's minimal PATH, so the tool is usually not on it even when the teacher's own shell finds it at once. Every door searches the same directories with only the tool's name changed - Codex's official installer and GitHub's install script for Copilot write into {home}/.local/bin, which is already the first place looked, and the Homebrew cask copilot-cli and an npm install of @github/copilot land in Homebrew's folder and npm's global folder, which are on the list too (#783, which changed nothing here). The Copilot door also skips a copilot that is not GitHub's (agents[copilot].identity). This is the first thing somebody will try to simplify away.",
     "serverArguments" : [
       "--mcp-stdio",
       "{folder}"

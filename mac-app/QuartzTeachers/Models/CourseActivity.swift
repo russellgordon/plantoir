@@ -297,17 +297,43 @@ enum CourseActivity {
         return nil
     }
 
-    // MARK: - A Claude or Codex session holding the course (#458)
+    // MARK: - A Claude, Codex or GitHub Copilot session holding the course (#458)
 
     /// Which Revise item is asking (`reviseUnavailableReason`).
     enum ReviseItem: Equatable {
         case claude
         case codex
+        case copilot
         case localAssistant
     }
 
+    /// The Revise item an outside door's button stands for, so Fix with and
+    /// Plan a Unit make the same click-time check as Revise With ▸.
+    static func reviseItem(for assistant: FixWithAssistant.Assistant) -> ReviseItem {
+        switch assistant {
+        case .claude:
+            return .claude
+        case .codex:
+            return .codex
+        case .copilot:
+            return .copilot
+        }
+    }
+
+    /// What a teacher is told when an outside door did not open.
+    static func couldNotStartSentence(for assistant: FixWithAssistant.Assistant, courseCode: String) -> String {
+        switch assistant {
+        case .claude:
+            return ClaudeCodeLauncher.couldNotStartSentence(courseCode: courseCode)
+        case .codex:
+            return CodexLauncher.couldNotStartSentence(courseCode: courseCode)
+        case .copilot:
+            return CopilotLauncher.couldNotStartSentence(courseCode: courseCode)
+        }
+    }
+
     /// True while ANOTHER live program holds an `assist` lease on this course
-    /// — on the mac, a Claude or Codex session opened from Plantoir, through its
+    /// — on the mac, a Claude, Codex or GitHub Copilot session opened from Plantoir, through its
     /// `Plantoir --mcp-stdio` (#458); on a folder Windows also opens,
     /// `plantoir-mcp`. Read from disk, because that program has a memory of
     /// its own. This process's own lease never counts (`heldElsewhere`), and
@@ -326,7 +352,7 @@ enum CourseActivity {
 
     /// The short line naming what stands in the way of STRUCTURAL work on a
     /// course — Rename Course, Add Section…, restoring a backup — or nil when
-    /// it is free: `busyDescription`, and then a Claude or Codex session open on the
+    /// it is free: `busyDescription`, and then a Claude, Codex or GitHub Copilot session open on the
     /// course elsewhere (#458; Windows' `BusyReason`, which includes it).
     ///
     /// **Separate from `busyDescription` on purpose.** That one is also the
@@ -358,7 +384,7 @@ enum CourseActivity {
     /// words that go under it — or nil when it can (#458).
     ///
     /// Two causes, each said as itself (ruling 7):
-    /// - a Claude or Codex session open on the course elsewhere greys ALL THREE items
+    /// - a Claude, Codex or GitHub Copilot session open on the course elsewhere greys ALL THREE items
     ///   (Windows' `CanReviseNow`): a second session on one course would
     ///   have two conversations writing the same pages;
     /// - the in-app assistant open on this course greys the two DOORS, with
@@ -380,7 +406,7 @@ enum CourseActivity {
             return nil
         }
         switch item {
-        case .claude, .codex:
+        case .claude, .codex, .copilot:
             if active.courseCode.lowercased() == courseCode.lowercased()
                 && FolderIdentity.isSameFolder(active.folderPath, folderPath) {
                 return AssistActivity.closeTheAssistantFirst(active)

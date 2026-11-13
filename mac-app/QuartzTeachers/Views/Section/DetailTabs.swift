@@ -3,7 +3,7 @@ import SwiftUI
 /// A detail view's tabs as one segmented control in a thin bar above its
 /// content (#717): Website | Coverage | Problems on a section (Coverage
 /// since #793), and Settings | Planning on a course (#708,
-/// `CourseDetailView`, while Claude Code or Codex is installed). Built once
+/// `CourseDetailView`, while Claude Code, Codex or GitHub Copilot is installed). Built once
 /// so each later use added a tab rather than a second shell.
 ///
 /// **Not a `TabView`**, which decides for itself what each tab keeps. The
