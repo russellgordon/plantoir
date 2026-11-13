@@ -4474,6 +4474,13 @@ three parts:**
   spaced path). A record landing in the microseconds between the look and
   the move is still replaced.
 
+Since #729 the same guard also refuses while the section is being BUILT by
+another `preview.sh --build-only` in this folder: a deploy's build leg (which
+the apps mark `--for-deploy`, said as "already being deployed") or a rebuild
+(said as "already being built"), so a second deploy can no longer clear the
+folder a first one's build is filling ([03](03-launcher-scripts.md) → "A
+section being deployed cannot be deployed again (#439)").
+
 The same refusal reaches an assistant's rebuild, publish and unpublish
 through the build leg, and since #471 those answers say it as the launcher's
 line too — [10](10-local-ai-assistant.md) → "A rebuild the launcher refused
@@ -4544,8 +4551,10 @@ Windows — but the guard and the wait do.
 them needs anything done on the mac.
 
 - **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
-  build leg run all 23 `launcherCases` (see [03](03-launcher-scripts.md) →
-  "A section still being deployed is not deployed again").
+  build leg run all 23 `launcherCases` of #467 (see [03](03-launcher-scripts.md) →
+  "A section still being deployed is not deployed again"). #729 added 11 more
+  (a deploy's build leg, `--for-deploy`, and any other build of the section)
+  and changed one; those are owed by its Windows issue.
 - **Windows has the mac's split.** The task runs
   `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
   course and then runs its wrapper as `powershell.exe -File`. A task set since

@@ -484,7 +484,8 @@ say_this_folder_cannot_be_reached() {
 #     program that started this work gone? (the_owners_of_the_work, in the
 #     PREVIEW PORT BLOCK);
 #   - deploy.sh's guard and preview.sh's build-leg guard (#439): is this
-#     section still being deployed by a scheduled script or another deploy.sh?
+#     section still being deployed by a scheduled script or another deploy.sh,
+#     or built by another `preview.sh --build-only` (#729)?
 #     (refuse_while_this_section_deploys, in the DEPLOY WHILE ITS SECTION
 #     DEPLOYS GUARD).
 # All three ask the_launchers_running, below, and each keeps its own POLICY —
@@ -534,8 +535,11 @@ say_this_folder_cannot_be_reached() {
 #            space ("Application Support"), so the word that ends in the
 #            name is looked for, never word 2.
 #   flags    the launcher's OWN words among --stop, --build-only,
-#            --builder-tag, --reset-token, --logout and --help (-h), without
-#            their dashes, ","-joined; "-" when none.
+#            --for-deploy, --builder-tag, --reset-token, --logout and --help
+#            (-h), without their dashes, ","-joined; "-" when none.
+#            --for-deploy (#729) is how a deploy's build leg, `preview.sh C S
+#            --build-only --for-deploy`, is told from the assistant's rebuild,
+#            which is the same line without it.
 #   folder   for a publish set for later, the folder id in its label, or "-"
 #            when the label carries none; "-" for everything else.
 #   places   the 1-based numbers of the PLACES this record is for,
@@ -664,7 +668,7 @@ the_launchers_running() {
           after = ""; flags = ""
           for (a = w + 1; a <= n; a++) {
             after = after " " word[a]
-            if (word[a] ~ /^--(stop|build-only|builder-tag|reset-token|logout|help)$/) {
+            if (word[a] ~ /^--(stop|build-only|for-deploy|builder-tag|reset-token|logout|help)$/) {
               flag = substr(word[a], 3)
               if (index("," flags ",", "," flag ",") == 0) flags = joined(flags, flag)
             } else if (word[a] == "-h" && index("," flags ",", ",help,") == 0) {

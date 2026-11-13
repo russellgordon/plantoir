@@ -2669,6 +2669,19 @@
         "why" : "Serving is the section window's job — it holds the port lease and the web view. A second server started behind its back would take a port the window then could not have."
       },
       {
+        "flag" : "--for-deploy",
+        "meaning" : "Only with --build-only (alone it is refused: \"❌ --for-deploy goes with --build-only.\", exit 1). Changes nothing the build does: it names this build in the process table as a deploy's first step, so the other launchers' guards can tell it from a rebuild.",
+        "usedFor" : [
+          "the build a deploy does first when the built site is stale"
+        ],
+        "notUsedFor" : [
+          "the assistant's rebuild, which is a build and not a deploy",
+          "the build leg of a deploy set for later, whose own script is already in the table and counts as one",
+          "deploy.sh's own rebuild, which the deploy.sh that started it already names"
+        ],
+        "why" : "GitHub #729, measured in #706's reproduction: the window's or an assistant's deploy builds with preview.sh --build-only BEFORE its deploy.sh starts, and that line was the same as the assistant's rebuild, so during the build leg another program's deploy of the section was not refused and its build broke the first. With the flag, shared-rules.json -> deployWhileItsSectionDeploys says 'already being deployed' for the build leg and 'already being built' for a rebuild, and previewWhileItsSectionDeploys refuses a preview during the build leg. An argument rather than an environment variable, because `ps -Ao args` shows arguments only."
+      },
+      {
         "flag" : "--port <n>",
         "meaning" : "Serve on this host port. The websocket goes on port + 1000.",
         "usedFor" : [
@@ -5864,7 +5877,7 @@
               [
                 6003,
                 6002,
-                "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --build-only --non-interactive"
+                "/bin/bash /Users/t/Work/preview.sh ICS4U 1 --build-only --non-interactive --for-deploy"
               ]
             ],
             "name" : "a build for deploying, its launcher running under Revise with Claude",

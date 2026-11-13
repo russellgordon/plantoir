@@ -3,8 +3,10 @@
 A deploy of a section refuses while that same section is still being
 deployed — by a deploy set for later whose script is still running (including
 a run ended by setting the section again: the "leftover run"), or by deploy.sh
-for that course and section (GitHub #439, decided by Russell 2026-10-04). The
-rule and its cases are data:
+for that course and section (GitHub #439, decided by Russell 2026-10-04) — and,
+since #729, while it is being BUILT by another `preview.sh --build-only`: a
+deploy's build leg (`--for-deploy`, said as "being deployed") or a rebuild
+(said as "being built"). The rule and its cases are data:
 `contracts/shared-rules.json` -> `deployWhileItsSectionDeploys`.
 
 This file runs `launcherCases` against the REAL guard, cut out of deploy.sh
@@ -83,8 +85,11 @@ def the_process_table_block(launcher: str = "deploy.sh") -> str:
     return cut(launcher_text(launcher), TABLE_START, TABLE_END, launcher)
 
 
-def refuse(mac: PretendMac, launcher: str, leg: str, course: str, section: str) -> subprocess.CompletedProcess:
-    """Runs the real guard, cut out of `launcher`, as that launcher's run would."""
+def refuse(mac: PretendMac, launcher: str, leg: str, course: str, section: str,
+           this_run_words: str = "") -> subprocess.CompletedProcess:
+    """Runs the real guard, cut out of `launcher`, as that launcher's run would.
+    `this_run_words` are the words the pretend ps lists for THIS run after
+    `./preview.sh` (the course and section when left out)."""
     text = launcher_text(launcher)
     script = "\n".join([
         "set -uo pipefail",
@@ -104,13 +109,15 @@ def refuse(mac: PretendMac, launcher: str, leg: str, course: str, section: str) 
     environment.pop("PLANTOIR_TRAIL_DIR", None)
     # The words the pretend ps lists for this run itself; this run never
     # counts, so they only have to be there.
-    environment["PREVIEWED"] = f"{course} {section}"
+    environment["PREVIEWED"] = this_run_words or f"{course} {section}"
     return subprocess.run([BASH, "-c", script], cwd=mac.here, env=environment,
                           capture_output=True, text=True, timeout=30)
 
 
 def expected_lines(who: str, leg: str, course: str, section: str) -> list:
-    key = ("later" if who == "later" else "another") + ("Deploy" if leg == "deploy" else "Build")
+    if who not in ("later", "another", "building"):
+        raise AssertionError(f"a refused case names who as later, another or building, not {who!r}")
+    key = who + ("Deploy" if leg == "deploy" else "Build")
     lines = []
     for line in the_rule()["sentences"]["launcher"][key]:
         lines.append(line.replace("{course}", course).replace("{section}", section))
@@ -119,8 +126,10 @@ def expected_lines(who: str, leg: str, course: str, section: str) -> list:
 
 def expected_trail(who: str, leg: str, course: str, section: str) -> str:
     entry = the_trail_entry()
-    key = ("launcherLineWhenALaterDeployIsStillWorking" if who == "later"
-           else "launcherLineWhenItsSectionIsAlreadyBeingDeployed")
+    keys = {"later": "launcherLineWhenALaterDeployIsStillWorking",
+            "another": "launcherLineWhenItsSectionIsAlreadyBeingDeployed",
+            "building": "launcherLineWhenItsSectionIsAlreadyBeingBuilt"}
+    key = keys[who]
     return entry[key].replace("{course}", course).replace("{section}", section).replace("{leg}", leg)
 
 
@@ -183,6 +192,43 @@ class TheLauncherCases(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, "#381's rule: a live deploy whose folder cannot be asked counts")
                 self.assertEqual(len(trail), 1, trail)
 
+    def test_a_build_that_has_ended_since_the_table_was_read_does_not_count(self):
+        # #737's race, for the build legs #729 counts: a preview.sh
+        # --build-only the table listed has exited by the time its folder is
+        # asked. It must not refuse, in either words.
+        for args in ("/bin/bash ./preview.sh ICS4U 2 --build-only",
+                     "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"):
+            ended = {"processes": [[700, 1, args]], "cwd": {}, "endedAfterTheTableWasRead": [700]}
+            still_running = {"processes": [[700, 1, args]], "cwd": {}}
+            for launcher in ("deploy.sh", "preview.sh"):
+                leg = "deploy" if launcher == "deploy.sh" else "build"
+                with self.subTest(args=args, launcher=launcher, case="ended"):
+                    result, trail, _course, _section, _leg = self.run_case(dict(ended, leg=leg), launcher)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("ALLOWED", result.stdout)
+                    self.assertEqual(trail, [])
+                with self.subTest(args=args, launcher=launcher, case="still running, folder unknown"):
+                    result, trail, _course, _section, _leg = self.run_case(dict(still_running, leg=leg), launcher)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertEqual(len(trail), 1, trail)
+
+    def test_this_run_is_never_its_own_overlap(self):
+        # The worst fault #729 could add: a build leg refused by ITSELF. The
+        # pretend ps lists this very run with the same words as the build it
+        # is, and its parent as the app; with nothing else running it goes on.
+        for words in ("ICS4U 2 --build-only", "ICS4U 2 --build-only --for-deploy",
+                      "ICS4U 2 --build-only --non-interactive --for-deploy"):
+            for launcher in ("deploy.sh", "preview.sh"):
+                with self.subTest(words=words, launcher=launcher):
+                    with tempfile.TemporaryDirectory() as folder:
+                        mac = PretendMac(Path(folder))
+                        mac.lay_out({"processes": [],
+                                     "parentArgs": "/Applications/Plantoir.app/Contents/MacOS/Plantoir"})
+                        result = refuse(mac, launcher, "build", "ICS4U", "2", this_run_words=words)
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn("ALLOWED", result.stdout)
+                        self.assertEqual(mac.trail(), [])
+
     def test_the_liveness_look_is_ps_never_kill(self):
         # kill -0 fails for another account's process that is still running,
         # which the guard must still count (#737).
@@ -196,6 +242,18 @@ class TheLauncherCases(unittest.TestCase):
                       "does not list this run", "app line alone, with its trailing words", "unreadable",
                       "command line", "ANOTHER folder", "own ancestor"):
             self.assertIn(words, names)
+        # #729: a deploy's build leg and a rebuild, each in this folder and in
+        # another, the app's two builds as brothers, and a build only named.
+        for words in ("build leg (--build-only --for-deploy) in this folder", "build leg in ANOTHER folder",
+                      "a rebuild (--build-only, no --for-deploy)", "a rebuild in ANOTHER folder",
+                      "same app are not one family", "beside its own rebuild", "merely named on a line, in an editor",
+                      "being stopped"):
+            self.assertIn(words, names)
+        whos = set()
+        for case in the_rule()["launcherCases"]:
+            if case["expect"] == "refused":
+                whos.add(case["who"])
+        self.assertEqual(whos, {"later", "another", "building"})
         spaced = [case for case in the_rule()["launcherCases"] if "Application Support" in case["name"]]
         self.assertIn("Application Support/", spaced[0]["processes"][0][2])
 
@@ -260,6 +318,18 @@ class TheCallSites(unittest.TestCase):
                 for word in ("workspace", "container", "script", "Docker", "docker", "publish"):
                     self.assertNotIn(word, line)
 
+    def test_a_build_in_the_way_is_never_called_a_deploy(self):
+        # #729: "building" is said when what is in the way is a build; its
+        # sentences must not claim a deploy is running, and the others must
+        # not claim a build.
+        for name, lines in the_rule()["sentences"]["launcher"].items():
+            with self.subTest(name):
+                if name.startswith("building"):
+                    self.assertIn("is already being built", lines[0])
+                    self.assertNotIn("being deployed", lines[0])
+                else:
+                    self.assertNotIn("being built", lines[0])
+
 
 
 # Mac only, for TheRealPreviewUpToItsGuard's reason: the pretend ps walks the
@@ -279,7 +349,8 @@ class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
     LEFTOVER = ("/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/"
                 "ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh")
 
-    def run_the_real_prefix(self, launcher: str, call_line: str, arguments: list, working: bool):
+    def run_the_real_prefix(self, launcher: str, call_line: str, arguments: list, working: bool,
+                            rows: list = None, cwd: dict = None):
         text = launcher_text(launcher)
         self.assertEqual(text.count(call_line), 1, call_line)
         end_of_block = text.index("fi\n", text.index(call_line)) + len("fi\n")
@@ -290,8 +361,9 @@ class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
             (mac.here / launcher).write_text(prefix, encoding="utf-8")
             (mac.here / "courses" / "ICS4U" / "section2").mkdir(parents=True)
             (mac.here / "courses" / "ICS4U" / "course_config.json").write_text("{}\n", encoding="utf-8")
-            rows = [[801, 1, self.LEFTOVER]] if working else []
-            mac.lay_out({"processes": rows})
+            if rows is None:
+                rows = [[801, 1, self.LEFTOVER]] if working else []
+            mac.lay_out({"processes": rows if working else [], "cwd": cwd or {}})
             environment = {"HOME": str(mac.home), "FAKE": str(mac.fake), "PATH": f"{mac.bin}:/usr/bin:/bin"}
             result = subprocess.run([BASH, "./" + launcher] + arguments, cwd=mac.here, env=environment,
                                     capture_output=True, text=True, timeout=60)
@@ -319,6 +391,75 @@ class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
     def test_the_real_preview_sh_build_only_refuses_while_a_leftover_run_works(self):
         self.check("preview.sh", 'refuse_while_this_section_deploys "$COURSE" "$SECTION" build\n',
                    ["ICS4U", "2", "--build-only", "--image", "x"], "build")
+
+    def test_the_real_launchers_refuse_while_another_build_of_the_section_runs(self):
+        """#729 through the real parsers: a deploy's build leg passes
+        --for-deploy and is accepted; a plain rebuild in this folder refuses
+        it ("built"), and a deploy's build leg in this folder refuses a
+        deploy.sh ("deployed")."""
+        build_call = 'refuse_while_this_section_deploys "$COURSE" "$SECTION" build\n'
+        deploy_call = 'refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy\n'
+        rebuild = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --non-interactive"]]
+        build_leg = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"]]
+        for launcher, call, arguments, rows, who, leg in (
+                ("preview.sh", build_call, ["ICS4U", "2", "--build-only", "--for-deploy", "--image", "x"],
+                 rebuild, "building", "build"),
+                ("preview.sh", build_call, ["ICS4U", "2", "--for-deploy", "--build-only", "--image", "x"],
+                 build_leg, "another", "build"),
+                ("deploy.sh", deploy_call, ["ICS4U", "2"], build_leg, "another", "deploy"),
+                ("deploy.sh", deploy_call, ["ICS4U", "2"], rebuild, "building", "deploy")):
+            with self.subTest(launcher=launcher, arguments=arguments, who=who):
+                refused = self.run_the_real_prefix(launcher, call, arguments, working=True,
+                                                   rows=rows, cwd={"700": "here"})
+                self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+                self.assertNotIn("REACHED", refused.stdout)
+                for line in expected_lines(who, leg, "ICS4U", "2"):
+                    self.assertIn(line, refused.stdout.splitlines())
+                allowed = self.run_the_real_prefix(launcher, call, arguments, working=False)
+                self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
+                self.assertIn("REACHED", allowed.stdout)
+
+@unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
+class TheForDeployFlag(unittest.TestCase):
+    """#729: `--for-deploy` names a deploy's build in the process table and
+    changes nothing the build does, so it is refused on a serving run, where it
+    could mean nothing, and accepted beside --build-only in either order. The
+    REAL preview.sh is run up to just after its argument checks."""
+
+    STOP_AT = "# Validate course and section\n"
+
+    def run_preview(self, arguments: list) -> subprocess.CompletedProcess:
+        text = launcher_text("preview.sh")
+        self.assertEqual(text.count(self.STOP_AT), 1)
+        prefix = text[:text.index(self.STOP_AT)] + 'echo "REACHED BUILD_ONLY=$BUILD_ONLY FOR_DEPLOY=$FOR_DEPLOY"\nexit 0\n'
+        with tempfile.TemporaryDirectory() as folder:
+            here = Path(folder)
+            (here / "preview.sh").write_text(prefix, encoding="utf-8")
+            environment = {"HOME": str(here), "PATH": "/usr/bin:/bin"}
+            return subprocess.run([BASH, "./preview.sh"] + arguments + ["--image", "x"], cwd=here,
+                                  env=environment, capture_output=True, text=True, timeout=60)
+
+    def test_alone_it_is_refused_in_words(self):
+        result = self.run_preview(["ICS4U", "2", "--for-deploy"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("❌ --for-deploy goes with --build-only.", result.stdout.splitlines())
+        self.assertNotIn("REACHED", result.stdout)
+        self.assertNotIn("Unknown option", result.stdout)
+
+    def test_beside_build_only_it_is_accepted_in_either_order(self):
+        for arguments in (["ICS4U", "2", "--build-only", "--for-deploy"],
+                          ["ICS4U", "2", "--for-deploy", "--build-only", "--non-interactive"]):
+            with self.subTest(arguments=arguments):
+                result = self.run_preview(arguments)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("REACHED BUILD_ONLY=--build-only FOR_DEPLOY=--for-deploy", result.stdout)
+
+    def test_a_serving_run_is_not_touched_by_an_inherited_variable(self):
+        # FOR_DEPLOY is set to empty before the parser, so a variable of that
+        # name in the environment cannot make a serving preview refuse.
+        text = launcher_text("preview.sh")
+        self.assertLess(text.index('FOR_DEPLOY=""'), text.index("    --for-deploy)"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

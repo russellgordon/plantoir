@@ -273,9 +273,26 @@ class TheLauncherCases(unittest.TestCase):
         result, trail, _course, _section = self.run_case({"processes": ended["processes"], "cwd": {}})
         self.assertEqual(result.returncode, 1, "a live deploy whose folder cannot be asked still counts")
 
+    def test_a_build_leg_that_has_ended_since_the_table_was_read_does_not_refuse_a_preview(self):
+        # #737's race for the deploy's build leg #729 counts.
+        rows = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"]]
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {},
+                                                          "endedAfterTheTableWasRead": [700]})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(trail, [])
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {}})
+        self.assertEqual(result.returncode, 1, "a live build leg whose folder cannot be asked still counts")
+
+    def test_a_build_leg_being_stopped_is_not_a_deploy(self):
+        rows = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy --stop"]]
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {"700": "here"}})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(trail, [])
+
     def test_the_cases_cover_every_kind_of_deployer(self):
         names = " ".join(case["name"] for case in the_rule()["launcherCases"])
-        for words in ("command line", "set for later", "unreadable", "ANOTHER section", "--build-only"):
+        for words in ("command line", "set for later", "unreadable", "ANOTHER section", "--build-only",
+                      "--build-only --for-deploy", "build leg in ANOTHER working folder"):
             self.assertIn(words, names)
 
 

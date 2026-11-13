@@ -583,8 +583,13 @@ a folder destination and 3,000 extra pages, so the deploy's build took 32 s):
 on return the window read "No Preview Running" with Deploy enabled. A press
 during the deploy's BUILD leg was worse than the report: it started a second
 `preview.sh --build-only`, and the first deploy's build ended "failed (exit 1)
-after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counts a
-running `deploy.sh`, and the first deploy had not reached it yet. After the
+after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counted a
+running `deploy.sh`, and the first deploy had not reached it yet. (Since #729
+the guard also counts a deploy's build leg, which the app now runs as
+`preview.sh C S --build-only --for-deploy`, and any other `--build-only` of
+the section, so a second program's press during the build leg is refused by
+the launcher in words: [03](03-launcher-scripts.md) → "A section being
+deployed cannot be deployed again (#439)".) After the
 fix, the same steps showed the live progress with Cancel, Deploy greyed, one
 launcher start in total (the press and ⇧⌘D started nothing), and a deploy
 that finished while the teacher was on section 2 showed "Done" on return.

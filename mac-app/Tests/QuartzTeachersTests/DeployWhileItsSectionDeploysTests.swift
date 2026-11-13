@@ -54,7 +54,7 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
     func testTheLaunchersRefusalIsExplainedInItsOwnWords() throws {
         let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["deployWhileItsSectionDeploys"])
         let cases: [[String: Any]] = try XCTUnwrap(rule["failureExplanationCases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 4)
+        XCTAssertEqual(cases.count, 6)
         for testCase in cases {
             let output: String = try XCTUnwrap(testCase["output"] as? String)
             let expected: String = try XCTUnwrap(testCase["expect"] as? String)
@@ -65,6 +65,18 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
             )
             XCTAssertEqual(refusal.sentence, expected)
             XCTAssertEqual(refusal.byALaterDeploy, assistantKey == "deployRefusedWhileALaterDeployWorks", output)
+            XCTAssertEqual(refusal.byAnotherBuild, assistantKey == "deployRefusedWhileItsSectionIsBeingBuilt", output)
+            let answer: AssistSiteWorkResult = MultiDestinationDeployRunner.refusalAnswer(
+                course: "ICS4U", section: "2", refusal: refusal
+            )
+            let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
+            let template: String = try XCTUnwrap(wording[assistantKey] as? String, assistantKey)
+            XCTAssertEqual(
+                answer.message,
+                template.replacingOccurrences(of: "{course}", with: "ICS4U")
+                    .replacingOccurrences(of: "{section}", with: "2"),
+                output
+            )
         }
     }
 
@@ -75,7 +87,7 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
         let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["deployWhileItsSectionDeploys"])
         let sentences: [String: Any] = try XCTUnwrap(rule["sentences"] as? [String: Any])
         let launcher: [String: Any] = try XCTUnwrap(sentences["launcher"] as? [String: Any])
-        XCTAssertEqual(launcher.count, 4)
+        XCTAssertEqual(launcher.count, 6)
         for (name, value) in launcher {
             let lines: [String] = try XCTUnwrap(value as? [String])
             var found: Bool = false
@@ -88,6 +100,10 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
             XCTAssertEqual(
                 lines[0].contains(FailureExplainer.laterDeployMarker), name.hasPrefix("later"),
                 "\(name): the later-deploy marker must name exactly the later sentences"
+            )
+            XCTAssertEqual(
+                lines[0].contains(FailureExplainer.anotherBuildMarker), name.hasPrefix("building"),
+                "\(name): the another-build marker must name exactly the building sentences (#729)"
             )
         }
     }
@@ -185,7 +201,11 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
     /// the contract's cases name, and say nothing about the machinery.
     func testTheAssistantSentencesAreInTheWording() throws {
         let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
-        for key in ["deployRefusedWhileALaterDeployWorks", "deployRefusedWhileItsSectionDeploys"] {
+        for key in [
+            "deployRefusedWhileALaterDeployWorks",
+            "deployRefusedWhileItsSectionDeploys",
+            "deployRefusedWhileItsSectionIsBeingBuilt"
+        ] {
             let sentence: String = try XCTUnwrap(wording[key] as? String, key)
             for word in ["script", "launcher", "container", "Docker", "toolchain", "publish"] {
                 XCTAssertFalse(sentence.lowercased().contains(word.lowercased()), "\(key) says \(word)")
