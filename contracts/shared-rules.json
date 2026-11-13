@@ -4909,6 +4909,346 @@
       "readFrom": "The console, as each line arrives, for a preview or a publish the app runs; the run's own log, from the size it had before the run, for a scheduled publish (the mac: ScheduledDeploy.recordFolderProblems, beside PLANTOIR_DATED:); on Windows also a run plantoir-mcp started (#660, BuildMachineLines)."
     }
   },
+  "coverageTab": {
+    "note": "#793. The curriculum coverage map as it would be if every existing page were published, which every build of a section (a preview, a deploy's build, a build-only run) writes BESIDE the section's built website for the app to show on the section's Coverage tab. 793a, the map and these keys, is the shared Python, so Windows inherits it; the tab itself (its presence, states, clicks and sentences) is 793b and adds its own keys here. The record the app reads is file-formats.json -> coverageTabMap. The site's own map is unchanged: curriculumRules, coverageMapsBuilt and build_site.COVERAGE_NOTES still describe it, and 'Only published pages count' stays true of the site.",
+    "whatCounts": {
+      "rule": "The site's counting rule (build_site._coverage_counts) with ONE difference: whether a page is published is not asked. Everything else is the site's: a page counts only when the course teaches it (a class page, a page a class page links to, or a page one of those links to; every page when the course has no class pages); a page inside any mapped curriculum folder never counts; the build's own maps never count; nothing inside code or a %% comment counts; a page in a folder that counts for marks is assessed work, so an unpublished test draws its ring and greens its overall expectation's chip. One function answers both maps (every_page=True for this one), so they cannot drift.",
+      "anExistingPage": "Every page the build copies into the section's website content: anything the site would show if its publish setting were true. That includes pages held back by publish: false and pages held back from this section only (publishForSection<N>: false, resolved by the build before counting, so each section's map is its own). It does NOT include excluded folders and files, which are never copied; the How I Teach page; hidden folders and Media; another section's own pages; the curriculum folders' own pages; or the pages the build makes (the maps, My Progress).",
+      "unreadablePages": "A page whose settings could not be read (#246) is LEFT OUT, whatever it says: the build cannot tell which section it was meant for, and counting it would overstate every section's map. The page says how many such pages there are in this section's build, and points to the Problems tab. A copy counts as such a page only while the build's own record of where it came from still names the file that could not be read (build_site.copies_still_unreadable): a section's readable page copied over a shared unreadable one at the same path (#678) is an ordinary page, counted on both maps (countingCases, the section's readable page case; the implementation review's M1). Russell's ruling, 2026-11-12.",
+      "hiddenPagesCounted": "The number of DIFFERENT pages that address at least one expectation on any of the page's maps and that students cannot see yet: publish false for this section after the build resolved it, or in a place the site never publishes (a top-level templates/ or private/ folder, or a dot-named part of the path; geogebraFences.files.notPublished, the rule build_site's geogebra.is_published applies). One line on the page says it, zero included, so a deliberately unpublished page (an answer key linked from a class, last year's draft) inflating the map shows up as a number. Russell's ruling, 2026-11-12. Which cells they colour is NOT marked in this release (ruled out, 2026-11-12).",
+      "countingCases": {
+        "howToRunACase": "Lay out a course folder holding curriculum and then pages (each a path below the course folder and its whole text; pages are written second, so a page at a curriculum path replaces that curriculum page). The folder Curriculum is declared as the course's curriculum folder. sectionPages, where a case carries them, are the section's own pages (paths below section<N>/, each folder of them a per-section folder), copied over the shared ones by build_site.copy_the_per_section_folders after the shared copy, as the build does. Copy every file into a fresh content folder the way the build does (remember where it came from, then build_site.process_frontmatter for the case's section, which resolves publishForSection<N> and hides a page whose settings cannot be read). Class pages are those under any of classFolders; gradedFolders is the configured list of folders that count for marks. Then count twice: the site's way (_coverage_counts as the site calls it) into expect.published, and the map-for-the-app's way (coverage_as_if_published) into expect.everyPage. Each expect side lists only the codes that are counted, as {count, assessed}; every code not listed is 0 and not assessed. chips, where a side carries it, is {overall code: whether assessed work addresses it}. hiddenCounted and unreadableLeftOut are the everyPage side's two count lines.",
+        "curriculum": {
+          "Curriculum/A1. Ideas.md": "---\ntitle: A1. Ideas\n---\nOverall expectation A1.\n",
+          "Curriculum/A1.1.md": "---\ntitle: A1.1\n---\nExplain the first idea.\n",
+          "Curriculum/A1.2.md": "---\ntitle: A1.2\n---\nExplain the second idea.\n",
+          "Curriculum/B1. Systems.md": "---\ntitle: B1. Systems\n---\nOverall expectation B1.\n",
+          "Curriculum/B1.1.md": "---\ntitle: B1.1\n---\nDescribe a system.\n"
+        },
+        "classFolders": ["All Classes"],
+        "gradedFolders": ["Tasks"],
+        "cases": [
+          {
+            "name": "a published lesson a class links to counts on both maps",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: true\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {"A1.1": {"count": 1, "assessed": false}},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "the same lesson not yet published counts only if every page were published",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 1,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "an unpublished test draws its ring and greens its chip only if every page were published",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Unit Test]]\n",
+              "Tasks/Unit Test.md": "---\npublish: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {"A1.1": {"count": 1, "assessed": true}},
+              "publishedChips": {"A1": false, "B1": false},
+              "everyPageChips": {"A1": true, "B1": false},
+              "hiddenCounted": 1,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a page held back from section 2 only counts in section 2's map only if every page were published",
+            "section": 2,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublishForSection1: true\npublishForSection2: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 1,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "the same page counts on both of section 1's maps, where it is published",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublishForSection1: true\npublishForSection2: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {"A1.1": {"count": 1, "assessed": false}},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "an unpublished page no class links to counts on neither: the taught rule holds",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\nNothing linked today.\n",
+              "Lessons/Spare.md": "---\npublish: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "an unpublished class page that transcludes an expectation itself",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 1,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a page whose settings cannot be read is left out of both, and counted apart",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: true\nyes: value\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 1
+            }
+          },
+          {
+            "name": "a curriculum page that transcludes another expectation counts on neither",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[A1.2]]\n",
+              "Curriculum/A1.2.md": "---\ntitle: A1.2\npublish: false\n---\nExplain the second idea, after ![[A1.1]].\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a transclusion inside a code fence on an unpublished page counts on neither",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[How To Cite]]\n",
+              "Lessons/How To Cite.md": "---\npublish: false\n---\nWrite it like this:\n\n```\n![[A1.1]]\n```\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a course with no class pages counts every page, unpublished ones only if every page were published",
+            "section": 1,
+            "pages": {
+              "Lessons/Lesson.md": "---\npublish: false\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 1,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a transclusion inside a %% comment on an unpublished page counts on neither",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: false\n---\n%% ![[A1.1]] %%\n"
+            },
+            "expect": {
+              "published": {},
+              "everyPage": {},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "a section's readable page over a shared page whose settings cannot be read counts, and nothing is left out",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: true\nyes: value\n---\n![[A1.1]]\n"
+            },
+            "sectionPages": {
+              "Lessons/Lesson.md": "---\npublish: true\n---\n![[A1.1]]\n"
+            },
+            "expect": {
+              "published": {"A1.1": {"count": 1, "assessed": false}},
+              "everyPage": {"A1.1": {"count": 1, "assessed": false}},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          },
+          {
+            "name": "with every page published the two maps are the same: the anti-drift case",
+            "section": 1,
+            "pages": {
+              "All Classes/Day 1.md": "---\npublish: true\n---\n[[Lesson]] and [[Unit Test]]\n",
+              "All Classes/Day 2.md": "---\npublish: true\n---\n[[Second Lesson]]\n",
+              "Lessons/Lesson.md": "---\npublish: true\n---\n![[A1.1]]\n![[B1.1]]\n[[Background]]\n",
+              "Lessons/Second Lesson.md": "---\npublish: true\n---\n![[A1.1]]\n",
+              "Lessons/Background.md": "---\npublish: true\n---\n![[A1.2]]\n",
+              "Tasks/Unit Test.md": "---\npublish: true\n---\n![[B1.1]]\n"
+            },
+            "expect": {
+              "published": {"A1.1": {"count": 2, "assessed": false}, "A1.2": {"count": 1, "assessed": false}, "B1.1": {"count": 2, "assessed": true}},
+              "everyPage": {"A1.1": {"count": 2, "assessed": false}, "A1.2": {"count": 1, "assessed": false}, "B1.1": {"count": 2, "assessed": true}},
+              "publishedChips": {"A1": false, "B1": true},
+              "everyPageChips": {"A1": false, "B1": true},
+              "hiddenCounted": 0,
+              "unreadableLeftOut": 0
+            }
+          }
+        ]
+      }
+    },
+    "pageWords": {
+      "note": "Every sentence the page itself carries, read from here by build_site.coverage_tab_page, so a test pins them by key and Windows shows the same page. {course} is the course code a teacher reads (displayed_course_code), {section} the section's number, {folder} the curriculum folder's name, {code} an overall expectation's code, {n} a count. The legend's labels and the standings' row names are the site's own (build_site.COVERAGE_WORDS, COVERAGE_ASSESSED_LEGEND, COVERAGE_STANDING_ROWS), shared by code rather than written twice. The sentence about clicking a code is NOT on the page: on Windows until its tab is wired, and on a Mac without Obsidian, it would be false, so the app says it above the page (793b; the plan review's L1).",
+      "heading": "Coverage if every page were published",
+      "subheading": "{course}, Section {section}",
+      "intro": "Every expectation in {course}, coloured by how many pages would address it if every page were published.",
+      "introNamingTheFolder": "Every expectation in {folder} for {course}, coloured by how many pages would address it if every page were published.",
+      "chipsHint": "The small chips under each strand letter are that strand's overall expectations: green when assessed work would address them, red when nothing marked would.",
+      "chipAssessed": "{code}, addressed by assessed work",
+      "chipNotAssessed": "{code}, no assessed work yet",
+      "standingsCaption": "Where this course would stand",
+      "hiddenNone": "No page counted here is hidden from students.",
+      "hiddenOne": "1 page counted here is one students cannot see yet.",
+      "hiddenMany": "{n} pages counted here are ones students cannot see yet.",
+      "unreadableOne": "1 page was left out because its settings could not be read. This section's Problems tab lists it.",
+      "unreadableMany": "{n} pages were left out because their settings could not be read. This section's Problems tab lists them.",
+      "whatCountsHere": "This map counts the way your website's coverage map does, except that pages students cannot see yet count too. A page addresses an expectation when it transcludes it, or links to it inside a curriculum connection block, and the course teaches the page: it is a class page, or a class page links to it, directly or through one other page. In a course with no class pages, every page counts. Assessed work is a page in a folder that counts for marks.",
+      "whatCountsHereSiteMapOff": "Your website's coverage map is switched off, so students do not see a map. This one is only here in Plantoir, and counts the way that map would, except that pages students cannot see yet count too. A page addresses an expectation when it transcludes it, or links to it inside a curriculum connection block, and the course teaches the page: it is a class page, or a class page links to it, directly or through one other page. In a course with no class pages, every page counts. Assessed work is a page in a folder that counts for marks."
+    },
+    "countLines": {
+      "rule": "Two lines under the subheading, before the first map. The hidden-pages line is ALWAYS there (hiddenNone at 0, which is also what an empty map says, hiddenOne at 1, hiddenMany with {n} otherwise). The unreadable-pages line is there only when at least one page was left out (unreadableOne, unreadableMany). Both counts are of pages, once each across every map on the page.",
+      "cases": [
+        {"hidden": 0, "unreadable": 0, "expectLines": ["hiddenNone"]},
+        {"hidden": 1, "unreadable": 0, "expectLines": ["hiddenOne"]},
+        {"hidden": 3, "unreadable": 0, "expectLines": ["hiddenMany"]},
+        {"hidden": 0, "unreadable": 1, "expectLines": ["hiddenNone", "unreadableOne"]},
+        {"hidden": 2, "unreadable": 4, "expectLines": ["hiddenMany", "unreadableMany"]}
+      ]
+    },
+    "link": {
+      "form": "plantoir-coverage:open/<buildId>/<map>/<code>",
+      "rule": "Each cell and chip whose page the build can name is a link of exactly this form: the scheme plantoir-coverage, then open, the build id that wrote the page (about.json's buildId), the map's place on the page counting from 0 (its index in about.json's maps), and the expectation's code, each part percent-encoded (a code's letters, digits, dots and hyphens are left as they are). The page names NO file: the app finds the file in about.json's maps[map].pages[code], which the build wrote and which names only curriculum pages inside the course folder. A code whose page the build cannot name (build_site._vault_relative_source answers None) is drawn as a span with no link. Nothing else on the page is a link: no http, no file, no fragment.",
+      "cases": [
+        {"name": "a specific expectation", "buildId": "20261112T190405Z-ab12cd34", "map": 0, "code": "A1.1", "expect": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1.1"},
+        {"name": "an overall expectation's chip", "buildId": "20261112T190405Z-ab12cd34", "map": 0, "code": "A1", "expect": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/A1"},
+        {"name": "a College Board skill on the second map", "buildId": "20261112T190405Z-ab12cd34", "map": 1, "code": "1.A", "expect": "plantoir-coverage:open/20261112T190405Z-ab12cd34/1/1.A"},
+        {"name": "a learning objective", "buildId": "20261112T190405Z-ab12cd34", "map": 1, "code": "CRD-1.A", "expect": "plantoir-coverage:open/20261112T190405Z-ab12cd34/1/CRD-1.A"},
+        {"name": "a lower-case code keeps its case", "buildId": "20261112T190405Z-ab12cd34", "map": 0, "code": "b2.3", "expect": "plantoir-coverage:open/20261112T190405Z-ab12cd34/0/b2.3"}
+      ]
+    },
+    "escaping": {
+      "rule": "Every string on the page that came from the course (the course code a teacher reads, a curriculum folder's name and the map title made from it) is escaped for HTML, quotes included, so it is text and never markup, and never becomes an attribute or a link. Codes are already limited to the shapes of curriculumRules.isExpectationCode and an overall page's leading code, and are escaped too. An overall expectation page's title after its code is never written on the page, and no file name is. Each case puts its text where it says and the page must contain none of mustNotContain, every one of mustContain, and no link but those of link.form.",
+      "howToRunACase": "Through build_site.coverage_tab_page, with the case's text handed in as data: courseCode as the course a teacher reads, curriculumFolder as a map's folder and the title the site would give it (coverage_page_titles), overallPage as the stem of A1's page. No file or folder is made with these names, because <, >, \" and | cannot be in a file name on Windows, where the same test runs.",
+      "cases": [
+        {
+          "name": "markup in the course code",
+          "courseCode": "<b>\"x\"&'",
+          "mustNotContain": ["<b>\"x\""],
+          "mustContain": ["&lt;b&gt;&quot;x&quot;&amp;&#x27;"]
+        },
+        {
+          "name": "a script in the curriculum folder's name",
+          "curriculumFolder": "Curriculum <script>alert(1)<script>",
+          "mustNotContain": ["<script"],
+          "mustContain": ["Curriculum &lt;script&gt;alert(1)&lt;script&gt;"]
+        },
+        {
+          "name": "a quote and a link of the app's own form in the curriculum folder's name stay text",
+          "curriculumFolder": "Curriculum \" onclick=\"plantoir-coverage:open",
+          "mustNotContain": ["\" onclick=\"plantoir-coverage:open"],
+          "mustContain": ["Curriculum &quot; onclick=&quot;plantoir-coverage:open"]
+        },
+        {
+          "name": "a link of the app's own form in the course code stays text",
+          "courseCode": "ICS3U\" href=\"plantoir-coverage:open/x/0/A1.1",
+          "mustNotContain": ["\" href=\"plantoir-coverage:open/x/0/A1.1"],
+          "mustContain": ["ICS3U&quot; href=&quot;plantoir-coverage:open/x/0/A1.1"]
+        },
+        {
+          "name": "markup in an overall expectation page's title never reaches the page",
+          "overallPage": "A1. <img src=x onerror=alert(1)>",
+          "mustNotContain": ["<img", "onerror"],
+          "mustContain": []
+        }
+      ]
+    },
+    "mapOfThisBuild": {
+      "rule": "Whether the map in .coverage-tab is the one a given build made, read from about.json and the page it names alone, never from the HTML (build_site.coverage_tab_map_state). none: no about.json, one that cannot be read, a version other than 1, page null or not a plain file name, or the named page not in the folder. thisBuild: about.json's buildId equals the id asked about. anotherBuild: any other buildId: the map was made by a different build, with its own startedNs, and nothing says whether that build is earlier or later, because ids come from a clock and are compared for equality only, never ordered (the fix review's M1 and L2). The id to ask about is the section's .build-id, which names the build that started last; anotherBuild then means that build made no map (its map step failed, or it is still running), and the tab (793b) shows the map it has with that map's own date and says plainly that it could not be made again with the latest build. A build's PLANTOIR_PROBLEMS: line carries its own id, which equals .build-id except when two builds of the section overlap; asked with the line's id, anotherBuild can also mean a later build's map, so .build-id is the one to ask with.",
+      "howToRunACase": "Lay out a .coverage-tab folder holding about.json (record, written as JSON; absent when null; the text itself when recordText is given) and the pages named in pagesOnDisk, then ask for the state against buildId.",
+      "cases": [
+        {"name": "no record yet", "record": null, "pagesOnDisk": [], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "a record that cannot be read", "recordText": "{ half a file", "pagesOnDisk": [], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "another version", "record": {"version": 2, "buildId": "20261112T190405Z-ab12cd34", "page": "map-20261112T190405Z-ab12cd34.html"}, "pagesOnDisk": ["map-20261112T190405Z-ab12cd34.html"], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "no curriculum, so no page", "record": {"version": 1, "buildId": "20261112T190405Z-ab12cd34", "page": null}, "pagesOnDisk": [], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "the named page is gone", "record": {"version": 1, "buildId": "20261112T190405Z-ab12cd34", "page": "map-20261112T190405Z-ab12cd34.html"}, "pagesOnDisk": [], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "a page named with a path", "record": {"version": 1, "buildId": "20261112T190405Z-ab12cd34", "page": "../public/index.html"}, "pagesOnDisk": [], "buildId": "20261112T190405Z-ab12cd34", "expect": "none"},
+        {"name": "this build's map", "record": {"version": 1, "buildId": "20261112T190405Z-ab12cd34", "page": "map-20261112T190405Z-ab12cd34.html"}, "pagesOnDisk": ["map-20261112T190405Z-ab12cd34.html"], "buildId": "20261112T190405Z-ab12cd34", "expect": "thisBuild"},
+        {"name": "the build ran and its map step failed: the map is another build's", "record": {"version": 1, "buildId": "20261111T080000Z-00000000", "page": "map-20261111T080000Z-00000000.html"}, "pagesOnDisk": ["map-20261111T080000Z-00000000.html"], "buildId": "20261112T190405Z-ab12cd34", "expect": "anotherBuild"},
+        {"name": "a map whose id reads LATER than the build asking is still another build's: ids are never ordered", "record": {"version": 1, "buildId": "20261112T190435Z-cccccccc", "page": "map-20261112T190435Z-cccccccc.html"}, "pagesOnDisk": ["map-20261112T190435Z-cccccccc.html"], "buildId": "20261112T190405Z-ab12cd34", "expect": "anotherBuild"}
+      ]
+    },
+    "consoleWords": {
+      "note": "The one line a teacher can read on this path in 793a, printed with a warning sign before it. It does not name the Coverage tab, which no app shows until 793b, and {reason} is the system's own words for what went wrong (an OSError's strerror, otherwise the error's kind), never a path: the console goes into problem reports, and a path carries the home folder (the implementation review's L3).",
+      "couldNotMake": "The map of this section's coverage as if every page were published could not be made this time ({reason})."
+    },
+    "page": {
+      "rule": "One stand-alone HTML document per build: a <meta charset>, a Content-Security-Policy meta allowing nothing but its own inline styles (default-src 'none'; style-src 'unsafe-inline'), the section's colour scheme as CSS variables for light and, under prefers-color-scheme: dark, for dark, a system font stack, and the site's own coverage stylesheet (build_site.coverage_stylesheet). No script, no event attribute, no external reference of any kind, no font, no image. One <section> per map, primary first, each with the site's title for that map as its heading; the standings are a real table whose row headings are <th scope=row>. Every cell and chip says its state in words (aria-label and title), so a colour or a ring is never the only signal. Text from the course is isolated in <bdi> (a right-to-left mark in a folder's name reorders only that name), and headings and paragraphs wrap anywhere, so a very long course code never makes the page scroll sideways.",
+      "colours": "The section's own colour scheme (course_config.json color_schemes.section<N>, Russell's ruling of 2026-11-12), lightMode and darkMode, from support/colour_schemes.json. No choice, or an id that is not there, is quartz-standard, the colours a site with no choice gets. The cell colours are the site's fixed scale, as on the site.",
+      "severalMaps": "More than one curriculum folder makes one page with a section per map, stacked in the order the site's maps are planned (curriculumRules.coveragePageTitles). The site makes one page per folder; a chooser in the app would need a script, which the page may not carry, or a second control over a page one scroll long."
+    },
+    "whereItIsWritten": "In the section's built output, in a hidden folder .coverage-tab beside public/, .page-sources.json and .problems.json: never in content/, which Quartz publishes, never in public/, which every deploy sends, and never in the course folder, which would sync and which #768's change walk would read as a change. file-formats.json -> coverageTabMap names the files and the order they are written in.",
+    "whenItIsWritten": "On every build of the section, whatever the section's coverage-map setting says (Russell's ruling, 2026-11-12: the setting decides what students see, not the teacher's planning view), after the How I Teach sweep, the hiding of pages whose settings cannot be read and the clearing of a site the build cannot replace, and BEFORE the section's problems record, so by the time the PLANTOIR_PROBLEMS: line every build prints arrives, the map STEP has run. That line does NOT say the step succeeded: it never fails a build, and anything that goes wrong (a full disk, a folder that cannot be written) prints one warning line (consoleWords.couldNotMake) and leaves the previous build's map and record as they were. So the map is THIS build's only when about.json's buildId equals the build's own id (the buildId the PLANTOIR_PROBLEMS: line carries, and the section's .build-id); otherwise the map is another build's, and the tab must say so (mapOfThisBuild; the implementation review's M2). Which map belongs is never decided by the clock: the build that owns the section's .build-id (the last to start) writes its map and removes the others; a build that no longer owns it leaves the record and the other build's map alone (file-formats.json -> coverageTabMap.orderOfWriting). A successful map prints nothing (the plan review's M4: a line naming a tab before the app has one, under the site's own map line with different numbers, would mislead).",
+    "reusedBuild": "A deploy that reuses the last build (#768) runs no Python, so the map stays exactly as that build left it, with its own startedNs. That is true: the build was reused because nothing in the course changed since it started. A deploy that builds writes a new map like a preview. Nothing ever re-dates an old map.",
+    "trail": "None from 793a: the build already records itself, and 793a shows a teacher nothing. The app's line for looking at the tab is 793b's.",
+    "rejected": [
+      "Counting in Swift and C#, or drawing the map natively: two more copies of the counting rule and the layout, which would drift from the site's.",
+      "Making the map when the tab opens: a second build path and a wait, which Russell ruled out.",
+      "Writing it into content/ (Quartz would publish it, and the date pass and the links checklist would meet it), into public/ (every deploy would upload it) or into the course folder (it would sync, Obsidian would show it, and #768's walk would read every build as a change).",
+      "Counting pages whose settings cannot be read: the build cannot tell which section such a page was meant for (Russell's ruling, 2026-11-12).",
+      "Links that name a file, or a list index alone: page content could then name a path, and an index can point at the wrong item when page and record come from different builds. A build id, a map index and a code cannot.",
+      "A console line for every successful map: it would name a tab before the app has one and sit under the site's own line with different numbers (the plan review's M4).",
+      "Marking which expectations only unpublished pages address: not in this release (Russell, 2026-11-12). Counting it is free; it would add a sixth visual state to a map read as one colour per cell."
+    ]
+  },
   "siteHealth": {
     "note": "What the toolchain checks about a course's folders before it builds, and the WORDS a teacher reads when one of them is wrong. Certain folder and file names carry behaviour — the curriculum folder, the folder holding class pages, Media, a section's index — and nothing stopped a teacher deleting or renaming one in Obsidian. The features then failed SILENTLY: the Curriculum Coverage map in particular still rendered, still looked healthy, and was wrong.",
     "whereItRuns": "Inside build_site.py, after the shared and per-section folders have been merged into content/ and BEFORE Quartz builds or anything is uploaded. It has to run there rather than in the apps: every check is defined over the MERGED tree, which does not exist until the build makes it, and a check that only guarded the GUI button would be bypassed by the assistant, by `Plantoir --mcp-stdio`, by the launchers, and by the scheduled deploy — which runs from launchd or Task Scheduler with the app CLOSED, and is the case that matters most. TWO checks are the exception, said from the SITE's build instead: runnableCodeShownAsPlainCode (#567) and quizzesReadDifferently (#644), because the disagreement each names exists only once Quartz has parsed the page - runnableCodeShownAsPlainCode's `why` says how, and why not after the build; both are said by the same emitter, in one call.",

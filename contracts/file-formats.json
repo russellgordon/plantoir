@@ -1546,6 +1546,38 @@
     "writtenBy": "the build, in a preview and a publish alike, immediately before Quartz runs - after every pass that adds or removes a page - atomically (a temporary file renamed into place). A failure to write it never fails a build. Never written into public/, so no deploy uploads it.",
     "why": "Only the build knows which file made a page: a section's page that replaced a shared one, a folder's _index and the names Quartz slugs cannot be worked back from an address."
   },
+  "coverageTabMap": {
+    "note": "GitHub #793. The record of the map Plantoir shows on a section's Coverage tab: the section's curriculum coverage map as it would be if every existing page were published (shared-rules.json -> coverageTab says what counts and what the page says). The app reads this, never the HTML, to know which page to show, how old it is, and which file a click on a code opens.",
+    "path": "<the section's built output>/.coverage-tab/about.json, beside public/, .page-sources.json and .problems.json and never inside public/ - <CODE>/.merged_output/section<N>/.coverage-tab/ on macOS (a link to ~/Library/Application Support/Plantoir/builds/<folder id>/<CODE>/section<N>/), PLANTOIR_BUILD_ROOT/<CODE>/section<N>/.coverage-tab/ on Windows. The page it names is map-<buildId>.html in the same folder.",
+    "keys": {
+      "version": "1 - a reader treats any other version, or a record it cannot read, as no map",
+      "course": "the course folder's name",
+      "section": "N",
+      "buildId": "the build that wrote it, the one in every link on the page (shared-rules.json -> coverageTab.link): a click naming another build id is a click on an older page than this record, and opens nothing",
+      "startedNs": "when that build STARTED, in nanoseconds since 1970: the modification time of the build's own .build-started.pending marker (contracts/app-rules.json -> buildFreshness.buildStartedMarker), the filesystem's clock that a teacher's Save is stamped with. null when the marker could not be made, and then the map is always to be said possibly out of date",
+      "startedAt": "the same instant in UTC, 2026-11-12T19:04:05Z, for a person reading the file; null with startedNs. A reader compares startedNs, never this",
+      "occasion": "preview or deploy: which kind of build wrote it (deploy for a deploy's build and a build-only run)",
+      "siteMapSwitchedOn": "whether the section's WEBSITE has its coverage map switched on (include_curriculum_coverage). The map here is written either way (Russell's ruling, 2026-11-12); the page's last paragraph says which",
+      "page": "the file name of the page, map-<buildId>.html, or null when there is no map (no curriculum folder holds an expectation page)",
+      "hiddenPagesCounted": "how many different pages that address an expectation on any map students cannot see yet (shared-rules.json -> coverageTab.hiddenPagesCounted)",
+      "unreadablePagesLeftOut": "how many pages in this build had settings that could not be read, all of them left out of the count (coverageTab.unreadablePages)",
+      "maps": "one entry per map on the page, in the page's order (primary first, as the site plans them), [] when there is none"
+    },
+    "mapKeys": {
+      "title": "the map's title, the site's own for that folder (curriculumRules.coveragePageTitles)",
+      "folder": "the curriculum folder's name",
+      "expectations": "how many specific expectations it shows",
+      "notYetAddressed": "how many of them no page would address",
+      "addressedOnce": "how many exactly one page would address",
+      "overallWithoutAssessedWork": "how many overall expectations no assessed work would address",
+      "pages": "{code: file}: for each specific and overall expectation whose page the build can name, that page as a POSIX path below the course folder with its .md (build_site._vault_relative_source). A click on code opens maps[map].pages[code], and only after the app has checked it is still a file inside the course folder. A code missing here is drawn with no link"
+    },
+    "orderOfWriting": "The page first (a hidden temporary file renamed into place), then about.json (likewise), then every other build's map-<id>.html pages and half-written temporaries (.map-<id>.html.<pid>.tmp, .about.json.<id>.tmp) removed one by one by name, never the page about.json names as it stands at that moment. Only the build that owns the section's .build-id does this: .build-id is written as each build STARTS, so it names the last build to start, and that build's map is the one that belongs. A build that no longer owns .build-id when it comes to write its record (another build of the section started after it) leaves about.json and the other build's files alone and removes only its own page. Build ids are compared for equality only and never ordered, because they come from a clock that can be set back (the fix review's M1). A temporary is removed by the build that made it when its write fails. A reader of about.json therefore always finds the page it names, and must still treat a named page that is missing as no map (shared-rules.json -> coverageTab.mapOfThisBuild). With no map, about.json says page null and maps [], and every map-*.html is removed, so a stale map can never outlive the course's curriculum.",
+    "writtenBy": "the build, on EVERY build of the section (a preview, a deploy's build, a build-only run), whatever the section's coverage-map setting says, before the section's problems record is written and so before its PLANTOIR_PROBLEMS: line. A failure to write it never fails a build: one warning line (shared-rules.json -> coverageTab.consoleWords.couldNotMake), and the last map and its record stay, carrying the EARLIER build's buildId. So that line arriving means the map step ran, not that it succeeded: the map is this build's only when buildId here equals the build's own (the buildId of its PLANTOIR_PROBLEMS: line, and .build-id) - coverageTab.mapOfThisBuild.",
+    "whyNotPublished": "Deploys send public/ and nothing else (deploy.py hands section/public to wrangler and to the Netlify manifest; deploy.sh's folder publish copies public/), Quartz reads only the build's content/ folder, nothing in content/ links to it, and the folder's name starts with a dot, so the change walks (#768) skip it. scripts/test_coverage_tab.py proves each.",
+    "clearedBy": "Every build replaces it. The launchers' clearing of a course's built output (a course with no link, a wrong link, archived, restored or replaced: link_course_build_output) removes it with the site, deliberately (#789 keeps only .geogebra-cache through that clear): a restored course's map could describe pages that are gone. Removing a section or course removes it with the builds folder.",
+    "reusedBuild": "A deploy that reuses the last build (#768) runs no Python, so this record and its page stay exactly as the last build that ran left them, startedNs included. Nothing re-dates them."
+  },
   "workLease": {
     "note": "A work lease: a file saying which process is doing what, so other windows, other copies of Plantoir and outside assistants leave that work alone. Windows' WorkLease (Plantoir.Core/Assist/WorkLease.cs) set the shape; the mac matches it and adds a fourth line. The rules a reader applies are shared-rules.json -> workLeases. #245 wrote this block for the import's lease; #156 filled in the kinds it writes (build, preview, publish) here rather than a second block. Which leases stand in the way of what is shared-rules.json -> workLeases.declining.",
     "directory": "courses/.internal/activity/ inside the working folder. Written outside the thing it is about on purpose: removing a staging folder must not remove the claim to it.",
