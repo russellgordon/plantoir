@@ -3720,6 +3720,25 @@ with that refusal turned off.
 | `python3 scripts/deploy.py …` | `deploy.py`, first thing in `main()` |
 | `verify-deploy.sh` / `.ps1` | inherits the two launchers' |
 
+### A deploy already set is turned off, so there is nothing to Cancel
+
+A deploy set before the course became one (or arriving with a hand-edited
+marker, or from another machine) is turned off when the working folder is
+READ — `scheduledDeployCancellation`, "a course kept for reference is met when
+the working folder is read" — and the trail gets `scheduled deploy turned off`
+for each section. The mac does it in `ReferenceCourseUpkeep` through
+`ScheduledDeployCleanup` (`Reason.theCourseIsKeptForReference`); Windows in
+`ReferenceCourseUpkeep.BringUpToDate` since #241. The row "already on disk,
+firing" above is the backstop for a task the read has not reached.
+
+So **neither platform offers Cancel Scheduled Deploy… on a reference
+section**: the menu bar greys it (`subjectMenus`), and since #527 (2026-11-13)
+Windows' sidebar row leaves it out too, as the mac's always did. Until then
+the Windows row kept it, on the stale belief that Windows did not turn such a
+deploy off by itself and the row was the only way to stop one. What was
+checked before it went, state by state, is in `12-windows-app.md` → "Menus,
+the Section menu's functions and #475 on Windows".
+
 ### Why door 12 needs the SHELL and not only `deploy.py`
 
 The folder destination does its work with `rsync` **on the host** and `exit 0`s

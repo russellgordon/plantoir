@@ -47,7 +47,7 @@ public class ScheduledDeployCancellationTests : IDisposable
     private static readonly Dictionary<string, string> PlayedBy = new()
     {
         ["a course kept for reference is met when the working folder is read"] =
-            "NOT PLAYED: this app keeps no course for reference yet (#241). The run refuses one (keptForReference), which is the backstop.",
+            "ReferenceRefusalTests.ReadingTheFolderTurnsOffAReferenceCoursesDeploy",
         ["remove one section of a course that has more than one"] = nameof(RemovingOneSectionTurnsOffThatSectionOnly),
         ["remove a whole course"] = nameof(RemovingACourseTurnsOffEveryDeployThisFolderHasForItAskedOfTheScheduler),
         ["remove the only section of a course"] = nameof(RemovingACourseTurnsOffEveryDeployThisFolderHasForItAskedOfTheScheduler),
