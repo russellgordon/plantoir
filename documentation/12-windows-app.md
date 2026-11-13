@@ -2069,8 +2069,18 @@ among them), #826 (3), #827 (11), #828 (23), #854 (10, #835's first part).
 **Each piece deletes its own entries when it lands; the ledger fails,
 naming the entry, the moment a held thing exists here.**
 
-It also wired eleven more lists into the ledger, each in one of three
-shapes. Every other key of a hooked list is asserted exactly as before.
+It also wired twelve more lists into the ledger (twelve new area constants
+in `NamedGapLedger.cs`, the rows below), each in one of three shapes. Every
+other key of a hooked list is asserted as before, with three measured
+exceptions: `TheWindowLiftsTheLaunchersLine…` counts its cases as at least
+six rather than exactly four (every case is still walked);
+`ReferenceImportTests.EverySentenceIsTheContracts` compares at least 25 (the
+26 of before less the held `explanation`); and a held row that merely has to
+FAIL can fail for a second reason unseen until its piece lands — narrowed
+where the test can tell: a held prompt must match no request, a held
+deploy-guard row must be "allowed here", a held launcher sentence or trail
+row must be absent from the launcher altogether, and the held workspace
+answer must be today's sentence by key.
 
 | Area (`NamedGapLedger` constant) | Shape | Read by |
 |---|---|---|
@@ -2099,12 +2109,18 @@ naming it), and fails a held row it never reported. A deploy-guard row is held
 only as "refused there, not refused at all here": refused by the wrong `who`
 is an ordinary failure, held or not. With the variable unset — a run by hand —
 nothing is held and every row reports as before. Neither held line contains
-the word the test looks for (`FAIL`).
+the word the test looks for (`FAIL`). A held launcher SENTENCE or trail row
+is held only while the line's words after its last slot appear nowhere in
+that launcher: written there but printed some other way, it fails.
 
 **Proved** by mutation, one run over the hooked tests each: an entry for a key
-that exists here failed all 13 areas with the closed message; an entry for a
-key the contract lacks failed all 14 with the withdrawn message; taking every
-step-0 entry out brought back all 18 reds. The mechanism stays proved on
+that exists here failed 13 areas with the closed message (the eleven new
+areas other than `AssistWordingSaidDifferently`, whose closed case is proved
+on made-up entries below, plus the two older areas
+`ActivityTrailEvents` and `AssistWordingKeys`); an entry for a key the
+contract lacks failed 14 with the withdrawn message (the twelve new areas and
+those two older ones); taking every step-0 entry out brought back all 18 C#
+reds. The mechanism stays proved on
 made-up entries whatever the ledger holds: `NamedGapLedgerTests.
 ACollectedHookHoldsWhileMissingAndFailsOnceItExistsOrIsWithdrawn` and
 `AHeldSentenceMustStillDifferAndIsWithdrawnWithItsKey`, and

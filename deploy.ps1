@@ -386,7 +386,7 @@ function Get-SavedDestinations([string]$Text, [string]$Course) {
     # carriage return or a line break in a kind or a path becomes a space
     # there, and here too (#788: the kind kept them until 1.9.3).
     $kind = ([string]$pair[0]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
-    $path =([string]$pair[1]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
+    $path = ([string]$pair[1]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
     $words = 'Netlify'
     if ($kind -ceq 'cloudflare_pages') { $words = 'Cloudflare Pages' }
     elseif ($kind -ceq 'local_folder') { $words = 'a folder on this computer' }

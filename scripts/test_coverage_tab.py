@@ -335,13 +335,17 @@ class TheTwoPanelsAreOnePanel(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "base.scss"
             path.write_text("body { color: red; }\n", encoding="utf-8")
-            # Hashed with CRLF read as LF: on Windows Python's text mode writes
-            # every "\n" of the stylesheet as "\r\n" (here and in the product,
-            # write_text), which changes the bytes and not the stylesheet
-            # (step 0 of v2.0.0). On the mac and in the container nothing is
-            # translated, so this is the very hash it always was.
+            # On Windows only, hashed with CRLF read as LF: Python's text mode
+            # there writes every "\n" of the stylesheet as "\r\n" (here and in
+            # the product, write_text), which changes the bytes and not the
+            # stylesheet (step 0 of v2.0.0). On the mac and in the container
+            # the raw bytes are hashed, as they always were, so a CR the
+            # product started writing there would still be caught.
             def lf_hash():
-                return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+                data = path.read_bytes()
+                if os.name == "nt":
+                    data = data.replace(b"\r\n", b"\n")
+                return hashlib.sha256(data).hexdigest()
             with redirect_stdout(io.StringIO()):
                 build_site.append_coverage_styles(path)
                 first = lf_hash()

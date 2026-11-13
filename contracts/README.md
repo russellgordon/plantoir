@@ -266,7 +266,7 @@ version and passes with entries left. **Since 2026-11-13 the ledger holds 86
 entries, every one on v2.0.0** — step 0 of the Windows v2.0.0 run
 ([#787](https://github.com/russellgordon/plantoir/issues/787)) held open
 every red the mac's v2.0.0 work brought that a later piece of the same run
-builds, each against its own open `windows` issue, and wired eleven more
+builds, each against its own open `windows` issue, and wired twelve more
 lists into the ledger, the launcher runner's rows among them
 (`documentation/12-windows-app.md` → "Step 0 of v2.0.0: what the ledger
 holds and how each entry ends"). It was empty from 2026-11-10 to then

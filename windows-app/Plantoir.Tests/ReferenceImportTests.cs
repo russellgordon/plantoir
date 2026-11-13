@@ -56,7 +56,9 @@ public class ReferenceImportTests : IDisposable
             compared++;
         }
         // 26 said here when the floor was set; the held explanation is one of
-        // them, so the floor counts the compared and the held together.
+        // them, so 25 are still compared, and the compared and the held
+        // together still reach the old floor.
+        Assert.True(compared >= 25, $"only {compared} compared");
         Assert.True(compared + deferred.Count >= 26, $"only {compared}, and {deferred.Count} held");
     }
 

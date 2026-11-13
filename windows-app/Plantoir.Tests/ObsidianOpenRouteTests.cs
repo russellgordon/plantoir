@@ -48,6 +48,8 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         /// <summary>When set, the offer waits for this before answering (a question left up).</summary>
         public Task? OfferAnsweredWhen;
         public readonly List<string?> PagesAskedAbout = new();
+        /// <summary>The state each offer was handed, which is what its words say (#815).</summary>
+        public readonly List<ObsidianFigureAddOnsOffer.CourseOpenState> OfferedStates = new();
         public readonly List<string> Asked = new();
         public string? Carried;
         public string? Defaults;
@@ -77,6 +79,7 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         public async Task<ObsidianFigureAddOnsTrail.Answered> AskOfferAsync(ObsidianAddOnsRequest request)
         {
             Asked.Add(request.CourseIsOpen ? "offer while open" : "offer");
+            OfferedStates.Add(request.OpenState);
             PagesAskedAbout.Add(request.Page);
             WhileOfferIsUp?.Invoke();
             if (OfferAnsweredWhen is not null) await OfferAnsweredWhen;
@@ -175,6 +178,36 @@ public sealed class ObsidianOpenRouteTests : IDisposable
         Assert.True(Added(course));
         Assert.Contains(ObsidianFigureAddOnsTrail.Offered("MPM2D", ObsidianFigureAddOnsTrail.Answered.AddThem), TrailText);
         Assert.Contains("MPM2D · Obsidian add-ons for diagrams and graphs (at Open in Obsidian): Functionplot 1.2.1 added", TrailText);
+    }
+
+    /// <summary>
+    /// #815: the offer is handed the state the route READ, so its words are
+    /// the right ones: open when the list marks the course open, cannot tell
+    /// when a list is there and cannot be read, closed when there is no list
+    /// at all. Cannot tell still goes the reopen way; no list writes the
+    /// add-ons and opens the course without closing Obsidian.
+    /// </summary>
+    [Fact]
+    public async Task TheOfferIsHandedTheStateTheRouteRead()
+    {
+        var cases = new (string Name, Func<Course, string?> Registry, ObsidianFigureAddOnsOffer.CourseOpenState Expected, bool Quits)[]
+        {
+            ("marked open", OpenRegistry, ObsidianFigureAddOnsOffer.CourseOpenState.Open, true),
+            ("a list that cannot be read", _ => "", ObsidianFigureAddOnsOffer.CourseOpenState.CannotTell, true),
+            ("no list at all", _ => null, ObsidianFigureAddOnsOffer.CourseOpenState.Closed, false),
+        };
+        foreach (var c in cases)
+        {
+            ObsidianFigureAddOnsThisRun.Forget();
+            var (world, course, route) = Make();
+            world.Running = true;
+            world.Registry = c.Registry(course);
+            await route.OpenAsync(course, course.DirectoryPath);
+            Assert.True(new[] { c.Expected }.SequenceEqual(world.OfferedStates), $"{c.Name}: offered {string.Join(", ", world.OfferedStates)}");
+            Assert.True(c.Quits == world.Asked.Contains("quit"), $"{c.Name}: {string.Join(", ", world.Asked)}");
+            Assert.True(Added(course), $"{c.Name}: the add-ons were not added");
+            Directory.Delete(course.DirectoryPath, recursive: true);
+        }
     }
 
     // Step 6: Not Now asks no more this run; Not Now with don't ask again stores no.

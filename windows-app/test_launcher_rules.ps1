@@ -430,12 +430,18 @@ foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
     foreach ($sentence in $deployGuard.sentences.launcher.PSObject.Properties) {
         $lines = @($sentence.Value)
         $first = $lines[0].Replace($crossText + ' ', '{0} ').Replace('{course}', '{1}').Replace('{section}', '{2}')
-        Report "deployWhileItsSectionDeploys.sentences/$launcher" $sentence.Name ($source.Contains('Write-Host ("' + $first + '" -f $cross, $Course, $Section)')) "does not print '$first' word for word"
+        # A held row (a named gap) is held only while the sentence is not in
+        # the launcher at all: its words after the last slot appear nowhere.
+        # A sentence that is there and printed some other way is a failure.
+        $words = $first.Substring($first.LastIndexOf('}') + 1)
+        Report "deployWhileItsSectionDeploys.sentences/$launcher" $sentence.Name ($source.Contains('Write-Host ("' + $first + '" -f $cross, $Course, $Section)')) "does not print '$first' word for word" (-not $source.Contains($words))
         Report "deployWhileItsSectionDeploys.sentences/$launcher" ($sentence.Name + ' (second line)') ($source.Contains('Write-Host "' + $lines[1] + '"')) "does not print '$($lines[1])'"
     }
     foreach ($field in @('launcherLineWhenALaterDeployIsStillWorking', 'launcherLineWhenItsSectionIsAlreadyBeingDeployed')) {
         $format = ([string]$declined.$field).Replace('{course}', '{0}').Replace('{section}', '{1}').Replace($dotText, '{2}').Replace('{leg}', '{3}').Replace($dashText, '{4}')
-        Report "activityTrail/$launcher" $field ($source.Contains('Write-TrailLine ("' + $format + '" -f $Course, $Section, $dot, $Leg, $dash)')) "does not record '$format'"
+        # Held only while the line's words after its last slot appear nowhere in the launcher.
+        $words = $format.Substring($format.LastIndexOf('}') + 1)
+        Report "activityTrail/$launcher" $field ($source.Contains('Write-TrailLine ("' + $format + '" -f $Course, $Section, $dot, $Leg, $dash)')) "does not record '$format'" (-not $source.Contains($words))
     }
 }
 # #386's line and #286's, which preview.ps1 alone writes, with the dash the
