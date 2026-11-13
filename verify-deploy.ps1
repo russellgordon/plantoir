@@ -141,6 +141,11 @@ $script:CfWaited = -1
 # other checks' helpers below because -SelfTest needs it before the preflight.
 $script:Curl = Join-Path $env:SystemRoot "System32\curl.exe"
 $script:Measured = @()
+# Any line saying a deploy builds first (#749, #799): deploy.ps1's four first
+# lines, and deploy.py's own rebuilds for Netlify and Cloudflare.
+$script:BuiltAgainLines = 'Plantoir has been updated since this site was built|Rebuilding it before it is deployed|Something in this course has changed since its site was last built|last build is dated later than now|Rebuilding site for production|Updating Quartz baseUrl|rebuilding for production'
+$script:Page799 = $null
+$script:TrailDir799 = $null
 
 # Called the moment a Cloudflare leg returns, because in a pairing the next
 # leg can rebuild the section before production is judged. Keeps a copy of
@@ -1660,12 +1665,71 @@ if (-not (Test-Path -LiteralPath $styleFile)) {
     $sameVersion = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-same-version.log")
     $sameSeconds = [int]$clock.Elapsed.TotalSeconds
     if ($sameVersion.ExitCode -eq 0) { Ok "the next publish exited 0" } else { No "the next publish exited $($sameVersion.ExitCode)" }
-    if ($sameVersion.Log -match 'Plantoir has been updated since this site was built|Rebuilding it before it is deployed') { No "the next publish built again although nothing had changed" }
+    if ($sameVersion.Log -match $script:BuiltAgainLines) { No "the next publish built again although nothing had changed" }
     else { Ok "the next publish, with nothing changed, did not build again" }
     $script:Measured += "A folder publish after a new version (#749): $rebuildSeconds s with the rebuild, then $sameSeconds s with nothing changed"
     Restore-Stylesheet
     Ok "tasks.scss put back as it was"
 }
+
+# ---------- a deploy reuses the last build only when nothing changed (#799)
+# The mac's #768 on Windows, offline, as verify.sh's #768 proof: a folder
+# deploy with nothing changed builds nothing and leaves the deployed files
+# byte for byte; a page added builds once, deploys the page and writes ONE
+# "site built again before deploying" line with the pages words; that page
+# deleted builds once and it is gone from the folder (#741); the next deploy
+# builds nothing. The trail is this run's own (PLANTOIR_TRAIL_DIR), never the
+# teacher's. The page is put away on every exit path.
+Hdr "A deploy reuses the last build only when nothing has changed (#799)"
+$script:TrailDir799 = Join-Path $work "trail-799"
+$script:TrailDirBefore799 = $env:PLANTOIR_TRAIL_DIR
+$env:PLANTOIR_TRAIL_DIR = $script:TrailDir799
+$trail799 = Join-Path $script:TrailDir799 "activity.txt"
+function Get-BuiltAgain799 { if (Test-Path -LiteralPath $trail799) { @(Get-Content -LiteralPath $trail799 -Encoding UTF8 | Where-Object { $_ -like "*$Course/$Section *before deploying it*" }) } else { @() } }
+function Get-FolderManifest799([string]$Dir) {
+    @(Get-ChildItem -LiteralPath $Dir -Recurse -File -Force | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Dir.Length) + ' ' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join "`n"
+}
+function Find-Mark799([string]$Dir, [string]$Mark) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Recurse -File -Filter *.html -Force)) { if ([IO.File]::ReadAllText($f.FullName).Contains($Mark)) { return $true } }
+    return $false
+}
+$sectionOut = Join-Path $folderTarget "section$Section"
+$page799Mark = "plantoir-verify-799-" + $script:RunMark.Replace(' ', '-').Replace(':', '-')
+$script:Page799 = Join-Path (Split-Path -Parent $runnerPage) "Plantoir verify 799.md"
+Set-Destination -Primary "local_folder" -FolderPath $folderTarget
+# Settled first: the stylesheet just put back is a toolchain change of its own.
+$settle = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-799-settle.log")
+if ($settle.ExitCode -ne 0) { No "the settling deploy exited $($settle.ExitCode)" }
+$manifestBefore = Get-FolderManifest799 $sectionOut
+$linesBefore = @(Get-BuiltAgain799).Count
+$clock = [Diagnostics.Stopwatch]::StartNew()
+$unchanged = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-799-unchanged.log")
+$unchangedSeconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
+if ($unchanged.ExitCode -eq 0 -and $unchanged.Log -notmatch $script:BuiltAgainLines) { Ok "a deploy with nothing changed did not build ($unchangedSeconds s)" }
+else { No "a deploy with nothing changed built again or failed (exit $($unchanged.ExitCode))" }
+if ((Get-FolderManifest799 $sectionOut) -ceq $manifestBefore) { Ok "and the deployed files are byte for byte as they were" } else { No "the deployed files changed although nothing had" }
+if (@(Get-BuiltAgain799).Count -eq $linesBefore) { Ok "and it wrote no 'built again' line" } else { No "a deploy that built nothing wrote a 'built again' line" }
+[IO.File]::WriteAllText($script:Page799, "---`npublish: true`n---`n`n$page799Mark`n", $script:NoBom)
+$clock = [Diagnostics.Stopwatch]::StartNew()
+$added = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-799-added.log")
+$addedSeconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
+$newLines = @(Get-BuiltAgain799 | Select-Object -Skip $linesBefore)
+if ($added.ExitCode -eq 0 -and $added.Log -match 'Something in this course has changed since its site was last built') { Ok "a page added: it said the site would be built again, and why ($addedSeconds s)" }
+else { No "a page added: it did not say it was building for the pages (exit $($added.ExitCode))" }
+if (Find-Mark799 $sectionOut $page799Mark) { Ok "the added page was deployed" } else { No "the added page did not reach the folder" }
+if ($newLines.Count -eq 1 -and $newLines[0] -like '*something in the course had changed since it was last built') { Ok "one 'built again' line, with the pages words" } else { No "the trail has $($newLines.Count) 'built again' lines for one build: $($newLines -join ' / ')" }
+Remove-Item -LiteralPath $script:Page799 -Force
+$clock = [Diagnostics.Stopwatch]::StartNew()
+$deleted = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-799-deleted.log")
+$deletedSeconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
+if ($deleted.ExitCode -eq 0 -and $deleted.Log -match 'Something in this course has changed since its site was last built') { Ok "the page deleted: it built again ($deletedSeconds s)" } else { No "the page deleted: it did not build again (exit $($deleted.ExitCode)) - the deleted page would stay on the site (#741)" }
+if (-not (Find-Mark799 $sectionOut $page799Mark)) { Ok "the deleted page is gone from the folder" } else { No "the deleted page is still in the deployed folder (#741)" }
+$clock = [Diagnostics.Stopwatch]::StartNew()
+$after = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Section", "--to-folder", $folderTarget) -LogFile (Join-Path $work "deploy-799-after.log")
+$afterSeconds = [math]::Round($clock.Elapsed.TotalSeconds, 1)
+if ($after.ExitCode -eq 0 -and $after.Log -notmatch $script:BuiltAgainLines) { Ok "the deploy after that built nothing ($afterSeconds s)" } else { No "the deploy after that built again although nothing had changed (exit $($after.ExitCode))" }
+$script:Measured += "A folder deploy (#799): nothing changed $unchangedSeconds s; a page added $addedSeconds s with the build; deleted $deletedSeconds s with the build; then $afterSeconds s with nothing changed"
+$env:PLANTOIR_TRAIL_DIR = $script:TrailDirBefore799
 
 # --------------- the course's own destinations, nothing typed (#739, offline)
 # A deploy given neither --target nor --to-folder reads the course's settings
@@ -1690,6 +1754,22 @@ $failedFirst = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Sect
 if ($failedFirst.ExitCode -eq 1) { Ok "a run whose first leg failed ends with that leg's code (1)" } else { No "a run whose first leg failed exited $($failedFirst.ExitCode), not 1" }
 Check-Folder "the leg after a failed one" (Join-Path $folderB "section$Section")
 
+# #799: the same site deployed again straight after, nothing changed, must
+# build nothing. Before #799 every Netlify and Cloudflare deploy here rebuilt:
+# deploy.py looked for the build in /tmp/quartz-builds, a folder Windows does
+# not use (55 to 66 s on the Lenovo 20QES70500). With -FirstPublish the first
+# deploy makes the course's hidden site records at its top, which changes the
+# course folder's own time, so the next deploy builds ONCE by the contract's
+# knownLimits; that run is measured, not asserted.
+function Check-DeployedAgainUnchanged([string]$Name, [string]$Target) {
+    $again = Measure-Deploy "$Name, the same site again, nothing changed (#799)" "deploy.bat" @($Course, "$Section", "--target", $Target) (Join-Path $work "deploy-$Target-again.log")
+    $built = $again.Log -match $script:BuiltAgainLines
+    if ($again.ExitCode -ne 0) { No "a second $Name deploy exited $($again.ExitCode)" }
+    elseif ($FirstPublish) { $script:Measured += "$Name, the same site again after a FIRST publish: built again $built (the site records made at the course's top, knownLimits)"; Ok "a second $Name deploy after a first publish exited 0" }
+    elseif ($built) { No "a second $Name deploy with nothing changed built again" }
+    else { Ok "a second $Name deploy with nothing changed built nothing" }
+}
+
 Hdr "Destination 2 of 3 - Netlify"
 if ($haveNetlify) {
     Set-Destination -Primary "netlify"
@@ -1704,6 +1784,7 @@ if ($haveNetlify) {
         Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/"
         Check-PageLinks "Netlify" "$($netlifyUrl.TrimEnd('/'))/" netlify
     } else { No "no Netlify address in the output" }
+    Check-DeployedAgainUnchanged "Netlify" "netlify"
 } else { Skipped "Netlify (no credentials)" }
 
 Hdr "Destination 3 of 3 - Cloudflare Pages"
@@ -1728,6 +1809,7 @@ if ($haveCloudflare) {
         Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
         Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
     } else { No "no Cloudflare address in the output" }
+    Check-DeployedAgainUnchanged "Cloudflare" "cloudflare"
 } else { Skipped "Cloudflare Pages (no credentials)" }
 
 # ------------------------------------------------------------- the pairings
@@ -1847,6 +1929,8 @@ finally {
     Restore-Stylesheet
     Stop-AnyPreview
     Remove-RunnerPage
+    if ($script:Page799 -and (Test-Path -LiteralPath $script:Page799)) { Remove-Item -LiteralPath $script:Page799 -Force -ErrorAction SilentlyContinue }
+    if ($script:TrailDir799) { $env:PLANTOIR_TRAIL_DIR = $script:TrailDirBefore799 }
 
     # DID THIS RUN ACTUALLY FINISH? Measured the hard way: a PowerShell error
     # inside Run-Launcher ended the run after four checks, printed no Result
