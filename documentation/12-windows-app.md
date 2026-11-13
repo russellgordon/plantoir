@@ -12551,6 +12551,9 @@ move), the app's write of the settled places into the marker before it
 answers yes, the public-address warning after the tables as labelled rows
 (#834), `deploy.ps1 -ChangePassword -PasswordOnly` and the dialog after it,
 and the contract's `filterCases`, `countCases`, `startingPlace`,
-`rememberedChoices`, `warningSheet` and `changePasswordCases` run by its own
-suite. The `windows` issue for #833 lists them.
+`rememberedChoices`, `warningSheet`, `changePasswordCases` and
+`unattendedKeys` run by its own suite, and `deploy.ps1`'s
+`-SendAnswerKeysOpenly` with the launcher's rule that a newly asked password
+is kept only once a share used it. It builds on #709's Windows work (#824),
+which is still open. The `windows` issue for #833 lists them.
 
