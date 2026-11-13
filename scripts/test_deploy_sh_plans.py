@@ -82,6 +82,12 @@ docker() {
       cat "$folder/cred" >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin"
       printf %s "$folder/cred"
       return 0 ;;
+    *"mktemp -d /tmp/deploy_pat."*)
+      # The token's own hand-off (#835 F1): a private file whose NAME comes
+      # back, the shape deploy.sh's TOKEN HAND-OFF BLOCK checks for.
+      cat >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin"
+      printf %s "/tmp/deploy_pat.stubbed/pat"
+      return 0 ;;
   esac
   case " $* " in
     *" -i "*) cat >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin" ;;
