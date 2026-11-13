@@ -365,6 +365,52 @@ class TheCallSites(unittest.TestCase):
                     self.assertNotIn("being built", lines[0])
 
 
+class AScheduledDeployIsNamedAsRunning(unittest.TestCase):
+    """#835 part 1. A deploy that is only SCHEDULED holds nothing: only its
+    run, while it works, is in anybody's way. Every sentence that names it as
+    the thing in the way says that it is running, and none says "set for
+    later", which Russell read as "having a deploy scheduled stops me
+    deploying" (2026-11-13). The launchers print the contract's sentences
+    (TheLauncherCases), and the mac's tests pin the window's help and the
+    assistant's sentences to the contract, so the contract is the one place
+    to look."""
+
+    def sentences_that_name_it(self) -> dict:
+        rules = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+        wording = json.loads((REPOSITORY_ROOT / "contracts" / "assist-wording.json").read_text(encoding="utf-8"))
+        launcher = rules["deployWhileItsSectionDeploys"]["sentences"]["launcher"]
+        return {
+            "returningToASectionMidDeploy.heldElsewhere.help":
+                rules["returningToASectionMidDeploy"]["heldElsewhere"]["help"],
+            "deployWhileItsSectionDeploys.sentences.launcher.laterDeploy": launcher["laterDeploy"][0],
+            "deployWhileItsSectionDeploys.sentences.launcher.laterBuild": launcher["laterBuild"][0],
+            "launcherLineWhenALaterDeployIsStillWorking":
+                the_trail_entry()["launcherLineWhenALaterDeployIsStillWorking"],
+            "wording.courseIsBeingBuiltElsewhere": wording["wording"]["courseIsBeingBuiltElsewhere"],
+            "wording.deployRefusedWhileALaterDeployWorks": wording["wording"]["deployRefusedWhileALaterDeployWorks"],
+        }
+
+    def test_each_says_the_scheduled_deploy_is_running(self):
+        for key, sentence in self.sentences_that_name_it().items():
+            with self.subTest(key):
+                self.assertNotIn("set for later", sentence)
+                self.assertIn("scheduled deploy that", sentence)
+                self.assertTrue("is running" in sentence or "is still running" in sentence
+                                or "was still running" in sentence, sentence)
+
+    def test_the_failure_cases_follow_the_launcher(self):
+        for case in the_rule()["failureExplanationCases"]:
+            with self.subTest(case["expect"]):
+                self.assertNotIn("set for later", case["output"])
+                self.assertNotIn("set for later", case["expect"])
+
+    def test_the_launchers_print_no_set_for_later(self):
+        for name in ("deploy.sh", "preview.sh"):
+            for line in launcher_text(name).splitlines():
+                if "set for later" in line and ("echo" in line or "note_on_the_trail" in line):
+                    self.fail(f"{name} still prints: {line.strip()}")
+
+
 
 # Mac only, for TheRealPreviewUpToItsGuard's reason: the pretend ps walks the
 # REAL process table with /bin/ps -o to list this run and its ancestors.

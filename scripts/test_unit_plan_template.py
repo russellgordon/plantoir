@@ -170,7 +170,7 @@ class SheetsAreTheExampleTests(unittest.TestCase):
 
     def test_every_class_every_shipped_release_defined_still_has_a_rule(self):
         shipped = json.loads(read_text(FIXTURES / "classes-shipped.json"))["releases"]
-        self.assertIn("1.10.0", shipped)
+        self.assertIn("2.0.0", shipped)
         for release, sheets in shipped.items():
             for sheet, classes in sheets.items():
                 defined = defined_classes(read_text(TEMPLATE / "assets" / sheet))
@@ -271,6 +271,27 @@ class PagesTests(unittest.TestCase):
             for target in re.findall(r'url\("([^"]+)"\)', text):
                 with self.subTest(sheet=sheet, url=target):
                     self.assertTrue((TEMPLATE / "assets" / target).is_file())
+
+    def test_every_answer_key_the_template_links_is_in_the_answer_keys_folder(self):
+        """#833: the example plan, its commented patterns included, links every
+        answer key inside the unit's Answer Keys folder, never in pdfs/."""
+        import os
+        import sys as _sys
+        os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY / "contracts"))
+        os.environ.setdefault("PLANTOIR_SUPPORT_DIR", str(REPOSITORY / "support"))
+        _sys.path.insert(0, str(REPOSITORY / "scripts"))
+        import unit_plan_site
+        found = 0
+        for page in PAGES:
+            text = read_text(TEMPLATE / page)
+            for target in re.findall(r'href="([^"#]+\.pdf)"', text):
+                name = unquote(target).rsplit("/", 1)[-1]
+                if unit_plan_site.is_answer_key(name):
+                    found += 1
+                    with self.subTest(page=page, link=target):
+                        self.assertTrue(unit_plan_site.in_answer_keys_folder(unquote(target)),
+                                        f"{page} links the answer key {target} outside Answer Keys/")
+        self.assertGreater(found, 0, "the example plan should show where an answer key goes")
 
     def test_every_class_a_page_uses_has_a_rule_in_its_sheet(self):
         for page, sheet in PAGES.items():

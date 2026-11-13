@@ -9,7 +9,8 @@ import SwiftUI
 /// (`PlanSharing.markers`), never from what the bar remembers, so a share
 /// made from Terminal reads the same. The rules are contract cases:
 /// whether a share is protected (`modeCases`), when the public-address
-/// warning comes first (`warningCases`), and the launcher's arguments
+/// warning is owed (`warningCases`; since #833 it comes after the two
+/// tables, in their sheet, with their counts), and the launcher's arguments
 /// (`planShareCases`).
 struct PlanShareBar: View {
 
@@ -30,9 +31,6 @@ struct PlanShareBar: View {
 
     /// A share without a password: keep the answer keys in.
     @State var includeAnswerKeys: Bool = false
-
-    /// The choice waiting on the public-address warning.
-    @State var choiceAwaitingTheWarning: PlanSharing.Choice?
 
     /// The school year waiting on the Stop Sharing alert.
     @State var markerAwaitingStop: PlanSharing.Marker?
@@ -112,33 +110,6 @@ struct PlanShareBar: View {
             }
         )) {
             PlanShareConsoleSheet(planRunner: planRunner)
-        }
-        .alert(
-            PlanSharingWording.crawlerWarningTitle,
-            isPresented: Binding(
-                get: { choiceAwaitingTheWarning != nil },
-                set: { (showing: Bool) in
-                    if !showing {
-                        choiceAwaitingTheWarning = nil
-                    }
-                }
-            )
-        ) {
-            // Destructive, so Return presses neither button and Escape is
-            // Cancel (#832): until then Share Without a Password took
-            // Return, and an address shared by a stray Return cannot be
-            // taken back from a crawler. `QuestionKeysTests` measures it.
-            Button(PlanSharingWording.shareAnyway, role: .destructive) {
-                if let choice = choiceAwaitingTheWarning {
-                    choiceAwaitingTheWarning = nil
-                    start(choice)
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                choiceAwaitingTheWarning = nil
-            }
-        } message: {
-            Text(PlanSharing.crawlerWarning(includingAnswerKeys: includeAnswerKeys))
         }
         .alert(
             stopTitle,
@@ -304,6 +275,12 @@ struct PlanShareBar: View {
             Text(PlanSharingWording.openToAnyone)
                 .font(.callout)
         }
+        if PlanSharing.showsNewPasswordWaiting(marker) {
+            // Said in words on the bar, never in a tooltip only (#833).
+            Text(PlanSharingWording.newPasswordNotInUse)
+                .font(.callout)
+                .accessibilityIdentifier("planShareNewPasswordWaiting")
+        }
         if PlanSharing.showsOldCopies(marker) {
             Text(PlanSharingWording.oldCopyStillThere)
                 .font(.callout)
@@ -323,7 +300,7 @@ struct PlanShareBar: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                 if PlanSharing.barStatus(for: marker) == .stopping || PlanSharing.barStatus(for: marker) == .unfinished
-                    || PlanSharing.showsOldCopies(marker) {
+                    || PlanSharing.showsOldCopies(marker) || PlanSharing.showsNewPasswordWaiting(marker) {
                     statusLines(marker)
                 }
             }
@@ -341,27 +318,26 @@ struct PlanShareBar: View {
         markers = PlanSharing.markers(courseDirectory: course.directoryURL)
     }
 
-    /// A choice, with the public-address warning first when it is owed.
+    /// A choice. The public-address warning, when it is owed, comes after
+    /// the two tables, in their sheet, so it can say what goes (#833, #834).
     func choose(_ choice: PlanSharing.Choice) {
         var asked: Bool?
         if let marker = current {
             asked = marker.askedForProtection
         }
-        if PlanSharing.warns(markerAskedForProtection: asked, choice: choice) {
-            choiceAwaitingTheWarning = choice
-            return
-        }
-        start(choice)
+        start(choice, warns: PlanSharing.warns(markerAskedForProtection: asked, choice: choice))
     }
 
-    func start(_ choice: PlanSharing.Choice, year: Int? = nil) {
+    func start(_ choice: PlanSharing.Choice, year: Int? = nil, warns: Bool = false) {
+        planRunner.earlierYearShared = !earlierYears.isEmpty
         planRunner.start(
             course: course,
             folder: folder,
             choice: choice,
             includeAnswerKeys: includeAnswerKeys,
             year: year ?? thisYear,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
+            warns: warns
         )
     }
 }

@@ -252,10 +252,11 @@ nonisolated enum AssistWording {
     /// still working, including one ended by setting the section again
     /// (GitHub #439). Said instead of "did not finish", which would send the
     /// teacher looking for a fault. Names what is deploying, because after a
-    /// re-set the app shows only the new time. `shared-rules.json` →
-    /// `deployWhileItsSectionDeploys.sentences.assistant`.
+    /// re-set the app shows only the new time, and says it is RUNNING (#835:
+    /// a schedule that has not fired is in nobody's way). `shared-rules.json`
+    /// → `deployWhileItsSectionDeploys.sentences.assistant`.
     static func deployRefusedWhileALaterDeployWorks(course: String, section: String) -> String {
-        return "\(course) Section \(section) is still being deployed by a deploy that was set for later, "
+        return "\(course) Section \(section) is still being deployed by a scheduled deploy that is still running, "
              + "so it was not deployed again. Try again once that deploy has finished."
     }
 
@@ -457,14 +458,18 @@ nonisolated enum AssistWording {
     /// names only the course (Windows' format). Names no program: the same
     /// sentence has to be true whichever of the three is in the way, and an
     /// assistant reached from Claude Code and one reached from Codex are the
-    /// same thing to a teacher. An assistant working from another app is told
+    /// same thing to a teacher. The third is "a scheduled deploy that is
+    /// running" since #835 ("running", not "running now", because the
+    /// sentence already says "right now"): "a deploy set for later" read as
+    /// if a deploy that is only scheduled held the course, and it holds
+    /// nothing until it runs. An assistant working from another app is told
     /// `courseIsBusy` instead — it is the one talking to the program that is
     /// busy, so "busy in Plantoir" is the true sentence there.
     static func courseIsBeingBuiltElsewhere(course: String) -> String {
         return "\(course) is being previewed or deployed somewhere else on this computer right now — "
-             + "by an assistant working from another app, another copy of Plantoir, or a deploy set "
-             + "for later. Both would build the same pages in the same place, so doing it here as "
-             + "well would spoil both. Try again once that has finished."
+             + "by an assistant working from another app, another copy of Plantoir, or a scheduled "
+             + "deploy that is running. Both would build the same pages in the same place, so doing "
+             + "it here as well would spoil both. Try again once that has finished."
     }
 
     /// Said when a preview of a section was asked for while THIS copy of

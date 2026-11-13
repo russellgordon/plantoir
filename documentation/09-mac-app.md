@@ -153,7 +153,7 @@ own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
 from the source, since `SectionDetailView` cannot be mounted in a unit test —
 that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
 
-**A sixth and a seventh shipped to `dev` in v1.10.0, and were caught in the
+**A sixth and a seventh shipped to `dev` in v2.0.0, and were caught in the
 real window before the cut** (#831, #832, 2026-11-13). On a section whose last
 build made a coverage map, the Coverage tab's column was laid out **2,194**
 points tall inside a 700-point content area; on a course whose class sites go
@@ -800,7 +800,16 @@ relying on it.
   never the section, and a press on a sibling section is refused the same way.
 - The button's help and its VoiceOver hint are
   `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
-  ready still wins (`folderReadinessReason`).
+  ready still wins (`folderReadinessReason`). Its third program is "a
+  scheduled deploy that is running now" since #835 (Russell, 2026-11-13). It
+  said "a deploy set for later" until then, and he read that as "having a
+  deploy scheduled stops me deploying", which is false: a schedule that has
+  not fired takes no lease, and only its run, while it works, greys the
+  button. `wording.courseIsBeingBuiltElsewhere` says "a scheduled deploy that
+  is running" (that sentence already says "right now"), and the launchers'
+  refusal for a leftover scheduled run (`laterDeploy`, `laterBuild`) and
+  `wording.deployRefusedWhileALaterDeployWorks` say "a scheduled deploy that
+  is still running".
 - When the other program removes its lease, or its process ends, the button
   is available again with no click.
 - Another program's PREVIEW greys it too, because a press is refused for one
@@ -1280,7 +1289,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 | the buttons | Return | Escape |
 |---|---|---|
-| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v1.10.0 used for "Cancel is the default") | Cancel | **nothing** |
+| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v2.0.0 first used for "Cancel is the default") | Cancel | **nothing** |
 | a plain action, then Cancel `role: .cancel` | the action | Cancel |
 | Cancel listed first, then a plain action | the action | Cancel |
 | an action `role: .destructive`, then Cancel `role: .cancel` | nothing | Cancel |
@@ -1288,7 +1297,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
-closes the question" cannot both hold in an alert, and the v1.10.0 shape had
+closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
 test pinned the modifier, not the key. The questions now use the destructive
 row of the table: **Escape is Cancel, and Return presses neither button**, so
@@ -1297,7 +1306,9 @@ nothing. That was #832's answer for Remove Group, Start the Groups Again,
 Replace It… and the public-address warning, whose Share Without a Password
 used to take Return. **Since #834 the first three are sheets, where Cancel
 answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
-below); the public-address warning is still an alert with Escape alone.
+below), and so, since #833, is the public-address warning: it comes after
+the two tables before a share and is a `FactsQuestionSheet` too, so its
+Cancel answers Return and Escape.
 `QuestionKeysTests` presses both keys on each, through the real modifiers.
 
 **A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
@@ -4527,7 +4538,7 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
 
-**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+**Lettered parts hang, and questions are worded plainly (#754, v2.0.0).**
 Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
 c) that runs to more than one line hangs under its first word, as a
 numbered question does. `starters/Quiz.tex` gains four macros:
@@ -4565,7 +4576,7 @@ which is not in the repository and, if it was in a working folder's
 `.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
 (`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
 
-**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+**Lesson materials, and whose way of teaching (#765, v2.0.0).** Rules
 settled on 2026-11-10 while building a day's resources (a warmup, task
 cards, a summary, an exercise). The handouts skill gains section 13,
 "Lesson materials", and section 14, "Wording and contexts"; the
@@ -4723,7 +4734,7 @@ still starts with its fixture (`scripts/fixtures/unit_plan/`, CSS only,
 extracted once from the example with Russell's leave), that the tokens and
 dark blocks are identical across the two sheets, and that every class a
 shipped release defined still has a rule (`classes-shipped.json`, whose
-first entry is 1.10.0). A later release adds rules at the end of a sheet and
+first entry is 2.0.0). A later release adds rules at the end of a sheet and
 never removes or renames one, because a plan written today must keep its look.
 REJECTED: one merged sheet (it cannot equal both blocks); one sheet scoped by
 a body class (every selector rewritten and one class more specific, so the
@@ -13179,6 +13190,55 @@ never the transcript, and the server writes nothing to stdout but its
 replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
 which is why it redacts that output too (documentation/12-windows-app.md).
 
+**What a redaction fixture may hold (#844).** On 2026-11-13 GitGuardian
+emailed Russell about a "Basic Auth String exposed on GitHub" in this
+repository. It was two of #709's cases: an `Authorization: Basic` header
+whose base64 decoded to an invented username and password, and an address
+with that pair written into it, on a `pages.dev` host that does not resolve.
+Nothing real leaked and nothing needed rotating. But a scanner cannot tell
+an invented pair from a live one, and an alert nobody can tell apart from a
+real one teaches people to dismiss the next. From then on:
+
+- **No case stores a username and password pair in either shape.** A case
+  that needs one carries `assembledFrom` (`user` and `password`, words that
+  say what they are: `example-user`, `example-password`) and an `input`
+  template; the test fills `{user}`, `{password}` and `{basic}` (the base64
+  of `user:password`) before it redacts
+  (`problemReportRedaction.assembledInput`,
+  `SharedRulesContractTests.assembledRedactionInput`). The redactor is run
+  against exactly the string a browser would send, so the case is as strong
+  as before. Measured with `LogRedactor.swift` compiled on its own: with
+  `basicAuthHeader` taken out the Basic case fails, and with `urlUserinfo`
+  taken out the address comes back as
+  `https://example-user:[removed: email address]/`, which is the ordering
+  against the email rule that the case exists to prove. Read unfilled, the
+  template still fails without either rule but no longer proves that
+  ordering: with `urlUserinfo` moved after the email rule, an unfilled
+  reader stays green (measured by the review). So a third assembled case,
+  `Signed in as {user}` expecting `Signed in as example-user`, holds no
+  credential and fails any reader that does not fill the template.
+- **An address in a fixture uses a reserved example host** (`plans.example`)
+  unless the rule under test reads the host. `urlUserinfo` does not.
+- **A prefixed token** (`nfp_`, `ghp_`, `github_pat_`, `AKIA`, `xox?-`, a
+  private key block) appears only where the rule under test keys on the
+  prefix, made of an obviously invented run (the alphabet), and is named in
+  `scripts/test_no_stored_credentials.py`'s `ALLOWED` by its SHA-256 with
+  where it is and why. That test fails on any other stored pair or prefixed
+  token in a tracked file, and on an `ALLOWED` entry that no longer matches
+  anything. Unprefixed fixtures (the 40-character run `secretLength` needs,
+  `CLOUDFLARE_API_TOKEN=abc123XYZ_super-secret-value`, the JWT-shaped
+  `Bearer` value with `abc.def` for its body) are left as they are: they
+  carry no provider's prefix for a detector to key on, and the rules they
+  prove need that shape.
+
+REJECTED: rewriting history to remove the two old strings. They were never
+secrets, a rewrite gives every commit since #709 a new hash on a repository
+two platforms work from, and the scanner's alert is closed in GitGuardian
+(as a test credential, a false positive) rather than in Git. Also rejected:
+storing the base64 of the example pair, which the issue first suggested. It
+is still a stored pair to a scanner that does not read the words, and the
+test that builds it is four lines.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
@@ -13390,7 +13450,7 @@ file, which is exactly how the mac lost lines.
 
 ### One line per entry: the trail is cleaned and redacted (#780)
 
-Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+Since v2.0.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
 `ProblemReportStore.appendActivityLine` passes every line through
 `ProblemReportStore.safeTrailLine` before the append described above, which
 cleans it with `OneLineText.cleaned` (the course name's rule,
@@ -16154,23 +16214,68 @@ this is the app's half.
   `words.lastShareUnfinished` (the plans may be open), and one in state
   `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
   (`PlanSharing.barStatus`, `barCases`).
-- **Before an open share goes out** the launcher lists every file it will
-  share and every file it leaves out, by name, and asks. The app reads the
-  lists from their marker lines (`PlanShareLists`, kept out of the console)
-  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
-  scrolling, the by-name sentence, Share and Cancel with Cancel the default
-  and Escape Cancel too, by `.onExitCommand` (#832: the sheet's
-  `.interactiveDismissDisabled()` had left Escape doing nothing)
-  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
-  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **Before EVERY share (#833)** the launcher lists the plan's documents, each
+  with where it starts, and asks. The app reads one JSON marker line per
+  document (`PlanShareLists`, `PlanShareDocument`, kept out of the console)
+  and answers ONLY in `PlanShareListsSheet` (`TaskProgressView
+  .questionSurface`; fix review H1): two `NSTableView`s side by side
+  (`PlanShareDocumentTable`), Shared and Not shared, each with Name, Unit,
+  Folder, Kind and Note columns, the system's sort indicator (each table
+  sorts on its own; by unit in the plan's order, then name, at first),
+  alternating rows, type-to-select and multiple selection. **Moving a
+  document**: drag one row or several to the other table (the whole table is
+  the drop target); the chevron buttons between the tables; ⌘→ and ⌘←; or
+  the context menu's Don't Share or Share, which shows the same keys. Every
+  move is said to VoiceOver (`PlanShareAnnouncer`, an announcement request).
+  A file of a kind no share takes cannot be dragged or moved. An answer key
+  in Shared in a share with no password carries a warning symbol and words
+  in its Note, never colour alone. **Filtering**: a standard `NSSearchField`
+  (⌘F) filters both tables by name, unit and kind, with a Unit popup and
+  Answer Keys Only (a popup for a choice of one, a checkbox for yes or no);
+  the headers read "Shared (3 of 12)" while anything is hidden, and the
+  sentence by Share gives the full counts (`PlanShareTablesModel`). Cancel is
+  the default and Escape. On Share the app writes the settled places into
+  the year's marker (`PlanSharing.writeChoices`: a temporary file and
+  rename(2), every other key kept) and only then answers y; a marker it
+  cannot write is answered n.
+
+  **Why `NSTableView`.** Dragging SEVERAL selected rows and dropping on the
+  table rather than on a row are its own data-source calls, and
+  `PlanShareTablesTests.testDraggingSeveralRowsToTheOtherTableMovesThemAll`
+  drives them against two real tables and a private pasteboard. SwiftUI's
+  `Table` was rejected: multi-row drag between two tables could be proved
+  only by driving the window, which no gate allows. **Why the keys are
+  watched rather than hung on buttons:** `KeyEquivalentPlacementScanTests`
+  keeps character shortcuts off buttons in views (#457), so the search
+  field's coordinator watches its own window's key presses for ⌘F, ⌘→ and
+  ⌘← (passing ⌘→ and ⌘← through while the cursor is in a text field) and
+  removes the watcher with the field; the context menu shows the arrows so
+  the keys can be found. Not measured: the drag itself by hand, VoiceOver's
+  reading, and the sheet's look; those are for the director's look at the
+  window.
 - **A plan's password** is sent from the credential sheet exactly as typed
   (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
-- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
-  comes before a choice exactly when `PlanSharing.warns` says
-  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
-  nothing and runs nothing. Share Without a Password is the destructive
-  button, so Escape is Cancel and Return presses neither (#832: it used to
-  take Return).
+- **The warning** is owed exactly when `PlanSharing.warns` says
+  (`warningCases`), and since #833 it comes AFTER the tables: their Share
+  opens #834's `FactsQuestionSheet` with `PlanSharing.warningQuestion` (the
+  title asks, one sentence, then the rows from `PlanSharing.warningRows`, the
+  answer-key row only when a key sits in Shared): Cancel answers Return and
+  Escape and goes back to the tables. The one-
+  paragraph `crawlerWarning` and `answerKeysClause` are retired. Cancel at
+  the Stop Sharing alert writes nothing and runs nothing.
+- **Change Password** (#833, `changePasswordCases`) runs `--change-password
+  --password-only`: the console asks for the new password, nothing is
+  shared, and when the run printed `PLANTOIR_PLAN_PASSWORD_SAVED: … waiting`
+  (`ScriptRunner.planPasswordSaved`) the console sheet asks
+  `PlanSharing.newPasswordQuestion` on the same `FactsQuestionSheet`, with
+  `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
+  through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
+  and Later takes Escape. `goAheadIsTheDefault` is false for every other
+  question, which keeps Cancel on Return and Escape.
+  The bar shows `words.newPasswordNotInUse` while the marker says
+  `newPasswordWaiting`, so a relaunch, a failed share or a declined one
+  keeps it; `changePasswordNote` stays as the button's tooltip, no longer the
+  only place the fact is said.
 - **The run** is `PlanShareRunner`: `deploy.sh` with
   `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
   `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
@@ -16187,11 +16292,12 @@ this is the app's half.
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
-  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
-  Never the address, whose suffix is a line of defence, and never a username
-  or a password. The plan asked for the share line to say whether the
-  warning had been shown and the password changed; the markers do not carry
-  either, so the line does not, and that is a known gap for a later piece.
+  "unit plans shared" (since #833 with how many documents went and how many
+  were held back), "unit plan share refused", "unit plan sharing stopped",
+  and "unit plan password changed" (#833). Never the address, whose suffix
+  is a line of defence, never a file's name, and never a username or a
+  password. Whether the warning was shown is still not on the share line:
+  the marker does not carry it.
 - **A reference copy** of the course renames every year's marker aside
   (`PlanSharing.releasePlanMarkers`, called by
   `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the

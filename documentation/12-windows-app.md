@@ -837,7 +837,7 @@ read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
 only, so the UI test accepts either and says which).
 
 **Coverage, owed (#793).** The mac's section page gained a Coverage tab
-(Website | Coverage | Problems) in v1.10.0, and with it a change Windows owes
+(Website | Coverage | Problems) in v2.0.0, and with it a change Windows owes
 here too: the mac now draws only the chosen tab's content, never one over
 another, because a layered tab left the preview able to take keys and browser
 commands. Windows' collapse of the covered layers already keeps them out of the
@@ -1147,10 +1147,10 @@ line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
 splits a command line (measured) and they are characters a name might carry.
 Whether a control character belongs in a course name at all — it also reaches
 the sidebar, the title and the trail — was the follow-up, and is #780
-(v1.10.0): no, and the name is cleaned where it is READ, by
+(v2.0.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half in v1.10.0;
+Python did their half in v2.0.0;
 this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
 `windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
 lands: a course name will reach it already clean, but it also cleans the page
@@ -12566,4 +12566,24 @@ and `deployArguments.planShareCases`, the three trail events, the two
 moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
 `windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
 until done.
+
+**Since #833** the look before a share is two tables, Shared and Not
+shared, before EVERY share, protected ones too, with the Answer Keys folder
+as the rule and the names a hint (`documentation/07-deployment.md` → the
+rulings, items 4 to 8; `documentation/09-mac-app.md` → the share bar).
+Windows inherits the Python free again: the document rule, where each
+document starts, the remembered choices in the year's marker, the refusal
+of a list naming a file no share sends, the advice, `--new-password-waiting`,
+and the new marker lines. It owes the same two tables in WinUI (sortable
+columns, a search box, a Unit choice and Answer Keys Only, drag and drop of
+several rows, a move each way from the keyboard, an announcement of each
+move), the app's write of the settled places into the marker before it
+answers yes, the public-address warning after the tables as labelled rows
+(#834), `deploy.ps1 -ChangePassword -PasswordOnly` and the dialog after it,
+and the contract's `filterCases`, `countCases`, `startingPlace`,
+`rememberedChoices`, `warningSheet`, `changePasswordCases` and
+`unattendedKeys` run by its own suite, and `deploy.ps1`'s
+`-SendAnswerKeysOpenly` with the launcher's rule that a newly asked password
+is kept only once a share used it. It builds on #709's Windows work (#824),
+which is still open. The `windows` issue for #833 lists them.
 
