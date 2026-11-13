@@ -847,13 +847,59 @@ its next base bump.
 **Windows: no Debian package to floor.** It has no image, and Node
 22.23.4's bundled Brotli is the fixed one. Corrected by #719 (2026-11-11),
 which measured two things this paragraph used to deny: Pillow 12.3.0's
-FreeType has a Brotli decoder linked in statically, with no version readable,
-and the image carries the same Pillow pin, unmeasured here (#766); and
-Windows' Python 3.11.9 carried OpenSSL 3.0.13, which #764 (Windows 1.9.3)
-ended by moving that runtime to Python 3.14.10 with OpenSSL 3.5.9 (see "The
-shared scripts run on two Pythons" under the base layer above).
+FreeType has a Brotli decoder linked in statically, and the image carries
+the same Pillow pin; and Windows' Python 3.11.9 carried OpenSSL 3.0.13,
+which #764 (Windows 1.9.3) ended by moving that runtime to Python 3.14.10
+with OpenSSL 3.5.9 (see "The shared scripts run on two Pythons" under the
+base layer above). Which Brotli that Pillow carries is answered below.
 `documentation/12-windows-app.md` → "#714 on Windows" and "Python 3.14.10 in
 the runtime".
+
+### Pillow's Brotli (#766)
+
+Pillow 12.3.0's FreeType decodes WOFF2 fonts with Brotli, and #719 found
+that decoder on Windows with "no version readable". The version is
+readable on both platforms, and it is **1.2.0**:
+
+| | The image (Linux arm64) | Windows' runtime |
+|---|---|---|
+| Wheel | `pillow-12.3.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl` (Python 3.11.15) | `pillow-12.3.0-cp314-cp314-win_amd64.whl` (Python 3.14.10) |
+| How Brotli is carried | A **shared library**, not static: `pillow.libs/libbrotlidec-53ab751a.so.1.2.0` and `libbrotlicommon-f79e5820.so.1.2.0`, which `libfreetype-c6d69da6.so.6.20.6` (FreeType 2.14.3) links (`ldd`) | Static, inside `PIL/_imagingft.cp314-win_amd64.pyd` (Pillow's `winbuild/build_prepare.py` builds brotlicommon and brotlidec with `BUILD_SHARED_LIBS OFF` and FreeType with Brotli) |
+| Where 1.2.0 is read | The library's file name. The Linux wheel's LICENSE does not name Brotli | The wheel's `LICENSE`: `===== brotli-1.2.0 =====` |
+
+Both are built from Pillow 12.3.0's `.github/dependencies.json`
+(`"brotli": "1.2.0"`). The image half was **measured in
+`quartz-teacher:dev-test` and `teaching-quartz:src-d096a1f5` on 2026-11-12**
+(the same files in both); the wheels were downloaded from PyPI and matched
+its SHA-256 by the #766 plan on 2026-11-11. The Windows runtime's installed
+copy is for the Windows side to confirm (the `windows` issue from #766).
+
+CVE-2026-111497 is a buffer overflow in Brotli's decoder, triggered by a
+crafted stream, affecting 1.0.3 to 1.2.0 and fixed in 1.0.10, 1.1.1 and
+1.2.1 (Debian's tracker, read by the plan on 2026-11-11). **Pillow stays at
+12.3.0** (Russell, 2026-11-12): PyPI's newest release, 13.0.0 (2026-10-16),
+still says `brotli 1.2.0`, and Pillow's `main` took 1.2.1 on 2026-10-27,
+after it. Instead the decoder is kept away from anything Plantoir did not
+ship: FreeType runs it only for a WOFF2 font, and the card now opens only
+the TrueType files `shared-rules.json` → `socialCardFonts` lists
+([05 → The social sharing card opens only Plantoir's own fonts](05-build-pipeline.md#the-social-sharing-card-opens-only-plantoirs-own-fonts-766)).
+That was not true before #766, which the same section measures. The other
+Pillow calls in the shipped `social_card.py` open the emoji font (Debian's
+`NotoColorEmoji.ttf` or the bundled one) and draw; `Image.open` never
+reaches Brotli. `brand_images.py` and `check_picture_sizes_against_the_site.py`
+use Pillow too, and are maintainer tools that ship to no teacher.
+
+`contracts/toolchain.json` → `pins` → `pillow` records `carriesBrotli`
+(`1.2.0`) and `brotliFixedFrom` (`1.2.1`), and `verify.sh` checks the fresh
+image's `pillow.libs/libbrotlidec-*.so.<carriesBrotli>`. So the day Pillow
+is moved, that check fails until the field says which Brotli then ships.
+**Move** when a Pillow release's `.github/dependencies.json` says brotli
+1.2.1 or later. Rejected: *Pillow 13.0.0 now* (the same Brotli, for a major
+version on two platforms); *building Pillow from source against Debian's
+patched `libbrotli1`* (a compiler in the image, a longer build for every
+teacher, and no answer for Windows); *swapping Debian's `libbrotlidec.so.1`
+in under the wheel* (the vendored name is auditwheel's, and replacing a
+wheel's library is unsupported).
 
 ### Node 22 (#640, v1.9.0)
 

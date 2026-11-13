@@ -3774,12 +3774,59 @@ Two more things happen here, fresh on every build:
   it over the scaffold's `quartz/static/og-image.png`, which the site's
   head already links as its share image. No logo and no domain (Apple's
   share sheet overlays the domain itself). A failed draw prints a warning
-  and never fails the build.
+  and never fails the build. The two fonts are opened only when they are
+  ones Plantoir offers ("The social sharing card opens only Plantoir's own
+  fonts (#766)", below).
 
 Additionally, `course_config.json` itself is copied to
 `<output>/quartz/course_config.json` and the patched Explorer components'
 import paths are pointed at it — the Explorer *reads course configuration at
 site-build time* to know which folders are expandable.
+
+### The social sharing card opens only Plantoir's own fonts (#766)
+
+**Why.** Pillow 12.3.0's FreeType decodes WOFF2 fonts with Brotli 1.2.0,
+which CVE-2026-111497 affects (1.0.3 to 1.2.0, fixed in 1.2.1, as the #766
+plan read Debian's tracker on 2026-11-11), and no Pillow release carries a
+fixed Brotli yet: [02 → Pillow's Brotli](02-docker-image.md#pillows-brotli-766).
+Before #766 `social_card._font_file` joined the course's header and body
+font names onto `support/fonts/` with `.ttf` added and no check, and
+FreeType picks a font's format from its bytes, not its name. **Measured
+in `quartz-teacher:dev-test` (2026-11-12)**: a WOFF2 file copied to
+`/tmp/Disguised.ttf` (its first bytes `wOF2`) and named by the absolute
+path `/tmp/Disguised` was opened by the old code through the decoder
+(`('IBM Plex Serif', 'SemiBold')`); the new code drew Inter. A
+`course_config.json` is not always the teacher's own: Import Courses for
+Reference copies a colleague's settings, and a restored archive brings its
+own.
+
+**What it does now.** `contracts/shared-rules.json` → `socialCardFonts` is
+the rule and its cases. A name is used only when it is one of `fonts` (the
+18 families Plantoir bundles, each mapped to its file), exactly as the apps
+write it. An empty name and the system pairing `Helvetica, Arial` use Inter
+and say nothing, as before. Anything else (a font Plantoir does not offer,
+`PlayfairDisplay` without its space, a path) is never joined into a path:
+the card is drawn in Inter, and the build prints
+`socialCardFonts.wording.unknownFontName` once per name, header first,
+after the card is drawn. The name is shown with control, format and
+line-separator characters removed and cut at 60 characters
+(`shownName`), so it cannot start a console line of its own. The card
+never fails the build over a name. `scripts/test_social_card_fonts.py`
+runs the cases through the card's own functions, plants a real font at an
+absolute path and beyond `../` (both opened by the old code, measured),
+checks every listed file is plain TrueType (`00010000`), and pins the mac's
+`FontCatalog` and `BundledFontList`, Windows' `StaticCatalogs` and
+`setup_course.py`'s lists to `fonts`. `verify.sh` runs its card half again
+inside the image.
+
+**No trail event.** The sentence is a build line in the console, like the
+card's other build lines, and nothing new is done in the app.
+
+**Rejected.** *Checking that the joined path stays inside `support/fonts/`*:
+it still opens any file that later lands in that folder, and tells the
+teacher nothing. *Matching without case or spaces*: neither app writes those
+forms, and one exact list is what the three catalogs are pinned to.
+*Moving Pillow to 13.0.0*: it carries the same Brotli 1.2.0.
 
 ## Stage 5: Dependencies and the actual Quartz build
 

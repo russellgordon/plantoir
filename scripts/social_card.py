@@ -22,7 +22,9 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
+import contracts
 import json
+import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 
@@ -75,22 +77,89 @@ def _load_scheme_colors(scheme_id):
     return {}
 
 
+def _font_rules():
+    """contracts/shared-rules.json -> socialCardFonts (#766)."""
+    return contracts.section("shared-rules", "socialCardFonts")
+
+
+def _is_offered(font_name):
+    """True when the name is one of the fonts Plantoir offers, exactly as
+    the apps write it, so it may open that font's file (#766)."""
+    if not isinstance(font_name, str):
+        return False
+    return font_name in _font_rules()["fonts"]
+
+
+def _is_silent(font_name):
+    """An empty or missing name, or the system pairing ("Helvetica,
+    Arial", which has no file of its own): Inter, and nothing to say."""
+    if font_name is None:
+        return True
+    return isinstance(font_name, str) and font_name in _font_rules()["silentNames"]
+
+
 def _font_file(font_name):
-    """The bundled .ttf for a display name ("Playfair Display" →
-    PlayfairDisplay.ttf), or the neutral Inter for anything unknown —
-    including the "Helvetica, Arial" system-font choice, which has no
-    file of its own."""
+    """The bundled .ttf for a font Plantoir offers ("Playfair Display" →
+    PlayfairDisplay.ttf), or the neutral Inter for anything else.
+
+    Only a name in the contract's list ever reaches a path (#766). Pillow's
+    FreeType decodes WOFF2 with a Brotli that has a known flaw, and it picks
+    a font's format from the file's bytes, so a name joined onto the fonts
+    folder unchecked (an absolute path, a ../ name) could hand that decoder
+    any file. A course's settings are not always the teacher's own: a
+    course imported for reference, or restored from an archive, brings its
+    settings with it."""
     support = _find_support_dir()
     if not support:
         return None
+    rules = _font_rules()
     fonts_dir = support / "fonts"
-    candidate = fonts_dir / (str(font_name or "").replace(" ", "") + ".ttf")
-    if candidate.is_file():
-        return candidate
-    fallback = fonts_dir / "Inter.ttf"
+    if _is_offered(font_name):
+        candidate = fonts_dir / rules["fonts"][font_name]
+        if candidate.is_file():
+            return candidate
+    fallback = fonts_dir / rules["fallbackFile"]
     if fallback.is_file():
         return fallback
     return None
+
+
+def _shown_name(font_name):
+    """The value as the console may show it: text with no control
+    characters, cut to the contract's length (socialCardFonts.shownName)."""
+    if isinstance(font_name, str):
+        text = font_name
+    else:
+        text = json.dumps(font_name, ensure_ascii=False)
+    kept = []
+    for character in text:
+        # Cc control, Cf format (a right-to-left override, say), Zl and Zp
+        # the line and paragraph separators some line readers split on.
+        if unicodedata.category(character) not in ("Cc", "Cf", "Zl", "Zp"):
+            kept.append(character)
+    shown = "".join(kept)
+    limit = _font_rules()["shownName"]["maxCharacters"]
+    if len(shown) > limit:
+        shown = shown[:limit] + "…"
+    return shown
+
+
+def fonts_not_used(header_font_name, body_font_name):
+    """The names the card could not use, header first, each once, as the
+    console shows them. Empty when every name was offered or silent."""
+    not_used = []
+    for font_name in [header_font_name, body_font_name]:
+        if _is_offered(font_name) or _is_silent(font_name):
+            continue
+        shown = _shown_name(font_name)
+        if shown not in not_used:
+            not_used.append(shown)
+    return not_used
+
+
+def unknown_font_sentence(shown_name):
+    """socialCardFonts.wording.unknownFontName, filled in."""
+    return _font_rules()["wording"]["unknownFontName"].replace("{name}", shown_name)
 
 
 def _load_font(font_name, size):
@@ -216,4 +285,6 @@ def generate_card(course_config, section_number, output_path):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     card.save(output_path, format="PNG")
+    for shown_name in fonts_not_used(header_font_name, body_font_name):
+        print(unknown_font_sentence(shown_name))
     return output_path
