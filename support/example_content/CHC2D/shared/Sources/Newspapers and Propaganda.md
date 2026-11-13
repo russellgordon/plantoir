@@ -43,6 +43,23 @@ absence you can explain is worth more than a quotation you cannot.
 > (accessed August 2026). The posters themselves are on Wikimedia Commons
 > under an open licence, so you can reproduce one in your own work.
 
+## Check the idea
+
+Nothing you answer here is sent to anyone. It is for you.
+
+> [!quiz] A First World War recruiting poster asks a young man why his friends are at the front and he is not. What is the poster the best evidence of?
+> - [ ] How the fighting at the front was going
+> - [x] What the people who made it believed would move young men to enlist
+> - [ ] What most Canadians thought about the war
+> - [ ] How many men enlisted after seeing it
+>
+> > [!explain]- Why
+> > A poster is made to change what people do, so it is evidence about
+> > its makers and the audience they imagined: here, that shame in front
+> > of friends would work on a young man. It cannot tell you what most
+> > people thought, or whether it worked. Enlistment records and letters
+> > are the sources for those questions.
+
 ## Where you can actually read Canadian papers
 
 Free and full-text searchable: Peel's Prairie Provinces, the University of
