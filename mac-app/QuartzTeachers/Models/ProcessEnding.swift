@@ -5,9 +5,9 @@ import Foundation
 /// can wait for a scheduled publish, or another program's build, to finish
 /// without looking at a clock.
 ///
-/// **The second permitted use of GCD in this app, and this comment is the
-/// permission** — the first is `ScheduledPublishWatcher.changes(at:watching:)`,
-/// and the reasoning is the same. Russell's rule forbids Dispatch for
+/// **A permitted use of GCD in this app, and this comment is the
+/// permission** — the others are `ScheduledPublishWatcher.changes(at:watching:)`
+/// and `DeployedFolderServer` (#850), and the reasoning is the same. Russell's rule forbids Dispatch for
 /// deferring work, for hopping to the main thread and for waiting before doing
 /// something; none of those happens here. `DispatchSource.makeProcessSource`
 /// is the kernel's own "this process has exited" event, and a `DispatchQueue`

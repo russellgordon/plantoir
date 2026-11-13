@@ -355,7 +355,7 @@ final class ScheduledPublishWatcher {
     /// Every change to a file or a folder, as an `AsyncStream`.
     ///
     /// **A permitted use of GCD in this app, and this comment is the
-    /// permission** (the one other is `ProcessEnding`, for the same reason). Russell's rule forbids Dispatch for deferring work, for
+    /// permission** (the others are `ProcessEnding` and `DeployedFolderServer`, for the same reason). Russell's rule forbids Dispatch for deferring work, for
     /// hopping to the main thread and for waiting before doing something; none
     /// of those happens here. `DispatchSource.makeFileSystemObjectSource` is the
     /// kernel's own file-system event source and a `DispatchQueue` is a required

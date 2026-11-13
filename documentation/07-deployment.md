@@ -2121,9 +2121,19 @@ account is involved at all.
 
 Because the copy is host-side, this path prints `PUBLISHED_FOLDER=<path>`
 rather than a live URL, and the apps show a "deployed to a folder"
-panel with a reveal-in-file-manager button instead of a link — plus a note
-that pages opened straight from disk won't look right, since the site expects
-to be served over HTTP.
+panel with a reveal-in-file-manager button instead of a link, and a note
+that pages opened straight from disk won't work, since the site expects
+to be served over HTTP. Since #850 (mac) the panel also offers **Open in
+Browser**: the app serves the folder itself on `127.0.0.1`, so every link
+and feature works, and Section ▸ Open in Browser opens it whenever no
+preview is showing. Nothing is written into the folder for it and the
+deploy is unchanged; the folder is read at each request, so a later deploy
+shows on reload. This shows the site as Plantoir serves it, which is not a
+promise about the host the folder is uploaded to: #849 measured a plain host
+answering 404 for every page link. The design, the measurements and what
+was rejected are in `documentation/09-mac-app.md` → "A deployed folder
+opened in the browser (#850)"; the rules are `shared-rules.json` →
+`deployedFolderInBrowser`.
 
 ### A relative folder, and a copy that did not finish
 

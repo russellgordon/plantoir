@@ -11898,9 +11898,9 @@ to `AppUpdates.teacherAnsweredReady` first.
   the child.
 - **The waiting is event-driven, never on a clock:** `withObservationTracking`
   on `CourseActivity.store`, `ProcessEnding.ends(of:)` for each process being
-  waited for (a `DispatchSource` process-exit event — the app's second
-  permitted use of GCD, commented as such; the first is
-  `ScheduledPublishWatcher`), and `ScheduledPublishWatcher.changes(at:)` on each
+  waited for (a `DispatchSource` process-exit event — a permitted use of
+  GCD, commented as such; the others are `ScheduledPublishWatcher` and, since
+  #850, `DeployedFolderServer`), and `ScheduledPublishWatcher.changes(at:)` on each
   lease folder. Each round ARMS its watches first and asks the gate SECOND, so
   work that ends in between is not missed.
 - **The postpone hook stays, as a second look.** Work could begin in the
@@ -16070,3 +16070,173 @@ this is the app's half.
   course title is left alone, and `urlUserinfo`, before the email rule, which
   would otherwise take a `user:password@host` for an address and leave the
   username behind.
+
+## A deployed folder opened in the browser (#850)
+
+GitHub [#850](https://github.com/russellgordon/plantoir/issues/850), v2.0.0.
+A section deployed to a folder on this computer can be opened in the web
+browser with every link and feature working. Opened straight from the
+folder, it does not work: Quartz writes every page link without `.html`, and
+the measurement behind #850 found 0 of 3,369 page links working from disk,
+and no module script running in Chrome or Safari. The rules are
+`contracts/shared-rules.json` → `deployedFolderInBrowser`; this section says
+why they are what they are.
+
+### What a teacher sees
+
+- **One Open in Browser for both** (Russell, 2026-11-13). The toolbar button
+  and Section ▸ Open in Browser open the PREVIEW while one is showing, and
+  the section's deployed folder otherwise. Their help says which
+  (`DeployedFolderWording.previewHelp` or `.help`), or why it is greyed
+  (`.notDeployedYet`, `.folderNotFound`, or CourseActivity's sentence while a
+  deploy runs). A second, differently named item was the plan's first
+  proposal and was ruled out.
+- **Under a finished folder deploy**, Open in Browser sits beside Show in
+  Finder, in `TaskProgressView` and in `DeployDestinationLinks`, and the note
+  under it is `DeployedFolderWording.renderNote`.
+- **The section row's context menu** offers Open in Browser when the folder
+  can be opened and Stop Showing Deployed Folder while it is shown, hidden
+  otherwise (the context menus' rule). The row is selected and its window
+  acts, through `sectionVerbRequest`, so the one Open in Browser behaves the
+  same there.
+- **While it is shown**, a one-line notice in the section's window
+  (`DeployedFolderNoticeView`, where the scheduled-deploy notice sits) with
+  Stop, and Section ▸ Stop Showing Deployed Folder (Russell's ruling on where
+  Stop lives). If the folder goes away while it is shown, the line says
+  `stoppedFolderGone` until dismissed.
+- **It runs until Stop or quitting Plantoir**, never until a window closes:
+  the browser tab outlives the window. Quit never asks about it
+  (`quittingWhileWorkIsUnderWay`, "a deployed folder is open in the browser"):
+  nothing is built or written, so nothing can be lost.
+
+### Who serves it: the app
+
+`DeployedFolderServer` is an `NWListener` inside the app, started in
+milliseconds, on `127.0.0.1` only (`requiredLocalEndpoint`), as previews have
+been since #684. Rejected:
+
+- **The website builder**, through a launcher flag. It sees only its two
+  mounts; a mount cannot be added to a workspace without remaking it (about
+  two minutes, refused while a preview is open, #94); a folder outside the
+  home folder can never be mounted (#221); it takes 109 s to start cold
+  (#225); Windows has no workspace at all.
+- **Python on the host.** The Mac has none a teacher can rely on
+  (`/usr/bin/python3` is Apple's stub without the developer tools), and
+  bundling one is about 50 MB for a file server.
+- **A `.command` or `.bat` beside the site** (a Terminal window, Gatekeeper,
+  a deprecated Ruby); making the folder browsable as files (#850's ruling);
+  one server for every folder under a path prefix (the site uses
+  root-relative addresses, so each site must sit at `/` of its own address);
+  `URLProtocol` (serves only the app's own web views, never the teacher's
+  browser); SwiftNIO (a dependency for about 400 lines); `NetworkListener`
+  behind `#available` (macOS 26 only, two code paths).
+
+It is not toolchain logic: it builds nothing and writes nothing, and would be
+the same for any static site. What must not drift between the apps is how a
+request is answered, and that is 76 contract cases both suites run.
+
+**GCD.** `NWListener.start(queue:)` and `NWConnection.start(queue:)` require a
+`DispatchQueue`: the framework's delivery channel, not somewhere work is
+thrown. The server's header comment is the permission, the third after
+`ScheduledPublishWatcher` and `ProcessEnding`. Every callback hops into the
+actor with a `Task`; the header and idle deadlines are `Task.sleep`, a real
+timeout rather than a wait for something to settle.
+
+### How a request is answered
+
+The aim (the plan review's M7) is that every link the build writes resolves,
+and nothing a strict host refuses is accepted here. It is not a copy of any
+one host: preview is Quartz's server, Netlify and Cloudflare each answer
+differently, and a folder's eventual host is unknown (#849). So it shows the
+site as Plantoir serves it, and the words never promise how a web host will
+behave (the review's H1).
+
+- **No slash after the last name**: that file, else that name plus `.html`
+  (`/Curriculum/A1.1` finds `A1.1.html`: 594 dotted links in the measured
+  site), else a folder with an `index.html`, redirected 308 with its slash so
+  its relative links resolve. **A slash after it**: the folder's
+  `index.html`, else the page, redirected 308 without the slash. Never a
+  listing; a missing page answers 404 with the site's own `404.html`.
+- **Every name on the way down is matched against its folder's listing**,
+  exactly after NFC, never with `fileExists`. APFS and NTFS ignore case and a
+  strict host does not; the review's stand-in, checking only the last name,
+  served `/concepts/` and `/CONCEPTS/index.html` with 200 for `Concepts/`.
+- **Refused**: `..`, dot names (`.DS_Store`, `.publish_state`, the deploy's
+  own temporary files), `_headers` and `_redirects`, names Windows reserves,
+  any name holding `:` (a drive, an NTFS stream), a raw or encoded separator,
+  a leading `//` (a `Location` built from it would name another host), and
+  any file whose real path leaves the folder (symlinks).
+- **The Host check is exact** (the review's H3): only `127.0.0.1:<port>`. A
+  prefix check answered 200 to `127.0.0.1.evil.example`, the name a page
+  rebinding itself to this computer would send.
+- **Every answer** carries `Cache-Control: no-cache` (a redeploy shows on
+  reload, and the back and forward cache still works, which `no-store` would
+  stop), `nosniff`, and `Cross-Origin-Resource-Policy: same-origin`, and
+  never an `Access-Control-*` header. Byte ranges are answered (Safari plays
+  video only from a server that does). `.wasm` is `application/wasm`
+  (Pyodide gives up at 45 s otherwise) and extensions match in any case
+  (`IMG_0042.JPG`).
+- **Live input is not offered** (the plan's piece C, dropped on review, H2):
+  a folder publish gets no COOP or COEP (documentation/06, I11), so the
+  faithful view is the one without them, and a list kept beside the course
+  would describe what this working folder last deployed rather than what
+  the folder holds.
+
+**Limits** (the review's M1: a server with none held 300 of 300 half-sent
+requests open after 12 seconds): 64 connections, a request line of 8 KiB
+(414), headers of 16 KiB (431), 10 s to send the headers, 30 s idle between
+requests, and a GET that says it has a body is answered 400 and closed.
+
+### The address
+
+The same address each time (Russell, 2026-11-13), because the site keeps
+ticked tasks and quiz answers per address. Ports come from 41000 to 41399, a
+block below the system's range for outgoing connections (49152 to 65535,
+where Windows also reserves moving ranges for Hyper-V, the review's M3) and
+outside the preview walk (8081 to 9474). The port remembered for the
+folder's canonical path is tried first; then the block from an FNV-1a hash
+of that path, wrapping, so the same folder lands on the same address even
+after the preference is lost. When the usual one was taken, the trail says
+the address moved, so "my ticks were gone" is answerable.
+
+**A known limit, accepted** (Russell, 2026-11-13): another account on this
+Mac can reach the address while it runs, as it can a preview. `~/Desktop`
+and `~/Documents` are `drwx------`, so this is longer exposure than a
+preview's, and a one-time key cookie was offered and declined.
+
+### Measured (2026-11-13, M4 Pro, macOS 26)
+
+- `browser-checks/crawl_deployed_folder.py --app <Plantoir.app>` on a
+  307-page built site: 7,647 links (314 distinct addresses), **0 not found**,
+  in 0.7 s. The must-fail, the same crawl against `python3 -m http.server`
+  on the same folder: **4,204 not found**. `verify.sh` runs both against its
+  own folder deploy when `PLANTOIR_APP` names the bundle, and skips, saying
+  so, when it does not.
+- Every one of the 76 resolution cases against the built app over a socket
+  (a scratch harness driving `--serve-deployed-folder`): 0 failed.
+- The limits against the built app: a 8,300-byte request line 414 and
+  closed; 16,500 bytes of headers 431; two pipelined requests both
+  answered; a connection that sent only its request line closed after
+  10.5 s; of 65 silent connections, 1 closed; a connection to this Mac's
+  network address (192.168.1.x) refused; `Host: 127.0.0.1.evil.example`
+  400.
+- Not measured: a firewall prompt (this Mac's firewall is off; none is
+  expected for a loopback-only listener, as `llama-server` already binds
+  127.0.0.1 from this app), and Safari playing a video through it.
+
+### `--serve-deployed-folder`
+
+`Plantoir --serve-deployed-folder <folder>` serves a folder with no window,
+prints `DEPLOYED_FOLDER_ADDRESS=http://127.0.0.1:<port>/`, and exits when its
+standard input closes. It is for checks run from the command line, like
+`--mcp-stdio`; it remembers no address and writes no trail line.
+
+### What Windows owes
+
+The same three places in the window, the same wording keys and trail
+events, and an `HttpListener` on `http://127.0.0.1:<port>/` running every
+case. What HTTP.sys answers itself before the app sees a request (a Host it
+does not match, a canonicalised `..`), the excluded port ranges inside and
+below the block (`netsh int ipv4 show excludedportrange protocol=tcp`), and
+whether an unelevated shell may listen on the block are to be measured
+there. The `windows` issue for #850 carries the list.
