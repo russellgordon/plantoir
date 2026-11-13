@@ -2750,7 +2750,21 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
   `pdfseparate`) and tectonic on PATH; which installs work, and how a
   teacher gets them, is NOT MEASURED here yet and is the `windows` issue
-  for 750a's to measure and write down in this section. The
+  for 750a's to measure and write down in this section. Since 750d (09 →
+  "The teacher runs the steps that touch names") the skill also carries
+  `launchers/Box the papers.bat` and `launchers/Put names on the
+  sheets.bat`, which the assistant copies into the marking folder for the
+  teacher to double-click: each finds `py -3` (then `python`), reads the
+  skill folder from `Skill folder.txt` with `set /p`, checks the SHA-256
+  of `teacher_only.py` and `run_with_names.py` with the same Python line the
+  Mac's `.command` uses, and runs `teacher_only.py`, which offers the
+  PowerShell `FolderBrowserDialog` on Return. They are checked out with
+  CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
+  and the skill pins their bytes. Written and checked as text on the Mac
+  only: running them, the folder chooser, `python` finding the Microsoft
+  Store's stand-in instead of a real Python, and a `Skill folder.txt` path
+  with non-ASCII letters are NOT MEASURED, and the `windows` issue for 750d
+  is to measure them. The
   handouts skill has an assistant write ONE file inside a course,
   `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
   handouts are kept), and the unit-planning skill a folder,
@@ -2759,8 +2773,8 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `windows` issue for #707) and shows on the course page's Planning tab
   (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
   page's Planning tab (#708)"), and the marking skill one more,
-  `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
-  paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
+  `courses/<CODE>/.internal/marking/marking.json` (the marking folder's
+  path since 750d, never the teacher-only folder's, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes

@@ -5027,7 +5027,9 @@ the trail, because it would be student data.
   computer. REJECTED: v1's "scans are redacted ... what I write stays on
   this computer", which claimed more than the redaction does, and "what I
   write" (L7: the assistant's replies go to the service too).
-- **Two folders, outside the working folder (Russell, 2026-11-12).** The
+- **Two folders, outside the working folder (Russell, 2026-11-12).** (Since
+  750d, below, the assistant records the marking folder only and is never
+  told where the teacher-only folder is.) The
   marking folder is the assistant's; the teacher-only folder beside it
   holds the mapping table, the originals, the check files, the named copies
   and the runner's quarantine, and only scripts write there. One folder
@@ -5209,7 +5211,9 @@ the trail, because it would be student data.
     name in the box on both fixture blanks, while a 0.40 in shift, a 94
     percent shrink and an upside-down page leave it showing, which is what
     the teacher's look is for.
-  - **One file and a recorded yes**: the last batch is cleared; the boxed
+  - **One file and a recorded yes** (since 750d, below, the combined file
+    and the yes are the pinned `teacher_only.py`'s, run by the teacher, and
+    `--confirm` is gone): the last batch is cleared; the boxed
     papers and `Redacted papers to look through.pdf` (each paper after a
     page naming it) are written in a holding folder on the teacher's side
     and moved into place only when all are written, so a failure leaves no
@@ -5361,6 +5365,115 @@ the trail, because it would be student data.
 NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
+(The trials ran on 2026-11-13 and their findings shaped 750d, below.)
+
+**The teacher runs the steps that touch names (#750, piece 750d,
+2026-11-13).** A PREPARED OPTION on its own branch: its central choice, that
+the teacher double-clicks a file and the assistant is never told where the
+teacher-only folder is, waits for Russell's yes. The contract is
+`assessment.teacherRun`; it supersedes what the bullets above say about
+who boxes the papers, who records the yes, and what `marking.json` holds.
+
+- **Why (measured in the six trials, 2026-11-13, Claude Code 2.1.323 and
+  Codex CLI 0.162.0).** Codex's FIRST command in the marking trial was `rg
+  --files` on the teacher-only folder, run in the same command that read
+  the skill, before it had said anything to the teacher; the listing put a
+  misnamed scan's invented name into its transcript. Codex also rewrote its
+  copy of `redact_scans.py` and that copy's self-test. Claude Code skipped
+  the four privacy points when the teacher said they had read them. The
+  adversarial review of the hardening plan then MEASURED the walls an
+  assistant could be asked to put up for itself: Claude Code deny rules for
+  the folder stopped 10 of 17 listing shapes and let 7 through (`rg
+  --files`, `python3 -c os.listdir`, `perl`, `sh -c 'ls'`, `du -a`, an
+  `echo` glob, a relative `ls ../Marking/*/Originals/*`); a Codex
+  permissions profile held only in a trusted folder and was silently
+  dropped by `-s workspace-write`; the same profile let the sandboxed
+  assistant rewrite its own rules and the pinned runner. REJECTED, for
+  those reasons: deny rules and sandbox profiles written into each
+  assistant's settings, a three-word code on the cover typed back (the
+  assistant could read the cover), and any script that writes into an
+  assistant's configuration (a second, weaker path to files the app writes
+  only through a yes-sheet). What changed instead is who runs the steps.
+- **What the assistant does.** It records the marking folder only:
+  `marking.json` lost `teacherOnlyFolder`, and nothing the assistant writes
+  or reads holds that path. It copies the four launchers (`Box the
+  papers.command`, `Put names on the sheets.command`, and their `.bat`
+  twins) into the marking folder, writes the skill folder's path into
+  `Skill folder.txt`, adapts `redact_scans.py` and runs only its
+  `--self-test` and `--box-from` on the BLANK test, and writes `Box
+  request.json` (the blank, the adapted script, the options `--label`,
+  `--box`, `--dpi`, `--identifiers` and nothing else). It tells the teacher
+  to double-click and waits. Its commands never contain the teacher-only
+  folder (a test fails on `<teacher-only>` in either skill or any template).
+- **What the teacher's window does.** The launcher checks the SHA-256 of
+  `teacher_only.py` and `run_with_names.py` in the skill folder before
+  anything else, refuses to run without a terminal (an assistant's command
+  has none), and runs the pinned, never-adapted `teacher_only.py`. That
+  asks for the teacher-only folder (dragged into the window, which the
+  Mac's Terminal writes with each space as a backslash and a space; or
+  Return for the system's own folder chooser, `osascript choose folder`),
+  checks it is beside the marking folder and holds the name table, boxes
+  the originals through the adapted script and the runner into
+  `<Assessment>/Holding` on the teacher's side, and builds ONE file of
+  exactly that folder: a cover with the four privacy points word for word
+  (`teacherRun.privacyPoints`, the same text the skill says), what to look
+  for, and that the file does not prove who looked; then each paper after a
+  page naming its identifier. It prints identifiers and counts, with the
+  teacher-only path put back as "your teacher-only folder" in every line
+  (an adapted script that prints its arguments is a test case), and asks
+  the teacher to type yes. Only on yes do the papers move into
+  `<Assessment>/Redacted` in the marking folder, with `Teacher looked.json`
+  (identifiers and SHA-256) written last; on no, or anything that ends the
+  run, nothing moves. Anything but yes or no is asked again.
+  `teacher_only.py --verify "<marking folder>/<Assessment>"` reads only the
+  marking folder and is the assistant's check and every brief's first step.
+  The second launcher does the named sheets and every report-comments step
+  that reads the table from `Names request.json`, asking a yes before it
+  writes named files, and writes what it printed into the marking folder
+  for the assistant to read. 750c's `--document` and `--grades` are request
+  kinds already, so that merge needs no change to `teacher_only.py` (and so
+  no change to any pin).
+- **MEASURED (Apple M4 Pro, macOS 26.6, Poppler 25.09.1, Python 3.14.4 and
+  macOS's own 3.9.6, `/bin/bash` 3.2.57).** `scripts/test_marking_teacher_run.py`:
+  28 tests in about 16 s on both Pythons. The launchers are driven in a
+  pseudo-terminal with echo off and their questions answered; six invented
+  canary names of ten letters or more are planted in a misnamed scan, the
+  name table, a file in `Check/` and one in `Named/`, and a marker word is
+  in the teacher-only folder's own path. On a yes, a no, a refusal (no
+  table; a teacher-only folder inside the marking folder), a crash (a
+  `Check` that is a file), a missing Poppler and a changed pinned script,
+  no canary and no marker is printed or reaches the marking or working
+  folder; killed at the folder question, during the boxing, after the
+  boxing and at the yes, no PDF is in the marking folder. A file copied by
+  `cp` or Python carries no extended attributes (`xattr -l` empty), so no
+  quarantine flag. Must-fails, by copy and restore, each red: the papers
+  moved before the yes; the path not put back; the launchers run without
+  a terminal; the launchers' check of the two scripts removed; one word of
+  a privacy point changed on the cover; a picture in the holding folder
+  taken for a paper; the never-asks sentence taken out of the skill (two
+  tests); the pointer recording the teacher-only folder again; `y` taken
+  for yes.
+- **NOT MEASURED.** The real double-click: that Terminal opens a `.command`
+  the assistant copied and made runnable, whether its window closes on
+  exit under the teacher's Terminal settings (the launcher waits for Return
+  so it does not), what Gatekeeper says, and the folder chooser itself
+  (`osascript` was not run: nothing in this piece may take the screen).
+  The `.bat` twins are written and checked as text only (CRLF, the same
+  pins and the same check line); `py -3`, `set /p` on a path with
+  non-ASCII letters, and the PowerShell folder chooser are unmeasured on
+  Windows. The re-trial with outside assistants is written up for the
+  director (`750d-trials.md` in the director's notes).
+- **THE LIMIT, said in the skill.** A pin finds a well-meant change, such
+  as an adapted copy; it would not catch an assistant that changed a file
+  and every pin together, and an assistant that set out to find the
+  teacher-only folder could look for it. The protection is that the
+  teacher starts these steps and the assistant is never told the path.
+  **The residual risk** (Russell's ruling puts the teacher-only folder
+  beside the marking folder): a listing of the marking folder's parent
+  folder shows the names of the files in it. Scans are named by
+  identifier, so only a misnamed scan would show a name that way; the
+  skill tells the assistant never to list that folder, and nothing else is
+  built against it.
 
 **The report-comments skill (#752).** The tenth skill,
 `plantoir-report-comments`, drafts report card comments from what
