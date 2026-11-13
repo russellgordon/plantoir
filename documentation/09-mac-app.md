@@ -11210,21 +11210,32 @@ folder ready after an update (#473)"), with the mac's differences named:**
   again at the next build rather than refused for ever with a sentence
   naming a File menu it has not got. And, like the quit, the server never
   leaves mid-copy: at the end of its input it waits for a running copy
-  before exiting (the fixes review's finding 1). **Not done on purpose:** a cross-process marker.
-  Windows wrote `toolchain-copying.<pid>` so one process could see another's
-  copy; the mac does not, because every file is written atomically from the
-  same bundle, so two copies at once write the same bytes and the worse
-  outcome is wasted work, not a broken recipe.
-- **The scheduled run is unchanged**: `ScheduledDeploy` starts its own
-  `Process`, never a `ScriptRunner`, and never mirrors; a `--stop`
-  (`PreviewStopper`) is its own process too, so neither meets the backstop
-  (finding 1). **Windows' run is no longer the same** (#477, 2026-10-15):
-  it waits for a live copy of the folder's tools and makes its own before it
-  builds, and its copies take turns, because two copies at once were
-  MEASURED to fail there with sharing violations (07 → "On Windows since
-  bundle 3: the scheduled run is Plantoir"). Whether the mac's run builds
-  from an out-of-date or half-copied `.toolchain/` after an update is a
-  `mac` issue.
+  before exiting (the fixes review's finding 1). **Not done on purpose
+  (until #748):** a cross-process marker. Windows wrote
+  `toolchain-copying.<pid>` so one process could see another's copy; the mac
+  did not, because every file is written atomically from the same bundle, so
+  two copies at once write the same bytes and the worse outcome is wasted
+  work, not a broken recipe. #748 MEASURED that and found it half right: the
+  bytes were right every time, but one of the two copies counted the files
+  the other had removed as FAILED, in every run after an update, and a
+  failed copy greys Preview and Deploy. The mac now writes Windows' marker
+  for every copy and counts a file already gone as done ("A scheduled deploy
+  brings its folder up to date first (#748 part 4)", below). Precisely: the
+  `.toolchain/` copy `ToolchainReadiness.ensure` starts off the main actor
+  and the scheduled run's copy write it; the launcher refresh, the
+  synchronous copy and `BuilderWarmUp` (its own folder) do not.
+- **The scheduled run was unchanged by #476**: `ScheduledDeploy` starts its
+  own `Process`, never a `ScriptRunner`; a `--stop` (`PreviewStopper`) is its
+  own process too, so neither meets the backstop (finding 1). It did not
+  mirror either, until #748 part 4 (2026-11-13): it now brings the folder's
+  launchers and `.toolchain/` up to date itself before its script runs,
+  waiting for another program's live copy first ("A scheduled deploy brings
+  its folder up to date first (#748 part 4)", below). Windows' run has done
+  the same since #477 (2026-10-15), with its copies taking turns because two
+  copies at once were MEASURED to fail there with sharing violations (07 →
+  "On Windows since bundle 3: the scheduled run is Plantoir"). That answers
+  the `mac` issue #535 asked: yes, the mac's run built from the folder's old
+  `.toolchain/` after an update, until #748.
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
   the synced-folder notice) appears only once the copy has actually written
   or removed its first file (`syncDirectory` says so once, for a write or a
@@ -11557,6 +11568,168 @@ known folders. The trap this paragraph used to
 name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
 already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
 → "Pruning the index (#735)" has the Windows details.
+
+### A scheduled deploy brings its folder up to date first (#748 part 4, 2026-11-13)
+
+**The gap.** The `--run-scheduled-deploy` process is this app's own binary,
+so it carries the version installed now, and since #323 it writes its
+wrapper afresh at the run. But the wrapper runs the FOLDER's `preview.sh`
+and `deploy.sh`, and those hash the folder's `.toolchain/` to choose the
+website builder. Only a window (`refreshLaunchersIfNeeded`), the assistant's
+server and `BuilderWarmUp` (its own folder) ever copied them. So after an
+update installed overnight, a 6:30 deploy in a folder nobody had opened
+since ran the launchers and the recipe of the version that last touched
+it, and so the old builder. It did not even rebuild the site: #746's stamp
+check is in those same old launchers, whose image matched the old stamp.
+
+**What the run does now** (`ScheduledRunFolderRefresh`, called from
+`runScheduled` on the branch that deploys): after the settings decision,
+holding the course's `build` and `publish` leases, and before the script
+runs, it
+
+1. waits while another program's copy into the folder is live (Windows'
+   `toolchain-copying.<pid>` marker, `ToolchainCopyMarker`);
+2. writes its own marker, replaces any launcher at the folder's top that
+   differs from the bundle's (`refreshLaunchersReporting`), mirrors
+   `.toolchain/` (`copyToolchainFiles`, the same function and fingerprints
+   the window uses, #663), and removes its marker;
+3. waits again, because a window opened during step 2 copies too, and its
+   copy must be over before anything hashes the recipe;
+4. writes `scheduled deploy got its folder ready` unless it changed nothing
+   and waited for nobody, which is every run but the first after an update.
+
+The two waits share one limit, five minutes from the first look, looking
+every second; then it goes ahead. It never mirrors from a bundle with no
+`Dockerfile` at its root, because the mirror deletes what its source lacks,
+and never writes into a folder with no `preview.sh`. A plist from before
+v1.2.0 names no section, so it has no folder to copy into and copies
+nothing, as it reads no settings.
+
+**It goes ahead in every case**, and that is the decision this piece had to
+make: `contracts/shared-rules.json` → `scheduledRunGetsItsFolderReady` has the
+table (14 cases) and the reasons (`whyItAlwaysGoesAhead`). A deploy that
+silently does not happen at 6:30 is the worst outcome; one that goes ahead
+with the tools as they were and says so is better. A copy that wrote nothing
+(a folder that cannot be written, no tools in the app) leaves the folder's
+old set whole, which is what every scheduled run used before this. A copy
+that failed part way leaves some files new; if the build then fails, the
+build leg records it (`scheduledPublishStopped`) and the notification says
+so. Windows stands down instead (#477), and the difference is recorded in
+`platformDifferences`: its failures were sharing violations on files the
+other copy had written correctly, which on the mac no longer count at all.
+
+**The guard, and what two copies at once actually do.** MEASURED on an Apple
+M4 Pro, macOS 26.6, 2026-11-13, with `copyToolchainFiles` and
+`refreshLaunchers` compiled standalone from this branch's source, two
+processes started at the same instant on the app's own recipe (13,023 files,
+83 MB) into one folder:
+
+| Shape | Runs | Runs with a failure reported | Folder at the end |
+|---|---|---|---|
+| After an update (91 files changed, removed or added; every file restamped) | 5 | 5 (18 or 19 files in one of the two) | right, byte for byte, every run |
+| Into an empty folder | 8 | 5 (1 or 2 files) | right every run |
+| Both, with a file already gone counted as done | 13 | 0 | right every run |
+
+Every failure was a removal of a file the other copy had removed first, or
+of the other copy's temporary file (`<name>.sb-…`, which Foundation's atomic
+write makes beside the file) after it had been renamed into place. So the
+mac's two writers are safe for the bytes, as #476 said, but not for the
+COUNT, and a failed count greys Preview and Deploy in the window. Since
+#748 `WorkspaceModel.removeStrayFile` treats a file that is not there as
+done. The marker is for the READER: the run is the one copier that goes
+straight on to build with nobody watching, so it is the one that waits.
+Two copies write it: the `.toolchain/` copy a window or the assistant's
+server starts off the main actor (`ToolchainReadiness.ensure`), which waits
+for nobody, and the run's own. The window's launcher refresh
+(`refreshLaunchersIfNeeded`, milliseconds), the synchronous copy
+(`initializeWorkspace` and the suite) and `BuilderWarmUp` (its own folder)
+do not write it; each writes whole files atomically, so a reader never sees
+half of one.
+
+**Two different versions of Plantoir copying at once** (the 748b review's
+LOW 1, measured by the reviewer: a new and an old bundle started together
+into one folder): both reported no failure and the folder ended MIXED in 3
+of 4 runs, 8 to 14 files from the older recipe. Nothing compares the folder
+with the bundle after the run's second wait, so the trail would still say
+it copied its files. It needs two copies of the app on one Mac, a plist
+whose saved path is a different copy from the one the teacher opens, or an
+assistant server started from one; and a job whose saved path is an OLDER
+copy of the app copies that older version's files over a newer folder.
+That is accepted: on `dev` before this piece the same older binary wrote its
+own wrapper and ran whatever launchers the folder had, so the folder's
+launchers and the wrapper could come from different versions on every run;
+now the run's launchers, recipe and wrapper come from one version, and the
+next window of the newer app mirrors the folder back (the image tag is a
+hash of the recipe, so a mixed recipe gets a builder of its own, never the
+newer version's).
+
+**A launcher is never half written when the wrapper runs it.** Every
+launcher and recipe file is written whole to a temporary file and moved
+into place. Measured under `/bin/bash` 3.2 with a script that sleeps
+between two `echo`s: replaced by a move while it ran, bash finished the OLD
+text; overwritten in place, bash went on reading the NEW file from the
+byte it had reached.
+
+**The cost when nothing is stale** (same Mac, same recipe, a single copy;
+an unrelated `verify.sh` was running for the first set): 0.84 to 0.86 s, and
+3.9 to 6.6 s at background priority (`taskpolicy -b`). After an update: 1.33
+to 1.47 s (3.9 to 6.1 s at background priority). Into an empty folder: 4.1
+to 4.7 s (10.6 to 14.3 s). Not measured under launchd itself, because no
+real job may be registered in this run; a job with no `ProcessType`, as
+ours is, runs as Standard, which should sit between the two.
+
+**What the first run after an update then costs.** Any change in
+`.toolchain/` changes the image tag, so the launchers build the website
+builder again unless this version has already built it (`BuilderWarmUp`
+does at the first launch of a new version, so a Mac that was used after the
+update has it). Measured with `setup.sh --prepare-builder` on the same Mac,
+the earlier version's layers cached: a change to a script copied near the
+end of the recipe, 6 s; to one copied half way through (before wrangler is
+installed), 25 s; to the first layer, so everything is rebuilt and
+downloaded, 70 s. Then #746's stamp check remakes the folder's workspace and
+builds the site again (32 s from scratch, measured by verify-deploy.sh; 07 →
+"`verify-deploy.sh` — the publishing harness"),
+and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
+deploy after an update can take between a few seconds and about two minutes
+longer than the one before it, which is why the trail line says so.
+
+**Two sections of one course set for the same time take turns** (the
+review's LOW 2). They wait for each other on the course's leases
+(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
+first now holds them through its copy (0.84 to 4.7 s measured above, up to
+14.3 s at background priority), any wait for another program's copy (up to
+five minutes) and, after an update, the builder built again (6 to 70 s) and
+the site rebuilt (about 32 s). The second section's own copy then finds
+nothing to change (0.85 s) and its builder is already built, so it adds
+only its own deploy. It stands down `courseWasBusy` only if the first takes
+more than ten minutes in all, which needs the five-minute wait used up as
+well; it was not measured end to end, for want of a real launchd job.
+
+**Rejected:**
+- **Standing down when the copy fails** (Windows' choice): it turns a copy
+  that did no harm into a deploy that publishes nothing.
+- **Waiting with no limit**: a stuck copy would hold the deploy for ever,
+  and the other copy writes the same bytes.
+- **"Open the folder once after an update" in the notes**: nobody reads them
+  at 6:30, and Russell ruled the part in.
+- **Rewriting every folder's tools at the first launch after an update**:
+  the app does not know every folder, and a folder opened then is mirrored
+  anyway.
+- **A kernel lock (`flock`)**: a second mechanism beside the marker Windows
+  already writes, whose liveness rule already ignores a marker left by a
+  program that is gone.
+- **The window taking turns with the run, as Windows' copies do**: measured
+  above, two copies at once on the mac write the same bytes once a file
+  already gone is not a failure, and a window must never wait on a run that
+  may itself be waiting for the course.
+- **A fresh event name for Windows to adopt**: Windows already records the
+  same facts on `working folder tools copied` and `scheduled publish waited
+  for the course`; the mac's event says something Windows' cannot (it went
+  ahead with the tools as they were), so it is `appliesOn: ["mac"]`.
+
+**Tests:** `ScheduledRunFolderRefreshTests` (the contract's cases, the
+sentences, real folders, the waits with a pretend clock, the marker, a stray
+file already gone, and where the call sits in `runScheduled`).
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 

@@ -4303,6 +4303,21 @@ run and after a Save.
    wrapper used to clear it first, and without it `fileUnderTheFolder` would
    move LAST week's record over tonight's — a failed run announced as last
    week's success. Must-fail: `testAnOldJobsRunIsNotReportedAsLastWeeksSuccess`.
+8. **The folder's own tools, brought up to date** (#748 part 4, 2026-11-13).
+   Only when the run will deploy, holding its leases, before the wrapper runs:
+   the launchers at the folder's top and `.toolchain/` are copied from the app
+   that is running (`ScheduledRunFolderRefresh`), after waiting for another
+   program's live copy, and again after. Until then the wrapper was this
+   version's but the launchers it ran, and the recipe they hash to choose the
+   website builder, were whatever the folder was last opened with, so the
+   first scheduled deploy after an overnight update built with the old
+   builder. It goes ahead in every case and says which on the trail
+   (`scheduled deploy got its folder ready`); the table is
+   `shared-rules.json` → `scheduledRunGetsItsFolderReady`, and the
+   measurements (the copy's cost, two copies at once, the builder built
+   again) are in 09 → "A scheduled deploy brings its folder up to date first
+   (#748 part 4)". Windows has done this since #477 and stands down where the
+   mac goes ahead ("On Windows since bundle 3", below).
 
 **Standing down.** A refusal releases the leases FIRST (`standDown` never
 returns, and until #323 it was only reached holding none), then records the new
@@ -5102,7 +5117,9 @@ on a warm folder, not on the cold one an update leaves.
 **Rejected:** standing down `courseWasBusy` for a copy (a false sentence
 about the course); building from whatever `.toolchain\` holds (the mix the
 issue describes); a contract case for both platforms (the ruling — the mac
-is asked whether it has the gap instead); copying to a temporary name and
+is asked whether it has the gap instead; it had, and #748 part 4 closed it
+on the mac with the same marker, going ahead where Windows stands down,
+`scheduledRunGetsItsFolderReady.platformDifferences`); copying to a temporary name and
 renaming (measured above); and capping the WINDOW's wait and then copying
 anyway (it would bring back the two-copies-at-once failure the turn exists
 to prevent).

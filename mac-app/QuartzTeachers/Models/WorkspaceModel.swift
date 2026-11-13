@@ -1827,15 +1827,17 @@ class WorkspaceModel {
                     announced = true
                     firstChange?()
                 }
-                do {
-                    try fileManager.removeItem(at: fileURL)
+                switch WorkspaceModel.removeStrayFile(fileURL) {
+                case .removed:
                     changed.changed += 1
-                } catch {
+                case .alreadyGone:
+                    continue
+                case .failed(let reason):
                     // A stray file that will not go changes the recipe's
                     // hash, so the folder is not up to date (#476).
                     changed.failed += 1
                     if changed.firstFailure == nil {
-                        changed.firstFailure = "\(fileURL.lastPathComponent): \(error.localizedDescription)"
+                        changed.firstFailure = "\(fileURL.lastPathComponent): \(reason)"
                     }
                 }
             }
@@ -1843,20 +1845,82 @@ class WorkspaceModel {
         return changed
     }
 
+    /// What removing one stray file from a mirrored folder came to.
+    nonisolated enum StrayRemoval: Equatable, Sendable {
+        case removed
+        /// It was not there to remove: another copy into the same folder
+        /// removed it first.
+        case alreadyGone
+        /// It is still there; the error, for the trail.
+        case failed(String)
+    }
+
+    /// Removes one file the mirror's source does not have.
+    ///
+    /// **Already gone is what was wanted, not a failure** (#748). Two copies
+    /// into one folder at once each list the stray files, and the second to
+    /// reach one finds it gone. Measured with two copies of the app's recipe
+    /// started at the same instant (documentation/09-mac-app.md): after an
+    /// update one of the two counted 18 or 19 such files as FAILED in every
+    /// one of 5 runs, and into an empty folder 5 runs of 8 had one (the other
+    /// copy's temporary file, renamed into place before it could be removed),
+    /// though the folder ended byte for byte right every time. A failed copy
+    /// greys Preview and Deploy in the window. Asked of the entry itself,
+    /// never through a link.
+    nonisolated static func removeStrayFile(_ fileURL: URL) -> StrayRemoval {
+        let fileManager: FileManager = FileManager.default
+        do {
+            try fileManager.removeItem(at: fileURL)
+            return .removed
+        } catch {
+            if (try? fileManager.attributesOfItem(atPath: fileURL.path)) == nil {
+                return .alreadyGone
+            }
+            return .failed(error.localizedDescription)
+        }
+    }
+
     /// Replaces any launcher whose content differs from the current copy.
     /// Only files that already exist are touched: a folder without
     /// launchers is a folder that has not been initialized, which is the
     /// picker's business, not this method's.
-    static func refreshLaunchers(in workspaceURL: URL, from sources: [String: URL]) -> [String] {
+    nonisolated static func refreshLaunchers(in workspaceURL: URL, from sources: [String: URL]) -> [String] {
+        return WorkspaceModel.refreshLaunchersReporting(in: workspaceURL, from: sources).refreshed
+    }
+
+    /// What `refreshLaunchersReporting` did: the launchers replaced, and the
+    /// ones that differed and could not be written.
+    nonisolated struct LauncherRefresh: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        var refreshed: [String] = []
+        var failed: [String] = []
+    }
+
+    /// `refreshLaunchers`, saying which launchers could not be written too —
+    /// what a scheduled run's trail line needs (#748), and nothing the window
+    /// needs: there a stale launcher fails loudly on its own when it runs.
+    /// Each launcher is written whole to a temporary file and moved into
+    /// place, so a launcher already running keeps reading the file it opened
+    /// and a launcher started now reads the old or the new, never half of
+    /// one (measured under /bin/bash, documentation/09-mac-app.md).
+    nonisolated static func refreshLaunchersReporting(in workspaceURL: URL, from sources: [String: URL]) -> LauncherRefresh {
         let fileManager: FileManager = FileManager.default
         var refreshed: [String] = []
+        var failed: [String] = []
         for (scriptName, sourceURL) in sources {
             let destinationURL: URL = workspaceURL.appendingPathComponent(scriptName)
             if !fileManager.fileExists(atPath: destinationURL.path) {
                 continue
             }
+            // A launcher that cannot be READ, the app's or the folder's, is
+            // one that could not be brought up to date: counted, not skipped
+            // (the 748b review's LOW 5), so a scheduled run never says the
+            // folder's tools were already up to date when it could not tell.
             guard let current = try? Data(contentsOf: sourceURL),
                   let existing = try? Data(contentsOf: destinationURL) else {
+                failed.append(scriptName)
                 continue
             }
             if current == existing {
@@ -1869,10 +1933,11 @@ class WorkspaceModel {
             } catch {
                 // A read-only folder is unusual but not fatal: the stale
                 // script will fail loudly on its own if it matters.
+                failed.append(scriptName)
                 continue
             }
         }
-        return refreshed.sorted()
+        return LauncherRefresh(refreshed: refreshed.sorted(), failed: failed.sorted())
     }
 
     /// Which folders in `courses/` are courses, each read from its

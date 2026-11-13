@@ -1003,6 +1003,15 @@ nonisolated enum ActivityTrail {
         /// record). Recorded because a deploy that went out half an hour late,
         /// or not at all, looks from outside exactly like one that misfired.
         case scheduledDeployWaitedForItsEarlierDeploy = "scheduled deploy waited for its earlier deploy"
+        /// A scheduled deploy brought its working folder's launchers and
+        /// tools up to date before it ran them (#748 part 4), so the first
+        /// deploy after an update builds with the version installed now.
+        /// Carries the course, the section, how many files changed and how
+        /// long it took, whether that means the website builder is built
+        /// again, how long it waited for another program's copy, or that it
+        /// could not finish and went ahead with the tools as they were.
+        /// Never written for the ordinary run that finds nothing to do.
+        case scheduledDeployGotItsFolderReady = "scheduled deploy got its folder ready"
         /// A section's deploy set for later was set again while that
         /// section's run was still working (GitHub #439, #409). Setting it
         /// again ends the run's app, but the deploy it had started goes on and

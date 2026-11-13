@@ -561,7 +561,7 @@
       {
         "carries": "the course, the section, how many seconds it waited, what the other program held and its process id - or, on Windows since #477, that Plantoir was getting the working folder ready and that copy's process id, or both obstacles in one line - and whether it then went ahead or stood down",
         "event": "scheduled publish waited for the course",
-        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac does not wait for a copy (its scheduled run does not mirror the tools); whether it should is a mac issue, not a contract case, by Russell's ruling on #477."
+        "why": "Added with #156. A publish set for later that finds another program building the course waits up to ten minutes (workLeases.declining.whyTheScheduledPublishWaits). A publish that went out ten minutes late, or not at all, looks from outside exactly like one that misfired; this line says it waited, for whom, and what it then did. A stand-down ALSO writes 'scheduled deploy turned off' (the job is cleared) and leaves the section's courseWasBusy record. On Windows since #477 (2026-10-15) the same wait, in the same ten minutes, also covers another program copying the app's tools into the working folder (a window opened on it just before the run, after an update): the line says 'waited N s for Plantoir to finish getting the working folder ready (process P)', and a copy still live at ten minutes stands the run down with couldNotRunAsSetNow and wording.wrapperCouldNotBeWritten - never courseWasBusy, which would be a false sentence about the course. The mac's run waits for a copy too since #748 part 4, before and after its own copy, for up to five minutes, and records that wait on its own event ('scheduled deploy got its folder ready'), never on this one, because it is not a wait for the course; it is not a contract case for both platforms, by Russell's ruling on #477, and scheduledRunGetsItsFolderReady.platformDifferences says how the two differ."
       },
       {
         "event": "scheduled deploy waited for its earlier deploy",
@@ -1154,6 +1154,25 @@
         "carries": "the course, the school year, and how it ended: deleted, already gone, or failed with the address still working. Never the address.",
         "line": "{course} · stopped sharing the {year} unit plans ({deleted | already gone | failed, so the address still works | not confirmed, so the address may still work})",
         "why": "#709. 'I stopped sharing and my colleague can still open it' is answerable only if the trail says whether the delete worked."
+      },
+      {
+        "event": "scheduled deploy got its folder ready",
+        "carries": "the course and the section, after the course's own prefix ({course}/{section} · ); which case of scheduledRunGetsItsFolderReady.cases it was (the line key); how many files were brought up to date and how many seconds the copy took; whether that means the website builder is built again; for a copy that could not finish, how many files failed and the first one with its error; and how long the run waited for another program's copy of the tools, with that program's process id. Never a path: the working folder is the course's.",
+        "lines": {
+          "broughtUpToDate": "a scheduled deploy copied {n} file(s) of Plantoir's tools into the working folder first, in {seconds} s{builder}, and went ahead",
+          "builderClause": ", so the website builder is built again for them unless this version of Plantoir has built it already",
+          "alreadyUpToDate": "a scheduled deploy found the working folder's tools already up to date, and went ahead",
+          "foundNothingToChange": "a scheduled deploy found nothing of its own to change in the working folder's tools, and went ahead",
+          "couldNotFinish": "a scheduled deploy could not bring all of the working folder's tools up to date ({failed} file(s) could not be copied or removed, {n} brought up to date, first: {first}){builder}, and went ahead with them as they were",
+          "appCarriesNoTools": "a scheduled deploy found none of Plantoir's own tools to bring the working folder up to date with, and went ahead with the folder's tools as they were",
+          "waitedClause": "; it first waited {waited} seconds for another program (process {pid}) to finish getting the working folder ready",
+          "stoppedWaitingClause": "; it stopped waiting after {waited} seconds for another program (process {pid}) that was still getting the working folder ready"
+        },
+        "why": "#748 part 4. The first scheduled deploy after an update is the one run that copies the new version's tools into a folder nobody has opened since, and it is also the one that then builds the website builder again, which makes it minutes slower than the run before it. A deploy that went out late, with a builder built again, looks from outside like a Mac that was slow for no reason; and one whose copy failed and went ahead with the old tools looks like a deploy that ignored the update. This line says which. Not written for the ordinary run that compares every file and changes nothing, and waits for nobody, which is every run but the first after an update: a line on every run would be noise in the one place a teacher's report is read. scheduledRunGetsItsFolderReady carries the cases and why the run goes ahead in every one of them.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "Windows' run has done the same since #477 (2026-10-15) and records it under the two events it already had: 'working folder tools copied' ('got the working folder ready for a scheduled deploy', a failure ending 'the scheduled deploy stood down') and 'scheduled publish waited for the course' for the wait. The mac gives it an event of its own because its run never stands down for the copy (scheduledRunGetsItsFolderReady.platformDifferences), so its line says something Windows' lines do not: that it went ahead with the tools as they were. Nothing is owed by Windows."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -38391,6 +38410,99 @@
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
       "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+    ]
+  },
+  "scheduledRunGetsItsFolderReady": {
+    "rule": "A scheduled deploy brings its working folder's launchers (setup.sh, preview.sh, deploy.sh at the folder's top) and .toolchain/ up to date from the tools of the Plantoir that runs it, before any of them runs, and then goes ahead in every case. The trail says what it did (activityTrail.mustRecord, 'scheduled deploy got its folder ready'), except for the ordinary run that finds nothing to change and waits for nobody.",
+    "order": "Lateness, the wait for an earlier deploy of the section, the wait for the course (which takes the run's build and publish leases), whether the job still stands, the settings as they are now (theDestination.order, unchanged), the wrapper written from them; then, only when the run will deploy and holding its leases: wait for another program's live copy, copy (the launchers, then .toolchain/, the window's order), wait again; then the wrapper runs. A run that stands down for its settings copies nothing. A plist from before v1.2.0 names no section and so no folder, and copies nothing, as it reads no settings.",
+    "theGuard": "Windows' marker, by name and body: courses/.internal/activity/toolchain-copying.<pid>, the lease body (process id, name, moment, start time), judged by the same liveness rule, written only when courses/ exists. Two copies on the mac write it while they run: the .toolchain/ copy a window or the assistant's server starts off the main actor (ToolchainReadiness.ensure), and the run's whole copy, launchers included. The window's launcher refresh (milliseconds), the synchronous copy (initializeWorkspace and the suite) and BuilderWarmUp (a folder of its own) do not. Only the run reads it: it waits while another program's marker is live before its own copy and again after, until five minutes have passed since it began waiting, then goes ahead. Each file is written whole to a temporary file and moved into place, so a launcher already running reads the file it opened and a launcher started now reads the old one or the new one, never part of one.",
+    "whyItAlwaysGoesAhead": "Because the alternative is a deploy that does not happen. A deploy that silently does not happen at 6:30 is the worst outcome; a deploy that goes ahead with the tools as they were and says so is better. In every case that cannot copy, the folder's tools are the ones the window last left there: nothing written at all (a folder that cannot be written, no tools in Plantoir) leaves the old set whole, which is exactly what every scheduled run used before #748. A copy that failed part way leaves some files new; the launchers then build from what is there, and if that build fails, the build leg and the destinations record it (scheduledPublishStopped) and the notification says so, so the run is never silent. Standing down would turn every one of these into a run that publishes nothing, the case where the copy did no harm included.",
+    "measured": "Apple M4 Pro, macOS 26.6, 2026-11-13, the app's own recipe (13,023 files, 83 MB), with an unrelated verify.sh running on the same Mac. The run's copy when nothing is stale: 0.84 to 0.86 s (3 runs), 3.9 to 6.6 s at background priority (taskpolicy -b). After an update (91 files changed, removed or added, every file restamped, the bundle's fingerprints valid): 1.33 to 1.47 s, 5.3 to 6.1 s at background priority. Into an empty folder: 4.1 to 4.7 s, 10.6 to 14.3 s. Two copies started at the same instant into one folder, before #748: after an update, one of the two counted 18 or 19 files as FAILED in each of 5 runs; into an empty folder, 5 of 8 runs had a failure; every one a file the other copy had already removed (or the other's temporary file), and the folder ended byte for byte right every time. With a file already gone not counted as a failure: 0 failures in 13 runs (5 after an update, 8 into an empty folder). A launcher replaced by a temporary file and a move while /bin/bash ran it: bash finished the old text; replaced in place: bash ran the new text from the middle. documentation/09-mac-app.md has the website builder's own rebuild time.",
+    "rejected": [
+      "Standing down when the copy fails (Windows' choice): it turns a copy that did no harm into a deploy that publishes nothing.",
+      "Waiting for the copy with no limit: a stuck copy would hold the deploy for ever, and the other copy writes the same bytes.",
+      "Leaving the folder alone and saying 'open the folder once after an update' in the notes: nobody reads the notes at 6:30, and Russell ruled the part in.",
+      "Rewriting every working folder's tools at the first launch after an update: the app does not know every folder, and a folder opened then is mirrored anyway.",
+      "A lock file the kernel releases (flock): a new mechanism beside the marker Windows already writes, and the marker's liveness rule already ignores a marker whose program is gone.",
+      "Making the window's copy take turns with the run's, as Windows does: on the mac two copies at once are measured to write the same bytes once an already-gone file is not a failure, and the window must never wait on a run that may itself be waiting for the course."
+    ],
+    "platformDifferences": "Mac: the run goes ahead in every case, waits up to five minutes in all for other copies, and writes its own event. Windows (#477): a failed copy, or one still waiting its turn when the run's ten minutes are up, stands the run down couldNotRunAsSetNow with wording.wrapperCouldNotBeWritten; its copies take turns because two writers failed with sharing violations on NTFS; its lines go under 'working folder tools copied' and 'scheduled publish waited for the course'. Both copy before the wrapper runs, and both write and honour the same marker.",
+    "appliesOn": [
+      "mac"
+    ],
+    "appliesOnWhy": "Windows' run already copies (#477) and decides differently on purpose, by Russell's ruling on #477 that this is not a contract case for both platforms: Windows stands down where the mac goes ahead. Windows' suite does not run these cases.",
+    "howToRunACase": "Build ScheduledRunFolderRefresh.Report from given (toolsChanged and toolsFailed are the .toolchain/ mirror's changed and failed counts; launchersRefreshed and launchersFailed are how many launchers at the folder's top were replaced or could not be; waitedFor is the other program's process id or null, waitedSeconds the seconds waited), call ScheduledRunFolderRefresh.decide, and compare every field of expect. When line is not none, trailLine must be the matching lines entry with the clauses expect names, and none of the others. A line written after the run stopped waiting says only what this run saw and did, so it never says the tools are up to date (the 748b review's LOW 4).",
+    "cases": [
+      {
+        "name": "every run but the first after an update: nothing stale, nobody else copying",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the first run after an update: the launchers and the tools brought up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher at the folder's top differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "only the tools differed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 3, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "a folder that cannot be written: nothing could be copied",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 0, "toolsFailed": 91, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "the disk filled part way through",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 1, "launchersFailed": 0, "toolsChanged": 40, "toolsFailed": 51, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "only a launcher could not be replaced",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 1, "toolsChanged": 91, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "Plantoir carries no tools to copy: nothing is copied, nothing is removed",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": false, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "appCarriesNoTools", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "not a working folder at all (no preview.sh): nothing to bring up to date",
+        "given": {"isAWorkingFolder": false, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": null, "waitedSeconds": 0, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "none", "saysItWaited": false, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for a window's copy, which left nothing to do",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 3, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "alreadyUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "waited for another program's copy, then brought the rest up to date",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 5, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 2, "stoppedWaiting": false},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": true, "saysItStoppedWaiting": false, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "another program was still copying after five minutes: the run copied anyway, found nothing of its own to change, and went ahead (never 'already up to date': the other copy may still be changing the folder)",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "foundNothingToChange", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      },
+      {
+        "name": "another program was still copying after five minutes, and the run's own copy changed files: it says what it copied, no more",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 7, "toolsFailed": 0, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "broughtUpToDate", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": true}
+      },
+      {
+        "name": "stopped waiting, and its own copy could not finish",
+        "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 2, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
+        "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
+      }
     ]
   }
 }
