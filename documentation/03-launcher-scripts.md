@@ -3359,16 +3359,48 @@ builder class. Now the `TOKEN HAND-OFF BLOCK` in `deploy.sh`:
   removes the folder before it does anything else;
 - removes the folder from the EXIT trap when the run ends before the reading
   step, and stops in words ("could not hand the sign-in to the website
-  builder") if the hand-off itself fails. SIGINT, SIGTERM and SIGHUP are each
-  trapped as an ordinary exit (130, 143, 129) so that the EXIT trap runs:
-  macOS's `/bin/bash` 3.2 skips the EXIT trap when a FOREGROUND command dies
-  of a signal sent to the whole group, which is what Stop in the app does,
-  and the #835 implementation review measured the folder left that way. The
-  first version of this section said SIGINT was measured clean; that was
-  measured only with a command in the background (`sleep & wait`), a shape
-  `deploy.sh` does not have. `test_deploy_token_handoff.py` now sends each
-  signal to the group while a foreground command runs, under `/bin/bash`
-  (the old block: SIGINT left the folder; the new: none of the three does).
+  builder") if the hand-off itself fails. SIGINT alone is trapped as an
+  ordinary exit (130) so that the EXIT trap runs: macOS's `/bin/bash` 3.2
+  skips the EXIT trap when a FOREGROUND command dies of SIGINT sent to the
+  whole group, and the #835 implementation review measured the folder left
+  that way. The first version of this section said SIGINT was measured
+  clean; that was measured only with a command in the background
+  (`sleep & wait`), a shape `deploy.sh` does not have.
+
+  What the app sends, and where it lands. Cancel (`ScriptRunner.cancelByUser`)
+  types ^C into the run's terminal, then, if the run is still going two
+  seconds later, `ScriptRunner.terminate` sends SIGTERM to bash ALONE; Stop,
+  quit and `PlanShareRunner.cancel` send that SIGTERM straight away. The ^C
+  reaches the whole group as SIGINT only while no `docker exec -it` holds the
+  terminal. While one does (the deploy's and the plan share's own steps), its
+  raw mode passes the ^C into the builder, to the command running there, and
+  bash sees no signal at all: that command ends, the exec returns its status,
+  and `set -e` ends the run through the EXIT trap.
+
+  SIGTERM and SIGHUP are deliberately NOT trapped. The fix round traps them
+  too, and the fix review (N1) measured the cost: a trapped signal waits for
+  the foreground command to finish, so SIGTERM to bash alone against a 20 s
+  command ended the run in 19.7 s with the trap and 0.0 s without it, and
+  the app's Stop waited for the whole deploy. Untrapped, bash 3.2 ends at
+  once and still runs the EXIT trap. Measured under `/bin/bash` 3.2 with
+  `sleep 20` in the foreground, the old block (cbc50a2ec) and the new one
+  alike: SIGTERM and SIGHUP, to the group or to bash alone, end the run in
+  0.0 s and leave no folder. SIGINT to the group ends it in 0.0 s (old: the
+  folder left; new: none). SIGINT to bash alone waits for the command, in
+  both (19.7 s), and leaves no folder; nothing in the app sends that. A
+  signal to bash alone leaves the foreground command running after bash has
+  gone, as it did before #835. `test_deploy_token_handoff.py` sends each
+  signal to the group, and SIGTERM and SIGHUP to bash alone with a 1 s limit
+  (the trapped block took the test's 5 s cap for both).
+
+  A known limit, in the old block and the new alike: a stop while the
+  WRITING step runs (the `docker exec -i` that makes the folder and fills
+  it) leaves the folder, because its name has not come back to
+  `DEPLOY_PAT_FILE` yet and the EXIT trap has nothing to remove. It stays in
+  the builder's `/tmp` until the builder is recreated (a new toolchain, or a
+  container recreated for its mounts), the same as after SIGKILL below.
+  The window is the length of one `docker exec`.
+
   Nothing in the EXIT trap may fail: under `set -e` a failing command there
   becomes the run's exit status (`test_deploy_sh_plans.py` met it).
 

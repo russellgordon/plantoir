@@ -4931,13 +4931,18 @@ hand_the_token_to_the_builder() {
   # becomes the run's exit status.
   trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi' EXIT
   # bash 3.2 (macOS's /bin/bash) does not run the EXIT trap when a
-  # FOREGROUND command dies of a signal sent to the whole group, which is
-  # what Stop in the app does (^C to the terminal): measured, the folder was
-  # left (#835 review M1). Each of the three is made an ordinary exit with
-  # the status the signal would have given, so the one EXIT trap removes it.
+  # FOREGROUND command dies of SIGINT sent to the whole group (^C typed into
+  # the terminal): measured, the folder was left (#835 review M1). SIGINT is
+  # made an ordinary exit with the status it would have given, so the one
+  # EXIT trap removes the folder.
+  #
+  # SIGTERM and SIGHUP are deliberately NOT trapped. Untrapped, bash ends on
+  # either at once and still runs the EXIT trap (measured: nothing left, to
+  # the group or to bash alone). Trapped, bash defers the trap until the
+  # foreground command finishes, and the app's Stop (ScriptRunner.terminate,
+  # SIGTERM to bash alone) then waited for the whole deploy: 0.0 s untrapped,
+  # 19.7 s trapped against a 20 s command (#835 fix review N1).
   trap 'exit 130' INT
-  trap 'exit 143' TERM
-  trap 'exit 129' HUP
 }
 # <<< TOKEN HAND-OFF BLOCK <<<
 if [[ "$TARGET" == "cloudflare" ]]; then

@@ -262,9 +262,50 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
                     code, console = self.finish(process)
                     self.assertFalse(os.path.exists(os.path.dirname(left)),
                                      f"{stopped_by.name} to the group left the hand-off folder behind")
-                    self.assertEqual(code, {signal.SIGINT: 130, signal.SIGTERM: 143, signal.SIGHUP: 129}[stopped_by],
+                    # SIGINT is trapped as an ordinary exit; SIGTERM and
+                    # SIGHUP end bash as the signal does (#835 fix review N1).
+                    self.assertEqual(code, {signal.SIGINT: 130, signal.SIGTERM: -signal.SIGTERM,
+                                            signal.SIGHUP: -signal.SIGHUP}[stopped_by],
                                      console)
                     (self.scratch / "go").unlink()
+
+    def test_sigterm_to_bash_alone_ends_the_run_at_once(self):
+        # The app's Stop, its quit and cancel's fallback all send SIGTERM to
+        # bash ALONE (ScriptRunner.terminate), not to the group. A TERM trap
+        # makes bash wait for the foreground command before it runs: against
+        # a 20 s command the run ended in 19.7 s with the trap and 0.0 s
+        # without it (#835 fix review N1). /bin/bash is 3.2, the shell the
+        # launchers run under on a Mac.
+        for stopped_by in (signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=stopped_by.name):
+                name = f"alone-{stopped_by.name}"
+                process = self.start(name, "made-up-token-alone", "sleep 20", shell="/bin/bash")
+                (self.scratch / "go").write_text("go", encoding="utf-8")
+                deadline = time.time() + 20
+                while self.where(name) == "" and time.time() < deadline:
+                    time.sleep(0.05)
+                left = self.where(name)
+                self.assertTrue(os.path.exists(left), "the hand-off was made")
+                time.sleep(0.2)
+                began = time.monotonic()
+                process.send_signal(stopped_by)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+                took = time.monotonic() - began
+                # The foreground command is not signalled and outlives bash,
+                # as it did before #835; end it so it is not left running.
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                code, console = self.finish(process)
+                self.assertLess(took, 1.0, f"{stopped_by.name} to bash alone took {took:.1f} s to end the run")
+                self.assertEqual(code, -stopped_by, console)
+                self.assertFalse(os.path.exists(os.path.dirname(left)),
+                                 f"{stopped_by.name} to bash alone left the hand-off folder behind")
+                (self.scratch / "go").unlink()
 
     def test_the_reading_step_removes_only_a_hand_off_folder(self):
         keep = self.scratch / "keep" / "pat"
