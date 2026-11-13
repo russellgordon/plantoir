@@ -311,5 +311,144 @@ class TheReaders(unittest.TestCase):
             self.assertNotIn("\u0000", text)
 
 
+class TheLabels(unittest.TestCase):
+    """`custom_short_name` and each section's label (#822), by the same rule."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.rule = the_rule()
+
+    def test_every_label_case_reads_as_the_contract_says(self):
+        import build_site
+        cases = self.rule["labelCases"]
+        self.assertGreaterEqual(len(cases), 9, "the contract lost label cases")
+        checked = 0
+        for case in cases:
+            with self.subTest(case=case["name"]):
+                config = case["config"]
+                if "expectHeaderLabel" in case:
+                    label = build_site.resolve_header_label(config, config["course_code"])
+                    self.assertEqual(code_points(label), code_points(case["expectHeaderLabel"]))
+                    checked += 1
+                if "expectSectionLabel" in case:
+                    label = build_site.resolve_section_emoji(config, case["section"])
+                    self.assertEqual(code_points(label), code_points(case["expectSectionLabel"]))
+                    checked += 1
+        self.assertEqual(checked, len(cases), "a case that checks nothing")
+
+    def test_the_page_title_line_stays_one_line(self):
+        import build_site
+        with tempfile.TemporaryDirectory() as folder:
+            config_path = Path(folder) / "quartz.config.ts"
+            config_path.write_text('const config = {\n  pageTitle: "x",\n}\n', encoding="utf-8")
+            config = {"course_code": "CODING", "custom_short_name": "Code\nClub\u202e",
+                      "emojis": {"sections": {"section1": "\U0001F4DA\r\n"}}}
+            label = build_site.resolve_header_label(config, "CODING")
+            emoji = build_site.resolve_section_emoji(config, 1)
+            with contextlib.redirect_stdout(io.StringIO()):
+                build_site.update_page_title(config_path, label, 1, emoji, True)
+            lines = config_path.read_text(encoding="utf-8").split("\n")
+        self.assertIn('  pageTitle: "\U0001F4DA Code Club S1",', lines)
+        self.assertEqual(len(lines), 4)
+
+    @unittest.skipUnless(HAS_PILLOW, "the sharing card needs Pillow")
+    def test_the_cards_section_label_is_cleaned(self):
+        import social_card
+        seen = []
+
+        class Stop(Exception):
+            pass
+
+        def record(emoji, *arguments, **keywords):
+            seen.append(emoji)
+            raise Stop()
+
+        if not hasattr(social_card, "_emoji_image"):
+            self.skipTest("the card draws its label through another function")
+        original = social_card._emoji_image
+        social_card._emoji_image = record
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    try:
+                        social_card.generate_card(
+                            {"course_code": "SPH3U", "course_name": "Physics",
+                             "emojis": {"sections": {"section1": "\u202e\U0001F52C\n"}}}, 1,
+                            Path(folder) / "card.png")
+                    except Stop:
+                        pass
+        finally:
+            social_card._emoji_image = original
+        self.assertEqual(len(seen), 1, "the card never drew its label")
+        self.assertEqual(code_points(seen[0]), code_points("\U0001F52C"))
+
+    def test_setup_offers_and_writes_the_labels_cleaned(self):
+        import setup_course
+        temporary = Path(tempfile.mkdtemp(prefix="plantoir-labels-"))
+        self.addCleanup(shutil.rmtree, temporary, True)
+        courses = temporary / "courses"
+        course = courses / "CODING"
+        course.mkdir(parents=True)
+        saved = {
+            "course_code": "CODING",
+            "course_name": "Coding Club",
+            "custom_short_name": "Code\nClub\u202e",
+            "emojis": {"sections": {"section1": "\u0000\U0001F4DA\n"}},
+            "num_sections": 1,
+            "section_numbers": [1],
+            "shared_folders": [],
+            "per_section_folders": [],
+            "shared_files": [],
+            "per_section_files": [],
+            "hidden": [],
+            "expandable": [],
+            "use_skeleton": False,
+            "prepopulate_example_content": False,
+            "use_lcs_terminology": False,
+            "include_curriculum_coverage": False,
+            "include_curriculum_pages": False,
+            "include_coverage_notes": False,
+        }
+        config_path = course / "course_config.json"
+        config_path.write_text(json.dumps(saved), encoding="utf-8")
+
+        original_courses = toolchain_paths.COURSES_DIR
+        original_quartz = toolchain_paths.QUARTZ_DIR
+        original_input = builtins.input
+        original_getch = setup_course.getch
+        prompts_shown = []
+
+        def answer(prompt: str = "") -> str:
+            prompts_shown.append(prompt)
+            if len(prompts_shown) > 200:
+                raise RuntimeError("the wizard kept asking; it is looping")
+            if prompt.startswith(setup_course.COURSE_CODE_PROMPT):
+                return "CODING"
+            return ""
+
+        def press_return() -> str:
+            return "ENTER"
+
+        toolchain_paths.COURSES_DIR = courses
+        toolchain_paths.QUARTZ_DIR = temporary / "no-quartz-here"
+        builtins.input = answer
+        setup_course.getch = press_return
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                setup_course.setup_course(no_backup=True)
+        finally:
+            toolchain_paths.COURSES_DIR = original_courses
+            toolchain_paths.QUARTZ_DIR = original_quartz
+            builtins.input = original_input
+            setup_course.getch = original_getch
+
+        written = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(code_points(written["custom_short_name"]), code_points("Code Club"))
+        self.assertEqual(code_points(written["emojis"]["sections"]["section1"]), code_points("\U0001F4DA"))
+        for prompt in prompts_shown:
+            for unwanted in ("\u0000", "\u202e", "Code\nClub"):
+                self.assertNotIn(unwanted, prompt)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -103,7 +103,8 @@ nonisolated enum ActivityTrail {
         case assistantOpened = "assistant opened"
         /// A Claude, Codex or GitHub Copilot session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
-        /// it takes its `assist` lease. Carries the course only. It answers
+        /// it takes its `assist` lease. Carries the course and, through the busy
+        /// sentences' slot, which assistant's session it is (#783). It answers
         /// "why is Rename greyed?" — `assistant opened` says a door was
         /// opened, never which course its server went on to hold.
         case outsideSessionHeldACourse = "outside session held a course"

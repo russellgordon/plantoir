@@ -816,6 +816,11 @@ enum AssistContract {
                          + "Mac on the mac, PC on Windows (#698). Recorded in shared-rules.json "
                          + "-> specialNames.platformWording.machine, whose usedIn names every "
                          + "sentence that carries it",
+                "assistant": "the outside assistant whose session holds the course, as the menus "
+                           + "name it: Claude, Codex or GitHub Copilot; two doors joined with or "
+                           + "in menu order; all three when the hold names none (#783). Filled from "
+                           + "the assist lease's fifth line by shared-rules.json -> "
+                           + "doorCourseHold.naming",
             ],
             "wording": table,
         ]

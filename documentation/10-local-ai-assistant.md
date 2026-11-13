@@ -7525,7 +7525,7 @@ this process's own (`heldElsewhere` skips its own pid and dead owners):
   (`WorkLeaseFiles.backupsHeldByOtherSessions`), and tells it apart from the
   in-app window's own held backup: the confirmation, the alert afterwards, the
   single Delete Backup and the trail's kept clause each say which (#458 ruling 7).
-- **A second session is refused.** All three Revise items grey on a held course
+- **A second session is refused.** Every Revise item greys on a held course
   with "Available once you finish revising with Claude or Codex" once under
   them — the sentence Windows' `BusyReason` has said since #430, with "or
   Codex" added because the server cannot tell which door started it. (Since
@@ -8048,9 +8048,13 @@ has). The rule and its cases are `shared-rules.json` →
 REJECTED: naming none (above); reading which program is the server's
 parent from the process table (it names a program, not a door, and fails for
 a server started by hand); a sidecar file or a line on every lease kind (the
-fifth line of the assist lease alone lives and dies with the hold, and
-Windows' readers read lines by index, so they are undisturbed: `WorkLease.cs`
-reads `lines[2]` and below).
+fifth line of the assist lease alone lives and dies with the hold). Windows'
+readers read lines by index: the name on line 2 and the start on line 4
+(`WorkLease.cs` → `ReadBody`), so a fifth line moves nothing, and a writer
+must write line 4 first (the start, or an empty line). Windows' assist lease
+has three lines today, so a key simply appended would land on line 4, be read
+as the start, and make a live hold read as gone (`file-formats.json` →
+`workLease.lines` and its four `bodyCases` for #783).
 
 ## #610: Open in Obsidian from the assistant
 

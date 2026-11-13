@@ -591,7 +591,7 @@ extension PlanInTheBrowser {
 }
 
 /// Plan a Unit with Claude… and Plan a Unit with Codex… on an empty Planning
-/// tab (#708): the two doors Revise With ▸ opens, with an opening message of
+/// tab (#708): the doors Revise With ▸ opens, with an opening message of
 /// their own (`contracts/app-rules.json` → `outsideAgents.planAUnit`), as
 /// Fix with Claude… does for problems (#717).
 nonisolated enum PlanAUnit {

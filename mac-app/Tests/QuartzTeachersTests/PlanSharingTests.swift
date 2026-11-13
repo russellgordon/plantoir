@@ -361,4 +361,21 @@ final class PlanSharingTests: XCTestCase {
         XCTAssertEqual(CredentialRequest.unitPlanUsername.isSecret, false)
         XCTAssertEqual(CredentialRequest.matching("Paste Cloudflare token: ")?.name, "cloudflareToken")
     }
+
+    /// The username request's explanation is written in the contract with
+    /// `{machine}` where the computer is named (#863), so Windows shows its
+    /// own word; this app fills in "Mac" and shows what it always showed.
+    func testTheUsernameExplanationNamesTheMachineByPlaceholder() throws {
+        let readout: [String: Any] = try XCTUnwrap(try PlanSharingTests.contract("app-rules")["credentialRequests"] as? [String: Any])
+        let requests: [[String: Any]] = try XCTUnwrap(readout["requests"] as? [[String: Any]])
+        var written: String?
+        for request in requests where request["name"] as? String == "unitPlanUsername" {
+            written = request["explanation"] as? String
+        }
+        let explanation: String = try XCTUnwrap(written, "No unitPlanUsername in credentialRequests")
+        XCTAssertTrue(explanation.contains(MachineWord.placeholder), explanation)
+        XCTAssertFalse(explanation.contains(MachineWord.onThisPlatform), explanation)
+        XCTAssertEqual(MachineWord.filling(explanation), CredentialRequest.unitPlanUsername.explanation)
+        XCTAssertNotEqual(explanation, CredentialRequest.unitPlanUsername.explanation, "the app fills the placeholder")
+    }
 }

@@ -2607,8 +2607,8 @@ struct CourseCodeField: View {
     }
 }
 
-/// The two outside doors' failure alerts — "Claude didn't open" and "Codex
-/// didn't open" — lifted out of `SidebarView.body`.
+/// The outside doors' failure alerts — "Claude didn't open", "Codex
+/// didn't open" and "GitHub Copilot didn't open" — lifted out of `SidebarView.body`.
 ///
 /// Not a tidy-up. Adding the second alert pushed the sidebar's modifier chain
 /// past what the Swift type-checker will finish, and the build failed with

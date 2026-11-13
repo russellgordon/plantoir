@@ -1255,7 +1255,9 @@ name the assistant holding the course through one `{assistant}` slot
 (`doorCourseHold.naming`). For that, every Windows door owes
 `PLANTOIR_DOOR_ASSISTANT` (its own key) in its server's environment, and
 `plantoir-mcp` owes the key as its `assist` lease's fifth line
-(`file-formats.json` → `workLease.lines`); until then a Windows hold names
+(`file-formats.json` → `workLease.lines`), writing line 4 first (the start, or
+an empty line): its assist lease has three lines today, and a key appended
+would be read as the start and the hold as gone (`workLease.bodyCases`); until then a Windows hold names
 none and the mac's sentences list all three, which is still true. What it owes, and the windows issue for #783 lists:
 a `CopilotLauncher` that writes `mcp-<CODE>-copilot.json` into Plantoir's data
 folder and starts `copilot.exe` by argument vector, or npm's `copilot.cmd`
