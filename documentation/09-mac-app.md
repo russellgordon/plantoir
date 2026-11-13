@@ -8097,6 +8097,12 @@ Russell's real 2025–26 folder on 2026-09-20: a 44,532-entry manifest of
 outside `Media` — is byte-identical before and after an import
 (`68276d82cf7f73ee…` both times).
 
+**A backup or archive zip is accepted as well** (#572), opened outside the
+working folder and read as the one course folder at its root, and **a code
+already in use by a live course here never refuses an import**: only the shelf
+rule is asked. Both are in "Making a reference course from nothing, or from a
+backup", below.
+
 **Three folder shapes are accepted**, because a teacher points at what they
 recognise: the working folder itself, the `courses` folder inside it, or ONE
 course folder. The last two resolve UPWARD and the whole shelf is offered,
@@ -8352,7 +8358,9 @@ no sleep anywhere in the path and no timer.
 The copy is made under a **hidden name** — `.plantoir-importing-<folder>`,
 inside `courses/` — and is marked, filed under its year, neutralised and
 locked THERE. The last act is a rename into the real name, which within one
-folder is atomic. Both ways of making a reference course do this.
+folder is atomic. Every way of making a reference course does this: Keep a
+Copy, this import, and since #572 a course made in the wizard ("Making a
+reference course from nothing, or from a backup", below).
 
 **The fault it closes was measured.** Until 2026-09-20 the copy was made at
 its final name, so for the length of the copy `courses/ICS4U-2025/` held last
@@ -9148,6 +9156,144 @@ reading S1's; following the links; importing section 2 (and either rewriting
 a website folder upward; reading the title or section out of
 `quartz.config.ts`, a program; showing Math Club as an untickable row; counting
 the program's files without a bound; leaving `unit_word` absent.
+
+### Making a reference course from nothing, or from a backup (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's first piece says. The setup half (`setup_course.py --reference-staging-folder`) and its test are shared, so Windows inherits them; the wizard choice, the creation run and the zip door are its own.
+
+Two more ways onto the shelf, both for a course whose code may already belong
+to a LIVE course in the same working folder. **Three doors, one path** was
+Russell's ruling of 2026-11-12:
+
+- **In the New Course wizard**, "Keep this course for reference" (offered
+  only for a code that has ready-made pages), or **Keep for Reference** under
+  the taken-code refusal, which turns the same toggle on.
+- **New Reference Course…** on the Reference Courses heading's menu, which
+  opens the same wizard with the toggle already on.
+- **Import Courses for Reference…**, which now also takes a backup or an
+  archive zip, a colleague's included. There is no separate "Restore as
+  Reference Course…".
+
+Which shape the wizard shows is `ReferenceChoice.offered`, a pure rule with
+contract cases (`referenceCourses.creating.whenOffered`). For a code with no
+ready-made pages the choice is not offered, and "There are no ready-made pages
+for {code} to keep for reference" is said where it would be, but only when the
+teacher asked (the code is taken, or the wizard came from the shelf). A
+reference course of such a code would be a locked skeleton nobody can read
+from or add to; the plan review asked, and the director took its
+recommendation.
+
+#### Made in the hidden staging folder, by the real setup
+
+`ReferenceCreation` is `ReferenceCopier` with setup as its source, and it
+keeps the same rule: nothing under `courses/` is ever a course that is not yet
+a reference course.
+
+1. The shelf rule for the chosen year, again at the act (the wizard's caption
+   asks the same function, `ReferenceCreation.courseCodeProblem`). With the
+   toggle on, the code rule is asked with NO existing codes, so a live
+   `ICS3U` does not refuse; characters, length and kept names still do.
+2. The folder name is `ReferenceCourseRule.proposedFolderName`'s, and the
+   staging folder is claimed through `ReferenceStaging.claim`, the claim and
+   lease every reference door takes.
+3. The wizard's settings are written into it **already marked**:
+   `kept_for_reference`, `reference_school_year`, the ready-made pages on,
+   no skeleton, and the destination neutralised by `neutraliseForReference`.
+   So the folder is a reference course for the whole run, not only at the
+   end (`referenceCourses.creating.settingsWritten`).
+4. `setup.sh -- --reference-staging-folder .plantoir-importing-<FOLDER>`,
+   with the ordinary answer pump and progress steps. Setup accepts only a
+   staging folder that already holds those settings, never asks the code and
+   makes no backup (`04-course-setup.md`, and
+   `course-management.json` → `courseCode.setupIntoStaging`).
+5. On success, and only when the ready-made pages are really there,
+   `makeIntoAReferenceCourse` and one rename. Otherwise, and on Cancel, the
+   staging folder is removed. The claim is given back last.
+
+**The live course is never opened, written, backed up or renamed.** Three of
+setup's path sites rebuilt the course's path from its CODE instead of the
+folder it was given, and they worked only because the live `courses/ICS3U`
+was there to write into. All three now use the folder, on every run. Measured
+by `scripts/test_setup_course_reference_staging.py`: a live `ICS3U` holding
+only `section1`, beside a staging folder whose settings name two sections and
+the payload's shared folders, is byte for byte the same after the run, and
+with one site put back the test finds a `section1/All Classes` folder made in
+the live course.
+
+**The pages check is plan review H3, and it has two locks.** The ordinary
+setup prints "Could not install the example content" and carries on with exit
+0, so the app would have locked an empty course and written "from the
+ready-made pages written for it" on the trail. In staging mode setup now stops
+with exit 1 when the payload is missing, declined or raises, or writes
+nothing. The app then asks again (`ReferenceCreation.pagesLanded`): the
+transcript says "Example content installed" AND a page other than a folder's
+front page is in the folder. An older setup that carried on is caught by the
+second lock. Either way the teacher reads `pagesDidNotLand` and nothing is on
+the shelf.
+
+**What the trail says.** `course created for reference` (the folder, the code,
+the year, the sections) or `course could not be created for reference` (the
+code, the folder, the sentence shown), once. The ordinary `course created`
+line is NOT written: it is written before setup runs and names only the code,
+which beside a live `ICS3U` would read as that course.
+
+**The staging folder now lives through an image build** (plan review L4). The
+claim comes before `setup.sh`, which may rebuild the image after a toolchain
+change. Liveness is per machine, so a second Mac or a Windows machine on the
+same cloud-synced folder can sweep it mid-run; the run then fails closed,
+because `makeIntoAReferenceCourse` finds no settings, and nothing is put on
+the shelf. No change was made for it.
+
+#### A backup or archive zip, through the import
+
+`ReferenceZipSource` opens the zip into a new folder in the system's temporary
+folder, never inside the working folder (the import refuses a source inside
+the folder that is open), and the sheet then reads the ONE course folder at
+its root as a lone course folder. Everything after that is the import's own:
+the shelf rule per row, the claim, the staging folder under `courses/`, the
+lock cleared, the names left behind, `makeIntoAReferenceCourse`, the rename,
+the summary. The trail names the zip's file name, not the temporary folder.
+What was unpacked is removed when the sheet closes; the zip is never written
+to. Live codes are never consulted, as for every import
+(`referenceCourses.importing.zips.codesInUse`, plan review L2).
+
+**A zip is someone else's file, so it is checked twice.** Measured on macOS 26
+with `/usr/bin/ditto -x -k` into a fresh folder: `../escaped.txt` and
+`ICS3U/../../escaped2.txt` were written INSIDE that folder, and `/tmp/x` was
+written as `tmp/x` inside it, so the unzipper does not let a name escape. A
+link entry, though, was made as a real link (`ICS3U/link -> /etc`). So the
+zip's listing is read first (`zipinfo -1` for the names, `zipinfo` for the
+permissions): an absolute name, a `~`, a backslash, a `..` part or any link
+refuses the whole zip. After unpacking, anything that is a link refuses it
+again, and what was unpacked is removed. The two checks are proven separately:
+with the second one off, the listing still refuses the link zip; with both
+off, `ReferenceCreationTests.testEveryZipCase` fails.
+
+**Site markers do not come along.** A backup of a live course carries its
+`.netlify_sites/section<N>.json`; `makeIntoAReferenceCourse` renames each
+aside exactly as for a folder, and the test asserts the marker is gone from
+the copy. Schedules live outside the course folder and never travel. Unit
+plans' share markers (`.cloudflare_sites/plans.json`, `.netlify_sites/plans.json`,
+#707's later parts) do not exist on `dev` yet; whichever piece adds them owes
+their release in `makeIntoAReferenceCourse` (plan review M4).
+
+#### Rejected
+
+- **A Restore as Reference Course… door on backup and archive rows**, with its
+  own sheet, menu verb, situation key and four trail events (the first plan).
+  It rebuilt what the import already does; Russell ruled it out on 2026-11-12.
+- **Running setup in a scratch working folder and importing the result.** On
+  the mac a new folder is a new container, a port block and a copy of the
+  toolchain: minutes of moving parts for one course.
+- **Making a live course, keeping a copy and removing the live one.**
+  Impossible when the code is taken, which is the point.
+- **Installing the ready-made pages from Swift.** A second installer that
+  would drift from setup's.
+- **`--no-backup`.** `setup.sh` asks "Are you sure?" for it, and the pump
+  answers with Return, which cancels.
+- **Opening the zip inside the working folder**, and **a size limit** on it
+  (no limit separates a large course from a hostile zip).
+- **Offering the choice for a code with no ready-made pages** (above).
 
 ## Copying a page from one course into another
 

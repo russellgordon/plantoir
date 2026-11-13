@@ -380,6 +380,44 @@ entire course is zipped to `courses/_backups/<CODE>/<timestamp>.zip` *before
 any mutation*, excluding caches and generated output (`node_modules`,
 `.merged_output`, `.git`, etc.). This makes the wizard safe to re-run.
 
+### 1–2b. A second door: setting up inside the apps' staging folder (#572)
+
+`--reference-staging-folder NAME` is used only by the two apps, when a teacher
+makes a course straight onto the Reference Courses shelf. The course is set up
+INSIDE the apps' hidden staging folder (`courses/.plantoir-importing-<FOLDER>`)
+rather than under its code, because the code may belong to a live course this
+run must not touch. The apps rename the folder into place afterwards.
+
+- **Exactly one shape is accepted**, and anything else is refused with exit 1
+  having written nothing: NAME begins with the staging prefix and is more
+  than it, is one bare folder name directly inside `courses/`, is a real
+  folder and not a link, and holds a `course_config.json` (a real file) that
+  carries `kept_for_reference: true` and a code the rule accepts with no
+  existing codes. The typed-code path still refuses a leading dot first, so
+  the code prompt can never be used to write into a staging folder.
+- **No code prompt, no Example Course offer and no backup.** The code is read
+  from the settings, and the folder was made by the app seconds before.
+  `--no-backup` is not used for this: `setup.sh` asks "Are you sure?" for it,
+  and the apps' answer pump presses Return, which cancels.
+- **Every path is under the staging folder.** Three scaffolding sites used to
+  rebuild the path from the code (`COURSES_DIR / course_code / …`) instead of
+  using `course_path`; they now use `course_path` on every run, which changes
+  nothing for the typed path, where the two are equal.
+- **No ready-made pages, no course.** A run that would not install them stops
+  with exit 1 and `REFERENCE_PAGES_NOT_INSTALLED`: no payload for the code,
+  the payload declined in the settings, or an install that raised or wrote
+  nothing. An ordinary course carries on without them and the teacher repairs
+  it; a reference course is locked once made, so it would be worthless (plan
+  review H3).
+- **The success line is still printed** (it is the last `courseCreation`
+  milestone the apps watch for), and the preview and deploy commands after it
+  are not, because they would name a folder no launcher accepts.
+
+The cases are `contracts/course-management.json` → `courseCode.setupIntoStaging`,
+run by `scripts/test_setup_course_reference_staging.py`. Why the apps make a
+reference course this way, and what was rejected, is `09-mac-app.md` →
+"Making a reference course from nothing, or from a backup (#572)".
+
 ### 3. Course-level conventions
 
 - Ensures a **`Media/` folder** at the course root. This is the designated
