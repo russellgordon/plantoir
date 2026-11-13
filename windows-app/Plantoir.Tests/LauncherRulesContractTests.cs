@@ -71,7 +71,10 @@ public class LauncherRulesContractTests
         Assert.Contains($"ledger: {held.Count} held pairs read", output);
         Assert.Equal(held.Count, output.Split('\n').Count(line => line.StartsWith("ledgered [", StringComparison.Ordinal)));
 
-        Assert.Contains(" 0 failed", output);
+        // Say WHICH rows failed: the output's head is the port walk's skips,
+        // so a Contains failure would show nothing useful.
+        Assert.True(output.Contains(" 0 failed", StringComparison.Ordinal),
+            string.Join("\n", output.Split('\n').Where(line => line.StartsWith("FAIL", StringComparison.Ordinal) || line.Contains(" passed, ", StringComparison.Ordinal))));
         Assert.DoesNotContain("FAIL", output);
         // A runner that skipped everything would also say "0 failed".
         Assert.Matches(@"(\d{2,}) passed", output);

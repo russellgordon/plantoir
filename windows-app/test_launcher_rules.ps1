@@ -911,6 +911,11 @@ try {
         $info.UseShellExecute = $false
         $info.RedirectStandardOutput = $true
         $info.RedirectStandardError = $true
+        # The launchers print UTF-8 ([Console]::OutputEncoding); read it as
+        # that, or the cross arrives as mojibake whenever this runs with no
+        # console of its own (under the test host).
+        $info.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        $info.StandardErrorEncoding = New-Object System.Text.UTF8Encoding($false)
         $info.RedirectStandardInput = $true
         $process = [Diagnostics.Process]::Start($info)
         $process.StandardInput.Close()
