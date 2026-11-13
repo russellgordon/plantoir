@@ -16356,8 +16356,14 @@ on TERM. It remembers no address and writes no trail line.
 HIGH). It runs from `verify.sh` and other checks while the teacher works,
 and at about 12:17 on 2026-11-13 the teacher's key window was taken while
 the reviewer started three of these; one printed nothing and two outlived
-their input. Not proven to be the cause, and the measurement is owed
-(above). The code allowed it but has not been shown to cause it: the flag
+their input. **Measured at the director's gate on 2026-11-13, the
+first build was not measurably an application either**:
+`browser-checks/check_headless_modes.py` passed 3 of 3 on faac3da1b's
+bundle as on the fix (`isAnApplication` False, `frontChanged` False,
+`secondsToLeave` 0.0), and `--mcp-stdio` the same. So the claim that the old
+mode took focus is not supported, and the 12:17 cause is unknown. The fix
+is kept as a structural guarantee. The code allowed it but was not shown to
+cause it: the flag
 was read in `QuartzTeachersApp.init`, inside SwiftUI's `App.main`, where an
 `NSApplication` MAY already exist. Whether one does at that point is the
 open question `browser-checks/check_headless_modes.py` settles on faac3da1b's

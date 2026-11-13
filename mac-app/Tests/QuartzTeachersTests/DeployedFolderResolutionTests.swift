@@ -213,6 +213,11 @@ final class DeployedFolderResolutionTests: XCTestCase {
         for testCase in cases {
             let files: [String: Any] = try XCTUnwrap(testCase["files"] as? [String: Any])
             let fixture: (root: URL, outside: URL, top: URL) = try DeployedFolderResolutionTests.makeFixture(files: files)
+            // Removed after the case is checked: `check` reads the expected
+            // file from the fixture to compare the body with it.
+            defer {
+                try? FileManager.default.removeItem(at: fixture.top)
+            }
             let started: (server: DeployedFolderServer, firstWasTaken: Bool) = try await DeployedFolderServer.start(
                 root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: {}
             )
@@ -220,7 +225,6 @@ final class DeployedFolderResolutionTests: XCTestCase {
             let request: DeployedFolderResolver.Request = try DeployedFolderResolutionTests.request(from: testCase, port: port)
             let answer: RawHTTP.Answer? = RawHTTP.exchange(port: port, request: request)
             await started.server.stop()
-            try? FileManager.default.removeItem(at: fixture.top)
             let name: String = (testCase["name"] as? String) ?? ""
             guard let answer else {
                 let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
