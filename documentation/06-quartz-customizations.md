@@ -4341,7 +4341,7 @@ card names.
 (marked `spa-preserve`), fetches the sketch from the site and hands it over
 as `ggbBase64`, and makes the applet with the web3d codebase, offline, in
 English (the language files are left out of the engine), no menu bar, no
-input bar, no right-click menu, the reset icon, shift-drag zoom, the fence's
+input bar, no right-click menu, the reset icon (below, #792), shift-drag zoom, the fence's
 `toolbar:`/`algebra:`, at the sketch's own size, scaled down to the page
 (`scaleContainerClass`). The box it is scaled into keeps the sketch's own
 shape (`aspect-ratio` from `--pl-geogebra-ratio`, `height: auto !important`,
@@ -4483,6 +4483,87 @@ a working one — a change to `geogebraFences.commands` and to what a teacher
 reads, for Russell to decide, not a hotfix); calling the engine's internal
 close (scrambled names, one pin only). **Not measured:** why the issue saw
 the sketch look fine from `file://`; a class site is always served over HTTP.
+
+**The reset icon puts a sketch back to how it opened (#792, v1.10.0).**
+Every sketch is made with `showResetIcon`, GeoGebra's two arrows in a circle
+at the top right of the graphics view. Russell found on 2026-11-12, in
+Safari on an iPad, that pressing it on a sketch written as lines left an
+empty grid with axes. Measured the same day over HTTP on `[::1]`, headless
+Chromium 1243 and WebKit 2359 (Playwright 1.63), the icon pressed with a
+real pointer (move, press, release at its place, never `.click()` or the
+applet's own `reset()`, #761), on the fixture's file sketch and its
+commands sketch:
+
+| Loader | Sketch | What `getAllObjectNames` holds after the press | `appletOnLoad` again? |
+|---|---|---|---|
+| Before #792 | written as lines | nothing (`f,g,a,A,c` before) | no |
+| Before #792 | from a file | the applet is gone: an empty white box | yes, and the loader removed it |
+| #792 | written as lines | `f,g,a,A,c`, `a` back at 3, `A` at (1, 2) | yes |
+| #792 | from a file | `A,B,f,m`, `A` back at (−3, −1) | yes |
+
+The same in both engines. **What the icon is:** no element of the page.
+GeoGebra 5.4.933.1 paints it onto the graphics view's canvas; its centre is
+24.5 px in from the view's right edge and 22 px down from its top, in the
+sketch's own pixels, scaled with the sketch (`geogebraFences.reset.icon`;
+the same on the 640 px file sketch, the 800 px commands sketch, and an
+800 px one with the toolbar and the algebra view). **What reset does:** it
+reloads the file the applet was loaded with, and calls `appletOnLoad` again
+when there is one. A sketch from a file therefore came back, and the
+loader's guard at the top of `appletOnLoad` (`if (settled || !samePage())`,
+written for a load that arrives after the student was told it did not
+open, or after the page changed) then removed it at once. That half was
+not in the issue, which expected a file sketch to be fine; it shipped in
+1.9.0 alongside the other. A sketch written as lines is loaded empty and
+built afterwards, so its reset reloaded nothing, and nothing told the page:
+no second `appletOnLoad`, and no event from a client, add or clear listener
+registered on the applet.
+
+**What the loader does now.** A second `appletOnLoad` on a sketch that has
+already opened (`opened`) is its reset: the sketch is kept, its entry in
+`open` takes the applet handle the reload passed (printing and the page
+change use it), and error dialogs are turned off again. Once a sketch's
+lines have run, `keepAsStart` loads what they built back in as the
+applet's file (`setBase64` of `getBase64`), and only then is the figure
+marked as having run its lines. That load changes nothing on screen
+(screenshots before and after it are the same, pixel for pixel, in both
+engines, with and without the toolbar and the algebra view), does not call
+`appletOnLoad`, and took about 65 ms in Chromium; the whole open took 569
+to 668 ms in Chromium and 549 to 622 ms in WebKit, one run each. Reset then
+reloads that file like any other: every object, each slider at the value
+the lines gave it, the view the lines zoomed to. Pressed five times in a
+row, it came back as it opened, in both engines. No line runs again, so a reset opens no
+dialog and lays no shade; dragged after a reset, slider `a` and point `A`
+both moved. While the lines run and that load is made, `holdPresses`
+stops a person's presses and touches on the sketch (capture phase, only
+`isTrusted` events, so the loader's own `click()` on a dialog's button
+still reaches it; holding those as well left 17 shades in the first try).
+Measured on a 163-line sketch with the icon pressed again and again until
+its lines were done (14 to 17 presses): without the hold, 5 of its 155
+objects were left in Chromium and 8 in WebKit; with it, all 155.
+
+`browser-checks/geogebra_applet.mjs` item 11 checks it in each phase: a
+real drag on slider `a` and on point `A`, a real press at
+`geogebraFences.reset.icon`, then the construction read back until it is
+what the sketch opened as (its own state is what is waited on; ten seconds
+is only the bound), no shade, the canvas on top, and a drag that moves it
+again. Against the loader before #792 (the old file put back, spliced into
+a built site, the new file restored) it fails on both sketches, in both
+phases. **The gate runs Chromium only:** the check speaks the DevTools
+protocol and carries no packages, so WebKit was measured by hand with
+Playwright as above and is in no gate. `scripts/test_geogebra.py` →
+`ResetKeepsTheSketchTextPinTests` is a text pin, for the Windows suite.
+
+**Rejected for #792:** running the lines again after a reset (on a sketch
+loaded empty nothing tells the page that a reset happened, and each run
+would open the lines' dialogs again, which #755 had to tame); hiding the
+icon on sketches written as lines, the issue's fallback (not needed: it
+works on both kinds, in both engines, and a student loses the quickest way
+back); turning the icon off and drawing one of our own; calling the
+engine's internal reset or its scrambled names; any fixed wait after the
+press. **Not measured:** an iPad itself, and a touch press; the hold also
+holds `touchstart` and `touchend`. A press during the lines does nothing
+rather than being remembered for later. **No trail event:** a student's
+press on a published site is not something the teacher did in Plantoir.
 
 **A failed fetch is not remembered** (stage 3+4 review item 4). With no
 saved copy, every build asks geogebra.org again, and a build while it does
