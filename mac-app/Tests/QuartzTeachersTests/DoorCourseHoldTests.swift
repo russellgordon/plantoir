@@ -92,7 +92,7 @@ final class DoorCourseHoldTests: XCTestCase {
     }
 
     /// Writes the other program's leases on a course, as either app writes them.
-    func writeOthersLeases(_ kinds: [String], course: String = "ICS3U", in root: URL) throws {
+    func writeOthersLeases(_ kinds: [String], course: String = "ICS3U", assistant: String? = nil, in root: URL) throws {
         let pid: Int32 = try otherProgram()
         let directory: URL = activityDirectory(root)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -102,7 +102,11 @@ final class DoorCourseHoldTests: XCTestCase {
             let url: URL = directory.appendingPathComponent(
                 WorkLeaseFiles.fileName(courseCode: course, kind: kind, pid: pid)
             )
-            try Data("\(pid)\nsleep\n\(when)\n\(start)\n".utf8).write(to: url)
+            var body: String = "\(pid)\nsleep\n\(when)\n\(start)\n"
+            if let assistant {
+                body += assistant + "\n"
+            }
+            try Data(body.utf8).write(to: url)
         }
     }
 
@@ -177,6 +181,7 @@ final class DoorCourseHoldTests: XCTestCase {
         let doors: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold", "whichDoors"])
         XCTAssertEqual(doors["claude"] as? Bool, true)
         XCTAssertEqual(doors["codex"] as? Bool, true, "Russell, #458, 2026-10-07: both doors hold their course.")
+        XCTAssertEqual(doors["copilot"] as? Bool, true, "#783: the GitHub Copilot door holds its course too.")
     }
 
     /// The server takes the lease on the course the door named, as the folder
@@ -189,7 +194,7 @@ final class DoorCourseHoldTests: XCTestCase {
         )
         let pid: Int32 = getpid()
         XCTAssertEqual(names(in: activityDirectory(made.root)), ["ICS3U.assist.\(pid).lease"])
-        XCTAssertTrue(trailText(in: made.root).contains(AssistMCPServer.holdingTrailLine(courseCode: "ICS3U")))
+        XCTAssertTrue(trailText(in: made.root).contains(AssistMCPServer.holdingTrailLine(courseCode: "ICS3U", assistant: nil)))
 
         WorkLeaseRegistry.reset()
         AssistMCPServer.holdTheDoorsCourse(
@@ -209,10 +214,143 @@ final class DoorCourseHoldTests: XCTestCase {
             line = event["line"] as? String
         }
         let expected: String = try XCTUnwrap(line)
-        XCTAssertEqual(
-            AssistMCPServer.holdingTrailLine(courseCode: "ICS3U"),
-            expected.replacingOccurrences(of: "{course}", with: "ICS3U")
+        XCTAssertTrue(expected.contains("{assistant}"), "#783: the line names the assistant through the slot")
+        for key in [nil, "claude", "codex", "copilot"] as [String?] {
+            XCTAssertEqual(
+                AssistMCPServer.holdingTrailLine(courseCode: "ICS3U", assistant: key),
+                expected.replacingOccurrences(of: "{course}", with: "ICS3U")
+                    .replacingOccurrences(of: "{assistant}", with: AssistWording.outsideAssistantNamed([key])),
+                key ?? "no door named"
+            )
+        }
+    }
+
+    // MARK: - Naming the assistant (#783)
+
+    /// `doorCourseHold.naming`: the names, the words for an unnamed hold and
+    /// every case, through the one function that fills the slot. MUST FAIL
+    /// if an unknown hold is named as one door, or two doors as one.
+    func testTheNamingCasesAreTheContracts() throws {
+        let naming: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold", "naming"])
+        let names: [String: String] = try XCTUnwrap(naming["names"] as? [String: String])
+        var swiftNames: [String: String] = [:]
+        for entry in AssistWording.outsideAssistantNames {
+            swiftNames[entry.key] = entry.name
+        }
+        XCTAssertEqual(swiftNames, names)
+        XCTAssertEqual(naming["anyAssistant"] as? String, AssistWording.anyOutsideAssistant)
+        // The names are the menus' own, without the ellipsis.
+        XCTAssertEqual((names["claude"] ?? "") + "…", ClaudeCodeLauncher.menuItemTitle)
+        XCTAssertEqual((names["codex"] ?? "") + "…", CodexLauncher.menuItemTitle)
+        XCTAssertEqual((names["copilot"] ?? "") + "…", CopilotLauncher.menuItemTitle)
+
+        let cases: [[String: Any]] = try XCTUnwrap(naming["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let given: [Any] = try XCTUnwrap(testCase["keys"] as? [Any], name)
+            var keys: [String?] = []
+            for value in given {
+                keys.append(value as? String)
+            }
+            XCTAssertEqual(AssistWording.outsideAssistantNamed(keys), testCase["expect"] as? String, name)
+        }
+    }
+
+    /// `doorCourseHold.naming.leaseCases`: only an `assist` lease records the
+    /// door, as its fifth line, and the reader reads it back. MUST FAIL if the
+    /// fifth line is not written, or written on another kind.
+    func testTheAssistLeaseRecordsItsDoor() throws {
+        let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
+        let coursesDirectory: URL = made.root.appendingPathComponent("courses", isDirectory: true)
+        let naming: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold", "naming"])
+        for testCase in try XCTUnwrap(naming["leaseCases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let kind: String = try XCTUnwrap(testCase["kind"] as? String)
+            let written: (url: URL, moment: String) = try XCTUnwrap(WorkLeaseFiles.write(
+                kind: kind, courseCode: "ICS3U", coursesDirectory: coursesDirectory,
+                assistant: testCase["assistant"] as? String
+            ), name)
+            let text: String = try String(contentsOf: written.url, encoding: .utf8)
+            let lines: [Substring] = text.split(separator: "\n", omittingEmptySubsequences: false)
+            let expected: String? = testCase["fifthLine"] as? String
+            if let expected {
+                XCTAssertEqual(lines.count, 6, "\(name): five lines and the last line feed\n\(text)")
+                XCTAssertEqual(lines.count > 4 ? String(lines[4]) : nil, expected, name)
+            } else {
+                XCTAssertEqual(lines.count, 5, "\(name): four lines and the last line feed\n\(text)")
+            }
+            XCTAssertEqual(WorkLeaseFiles.assistantLine(in: text), expected, name)
+            WorkLeaseFiles.remove(at: written.url)
+        }
+    }
+
+    /// The server takes its door's name from its environment and records it
+    /// on the hold; another program's lease naming GitHub Copilot is read
+    /// back as GitHub Copilot, and one naming none as all three. MUST FAIL if
+    /// the server does not pass the door on.
+    func testTheServerRecordsItsDoorAndReadersNameIt() throws {
+        let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
+        AssistMCPServer.holdTheDoorsCourse(
+            in: made.workspace,
+            environment: [
+                AssistMCPServer.doorCourseVariable: "ICS3U",
+                AssistMCPServer.doorAssistantVariable: " Copilot ",
+            ]
         )
+        let pid: Int32 = getpid()
+        let own: URL = activityDirectory(made.root).appendingPathComponent("ICS3U.assist.\(pid).lease")
+        XCTAssertEqual(WorkLeaseFiles.assistantLine(in: try String(contentsOf: own, encoding: .utf8)), "copilot")
+        XCTAssertTrue(trailText(in: made.root).contains(
+            AssistMCPServer.holdingTrailLine(courseCode: "ICS3U", assistant: "copilot")
+        ))
+        WorkLeaseRegistry.reset()
+        XCTAssertNil(WorkLeaseRegistry.heldForTheConversationAssistant, "cleared with the hold")
+
+        try writeOthersLeases(["assist"], assistant: "copilot", in: made.root)
+        XCTAssertEqual(
+            CourseActivity.revisingAssistant(folderPath: made.root.path, courseCode: "ICS3U"), "GitHub Copilot"
+        )
+        let refusal: WorkspaceModel.ReviseRefusal? = made.workspace.reviseRefusal(
+            item: .claude, courseCode: "ICS3U", sectionNumber: nil
+        )
+        XCTAssertEqual(refusal?.message, AssistWording.finishTheSessionFirst(assistant: "GitHub Copilot"))
+        XCTAssertEqual(made.workspace.revisingAssistant("ICS3U"), "GitHub Copilot", "the snapshot carries the name")
+    }
+
+    /// A hold an older Plantoir or Windows wrote, with no fifth line, is
+    /// still named truly: all three.
+    func testAHoldThatNamesNoneListsAllThree() throws {
+        let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
+        try writeOthersLeases(["assist"], in: made.root)
+        XCTAssertEqual(
+            CourseActivity.revisingAssistant(folderPath: made.root.path, courseCode: "ICS3U"),
+            AssistWording.anyOutsideAssistant
+        )
+    }
+
+    /// Every one of the nine sentences carries the slot: filled with one
+    /// name it says that name, and none says another door's. MUST FAIL on
+    /// the "name none" sentences of the first round.
+    func testTheNineSentencesNameTheAssistantThroughTheSlot() {
+        for entry in AssistWording.outsideAssistantNames {
+            let named: String = entry.name
+            let every: [String] = [
+                AssistWording.availableOnceYouFinishRevising(with: named),
+                AssistWording.finishTheSessionFirst(assistant: named),
+                AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "rename", assistant: named),
+                AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "restore", assistant: named),
+                AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "add the section", assistant: named),
+                AssistWording.backupsKeptForASession(course: "ICS3U", count: 1, assistant: named),
+                AssistWording.backupsKeptForASession(course: "ICS3U", count: 2, assistant: named),
+                AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 1, assistant: named),
+                AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 2, assistant: named),
+            ]
+            for text in every {
+                XCTAssertTrue(text.contains(named), "\(named) missing: \(text)")
+                XCTAssertFalse(text.lowercased().contains("an assistant session"), text)
+            }
+        }
     }
 
     // MARK: - The lease lasts the conversation
@@ -338,7 +476,7 @@ final class DoorCourseHoldTests: XCTestCase {
                 XCTAssertTrue(deletion.keptForTheAssistant.isEmpty, "\(name): told as the in-app window's")
                 XCTAssertEqual(
                     made.workspace.backupProblem,
-                    AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1), name
+                    AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant), name
                 )
             }
             stopTheOtherProgram()
@@ -363,7 +501,7 @@ final class DoorCourseHoldTests: XCTestCase {
         XCTAssertNil(made.workspace.backupDeleteRequest)
         XCTAssertEqual(
             made.workspace.backupProblem,
-            AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1)
+            AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant)
         )
 
         let chosen: [BackupItem] = [
@@ -379,7 +517,7 @@ final class DoorCourseHoldTests: XCTestCase {
             heldByOtherSessions: WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: made.root)
         )
         XCTAssertTrue(message.contains("the assistant for ICS3U Section 1 is open"), message)
-        XCTAssertTrue(message.contains(AssistWording.backupsKeptForAClaudeSession(course: "ICS3U", count: 1)), message)
+        XCTAssertTrue(message.contains(AssistWording.backupsKeptForASession(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant)), message)
 
         let deletion: WorkspaceModel.BackupDeletion = made.workspace.deleteBackups(chosen, following: [])
         XCTAssertEqual(deletion.deleted.count, 1)
@@ -388,10 +526,10 @@ final class DoorCourseHoldTests: XCTestCase {
         let problem: String = try XCTUnwrap(made.workspace.backupProblem)
         XCTAssertTrue(problem.contains("Close the assistant for ICS3U Section 1 first"), problem)
         XCTAssertTrue(
-            problem.contains(AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1)), problem
+            problem.contains(AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant)), problem
         )
         let trail: String = trailText(in: made.root)
-        XCTAssertTrue(trail.contains("which a Claude or Codex session still open made"), trail)
+        XCTAssertTrue(trail.contains("which a Claude, Codex or GitHub Copilot session still open made"), trail)
     }
 
     // MARK: - Protection 2: a second session is refused
@@ -401,7 +539,15 @@ final class DoorCourseHoldTests: XCTestCase {
     func testTheReviseCasesAreTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold"])
         let cases: [[String: Any]] = try XCTUnwrap(block["reviseCases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 9)
+        // Every door and the local item is asked about at least once; the
+        // count itself is the contract's, so a case added there is run here.
+        var itemsAsked: Set<String> = []
+        for item in cases {
+            if let asked = item["item"] as? String {
+                itemsAsked.insert(asked)
+            }
+        }
+        XCTAssertEqual(itemsAsked, ["claude", "codex", "copilot", "local"])
         let folder: String = "/folder"
         for item in cases {
             let name: String = item["name"] as? String ?? "?"
@@ -417,11 +563,19 @@ final class DoorCourseHoldTests: XCTestCase {
                 which = .claude
             case "codex":
                 which = .codex
+            case "copilot":
+                which = .copilot
             case "local":
                 which = .localAssistant
             default:
                 XCTFail("Unknown item in: \(name)")
                 continue
+            }
+            // The door the holding lease records (#783), named as the slot
+            // names it; absent, the hold names none.
+            var holder: String? = nil
+            if let key = item["revisingAssistant"] as? String {
+                holder = AssistWording.outsideAssistantNamed([key])
             }
             var active: AssistActivity.Session? = nil
             if let open = item["active"] as? [String: Any] {
@@ -437,13 +591,18 @@ final class DoorCourseHoldTests: XCTestCase {
                 courseCode: "ICS3U",
                 sectionNumber: which == .localAssistant ? 1 : nil,
                 revisedElsewhere: try XCTUnwrap(item["revisedElsewhere"] as? Bool),
+                revisingAssistant: holder,
                 active: active
             )
             switch item["expect"] as? String {
             case nil:
                 XCTAssertNil(reason, name)
             case "availableOnceYouFinishRevisingWithClaude":
-                XCTAssertEqual(reason, AssistWording.availableOnceYouFinishRevisingWithClaude, name)
+                XCTAssertEqual(
+                    reason,
+                    AssistWording.availableOnceYouFinishRevising(with: holder ?? AssistWording.anyOutsideAssistant),
+                    name
+                )
             case "closeTheAssistantFirst":
                 XCTAssertEqual(reason, AssistActivity.closeTheAssistantFirst(try XCTUnwrap(active)), name)
             default:
@@ -466,7 +625,7 @@ final class DoorCourseHoldTests: XCTestCase {
             )
             XCTAssertEqual(refusal, WorkspaceModel.ReviseRefusal(
                 title: AssistWording.courseIsAlreadyBeingRevised(course: "ICS3U"),
-                message: AssistWording.finishTheClaudeSessionFirst
+                message: AssistWording.finishTheSessionFirst(assistant: AssistWording.anyOutsideAssistant)
             ), "\(item)")
         }
         XCTAssertTrue(made.workspace.isRevisedElsewhere("ICS3U"), "A click refreshes the snapshot.")
@@ -508,7 +667,7 @@ final class DoorCourseHoldTests: XCTestCase {
 
         XCTAssertEqual(
             CourseActivity.structuralHoldReason(folderPath: folder, courseCode: "ICS3U"),
-            AssistWording.availableOnceYouFinishRevisingWithClaude
+            AssistWording.availableOnceYouFinishRevising(with: AssistWording.anyOutsideAssistant)
         )
         XCTAssertNil(CourseActivity.structuralHoldReason(folderPath: folder, courseCode: "MPM2D"))
         XCTAssertNil(CourseActivity.busyDescription(folderPath: folder, courseCode: "ICS3U"),
@@ -522,7 +681,7 @@ final class DoorCourseHoldTests: XCTestCase {
         // The menu's snapshot, and the reason Rename reads from it.
         made.workspace.refreshCoursesRevisedElsewhere()
         made.workspace.selection = SidebarSelection.course("ICS3U")
-        XCTAssertEqual(made.workspace.renameIsUnavailableReason, AssistWording.availableOnceYouFinishRevisingWithClaude)
+        XCTAssertEqual(made.workspace.renameIsUnavailableReason, AssistWording.availableOnceYouFinishRevising(with: AssistWording.anyOutsideAssistant))
 
         // A preview of the course is still said first: it is the one this
         // window started.
@@ -543,15 +702,15 @@ final class DoorCourseHoldTests: XCTestCase {
         let ics3u: Course = try course("ICS3U", in: made.workspace)
 
         made.workspace.rename(ics3u, to: "ICS3X")
-        XCTAssertEqual(made.workspace.renameProblem, AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "rename"))
+        XCTAssertEqual(made.workspace.renameProblem, AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "rename", assistant: AssistWording.anyOutsideAssistant))
         XCTAssertTrue(FileManager.default.fileExists(atPath: made.root.appendingPathComponent("courses/ICS3U").path))
 
         await made.workspace.restoreBackup(try item(backup, in: made.workspace))
-        XCTAssertEqual(made.workspace.backupProblem, AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "restore"))
+        XCTAssertEqual(made.workspace.backupProblem, AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "restore", assistant: AssistWording.anyOutsideAssistant))
 
         XCTAssertEqual(
             made.workspace.structuralRefusal(courseCode: "ICS3U", act: "add the section", whenBusy: "busy"),
-            AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "add the section")
+            AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "add the section", assistant: AssistWording.anyOutsideAssistant)
         )
         XCTAssertNil(made.workspace.structuralRefusal(courseCode: "MPM2D", act: "add the section", whenBusy: "busy"))
     }
@@ -601,15 +760,15 @@ final class DoorCourseHoldTests: XCTestCase {
     /// none uses deploy or publish (the v1.4.4 words).
     func testTheNewSentencesNameNoMachinery() {
         let every: [String] = [
-            AssistWording.availableOnceYouFinishRevisingWithClaude,
+            AssistWording.availableOnceYouFinishRevising(with: AssistWording.anyOutsideAssistant),
             AssistWording.courseIsAlreadyBeingRevised(course: "ICS3U"),
-            AssistWording.finishTheClaudeSessionFirst,
-            AssistWording.claudeIsRevisingTheCourse(course: "ICS3U", then: "rename"),
-            AssistWording.backupsKeptForAClaudeSession(course: "ICS3U", count: 1),
-            AssistWording.backupsKeptForAClaudeSession(course: "ICS3U", count: 2),
-            AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1),
-            AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 2),
-            AssistMCPServer.holdingTrailLine(courseCode: "ICS3U"),
+            AssistWording.finishTheSessionFirst(assistant: AssistWording.anyOutsideAssistant),
+            AssistWording.sessionIsRevisingTheCourse(course: "ICS3U", then: "rename", assistant: AssistWording.anyOutsideAssistant),
+            AssistWording.backupsKeptForASession(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant),
+            AssistWording.backupsKeptForASession(course: "ICS3U", count: 2, assistant: AssistWording.anyOutsideAssistant),
+            AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 1, assistant: AssistWording.anyOutsideAssistant),
+            AssistWording.finishTheSessionToDeleteItsBackup(course: "ICS3U", count: 2, assistant: AssistWording.anyOutsideAssistant),
+            AssistMCPServer.holdingTrailLine(courseCode: "ICS3U", assistant: nil),
         ]
         for text in every {
             let lowered: String = text.lowercased()
@@ -619,4 +778,5 @@ final class DoorCourseHoldTests: XCTestCase {
             }
         }
     }
+
 }
