@@ -25729,7 +25729,7 @@
       "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg - which is also why a refused rebuild says the LIFTED build line rather than wording.deployRefusedWhileItsSectionDeploys: that sentence says the section was not deployed again, which is false of a rebuild, and a new wording key can be added only where assist-wording.json is generated. The lifted line keeps the launcher's lower-case 'section 2'; that is accepted rather than re-cased, because it is the same line the window shows and a teacher who sees both should read one sentence, not two. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1). The two 'building' sentences (#729) say 'built' because what is in the way is a build, not a deploy: 'already being deployed' would send a teacher looking for a deploy that is not there."
     },
     "launcherLines": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> launcherLineWhenALaterDeployIsStillWorking, launcherLineWhenItsSectionIsAlreadyBeingDeployed and (since #729) launcherLineWhenItsSectionIsAlreadyBeingBuilt, with {leg} 'deploy' (deploy.sh) or 'build' (preview.sh --build-only).",
-    "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default) or 'build'. The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild), 'another' (anotherDeploy/anotherBuild) or 'building' (buildingDeploy/buildingBuild, #729). Every pid in processes is still running when the guard looks again, as in previewWhileItsSectionDeploys.launcherCasesShape. parentArgs is this run's parent's command line (default '-bash').",
+    "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default), 'build', or 'deploy-build' (preview.sh --build-only --for-deploy, a deploy's own build leg, #729: it takes the 'Build' sentences, except 'buildingDeploy' when another build is in the way, and {leg} 'build' on the trail). The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild), 'another' (anotherDeploy/anotherBuild) or 'building' (buildingDeploy/buildingBuild, #729). Every pid in processes is still running when the guard looks again, as in previewWhileItsSectionDeploys.launcherCasesShape. parentArgs is this run's parent's command line (default '-bash').",
     "launcherCases": [
       {
         "name": "a leftover run's script, under Application Support (a path with a space), refuses a deploy",
@@ -26127,6 +26127,40 @@
         "why": "#729, the plan review's M7, ruled by the director 2026-11-12: the assistant's Rebuild Preview holds a build lease, but a deploy.sh typed in Terminal reads none, and its build would clear the folder the rebuild is filling. Any second build of the section is refused; --for-deploy decides only the words."
       },
       {
+        "name": "a deploy's own build leg held up by a rebuild says it cannot be deployed",
+        "leg": "deploy-build",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "building",
+        "why": "#729 review, L-a3: the teacher pressed Deploy, so the line says 'cannot be deployed' (buildingDeploy), not 'cannot be built again'. The leg knows it is a deploy's from --for-deploy."
+      },
+      {
+        "name": "a deploy's own build leg held up by a deploy keeps the build leg's words",
+        "leg": "deploy-build",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another",
+        "why": "anotherBuild, as before #729: 'already being deployed, so it cannot be built'. Only the building sentences take the deploy's words on this leg."
+      },
+      {
         "name": "a rebuild refuses another build of the section",
         "leg": "build",
         "processes": [
@@ -26404,7 +26438,8 @@
       "A leftover run's own after-work is still lost: the app's record that the section was deployed (it stays ' — Edited', the harmless direction), the run's trail line and its notification. Its script does write the section's outcome record, and since #439 never over a newer run's (scheduledPublishStopped.newerRecordWins).",
       "A deploy set for later before #237 names no folder in its label, so its leftover run refuses that course and section in every working folder until it ends; a newly set run never ends such a run's app (its plist is gone, so there is nothing to boot out), so the run's app and leases live on, #156's ten-minute wait sees them, and if it is still working when the new run starts the new run's legs are refused by this guard and the run is recorded as stopped.",
       "A scheduled run does not wait for a deploy typed in Terminal (it writes no lease); its legs are refused here and the run is recorded as stopped, which is better than two deploys of one section at once.",
-      "The look is the live process table: a process another account runs is not seen, as everywhere else the launchers look.",
+      "The look is the live process table, which lists every account's processes. A process another account runs is listed but never counted: lsof cannot read its working folder, and a folder that belongs to another account is not this one (#729 review, L-a1, measured: until then another account's build or deploy of the same course code and section refused this teacher's, in every folder). That is the mac's two-look mechanics (ps, then lsof and ps -p's owner), so it is tested in scripts/test_deploy_while_its_section_deploys.py (otherAccount), not as a shared case. A process of THIS account whose folder lsof cannot read still counts, as #381 decided.",
+      "Two builds or deploys of one section started within a few milliseconds of each other each see the other and BOTH are refused (#729 review, L-a2, measured with real processes: started together, both refused 20 of 20; started 50, 100, 200, 400 or 800 ms apart, exactly one refused, 10 of 10 at each). The overlap never gets through; each teacher sees the refusal and a second press goes ahead. No tie-break was added: one that is provably right needs an order both runs agree on, which the process table does not give. #439 already had this shape for two deploy.sh runs.",
       "One narrow race turns a deploy off yet lets it go out: the sidebar's Cancel Deploy dialog opened before the deploy's time and confirmed after its run has started. The run has removed its own plist, so cancelScheduledDeploy boots the label out blind, ending the run's app as a re-set does, and the deploy its script started still goes out (the guard keeps it from overlapping anything); no trail line says so. Every other cancel - a rename (CourseRenamer), the assistants' cancels, the cleanup - acts only on a plist found on disk, so it never reaches a working run. Recorded rather than built (#439 review finding 5, narrowed by the fixes review): it needs the dialog's moment to pass while it is open.",
       "newerRecordWins holds only for a leftover whose script was written by an app that has it (1.4.4 and later): the look is in the leftover's OWN script, written at the PREVIOUS set. A deploy set under 1.4.3 or earlier and set again after updating leaves a leftover without the look, so if the new run stands down after thirty minutes that leftover can still replace earlierDeployStillWorking with its own 'succeeded'. Transitional: it ends with the last deploy set before the update (#439 review, finding 6).",
       "A teacher who dismisses earlierDeployStillWorking while the leftover still works leaves no record in place, so the leftover then writes its own 'succeeded' and the section reads as deployed on its own - true of the OLD deploy's content, not of what was just set. Left as it is: the record is the truth about what last went out, and what was just set never ran, which the dismissed notice had said (#439 review, finding 7).",

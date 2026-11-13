@@ -4567,7 +4567,7 @@ them needs anything done on the mac.
 
 - **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
   build leg run all 23 `launcherCases` of #467 (see [03](03-launcher-scripts.md) →
-  "A section still being deployed is not deployed again"). #729 added 11 more
+  "A section still being deployed is not deployed again"). #729 added 13 more
   (a deploy's build leg, `--for-deploy`, and any other build of the section)
   and changed one; those are owed by its Windows issue.
 - **Windows has the mac's split.** The task runs
