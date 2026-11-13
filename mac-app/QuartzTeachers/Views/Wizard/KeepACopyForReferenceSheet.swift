@@ -38,6 +38,10 @@ struct KeepACopyForReferenceSheet: View {
     /// rather than on every redraw of `body`.
     @State var addOns: ObsidianAddOns.Found = ObsidianAddOns.Found()
 
+    /// The warning before a reference course is replaced, while it is up
+    /// (#572, second piece).
+    @State var replaceWarning: ReferenceReplacer.Warning?
+
     /// The day the year list is built from. A stored property rather than a
     /// call to the clock inside the body, so the list cannot change under
     /// the teacher mid-sheet — and so a test can move it.
@@ -62,6 +66,18 @@ struct KeepACopyForReferenceSheet: View {
             return trouble.sentence
         }
         return CourseCodeRule.problem(folderName, existingCodes: existingFolderNames)
+    }
+
+    /// The course on the shelf the copy would clash with in the chosen
+    /// year: the one Replace It… would replace, or nil. Still offered when
+    /// a refusal of it is showing, so the teacher can try again once the
+    /// preview or Obsidian is closed.
+    var courseInTheWay: ReferenceCourseRule.Shelved? {
+        return ReferenceCourseRule.courseInTheWay(
+            placing: course.displayCode,
+            inYear: schoolYear,
+            among: workspace.shelvedReferenceCourses(on: today)
+        )
     }
 
     var existingFolderNames: [String] {
@@ -100,10 +116,22 @@ struct KeepACopyForReferenceSheet: View {
             }
 
             if let entryProblem {
-                Text(entryProblem)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("keepACopyProblem")
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(entryProblem)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("keepACopyProblem")
+                    // Beside the shelf rule's refusal, and only there
+                    // (#572): the one answer to it.
+                    if let inTheWay = courseInTheWay {
+                        Spacer(minLength: 0)
+                        Button(ReferenceReplaceWording.replaceButton) {
+                            offerToReplace(inTheWay.folderName)
+                        }
+                        .disabled(isCopying)
+                        .accessibilityIdentifier("replaceReferenceCourseButton")
+                    }
+                }
             }
 
             // The calm note, said where the teacher is deciding rather than
@@ -145,6 +173,9 @@ struct KeepACopyForReferenceSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         })
         .frame(width: 460)
+        .replaceReferenceCourseAlert($replaceWarning) { folderName in
+            keepACopy(replacing: folderName)
+        }
         .onAppear {
             if folderName.isEmpty {
                 folderName = proposedFolderName()
@@ -180,6 +211,53 @@ struct KeepACopyForReferenceSheet: View {
             schoolYear: schoolYear,
             existingFolderNames: existingFolderNames
         )
+    }
+
+    /// Replace It…: the refusal, said where the sheet's own problems are, or
+    /// the warning (`ReferenceReplacer.offer`).
+    func offerToReplace(_ folderName: String) {
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return
+        }
+        let world: ReferenceReplacer.World = ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+        Task { @MainActor in
+            let offer: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
+                toReplace: folderName, coursesDirectoryURL: coursesDirectoryURL, world: world
+            )
+            switch offer {
+            case .refused(let sentence):
+                problem = sentence
+            case .warn(let warning):
+                replaceWarning = warning
+            }
+        }
+    }
+
+    /// The copy, made in place of the course on the shelf the teacher was
+    /// warned about (#572). The sheet stays up while the old course is
+    /// backed up, and says why if it was not replaced.
+    func keepACopy(replacing folderName: String) {
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return
+        }
+        isCopying = true
+        let world: ReferenceReplacer.World = ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+        Task { @MainActor in
+            do {
+                let made: ReferenceCopier.Made = try await ReferenceCopier.keepACopy(
+                    of: course,
+                    replacing: folderName,
+                    schoolYear: schoolYear,
+                    coursesDirectoryURL: coursesDirectoryURL,
+                    world: world
+                )
+                dismiss()
+                onCopy(made.folderName)
+            } catch {
+                isCopying = false
+                problem = error.localizedDescription
+            }
+        }
     }
 
     func keepACopy() {

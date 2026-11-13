@@ -210,6 +210,32 @@ enum ReferenceReplacer {
         let backupFileName: String
     }
 
+    /// The warning a door shows before anything is made (`offer`).
+    struct Warning: Identifiable, Equatable {
+
+        // MARK: - Stored properties
+
+        /// The folder of the course it is about.
+        let folderName: String
+
+        let title: String
+        let message: String
+
+        // MARK: - Computed properties
+
+        var id: String {
+            return folderName
+        }
+    }
+
+    /// What pressing Replace It… comes to.
+    enum Offer: Equatable {
+        /// The warning, to confirm or cancel.
+        case warn(Warning)
+        /// Refused before the warning, in the sentence the door shows.
+        case refused(String)
+    }
+
     /// What a sweep did about one leftover aside folder.
     struct SweepOutcome: Equatable {
 
@@ -311,6 +337,70 @@ enum ReferenceReplacer {
             return .openInObsidian(course: old.displayCode)
         }
         return nil
+    }
+
+    /// What Replace It… beside the shelf rule's refusal shows: the refusal,
+    /// when the course cannot be replaced right now, or the warning, which
+    /// says what the course holds, when it was kept, what the backup will be
+    /// called in Backups and that restoring it puts the old course back.
+    /// The walk that counts the pages runs off the main actor.
+    static func offer(
+        toReplace folderName: String,
+        coursesDirectoryURL: URL,
+        world: World = World()
+    ) async -> Offer {
+        if let refusal = ReferenceReplacer.refusal(
+            toReplace: folderName, coursesDirectoryURL: coursesDirectoryURL, world: world
+        ) {
+            return .refused(refusal.errorDescription ?? "")
+        }
+        guard let old = ReferenceReplacer.courseOnTheShelf(
+            folderName: folderName, coursesDirectoryURL: coursesDirectoryURL
+        ) else {
+            return .refused(ReferenceReplaceWording.notOnTheShelf(course: folderName))
+        }
+        let course: String = old.displayCode
+        let group: String = ReferenceReplacer.groupLabel(for: old)
+        let counted: (files: Int, pages: Int, bytes: Int64) = await ReferenceReplacer.counting(
+            courseDirectoryPath: old.directoryURL.path
+        )
+        let sections: String = ReferenceReplaceWording.sections(old.sectionNumbers.count)
+        let pages: String = ReferenceReplaceWording.pages(counted.pages)
+        let size: String = ReferenceImportWording.size(counted.bytes)
+
+        var message: String
+        let created: Date? = try? old.directoryURL.resourceValues(forKeys: [.creationDateKey]).creationDate
+        if let created {
+            let formatter: DateFormatter = DateFormatter()
+            formatter.dateStyle = .long
+            formatter.timeStyle = .none
+            message = ReferenceReplaceWording.body(
+                course: course, group: group, sections: sections, pages: pages, size: size,
+                date: formatter.string(from: created), folder: folderName
+            )
+        } else {
+            message = ReferenceReplaceWording.bodyWithoutADate(
+                course: course, group: group, sections: sections, pages: pages, size: size, folder: folderName
+            )
+        }
+        return .warn(Warning(
+            folderName: folderName,
+            title: ReferenceReplaceWording.title(course: course, group: group),
+            message: message
+        ))
+    }
+
+    /// How many files and pages the course holds, and how large it is, by
+    /// the same walk the backup check makes, leaving out what it leaves out.
+    @concurrent
+    nonisolated static func counting(courseDirectoryPath: String) async -> (files: Int, pages: Int, bytes: Int64) {
+        let check: BackupCheck = ReferenceReplacer.compare(
+            zipNames: nil, courseDirectoryURL: URL(fileURLWithPath: courseDirectoryPath), mayBeMissing: []
+        )
+        if case .holdsTheCourse(let files, let pages, let bytes) = check {
+            return (files: files, pages: pages, bytes: bytes)
+        }
+        return (files: 0, pages: 0, bytes: 0)
     }
 
     /// Replaces the reference course `asked.folderName` with the course made
@@ -635,13 +725,16 @@ enum ReferenceReplacer {
     ///
     /// Names are compared in one Unicode form, because a disk and a zip can
     /// spell `Thème` two ways that are the same name.
+    ///
+    /// `zipNames` nil counts the course without comparing it with anything,
+    /// for the warning's numbers.
     nonisolated static func compare(
-        zipNames: [String],
+        zipNames: [String]?,
         courseDirectoryURL: URL,
         mayBeMissing: [String]
     ) -> BackupCheck {
         var inTheZip: Set<String> = []
-        for name in zipNames {
+        for name in zipNames ?? [] {
             var bare: String = name
             while bare.hasSuffix("/") {
                 bare.removeLast()
@@ -695,6 +788,9 @@ enum ReferenceReplacer {
                 pages += 1
             }
             bytes += Int64(values?.fileSize ?? 0)
+            if zipNames == nil {
+                continue
+            }
             let zipName: String = (folderName + "/" + relative).precomposedStringWithCanonicalMapping
             if !inTheZip.contains(zipName) {
                 missing.append(relative)

@@ -182,6 +182,10 @@ struct NewCourseWizardView: View {
     /// so the list cannot change under the teacher.
     let today: CalendarDay
 
+    /// The warning before a reference course is replaced, while it is up
+    /// (#572, second piece).
+    @State var replaceWarning: ReferenceReplacer.Warning?
+
     /// What the progress header is called — the wizard creates a course,
     /// but the same sheet also adds the example course.
     @State var progressTitle: String = WizardWording.coursePanelWords.creatingTitle
@@ -341,6 +345,40 @@ struct NewCourseWizardView: View {
             schoolYear: referenceSchoolYear,
             shelved: workspace.shelvedReferenceCourses(on: today)
         )
+    }
+
+    /// The course on the shelf a reference course of this code and year
+    /// would clash with, when the wizard is making one: the course Replace
+    /// It… would replace. Nil otherwise.
+    var referenceCourseInTheWay: ReferenceCourseRule.Shelved? {
+        if !makesAReferenceCourse {
+            return nil
+        }
+        return ReferenceCourseRule.courseInTheWay(
+            placing: courseCode,
+            inYear: referenceSchoolYear,
+            among: workspace.shelvedReferenceCourses(on: today)
+        )
+    }
+
+    /// Replace It…: the refusal, or the warning (`ReferenceReplacer.offer`).
+    func offerToReplace(_ folderName: String) {
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return
+        }
+        let world: ReferenceReplacer.World = ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+        Task { @MainActor in
+            let offer: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
+                toReplace: folderName, coursesDirectoryURL: coursesDirectoryURL, world: world
+            )
+            switch offer {
+            case .refused(let sentence):
+                validationProblem = sentence
+            case .warn(let warning):
+                validationProblem = nil
+                replaceWarning = warning
+            }
+        }
     }
 
     /// Every course folder in this working folder, live and reference.
@@ -734,6 +772,9 @@ struct NewCourseWizardView: View {
     var body: some View {
         wizardContent
             .frame(width: 680, height: 620)
+            .replaceReferenceCourseAlert($replaceWarning) { folderName in
+                startCreation(replacing: folderName)
+            }
             // Resolves the anchor `CourseCodePickerView` published for the
             // code field into an actual rect via THIS outer
             // `GeometryReader`'s proxy, then draws the popup as a sibling
@@ -1012,10 +1053,23 @@ struct NewCourseWizardView: View {
                         // wears — a duplicate code is the usual reason a
                         // filled-in form still won't submit, so it must
                         // never be a mystery.
-                        Text(problem)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("courseCodeWarning")
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(problem)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("courseCodeWarning")
+                            // Beside the shelf rule's refusal, and only
+                            // there (#572): the one answer to it.
+                            if let inTheWay = referenceCourseInTheWay {
+                                Spacer(minLength: 0)
+                                Button(ReferenceReplaceWording.replaceButton) {
+                                    offerToReplace(inTheWay.folderName)
+                                }
+                                .controlSize(.small)
+                                .accessibilityIdentifier("replaceReferenceCourseButton")
+                            }
+                        }
                     } else {
                         ExampleCaption("Type a code, or type what the course is called — e.g. “chem” finds SCH3U. Or type a club name like CODING.")
                     }
@@ -1832,7 +1886,10 @@ struct NewCourseWizardView: View {
         return RemovalTrail.inNewCourse(typedCode: courseCode, list: list)
     }
 
-    func startCreation() {
+    /// - Parameter confirmedReplace: the reference course the teacher chose
+    ///   to replace in the warning (#572), for THIS press only; Create
+    ///   itself passes nothing, so it never replaces anything.
+    func startCreation(replacing confirmedReplace: String? = nil) {
         validationProblem = nil
 
         let code: String = courseCode.trimmingCharacters(in: .whitespaces).uppercased()
@@ -1840,10 +1897,21 @@ struct NewCourseWizardView: View {
             validationProblem = "Enter a course code."
             return
         }
-        // The same check the live warning under the field uses.
+        // The same check the live warning under the field uses. The shelf
+        // rule's refusal is answered by a replace the teacher confirmed, and
+        // only for the course it names (#572).
+        let replacesTheCourseInTheWay: Bool = confirmedReplace != nil
+            && referenceCourseInTheWay?.folderName == confirmedReplace
         if let problem = courseCodeProblem {
-            validationProblem = problem
-            return
+            let shelfSentence: String? = ReferenceCreation.shelfTrouble(
+                typed: courseCode,
+                schoolYear: referenceSchoolYear,
+                shelved: workspace.shelvedReferenceCourses(on: today)
+            )?.sentence
+            if !replacesTheCourseInTheWay || problem != shelfSentence {
+                validationProblem = problem
+                return
+            }
         }
         if let problem = NewCourseWizardView.sectionNumbersProblem(sectionNumbersText) {
             validationProblem = problem
@@ -1884,7 +1952,9 @@ struct NewCourseWizardView: View {
                 schoolYear: referenceSchoolYear,
                 workspaceURL: workspaceURL,
                 existingFolderNames: courseFolderNamesHere,
-                shelved: workspace.shelvedReferenceCourses(on: today)
+                shelved: workspace.shelvedReferenceCourses(on: today),
+                replacing: replacesTheCourseInTheWay ? confirmedReplace : nil,
+                replaceWorld: ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
             )
             return
         }
