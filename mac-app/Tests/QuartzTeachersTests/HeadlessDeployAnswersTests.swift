@@ -175,7 +175,7 @@ final class HeadlessDeployAnswersTests: XCTestCase {
     /// is stale (nothing has been built), so the build leg runs — the usual
     /// case after a teacher edits and sets a deploy again.
     func testAHeadlessDeployWhoseBuildIsRefusedSaysTheRefusal() async throws {
-        let laterDeploy: String = "\u{274C} ICS3U section 1 is still being deployed by a deploy that was set for later, "
+        let laterDeploy: String = "\u{274C} ICS3U section 1 is still being deployed by a scheduled deploy that is still running, "
             + "so it cannot be built until that has finished."
         let build: String = "#!/bin/bash\necho \"$*\" >> \"\(root.path)/preview-words.txt\"\n"
             + "echo \"\(laterDeploy)\"\necho \"   Nothing was changed.\"\nexit 1\n"

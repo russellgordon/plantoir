@@ -2445,15 +2445,23 @@ leases do NOT cover a leftover run — that is the fault): failing closed would
 refuse every deploy, and every scheduled run's own legs, for as long as `ps`
 fails.
 
-**What a teacher reads.** "❌ {course} section {section} is still being
-deployed by a deploy that was set for later, so it cannot be deployed again
-until that has finished." (or "…already being deployed…" for the Terminal
-pair and a deploy's build leg; "…cannot be built…" from the build leg; and
-since #729 "…is already being built, so it cannot be deployed…" or "…cannot
-be built again…" when another build is in the way), then "Nothing was
-changed."
+**What a teacher reads.** `deployWhileItsSectionDeploys.sentences.launcher`
+→ `laterDeploy` when a scheduled deploy's run is in the way (`laterBuild`
+from the build leg), `anotherDeploy` / `anotherBuild` for the Terminal pair
+and a deploy's build leg, and since #729 `buildingDeploy` / `buildingBuild`
+when another build is in the way; each is followed by "Nothing was changed."
 It names WHAT is deploying because after a re-set the app shows only the new
-time. The window lifts that line into its failure explanation
+time. Since #835 (Russell, 2026-11-13) it names it as "a scheduled deploy
+that is still running", and the trail line as one that "was still running".
+Until then it said "a deploy that was set for later", and Russell read the
+same phrase on the greyed Deploy as "having a deploy scheduled stops me
+deploying". A schedule that has not fired holds nothing and refuses
+nothing: only its run, while it works, is in the way, so every sentence that
+names it says that it is running. `scripts/test_deploy_while_its_section_deploys.py`
+→ `AScheduledDeployIsNamedAsRunning` checks each of them in the contract and
+that neither launcher still prints "set for later". Rejected: keeping "set
+for later" (the reading Russell met) and "is being deployed right now"
+(false after a re-set). The window lifts that line into its failure explanation
 (`FailureExplainer.sectionDeployRefusal`); the in-app and outside assistants
 say `deployRefusedWhileALaterDeployWorks`,
 `deployRefusedWhileItsSectionDeploys`, or (#729, another build in the way)
