@@ -132,6 +132,16 @@ public sealed class LocalSiteGuardTests : IDisposable
         Assert.Equal(Path.Combine(planning, "index.html"), home.RealPath);
     }
 
+    /// <summary>A drive's root is its root, never the drive's current folder, which is what "C:" alone names to Windows.</summary>
+    [Fact]
+    public void ADrivesRootIsItsRoot()
+    {
+        var guard = Guard(Path.Combine(_root, "planning"));
+        string drive = Path.GetPathRoot(_root)!;
+        Assert.Equal(drive, guard.RealPath(drive), ignoreCase: true);
+        Assert.False(guard.IsInside(drive));
+    }
+
     [Fact]
     public void SegmentsWindowsWouldReadAsAnotherFileAreRefused()
     {

@@ -210,6 +210,9 @@ public sealed class LocalSiteGuard
     public string RealPath(string path)
     {
         string full = Path.GetFullPath(path).TrimEnd('\\');
+        // The root's own backslash is put back: "C:" alone is the drive's
+        // CURRENT folder to Windows, never its root.
+        if (full.Length == 2 && full[1] == ':') full += "\\";
         var missing = new Stack<string>();
         string? existing = full;
         while (existing is not null)
@@ -218,7 +221,7 @@ public sealed class LocalSiteGuard
             {
                 var result = new StringBuilder(real.TrimEnd('\\'));
                 foreach (string part in missing) result.Append('\\').Append(part);
-                return result.ToString();
+                return result.Length == 2 && result[1] == ':' ? result.Append('\\').ToString() : result.ToString();
             }
             string? parent = Path.GetDirectoryName(existing);
             if (parent is null || parent.Length == 0 || parent == existing) break;
