@@ -4419,7 +4419,7 @@ rejected:
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
   only. (Since #707 it is one of the places under a dot folder an
-  assistant writes; the others are `.internal/planning/`: "Unit planning (#707)" below, and since #750 `.internal/marking/marking.json`: "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
+  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below. The marking skill's `.internal/marking/marking.json` is a third when that skill ships; it is held from v2.0.0: "Held from v2.0.0" under "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
   and a restore, as `.internal/timetable/` does; a reference import keeps
   `.internal` minus `activity`. It never reaches a site: discovery skips
   dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
@@ -4831,7 +4831,10 @@ into `support/agent_guidance/skills/`, add one bullet to each root file, add a
 contract key for it under the feature it belongs to (`<feature>.agentGuidance`,
 as `unitPlanning.agentGuidance` is), and copy one of the
 `PrintablePagesTests.testThe…SkillIsWritten…` tests. No code enumerates the
-skills by name on either platform. Three costs come with it (707a review):
+skills by name on either platform. Holding a skill out of a release is the
+reverse: move its folder to `held/agent_guidance/skills/`, take its bullet
+out of each root file, and name it in `printablePages.agentGuidance.held`
+(#750: "Held from v2.0.0" below). Three costs come with it (707a review):
 every change to the root files' managed section asks again every teacher who
 chose Not Now, so bullets landed in one release ask once; two skill pieces in
 flight both append to the end of `CLAUDE.md` and `AGENTS.md`, a small merge
@@ -5267,6 +5270,122 @@ reaches a working folder as every skill does, and the contract is
 `shared-rules.json` → `assessment`. This subsection was started by #751;
 #750 and #752 add theirs below.
 
+**Held from v2.0.0 (#750, 2026-11-13).** `plantoir-marking` (its class
+results, 750c, included) and `plantoir-report-comments` are kept in the
+repository and NOT written into any working folder in v2.0.0, on either
+platform; they move to the release after it (2.1 on the roadmap). The
+ruling on #750 deferred both after six rounds of trials and fixes: every
+route found by which a student's name could reach an assistant on a Mac
+was closed, but the last ordinary review still found fixes needed (a
+contract row calling a route closed that the documentation admits a
+deliberately written child process can escape, a stray copy on Windows no
+test can catch, nine smaller items), and Windows has none of the
+protection the step that opens the original scans needs. That work is
+kept, unmerged, on `issue/750d-the-teacher-runs-the-steps-that-touch-names`
+for the later release, with the recommendation recorded on #750: only a
+fixed script shipped with Plantoir runs beside the original scans, and the
+assistant supplies settings, never code. Report comments put the names in
+through the marking skill's runner and script, so they are held with it.
+`plantoir-test-authoring` ships, and while marking is held it offers no
+marking and never marks from a kit. Asked to mark, or about report card
+comments, it says `held.saysWhenAsked.sentence` (the director's wording,
+2026-11-13, also at the top of the kit's README): this version does not
+help with them, and the kit's files are for the teacher's own marking. It
+names no skill, so nothing suggests one could be added (hold review M4;
+until then section 9 offered marking when the skill was present and told a
+teacher who asked that it "needs" a skill that was not there).
+
+What the hold is:
+
+- Both skill folders are in `held/agent_guidance/skills/` instead of
+  `support/agent_guidance/skills/`. Both apps copy every folder under the
+  second and nothing else (`AgentGuidance.write`, and Windows'
+  `AgentGuidance.Write`), and `held/` is in neither app's bundle nor the
+  image, so the hold needs no code on either platform. The folders sit
+  side by side there because the report-comments skill names the marking
+  skill's scripts by their path beside it.
+- The root `CLAUDE.md` and `AGENTS.md` lose their two bullets, and
+  `plantoir-handouts` and `plantoir-page-authoring` no longer name the
+  marking skill's `.internal/marking/marking.json` or folder. The
+  test-authoring skill, its kit's `FORMAT.md`, `README.md` and
+  `marks-template.json`, and `check_kit.py`'s comments no longer name
+  `plantoir-marking`, so `held.mayStillName` is empty.
+- **Help.** Help's outline planned "Mark a test or assignment" (`marking`)
+  and "Draft report card comments" (`report-comments`) in the assistant
+  section. Both are out of `help/outline.json` (104 pages became 102, 14
+  assistant pages 12, scenes 203 to 202, pictures 406 to 404, reading time
+  277 to 272 minutes), and the web's `report card comments` withholding
+  pattern went with them. `held.helpPages` keeps both outline entries
+  verbatim, with the section and the page each followed, and the pattern.
+- The contract keeps every block: `printablePages.agentGuidance.held` says
+  which skills are held, where (`place`), until when, why, and what was
+  rejected; `assessment.held` lists the assessment keys kept for them;
+  the two `mustSay` lists stay. The six `scripts/test_marking_*.py` files
+  find the skills through `held.place`, so they still run in `verify.sh`
+  and on Windows through `PythonToolchainTests`, and `.gitattributes`' LF
+  rule for `run_with_names.py` names the held path.
+  `PrintablePagesTests.testHeldSkillsAreNotWrittenAndNothingWrittenNamesThem`
+  checks a freshly written folder: neither skill in either home, neither
+  root file naming them, and no written file naming them outside
+  `mayStillName`. `testTheMarkingSkillIsWrittenWithItsScriptsAndBothRootFilesNameIt`
+  and `testTheReportCommentsSkillIsWrittenAndBothRootFilesNameIt` are back
+  (review M3): while their skill is in `held.skills` each asserts it is NOT
+  written and no root file names it; when the list is shortened each
+  asserts again that it IS written and that the root files and every skill
+  in `mentionedBy` name it. `scripts/test_held_skills.py` checks the source
+  both apps copy, so it runs on Windows too (`PythonToolchainTests`) and in
+  `verify.sh`: every held skill is in `held.place` and not in
+  `support/agent_guidance/skills`, and no root file, written skill, string
+  in `app-rules.json` or `assist-wording.json`, app source, Help file
+  (`help/*.json` and `help/pages/`) or plantoir.app page names one or says
+  one of `held.words.bySkill`'s expressions, after `held.words.allowed`
+  (the sentence above) is taken out. The expressions cover the ways a
+  teacher or an assistant would say either feature ("help with marking",
+  "mark a test from your scanned papers", "comments for report cards",
+  "class results", "term comments"); `mustTrip` holds twelve such
+  sentences, each caught, and `mustPass` thirteen ordinary uses that stay
+  ("a marks column", "Marking Guide.pdf", "the marking period", a
+  rubric's marks, "Mark the page printable", a problem report), each left
+  alone.
+- **A folder that already has them stays as it is.** A development build
+  of 2.0.0 made before the hold wrote `.claude/skills/plantoir-marking`,
+  `.claude/skills/plantoir-report-comments` and the same two under
+  `.agents/skills`. The next pass rewrites the root files' managed section,
+  so those stop naming them, but the four skill folders are left: an app
+  removes nothing under `.claude` or `.agents` it is not writing, and a
+  skill folder carries no mark that says the app wrote it. No released
+  version wrote them, so only development working folders have them, and
+  they are deleted by hand.
+- **Bringing them back** is this list, which `held.whenTheyReturn.steps`
+  gives word for word:
+  1. Move each skill's folder from `place` back to support/agent_guidance/skills.
+  2. Put back the two bullets in support/agent_guidance/CLAUDE.md and AGENTS.md, as commit ae1e0db32 removed them.
+  3. Put back the `.internal/marking/marking.json` lines in plantoir-handouts and plantoir-page-authoring (three dot-folder exceptions, not two), as ae1e0db32 removed them; assessment.agentGuidance.markingSkill.mentionedBy names both, and the mac test below fails until they are back.
+  4. Put back plantoir-test-authoring's offer: SKILL.md sections 7 and 9, and the kit's FORMAT.md, README.md, marks-template.json and scripts/check_kit.py comments, as they read at 1f4b655fe; in mustSay, replace the two `saysWhenAsked` pins with whenTheyReturn.testAuthoringMustSay.
+  5. Put Help's two pages back: helpPages.pages into help/outline.json (each after `_after`, in `_section`, without the two underscore keys), the counts (pageCount 104, sceneCount 203, pictureFilesMac 406, readingTimeTotalMinutes 277) and helpPages.withheldOnTheWeb into help/withheld-on-the-web.json; help/tests/test_build_help.py, help/README.md and verify.sh go back to 104 pages and 14 assistant pages; then Help's own process writes the two pages.
+  6. Delete this `held` block and assessment.held (or, for one skill, its entries here).
+  7. Run PrintablePagesTests (testTheMarkingSkillIsWrittenWithItsScriptsAndBothRootFilesNameIt and testTheReportCommentsSkillIsWrittenAndBothRootFilesNameIt now assert the skills ARE written and named), scripts/test_held_skills.py, the six scripts/test_marking_*.py and help/tests/.
+- **The Mac's own bundle drops them on an ordinary build.** MEASURED
+  (2026-11-13, Xcode 27.0, `-derivedDataPath` of its own): a Debug build
+  with the two folders put back under `support/agent_guidance/skills`
+  carried them; after they were removed, the next incremental build's
+  bundle held only the eight shipped skills. A Debug build in a
+  DerivedData folder made from `dev` before the hold therefore loses them
+  on its next build, with no clean needed. Windows differs (12: its
+  `PreserveNewest` copy keeps them until a clean build).
+
+MEASURED (2026-11-13): the new test fails against `origin/dev`'s
+`support/agent_guidance` (both skills written in both homes, both root
+files naming them, and `plantoir-handouts` and `plantoir-page-authoring`
+naming the marking skill) and passes on the branch; the six marking
+Python tests pass from the held folders under Homebrew's Python 3.14 and
+macOS's own 3.9. REJECTED: deleting the skills and their tests (the next
+release would rebuild them from history); a list in the app of skills not
+to copy (code on both platforms for what a folder move makes true);
+removing the already-written folders (no marker tells the app's folder
+from a teacher's own of the same name); keeping them under `scripts/` or
+`research/` (the first is bundled whole, the second holds measurements).
+
 **The test-authoring skill (#751).** The eighth skill. For a unit test with
 versions it builds each version's paper and solutions (copies of
 `plantoir-handouts`' `starters/Quiz.tex`, in that skill's house style and
@@ -5377,14 +5496,19 @@ invented SNC2D Unit 2 test on chemical reactions, two versions, 16 points.
   list the skills): without it the assistant says nothing about marking
   and does not mark from the kit, because marking without that skill's
   rules about names would skip them (751 implementation review M4; #751
-  can land before #750). Nothing on
+  can land before #750). **While marking is held (above, "Held from v2.0.0")
+  this skill offers no marking at all** and, when asked, says
+  `held.saysWhenAsked.sentence`; the offer described here returns with the
+  skill (`held.whenTheyReturn.steps` 4). Nothing on
   plantoir.app and no new text in the app (Plantoir is not to read as an
   app that needs an assistant). The greeting sentence is its own piece.
 - **The root files.** One bullet each; the handouts bullet's "a quiz or
   test for marks" became "a quiz for marks", so a unit test is routed here
   and a single quiz stays a handout. Changing the managed section asks
-  again any teacher who chose Not Now; #751, #750 and #752 land in one
-  release, so a teacher is asked once.
+  again any teacher who chose Not Now. #751, #750 and #752 were meant to
+  land in one release so a teacher is asked once; with marking and report
+  comments held to the release after v2.0.0, a teacher who chose Not Now is asked again when
+  their two bullets come back.
 
 MEASURED (2026-11-12, `tectonic` 0.17.0): the Marking Guide template
 compiles to 4 letter pages with no overfull box once its "what earns the
@@ -5405,7 +5529,9 @@ part-score case fail. NOT MEASURED: a trial with an outside
 assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
 
-**The marking skill (#750, piece 750a: a test from scanned papers).** The
+**The marking skill (#750, piece 750a: a test from scanned papers).** Held
+from v2.0.0 (above): what follows describes the skill as kept in
+`held/agent_guidance/skills/plantoir-marking`. The
 ninth skill, `plantoir-marking`. It marks a test or quiz written on paper
 and scanned, onto a feedback sheet per student, from the kit #751 writes.
 Coding assignments (750b) are a later piece, held for a ruling; until it
@@ -5758,8 +5884,8 @@ the trail, because it would be student data.
   then swept across every paper and recorded, numbered.
 - **How a teacher finds out.** The honest answer when asked what it can
   help with, and the one-time offers: #751's skill mentions marking when a
-  kit is finished, only when this skill is present (that sentence now
-  reads true); this skill mentions report comments once when the marks are
+  kit is finished, only when this skill is present (while it is held,
+  #751's skill offers none: "Held from v2.0.0" above); this skill mentions report comments once when the marks are
   final, only when `plantoir-report-comments` is present (#752). No
   greeting sentence here (piece G), nothing on plantoir.app, no new app text.
 
@@ -5767,7 +5893,8 @@ NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
 
-**The report-comments skill (#752).** The tenth skill,
+**The report-comments skill (#752).** Held from v2.0.0 with the marking
+skill (above), and kept in `held/agent_guidance/skills/plantoir-report-comments`. The tenth skill,
 `plantoir-report-comments`, drafts report card comments from what
 `plantoir-marking` wrote: three options per student, each complete, so the
 teacher picks or blends. It has a `SKILL.md` and one reference, and no
@@ -5954,14 +6081,16 @@ script, because two copies of the name step drift.
   comments.
 - **How a teacher finds out.** `plantoir-marking` mentions it once when the
   marks are final; the root `CLAUDE.md` and `AGENTS.md` name it in one
-  bullet each; it offers nothing after itself, being the last step. Nothing
+  bullet each (while it is held, neither does); it offers nothing after itself, being the last step. Nothing
   on plantoir.app, no new app text, no trail event (the app does nothing
   new, and work on student records is never recorded).
 
 NOT MEASURED in this piece: a trial with a real assistant drafting comments
 from invented marks records; it is written up for the director.
 
-**Class results (#750, piece 750c).** `plantoir-marking` gained a fifth
+**Class results (#750, piece 750c).** Held from v2.0.0 with the rest of
+the marking skill (above), in `held/agent_guidance/skills/plantoir-marking`.
+`plantoir-marking` gained a fifth
 script, `scripts/class_results.py`, and a third reference,
 `reference/results.md`; `make_named_copies.py` gained `--document` and
 `--grades`. The contract is `assessment.results` (its `cases`) and

@@ -2,9 +2,8 @@
 
 A test's `Marking Kit/` folder holds three files: this format's
 `answers.json`, an empty marks record `marks-template.json`, and a
-`README.md` for whoever marks. The `plantoir-marking` skill, when it is in
-the working folder, reads the kit to mark papers and build feedback
-sheets, so the kit is written in this format exactly. `answers.json` and `marks-template.json` beside this file
+`README.md` for the teacher, who marks. The kit is written in this format
+exactly, and `check_kit.py` holds it to it. `answers.json` and `marks-template.json` beside this file
 are a worked example (an invented Grade 10 science test with two
 versions); copy them and replace every value.
 
@@ -30,7 +29,7 @@ last, full, given, family or middle. The format's own `studentNote` is the
 one exception. And no object has a key the tables below do not list
 (keys that start with an underscore are notes). A marks record names its
 paper by `identifier` (such as `Student A`), never by a name; whether an
-identifier has the right shape is the marking skill's check. Every key at
+identifier has the right shape is not this checker's to decide. Every key at
 every depth of both files is read, the free places included. The checker
 reads keys, never what a value says: a name typed into a note, `seen` or a
 sentence is not something it can find, so never type one. The reason is
@@ -108,12 +107,12 @@ that teach it: `when` says when to choose it, `pages` lists `{title, path,
 anchor}`, where `path` is the page's address on the section's website
 after the site's address (`Concepts/Balancing-Equations`) and `anchor` a
 heading on it, or `""`. The site's address is not in the kit, because each
-section has its own; `plantoir-marking` adds it at marking time and checks
-the link opens.
+section has its own; it is added at marking time, and the link is checked
+then.
 
 ## marks-template.json: one marks record
 
-`plantoir-marking` copies it once per paper, names the copy by the
+The teacher copies it once per paper, names the copy by the
 identifier (`Student A.json`), and fills it in. It has every point of
 `answers.json`, and nothing else:
 
@@ -123,8 +122,8 @@ identifier (`Student A.json`), and fills it in. It has every point of
 | `identifier` | The paper's identifier, such as `Student A`. Never a name. |
 | `section`, `version` | The section, and the version written at the top of the paper. |
 | `points` | One entry per point ID: `{earned, seen, note, studentNote}`. `earned` is `null` until marked, then `0` or `1`; `0.5` only where the teacher's marking settings allow a half mark. `seen` is what is on the paper, briefly. `note` is the reason when a mark is withheld or a judgement was made. `studentNote` is one sentence to the student about a lost mark. |
-| `voided` | The points the kit's `voided` removes from the count, each `{reason, intended}`: exactly those, no more and no fewer. After the teacher voids a point, it is added to the kit and to every record, and every sheet and the class results are built again. |
+| `voided` | The points the kit's `voided` removes from the count, each `{reason, intended}`: exactly those, no more and no fewer. After the teacher voids a point, it is added to the kit and to every record. |
 | `checks` | Things for the teacher to look at, each starting with its question. A name seen on a paper is written here only as "NAME VISIBLE page N", never the name. |
-| `summary`, `byQuestion`, `strengths`, `focus`, `closing`, `feedback` | What the feedback sheet says, written by the marker. `plantoir-marking` (#750) defines what is inside them; the checker only refuses a key there that looks like it holds a person, and a `feedback` key that is not a part. |
+| `summary`, `byQuestion`, `strengths`, `focus`, `closing`, `feedback` | What the feedback sheet says, written by the marker; the checker only refuses a key there that looks like it holds a person, and a `feedback` key that is not a part. |
 
 Totals are never written: they are counted from `points`.

@@ -221,8 +221,8 @@ not checkable: it, too, may be a false alarm.
 
 ## 7. Scans: box them, the teacher looks through them, then the papers
 
-Russell, 2026-11-12: "script runs, teacher checks the papers, confirms
-names are redacted, then agent based marking begins. Simple." The script
+The order is fixed: the script runs, the teacher checks the papers and
+confirms the names are redacted, and only then does marking begin. The script
 places the boxes and puts the boxed papers in one file; the teacher's look
 through every page is what confirms the names are redacted.
 

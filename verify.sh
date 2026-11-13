@@ -282,9 +282,9 @@ if ! command -v node >/dev/null 2>&1; then
   echo "note: node is not on PATH, so help/tests/test_web_search.py skips its search test (the pass line below does not cover search)"
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_build_help.py >/tmp/verify_help_test_build_help.log 2>&1; then
-  pass "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  pass "Help: the real help/ builds green with its 102 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
 else
-  fail "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  fail "Help: the real help/ builds green with its 102 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
   cat /tmp/verify_help_test_build_help.log
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_markdown.py >/tmp/verify_help_test_markdown.log 2>&1; then
@@ -760,6 +760,10 @@ fi
 # runner, and the plantoir-report-comments skill's files. Class results
 # (#750, 750c): every results case through class_results.py, and the named
 # grade tables and documents (gradeCases, documentCases). Stdlib only.
+# Both skills are HELD from v2.0.0 (#750, shared-rules.json ->
+# printablePages.agentGuidance.held): their folders are in
+# held/agent_guidance/skills, which neither app copies into a working folder,
+# and these tests find them there through the contract's held.place.
 for marking_test in redact names guard sheets comments results; do
   if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
     pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a and 750c; comments #752)"
@@ -768,6 +772,17 @@ for marking_test in redact names guard sheets comments results; do
     cat "/tmp/verify_marking_${marking_test}_test.log"
   fi
 done
+
+# Held skills (#750, 2026-11-13): marking and report comments are deferred from
+# v2.0.0. A held skill is not where both apps copy skills from, and nothing a
+# working folder receives, no greeting or sentence, neither app, not Help and
+# not the website names or offers it (shared-rules.json -> printablePages.agentGuidance.held).
+if (cd scripts && python3 -B test_held_skills.py) >/tmp/verify_held_skills_test.log 2>&1; then
+  pass "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+else
+  fail "held skills: marking and report comments are installed nowhere and offered by nothing (scripts/test_held_skills.py, #750)"
+  cat /tmp/verify_held_skills_test.log
+fi
 
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
