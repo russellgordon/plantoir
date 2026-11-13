@@ -196,6 +196,66 @@ class StepsAcrossBlocks(unittest.TestCase):
         self.assertIn('<ol start="3">\n<li>Ask the helper.</li>', mac)
         self.assertIn('<ol start="4">\n<li>Press it.</li>', mac)
 
+    def web_and_mac_steps(self, body: str):
+        """The numbers each form shows: [(start, [item texts])] per numbered list."""
+        import re
+
+        self.fixture.replace("help/pages/first-steps.md", "Open the fixture and look at the window.\n", body)
+        shown = {}
+        for form, folder in (("web", self.fixture.out / "web"), ("mac", self.fixture.out / "Plantoir.help")):
+            code, output = self.fixture.run("--" + form, str(folder))
+            self.assertEqual(code, 0, output)
+            page = folder / "first-steps.html" if form == "web" else folder / "Contents" / "Resources" / "en.lproj" / "first-steps.html"
+            html = page.read_text(encoding="utf-8")
+            lists = []
+            for found in re.finditer(r'<ol(?: start="(\d+)")?>\n(.*?)\n</ol>', html, re.DOTALL):
+                items = re.findall(r"<li>([^<]*)</li>", found.group(2))
+                if len(items) > 0:  # the fixture's own steps (with tokens) come after a heading
+                    lists.append((int(found.group(1) or 1), items))
+            shown[form] = lists
+        return shown
+
+    def test_the_web_copy_never_skips_a_number_wherever_the_withheld_steps_are(self) -> None:
+        if shutil.which("hiutil") is None:
+            self.skipTest("hiutil is not on this machine")
+        run = lambda steps: "{{assistant}}\n" + steps + "{{/assistant}}\n\n"
+        cases = {
+            "the first step": (
+                "Words.\n\n" + run("1. Ask the helper.\n") + "2. Press it.\n3. Wait.\n",
+                [(1, ["Ask the helper."]), (2, ["Press it.", "Wait."])],
+                [(1, ["Press it.", "Wait."])],
+            ),
+            "an aside, then the first step": (
+                "Words.\n\n" + run("The helper can do this.\n\n1. Ask the helper.\n") + "2. Press it.\n",
+                [(1, ["Ask the helper."]), (2, ["Press it."])],
+                [(1, ["Press it."])],
+            ),
+            "the last step": (
+                "Words.\n\n1. Open it.\n2. Look.\n\n" + run("3. Ask the helper.\n"),
+                [(1, ["Open it.", "Look."]), (3, ["Ask the helper."])],
+                [(1, ["Open it.", "Look."])],
+            ),
+            "every step": (
+                "Words.\n\n" + run("1. Ask the helper.\n2. Read its answer.\n"),
+                [(1, ["Ask the helper.", "Read its answer."])],
+                [],
+            ),
+            "two runs": (
+                "Words.\n\n1. Open it.\n\n" + run("2. Ask the helper.\n") + "3. Look.\n\n" + run("4. Ask again.\n") + "5. Close it.\n",
+                [(1, ["Open it."]), (2, ["Ask the helper."]), (3, ["Look."]), (4, ["Ask again."]), (5, ["Close it."])],
+                [(1, ["Open it."]), (2, ["Look."]), (3, ["Close it."])],
+            ),
+        }
+        for name in cases:
+            with self.subTest(case=name):
+                fixture = Fixture()
+                self.fixture.close()
+                self.fixture = fixture
+                body, mac, web = cases[name]
+                shown = self.web_and_mac_steps(body)
+                self.assertEqual(shown["mac"], mac)
+                self.assertEqual(shown["web"], web)
+
     def test_a_misnumbered_step_inside_a_run_says_the_run(self) -> None:
         body = "Words.\n\n1. Open it.\n\n{{assistant}}\n1. Ask the helper.\n{{/assistant}}\n"
         self.fixture.replace("help/pages/first-steps.md", "Open the fixture and look at the window.\n", body)

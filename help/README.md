@@ -28,20 +28,25 @@ every page, caption and alt text is written by Fable from a fact sheet
    `{{control:}}` for a button or label, `{{key:}}` for a shortcut,
    `{{say:}}` for a sentence the app shows. A token is checked against the
    app and is searchable on the web; a label typed by hand is neither.
-   **Retyping the app's sentences.** Only a WHOLE sentence the app shows, of
-   five words or more, retyped in your prose, is refused: write `{{say:key}}`.
-   A phrase of your own that shares some of its words ("ready for the start
-   of the year", "a folder on this computer") is ordinary English and passes.
-4. **Publish and deploy.** Publish marks a page for students; deploy sends a
-   section's site somewhere. Refused, because always wrong: publishing a site
-   ("publish the site"); publishing to a destination ("to the web", "to your
-   school's server", "to Netlify", "to a folder", "to section 2"); publishing
-   online; "the site was published"; deploying a page, class, unit or lesson
-   ("Deploy Unit 3"). Correct sentences pass: "Published pages appear on the
-   site", "A page you publish today shows on the site once you deploy",
-   "Deploy now, and the new pages appear". Where a correct sentence still
-   fails, ask for a `tone.json` exemption scoped to the page, with its
-   reason.
+   **Retyping the app's sentences.** A sentence of yours that IS, as a
+   whole, a sentence the app shows (five words or more) is refused: write
+   `{{say:key}}`. A longer sentence that holds one, or a phrase that shares
+   its words ("ready for the start of the year"), is ordinary prose and
+   passes. A label the app shows (no full stop) is never checked when typed,
+   so always name a button or label with `{{control:}}` and a menu with
+   `{{menu:}}`: a typed label goes stale silently.
+4. **Publish and deploy: a person is the check.** Deploy sends a section's
+   site somewhere (a folder, Netlify, Cloudflare Pages). Publish marks a page
+   for inclusion, so students see it once the section is next deployed.
+   Right: "Publish the pages, then deploy the section." "Published pages
+   appear on the site after you deploy." "Deploy your site to Netlify." "You
+   do not deploy a page: you publish it, then deploy the section."
+   Wrong: "Publish your site to Netlify." "Your site is now published."
+   "Deploy only the pages you changed." "Deploy Monday's class." No pattern
+   tells these apart reliably (three reviews tried), so the build never
+   fails on them: `--check` lists the sentences that may misuse either word
+   under "For the page's reviewer: publish and deploy", with file and line,
+   and counts them in its summary line. The reviewer reads each one.
 5. **Counts.** A digit within four words of "course" or "code" is refused as
    a typed count, including "a Grade 9 course" and "Section 2 of the course".
    Write a count as `{{count:ready_made_ontario}}`; rephrase anything else.
@@ -71,12 +76,19 @@ every page, caption and alt text is written by Fable from a fact sheet
     first line. Each finding is printed once. The "number this one N" hint
     after a numbering error can be wrong when several steps are misnumbered;
     renumber all of them in order.
-12. **Search on the web** folds plurals and endings ("classes" finds class
-    pages, "scheduled" finds schedule) and ranks a page whose title or id
-    holds the words first. Keywords still help: put the words a teacher
-    would type in `keywords:`.
 11. **The words around the pages** (the stub box, "Picture to come", the
     search box) are in `interface-words.json`, by key: reword them there.
+12. **Search on the web** folds plurals and endings ("classes" finds class
+    pages, "scheduled" finds schedule, "quizzes" finds quiz) and ranks a page
+    whose title or id holds the words first. Keywords still help: put the
+    words a teacher would type in `keywords:`.
+13. **Step numbers in prose.** Do not refer to a step by its number ("in
+    step 4") on a page with an `{{assistant}}` run among its steps: the web
+    copy renumbers the steps, and nothing checks numbers in prose. Say "the
+    step above", or name the step's action.
+14. **"Coverage" and "assistant" in any sense** ("curriculum coverage", "an
+    assistant principal") are refused on the web copy outside an
+    `{{assistant}}` run. Choose other words, or use the run.
 
 ## What is here
 
@@ -114,7 +126,7 @@ than 60 days, an unused registry id, a sentence over 25 words, a scene with no
 `shows`. Piece F adds `--release`, which refuses those too.
 
 - `--check` writes nothing and prints one line: pages written, stubs, scenes
-  awaiting capture, warnings, failures.
+  awaiting capture, warnings, publish/deploy notes for the reviewer, failures.
 - `--mac` writes the book (below) and prints its size. No size is refused
   (decision 11).
 - `--web` writes `index.html`, one `<id>.html` per page, `assets/` and the
@@ -228,9 +240,11 @@ header.
 3. **Links and lists.** `page:` names an outline id; `https://` is well formed
    (never fetched). A link from an ordinary page to an assistant page must sit
    in an `{{assistant}}` run (below). Numbered steps count up by one, and the
-   steps after a picture, note, table or code block carry on from the steps
-   above, rendered `<ol start="3">`; a list that restarts at 1 there is
-   refused. The review of P2a found the old behaviour: steps after a picture
+   steps after a picture, note, table, code block or run carry on from the
+   steps above, rendered `<ol start="3">`; a list that restarts at 1 there is
+   refused. Each form counts the steps it shows: the web copy, which leaves
+   an `{{assistant}}` run out, renumbers from 1, wherever the left-out steps
+   were (first, last, all of them, or in two runs). The review of P2a found the old behaviour: steps after a picture
    silently restarted at 1, the shape of most how-to pages. Allowing a picture
    inside a list item was rejected: it needs indentation rules writers get
    wrong, and the refusal makes the wrong state impossible instead.
@@ -239,18 +253,13 @@ header.
      word and any case, as the app's `UserFacingLabelWordsTests` matches it;
    - the site's `MACHINERY` pattern, copied from `website/build.py`;
    - `tone.json`'s banned words and shapes;
-   - **Help's own publish rule.** PUBLISH marks a page for students; DEPLOY
-     sends a section's site somewhere. The check refuses six shapes that are
-     always wrong (`PUBLISH_DEPLOY_MISUSE` in `words.py`): the verb publish
-     (never "publisher") with a site as its object; publish followed within
-     five words by "to" or "onto" a destination (the web, a server, Netlify,
-     Cloudflare, GitHub Pages, a site, a folder, a section); publish followed
-     by "online"; publish "on" Netlify, Cloudflare, GitHub Pages or the web; a
-     site that "was published"; and deploy with a page, class, unit or lesson
-     as its object. No shape reaches across a comma or a full stop. The
-     second review's cases are the tests: twelve correct sentences pass and
-     ten misuses are refused, so the rule stays a failure rather than a
-     warning.
+   - **publish and deploy, for the reviewer.** Sentences where publish may be
+     used for sending a site, or deploy for a page (`PUBLISH_DEPLOY_MISUSE`
+     in `words.py`), are listed by `--check` under "For the page's reviewer:
+     publish and deploy" and counted in the summary line. They are never a
+     failure: three rounds of review measured every pattern tried as wrong
+     both ways (the third: 6 of 12 correct sentences flagged, 7 of 12 misuses
+     missed), so a person reads them.
      The site's rule (every "publish" must be on an allowed list) was
      rejected for Help: "publish" is Help's correct verb and a real menu item,
      and that rule failed five approved titles (plan review H1).
@@ -275,14 +284,19 @@ header.
    `wording`) or the `sentences`, `wording` and `words` values of the other
    `contracts/*.json` (a value of several sentences gives each), found in a
    page's RUNNING PROSE (paragraphs, list items, table cells, alt text, the
-   description, `pages/index.md`). It compares words: case, curly or straight
-   quotes, dashes, punctuation and line breaks are ignored, and a placeholder
-   (`{name}`, `%@`) stands for one to four words. A shorter string, a label
-   without a full stop, or any fragment of a sentence is ordinary English and
-   passes. Two earlier forms were rejected: matching every five-word run cut
-   out of the contract refused ordinary prose ("a folder on this computer",
-   "already for the start of the year", twice reviewed), and per-page
-   exemptions would have been needed on nearly every page. Titles,
+   description, `pages/index.md`), and only when one of the page's sentences
+   IS, as a whole, a contract sentence. It compares words: case, curly or
+   straight quotes, dashes, punctuation and line breaks are ignored, and a
+   placeholder (`{name}`, `%@`) stands for a name or a number: one to four
+   words, the first a capital or a digit ("Section 2"), so "Put back as they
+   were, the pages show again." is not taken for "Put back as they were:
+   {pages}.". A shorter string, a label without a full stop, a fragment, or a
+   longer sentence that holds a contract sentence is ordinary prose and
+   passes. Three earlier forms were rejected: matching every five-word run cut
+   out of the contract, and then matching a whole contract sentence anywhere
+   inside a paragraph, both refused ordinary prose ("a folder on this
+   computer", "If it fails, try again in a moment and it usually works.");
+   per-page exemptions would have been needed on nearly every page. Titles,
    questions, headings and keywords are NAMES and are not read; a name in
    prose is kept true by writing it as a token.
 6. **Head fields** of written pages, as above; stubs are exempt. A keyword
@@ -345,7 +359,7 @@ page never lingers and pictures are not rewritten.
 - Index bytes differ between two runs over identical pages, so they are never
   compared across builds.
 - A `robots: anchors` page is listed with no title or description.
-- The real 100 stubs build into a 136 KB book in 0.36 s.
+- The real 104 stubs (outline revision 4) build into a 142 KB book.
 - `/usr/bin/python3` is 3.9.6, the Python an Xcode build phase gets. `-I`
   takes the script's own folder off `sys.path`, so `build_help.py` inserts it
   explicitly, and it finds the repository as its own folder's parent, never

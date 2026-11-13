@@ -98,3 +98,76 @@ def run_build(arguments: List[str], repo: Optional[Path] = None, help_dir: Optio
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment
     )
     return completed.returncode, completed.stdout
+
+
+# The WHOLE search page path, as a browser runs it: search-index.js and
+# search.js loaded into a page with a stub DOM, ?q= in the address, the
+# results box read back. Testing searchHelp alone let a ReferenceError in the
+# box's own code ship twice (third review of P2a, HIGH 1).
+DOM_HARNESS = r"""
+const fs = require("fs");
+const vm = require("vm");
+const [indexPath, searchPath, query, readyState] = process.argv.slice(2);
+class Element {
+  constructor(tag) { this.tag = tag; this.children = []; this._text = ""; this.hidden = true; this.href = ""; this.value = ""; }
+  appendChild(child) { this.children.push(child); return child; }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() {
+    let text = this._text;
+    for (const child of this.children) { text += child.textContent; }
+    return text;
+  }
+}
+const box = new Element("section");
+const field = new Element("input");
+const listeners = [];
+const document = {
+  readyState: readyState,
+  getElementById(id) { return id === "help-results" ? box : (id === "help-search" ? field : null); },
+  createElement(tag) { return new Element(tag); },
+  addEventListener(name, handler) { if (name === "DOMContentLoaded") { listeners.push(handler); } },
+};
+const sandbox = { document: document, URLSearchParams: URLSearchParams };
+sandbox.window = sandbox;
+sandbox.window.location = { search: "?q=" + encodeURIComponent(query) };
+vm.createContext(sandbox);
+const report = { threw: null };
+try {
+  vm.runInContext(fs.readFileSync(indexPath, "utf8"), sandbox, { filename: "search-index.js" });
+  vm.runInContext(fs.readFileSync(searchPath, "utf8"), sandbox, { filename: "search.js" });
+  for (const handler of listeners) { handler(); }
+} catch (error) {
+  report.threw = String(error && error.name) + ": " + String(error && error.message);
+}
+report.hidden = box.hidden;
+report.fieldValue = field.value;
+report.heading = "";
+report.items = [];
+report.paragraphs = [];
+for (const child of box.children) {
+  if (child.tag === "h2") { report.heading = child.textContent; }
+  if (child.tag === "ol") {
+    for (const item of child.children) {
+      report.items.push({ href: item.children[0].href, title: item.children[0].textContent });
+    }
+  }
+  if (child.tag === "p") { report.paragraphs.push(child.textContent); }
+}
+console.log(JSON.stringify(report));
+"""
+
+
+def run_page_search(node: str, web: Path, query: str, ready_state: str = "complete", search_js: Optional[Path] = None) -> dict:
+    """Runs the contents page's search as a browser would; returns what the box shows."""
+    import json
+
+    script = web.parent / "page-search-harness.js"
+    script.write_text(DOM_HARNESS, encoding="utf-8")
+    search_path: Path = search_js if search_js is not None else web / "assets" / "search.js"
+    completed = subprocess.run(
+        [node, str(script), str(web / "assets" / "search-index.js"), str(search_path), query, ready_state],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+    )
+    if completed.returncode != 0:
+        raise AssertionError("the page harness failed: " + completed.stdout)
+    return json.loads(completed.stdout)

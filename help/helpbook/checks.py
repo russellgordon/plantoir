@@ -241,12 +241,13 @@ def _collect_sentence_values(value: Any, into: List[str]) -> None:
 
 def contract_words(text: str) -> List[str]:
     """A text as the words it holds, for comparing a page with the contract:
-    case folded, curly quotes made straight, dashes and punctuation dropped,
-    white space (line breaks included) ignored."""
-    folded: str = text.casefold()
+    curly quotes made straight, dashes and punctuation dropped, white space
+    (line breaks included) ignored. Case is kept here and ignored by the
+    patterns, except where a placeholder stands (see contract_sentences)."""
+    straightened: str = text
     for curly, straight in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", '"'), ("\u201d", '"')):
-        folded = folded.replace(curly, straight)
-    return re.findall(r"[0-9a-z\u00c0-\u024f]+(?:'[0-9a-z\u00c0-\u024f]+)*", folded)
+        straightened = straightened.replace(curly, straight)
+    return re.findall(r"[0-9A-Za-z\u00c0-\u024f]+(?:'[0-9A-Za-z\u00c0-\u024f]+)*", straightened)
 
 
 PLACEHOLDER = re.compile(r"\{[^}]*\}|%@|%d|%\d\$@|\\\([^)]*\)")
@@ -281,13 +282,16 @@ def contract_sentences(repo: Path) -> List[Tuple[str, Any]]:
             real_words: int = 0
             for chunk in marked.split(WILDCARD_WORD):
                 for word in contract_words(chunk):
-                    pieces.append(re.escape(word))
+                    pieces.append("(?i:" + re.escape(word) + ")")
                     real_words += 1
-                pieces.append(r"\S+(?: \S+){0,3}")
+                # A placeholder stands for a name or a number (a section, a page title,
+                # a count): one to four words, the first a capital or a digit, so
+                # "Put back as they were: {pages}." never swallows "the pages show again".
+                pieces.append(r"[A-Z0-9\u00c0-\u00de]\S*(?: \S+){0,3}")
             pieces.pop()
             if real_words < SENTENCE_MIN_WORDS:
                 continue
-            pattern_text: str = "(?:^| )" + " ".join(pieces) + "(?: |$)"
+            pattern_text: str = "^" + " ".join(pieces) + "$"
             if pattern_text in seen:
                 continue
             seen.add(pattern_text)
@@ -296,9 +300,9 @@ def contract_sentences(repo: Path) -> List[Tuple[str, Any]]:
 
 
 def check_contract_sentences(source: HelpSource) -> None:
-    """A whole sentence the app shows, retyped in running prose, would go
-    stale silently when the app's words change: it is refused, and written
-    {{say:<key>}} instead. Titles, questions, headings and keywords are names
+    """A whole sentence the app shows, retyped as a whole sentence of a page's
+    running prose, would go stale silently when the app's words change: it is
+    refused, and written {{say:<key>}} instead. Titles, questions, headings and keywords are names
     and are not read."""
     sentences: List[Tuple[str, Any]] = contract_sentences(source.repo)
     pages: List[Page] = list(source.pages)
@@ -310,13 +314,19 @@ def check_contract_sentences(source: HelpSource) -> None:
         for line, text in readable_texts(source, page, include_names=False):
             if text.strip() == "":
                 continue
-            prose: str = " ".join(contract_words(text))
-            for sentence, pattern in sentences:
-                if pattern.search(prose) is not None:
-                    source.problems.fail(
-                        str(page.file), line,
-                        "retypes a whole sentence the app shows (" + repr(sentence[:70]) + "): write its {{say:}} token",
-                    )
+            # Per sentence of the page: refused only when the writer's WHOLE sentence is
+            # a contract sentence. A longer sentence that holds one is ordinary prose.
+            for prose_sentence in re.split(r"(?<=[.!?\u2026])\s+", text.strip()):
+                prose: str = " ".join(contract_words(prose_sentence))
+                if prose == "":
+                    continue
+                for sentence, pattern in sentences:
+                    if pattern.match(prose) is not None:
+                        source.problems.fail(
+                            str(page.file), line,
+                            "retypes a whole sentence the app shows (" + repr(sentence[:70]) + "): write its "
+                            "{{say:}} token (a menu item is {{menu:}}, a button or label {{control:}})",
+                        )
 
 
 def run_structural_checks(source: HelpSource) -> None:

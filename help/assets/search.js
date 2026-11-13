@@ -33,6 +33,8 @@
     "who", "why", "with", "you", "your", "t", "s"
   ];
   var KEY_SYMBOLS = /[⌘⇧⌥⌃]/;
+  // At most this many results are listed; a line counts the rest.
+  var MOST_SHOWN = 10;
 
   function stem(word) {
     if (KEY_SYMBOLS.test(word)) {

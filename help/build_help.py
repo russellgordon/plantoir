@@ -56,6 +56,11 @@ def parse_arguments(arguments: List[str]) -> argparse.Namespace:
 def print_findings(problems: Problems) -> None:
     for warning in problems.warnings:
         print("warning: " + warning)
+    if len(problems.review_notes) > 0:
+        print("For the page's reviewer: publish and deploy (" + str(len(problems.review_notes)) + "). "
+              "Deploy sends a site somewhere; publish marks a page for inclusion. Read each:")
+        for note in problems.review_notes:
+            print("review: " + note)
     for failure in problems.failures:
         print("FAILED: " + failure)
 
@@ -114,6 +119,7 @@ def main(arguments: Optional[List[str]] = None) -> int:
     summary: str = (
         "Help: " + str(len(source.pages) - stubs) + " pages written, " + str(stubs) + " stubs, "
         + str(awaiting) + " scenes awaiting capture, " + str(len(problems.warnings)) + " warnings, "
+        + str(len(problems.review_notes)) + " publish/deploy notes, "
         + str(len(problems.failures)) + " failures"
     )
     print(summary)

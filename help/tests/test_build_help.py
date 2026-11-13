@@ -16,7 +16,7 @@ import shutil  # noqa: E402
 import tempfile  # noqa: E402
 import unittest  # noqa: E402
 
-from helpers import HELP_DIR, REPO, run_build  # noqa: E402
+from helpers import HELP_DIR, REPO, run_build, run_page_search  # noqa: E402
 
 STANDARD_LIBRARY = {
     "__future__", "argparse", "ast", "datetime", "functools", "hashlib", "html", "http", "json", "os",
@@ -76,8 +76,8 @@ class RealRepositoryTests(unittest.TestCase):
 
     def test_the_real_outline_has_its_counts(self) -> None:
         ids, assistant_ids, assistant_sections = outline_ids()
-        self.assertEqual(len(ids), 100)
-        self.assertEqual(len(set(ids)), 100)
+        self.assertEqual(len(ids), 104)
+        self.assertEqual(len(set(ids)), 104)
         self.assertEqual(len(assistant_ids), 14)
         self.assertEqual(len(assistant_sections), 1)
 
@@ -86,7 +86,7 @@ class RealRepositoryTests(unittest.TestCase):
         book = Path(self.temporary) / "Plantoir.help"
         code, output = run_build(["--mac", str(book), "--app-version", "2.0.0"])
         self.assertEqual(code, 0, output)
-        self.assertIn("Plantoir.help: 100 pages, ", output)
+        self.assertIn("Plantoir.help: 104 pages, ", output)
         ids, _assistant_ids, _sections = outline_ids()
         anchors = json.loads((book / "Contents" / "Resources" / "anchors.json").read_text(encoding="utf-8"))
         self.assertEqual(anchors, ids)
@@ -147,6 +147,8 @@ class RealRepositoryTests(unittest.TestCase):
             "my students can't see the new page": "missing-page",
             "change the dates of my classes after a snow day": "redate",
             "make room for a class": "make-room",
+            "quizzes": "quizzes",
+            "quiz": "quizzes",
         }
         import subprocess
 
@@ -164,6 +166,25 @@ class RealRepositoryTests(unittest.TestCase):
         self.assertEqual(found["classes"][:3], ["class-pages", "class-dates", "later-classes"])
         self.assertLessEqual(len(found["change the dates of my classes after a snow day"]), 5)
 
+    def test_the_real_contents_page_caps_its_results_at_ten(self) -> None:
+        # The whole page path over the real web copy: a query that finds more than ten pages
+        # lists ten, and a line counts the rest.
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not installed; the page's search was not run")
+        web = Path(self.temporary) / "cap-web"
+        code, output = run_build(["--web", str(web)])
+        self.assertEqual(code, 0, output)
+        shown = run_page_search(node, web, "how do I deploy my site")
+        self.assertIsNone(shown["threw"], shown)
+        self.assertFalse(shown["hidden"])
+        self.assertEqual(len(shown["items"]), 10)
+        self.assertEqual(shown["items"][0]["href"], "deploy.html")
+        self.assertEqual(len(shown["paragraphs"]), 1)
+        found = re.match(r"^(\d+) more pages match\.$", shown["paragraphs"][-1])
+        self.assertIsNotNone(found, shown["paragraphs"])
+        self.assertGreater(int(found.group(1)), 0)
+
     def test_the_review_sentences_build_on_a_real_page(self) -> None:
         # Ordinary English that holds a FRAGMENT of a contract sentence passes (second review, HIGH 1),
         # in the body of the page whose title holds one.
@@ -177,7 +198,11 @@ class RealRepositoryTests(unittest.TestCase):
             "Pick a folder on this computer for your work.\n\n"
             "A class page can link to another section of this course.\n\n"
             "Most students get it right on the first try.\n\n"
-            "The page you last viewed opens again.\n",
+            "The page you last viewed opens again.\n\n"
+            "Put back as they were, the pages show again.\n\n"
+            "If it fails, try again in a moment and it usually works.\n\n"
+            "Their names do not change when you move them.\n\n"
+            "It is as it was before you opened it.\n",
             encoding="utf-8",
         )
         code, output = run_build(["--check", "--help-dir", str(copy), "--repo", str(REPO)])

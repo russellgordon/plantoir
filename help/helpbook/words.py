@@ -35,9 +35,10 @@ COUNT_NOUNS = re.compile(r"^(course|courses|code|codes)$", re.IGNORECASE)
 LONG_SENTENCE_WORDS = 25
 QUOTED_RUN_WORDS = 3
 
-# Help's own publish rule. PUBLISH marks a page for students; DEPLOY sends a
-# section's site somewhere. PUBLISH_DEPLOY_MISUSE below names the shapes that
-# are always wrong; correct sentences that explain the two words pass.
+# Help's publish and deploy words. DEPLOY sends a site somewhere; PUBLISH
+# marks a page for inclusion. The shapes below flag sentences for the page's
+# reviewer to read (--check lists them under their own heading); they are
+# never a build failure, because no pattern tells the two apart reliably.
 PAGES_PRODUCTS = re.compile(r"\b(?:github|cloudflare) pages\b", re.IGNORECASE)
 
 WORD = re.compile(r"[A-Za-z0-9(][A-Za-z0-9,.'’()-]*")
@@ -113,8 +114,10 @@ class WordRules:
             found = entry["pattern"].search(readable)
             if found is not None:
                 problems.fail(file, line, "tone: " + repr(found.group(0)) + " (" + entry["why"] + ")")
-        for message in publish_deploy_problems(readable):
-            problems.fail(file, line, message)
+        doubtful: List[str] = publish_deploy_problems(readable)
+        if len(doubtful) > 0:
+            # One note a passage: the reviewer reads the sentence, not the pattern.
+            problems.note_for_review(file, line, "may misuse publish or deploy: " + doubtful[0])
         for message in self.quoted_run_problems(page_id, readable):
             problems.fail(file, line, message)
         for message in typed_count_problems(readable):
@@ -154,8 +157,8 @@ def _sentences(text: str) -> List[List[str]]:
 W = r"[\w'\u2019]+"
 PUBLISH_VERB = r"\bpublish(?:es|ed|ing)?\b"
 SITE_NOUN = r"(?:sites?|websites?)\b"
-# Each pattern is a shape that is ALWAYS wrong: the verb publish used for
-# sending a site somewhere, or deploy used for a page. Words are joined by
+# Each pattern is a shape where the verb publish MAY be used for sending a
+# site somewhere, or deploy for a page. Words are joined by
 # spaces only, so no pattern reaches across a comma, a full stop or a clause
 # that punctuation separates ("Deploy now, and the new pages appear").
 PUBLISH_DEPLOY_MISUSE = [
@@ -177,9 +180,10 @@ PUBLISH_DEPLOY_MISUSE = [
 
 
 def publish_deploy_problems(text: str) -> List[str]:
-    """Help's own publish rule: the misuse shapes above, each always wrong.
-    Measured against the reviews' cases (help/tests/test_words.py): the
-    correct sentences that explain publish and deploy pass."""
+    """Sentences where "publish" or "deploy" MAY be misused, for the page's
+    reviewer to read. Three rounds of review showed no pattern judges this
+    right (the third: 6 of 12 correct sentences flagged, 7 of 12 misuses
+    missed), so these are notes, never failures: a person is the check.""" 
     # "GitHub Pages" and "Cloudflare Pages" are destinations, never pages.
     # "GitHub Pages" and "Cloudflare Pages" are destinations, never pages.
     cleaned: str = PAGES_PRODUCTS.sub("ThatDestination", text)

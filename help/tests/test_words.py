@@ -16,8 +16,8 @@ from helpbook.words import publish_deploy_problems, typed_count_problems  # noqa
 
 
 class RuleTests(unittest.TestCase):
-    # The cases of both reviews: correct sentences that explain publish and deploy,
-    # and misuses that must be refused.
+    # The cases of the reviews: correct sentences, and misuses the patterns flag
+    # for the reviewer (notes, never failures, since the third review).
     CORRECT = [
         "Publish the pages, then deploy the section.",
         "Publish the class for a date.",
@@ -112,8 +112,17 @@ class WordCheckTests(unittest.TestCase):
     def test_a_count_token_is_not_a_typed_count(self) -> None:
         self.passes("There are {{count:ready_made_ontario}} ready-made courses.\n")
 
-    def test_publish_to_a_site_is_refused_on_a_page(self) -> None:
-        self.refused("Publish the site to Netlify.\n", "PUBLISH marks a page for students")
+    def test_a_possible_misuse_of_publish_is_a_note_for_the_reviewer_and_never_a_failure(self) -> None:
+        output = self.passes("Publish the site to Netlify.\n\nDeploy the page for Thursday.\n")
+        self.assertIn("For the page's reviewer: publish and deploy (2).", output)
+        self.assertIn("review: help/pages/second-look.md:8: may misuse publish or deploy: 'Publish the site'", output)
+        self.assertIn("review: help/pages/second-look.md:10: may misuse publish or deploy: 'Deploy the page'", output)
+        self.assertIn(" 2 publish/deploy notes, 0 failures", output)
+
+    def test_a_page_with_no_doubtful_use_has_no_notes(self) -> None:
+        output = self.passes("Publish the pages, then deploy the section.\n")
+        self.assertNotIn("For the page's reviewer", output)
+        self.assertIn(" 0 publish/deploy notes, ", output)
 
     def test_publish_inside_a_menu_token_is_not_read(self) -> None:
         self.fixture.replace(
@@ -137,18 +146,22 @@ class WordCheckTests(unittest.TestCase):
         self.assertIn("warning: help/pages/second-look.md:8: a sentence of 30 words", output)
 
     def test_a_contract_sentence_typed_by_hand_is_refused(self) -> None:
-        self.refused("It says the section was copied into the folder you chose.\n", "retypes a whole sentence the app shows")
+        self.refused("Look in the folder. The section was copied into the folder you chose.\n", "retypes a whole sentence the app shows")
         self.refused("Ask me to show or hide a class for a section.\n", "retypes a whole sentence the app shows")
 
     def test_a_whole_sentence_retyped_with_small_changes_is_still_refused(self) -> None:
         # A line break in the middle, a changed full stop, a straight quote for a curly one.
-        self.refused("Then the section was copied into the\nfolder you chose; that is all it does.\n", "help/pages/second-look.md:8: retypes a whole sentence")
+        self.refused("Words.\n\nThe section was copied into the\nfolder you chose\n", "help/pages/second-look.md:10: retypes a whole sentence")
         self.refused("The teacher's copy stays on this Mac.\n", "help/pages/second-look.md:8: retypes a whole sentence")
-        self.refused("It shows THE SECTION WAS COPIED INTO THE FOLDER YOU CHOSE\n", "retypes a whole sentence")
+        self.refused("First words. THE SECTION WAS COPIED INTO THE FOLDER YOU CHOSE? Last words.\n", "retypes a whole sentence")
 
     def test_a_fragment_of_a_contract_sentence_is_ordinary_english(self) -> None:
         self.passes("The section was copied into a new place.\n")
         self.passes("Pick the folder you chose last time.\n")
+
+    def test_a_longer_sentence_holding_a_contract_sentence_is_ordinary_prose(self) -> None:
+        self.passes("If it worked, the section was copied into the folder you chose, so look there.\n")
+        self.passes("Deploying Section 2 to the folder now and then is fine.\n")
 
     def test_a_contract_sentence_with_a_placeholder_matches_any_words_there(self) -> None:
         self.refused("Deploying Section 2 to the folder now.\n", "retypes a whole sentence")

@@ -17,7 +17,7 @@ import time  # noqa: E402
 import unittest  # noqa: E402
 import urllib.request  # noqa: E402
 
-from helpers import BUILD_HELP, HELP_DIR, Fixture, write_webp  # noqa: E402
+from helpers import BUILD_HELP, HELP_DIR, Fixture, run_page_search, write_webp  # noqa: E402
 
 NODE = shutil.which("node")
 
@@ -160,6 +160,29 @@ class WebTests(unittest.TestCase):
         self.assertEqual(search_for("marmaladew"), ["first-steps"])
         self.assertEqual(search_for("how do I deploy my site")[0], "send-section")
 
+    def test_the_contents_page_shows_its_results_as_a_browser_would(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the page's search was not run")
+        self.build()
+        for ready_state in ("loading", "complete"):
+            with self.subTest(ready_state=ready_state):
+                shown = run_page_search(NODE, self.web, "marmaladeword", ready_state)
+                self.assertIsNone(shown["threw"], shown)
+                self.assertFalse(shown["hidden"])
+                self.assertEqual(shown["heading"], "Search results")
+                self.assertEqual(shown["fieldValue"], "marmaladeword")
+                self.assertEqual(shown["items"][0], {"href": "first-steps.html", "title": "Take the first steps"})
+        # No match: the box shows the interface sentence.
+        shown = run_page_search(NODE, self.web, "zzzqqq")
+        self.assertIsNone(shown["threw"], shown)
+        self.assertFalse(shown["hidden"])
+        self.assertEqual(shown["items"], [])
+        self.assertEqual(shown["paragraphs"], ["No page matches."])
+        # No query: the box stays hidden and the contents show.
+        shown = run_page_search(NODE, self.web, "")
+        self.assertIsNone(shown["threw"], shown)
+        self.assertTrue(shown["hidden"])
+
     def test_the_assistant_pages_are_found_once_the_switch_is_on(self) -> None:
         if NODE is None:
             self.skipTest("node is not installed; the search index was not run")
@@ -193,6 +216,7 @@ class WebTests(unittest.TestCase):
             "a menu token": ("Choose {{menu:revise-claude}} from the menu.\n", "help/pages/second-look.md:8"),
             "a code span": ("Type `copilot` in the window.\n", "help/pages/second-look.md:8"),
             "a fenced block": ("Type this:\n\n```text wrap\ncopilot fix\n```\n", "help/pages/second-look.md:10"),
+            "a word split by bold": ("Ask **Clau**de to help.\n", "help/pages/second-look.md:8"),
             "a link target": ("Read [the vendor's page](https://github.com/features/copilot).\n", "help/pages/second-look.md:8"),
         }
         for name in routes:

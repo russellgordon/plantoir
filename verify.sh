@@ -282,9 +282,9 @@ if ! command -v node >/dev/null 2>&1; then
   echo "note: node is not on PATH, so help/tests/test_web_search.py skips its search test (the pass line below does not cover search)"
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_build_help.py >/tmp/verify_help_test_build_help.log 2>&1; then
-  pass "Help: the real help/ builds green with its 100 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  pass "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
 else
-  fail "Help: the real help/ builds green with its 100 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  fail "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
   cat /tmp/verify_help_test_build_help.log
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_markdown.py >/tmp/verify_help_test_markdown.log 2>&1; then

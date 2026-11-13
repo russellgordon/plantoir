@@ -207,7 +207,9 @@ class PageRenderer:
         token, code span or link is a way round it (#804)."""
         if self.form != "web" or page.assistant or self.registries.assistant_on_the_web:
             return
-        pieces: List[str] = [html.unescape(re.sub(r"<[^>]+>", " ", fragment))]
+        # Inline tags join their words ("**Clau**de" reads "Claude"); other tags part them.
+        joined: str = re.sub(r"</?(?:strong|em|b|i|code|span|kbd|a)\b[^>]*>", "", fragment)
+        pieces: List[str] = [html.unescape(re.sub(r"<[^>]+>", " ", joined))]
         for value in re.findall(r'\b(?:alt|href|title|aria-label|content)="([^"]*)"', fragment):
             pieces.append(html.unescape(value))
         text: str = " ".join(" ".join(pieces).split())
@@ -283,7 +285,9 @@ class PageRenderer:
         counter: int = 0
         for block, inside_run in step_sequence(blocks, self.shown_runs()):
             if block["kind"] == "list" and block["ordered"] and len(block["items"]) > 0:
-                start: int = counter + 1 if counter > 0 else block["start"]
+                # Counted from what this form shows: a list whose earlier steps were all
+                # in a run left out of this form starts at 1, never at its source number.
+                start: int = counter + 1
                 self.list_starts[id(block)] = start
                 counter = start + len(block["items"]) - 1
                 continue

@@ -17,6 +17,9 @@ class Problems:
     def __init__(self) -> None:
         self.failures: List[str] = []
         self.warnings: List[str] = []
+        # For the page's reviewer to read, never a failure: the uses of
+        # "publish" and "deploy" a pattern cannot judge (third review of P2a).
+        self.review_notes: List[str] = []
 
     @staticmethod
     def _where(file: str, line: Optional[int]) -> str:
@@ -34,6 +37,11 @@ class Problems:
         finding: str = self._where(file, line) + ": " + message
         if finding not in self.warnings:
             self.warnings.append(finding)
+
+    def note_for_review(self, file: str, line: Optional[int], message: str) -> None:
+        finding: str = self._where(file, line) + ": " + message
+        if finding not in self.review_notes:
+            self.review_notes.append(finding)
 
     def has_failures(self) -> bool:
         return len(self.failures) > 0
