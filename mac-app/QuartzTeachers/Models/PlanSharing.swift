@@ -418,6 +418,7 @@ nonisolated enum PlanSharingWording {
     /// the marker's oldCopies is above 0 (review M2).
     static let oldCopyStillThere: String = "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more."
     static let listsSheetTitle: String = "Share these files?"
+    static let consoleSheetTitle: String = "Sharing unit plans"
     static let listsSharedHeading: String = "These files will be shared with anyone who has the address:"
     static let listsLeftOutHeading: String = "These files are left out:"
     static let listsNone: String = "(none)"
@@ -459,6 +460,7 @@ nonisolated enum PlanSharingWording {
             "earlierYear": earlierYear,
             "changePasswordNote": changePasswordNote,
             "courseBusy": courseBusy,
+            "consoleSheetTitle": consoleSheetTitle,
             "lastShareUnfinished": lastShareUnfinished,
             "stopUnconfirmed": stopUnconfirmed,
         ]

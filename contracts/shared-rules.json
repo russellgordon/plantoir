@@ -37766,6 +37766,7 @@
         "earlierYear": "{year}: {address}",
         "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with.",
         "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished.",
+        "consoleSheetTitle": "Sharing unit plans",
         "lastShareUnfinished": "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing.",
         "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
       },

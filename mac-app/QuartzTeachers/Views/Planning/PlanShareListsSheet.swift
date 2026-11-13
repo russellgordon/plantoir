@@ -23,8 +23,6 @@ struct PlanShareListsSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(PlanSharingWording.listsSheetTitle)
-                .font(.headline)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     list(PlanSharingWording.listsSharedHeading, lists.shared, identifier: "planShareListShared")
@@ -33,10 +31,6 @@ struct PlanShareListsSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 200, maxHeight: 420)
-            Text(PlanSharingWording.listsByName)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
                 Button(PlanSharingWording.listsShareButton) {
@@ -50,7 +44,14 @@ struct PlanShareListsSheet: View {
                 .accessibilityIdentifier("planShareListsCancel")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        // The by-name sentence under the title, read before either list.
+        .sheetTitle(PlanSharingWording.listsSheetTitle, explanation: {
+            Text(PlanSharingWording.listsByName)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        })
         .frame(width: 560)
         .interactiveDismissDisabled()
     }

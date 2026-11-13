@@ -109,7 +109,7 @@ struct PlanShareBar: View {
                 planRunner.isShowingSheet = showing
             }
         )) {
-            shareSheet
+            PlanShareConsoleSheet(planRunner: planRunner)
         }
         .alert(
             PlanSharingWording.crawlerWarningTitle,
@@ -332,31 +332,6 @@ struct PlanShareBar: View {
             }
             .disabled(isBusy)
         }
-    }
-
-    /// The console, as a section's deploy shows it, with a Done button once
-    /// the launcher has finished.
-    var shareSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TaskProgressView(
-                runner: planRunner.runner,
-                title: planRunner.title,
-                hidesSiteLink: true,
-                onCancel: {
-                    planRunner.cancel()
-                }
-            )
-            HStack {
-                Spacer()
-                Button("Done") {
-                    planRunner.isShowingSheet = false
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(planRunner.runner.isRunning)
-            }
-        }
-        .padding(16)
-        .frame(minWidth: 520, minHeight: 320)
     }
 
     // MARK: - Functions
