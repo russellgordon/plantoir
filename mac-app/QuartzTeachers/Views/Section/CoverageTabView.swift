@@ -29,6 +29,8 @@ struct CoverageTabView: View {
     let ownBuildRunning: Bool
     let deploying: Bool
     let otherWindow: Bool
+    let previewIsShowing: Bool
+    let browserHasThePreview: Bool
 
     /// Whether the folder lets a build start at all (being copied, or its
     /// tools still being made ready), and why not.
@@ -55,19 +57,13 @@ struct CoverageTabView: View {
     }
 
     var facts: CoverageTabDisplay.Facts {
-        var facts: CoverageTabDisplay.Facts = CoverageTabDisplay.Facts()
-        facts.record = entry.reading?.kind ?? .noRecord
-        facts.refresh = entry.refresh
-        facts.ownBuildBeforeItsMap = ownBuildBeforeItsMap
-        facts.ownBuildRunning = ownBuildRunning
-        facts.deploying = deploying
-        facts.elsewhere = entry.elsewhere
-        facts.otherWindow = otherWindow
-        facts.changed = entry.changed
-        facts.startKnown = entry.reading?.record?.startedAt != nil
-        facts.rulesCompiled = !coverage.rulesFailed
-        facts.obsidianInstalled = FolderActions.obsidianIsInstalled
-        return facts
+        return CoverageTabView.facts(
+            entry: entry, rulesFailed: coverage.rulesFailed,
+            ownBuildBeforeItsMap: ownBuildBeforeItsMap, ownBuildRunning: ownBuildRunning,
+            deploying: deploying, otherWindow: otherWindow,
+            previewIsShowing: previewIsShowing, browserHasThePreview: browserHasThePreview,
+            obsidianInstalled: FolderActions.obsidianIsInstalled
+        )
     }
 
     var display: CoverageTabDisplay.Display {
@@ -95,6 +91,37 @@ struct CoverageTabView: View {
         let resolvedFolder: URL = URL(fileURLWithPath: PlanNavigation.resolvedPath(reading.folder.path), isDirectory: true)
         let resolvedPage: URL = resolvedFolder.appendingPathComponent(page.lastPathComponent, isDirectory: false)
         return (page: resolvedPage, folder: resolvedFolder)
+    }
+
+    // MARK: - Functions
+
+    /// The facts the tab is drawn from, from what the store holds and what
+    /// the section's page knows: one place, which a test of the real page
+    /// asks too.
+    static func facts(
+        entry: SectionCoverage.Entry, rulesFailed: Bool,
+        ownBuildBeforeItsMap: Bool, ownBuildRunning: Bool,
+        deploying: Bool, otherWindow: Bool,
+        previewIsShowing: Bool, browserHasThePreview: Bool,
+        obsidianInstalled: Bool
+    ) -> CoverageTabDisplay.Facts {
+        var facts: CoverageTabDisplay.Facts = CoverageTabDisplay.Facts()
+        facts.record = entry.reading?.kind ?? .noRecord
+        facts.refresh = entry.refresh
+        facts.ownBuildBeforeItsMap = ownBuildBeforeItsMap
+        facts.ownBuildRunning = ownBuildRunning
+        facts.deploying = deploying
+        facts.elsewhere = entry.elsewhere
+        facts.otherWindow = otherWindow
+        facts.changed = entry.changed
+        facts.startKnown = entry.reading?.record?.startedAt != nil
+        facts.previewIsShowing = previewIsShowing
+        facts.restartingThePreview = entry.restartsThePreview
+            && (entry.refresh == .starting || entry.refresh == .pending)
+        facts.browserHasThePreview = browserHasThePreview
+        facts.rulesCompiled = !rulesFailed
+        facts.obsidianInstalled = obsidianInstalled
+        return facts
     }
 
     // MARK: - Body

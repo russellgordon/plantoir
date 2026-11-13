@@ -88,9 +88,18 @@ final class CoverageRefreshInThePageTests: XCTestCase {
             exit 0
           fi
         done
+        port=8081
+        previous=""
+        for word in "$@"; do
+          if [ "$previous" = "--port" ]; then
+            port="$word"
+          fi
+          previous="$word"
+        done
         echo run >> "$log"
         runs=$(grep -c '^run$' "$log")
         out="$here/courses/$1/.merged_output/section$2"
+        mkdir -p "$out/public"
         if [ "$runs" -ge 2 ]; then
           id="build-$runs"
           printf '%s\\n' "$id" > "$out/.build-id"
@@ -98,7 +107,11 @@ final class CoverageRefreshInThePageTests: XCTestCase {
           printf '{"version": 1, "buildId": "%s", "page": "map-%s.html", "startedNs": null, "maps": [{"title": "Curriculum Coverage", "folder": "Curriculum", "expectations": 2, "notYetAddressed": 1, "pages": {}}]}' "$id" "$id" > "$out/.coverage-tab/about.json"
           echo "PLANTOIR_PROBLEMS: {\\"course\\": \\"$1\\", \\"section\\": $2, \\"buildId\\": \\"$id\\", \\"rows\\": 0}"
         fi
-        exec sleep 600
+        echo "Preview will be available at: http://127.0.0.1:$port"
+        printf '<p>site %s</p>' "$runs" > "$out/public/index.html"
+        echo "Launching Quartz preview"
+        echo "Started a Quartz server"
+        exec /usr/bin/python3 -m http.server "$port" --bind 127.0.0.1 --directory "$out/public"
         """
 
     private func runs(in folder: URL) -> (runs: Int, stops: Int) {
@@ -160,10 +173,11 @@ final class CoverageRefreshInThePageTests: XCTestCase {
         let controller: SectionWindowControllers.Controller = try XCTUnwrap(
             registry.controller(folderPath: root.path, courseCode: course.code, sectionNumber: 1)
         )
-        // The teacher previewed first: a preview is serving.
+        // The teacher previewed first: a preview is serving, its site
+        // answering.
         controller.startPreview()
-        XCTAssertTrue(runUntil(timeout: 10) { runs(in: root).runs == 1 && controller.previewState() != .notRunning },
-                      "the first preview is running")
+        XCTAssertTrue(runUntil(timeout: 20) { runs(in: root).runs == 1 && controller.previewState() == .showing },
+                      "the first preview is showing (state \(controller.previewState()))")
 
         let coverage: SectionCoverage = SectionCoverage.shared
         let key: String = coverage.key(folder: root, course: course, sectionNumber: 1)
@@ -172,6 +186,17 @@ final class CoverageRefreshInThePageTests: XCTestCase {
             host.layoutSubtreeIfNeeded()
             return coverage.entry(key).reading?.kind == .thisBuild
         }, "the Coverage tab reads its map")
+        // The button as the teacher meets it: enabled, and the tab saying
+        // before the press that the preview will start again.
+        let before: CoverageTabDisplay.Display = CoverageTabDisplay.display(CoverageTabView.facts(
+            entry: coverage.entry(key), rulesFailed: coverage.rulesFailed,
+            ownBuildBeforeItsMap: false, ownBuildRunning: controller.previewState() == .building,
+            deploying: false, otherWindow: false,
+            previewIsShowing: controller.previewState() == .showing, browserHasThePreview: false,
+            obsidianInstalled: true
+        ))
+        XCTAssertTrue(before.buttonEnabled, "Make the Map Again is enabled with a preview showing")
+        XCTAssertTrue(before.lines.contains("previewRestarts"), "and the tab says the preview starts again: \(before.lines)")
         // The button's own action, through the page's registration: SwiftUI
         // offers no control to click in a window that is never on screen
         // (measured: no NSButton and no accessibility element in the tree).
@@ -187,6 +212,8 @@ final class CoverageRefreshInThePageTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(runs(in: root).stops, 1, "the old preview was stopped")
         let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
         XCTAssertTrue(trail.contains(CoverageTabTrail.madeAgain), trail)
+        XCTAssertTrue(runUntil(timeout: 20) { controller.previewState() == .showing },
+                      "the preview is showing again after the refresh")
 
         // Leave nothing running.
         var stopped: Bool = false

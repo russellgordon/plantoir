@@ -1168,7 +1168,8 @@ over the builder's copy, so the serve never writes a new map. A
 build-only refresh would end the teacher's preview AND leave the window's
 Website tab with nothing to show. So every path that makes the map again stops
 the serve; stopping it and serving again (the ordinary Preview) is the one
-that leaves the teacher a live preview afterwards, on the site's front page.
+that leaves the teacher a live preview afterwards, at the page they were last
+reading.
 Rejected: a build-only refresh, for that reason; a map-only run, ruled out by
 Russell.
 
@@ -1206,7 +1207,45 @@ another window leaving, a Preview the teacher starts), 80 runs
 drives the real section page offscreen with a stand-in `preview.sh` whose
 stop takes a second, so the old run's end and the page's own readings land
 inside the stop: the press starts its build and the map is made again in
-place. With the guard removed, that test and 80 interleavings fail.
+place. With the guard removed, that test fails and 32 of the 80 interleavings
+fail: the 32 with a reading during the stop. The other 48 take no reading
+there, so they pass on the old code too (the fix review 2's LOW 6).
+`CoverageRefreshInThePageTests`' stand-in serves the site over HTTP, so the
+press is made with the preview really showing and the button checked enabled
+first.
+
+**The old run's end, waited for.** The stop's own wait ends when the stop
+process does; the old run may end a moment after. `makeAgain` then waits for
+that run's end (`ScriptRunner.waitUntilFinished`, an event) before asking
+whether a build is running, so the old run is never taken for a new one and
+the tab never stays on "Making…" (the fix review 2's LOW 1;
+`sequenceCases` → oldRunEndsLate). And a start whose lease is no longer its
+own after waiting for stops to finish (its view went away, or it was stopped)
+runs nothing (LOW 2): the guard is in `startPreview`, so it covers every way
+in, the refresh's and the toolbar's alike.
+
+**The teacher's place, and what they are told** (the fix review 2's M1). A
+preview that was showing starts again at the page last viewed, the Preview
+button's own rule (`previewStartPage`, `.lastViewed`; it falls back to the
+front page when that page is gone), not at the front page. The tab says
+before the press that making the map again starts the preview again
+(`previewRestarts`), and while it builds that it will (`makingWithThePreview`).
+A browser tab the teacher opened on the preview (Open in Browser, or a link
+the preview handed to the browser) keeps its old page and stops reloading by
+itself, because Quartz's live-reload client does not reconnect; it works again
+after one reload once the build is done. That is something the teacher must
+act on, so the tab says it (`browserReload`), only when this window had handed
+the preview to the browser.
+
+**Another window's build.** While another window's preview of the section
+builds, it has moved `.build-id` before its map, so this window's tab no
+longer says the latest build made no map: the older map is "made by an
+earlier build", with the line that the section is being previewed in another
+window (LOW 4).
+
+**A late refusal that waited on Coverage** goes to the section's next page
+when the teacher leaves the section from Coverage, through `SectionCoverage`,
+and is raised there (LOW 3).
 
 **A Preview pressed during the stop is the build** (the fix review's M1).
 After the stop, `makeAgain` asks whether a build is already running (the
@@ -1216,8 +1255,8 @@ the refresh. `CoverageTabTests.testEverySequenceCase`
 runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
 test holds open, no window and no delay. A repair's Preview Again
 (`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
-A preview serving when the refresh is pressed starts again at the site's front
-page, as every way in but the Preview button does.
+A preview serving when the refresh is pressed starts again at the page last
+viewed (below).
 
 The wait's end is noticed on `isWaitingForServer` turning false, asked again
 inside the callback, because the stop that a refresh makes first ends the OLD

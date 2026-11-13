@@ -52,6 +52,15 @@ final class SectionCoverage {
         var refreshCourse: String?
         var refreshSection: Int?
 
+        /// The press stopped a preview that was showing, which its build
+        /// starts again (the fix review 2's M1).
+        var restartsThePreview: Bool = false
+
+        /// A late "the preview did not appear" that waited on Coverage when
+        /// the section's page went away (the fix review 2's LOW 3): the next
+        /// page of the section raises it.
+        var heldLateRefusal: CoverageHeldRefusal?
+
         /// The build id the last freshness walk was for: a reading of a
         /// different map says nothing about change until its own walk is
         /// back (the 793b review's LOW 1).
@@ -154,7 +163,7 @@ final class SectionCoverage {
     /// unavailable from this instant. Nil, and nothing recorded, when a
     /// refresh is already starting or waiting for its map: a second press
     /// does nothing, so it can never end the running build's wait.
-    func beginRefresh(folder: URL, course: Course, sectionNumber: Int, owner: UUID? = nil) -> UUID? {
+    func beginRefresh(folder: URL, course: Course, sectionNumber: Int, owner: UUID? = nil, restartsThePreview: Bool = false) -> UUID? {
         let sectionKey: String = key(folder: folder, course: course, sectionNumber: sectionNumber)
         var updated: Entry = entry(sectionKey)
         if updated.refresh == .starting || updated.refresh == .pending {
@@ -166,6 +175,7 @@ final class SectionCoverage {
         updated.refreshOwner = owner
         updated.refreshCourse = course.code
         updated.refreshSection = sectionNumber
+        updated.restartsThePreview = restartsThePreview
         updated.clickLine = nil
         entries[sectionKey] = updated
         ActivityTrail.note(.askedToMakeTheCoverageMapAgain, CoverageTabTrail.asked, course: course.code, section: sectionNumber)
@@ -225,6 +235,24 @@ final class SectionCoverage {
         }
     }
 
+    /// Keeps a late refusal for the section's next page.
+    func holdALateRefusal(_ held: CoverageHeldRefusal, key sectionKey: String) {
+        var updated: Entry = entry(sectionKey)
+        updated.heldLateRefusal = held
+        entries[sectionKey] = updated
+    }
+
+    /// The late refusal kept for this section, taken once.
+    func takeTheHeldLateRefusal(_ sectionKey: String) -> CoverageHeldRefusal? {
+        var updated: Entry = entry(sectionKey)
+        guard let held = updated.heldLateRefusal else {
+            return nil
+        }
+        updated.heldLateRefusal = nil
+        entries[sectionKey] = updated
+        return held
+    }
+
     /// Whether the tab's own start is running for this section now.
     func isRunningTheTabsOwnStart(_ sectionKey: String) -> Bool {
         return ownStartRunning.contains(sectionKey)
@@ -250,13 +278,21 @@ final class SectionCoverage {
         previewIsRunning: Bool,
         aBuildIsRunning: () -> Bool = { () -> Bool in return false },
         stop: () async -> Void,
+        waitForTheOldRun: () async -> Void = { () async -> Void in },
         start: () -> Bool
     ) async {
-        guard let token = store.beginRefresh(folder: folder, course: course, sectionNumber: sectionNumber, owner: owner) else {
+        guard let token = store.beginRefresh(
+            folder: folder, course: course, sectionNumber: sectionNumber, owner: owner, restartsThePreview: previewIsRunning
+        ) else {
             return
         }
         if previewIsRunning {
             await stop()
+            // The stop's own wait ends when the stop does, and the OLD run
+            // may end a moment after it: until it has, "a build is already
+            // running" would be that old run (the fix review 2's LOW 1).
+            // Waited for its end, an event, never a delay.
+            await waitForTheOldRun()
         }
         if !store.refreshMayStart(token: token, folder: folder, course: course, sectionNumber: sectionNumber) {
             return

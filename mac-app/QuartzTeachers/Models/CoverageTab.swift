@@ -591,6 +591,15 @@ nonisolated enum CoverageRefresh: Equatable, Sendable {
     }
 }
 
+/// A late "the preview did not appear", kept for the section's next page.
+nonisolated struct CoverageHeldRefusal: Equatable, Sendable {
+
+    // MARK: - Stored properties
+
+    let title: String
+    let sentence: String
+}
+
 /// What the Coverage tab shows, from facts a test can give without a window:
 /// `coverageTab.stateCases`. The view draws what this answers; every line is
 /// a key of `coverageTab.words`.
@@ -625,6 +634,15 @@ nonisolated enum CoverageTabDisplay {
         var changed: CoverageChange = .none
         /// Whether the record says when its build started.
         var startKnown: Bool = true
+        /// This window's preview is up and showing the site: a press stops
+        /// it and starts it again, which the tab says before the press.
+        var previewIsShowing: Bool = false
+        /// The refresh under way stopped a preview that was showing, and
+        /// starts it again with its build.
+        var restartingThePreview: Bool = false
+        /// This window handed the section's preview to the web browser: a
+        /// restart leaves that browser tab without its live reload.
+        var browserHasThePreview: Bool = false
         var rulesCompiled: Bool = true
         var obsidianInstalled: Bool = true
     }
@@ -669,7 +687,10 @@ nonisolated enum CoverageTabDisplay {
             case .none, .pending, .starting:
                 break
             }
-            if facts.record == .anotherBuild && !anyBuildRunning {
+            // Another window of this app holds the section's preview: its build
+            // may be the one that moved .build-id, so the older map is not
+            // said to be "not made again" (the fix review 2's LOW 4).
+            if facts.record == .anotherBuild && !anyBuildRunning && !facts.otherWindow {
                 failed = true
             }
         }
@@ -684,13 +705,16 @@ nonisolated enum CoverageTabDisplay {
         var lines: [String] = []
         if facts.record == .thisBuild {
             lines.append(hasATime ? "asOf" : "asOfNoTime")
-        } else if facts.record == .anotherBuild && making {
+        } else if facts.record == .anotherBuild && (making || facts.otherWindow) {
             lines.append(hasATime ? "olderMapWhileBuilding" : "olderMapWhileBuildingNoTime")
         } else if facts.record == .anotherBuild {
             lines.append(hasATime ? "olderMap" : "olderMapNoTime")
         }
         if making {
-            lines.append("making")
+            lines.append(facts.restartingThePreview ? "makingWithThePreview" : "making")
+            if facts.restartingThePreview && facts.browserHasThePreview {
+                lines.append("browserReload")
+            }
         } else {
             if failed {
                 lines.append(hasAMap ? "couldNotMakeAgain" : "couldNotMake")
@@ -714,6 +738,10 @@ nonisolated enum CoverageTabDisplay {
                 lines.append("elsewhere")
             } else if facts.otherWindow {
                 lines.append("otherWindow")
+            } else if facts.previewIsShowing && !facts.ownBuildRunning {
+                // Said BEFORE the press (Russell's ruling on the fix review 2's
+                // M1): making the map again restarts the preview.
+                lines.append("previewRestarts")
             }
         }
         if hasAMap {
@@ -751,6 +779,12 @@ nonisolated enum CoverageTabWording {
     static let olderMapWhileBuilding: String = "Made by an earlier build of this section, {when}."
     static let olderMapWhileBuildingNoTime: String = "Made by an earlier build of this section."
     static let making: String = "Making the map again with a new build of this section…"
+    static let makingWithThePreview: String =
+        "Making the map again with a new build of this section… Its preview starts again when the build is done, at the page you were last reading."
+    static let previewRestarts: String =
+        "Making the map again starts this section’s preview again, at the page you were last reading."
+    static let browserReload: String =
+        "If this section’s preview is open in your web browser, reload it there once the build is done."
     static let couldNotMakeAgain: String = "The map could not be made again this time."
     static let couldNotMake: String = "The map could not be made this time."
     static let changedSince: String = "Pages in the course have changed since then, so the map may be out of date."
@@ -798,6 +832,12 @@ nonisolated enum CoverageTabWording {
             text = olderMapWhileBuildingNoTime
         case "making":
             text = making
+        case "makingWithThePreview":
+            text = makingWithThePreview
+        case "previewRestarts":
+            text = previewRestarts
+        case "browserReload":
+            text = browserReload
         case "couldNotMakeAgain":
             text = couldNotMakeAgain
         case "couldNotMake":

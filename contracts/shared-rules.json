@@ -5354,6 +5354,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5380,6 +5383,9 @@
             "otherWindow": false,
             "changed": "pages",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5407,6 +5413,9 @@
             "otherWindow": false,
             "changed": "clock",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5434,6 +5443,9 @@
             "otherWindow": false,
             "changed": "unknown",
             "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5461,6 +5473,9 @@
             "otherWindow": false,
             "changed": "notKnownYet",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5487,6 +5502,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5514,6 +5532,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": false
           },
@@ -5540,6 +5561,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5567,6 +5591,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5594,6 +5621,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5621,6 +5651,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5647,6 +5680,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5674,6 +5710,9 @@
             "otherWindow": false,
             "changed": "unknown",
             "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5701,6 +5740,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5728,6 +5770,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5755,6 +5800,9 @@
             "otherWindow": false,
             "changed": "unknown",
             "startKnown": false,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5783,6 +5831,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5810,6 +5861,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5837,6 +5891,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5864,6 +5921,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5891,6 +5951,9 @@
             "otherWindow": true,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5918,6 +5981,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5935,6 +6001,127 @@
           }
         },
         {
+          "name": "a preview is showing: the tab says before the press that making the map again restarts it",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": true,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "previewRestarts",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": true,
+            "description": null
+          }
+        },
+        {
+          "name": "the refresh stopped a showing preview and starts it again with its build",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": true,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "makingWithThePreview",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "the same, with the preview open in the web browser too: reload it there",
+          "facts": {
+            "record": "thisBuild",
+            "refresh": "pending",
+            "ownBuildBeforeItsMap": true,
+            "ownBuildRunning": true,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": false,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": true,
+            "browserHasThePreview": true,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "asOf",
+              "makingWithThePreview",
+              "browserReload",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
+          "name": "another window's build has moved .build-id before its map: no claim the latest build made none",
+          "facts": {
+            "record": "anotherBuild",
+            "refresh": "none",
+            "ownBuildBeforeItsMap": false,
+            "ownBuildRunning": false,
+            "deploying": false,
+            "elsewhere": false,
+            "otherWindow": true,
+            "changed": "none",
+            "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
+            "rulesCompiled": true,
+            "obsidianInstalled": true
+          },
+          "expect": {
+            "kind": "map",
+            "lines": [
+              "olderMapWhileBuilding",
+              "otherWindow",
+              "clickHint"
+            ],
+            "button": "makeTheMapAgain",
+            "buttonEnabled": false,
+            "description": null
+          }
+        },
+        {
           "name": "no map yet",
           "facts": {
             "record": "noRecord",
@@ -5946,6 +6133,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5969,6 +6159,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -5994,6 +6187,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -6019,6 +6215,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -6042,6 +6241,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": true,
             "obsidianInstalled": true
           },
@@ -6065,6 +6267,9 @@
             "otherWindow": false,
             "changed": "none",
             "startKnown": true,
+            "previewIsShowing": false,
+            "restartingThePreview": false,
+            "browserHasThePreview": false,
             "rulesCompiled": false,
             "obsidianInstalled": true
           },
@@ -6188,6 +6393,20 @@
           }
         },
         {
+          "name": "the old run's end arriving AFTER its stop has finished is waited for, as an event: the build then starts",
+          "previewRunning": true,
+          "duringTheStop": [
+            "oldRunEndsLate"
+          ],
+          "afterTheStart": [],
+          "expect": {
+            "stops": 1,
+            "starts": 1,
+            "refresh": "pending",
+            "askedLines": 1
+          }
+        },
+        {
           "name": "the old run's end without a reading (the store's own rule)",
           "previewRunning": true,
           "duringTheStop": [
@@ -6279,7 +6498,7 @@
           "reloadThenOwnRunEnded"
         ]
       },
-      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. A reading of the record never moves a press out of starting: only its own start or its abandon does (the 793b fix review's H1, where a reading during the stop, which the old run's end always brings, wiped the press and nothing started). A preview somebody started during the stop (the teacher's own Preview, the assistant) is the build: the refresh starts nothing, so that build keeps its wait (⌘Q still asks about it). Only the pressing window's leaving, or its own run ending, settles the press; another window on the same section settles nothing. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
+      "sequenceRule": "The press is recorded AT ONCE, before anything is awaited (the 793b review's H1): the refresh is starting, with a token, and the tab says making with the button unavailable from that instant. A preview already running is stopped and waited for; its run ending meanwhile is the old run's and settles nothing. The build starts only if the press's token survives the stop: leaving the section, the course or the window, or quitting, clears it (didNotFinish), so a view that has gone never starts a preview nobody would stop. A second press while starting or pending does nothing, so it never ends the running build's wait (#232's record of a build in progress). A start that did not begin (refused, or the course being copied) is settled at once. A reading of the record never moves a press out of starting: only its own start or its abandon does (the 793b fix review's H1, where a reading during the stop, which the old run's end always brings, wiped the press and nothing started). A preview somebody started during the stop (the teacher's own Preview, the assistant) is the build: the refresh starts nothing, so that build keeps its wait (⌘Q still asks about it). Only the pressing window's leaving, or its own run ending, settles the press; another window on the same section settles nothing. After the stop, the OLD run's end is waited for as an event if it has not come (oldRunEndsLate), so a build already running is never that old run (the 793b fix review 2's LOW 1). A preview that was showing starts again at the page last viewed (previewStartPage's lastViewed, the Preview button's own rule), and the tab says so before the press (previewRestarts) and while it builds (makingWithThePreview), with browserReload when this window had handed the preview to the web browser: Quartz's live-reload client there does not reconnect, so that tab must be reloaded once by hand. In a case, stops and starts count the stop and start the steps asked for, refresh is the state at the end, askedLines the trail lines saying the press was made; a press refused by the preview's own rule is startRefused.",
       "refresh": "Make the Map (Again) runs the section's ordinary preview build in the background (Russell, 2026-11-12: no map-only run): a preview already running is stopped and waited for, then the preview starts through the way in every caller but the Preview button uses (mac: startPreview, never pressPreview), so the question about today's class is never asked. The teacher stays on the Coverage tab: no switch to Website, no browser, no focus taken. The refresh is a per-section state driven by events: pending from the press; the map made again when a reading finds the record thisBuild with a buildId other than the one it had at the press (the tab updates in place, before Quartz has finished); didNotFinish when this build printed its problems line and the map is not its own, or when this window's build ended, was stopped or cancelled, or the section's view went away (a switch of section stops its build) before that; refused, with the refusal's sentence, when the preview could not start. A later build's own map clears an earlier didNotFinish or refused. Quitting leaves nothing: the state is memory only, and the map's files are written whole by the build. Between the press and the start the refresh is starting (sequenceRule). A preview serving when the refresh is pressed starts again at the site's front page, as every way in but the Preview button does: the teacher's place in the preview is not kept.",
       "alertsWait": "While the Coverage tab shows, nothing a build can raise pops up over it (Russell, 2026-11-12): the Problems alert stays due, the links checklist waits, and the refusal of the tab's own START (only while that start runs, which is when its refusals come) is said in the tab instead (refusedReason) and not shown as an alert. A refusal of anybody else's press, in this window or another, is shown as ever, Coverage or not, to whoever pressed (the 793b review's M2 and the fix review's M1, M2). A 'preview did not appear', which arrives long after any press, is held while Coverage shows and raised when the teacher leaves it. The Problems tab still appears in the bar. What waited is raised when the teacher next shows Website or Problems, one at a time, as it would have been. The question about today's class is asked only by the Preview button, which a refresh never presses.",
       "whatAPageMayRead": "The map is content Plantoir did not write (it comes from course content), so it is shown by the Planning tab's web view, parameterised, never a second one: unitPlanning.tab.whatAPageMayRead's three guards, with the .coverage-tab folder (every link followed) as the only folder the page may read, a rule list of its own name compiled from the same text, scripts off, nothing stored, and the network blocked. A rule list that cannot be made shows cannotShowTitle and cannotShowDescription and writes a trail line, and no page is ever shown without it.",
@@ -6642,6 +6861,9 @@
         "olderMapWhileBuilding": "Made by an earlier build of this section, {when}.",
         "olderMapWhileBuildingNoTime": "Made by an earlier build of this section.",
         "making": "Making the map again with a new build of this section…",
+        "makingWithThePreview": "Making the map again with a new build of this section… Its preview starts again when the build is done, at the page you were last reading.",
+        "previewRestarts": "Making the map again starts this section’s preview again, at the page you were last reading.",
+        "browserReload": "If this section’s preview is open in your web browser, reload it there once the build is done.",
         "couldNotMakeAgain": "The map could not be made again this time.",
         "couldNotMake": "The map could not be made this time.",
         "changedSince": "Pages in the course have changed since then, so the map may be out of date.",

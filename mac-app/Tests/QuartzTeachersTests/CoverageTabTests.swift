@@ -175,6 +175,9 @@ final class CoverageTabTests: XCTestCase {
             facts.otherWindow = try XCTUnwrap(given["otherWindow"] as? Bool)
             facts.changed = try XCTUnwrap(CoverageChange(rawValue: try XCTUnwrap(given["changed"] as? String)), name)
             facts.startKnown = try XCTUnwrap(given["startKnown"] as? Bool, name)
+            facts.previewIsShowing = try XCTUnwrap(given["previewIsShowing"] as? Bool, name)
+            facts.restartingThePreview = try XCTUnwrap(given["restartingThePreview"] as? Bool, name)
+            facts.browserHasThePreview = try XCTUnwrap(given["browserHasThePreview"] as? Bool, name)
             facts.rulesCompiled = try XCTUnwrap(given["rulesCompiled"] as? Bool)
             facts.obsidianInstalled = try XCTUnwrap(given["obsidianInstalled"] as? Bool)
 
@@ -342,6 +345,9 @@ final class CoverageTabTests: XCTestCase {
             "olderMapWhileBuilding": CoverageTabWording.olderMapWhileBuilding,
             "olderMapWhileBuildingNoTime": CoverageTabWording.olderMapWhileBuildingNoTime,
             "making": CoverageTabWording.making,
+            "makingWithThePreview": CoverageTabWording.makingWithThePreview,
+            "previewRestarts": CoverageTabWording.previewRestarts,
+            "browserReload": CoverageTabWording.browserReload,
             "couldNotMakeAgain": CoverageTabWording.couldNotMakeAgain,
             "couldNotMake": CoverageTabWording.couldNotMake,
             "changedSince": CoverageTabWording.changedSince,
@@ -829,6 +835,7 @@ final class CoverageTabTests: XCTestCase {
             let owner: UUID = UUID()
             let otherWindow: UUID = UUID()
             var teacherPreview: Bool = false
+            var oldRunRunning: Bool = false
             let refused: Bool = (testCase["startRefused"] as? Bool) ?? false
             let previewRunning: Bool = try XCTUnwrap(testCase["previewRunning"] as? Bool)
             let duringTheStop: [String] = try XCTUnwrap(testCase["duringTheStop"] as? [String])
@@ -838,7 +845,9 @@ final class CoverageTabTests: XCTestCase {
                     owner: owner,
                     previewIsRunning: previewRunning,
                     aBuildIsRunning: {
-                        return teacherPreview
+                        // As the page asks it: a lease taken (the teacher's
+                        // press), or the runner still running.
+                        return teacherPreview || oldRunRunning
                     },
                     stop: {
                         counted.stops += 1
@@ -855,6 +864,10 @@ final class CoverageTabTests: XCTestCase {
                                 store.noteOwnRunEnded(folder: made.folder, course: made.course, sectionNumber: 1, owner: owner)
                             case "teacherStartsAPreview":
                                 teacherPreview = true
+                            case "oldRunEndsLate":
+                                // The old run is still running when the stop's
+                                // own wait returns.
+                                oldRunRunning = true
                             case "anotherWindowLeaves":
                                 store.abandonRefresh(folder: made.folder, course: made.course, sectionNumber: 1, owner: otherWindow)
                             case "leave":
@@ -868,6 +881,10 @@ final class CoverageTabTests: XCTestCase {
                         // Read AFTER the steps: none but leaving or
                         // quitting may move the press out of starting.
                         counted.stateDuringTheStop = store.entry(key).refresh
+                    },
+                    waitForTheOldRun: {
+                        // Its end, as the runner's own event delivers it.
+                        oldRunRunning = false
                     },
                     start: {
                         counted.starts += 1

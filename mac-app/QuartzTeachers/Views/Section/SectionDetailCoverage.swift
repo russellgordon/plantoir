@@ -167,6 +167,8 @@ extension SectionDetailView {
                     run: deployRun, folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
                 ),
                 otherWindow: anotherWindowHoldsThePreview,
+                previewIsShowing: previewRunner.isRunning && previewURL != nil,
+                browserHasThePreview: previewIsInTheBrowser,
                 folderIsReady: !(workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady),
                 folderNotReadyReason: workspace.folderReadinessReason,
                 makeAgain: makeTheCoverageMapAgain,
@@ -232,9 +234,16 @@ extension SectionDetailView {
             }
             .task {
                 if let folder = workspace.workspaceURL {
-                    SectionCoverage.shared.noteShown(
-                        SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
-                    )
+                    let sectionKey: String = SectionCoverage.shared.key(folder: folder, course: course, sectionNumber: sectionNumber)
+                    SectionCoverage.shared.noteShown(sectionKey)
+                    // What the last page of this section was holding for the
+                    // teacher: raised here, or on leaving Coverage.
+                    if let held = SectionCoverage.shared.takeTheHeldLateRefusal(sectionKey) {
+                        refusalHeldOnCoverage = .refusal(title: held.title, sentence: held.sentence)
+                        if !alertsWaitForCoverage {
+                            raiseWhatWaitedForCoverage()
+                        }
+                    }
                 }
                 reloadTheCoverage(afterThisRunsMarker: false)
             }
@@ -296,8 +305,25 @@ extension SectionDetailView {
                 stop: {
                     await stopPreviewAndWait()
                 },
+                waitForTheOldRun: {
+                    // The old run's end, if it has not come yet: its own
+                    // event, so "a build is already running" below is never
+                    // the old run (the 793b fix review 2's LOW 1). Not when a
+                    // new start has taken the lease, which IS a build.
+                    if previewRunner.isRunning && previewLease == nil {
+                        _ = await previewRunner.waitUntilFinished()
+                    }
+                },
                 start: {
-                    startPreview()
+                    // A preview that was showing starts again where the
+                    // teacher was reading (#504's "Preview at Last Viewed",
+                    // the rule the Preview button uses), not at the front
+                    // page (the 793b fix review 2's M1).
+                    if previewIsRunning {
+                        startPreview(at: PreviewStartPage.Request(opensAt: .lastViewed))
+                    } else {
+                        startPreview()
+                    }
                     // `startPreview` returns without starting anything while
                     // the course is being copied, or when it refuses: then
                     // no lease is held.
@@ -316,6 +342,15 @@ extension SectionDetailView {
         }
         let coverage: SectionCoverage = SectionCoverage.shared
         coverage.abandonRefresh(folder: folder, course: course, sectionNumber: sectionNumber, owner: coverageOwner)
+        // A late "the preview did not appear" that waited on Coverage goes to
+        // the section's next page, not away with this one (the fix review
+        // 2's LOW 3).
+        if let held = refusalHeldOnCoverage, case .refusal(let title, let sentence) = held {
+            coverage.holdALateRefusal(
+                CoverageHeldRefusal(title: title, sentence: sentence),
+                key: coverage.key(folder: folder, course: course, sectionNumber: sectionNumber)
+            )
+        }
         coverage.noteGone(coverage.key(folder: folder, course: course, sectionNumber: sectionNumber))
     }
 

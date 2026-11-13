@@ -145,6 +145,12 @@ struct SectionDetailView: View {
     /// on the same section settles nothing of its press (#793).
     @State var coverageOwner: UUID = UUID()
 
+    /// Whether this section's preview was handed to the web browser (Open in
+    /// Browser, or a link the preview opens there): a restart of the preview
+    /// leaves that browser tab without its live reload, which the Coverage
+    /// tab then says (#793, the 793b fix review 2's M1).
+    @State var previewIsInTheBrowser: Bool = false
+
 
     /// Set by the question's answer, and acted on once the alert has GONE
     /// (`afterThePreviewAlert`): the preview starts then, never from inside
@@ -2011,6 +2017,7 @@ struct SectionDetailView: View {
         let code: String = course.code
         let section: Int = sectionNumber
         previewController.browserHandoff.whenHandedOver = { page, target, reason in
+            previewIsInTheBrowser = true
             ActivityTrail.note(
                 .previewPageOpenedInBrowser,
                 PreviewBrowserHandoff.trailWords(page: page, target: target, reason: reason),
@@ -2240,6 +2247,14 @@ struct SectionDetailView: View {
             await PreviewStopper.waitForStopsToFinish(
                 courseCode: course.code, sectionNumber: sectionNumber
             )
+            // The lease is still this start's own: nobody stopped it while
+            // the stops finished, and the view has not gone (a view going
+            // away releases its lease). Otherwise this start belongs to no
+            // one, and running it would leave a preview nothing stops
+            // (#793, the 793b fix review 2's LOW 2).
+            if previewLease != lease {
+                return
+            }
             // What the built page looked like BEFORE this build — so we can
             // wait for it to CHANGE rather than for it to look new.
             //
@@ -2814,6 +2829,7 @@ struct SectionDetailView: View {
             urlToOpen = previewURL
         }
         if let urlToOpen {
+            previewIsInTheBrowser = true
             NSWorkspace.shared.open(SectionDetailView.browserSafeURL(for: urlToOpen))
         }
     }
