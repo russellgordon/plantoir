@@ -72,6 +72,7 @@ struct CourseMenu: Commands {
                 Text(reason)
             }
             item(ReferenceWording.setSchoolYearMenuItem, .setSchoolYear, enabled)
+            moveToGroupMenu(enabled)
             item(ReferenceWording.keepACopyMenuItem, .keepACopyForReference, enabled)
 
             Divider()
@@ -122,6 +123,41 @@ struct CourseMenu: Commands {
             run(item)
         }
         .disabled(!enabled.contains(item))
+    }
+
+    /// Move to Group ▸ (#572, third piece): the keyboard's way to the same
+    /// list as a reference course's row menu (menu search reaches it; no key
+    /// equivalent). Greys where Set School Year greys, and while the shelf's
+    /// arrangement cannot be changed.
+    @ViewBuilder
+    func moveToGroupMenu(_ enabled: Set<SubjectMenuRules.Item>) -> some View {
+        let course: Course? = workspace?.selectedCourse
+        let mayChange: Bool = workspace?.referenceGroupsMayChange ?? false
+        Menu(ReferenceGroupWording.moveToGroupMenuItem) {
+            if let workspace, let course, course.isKeptForReference {
+                ForEach(workspace.referenceMoveTargets(for: course)) { target in
+                    Toggle(target.title, isOn: Binding(
+                        get: { return target.isCurrent },
+                        set: { _ in
+                            if target.isCurrent {
+                                return
+                            }
+                            MenuRoute.run(.moveToGroup, in: workspace.window) {
+                                workspace.moveReferenceCourse(course, to: target.place)
+                            }
+                        }
+                    ))
+                }
+                Divider()
+                Button(ReferenceGroupWording.newGroupMenuItem) {
+                    MenuRoute.run(.moveToGroup, in: workspace.window) {
+                        workspace.newGroupThenMove = course.code
+                        workspace.isMakingAReferenceGroup = true
+                    }
+                }
+            }
+        }
+        .disabled(!enabled.contains(.moveToGroup) || !mayChange)
     }
 
     func run(_ item: SubjectMenuRules.Item) {

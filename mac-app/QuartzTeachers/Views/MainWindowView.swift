@@ -153,7 +153,7 @@ struct MainWindowView: View {
                 // Save for ever, and let every other setting be changed on a
                 // course the app has called frozen.
                 if course.isKeptForReference {
-                    ReferenceCourseSummaryView(course: course) {
+                    ReferenceCourseSummaryView(course: course, groupName: workspace.madeGroupName(of: course)) {
                         workspace.schoolYearRequestCode = course.code
                     }
                     .id(code)

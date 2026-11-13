@@ -7,8 +7,9 @@ import Foundation
 /// 1. **A folder name is unique in `courses/`**, which `CourseCodeRule`
 ///    already decides for every course — a reference course is a folder like
 ///    any other, so it borrows that rule rather than inventing a second one.
-/// 2. **Within one school-year group, no two reference courses share a course
-///    code.** That is this file's own rule, and it is the one that makes the
+/// 2. **Within one group, no two reference courses share a course code** —
+///    a school-year group, the no-year group, or a group the teacher made
+///    (#572, third piece). That is this file's own rule, and it is the one that makes the
 ///    shelf readable: three rows all saying "ICS3U" under one year is a
 ///    teacher's mistake made permanent, while the same three under 2024–25,
 ///    2025–26 and "Other" is exactly what they meant.
@@ -32,12 +33,29 @@ enum ReferenceCourseRule {
         /// being re-filed must not be found clashing with itself.
         let folderName: String
 
+        /// The made group the shelf's arrangement puts it in (#572, third
+        /// piece), or nil when it sits in its school year or the no-year
+        /// group. A course in a made group is in NO year group, so it never
+        /// blocks a course of its code from its year.
+        let madeGroupID: String?
+
+        // MARK: - Computed properties
+
+        /// The group it sits in.
+        var place: ReferenceShelf.Place {
+            if let madeGroupID {
+                return .made(madeGroupID)
+            }
+            return ReferenceShelf.Place.forYear(schoolYear)
+        }
+
         // MARK: - Initializer
 
-        init(displayCode: String, schoolYear: Int?, folderName: String) {
+        init(displayCode: String, schoolYear: Int?, folderName: String, madeGroupID: String? = nil) {
             self.displayCode = displayCode
             self.schoolYear = schoolYear
             self.folderName = folderName
+            self.madeGroupID = madeGroupID
         }
     }
 
@@ -45,12 +63,19 @@ enum ReferenceCourseRule {
     enum Trouble: Equatable {
         case codeAlreadyInThatYear(code: String, schoolYear: Int?)
 
+        /// The group is one the teacher made (#572, third piece), named as
+        /// the shelf shows it.
+        case codeAlreadyInThatGroup(code: String, group: String)
+
         // MARK: - Computed properties
 
         /// The sentence a teacher reads. Says which shelf is full and what
         /// they can do about it — never why the app cannot.
         var sentence: String {
             switch self {
+            case .codeAlreadyInThatGroup(let code, let group):
+                return "You already have a \(code) kept for reference in \(group). "
+                     + "Choose a different group."
             case .codeAlreadyInThatYear(let code, let schoolYear):
                 guard let schoolYear else {
                     return "You already have a \(code) kept for reference with no school year. "
@@ -71,28 +96,47 @@ enum ReferenceCourseRule {
     /// `ignoring` is the folder of the course being re-filed, when there is
     /// one: changing a course's year must not find the course itself sitting
     /// where it is about to move from.
+    ///
+    /// The year group means the group the year puts a course in: a course
+    /// the teacher has put in a group of their own is not in it (#572, third
+    /// piece), so every door that lands a course by its year asks this.
     static func trouble(
         placing code: String,
         inYear schoolYear: Int?,
         among shelved: [Shelved],
         ignoring folderName: String? = nil
     ) -> Trouble? {
-        let wanted: String = CourseCodeRule.normalized(code)
-        if wanted.isEmpty {
+        return ReferenceCourseRule.trouble(
+            placing: code, in: ReferenceShelf.Place.forYear(schoolYear), named: nil,
+            among: shelved, ignoring: folderName
+        )
+    }
+
+    /// Why `code` cannot join the shelf in `place`, or nil when it can — the
+    /// rule for every kind of group (`codeUniqueWithinAGroup`). `groupName`
+    /// is what a MADE group is called, for its sentence; a year group and
+    /// the no-year group keep the sentences they have always had.
+    static func trouble(
+        placing code: String,
+        in place: ReferenceShelf.Place,
+        named groupName: String?,
+        among shelved: [Shelved],
+        ignoring folderName: String? = nil
+    ) -> Trouble? {
+        guard let existing = ReferenceCourseRule.courseInTheWay(
+            placing: code, in: place, among: shelved, ignoring: folderName
+        ) else {
             return nil
         }
-        for existing in shelved {
-            if let folderName, existing.folderName == folderName {
-                continue
-            }
-            if existing.schoolYear != schoolYear {
-                continue
-            }
-            if CourseCodeRule.normalized(existing.displayCode) == wanted {
-                return .codeAlreadyInThatYear(code: wanted, schoolYear: schoolYear)
-            }
+        let wanted: String = CourseCodeRule.normalized(existing.displayCode)
+        switch place {
+        case .year(let year):
+            return .codeAlreadyInThatYear(code: wanted, schoolYear: year)
+        case .noYear:
+            return .codeAlreadyInThatYear(code: wanted, schoolYear: nil)
+        case .made:
+            return .codeAlreadyInThatGroup(code: wanted, group: groupName ?? "")
         }
-        return nil
     }
 
     /// The course on the shelf that `trouble` would refuse `code` because
@@ -104,12 +148,27 @@ enum ReferenceCourseRule {
         inYear schoolYear: Int?,
         among shelved: [Shelved]
     ) -> Shelved? {
+        return ReferenceCourseRule.courseInTheWay(
+            placing: code, in: ReferenceShelf.Place.forYear(schoolYear), among: shelved
+        )
+    }
+
+    /// The same, for any kind of group.
+    static func courseInTheWay(
+        placing code: String,
+        in place: ReferenceShelf.Place,
+        among shelved: [Shelved],
+        ignoring folderName: String? = nil
+    ) -> Shelved? {
         let wanted: String = CourseCodeRule.normalized(code)
         if wanted.isEmpty {
             return nil
         }
         for existing in shelved {
-            if existing.schoolYear != schoolYear {
+            if let folderName, existing.folderName == folderName {
+                continue
+            }
+            if existing.place != place {
                 continue
             }
             if CourseCodeRule.normalized(existing.displayCode) == wanted {

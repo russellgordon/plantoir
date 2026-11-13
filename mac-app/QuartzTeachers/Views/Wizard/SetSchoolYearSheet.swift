@@ -38,6 +38,12 @@ struct SetSchoolYearSheet: View {
         if let problem {
             return problem
         }
+        // A course the teacher put in a group of their own stays in it
+        // whatever its year (#572, third piece): the year changes what its
+        // summary says, not where it sits, so no year group is asked.
+        if case .made = workspace.referenceShelfPlace(of: course, on: today) {
+            return nil
+        }
         // `ignoring` this course's own folder: moving a course into the year
         // it is already in must not find the course itself sitting there.
         if let trouble = ReferenceCourseRule.trouble(
@@ -59,7 +65,8 @@ struct SetSchoolYearSheet: View {
                 ForEach(offeredYears, id: \.self) { year in
                     Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
                 }
-                Text(SchoolYear.otherGroupName).tag(Int?.none)
+                // The no-year group under the name the shelf shows it by.
+                Text(workspace.referenceShelf.arrangement.noYearTitle).tag(Int?.none)
             }
             .onChange(of: schoolYear) {
                 problem = nil

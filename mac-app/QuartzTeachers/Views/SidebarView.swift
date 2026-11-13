@@ -534,6 +534,8 @@ struct SidebarView: View {
         // known to present only the first of — so this one lives on its own
         // view, which the window's folder chooser does too.
         .modifier(ImportCoursesForReferencePresenter())
+        // The groups on the reference shelf (#572, third piece).
+        .modifier(ReferenceGroupPresenter())
         .sheet(isPresented: schoolYearSheetIsPresented) {
             if let course = schoolYearCourse {
                 SetSchoolYearSheet(course: course) {
@@ -1272,12 +1274,15 @@ struct SidebarView: View {
     /// The open/closed state of one course's disclosure triangle, living
     /// on the window's model so restoration can bring it back.
     /// The "Reference Courses" group: courses kept to be read, never
-    /// deployed, filed by the school year they were taught in.
+    /// deployed, filed by the school year they were taught in or in groups
+    /// the teacher made (#572, third piece).
     ///
-    /// **Two levels of folding, and nothing is drawn that is empty.** The
-    /// outer group appears only when there is at least one reference course;
-    /// a year group appears only when it holds one. An empty "2023–24" is a
-    /// row that teaches a teacher to stop reading the sidebar.
+    /// **Two levels of folding.** The outer group appears when there is at
+    /// least one reference course or one group the teacher made. A year
+    /// group, and the no-year group, appear only when they hold a course: an
+    /// empty "2023–24" is a row that teaches a teacher to stop reading the
+    /// sidebar. A group the teacher made is drawn even when empty, because
+    /// they just made it.
     ///
     /// The rows are deliberately plainer than a live course's: no scheduled
     /// deploy clock and no stopped-publish badge, because neither can exist
@@ -1285,34 +1290,101 @@ struct SidebarView: View {
     /// is the absence of two things this kind of course does not have.
     @ViewBuilder
     var referenceCoursesSection: some View {
-        let groups: [WorkspaceModel.ReferenceYearGroup] = workspace.referenceYearGroups()
+        let groups: [ReferenceShelfGroup] = workspace.referenceShelfGroups()
         if !groups.isEmpty {
             Section(isExpanded: referenceGroupBinding) {
                 ForEach(groups) { group in
-                    DisclosureGroup(isExpanded: referenceYearBinding(for: group.id)) {
+                    DisclosureGroup(isExpanded: referenceGroupFoldBinding(for: group.place)) {
                         ForEach(group.courses) { course in
                             referenceCourseRow(course)
                         }
                     } label: {
-                        Label(group.title, systemImage: "calendar")
-                            .accessibilityIdentifier("referenceYear-\(group.id)")
+                        Label(group.title, systemImage: group.systemImage)
+                            .accessibilityIdentifier("referenceGroup-\(group.id)")
+                            .contextMenu {
+                                referenceGroupMenu(group)
+                            }
                     }
                 }
             } header: {
                 Text(ReferenceWording.groupTitle)
                     // The shelf's own door to the New Course wizard (#572),
                     // opening it with the reference choice already made.
-                    // The shelf is drawn only when it holds a course, so the
-                    // wizard's own toggle is the door for a teacher with none.
+                    // The shelf is drawn only when it holds a course or a
+                    // group, so the wizard's own toggle is the door for a
+                    // teacher with neither.
                     .contextMenu {
                         Button(ReferenceCreationWording.newReferenceCourseMenuItem, systemImage: "plus") {
                             workspace.newCourseWizardIsForReference = true
                             workspace.isShowingNewCourseWizard = true
                         }
                         .accessibilityIdentifier("newReferenceCourse")
+                        Button(ReferenceGroupWording.newGroupMenuItem, systemImage: "folder.badge.plus") {
+                            workspace.newGroupThenMove = nil
+                            workspace.isMakingAReferenceGroup = true
+                        }
+                        .disabled(!workspace.referenceGroupsMayChange)
+                        .accessibilityIdentifier("newReferenceGroup")
                     }
             }
         }
+    }
+
+    /// A group row's own menu: Rename Group… on a made group and on the
+    /// no-year group, Remove Group on a made group. A year group's name is
+    /// its year, so it offers neither (Russell, 2026-11-12).
+    @ViewBuilder
+    func referenceGroupMenu(_ group: ReferenceShelfGroup) -> some View {
+        if group.isRenamable {
+            Button(ReferenceGroupWording.renameGroupMenuItem, systemImage: "pencil") {
+                workspace.renameGroupRequest = group
+            }
+            .disabled(!workspace.referenceGroupsMayChange)
+            .accessibilityIdentifier("renameReferenceGroup-\(group.id)")
+        }
+        if group.group.isMade {
+            let holdsACourse: Bool = workspace.referenceGroupHoldsACourse(group)
+            Button(
+                holdsACourse ? ReferenceGroupWording.removeGroupAskingMenuItem : ReferenceGroupWording.removeGroupMenuItem,
+                systemImage: "folder.badge.minus"
+            ) {
+                workspace.askToRemoveReferenceGroup(group)
+            }
+            .disabled(!workspace.referenceGroupsMayChange)
+            .accessibilityIdentifier("removeReferenceGroup-\(group.id)")
+        }
+    }
+
+    /// Move to Group ▸ for one reference course: where its school year puts
+    /// it, every group the teacher made, and New Group…, which makes one and
+    /// moves the course into it. The group it is in now carries a checkmark
+    /// and does nothing. The Course menu draws the same list.
+    @ViewBuilder
+    func moveToGroupMenu(for course: Course, row: SidebarSelection) -> some View {
+        Menu(ReferenceGroupWording.moveToGroupMenuItem, systemImage: "folder") {
+            ForEach(workspace.referenceMoveTargets(for: course)) { target in
+                Toggle(target.title, isOn: Binding(
+                    get: { return target.isCurrent },
+                    set: { _ in
+                        if target.isCurrent {
+                            return
+                        }
+                        select(row)
+                        workspace.moveReferenceCourse(course, to: target.place)
+                    }
+                ))
+                .accessibilityIdentifier("moveToGroup-\(course.code)-\(target.id)")
+            }
+            Divider()
+            Button(ReferenceGroupWording.newGroupMenuItem) {
+                select(row)
+                workspace.newGroupThenMove = course.code
+                workspace.isMakingAReferenceGroup = true
+            }
+            .accessibilityIdentifier("moveToNewGroup-\(course.code)")
+        }
+        .disabled(!workspace.referenceGroupsMayChange)
+        .accessibilityIdentifier("moveToGroup-\(course.code)")
     }
 
     @ViewBuilder
@@ -1342,6 +1414,7 @@ struct SidebarView: View {
                         workspace.schoolYearRequestCode = course.code
                     }
                     .accessibilityIdentifier("setSchoolYear-\(course.code)")
+                    moveToGroupMenu(for: course, row: row)
                     Divider()
                     copyAPageItem(course: course, row: row)
                     Divider()
@@ -1395,14 +1468,40 @@ struct SidebarView: View {
         )
     }
 
-    func referenceYearBinding(for identifier: Int) -> Binding<Bool> {
+    /// One group's fold state: years and the no-year group by year (the
+    /// no-year group as `0`, as before groups), made groups by id.
+    func referenceGroupFoldBinding(for place: ReferenceShelf.Place) -> Binding<Bool> {
         return Binding(
-            get: { return workspace.expandedReferenceYears.contains(identifier) },
+            get: {
+                switch place {
+                case .year(let year):
+                    return workspace.expandedReferenceYears.contains(year)
+                case .noYear:
+                    return workspace.expandedReferenceYears.contains(ReferenceShelfGroup.otherIdentifier)
+                case .made(let id):
+                    return workspace.expandedReferenceGroups.contains(id)
+                }
+            },
             set: { isOpen in
-                if isOpen {
-                    workspace.expandedReferenceYears.insert(identifier)
-                } else {
-                    workspace.expandedReferenceYears.remove(identifier)
+                switch place {
+                case .year(let year):
+                    if isOpen {
+                        workspace.expandedReferenceYears.insert(year)
+                    } else {
+                        workspace.expandedReferenceYears.remove(year)
+                    }
+                case .noYear:
+                    if isOpen {
+                        workspace.expandedReferenceYears.insert(ReferenceShelfGroup.otherIdentifier)
+                    } else {
+                        workspace.expandedReferenceYears.remove(ReferenceShelfGroup.otherIdentifier)
+                    }
+                case .made(let id):
+                    if isOpen {
+                        workspace.expandedReferenceGroups.insert(id)
+                    } else {
+                        workspace.expandedReferenceGroups.remove(id)
+                    }
                 }
                 WorkspaceModel.rememberOpenFolders()
             }
@@ -1720,6 +1819,7 @@ struct SidebarView: View {
                 workspace.schoolYearRequestCode = course.code
             }
             .accessibilityIdentifier("setSchoolYear-\(course.code)")
+            moveToGroupMenu(for: course, row: row)
             Divider()
         } else {
             Button(ReferenceWording.keepACopyMenuItem, systemImage: "books.vertical") {
@@ -1935,6 +2035,10 @@ struct SidebarView: View {
             if let course {
                 workspace.schoolYearRequestCode = course.code
             }
+        case .moveToGroup:
+            // A submenu: the Course menu calls the move itself, with the
+            // group chosen, through `WorkspaceModel.moveReferenceCourse`.
+            break
         case .keepACopyForReference:
             keepACopyCourse = course
         case .backUpNow:
