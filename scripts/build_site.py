@@ -1598,7 +1598,8 @@ def apply_color_scheme_to_quartz_config(quartz_config_path: Path, scheme_colors:
     if updated == content:
         updated = re.sub(
             r'(theme:\s*\{\s*[\s\S]*?typography:\s*\{[\s\S]*?\},\s*)',
-            r'\1\n' + new_colors_block + "\n",
+            # A function, not a template (#871): the block's backslashes are text.
+            lambda match: match.group(1) + "\n" + new_colors_block + "\n",
             content,
             count=1
         )

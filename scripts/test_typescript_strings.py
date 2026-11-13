@@ -263,6 +263,21 @@ class TheWritersTests(unittest.TestCase):
         self.assertEqual(self.the_footer_html(text), "<p>a\\1b</p>")
         self.assertNotIn("Created with Quartz", text)
 
+    def test_a_colour_block_added_where_there_was_none_keeps_its_backslashes(self):
+        # The fallback that inserts a colours block after typography went
+        # through re.sub as a TEMPLATE, which halved every backslash (#871
+        # review, measured with `#fff\\u`). Colours come from the bundled
+        # schemes, so this is the writer being right, not a teacher's value.
+        for case in CASES:
+            with self.subTest(case["name"]):
+                colours = {"lightMode": {"light": case["raw"]}, "darkMode": {"light": "#161618"}}
+
+                def write(path):
+                    build_site.apply_color_scheme_to_quartz_config(path, colours)
+                text = self.patched(QUARTZ_CONFIG, write)
+                self.assertIn("colors", text)
+                self.assertEqual(the_value_of(text, "light"), case["raw"])
+
     def test_the_colours_are_quoted_the_same_way(self):
         block = build_site.format_colors_block({"lightMode": {"light": "#faf8f8"}, "darkMode": {"light": "#161618"}})
         self.assertIn('light: "#faf8f8",', block)

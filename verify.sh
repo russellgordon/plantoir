@@ -826,6 +826,18 @@ else
   cat /tmp/verify_course_names_test.log
 fi
 
+# A value from a course's settings is written into the site's TypeScript as an
+# escaped string (GitHub #871): every typescriptStrings case, and every writer
+# (title, locale, baseUrl, fonts, colours, footer) read back from its file and
+# run again over its own output. Pure stdlib; Node reads the literals back
+# when it is on PATH.
+if (cd scripts && python3 test_typescript_strings.py) >/tmp/verify_typescript_strings_test.log 2>&1; then
+  pass "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+else
+  fail "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+  cat /tmp/verify_typescript_strings_test.log
+fi
+
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
 # #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
 # and deploy.sh's own question, and the real deploy.sh and deploy.py.

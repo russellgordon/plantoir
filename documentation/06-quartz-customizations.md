@@ -344,7 +344,20 @@ same text, so the footer cannot close the `<footer>` that the next build's
 pattern looks for. The patterns that find a value written by an earlier
 build (`TS_DOUBLE_QUOTED`, `TS_SINGLE_QUOTED`) match a whole literal,
 escapes included, and every replacement is a function rather than a `re`
-template, so a value's own backslashes stay text. The rule and its cases are
+template, so a value's own backslashes stay text. That includes the colours'
+fallback in `apply_color_scheme_to_quartz_config`, which inserts a block
+after `typography` when the config has none; as a template it halved every
+backslash (found in review, measured with `#fff\\u`).
+
+Two limits to know. The fonts are the one writer of these that runs only
+when the scaffold is first copied (`if full_rebuild or not
+output_dir.exists()`), so a folder whose fonts failed to patch under the old
+code keeps Quartz's defaults until `--full-rebuild`; the fonts come from an
+18-family list, so only a hand edit reaches that. And `deploy.py`'s
+`ensure_base_url_and_rebuild` reads `baseUrl` back raw and compares it with
+the domain: for any real domain the JSON literal is the same bytes, and a
+domain holding `"` or `\` (which no valid domain does) would only cost one
+extra rebuild per deploy. The rule and its cases are
 `contracts/shared-rules.json` -> `typescriptStrings`; the test is
 `scripts/test_typescript_strings.py`.
 
