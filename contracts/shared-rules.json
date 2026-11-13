@@ -15259,7 +15259,8 @@
         "Open in Obsidian, with the calm note in front of it the first time",
         "Back Up Now - it only READS the course, and a restored backup is still a reference course",
         "Remove - unlocks first, same confirmation, same words",
-        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page"
+        "Set School Year... - the one thing a frozen course still lets a teacher change, and it is a label on the shelf rather than a page",
+        "Move to Group - which group it sits in on the shelf (#572, third piece, referenceCourses.groups). Like the school year it is a fact about the shelf, not the course: nothing in the course is written, and it is not even in the course's settings"
       ],
       "theCalmNote": "Shown when the copy is made AND before the teacher opens the course in Obsidian - once per course, remembered. In FRONT of them rather than after, because what Obsidian shows somebody typing into a locked page could not be measured and silent loss is not ruled out. It claims no more than wording.pagesAreLocked says: not that the pages cannot be changed (the lock is per-Mac and a cloud folder strips it while files upload), and not that the teacher will be TOLD when an edit fails. No warning icon, no 'cannot', no 'error'.",
       "theLocalAssistant": "Not offered on a reference course and told nothing about one. The menu item is not drawn; a window request naming one opens no window, which also closes the deploy approval card as a door by construction; and list_courses does not list them to the LOCAL client - which matters because 'what courses do i have?' is matched in code and its answer is shown to the teacher.",
