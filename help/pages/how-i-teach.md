@@ -43,12 +43,14 @@ Any other name is an ordinary page. A page named `How I Teach 1` or `How-I-Teach
 
 ## What to write
 
-Write how you teach this course, in your own words. The page can hold up to 8000 characters. A page with nothing written on it counts as not written.
+Write how you teach this course, in your own words. A page with nothing written on it counts as not written.
+
+An assistant that writes the page for you may write 8000 characters at most. A page you write yourself may be longer. An assistant then reads its first 8000 characters, and is told where the rest is.
 
 ## Who reads it
 
-- **Claude Code and Codex**, when you open them through Plantoir, are asked to read the page and keep to it. See [Revise a course with Claude or Codex](page:revise-with).
-- Either of them may offer to draft the page for you from the course's own pages. A draft is saved only once you agree.
+- **Claude Code, Codex and GitHub Copilot**, when you open them through Plantoir, are asked to read the page and keep to it. See [Revise a course with Claude or Codex](page:revise-with).
+- Any of them may offer to draft the page for you from the course's own pages. A draft is saved only once you agree.
 - **The assistant that runs on this Mac** does not use the page.
 
 ## It is never on a website

@@ -29,7 +29,7 @@ You can share a course's unit plans with a colleague. Plantoir puts them on a sm
 
 ## Before you start
 
-- **The Planning tab.** The share bar is at the foot of a course's {{control:courseDetailPlanningTab}} tab. The tab shows only when Claude Code or Codex is installed on this Mac, and never for a course kept for reference. See [Plan a unit](page:plan-a-unit).
+- **The Planning tab.** The share bar is at the foot of a course's {{control:courseDetailPlanningTab}} tab. The tab shows only when Claude Code, Codex or GitHub Copilot is installed on this Mac, and never for a course kept for reference. See [Plan a unit](page:plan-a-unit).
 - **A Cloudflare account.** The share bar says:
 
 {{say:shared-rules#unitPlanning.share.words.sharedThroughCloudflare}}
@@ -47,10 +47,10 @@ alt: The share bar at the foot of the Planning tab before the plans are shared, 
 
 2. Decide who may open the plans. Turn on {{control:sharePlanProtect}} if colleagues should type a username and a password first. Without a password, answer keys are left out unless you turn on {{control:sharePlanIncludeAnswerKeys}}.
 3. Press {{control:sharePlanShareUnitPlans}}.
-4. Read the sheet titled {{control:sharePlanListsTitle}} It holds two tables, Shared and Not shared, each with a count. Every share shows this sheet.
+4. Read the sheet titled {{control:sharePlanListsTitle}}. It holds two tables, Shared and Not shared, each with a count. Every share shows this sheet.
 5. Move any document that is in the wrong table. Select it, then press {{control:sharePlanDontShare}} or {{control:sharePlanMoveToShared}}, or drag it to the other table.
 6. Press {{control:sharePlanListsShareButton}}. Pressing Return chooses Cancel, not this button.
-7. For a share with no password, read the warning that follows, titled {{control:sharePlanWarningTitle}} Press {{control:sharePlanShareWithoutPassword}} to go on, or Cancel to go back to the tables.
+7. For a share with no password, read the warning that follows, titled {{control:sharePlanWarningTitle}}. Press {{control:sharePlanShareWithoutPassword}} to go on, or Cancel to go back to the tables.
 8. Wait while a sheet titled {{control:sharePlanConsoleTitle}} shows the progress. When it is done, the share bar shows the address.
 9. Press {{control:sharePlanCopyLink}} and send the address to your colleague. For protected plans, send the username and the password as well.
 
@@ -90,7 +90,7 @@ Press {{control:sharePlanStopSharing}}. Plantoir asks first, and names the schoo
 
 ## If it does not work
 
-- **The course has no Planning tab.** Neither Claude Code nor Codex is installed on this Mac, or the course is kept for reference.
+- **The course has no Planning tab.** None of Claude Code, Codex and GitHub Copilot is installed on this Mac, or the course is kept for reference.
 - **Answer keys were left out.** The plans have no password. Protect them, or turn on {{control:sharePlanIncludeAnswerKeys}}, then share again.
 - **The plans were not shared because the course is busy.** Plantoir says:
 

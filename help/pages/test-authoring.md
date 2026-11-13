@@ -22,15 +22,15 @@ keywords:
 - handouts folder
 - Claude
 - Codex
-description: Ask Claude or Codex to draft a unit test, its solutions and a marking guide, as paper kept outside the course.
+description: Ask Claude, Codex or GitHub Copilot to draft a unit test, its solutions and a marking guide, as paper kept outside the course.
 ---
 An assistant can draft a unit test for you: the test paper, its solutions and a marking guide. It builds them from only what your class was taught, following guidance that Plantoir gives it. The test is paper. Its files are kept in a folder outside the course, so that none of them reaches a class website.
 
-This page is about Claude Code and Codex, which you install yourself. See [Revise a course with Claude or Codex](page:revise-with).
+This page is about Claude Code, Codex and GitHub Copilot, which you install yourself. See [Revise a course with Claude or Codex](page:revise-with).
 
 ## Ask for the test
 
-1. In the sidebar, select the course. Choose {{menu:courseReviseWithClaude}} or {{menu:courseReviseWithCodex}}. A terminal window opens with the assistant started and connected to Plantoir. You type no command.
+1. In the sidebar, select the course. Choose {{menu:courseReviseWithClaude}}, {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}}. A terminal window opens with the assistant started and connected to Plantoir. You type no command.
 2. Ask for a unit test, in your own words. You can also ask for more than one version of it, a practice test, or a quiz for marks with a marking guide.
 3. Check what the assistant shows you first. It asks for the day-by-day list of what was taught, or reads it from the section's class pages, and shows the list back to you. The test is built from that list.
 4. Say where to keep the files. The first time, the assistant asks where this course's handouts should go. It should be a folder of its own outside the course. One example is a folder named handouts in your Documents folder, with a folder for the course inside it. The assistant remembers your answer for the course, and says the folder back each time it uses it.
@@ -45,7 +45,7 @@ alt: A unit test's folder in Finder, with the test paper, its solutions and the 
 
 - `Version A.pdf` is the test, and `Version A - Solutions.pdf` its solutions. A second version is `Version B`, and so on.
 - `Marking Guide.pdf` is the one marking guide.
-- `Marking Kit` is a folder in a fixed form, with no place for a student's name.
+- `Marking Kit` is a folder that holds the test's marks in a fixed form, with no place for a student's name. It holds three files. `README.md` is a short note on the folder. `answers.json` lists every mark on the test, for every version. `marks-template.json` is an empty record of marks for one paper.
 - `Coverage.md` is a table of what the test covers.
 - `Practice Test.pdf` and `Practice Test - Solutions.pdf` are there when you asked for a practice test.
 - A folder named `Checks` is there when the answers can be computed.
@@ -69,6 +69,6 @@ The assistant does this work, not Plantoir. Look in the handouts folder and in t
 
 ## If it does not work
 
-- **Revise With is not in the Course menu, or lacks the assistant you want.** Each item shows only when that program is installed on this Mac. Plantoir does not install either one.
+- **Revise With is not in the Course menu, or lacks the assistant you want.** Each item shows only when that program is installed on this Mac. Plantoir does not install any of them.
 - **The assistant asks again where the handouts go.** It asks again on another computer, or when the folder has been renamed.
 - **You cannot find the test.** Ask the assistant where the test's folder is. It is in the handouts folder you chose, not in the course.

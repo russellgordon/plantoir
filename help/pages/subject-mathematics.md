@@ -64,7 +64,7 @@ alt: The GeoGebra sketch on the page The Slope-Angle Conjecture, open on the cla
 {{picture:subject-mathematics-2}}
 alt: The graph of two parabolas on the page Transformations of Parabolas, on the class website.
 
-- **A handout that prints, with its answers on a page of their own.** MPM2D's page Similar Triangles Practice, in Exercises, has five questions, each followed by a folded answer. See [A handout that prints](page:printing).
+- **A handout that prints, with its answers on a page of their own.** MPM2D's page Similar Triangles Practice, in Exercises, has seven questions, each with its answer folded under it. See [A handout that prints](page:printing).
 
 {{picture:subject-mathematics-3}}
 alt: The page Similar Triangles Practice printed as a handout, with its questions on one sheet and its answers on another.
