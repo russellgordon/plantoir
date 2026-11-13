@@ -22,8 +22,8 @@ will understand every pay stub you ever get.
 
 > [!quiz] A pay stub shows gross pay of \$400 and deductions of \$62. Which amount belongs on the income line of your budget?
 > - [ ] \$400
-> - [x] \$338
 > - [ ] \$462
+> - [x] \$338
 > - [ ] \$62
 >
 > > [!explain]- Why

@@ -64,7 +64,7 @@ other piece of work in this course.
 
 ### Success criteria
 
-Before you hand in, tick each one that your own work does.
+Before you present, tick each one that your own defence does.
 
 - [ ] Someone who has never heard any of this could follow me, and I explain any term from this course that I use.
 - [ ] I chose the evidence that fits each claim, instead of showing everything I have.

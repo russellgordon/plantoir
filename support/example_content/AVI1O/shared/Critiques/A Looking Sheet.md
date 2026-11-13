@@ -60,8 +60,9 @@ to the way you read the picture.
 
 > [!answer]-
 >
-> One possible answer. Emphasis: the couple is the nearest, largest, and
-> darkest thing in the picture, so the eye starts there. Another.
+> One possible answer. Emphasis: the couple are the nearest whole
+> figures, large and dark against the pale street, so the eye starts
+> there. Another.
 > Repetition: the same umbrella shape comes back smaller and smaller down
 > the street, and that shrinking is how you measure the distance.
 

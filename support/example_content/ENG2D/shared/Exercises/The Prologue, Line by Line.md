@@ -51,14 +51,19 @@ carry, and say why the line needs both.
 
 ### Question 3
 
-Read lines 5 to 8. What are we told will happen to the two lovers, and
-what will that do to their parents' quarrel?
+Read lines 5 to 8. Line 6 says the lovers "take their life". What does
+that phrase mean in this sentence, and what second meaning can you hear
+under it? Which line then says outright what happens to them, and what
+does it do to their parents' quarrel?
 
 > [!answer]-
 >
-> They will die: they "take their life" (line 6). Their deaths "bury
-> their parents' strife" (line 8): the feud ends, and only because of
-> the deaths.
+> In the sentence, "take their life" means *are born*: the two lovers
+> take their life from "the fatal loins of these two foes", their
+> feuding parents. Under it is a second sense, to take one's own life,
+> and "fatal" has already pointed that way. Line 8 says it outright:
+> "Doth with their death bury their parents' strife." They die, and
+> their deaths end the feud. Line 11 adds that nothing else could have.
 
 ### Question 4
 

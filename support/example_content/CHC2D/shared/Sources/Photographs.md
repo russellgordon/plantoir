@@ -63,7 +63,8 @@ Watch it once straight through. Then watch it again with these in hand:
 - What is outside the frame? Name two things that must have been there
   and that the camera never turns to.
 - The archive's title is *Visit of Queen Elizabeth - dogwood -
-  playground*. An archivist wrote that, later. What does it leave out?
+  playground*. It was probably written by an archivist, later. What does
+  it leave out?
 
 The film plays from YouTube, so it needs an internet connection. The
 archive published it under a Creative Commons Attribution licence.

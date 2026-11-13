@@ -64,7 +64,7 @@ graph LR
 
 Boxes under a heading called **Success criteria** do one thing more: the
 site counts the ones you have ticked on a page called **My Progress**,
-first in Key Links. Every task in this course ends with such a list —
+first in Key Links. Every task in this course has such a list —
 [[The Budget]] has one.
 
 ## Money

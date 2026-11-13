@@ -53,8 +53,8 @@ your reading of it now; nothing you answer here is sent to anyone.
 
 > [!quiz] In Act 2, Scene 2, Juliet says "O Romeo, Romeo, wherefore art thou Romeo?" What is she asking?
 > - [ ] Where Romeo is hiding in the orchard
-> - [x] Why he has to be Romeo, a Montague
 > - [ ] Whether Romeo will come back to her
+> - [x] Why he has to be Romeo, a Montague
 > - [ ] What Romeo's real name is
 >
 > > [!explain]- Why

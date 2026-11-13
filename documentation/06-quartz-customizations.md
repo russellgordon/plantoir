@@ -3296,8 +3296,8 @@ over tables). Since #878 (2026-11-13) one does: GLC2O's seven task pages
 each close with tick boxes under `### Success criteria`, so a course made
 from GLC2O builds the page (measured with
 `my_progress.page_has_counted_items` over every page of every payload:
-GLC2O's seven and no other). The other 38 build none until their pages say
-so.
+GLC2O's seven, its task template, which is held back and so not counted on
+a site, and no other). The other 38 build none until their pages say so.
 
 Rejected (`myProgress.rejected`): a Python pass over `public/*.html`; ids
 re-derived from the Markdown; a transformer that stamps counted items; a

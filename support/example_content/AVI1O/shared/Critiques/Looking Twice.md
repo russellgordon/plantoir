@@ -71,7 +71,7 @@ theirs?
 Follow the lines of the buildings and the paving back into the picture.
 Where do they take you, and what is standing in the way?
 
-![A park beside a river on a sunny day, built entirely from small dots of paint. Dozens of people sit, stand, and stroll, most seen from the side. At the right a tall couple stands in shade; the woman holds a monkey on a lead.](Critiques/seurat-a-sunday-on-la-grande-jatte.jpg)
+![A park beside a river on a sunny day, built from small dots and dashes of paint. Dozens of people sit, stand, and stroll, most seen from the side. At the right a tall couple stands in shade; the woman holds a monkey on a lead.](Critiques/seurat-a-sunday-on-la-grande-jatte.jpg)
 
 *Georges Seurat, A Sunday on La Grande Jatte — 1884, 1884–86. Oil on
 canvas, about 2.1 by 3.1 m.*

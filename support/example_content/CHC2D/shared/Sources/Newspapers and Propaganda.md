@@ -49,9 +49,9 @@ Nothing you answer here is sent to anyone. It is for you.
 
 > [!quiz] A First World War recruiting poster asks a young man why his friends are at the front and he is not. What is the poster the best evidence of?
 > - [ ] How the fighting at the front was going
-> - [x] What the people who made it believed would move young men to enlist
 > - [ ] What most Canadians thought about the war
 > - [ ] How many men enlisted after seeing it
+> - [x] What the people who made it believed would move young men to enlist
 >
 > > [!explain]- Why
 > > A poster is made to change what people do, so it is evidence about

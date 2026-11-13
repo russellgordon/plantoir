@@ -12,7 +12,7 @@ for years. Each film is a lesson or a demonstration, so you see the
 vocabulary built up slowly, the way you met it — not a finished performance
 where the work is hidden.
 
-Do not try to watch all four in one sitting. Pick one, watch five minutes,
+Do not try to watch all four in one sitting. Pick one, watch the first five or ten minutes,
 and answer the questions under it in your journal before you start the next.
 
 ## How to watch
