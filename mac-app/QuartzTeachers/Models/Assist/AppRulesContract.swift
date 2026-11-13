@@ -67,7 +67,10 @@ enum AppRulesContract {
                   + "for them; see credentialPrompts.whyNoBrowserOpens.",
         ]
         var requests: [[String: Any]] = []
-        for request in CredentialRequest.all {
+        // Written with the placeholder where a sentence names the computer
+        // (#863), so Windows fills in "PC" rather than showing "Mac":
+        // `shared-rules.json` -> `specialNames.platformWording.machine`.
+        for request in CredentialRequest.all(machine: MachineWord.placeholder) {
             requests.append([
                 "name": request.name,
                 "title": request.title,
