@@ -220,9 +220,8 @@ BROKEN = [
     ("blank-strut", "\\llap{\\rule[-0.2em]{#1}{0.4pt}}}\\rule[-0.2em]{0pt}{2.1em}}", "\\llap{\\rule[-0.2em]{#1}{0.4pt}}}}"),
     ("key-layout", "\\begin{tikzpicture}\\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,\n    xmin=-4,",
      "\\begin{tikzpicture}\\begin{axis}[gridgraph, x=\\qa{0.42cm}{0.3cm}, y=0.42cm,\n    xmin=-4,"),
-    ("key-layout", "\\begin{tasks}(3)\n  \\task \\qa{$3x + y$}", "\\begin{tasks}(\\qa{3}{2})\n  \\task \\qa{$3x + y$}"),
-    ("arrowheads", "domain=-0.95:3.95]{-2*x + 3}", "domain=-4:6]{-2*x + 3}"),
-    ("arrowheads", "domain=-0.95:3.95]{-2*x + 3}", "domain=0:2]{-2*x + 3}"),
+    ("arrowheads", "domain=-1.45:3.95]{-2*x + 3}", "domain=-4:6]{-2*x + 3}"),
+    ("arrowheads", "domain=-1.45:3.95]{-2*x + 3}", "domain=0:2]{-2*x + 3}"),
     ("context-graph", "\\addplot[lineA, domain=0:4]{4.5*x};", "\\addplot[lineA, <->, >=latex, domain=0:4]{4.5*x};"),
     ("corners", "\\newcommand{\\schoolname}{}", "\\newcommand{\\schoolname}{School Name}"),
     ("hints", "\\end{document}\n\\fi\n", "\\fi\n"),
@@ -256,6 +255,13 @@ class EachBreakIsNamed(unittest.TestCase):
             result = run_checker(folder / "Handout.tex")
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertEqual(len(re.findall(r"(?m)^note: key-only-graph:", result.stdout)), 1, result.stdout)
+            # The director's direction on his templates: a changed tasks column count is a note too.
+            columns = starter.replace("\\begin{tasks}(3)\n  \\task \\qa{$3x + y$}", "\\begin{tasks}(\\qa{3}{2})\n  \\task \\qa{$3x + y$}", 1)
+            self.assertNotEqual(columns, starter)
+            (folder / "Handout.tex").write_text(columns, encoding="utf-8")
+            result = run_checker(folder / "Handout.tex")
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertRegex(result.stdout, r"(?m)^note: key-columns:")
             # A negative in a centred tabularx column, and in a table whose first column is words.
             for table in ("\\begin{tabularx}{8cm}{|>{\\centering\\arraybackslash}X|>{\\centering\\arraybackslash}X|}\\hline\n"
                           "$x$ & $y$ \\\\ \\hline\n$1$ & $-2$ \\\\ \\hline\n$2$ & $-4$ \\\\ \\hline\n\\end{tabularx}",
@@ -301,6 +307,80 @@ class EachBreakIsNamed(unittest.TestCase):
             code, log = compile_tex(folder, "Handout.tex")
             self.assertEqual(code, 0, log[-2000:])
             self.assertIn("use N", pdf_text(folder / "Handout.pdf"))
+
+
+SCRIPTS = REPOSITORY / "scripts"
+
+
+def frontmatter_available():
+    try:
+        import frontmatter  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+class TheAnswersCopyStaysHidden(unittest.TestCase):
+    """
+    The Fable sweep's F1: a copy of a published SHARED exercise page keeps its
+    publishForSection<N>: true lines, and the build lets a section's own line
+    win over `publish:`. So the skill hides the answers copy by setting EVERY
+    per-section line false, and the checker fails a copy that would publish.
+    """
+
+    COPY_AS_MADE = "---\ntitle: Practice - Answers\npublishForSection1: true\npublishForSection2: true\npublish: false\n---\nx\n"
+    EVERY_LINE_FALSE = "---\ntitle: Practice - Answers\npublishForSection1: false\npublishForSection2: false\n---\nx\n"
+
+    @unittest.skipUnless(frontmatter_available(), "needs python-frontmatter, which the image carries; skipped")
+    def test_the_build_publishes_a_copy_that_only_adds_publish_false(self):
+        sys.path.insert(0, str(SCRIPTS))
+        import build_site
+        import frontmatter
+        with tempfile.TemporaryDirectory() as temporary:
+            page = Path(temporary) / "Practice - Answers.md"
+            for text, expected in ((self.COPY_AS_MADE, True), (self.EVERY_LINE_FALSE, False)):
+                for section in (1, 2):
+                    page.write_text(text, encoding="utf-8")
+                    build_site.process_frontmatter(page, section)
+                    self.assertEqual(bool(frontmatter.load(page).get("publish")), expected, (text, section))
+
+    def test_the_checker_fails_the_copy_and_passes_it_hidden(self):
+        starter = fill_in((SKILL / "starters" / "Handout.tex").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary) / "handouts"
+            folder.mkdir()
+            (folder / "Handout.tex").write_text(starter, encoding="utf-8")
+            (folder / "Handout - Answers.tex").write_text("\\def\\showanswers{}\n\\input{Handout.tex}\n", encoding="utf-8")
+            (folder / "Handout - Hints.tex").write_text("\\def\\showhints{}\n\\input{Handout.tex}\n", encoding="utf-8")
+            course = Path(temporary) / "courses" / "MTH1W"
+            (course / "Exercises").mkdir(parents=True)
+            (course / "Media").mkdir()
+            config = course / "course_config.json"
+            config.write_text(json.dumps({"section_numbers": [1, 2]}), encoding="utf-8")
+            (course / "Exercises" / "Practice.md").write_text(
+                "---\ntitle: Practice\npublishForSection1: true\npublishForSection2: true\n"
+                "printPdf: \"[[Handout - with Hints.pdf]]\"\n---\n", encoding="utf-8")
+            (course / "Media" / "Handout - with Hints.pdf").write_bytes(b"%PDF-1.4\n")
+            twin = course / "Exercises" / "Practice - Answers.md"
+            twin.write_text(self.COPY_AS_MADE, encoding="utf-8")
+            result = run_checker(folder / "Handout.tex", "--course-config", config)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertRegex(result.stdout, r"(?m)^answers-copy-published:")
+            twin.write_text(self.EVERY_LINE_FALSE, encoding="utf-8")
+            result = run_checker(folder / "Handout.tex", "--course-config", config)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            # The swap, as the skill writes it: the checker stays quiet afterwards.
+            (course / "Exercises" / "Practice.md").rename(course / "Exercises" / "Practice - Hints.md")
+            (course / "Exercises" / "Practice - Hints.md").write_text(
+                "---\ntitle: Practice - Hints\npublishForSection1: false\npublishForSection2: false\n---\n", encoding="utf-8")
+            twin.rename(course / "Exercises" / "Practice.md")
+            (course / "Exercises" / "Practice.md").write_text(
+                "---\ntitle: Practice\npublishForSection1: true\npublishForSection2: true\n"
+                "printPdf: \"[[Handout - with Answers.pdf]]\"\n---\n", encoding="utf-8")
+            (course / "Media" / "Handout - with Answers.pdf").write_bytes(b"%PDF-1.4\n")
+            (course / "Media" / "Handout - with Hints.pdf").unlink()
+            result = run_checker(folder / "Handout.tex", "--course-config", config)
+            self.assertEqual(result.returncode, 0, result.stdout)
 
 
 if __name__ == "__main__":

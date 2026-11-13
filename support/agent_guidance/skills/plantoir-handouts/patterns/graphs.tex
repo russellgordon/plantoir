@@ -218,9 +218,15 @@
   lineC/.style={green!50!black, thick, samples=2},
   lineD/.style={orange!85!black, thick, samples=2},
   % a legend whose keys show a plain line, without the arrowheads the lines carry
-  answerlegend/.style={legend pos=outer north east, legend cell align=left,
-    legend style={font=\small, draw=gray!50}, legend image post style={arrows=-}},
+  % It sits to the right of the axes and clear of the x label (0.9 cm past
+  % the grid's right edge), with its top level with the grid's top.
+  answerlegend/.style={legend cell align=left,
+    legend style={at={(1,1)}, anchor=north west, xshift=0.9cm, font=\small, draw=gray!50},
+    legend image post style={arrows=-}},
 }
+% The run and the rise of a slope, drawn on a graph with \draw: dashed, with
+% a word beside each.
+\tikzset{slopestep/.style={teal, thick, dashed, -latex}}
 
 % ---------- End of the starter's preamble ----------
 \renewcommand{\handouttitle}{Pattern: Graphs}

@@ -4729,14 +4729,14 @@ fix is in what it is shown, and in a checker that fails:
   key's render, not the question copy's. The checker covers both copies
   from the source.
 - **`tools/check_handout.py`** (stdlib, an aid that is never required):
-  17 rules (19 with the fix round's `answers-in-media` and the `key-only-graph` note) decided from the source, its wrappers, its PDFs and its folder
+  19 failing rules and 2 notes after the two fix rounds below, decided from the source, its wrappers, its PDFs and its folder
   (the skill's section 8 lists them), one line per problem, exit 1, and
   at the end of every run the list of what it cannot decide, which the
   skill sends to the rendered pages. The graph rule evaluates the plotted
   expression over its domain against `xmin`, `xmax`, `ymin` and `ymax`
   (the plan review's M1b: a curve leaving through the top before its
   domain ends is the common miss, not the side edges). `--self-test` has
-  29 cases. `scripts/test_handout_starters.py` (14 tests, about 32 s on
+  40 cases after the fix rounds. `scripts/test_handout_starters.py` (14 tests, about 32 s on
   this Mac) runs it, compiles every starter and pattern in every copy, and
   breaks the starter once per rule (13 breaks) expecting that rule's
   name. Must-fail: with `origin/dev`'s `Handout.tex` put back, 8 of the 14
@@ -4842,6 +4842,47 @@ needspace came before an overflow, even when that question would have fitted.
 The starters' `\q` now uses `\roomfor`, the same test with a `\penalty0`.
 Pages 1 and 2 of the starter are now full. The owner's templates carry the
 same `\needspace`.
+
+**The last round on #859 B** (the Fable sweep). Measured with
+`build_site.process_frontmatter`, called directly (a Python with
+`frontmatter`, no site build). A copy of a published shared page that
+keeps `publishForSection1: true` and `publishForSection2: true` and adds
+`publish: false` resolves to `publish: True` in both sections, because the
+section's own line wins (`build_site.py`, `process_frontmatter`). With
+every per-section line false it resolves to `False` in both. With one line
+left true it publishes in that section only.
+
+So the recipe now does three things. It hides the answers copy with
+`unpublish_pages`, or by setting EVERY `publishForSection<N>` line false.
+It confirms the copy is hidden with `plan_unpublish_pages` before telling
+the teacher so. And the swap's unpublish step does the same for the hints
+page.
+
+The checker changed with it:
+- Its new rule `answers-copy-published` reads the course's pages. It finds
+  the page whose `printPdf` is the handout's `- with Hints` file, and that
+  page's "- Answers" twin. It fails when the twin would publish in a
+  section where the hints page does. The sections come from
+  `section_numbers` in the course settings and the page's own keys.
+- `answers-in-media` now judges the hints period by whether that hints page
+  is published, so it stays quiet after the swap. The swap now also takes
+  the `- with Hints` file out of `Media` and clears the hints page's
+  `printPdf`.
+- `scripts/test_handout_starters.py` gained `TheAnswersCopyStaysHidden`:
+  the build call, which skips where `frontmatter` is missing, and the
+  checker through a whole hints period and swap.
+- A key whose `tasks` column count differs is now a note (`key-columns`),
+  on the director's direction following the owner's ruling. On his two
+  templates the checker now gives 0 problems and 7 and 13 notes.
+
+The look:
+- question 4's grid now runs to y = 6, so the arrowhead passes the plotted
+  point (-1, 5);
+- the key carries the run and the rise (`slopestep`);
+- `answerlegend` sits 0.9 cm past the grid's right edge, clear of the x
+  label;
+- `worked_examples.tex` gains G, a line drawn from its slope and
+  y-intercept with the run and the rise.
 
 REJECTED: shipping his "outer border drawn last" preamble as the default
 (nicematrix was measured better, #715); "older files move to this format"

@@ -208,20 +208,27 @@
   lineC/.style={green!50!black, thick, samples=2},
   lineD/.style={orange!85!black, thick, samples=2},
   % a legend whose keys show a plain line, without the arrowheads the lines carry
-  answerlegend/.style={legend pos=outer north east, legend cell align=left,
-    legend style={font=\small, draw=gray!50}, legend image post style={arrows=-}},
+  % It sits to the right of the axes and clear of the x label (0.9 cm past
+  % the grid's right edge), with its top level with the grid's top.
+  answerlegend/.style={legend cell align=left,
+    legend style={at={(1,1)}, anchor=north west, xshift=0.9cm, font=\small, draw=gray!50},
+    legend image post style={arrows=-}},
 }
+% The run and the rise of a slope, drawn on a graph with \draw: dashed, with
+% a word beside each.
+\tikzset{slopestep/.style={teal, thick, dashed, -latex}}
 
 \begin{document}
 
 % ---------- The hints sheet: only in "Handout - Hints.pdf" ----------
-% One \hint per question that has one. A hint never gives the answer, not
-% even through a pointed first step: it points back to the day's idea, in
-% the words the lesson used (the skill's section 13).
+% One \hint per question that has one. A hint never gives the answer. In
+% hints first, then the answers (the skill's section 13) it gives no pointed
+% first step either: it points back to the day's idea, in the words the
+% lesson used.
 \ifhints
 {\LARGE\bfseries\sffamily \doctitle}\par
 \medskip
-{\color{why} Try each question first. Open a hint only when you are stuck.
+{\color{why} Try each question first. Read its hint only when you are stuck.
 The answers come out at the start of next class.}
 \begin{description}[leftmargin=6.5em, style=nextline, itemsep=0.8em]
   \hint{1}{Look back at the worked example ``Substitute and Evaluate''. Each value goes where its letter was, in brackets.}
@@ -380,12 +387,16 @@ $3$ & \qa{}{$-3$} \\
 \end{NiceTabular}}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
-% It leaves the grid through y = 5 at x = -1 and y = -5 at x = 4.
+% It leaves the grid through y = 6 at x = -1.5 and y = -5 at x = 4, past
+% every plotted point. In the key, the run and the rise from (0, 3) show the
+% slope question 5 asks for.
 \begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
-    xmin=-4, xmax=6, ymin=-5, ymax=5, xtick={-4,-2,...,6}, ytick={-4,-2,...,4}]
+    xmin=-4, xmax=6, ymin=-5, ymax=6, xtick={-4,-2,...,6}, ytick={-4,-2,...,6}]
   \onlya{%
-  \addplot[lineA, <->, >=latex, domain=-0.95:3.95]{-2*x + 3};
-  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,5) (0,3) (1,1) (2,-1) (3,-3)};}
+  \addplot[lineA, <->, >=latex, domain=-1.45:3.95]{-2*x + 3};
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,5) (0,3) (1,1) (2,-1) (3,-3)};
+  \draw[slopestep] (axis cs:0,3) -- node[pos=1, above right, font=\scriptsize\sffamily]{run $1$} (axis cs:1,3);
+  \draw[slopestep] (axis cs:1,3) -- node[right, font=\scriptsize\sffamily]{rise $-2$} (axis cs:1,1);}
 \end{axis}\end{tikzpicture}
 \end{minipage}
 

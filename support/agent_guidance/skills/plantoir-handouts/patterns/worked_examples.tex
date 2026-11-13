@@ -13,6 +13,8 @@
 %   E. A grey box of instructions before a group of questions (groupnote),
 %      and how the answer key hides every example behind a \strand heading.
 %   F. A small framed note beside an example (notebox).
+%   G. A slope drawn on the graph: the run and the rise, dashed, from the
+%      y-intercept (slopestep), for an example whose point is the slope.
 %
 % What makes an example good, in this house style: it teaches the WHOLE
 % method a question below it needs, in the order a student does it; the
@@ -216,9 +218,15 @@
   lineC/.style={green!50!black, thick, samples=2},
   lineD/.style={orange!85!black, thick, samples=2},
   % a legend whose keys show a plain line, without the arrowheads the lines carry
-  answerlegend/.style={legend pos=outer north east, legend cell align=left,
-    legend style={font=\small, draw=gray!50}, legend image post style={arrows=-}},
+  % It sits to the right of the axes and clear of the x label (0.9 cm past
+  % the grid's right edge), with its top level with the grid's top.
+  answerlegend/.style={legend cell align=left,
+    legend style={at={(1,1)}, anchor=north west, xshift=0.9cm, font=\small, draw=gray!50},
+    legend image post style={arrows=-}},
 }
+% The run and the rise of a slope, drawn on a graph with \draw: dashed, with
+% a word beside each.
+\tikzset{slopestep/.style={teal, thick, dashed, -latex}}
 
 % ---------- End of the starter's preamble ----------
 \renewcommand{\handouttitle}{Pattern: Worked Examples}
@@ -227,7 +235,7 @@
 
 {\LARGE\bfseries\sffamily \doctitle}\par
 \medskip
-{\color{why} Six ways to set out a worked example. Copy the one that fits.}
+{\color{why} Seven ways to set out a worked example. Copy the one that fits.}
 
 % ---------- A. Substitute and evaluate ----------
 \ifanswers
@@ -334,6 +342,41 @@ At the $y$-intercept, $x = 0$.
   y &= 2
 \end{align*}
 The $y$-intercept is $2$: the point $(0, 2)$.
+\end{minipage}
+\end{example}
+\fi
+
+% ---------- G. A slope drawn on the graph: the run and the rise ----------
+% y = (3/4)x - 1 on x from -3 to 7 and y from -4 to 5: it meets the left
+% edge at y = -3.25 and the right edge at y = 4.25, before the bottom and
+% top. From the y-intercept (0, -1): run 4 to the right, then rise 3.
+\ifanswers
+\strand{Graph a line from its slope and y-intercept}
+\else
+\begin{example}{Graph a Line from its Slope and $y$-Intercept}
+\begin{minipage}[t]{0.52\linewidth}
+Graph the line $y = \dfrac34x - 1$.
+
+\smallskip
+The slope is $\dfrac34$, so $\dfrac{\text{rise}}{\text{run}} = \dfrac{3}{4}$.
+
+\smallskip
+The $y$-intercept is $-1$, so the point $(0, \sv{-1})$ is on the line.
+
+\smallskip
+Start at $(0, -1)$. Run $4$ to the right, then rise $3$, to reach
+$(4, 2)$. Draw a line through the two points, to the edge of the grid.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.44\linewidth}
+\vspace{0pt}\centering
+\begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
+    xmin=-3, xmax=7, ymin=-4, ymax=5, xtick={-2,2,4,6}, ytick={-2,2,4}]
+  \addplot[exampleline, domain=-2.9:6.9]{3/4*x - 1};
+  \draw[slopestep] (axis cs:0,-1) -- node[below, font=\scriptsize\sffamily]{run $4$} (axis cs:4,-1);
+  \draw[slopestep] (axis cs:4,-1) -- node[right, font=\scriptsize\sffamily]{rise $3$} (axis cs:4,2);
+  \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(0,-1) (4,2)};
+  \node[anchor=west, font=\small, fill=peach, inner sep=1pt] at (axis cs:-2.8,3.6) {$y = \tfrac34x - 1$};
+\end{axis}\end{tikzpicture}
 \end{minipage}
 \end{example}
 \fi

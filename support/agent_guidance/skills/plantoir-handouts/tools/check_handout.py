@@ -47,7 +47,12 @@ Rules (each line it prints starts with the rule's name):
   firearms          a word that only ever means a firearm or its ammunition
   answers-in-media  (with --course-config) an answer key in the course's Media folder,
                     which the website copies whole, or a joined answers file there
-                    while the exercise is in its hints period
+                    while the exercise is in its hints period (its hints page published)
+  answers-copy-published (with --course-config) the "- Answers" copy of a published
+                    hints page that would itself be published in a section: a
+                    publishForSection<N>: true line wins over publish: false
+  key-columns       (a NOTE, never a problem) the key's tasks column count differs
+                    from the question copy's: allowed where the answers need the room
 
 Standard library only. Python 3.8 or later.
 """
@@ -636,8 +641,9 @@ def check_key_layout(text, problems):
                              "this table's columns change between the copies: the key keeps the question's table"))
     for match in re.finditer(r"\\begin\{tasks\}\s*\(([^)]*)\)", text):
         if re.search(r"\\(qa|ifanswers)(?![A-Za-z])", match.group(1)):
-            problems.append(("key-layout", line_of(text, match.start()),
-                             "the tasks column count changes in the key: the key keeps the worksheet's column count"))
+            problems.append(("key-columns", line_of(text, match.start()),
+                             "the tasks column count changes in the key. That is allowed where the answers need the "
+                             "room; otherwise the key keeps the worksheet's column count"))
 
 
 # ---------------------------------------------------------------------------
@@ -1019,7 +1025,7 @@ CANNOT_CHECK = [
 
 # Rules printed as a note for the teacher's and the assistant's judgement:
 # printed, but never a problem, and never the reason for exit 1.
-NOTE_RULES = {"key-only-graph"}
+NOTE_RULES = {"key-only-graph", "key-columns"}
 
 
 def failures_in(problems):
@@ -1039,14 +1045,107 @@ def media_folder(course_dir):
     return None
 
 
+YAML_FALSE_WORDS = ("false", "no", "off")
+
+
+def page_settings(path):
+    """A page's settings block as {key: value}, read line by line (enough for the keys this checker reads)."""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}
+    settings = {}
+    for line in text[3:end].split("\n"):
+        match = re.match(r"^([A-Za-z][A-Za-z0-9_]*)\s*:\s*(.*?)\s*(#.*)?$", line)
+        if match:
+            settings[match.group(1)] = match.group(2).strip().strip('"').strip("'")
+    return settings
+
+
+def visible_in(settings, section):
+    """
+    The build's order (contracts/file-formats.json -> pageVisibility): a
+    section's own publishForSection<N> first, then publish, then the legacy
+    draftSection<N> and draft. A copy of a published shared page keeps its
+    publishForSection<N>: true lines, so a publish: false added beside them
+    hides nothing (measured with build_site.process_frontmatter).
+    """
+    for key, inverted in (("publishForSection" + str(section), False), ("publish", False),
+                          ("draftSection" + str(section), True), ("draft", True)):
+        if key in settings:
+            falsy = settings[key].lower() in YAML_FALSE_WORDS
+            return falsy if inverted else not falsy
+    return True
+
+
+def course_pages(course_dir):
+    pages = []
+    for path in course_dir.rglob("*.md"):
+        parts = path.relative_to(course_dir).parts
+        if parts and parts[0].startswith("."):
+            continue
+        pages.append(path)
+    return pages
+
+
 def check_media(source, config_path, problems):
-    """No answer key in the course's Media folder, and no answers there while an exercise is in its hints period."""
+    """
+    No answer key in the course's Media folder; no answers there while the
+    exercise is in its hints period; and no answers copy of an exercise page
+    that would publish while its hints page is published.
+    """
     if config_path is None:
         return
-    media = media_folder(Path(config_path).resolve().parent)
+    course_dir = Path(config_path).resolve().parent
+    stem = Path(source).stem
+    try:
+        settings = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        settings = {}
+    sections = settings.get("section_numbers") if isinstance(settings.get("section_numbers"), list) else None
+    hints_name = (stem + " - with Hints.pdf").lower()
+    answers_name = (stem + " - with Answers.pdf").lower()
+    hints_pages = []
+    for page in course_pages(course_dir):
+        page_values = page_settings(page)
+        if page_values.get("printPdf", "").strip("[]").lower() == hints_name:
+            hints_pages.append((page, page_values))
+    def sections_for(*value_sets):
+        found = set()
+        if sections:
+            for number in sections:
+                try:
+                    found.add(int(number))
+                except (TypeError, ValueError):
+                    pass
+        for values in value_sets:
+            for key in values:
+                match = re.match(r"(publishForSection|draftSection)(\d+)$", key)
+                if match:
+                    found.add(int(match.group(2)))
+        return sorted(found) or [1]
+    hints_published = False
+    for page, values in hints_pages:
+        for section in sections_for(values):
+            if visible_in(values, section):
+                hints_published = True
+        twin = page.with_name(page.stem + " - Answers.md")
+        if twin.exists():
+            twin_values = page_settings(twin)
+            for section in sections_for(values, twin_values):
+                if visible_in(values, section) and visible_in(twin_values, section):
+                    problems.append(("answers-copy-published", 0, twin.name + " would be on section " + str(section)
+                                     + "'s site while its hints page is: set EVERY publishForSection<N> line on it to "
+                                     "false (a per-section line wins over publish: false), then check the publishing "
+                                     "plan shows it is not published"))
+    media = media_folder(course_dir)
     if media is None:
         return
-    stem = Path(source).stem
     names = {}
     for entry in media.iterdir():
         names[entry.name.lower()] = entry.name
@@ -1054,10 +1153,14 @@ def check_media(source, config_path, problems):
         if (stem.lower() + ending) in names:
             problems.append(("answers-in-media", 0, names[stem.lower() + ending] + " is in the course's Media folder, "
                              "which the website copies whole: an answer key on its own never goes on the site"))
-    if (stem.lower() + " - with hints.pdf") in names and (stem.lower() + " - with answers.pdf") in names:
-        problems.append(("answers-in-media", 0, names[stem.lower() + " - with answers.pdf"] + " is in the course's "
-                         "Media folder while the exercise is in its hints period: anyone can download it from the site. "
-                         "Keep it in the handouts folder and copy it into Media as a step of the swap"))
+    # The hints period: a published page hands out the hints file, or, with
+    # no page naming it, the hints file is still in Media. After the swap the
+    # hints page is unpublished and its file taken out, so this stays quiet.
+    in_hints_period = hints_published or (not hints_pages and hints_name in names)
+    if in_hints_period and answers_name in names:
+        problems.append(("answers-in-media", 0, names[answers_name] + " is in the course's Media folder while the "
+                         "exercise is in its hints period: anyone can download it from the site. Keep it in the "
+                         "handouts folder and copy it into Media as a step of the swap"))
 
 
 def check(source, config_path=None):
@@ -1164,7 +1267,7 @@ BREAKS = [
     ("negative-column", r"Its slope is \fillin{$-2$}.",
      "\\begin{tabular}{|l|c|}\\hline\nDay & Low \\\\ \\hline\nMonday & $4$ \\\\ \\hline\nTuesday & $-3$ \\\\ \\hline\nFriday & $-1$ \\\\ \\hline\n\\end{tabular}"),
     ("key-layout", r"[gridgraph, xmin=-4,", r"[gridgraph, \qa{width=6cm}{width=4cm}, xmin=-4,"),
-    ("key-layout", r"\begin{tasks}(2)", r"\begin{tasks}(\qa{1}{3})"),
+    ("key-columns", r"\begin{tasks}(2)", r"\begin{tasks}(\qa{1}{3})"),
     ("arrowheads", "domain=-1.45:4.45", "domain=-4:6"),
     ("arrowheads", "domain=-1.45:4.45", "domain=0:2"),
     ("context-graph", r"\addplot[lineA, domain=0:4]{4.5*x};", r"\addplot[lineA, <->, >=latex, domain=0:4]{4.5*x};"),
@@ -1278,7 +1381,42 @@ def self_test():
         found = [rule for rule, line, message in check(source, config)]
         if "answers-in-media" not in found:
             failures.append("answers-in-media did not fire for an answer key in Media")
+        os.remove(media / "Lines - Answers.pdf")
+        # Page-aware: a published hints page, its answers copy, and the swap.
+        hints_page = course / "Practice.md"
+        twin_page = course / "Practice - Answers.md"
+        config.write_text(json.dumps({"section_numbers": [1, 2]}), encoding="utf-8")
+        hints_page.write_text("---\ntitle: Practice\npublishForSection1: true\npublishForSection2: true\n"
+                              "printPdf: \"[[Lines - with Hints.pdf]]\"\n---\n", encoding="utf-8")
+        twin_page.write_text("---\ntitle: Practice - Answers\npublishForSection1: true\npublishForSection2: true\n"
+                             "publish: false\n---\n", encoding="utf-8")
+        (media / "Lines - with Hints.pdf").write_bytes(b"%PDF-1.4\n")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-copy-published" not in found:
+            failures.append("answers-copy-published did not fire for a copy whose per-section lines are still true")
+        if "answers-in-media" not in found:
+            failures.append("answers-in-media did not fire while the hints page is published")
+        twin_page.write_text("---\ntitle: Practice - Answers\npublishForSection1: false\npublishForSection2: false\n"
+                             "---\n", encoding="utf-8")
+        os.remove(media / "Lines - with Answers.pdf")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-copy-published" in found or "answers-in-media" in found:
+            failures.append("the hints period done right was reported: " + ", ".join(found))
+        # After the swap: the hints page renamed and hidden, its file out of Media, the answers page published.
+        os.remove(hints_page)
+        (course / "Practice - Hints.md").write_text("---\ntitle: Practice - Hints\npublishForSection1: false\n"
+                                                    "publishForSection2: false\n---\n", encoding="utf-8")
+        os.remove(twin_page)
+        (course / "Practice.md").write_text("---\ntitle: Practice\npublishForSection1: true\npublishForSection2: true\n"
+                                            "printPdf: \"[[Lines - with Answers.pdf]]\"\n---\n", encoding="utf-8")
+        os.remove(media / "Lines - with Hints.pdf")
+        (media / "Lines - with Answers.pdf").write_bytes(b"%PDF-1.4\n")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-in-media" in found or "answers-copy-published" in found:
+            failures.append("the state after the swap was reported: " + ", ".join(found))
         shutil.rmtree(media)
+        for page in (course / "Practice.md", course / "Practice - Hints.md"):
+            os.remove(page)
         # Inside courses/
         inside_course = course / "Lines.tex"
         inside_course.write_text(CLEAN, encoding="utf-8")
@@ -1289,7 +1427,7 @@ def self_test():
         for failure in failures:
             print("SELF-TEST FAILED: " + failure)
         return 1
-    print("check_handout: self-test passed (" + str(len(BREAKS) + 14) + " cases)")
+    print("check_handout: self-test passed (" + str(len(BREAKS) + 18) + " cases)")
     return 0
 
 

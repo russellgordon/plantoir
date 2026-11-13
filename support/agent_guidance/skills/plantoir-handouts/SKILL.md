@@ -227,13 +227,12 @@ look the same:
 - So author each table and each graph ONCE, outside the switch, and switch
   only what changes: the cell contents (`$1$ & \qa{}{$-2$} \\`) and the
   plotted answer (`\onlya{\addplot ...;}` inside the `axis`). The starter's
-  questions 2 and 3 do exactly this.
+  questions 4, 6 and 7 do exactly this.
 - Never a vertical table in the question copy with a horizontal one in the
   key, never a smaller, more compressed or differently scaled grid in the
   key, and never a table that appears only in the key. The checker
-  (section 8) finds a table inside an answers-only branch, axis options or
-  a column spec that switch between the copies, and a `tasks` column count
-  that switches.
+  (section 8) finds a table inside an answers-only branch, and axis
+  options or a column spec that switch between the copies.
 - **A graph only in the key is allowed where it serves the topic**: for
   example, when students graph on their own grid paper, the question copy
   has no grid and the key draws each answer on a grid of its own. Decide
@@ -258,7 +257,9 @@ look the same:
   A source line on a quiz tells students where to look the questions up,
   so leave it off unless the teacher's own quizzes carry one.
 - `tasks` columns for short a), b), c) parts side by side. The answer key
-  keeps the worksheet's column count. On a quiz or test, a part that runs
+  keeps the worksheet's column count unless the answers need the room (a
+  long answer that would wrap in a narrow column); the checker prints a
+  changed count as a note, for your judgement, not a problem. On a quiz or test, a part that runs
   to more than one line hangs under its first word (section 6).
 - `pgfplots` for graphs. How far a graph is drawn, and when it has
   arrowheads, is in section 12.
@@ -474,9 +475,11 @@ stops short of the grid's edge or runs past it, a context graph with
 arrowheads, a placeholder or a wrong corner, a missing wrapper, a hints
 block in the wrong place, build files or pictures left in the folder, a
 PDF older than its source, the wrong paper, and (with `--course-config`)
-an answer key in the course's `Media` folder or an answers file there
-during a hints period. A graph found only in the key is printed as a
-note, for your judgement, and never counts as a problem. Run it, never import it,
+an answer key in the course's `Media` folder, an answers file there
+while the hints page is published, and an "- Answers" copy of an exercise
+page that would publish beside its hints page. A graph found only in the
+key, and a key whose `tasks` column count differs, are printed as notes,
+for your judgement, and never count as problems. Run it, never import it,
 from the working folder, when Python is on the computer:
 
 ```bash
@@ -885,12 +888,22 @@ topic, and other topics keep their answers from the start.
      PDF) is `Name - with Hints.pdf`.
   2. At the same time, make a second copy named "Practice - Answers" (its
      file name and its `title`), the same page with folded answers, and
-     leave it UNPUBLISHED (`unpublish_pages`, or `publish: false` in its
-     settings). Do not give it a `printPdf` yet. The build drops a page
-     marked `publish: false` before it writes anything, so its text is on
-     no page, in no search and in no link of the site; but EVERY file in
-     the course's `Media` folder is copied to the site whatever links to
-     it. So **`Name - with Answers.pdf` stays in the handouts folder,
+     make sure it is UNPUBLISHED in every section. **A copy of a published
+     shared page still carries its `publishForSection1: true`,
+     `publishForSection2: true` (one line per section) from the page it was
+     copied from, and a section's own line wins over `publish:`**, so a
+     `publish: false` added beside them hides nothing (measured: the build
+     publishes such a copy to every section). Use `unpublish_pages` on the
+     copy for every section; or, without Plantoir's tools, set EVERY
+     `publishForSection<N>` line on the copy to `false`, for every section
+     the course has, and remove any `publish: true`. Then confirm it before
+     you tell the teacher the page is hidden: `plan_unpublish_pages` on the
+     copy, for each section, must say it is already not published (without
+     the tools, preview each section and search for its title). Do not
+     give the copy a `printPdf` yet. A page hidden this way is dropped by
+     the build before it writes anything, so its text is on no page, in no
+     search and in no link of the site; but EVERY file in the course's
+     `Media` folder is copied to the site whatever links to it. So **`Name - with Answers.pdf` stays in the handouts folder,
      outside the course, for the whole hints period**: copying it into
      `Media` is a step of the swap, below. Only `Name - with Hints.pdf`
      goes into `Media` now.
@@ -910,15 +923,20 @@ topic, and other topics keep their answers from the start.
   2's alert): that is the point of the swap, and it is still said. Then,
   in this order:
   1. unpublish "Practice" for every section (`plan_unpublish_pages`, then
-     `unpublish_pages`);
+     `unpublish_pages`; by hand, EVERY `publishForSection<N>` line set to
+     `false`, as in step 2 above, and confirmed the same way);
   2. rename "Practice" to "Practice - Hints": its file name and its
      `title`;
   3. rename "Practice - Answers" to "Practice": its file name and its
      `title`;
   4. copy `Name - with Answers.pdf` into the course's `Media` folder and
      set the answers page's `printPdf` (and any link to the PDF) to it;
+     take `Name - with Hints.pdf` out of `Media` (it stays in the handouts
+     folder) and clear the `printPdf` of "Practice - Hints", which is no
+     longer on the site;
   5. publish "Practice" for every section (`plan_publish_pages`, then
-     `publish_pages`);
+     `publish_pages`; by hand, every `publishForSection<N>` line set to
+     `true`);
   6. preview the course again, and say what changed. Never deploy on the
      teacher's behalf; deploying is theirs.
   Plantoir has no tool that renames a page, so steps 2 and 3 are file
