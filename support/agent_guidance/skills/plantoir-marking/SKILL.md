@@ -82,7 +82,8 @@ working folder:
 **Never set up a marking folder inside the working folder**, and refuse
 when asked: it could be built into a class website or copied with a
 course. If a folder the teacher names is inside it, say so and ask for
-another.
+another. The scripts refuse it too: each stops, writing nothing, when a folder
+it is given is inside a Plantoir working folder.
 
 **A folder kept in sync by a service** (iCloud Drive, OneDrive, Dropbox,
 Google Drive, a school's own storage) stores the papers and the name table
@@ -186,7 +187,7 @@ shipped:
 python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
 ```
 
-It must print `RUNNER_SHA256`. If it does not, stop and tell the teacher
+It must print `6628bd0d13b309685a25d3babde2b199b503d2f94722cf4138d15595a77afefe`. If it does not, stop and tell the teacher
 the runner has been changed; do not run any script that reads the table.
 
 **Every script that reads the name mapping table is run through

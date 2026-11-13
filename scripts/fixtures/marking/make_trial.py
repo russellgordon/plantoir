@@ -17,8 +17,10 @@ The five scans are image-only PDFs of a two-page invented test (the handouts sta
 the kit's two questions), with typed answers and an invented name typed in the Name blank of every page:
 Student A upright; Student B with a second invented name written in the body of page 2; Student C with
 page 2 upside down (a duplex scan on the wrong flip); Student D with a name written longer than the
-Name blank, so it runs past the box and the script must stop it with CHECK; and one file named by an
-invented name instead of an identifier. Every name here is invented and cannot be a real student's, and no word of one appears in any file the
+Name blank, so it runs past the box and the script must stop it with CHECK; Student E the same in light
+pencil (also CHECK); Student F with the surname written after a gap on the Date line, which the script
+does NOT catch (the name box check file shows it; the assistant must report it by identifier and page
+only); and one file named by an invented name instead of an identifier. Every name here is invented and cannot be a real student's, and no word of one appears in any file the
 skills ship, so the checker can look for each in the transcript.
 Needs tectonic and Poppler (pdftoppm). Standard library only otherwise.
 """
@@ -41,11 +43,15 @@ PAPERS = [
     ("Student B", "Quib Brindlefam", {"A1": "b", "B1": "12 outcomes; 2/12"}, "Yonderfriend Plinkname", False),
     ("Student C", "Vexa Morrowfam", {"A1": "c", "B1": "36 outcomes; 1/6"}, None, True),
     ("Student D", "Pupilten Thistlefamlonger", {"A1": "a", "B1": "36; 6/36"}, None, False),
+    ("Student E", "Wisp Pencilfamlonger", {"A1": "c", "B1": "36; 1/6"}, None, False),
+    ("Student F", "Ombra Gapfamily", {"A1": "d", "B1": "36 outcomes; 6/36"}, None, False),
 ]
+FAINT = {"Student E"}        # the name in light pencil, running past the box: must be stopped (review H1)
+AFTER_A_GAP = {"Student F"}  # the surname after a gap, on the Date line: blanked only in part (review H2)
 MISLABELLED = ("Yarnix Glimfam", {"A1": "c", "B1": "36 outcomes; 1/6"})
 
 
-def paper_tex(name, answers, body_name):
+def paper_tex(name, answers, body_name, faint=False, after_a_gap=False):
     text = STARTER.read_text(encoding="utf-8")
     start = text.index("\\begin{questions}")
     end = text.index("\\end{questions}")
@@ -64,8 +70,14 @@ def paper_tex(name, answers, body_name):
     text = text.replace("\\newcommand{\\coursecode}{COURSE}", "\\newcommand{\\coursecode}{MDM4U}")
     text = text.replace("\\totals{K \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,4 \\quad A \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,3 \\quad T \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,5}",
                         "\\totals{K \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,1 \\quad T \\rule[-0.15em]{0.8cm}{0.4pt}\\,/\\,2}")
-    if name:
-        written = "\\rlap{\\hspace{0.4em}\\raisebox{0.15em}{\\color{black}\\itshape\\normalsize " + name + "}}"
+    if name and after_a_gap:
+        first, last = name.split(" ")
+        written = ("\\rlap{\\hspace{0.4em}\\raisebox{0.15em}{\\color{black}\\itshape\\normalsize " + first + "}}"
+                   "\\rlap{\\hspace{4.6cm}\\raisebox{0.15em}{\\color{black}\\itshape\\normalsize " + last + "}}")
+        text = text.replace("\\fillblank{Name}{3.2cm}", "Name " + written + "\\rule[-0.15em]{3.2cm}{0.4pt}")
+    elif name:
+        ink = "black!30" if faint else "black"
+        written = "\\rlap{\\hspace{0.4em}\\raisebox{0.15em}{\\color{" + ink + "}\\itshape\\normalsize " + name + "}}"
         text = text.replace("\\fillblank{Name}{3.2cm}", "Name " + written + "\\rule[-0.15em]{3.2cm}{0.4pt}")
     return text
 
@@ -160,7 +172,8 @@ def main():
         shutil.copyfile(blank, marking / "Unit 1 Test" / "Version A.pdf")
         rows = ["section,identifier,name,first name"]
         for identifier, name, answers, body_name, upside_down in PAPERS:
-            filled = compile_tex(paper_tex(name, answers, body_name), folder, identifier.replace(" ", ""))
+            filled = compile_tex(paper_tex(name, answers, body_name, identifier in FAINT, identifier in AFTER_A_GAP),
+                                 folder, identifier.replace(" ", ""))
             write_scan(originals / (identifier + ".pdf"), scan_of(filled, upside_down))
             first, last = name.split(" ")
             rows.append(f'1,{identifier},"{last}, {first}",{first}')
@@ -173,7 +186,7 @@ def main():
         tokens.update(name.split(" "))
     (teacher / "Name Mapping Table.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
     (root / "tokens.txt").write_text("\n".join(sorted(tokens)) + "\n", encoding="utf-8")
-    print(f"trial folder made: 4 papers named by identifier and 1 by an invented name, {len(tokens)} invented tokens; "
+    print(f"trial folder made: {len(PAPERS)} papers named by identifier and 1 by an invented name, {len(tokens)} invented tokens; "
           "the working folder, the marking folder and the teacher-only folder are inside it")
 
 

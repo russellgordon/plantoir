@@ -201,6 +201,14 @@ class SkillFileTests(unittest.TestCase):
         for relative in self.guidance()["scripts"] + self.guidance()["templates"] + self.guidance()["references"]:
             self.assertIn(relative.split("/", 1)[1], text, f"the skill names {relative}")
 
+    def test_the_skill_names_the_runners_own_sha256(self):
+        # 750a review L6: the runner can be edited in place until Plantoir next refreshes the folder, so
+        # the skill has the assistant check it first; the hash it gives must be the shipped file's.
+        import hashlib
+        runner = SKILL / self.guidance()["runner"]
+        digest = hashlib.sha256(runner.read_bytes()).hexdigest()
+        self.assertIn("It must print `" + digest + "`", (SKILL / "SKILL.md").read_text(encoding="utf-8"))
+
     def test_the_offered_templates_name_is_the_handouts_skills(self):
         name = contract()["printablePages"]["agentGuidance"]["handoutsSkill"]["offeredTemplate"]["name"]
         for relative in ("SKILL.md", "reference/template.md"):
