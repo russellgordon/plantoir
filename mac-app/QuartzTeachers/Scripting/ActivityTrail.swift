@@ -937,10 +937,75 @@ nonisolated enum ActivityTrail {
         /// it" gets an answer.
         case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
 
+        /// A course on the Reference Courses shelf was replaced by a new one
+        /// after the warning (#572): its folder, the code it shows and its
+        /// group, where the new one came from (made from the ready-made
+        /// pages, a copy of a live course, or an import, by folder or zip
+        /// name), what the old one held (sections, files, pages, size) and
+        /// the backup's FILE NAME, which is how it comes back. Never a page.
+        case referenceCourseReplaced = "reference course replaced"
+
+        /// A replace the teacher confirmed did not happen: the folder, the
+        /// code and group, where the new one came from, and the sentence the
+        /// teacher read, with what failed (the backup, its check, a rename)
+        /// in brackets. Written for every way it ends without a replace, so
+        /// "I pressed Replace and the old one is still there" has an answer.
+        case referenceCourseCouldNotBeReplaced = "reference course could not be replaced"
+
+        /// A working folder was opened and a replace that did not finish was
+        /// found in it and settled: the old course renamed back to its own
+        /// folder, or its old copy removed because the new one was in place
+        /// and a backup was there, or that it could not be renamed back yet.
+        /// Carries the folder only.
+        case unfinishedReplaceOfAReferenceCoursePutRight = "unfinished replace of a reference course put right"
+
+        /// A whole course was put back from one of its backups (Restore from
+        /// Backup…): the code it shows, its folder, the backup's FILE NAME,
+        /// the archive made of the course as it was first, and whether the
+        /// restored course is kept for reference. For EVERY whole-course
+        /// restore, live or reference (#572 closed the gap: only a section's
+        /// restore left a line before). Never a page.
+        case courseRestoredFromABackup = "course restored from a backup"
+
         /// A reference course was filed under a different school year — the
         /// one thing about a frozen course a teacher can still change.
         /// Carries the code they read, the folder, and both years.
         case referenceCourseSchoolYearChanged = "reference course school year changed"
+
+        /// A group was made on the Reference Courses shelf (#572, third
+        /// piece). Carries its name, the teacher's own words, quoted. A
+        /// course "missing" from the shelf is often in a group the teacher
+        /// forgot making, and this is the line that says it was made.
+        case referenceGroupMade = "reference group made"
+
+        /// A group on the shelf was renamed: its old and new names, and
+        /// whether it was the group for courses with no school year ("Other"
+        /// until renamed). Year groups are never renamed.
+        case referenceGroupRenamed = "reference group renamed"
+
+        /// A made group was removed: its name, and how many courses went
+        /// back to the groups their school years put them in. No course is
+        /// ever removed with it, and the line says so.
+        case referenceGroupRemoved = "reference group removed"
+
+        /// A reference course was moved to another group (Move to Group ▸):
+        /// the code it shows, its folder, and the group it came from and went
+        /// to, by name. Nothing on disk moved, which is why only this line
+        /// can say where a course went.
+        case referenceCourseMovedToAGroup = "reference course moved to a group"
+
+        /// A group change the teacher asked for did not happen: what was
+        /// asked and the sentence they read (a name already taken, a clash
+        /// with another course of the same code, or the arrangement could not
+        /// be read or saved). Also written when an arriving course's group
+        /// could not be recorded.
+        case referenceGroupsNotChanged = "reference groups not changed"
+
+        /// The teacher started the shelf's groups again because their
+        /// arrangement could not be read (Start the Groups Again…). Carries
+        /// the name the unreadable copy was kept under beside it, which is
+        /// the way back to whatever it held. Never what it held.
+        case referenceGroupsStartedAgain = "reference groups started again"
 
         /// Backups were deleted — one from the sidebar, or several from All
         /// Backups (#242). Carries the course code or codes, how many, what
@@ -1003,6 +1068,15 @@ nonisolated enum ActivityTrail {
         /// record). Recorded because a deploy that went out half an hour late,
         /// or not at all, looks from outside exactly like one that misfired.
         case scheduledDeployWaitedForItsEarlierDeploy = "scheduled deploy waited for its earlier deploy"
+        /// A scheduled deploy brought its working folder's launchers and
+        /// tools up to date before it ran them (#748 part 4), so the first
+        /// deploy after an update builds with the version installed now.
+        /// Carries the course, the section, how many files changed and how
+        /// long it took, whether that means the website builder is built
+        /// again, how long it waited for another program's copy, or that it
+        /// could not finish and went ahead with the tools as they were.
+        /// Never written for the ordinary run that finds nothing to do.
+        case scheduledDeployGotItsFolderReady = "scheduled deploy got its folder ready"
         /// A section's deploy set for later was set again while that
         /// section's run was still working (GitHub #439, #409). Setting it
         /// again ends the run's app, but the deploy it had started goes on and

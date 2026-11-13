@@ -40,6 +40,12 @@ enum WindowFolderMemory {
         var referenceExpanded: Bool = false
         var expandedReferenceYears: [Int] = []
 
+        /// The groups the teacher MADE on the shelf that are folded open, by
+        /// their id in the shelf's arrangement (#572, third piece). A key of
+        /// its own beside the years, so an entry written before groups reads
+        /// exactly as it did: no made group open.
+        var expandedReferenceGroups: [String] = []
+
         /// The selected course, section, or archived item, in
         /// `SidebarSelection`'s storage form; empty for none.
         var selection: String = ""
@@ -170,6 +176,8 @@ enum WindowFolderMemory {
                 "backups": entry.backupsExpanded ? "1" : "0",
                 "reference": entry.referenceExpanded ? "1" : "0",
                 "referenceYears": WindowFolderMemory.joined(entry.expandedReferenceYears),
+                // A group id is `g-` and hex digits, so it never holds a comma.
+                "referenceGroups": entry.expandedReferenceGroups.sorted().joined(separator: ","),
                 "selection": entry.selection,
                 "bookmark": entry.bookmark?.base64EncodedString() ?? "",
             ])
@@ -197,6 +205,18 @@ enum WindowFolderMemory {
             if let year = Int(piece) {
                 result.append(year)
             }
+        }
+        return result
+    }
+
+    /// The made groups' ids as stored; an absent or empty key is none.
+    static func groupIDs(_ stored: String?) -> [String] {
+        guard let stored, !stored.isEmpty else {
+            return []
+        }
+        var result: [String] = []
+        for piece in stored.components(separatedBy: ",") where !piece.isEmpty {
+            result.append(piece)
         }
         return result
     }
@@ -238,6 +258,7 @@ enum WindowFolderMemory {
                         backupsExpanded: pair["backups"] == "1",
                         referenceExpanded: pair["reference"] == "1",
                         expandedReferenceYears: WindowFolderMemory.years(pair["referenceYears"]),
+                        expandedReferenceGroups: WindowFolderMemory.groupIDs(pair["referenceGroups"]),
                         selection: pair["selection"] ?? "",
                         bookmark: WindowFolderMemory.bookmark(fromStored: pair["bookmark"])
                     ))

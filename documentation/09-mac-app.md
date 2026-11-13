@@ -4861,8 +4861,9 @@ unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 Three skills help a teacher with assessment: `plantoir-test-authoring`
 (#751) writes a unit test and the kit to mark it from, `plantoir-marking`
-(#750) marks papers onto feedback sheets, and a third drafts report
-comments (#752). Neither app reads or writes any file they make. Each
+(#750) marks papers onto feedback sheets, and `plantoir-report-comments`
+(#752) drafts report card comments from the marking. Neither app reads or
+writes any file they make. Each
 reaches a working folder as every skill does, and the contract is
 `shared-rules.json` → `assessment`. This subsection was started by #751;
 #750 and #752 add theirs below.
@@ -5281,7 +5282,10 @@ the trail, because it would be student data.
   path) to `Quarantine/`, counting both. Since the 750a review (H3) it
   tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
   a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
-  and XMP; it reports read and clean, moved, and NOT checked by kind, and
+  and XMP; it reports read and holding none of the forms of the table's
+  names (it said "read and clean" until the 752 review, H1; its last line
+  says a nickname or a name not in the table cannot be seen), moved, and
+  NOT checked by kind, and
   exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
   file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
   name were "checked, 0 held a name", and a folder named by a name stayed
@@ -5311,7 +5315,9 @@ the trail, because it would be student data.
   direction. Must-fails: a runner that passes every line, or passes
   stderr through, lets the invented names out (`test_marking_guard.py`).
 - **The named step (review H2, M3).** `make_named_copies.py` is the only
-  script that puts a name into anything: the TeX-escaped name into each
+  script that puts a name into anything (since #752 the first names into
+  report comments as well: "The report-comments skill" below): the
+  TeX-escaped name into each
   sheet's one `\studentline{}`, compiled in a temporary folder outside both
   folders with its output captured and thrown away, never `--keep-logs`,
   the PDF alone moved into `Named/`. MEASURED (tectonic 0.17.0): a failed
@@ -5360,6 +5366,200 @@ the trail, because it would be student data.
 NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
 Codex) marking invented scanned papers, which the plan makes the gate that
 matters; it needs the screen-free Mac and is written up for the director.
+
+**The report-comments skill (#752).** The tenth skill,
+`plantoir-report-comments`, drafts report card comments from what
+`plantoir-marking` wrote: three options per student, each complete, so the
+teacher picks or blends. It has a `SKILL.md` and one reference, and no
+scripts of its own: the names go in through `plantoir-marking`'s
+`make_named_copies.py`, which gained three modes, run through the same
+never-adapted runner (`assessment.agentGuidance.reportCommentsSkill.uses`).
+Russell's kit had a separate comments script; REJECTED: a second name
+script, because two copies of the name step drift.
+
+- **What a comment is drawn from.** The marks records of tests marked from
+  scanned papers (`summary`, `strengths`, `focus`, `closing`, `byQuestion`,
+  each point's `studentNote`), the kit and the rulings, once the marks are
+  final; evidence from the records only. No skill marks a coding assignment
+  yet (750b is not built), so the skill says plainly that there is no record
+  of one. It drafts about something no record holds only from the teacher's
+  own notes, written by identifier in `Teacher Notes.md` and read only
+  after `make_named_copies.py --check-file` (through the runner) finds no
+  word of the mapping table in them. That check prints line numbers, never
+  the words, and counts EVERY part of two letters or more on its own,
+  surnames too, as the runner does, because it decides what the assistant
+  may read. It never calls a file clean: when it finds nothing it says what
+  it looked for, and that a nickname, initials or a name not in the table
+  cannot be seen by it, so the teacher reads the notes once first. MEASURED
+  by the implementation review (H1): with the first rule (a short part only
+  beside another part of its name), notes reading "Student A: Ixo led the
+  group project well." were reported clean, exit 0, and would have been read
+  and sent to the AI service; a three-letter first name is common.
+- **Whose shape.** The teacher's How I Teach page first, then the school's
+  own report convention, ASKED: the limit and whether the system counts
+  characters or bytes, line breaks, who the comment speaks about and in what
+  tense, the parts, words required or avoided; recorded in `Marking
+  Settings.md`. Russell's shape (formal, past tense, did well, still
+  working on, one next step, written for a parent as well as the student,
+  450 characters) is in `reference/template.md` as the comment shape of the
+  named template, offered with it only to a teacher who has shown the
+  interest it bridges, and shown to anyone else only as one teacher's
+  example when they have no convention and ask for a suggestion (plan review
+  L5). REJECTED: his shape as the default, since report conventions belong
+  to the school or board. Fixed for everyone: three options, kind, plain
+  words, evidence only, within the limit after the names go in, and a
+  separate reviewer checking each option against the records it cites.
+- **Names, and why no pronouns by default.** Drafts write `{first name}` and
+  are written so that no pronoun is needed. The assistant never asks for,
+  guesses or holds a pronoun or gender. Russell's kit had a `gender` column
+  on the assistant's side of its comment rows; REJECTED, because the
+  assistant does not know them and must not hold them. Only when the
+  teacher says the table has a `pronouns` column may a draft use `{they}`,
+  `{them}`, `{their}`, `{theirs}` (capitalised at a sentence's start),
+  filled from that column (`she/her`, `he/him`, `they/them`, the same with a
+  third word such as `she/her/hers`, or four words); a pronoun placeholder
+  with no column, or with an empty value, refuses the run. After `{they}`
+  or `{They}` only an ALLOW-list is accepted: can, could, will, would,
+  should, might, must, may, did, had, a past tense in -ed (need, proceed
+  and their like excluded) or a short list of irregular past forms, with
+  adverbs skipped; anything else, or anything glued to the placeholder, is
+  REFUSED at the draft, by word number, whatever the table holds. MEASURED
+  by the reviews: with they/them the first version wrote "They was proud of
+  their work, and they is improving." (M2), and the deny-list of auxiliaries
+  that fixed it still wrote "They explains" and "They always was careful"
+  (fix review M2); under a present-tense convention every verb after
+  `{they}` changes, so the skill steers such a teacher to `{first name}`.
+  REJECTED: conjugating the verb at the fill, because a refusal can be
+  proved by cases and a conjugator for every verb cannot. The first name is the `first name` column, else the part after the
+  comma of "Last, First", and otherwise refused, never guessed from a name
+  with no comma.
+- **A name in a draft.** `--comments` refuses the whole run, writing
+  nothing, when a draft already holds a word from the table before the
+  names go in: in an option (named by option and word number, never the
+  word), in another field of the student's entry such as `cites`, or on a
+  line of `Comments - Drafts.md` beside it. **The comparison is ONE block of
+  code** ("The name comparison", between `# >>>` and `# <<<` markers),
+  carried byte for byte in `run_with_names.py` and `make_named_copies.py`,
+  so the runner, `--check-file` and `--comments` give the same answer on
+  every line; `scripts/test_marking_comments.py` fails if the two copies
+  differ, and runs all three over one corpus of 31 lines, failing on any
+  disagreement. MEASURED by the fix review (H1): before, they disagreed on
+  7 of 22 lines in both directions (the runner passed `Ixo2`, `Ixo_notes`
+  and `Mark_feedback.pdf`, because `\w+` counts `_` and digits as letters;
+  the scripts passed a preferred name and a first name run into a surname,
+  because they read two columns where the runner reads five), and the
+  runner left `Ixo_feedback.txt` and `TestpartFeedback.txt` in the marking
+  folder while saying no word was found. The block reads the name, first
+  name, preferred name, last name, surname, e-mail, handle and repository
+  columns, compares case and accents off, counts every part of two letters
+  or more as a whole word (a short part on its own too), every form of six
+  letters or more anywhere, and finds whole words three ways: as `\w+`, as
+  runs of letters, and split where a small letter meets a capital
+  (`AnaLi`). REJECTED: a short part counted only beside another part of its
+  name, which let "{first name} and Ixo compared answers" into another
+  child's comment (review H1); a missed name is worse than a false alarm.
+  So an everyday word that is also a name (May, Will, Mark) is refused, and
+  every refusal says it may be one: a draft is rewritten without it, and a
+  teacher's note is read by the teacher, who changes the line or says to go
+  on by its number. Measured by the fix review on a table of fourteen such
+  names against eighteen ordinary sentences: 10 of 18 refused; a real class
+  holds one to three. No line says or implies that no name is present:
+  `--check-file`'s line when it finds nothing says it looked for the forms
+  of the N names in the table and found none of THEM, and that a nickname,
+  initials or a name not in the table cannot be seen. A printed line holding
+  an everyday word that is a name in the table is withheld by the runner,
+  so the scripts' own lines avoid them ("could", not "may"; "I do not open
+  them", not "will not"). It also refuses a `cites` entry that is not that
+  student's own marks record inside this marking folder: relative, no `..`,
+  exactly `<Assessment>/Marks/Section N/<identifier>.json`, and there.
+  MEASURED by the reviews: Student A's comment citing Student AA's record,
+  or Section 2's Student A drafted under Section 1, was written with exit 0
+  (M1), and then another course's record through `..`, a full path, and any
+  file called `Teacher Notes.md` were accepted (fix review L1). A comment
+  drawn from the teacher's notes says so with `"teacherNotes": true`. This is what catches a comment that quotes a student's work
+  holding their own or a classmate's name. The runner cannot, because the
+  drafts existed before the run and it looks only at what a run writes in
+  the marking folder. An everyday word that is also a name (May, Will) is
+  refused too, the safe direction; the skill says to rewrite the option
+  without it.
+- **Why the length is checked after the names go in.** `{first name}` is 12
+  characters, so a draft that fits can be over with a long name in it, and
+  one that looks over can fit with a short one; only the filled text counts.
+  It is counted in Unicode characters of the NFC text, or UTF-8 bytes with
+  `--count bytes`, because report systems differ and a system that counts
+  bytes counts an accented letter as two (a web form counting UTF-16 units
+  counts some emoji as two, and a line break is one or two: the skill names
+  both when it asks). MEASURED (`commentNames.cases`, 42, and `checkFileCases`, 6, every comment
+  typed and counted by hand; the invented names are made-up words such as
+  Qoë and Ixo, so the name check before a merge does not meet a real given
+  name): `Qoë` is 3 characters and 4 bytes; a table that holds it decomposed (e and a combining diaeresis)
+  counts 3 only after NFC; a 47-character draft for a 14-letter first name
+  is 2 over a limit of 47. `--longest-first-name` prints the longest first
+  name's length in characters and bytes for the budget, never the name. A
+  comment over the limit is still written, marked "OVER THE LIMIT by N" in
+  the teacher's files, and named by identifier and option; the run exits 1.
+  The line saying every comment is within the limit is printed only after
+  each was counted. `Report Comments.csv` is UTF-8 with a byte order mark
+  so a spreadsheet opens the accents; it and `Report Comments.md` go only
+  into the teacher-only folder that holds the mapping table (review L1: any
+  folder outside the marking folder was taken, and the line saying where the
+  names went was printed regardless), with the full name beside the
+  identifier for finding each student in the report system. A refused run
+  renames an earlier run's files "earlier run, do not use" (L2), and the
+  run names, by identifier, any student of a drafted section the drafts
+  left out (L4).
+- **Python 3.9.** MEASURED by the review (H2): `/usr/bin/python3` on macOS
+  is 3.9.6, and `Path.write_text(newline=)` is 3.10, so `--comments`
+  crashed there and the self-test, which the marking skill makes a gate,
+  failed, blocking 750a's named sheets too. The file is now written with
+  `open(..., newline="")`; every `--self-test` of both skills, and every
+  marking test, passes on 3.9.6 and 3.14.4, and a test compiles every
+  shipped `.py` of every skill under `/usr/bin/python3` and runs each
+  `--self-test` there (it skips where that Python is not installed).
+- **Tests.** `scripts/test_marking_comments.py` runs every case directly and
+  through the runner (which must withhold no line and move nothing), checks
+  that no word of the table is printed and nothing new is in the marking
+  folder, and checks the skill's files and pins. Must-fails by copy and
+  restore, each red: counting bytes when no count is given (5 cases), the
+  draft counted before the names go in (8), no look for a name in a draft
+  (the two quoting cases), NFC dropped at both the table read and the
+  filled comment (the decomposed case; dropping either alone stays green,
+  because each covers the other), a pronoun filled with no column, the
+  drafts page not looked at, an over-limit line carrying the name (directly
+  and through the runner), the marking skill without
+  `make_named_copies.py`, and a pinned sentence taken out. After the fix
+  review, each red too: the runner's copy of the block changed alone (the
+  one-block test and the agreement test), both copies back to `\w+` words
+  only, both without the preferred name column, both without long parts
+  matched inside a word, a deny-list in place of the allow-list, a cite
+  accepted when its record is not there or when it climbs out through
+  `..`, the everyday-word sentence dropped from `--check-file`, a "clean"
+  line, and `write_text(newline=)` under `/usr/bin/python3`. The narrow
+  regex guard for 3.10-only features is gone: a test compiles every shipped
+  `.py` of every skill under `/usr/bin/python3` and runs each `--self-test`
+  there (the fix review found the guard missed `int | None`, `except*`,
+  `itertools.pairwise` and more). After the
+  implementation review, each red as well: the beside rule for every short
+  part (the two classmate cases, and three of the four `checkFileCases`),
+  a short surname alone not counted by `--check-file`, the old "clean"
+  line, `write_text(newline=)` (the source guard, and the self-test on
+  `/usr/bin/python3`), `cites` not checked, the verb check removed,
+  three-word pronouns refused, `--out` anywhere, the earlier run left in
+  place, the left-out students not named, and each of seven privacy and
+  refusal sentences the review found unpinned, taken out one at a time.
+  `--self-test`
+  now tests the comments always and the named sheets only where tectonic
+  and pdftotext are installed, saying which. Before, a missing tectonic
+  failed it outright, which would have stopped a teacher who only wants
+  comments.
+- **How a teacher finds out.** `plantoir-marking` mentions it once when the
+  marks are final; the root `CLAUDE.md` and `AGENTS.md` name it in one
+  bullet each; it offers nothing after itself, being the last step. Nothing
+  on plantoir.app, no new app text, no trail event (the app does nothing
+  new, and work on student records is never recorded).
+
+NOT MEASURED in this piece: a trial with a real assistant drafting comments
+from invented marks records; it is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
@@ -8165,6 +8365,10 @@ course in it does no work at all.
   no attempts — and the view drew the button anyway, so pressing it said
   *"That is already put right. Nothing needed changing."* about a folder that
   was really missing. The findings still report; the action is gone.
+- **Replacing the whole course is offered, after a warning and a checked
+  backup**, beside the shelf rule's refusal at three doors (#572); see
+  "Replacing a reference course (#572)". The old course is renamed aside
+  locked and removed only after the new one is in place.
 - **Removing one SECTION is refused**, with `ReferenceWording.staysAsItIs` —
   removing a section changes the course, so "frozen" already requires it. The
   sidebar does not offer the item; the refusal exists so no other caller gets
@@ -8561,7 +8765,10 @@ inside `courses/` — and is marked, filed under its year, neutralised and
 locked THERE. The last act is a rename into the real name, which within one
 folder is atomic. Every way of making a reference course does this: Keep a
 Copy, this import, and since #572 a course made in the wizard ("Making a
-reference course from nothing, or from a backup", below).
+reference course from nothing, or from a backup", below). A replace (#572,
+"Replacing a reference course", below) uses a second hidden name,
+`.plantoir-replacing-<folder>`, for the OLD course while the new one is
+renamed in; its own sweep puts the old course back rather than removing it.
 
 **The fault it closes was measured.** Until 2026-09-20 the copy was made at
 its final name, so for the length of the copy `courses/ICS4U-2025/` held last
@@ -9569,6 +9776,353 @@ their release in `makeIntoAReferenceCourse` (plan review M4).
   in for a free-space check** (above).
 - **Stopping the setup inside the website builder on Cancel** (below).
 - **Offering the choice for a code with no ready-made pages** (above).
+
+### Replacing a reference course (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's second piece says. Every rule is a case in `contracts/shared-rules.json` → `referenceCourses.replacing`; nothing here is shared code.
+
+Where the shelf rule refuses a second course of one code in one group ("You
+already have a ICS3U kept for reference from 2025–26"), a **Replace It…**
+button sits beside the sentence. It is offered at three doors and nowhere
+else: the New Course wizard with Keep this course for reference on, Keep a
+Copy for Reference…, and an import of ONE course (a folder or a backup or
+archive zip). A refused row in an import of several keeps its sentence (plan
+review M6). Set School Year… never offers it, because a clash there is two
+real courses; nor does the assistant, which has no tool for it.
+
+Replace It… first asks whether the course can be replaced at all (it must be
+a reference course, not previewing or being copied, and not open in
+Obsidian), and says why not where the door says its other problems. Then the
+warning: title `wording.title`, body `wording.body`, which gives the
+sections, pages and size, the day the folder was made, the name the backup
+will have in Backups (the folder's), and that restoring that backup puts the
+old course back in place of the new one (plan review M9). Cancel is the
+default button. Composed by `ReferenceReplacer.offer`; the alert is the
+shared `ReplaceReferenceCourseAlert`.
+
+**The order is the design.** `ReferenceReplacer.replace`:
+
+0. The door makes the new course FIRST, exactly as it would with nothing in
+   the way, under the hidden staging name of the OLD folder
+   (`.plantoir-importing-ICS3U-2025`), claimed and leased. A failed setup,
+   copy or import therefore costs the old course nothing, and the claim on
+   the old folder's name is what refuses a second replace of the same course
+   (`twoAtOnce`).
+1. Refuse anything that is not a reference course directly inside `courses/`,
+   read from DISK (`courseOnTheShelf`), a busy course (a Copy a Page pass
+   reading from it counts, through `PageCopySourceReads`, implementation
+   review L3; it makes nothing else wait), and a course Obsidian holds
+   (below). An aside folder of that name already there refuses too. The LIVE course of the same code is refused like anything
+   else; a test takes the guard out and watches the live course be backed up
+   and swapped, which is what it is there for.
+2. Back it up: `CourseArchiver.backUpCourse(madeBy: .teacher)`. From here to
+   the end the course counts as being copied (`CourseActivity.beginCopy`), so
+   no removal, restore, backup or preview starts on it.
+3. Check the backup (plan review M3, `backupCheck`): its listing must name
+   every file of the course on disk, compared in NFC. Only `.DS_Store`, the
+   top-level `.merged_output` (a teacher's own one deeper down counts) and
+   Plantoir's own Obsidian add-on folders may be missing. **The listing takes
+   two tools** (implementation review H1, measured): macOS's `zipinfo` 3.00
+   prints every byte outside ASCII as `?` under every locale, so the first
+   version refused every course with `Thème`, `Canada’s` or `y = x²` in a
+   page's name (7 names in 6 of the 39 payloads, MPM2D among them); `tar -tf`
+   under `LC_ALL=en_US.UTF-8` spells the names as stored but listed a zip cut
+   to 300 bytes as whole. So `zipinfo -1` must exit 0, the names are `tar`'s,
+   and the two counts must agree. Proved with real backups of pages carrying
+   the contract's `realNames`, and with an empty and a cut zip.
+   Every other name the archiver leaves out (`build`, `out`, `dist`,
+   `node_modules`…) fails the check, because a course an older Plantoir or
+   Windows made can hold a teacher's own folder of that name. Measured: a
+   reference course with `build/Notes.md` backs up without it and is refused.
+   That backup is KEPT and SAID: `wording.backupIsIncomplete` tells the
+   teacher the course is as it was, that the backup is in Backups under the
+   folder's name without those files, and what they can do (implementation
+   review M1). Removing it was rejected: it holds most of the course, and it
+   would be a delete on a failure path. The trail gives the backup's file
+   name and a COUNT of the files it lacks, never their names, which are page
+   titles (L6). A zip that fails gives only its exit code, for the same
+   reason.
+4. Ask (1) again: the backup takes time (9.7 s for a 467 MB course, measured
+   for #351).
+5. Rename the old course aside to `.plantoir-replacing-ICS3U-2025`.
+6. Rename the new course to `ICS3U-2025`. If that fails, the old course is
+   renamed back BEFORE the staged one is removed (`couldNotReplace`); if that
+   fails too, `couldNotPutBackYet`, and the next reading puts it back.
+7. Remove the aside folder, unlocked first, and the built site.
+
+Nothing on a failure path deletes the old course. Every case, with the steps
+run and what is on disk afterwards, is `sequence.cases`, and
+`ReferenceReplacerTests` runs them on real folders through the seams in
+`ReferenceReplacer.World`, failing one step at a time.
+
+**Why the replacement takes the old folder name** (the plan's Q6): Restore
+from Backup on the backup made in step 2 is then the ordinary in-place
+restore. It archives the replacement and puts the old course back, locked
+again from its marker. Measured end to end in
+`testKeepACopyReplacesAndRestoreBringsTheOldOneBack`. A new folder name would
+land the restored course beside the new one in one group, which the shelf
+rule forbids. One consequence to leave alone (plan review L7): a replacement
+can sit in `ICS3U-2025` holding a different `reference_school_year` once
+groups exist; identity is the folder.
+
+**Obsidian** (plan review M2). The swap renames the folder, and Obsidian's
+watcher is anchored to it, so the act refuses while the course is open,
+or cannot tell, by #742's open-state rule (`openStateCases`), or while a
+vault INSIDE it is open (`openVaultWouldBeStranded`). A vault that contains
+the course (the whole `courses` folder) is not affected. `obsidianCases`.
+
+**A quit part way** (plan review M1). `ReferenceReplacer.sweepLeftovers`
+runs at the top of `reloadCourses`, BEFORE the folder is listed, so a course
+put back is in that reading's list. For each `.plantoir-replacing-<OLD>`
+nobody is still replacing: `<OLD>` free → renamed BACK; `<OLD>` a course and
+a backup in `_backups/<OLD>/` that is OPENED and found to hold every file of
+the old copy → removed; otherwise → left alone. A file merely named like a
+backup is not trusted (implementation review L1). The check runs `zipinfo`
+and `tar` on the main actor, for a leftover only, so an ordinary reading of a
+folder runs neither. Only the
+whole prefix, dash included, is touched (`sweepCases`, with three look-alike
+teacher folders). The staged new course is the staging sweep's, as before.
+Windows' discovery skips dot-folders, so a leftover from a mac crash is
+hidden there until a mac of this version opens the folder.
+
+**Every whole-course restore now leaves a line**, "course restored from a
+backup" (`WorkspaceModel.restoredTrailLine`), live or reference, after the
+restore has happened, and so does a whole course put back from Archived
+(`restoredFromArchivedTrailLine`, implementation review L5), which is how
+the replacement a restore archived comes back. Until #572 only a section's
+restore did.
+
+**Keep a Copy asks the shelf rule again when Replace is pressed**, as the
+wizard and the import already did (L4): if another window re-filed the old
+course meanwhile, `wording.notTheCourseInTheWay` is said and nothing is
+made or backed up.
+
+The replacement takes the replaced course's folder name and so keeps its
+group, a group the teacher made included (#572's third piece; "Groups on the
+reference shelf" below), and the warning names that group.
+
+Trail: "reference course replaced", "reference course could not be
+replaced", "unfinished replace of a reference course put right", "course
+restored from a backup". The door's own line ("created … for reference",
+"kept a copy …", "imported …") is written as well.
+
+#### Rejected
+
+- **A Restore from Backup submenu on the shelf row** (plan review M7):
+  Backups already has the door.
+- **Several ticked rows and one alert at Import** (M6).
+- **A new backup suffix such as `_replaced`.** Windows would not list a name
+  it cannot parse, so the backup would be invisible in the one place it must
+  be found.
+- **Removing the old course first.** A moment with neither.
+- **Emptying the old folder and moving the new contents in**, which would keep
+  Obsidian's vault anchored. That is many moves instead of one rename, and a
+  half-old, half-new course if one failed. Refusing while Obsidian holds the
+  course is the safer answer.
+- **Finishing an unfinished replace with the staged course on the next
+  launch.** It was never checked again; putting the old course back cannot
+  lose anything.
+- **Checking the backup by unpacking it.** Twice the time, and the listing
+  answers the question asked.
+
+### Groups on the reference shelf (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's third piece says. Every rule is a case in `contracts/shared-rules.json` → `referenceCourses.groups` and the file is `contracts/file-formats.json` → `referenceShelf`; nothing here is shared code.
+
+A teacher can make groups of their own on the Reference Courses shelf
+("From colleagues", "Exemplars"), move a reference course into one, rename
+one, and remove one. Russell's ruling of 2026-11-12: **groups are flat; year
+groups keep their names; "Other" and groups the teacher makes can be
+renamed.**
+
+**Three kinds of group, one list** (`ReferenceShelf.groups`, pure, which the
+sidebar calls):
+
+- **Year groups**, derived from `reference_school_year` as before, named by the
+  year, never stored, never renamed, not drawn when empty.
+- **The no-year group**, derived the same way and not drawn when empty, whose
+  NAME is stored: "Other" until the teacher renames it.
+- **Made groups**, stored with an id and a name, drawn even when empty (the
+  teacher just made it), except while the filter field narrows the list.
+
+The order is years newest first, then made groups A to Z (Finder's comparison,
+so "Unit 2" comes before "Unit 10"), then the no-year group last. A course is
+in a made group only when the file places it there and that group exists;
+otherwise it is where its school year puts it. **So with no file the shelf is
+exactly the shelf before groups, and that is the whole migration.**
+`ReferenceShelfTests.testWithNoFileTheShelfIsTheShelfBeforeGroups` holds the
+new function to a copy of the one it replaced (`referenceYearGroups`), title
+for title and course for course, and from an empty or an unreadable file too.
+
+**Groups are a view.** No group act renames, moves, removes or writes into a
+course folder, and the move and remove tests compare every file under
+`courses/` byte for byte before and after. Remove Group never removes a
+course: its courses go back to their year groups or the no-year group. An
+empty group goes at once ("Remove Group", no question, since nothing is lost);
+one that holds courses is asked about first ("Remove Group…", saying where
+they go), and the removal is refused with `removeWouldClash` when one of its
+courses would land beside another course of the same code.
+
+**Where it is stored, and why there.** `courses/.internal/reference-shelf.json`
+(`ReferenceShelfStore`), beside `profile.json`, `timetable/` and `activity/`.
+The arrangement belongs to the working folder: a second Mac on the same folder
+in iCloud Drive sees the same groups. Not in each course's
+`course_config.json`, because a group exists with no course in it; not in the
+app's preferences, because two machines would then disagree about where every
+course is. It does NOT travel with a course's backup or archive, deliberately:
+those hold one course, and a group is the folder's. A backup restored where
+its course still is keeps the folder name, and so the group.
+
+| Who | Sees |
+|---|---|
+| Any window on this Mac | the same groups (a change is announced, and another window on the folder reads the file again); fold state stays per window |
+| Another Mac on the folder, this version | the same groups |
+| An older Plantoir, or Windows before it implements this | the year layout: a course in a made group shows under its year or Other. Nothing breaks |
+| A course's backup or archive | not its group |
+| The assistant | nothing new: no tool, no description moved (`test_tool_surface_digest.py` green) |
+
+**The file is the teacher's arrangement, so it is never written over by an app
+that could not read it.** Missing: the year layout, and the first change
+writes it. Unreadable (half synced, cut short, hand-edited): the year layout,
+and EVERY change is refused with `couldNotReadGroups`, which names the way
+out rather than saying "try again", since waiting does not help a hand-edited
+copy (implementation review M2). **The way out is Start the Groups Again…**,
+on the Reference Courses heading's menu only while the arrangement cannot be
+read, asked first (Cancel the default). It MOVES the unreadable file aside to
+`reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
+name is taken; never deleted, never written over), and the shelf is the year
+layout with every control working. A NEWER version's file is never moved by
+an older app: the heading's menu says so and offers nothing. Written by a newer
+Plantoir (`version` above 1): what is understood is drawn, and every change
+is refused with `arrangedByANewerPlantoir`. A key or an entry this version
+does not understand is written back as it was. A change that moves nothing
+leaves the file byte for byte as it is. Every change is read, decided and
+written under one exclusive `flock` on `courses/.internal`, taken by every
+window and every process (the MCP server is the app, run again), with the
+file read FRESH inside the lock and written atomically. Measured: twenty
+groups made at once from twenty concurrent tasks all land; with the lock taken
+out, 2 of the 20 did. Two Macs at the same moment through iCloud: the later
+write wins, which costs one move or one rename.
+
+**Placements are explicit (plan review H2), and this is the heart of the
+piece.** A placement is keyed on the course's FOLDER, its identity, and folder
+names are reused: `ReferenceCourseRule.proposedFolderName` gives the first
+free `CODE-YYYY`, so the name a removal frees is the name the next course of
+that code and year is given. A placement that outlived its course would file
+that stranger in the old course's group, where the shelf rule never looked,
+and two ICS3Us would sit in one group. So:
+
+- every door that lands a course writes its placement at the moment it lands,
+  BEFORE the course is visible: the wizard's chosen group, or none
+  (`ReferenceShelfStore.recordArrival`, called by `ReferenceCreation.finish`,
+  `ReferenceImporter.land`, `ReferenceCopier`'s copy, and `CourseRestorer`'s
+  archive restore and its restore of a backup whose course is gone);
+- Remove Course… forgets the placement (`CourseArchiver.archiveAndRemoveCourse`);
+- a replace KEEPS it, because the replacement takes the replaced course's
+  folder name, and so its group (`ReferenceReplacer` writes no placement, and a
+  scan holds it to that); a backup restored in place keeps it too;
+- every write drops a placement whose folder is not there, unless the hidden
+  folder of a replace or an import of that name is (`.plantoir-replacing-…`,
+  `.plantoir-importing-…`), so a change made in another window at that moment
+  does not take the course out of its group.
+
+A folder with no file gets no file from any of this: an arrival that clears a
+placement that was never there writes nothing. The residual, said so nobody
+chases it: a course removed OUTSIDE Plantoir (in Finder, or by an app that
+does not know the file) and a new course given its name by such an app before
+any change here is written would inherit the group. Any change made here
+afterwards drops nothing in that case, because the folder is there; Move to
+Group puts it right.
+
+**The shelf rule is by group.** `ReferenceCourseRule.Shelved` carries the made
+group a course is in, and `trouble(placing:in:named:among:ignoring:)` asks the
+target group, of any kind. A course in a made group is in no year group, so an
+ICS3U in "From colleagues" never blocks an ICS3U from 2025–26. The year
+sentences are unchanged; a made group's is `codeAlreadyInThatGroup`. Every
+door that lands a course by its year asks `trouble(placing:inYear:…)`
+unchanged and gets the right answer, because the year means the year group.
+The replace warning names a made group as its group, and the replacement keeps
+it.
+
+**Where it is offered.** New Group… on the Reference Courses heading's menu
+and inside every Move to Group submenu (it makes the group and moves that
+course in). Rename Group… on a made group's row and the no-year group's.
+Remove Group on a made group's row. **Move to Group ▸** on a reference
+course's row and in the Course menu after Set School Year…, so the keyboard
+reaches it through menu search (`subjectMenus` item `moveToGroup`, live where
+Set School Year is): the course's own year group (or the no-year group by its
+name) first, then every made group, the current one with a checkmark. The
+**Group picker** is in the New Course wizard's reference mode only (plan
+review M8), drawn only when a made group exists, "Its school year" first.
+Every other door lands by year; Move to Group does the rest. Set School Year…
+for a course in a made group changes the year its summary shows and leaves it
+where it is. The read-only summary shows the made group a course is in, by
+name. The year pickers in the wizard and in Set School Year… name the no-year
+choice as the shelf does, so a renamed "Other" reads the same in both places.
+Fold state of a made group is remembered by its id under a key of its own
+(`referenceGroups`), so a window remembered before groups restores as it did.
+Every menu item is a text label, so VoiceOver reads it, and the disclosure
+rows are the sidebar's own.
+
+**The name rule** (`groups.nameRule`): cleaned first by the SAME rule as a
+course's name (#780's `CourseName.cleaned`, `courseNameCharacters`), so the
+zero-width joiner an emoji needs and the non-joiner a Persian word needs are
+kept and the bidirectional overrides removed; then white space collapsed and
+trimmed (a pasted line break is a space). Foundation's `controlCharacters`,
+used at first, holds those joiners, and spacing them split "👩‍🏫" into two
+(implementation review M1). Then refused when empty, longer than 40
+characters, shaped like a school year at all (four digits, a dash, the next
+year's last two digits, so next year's "2027–28" too and not only today's
+offered years: review L3), or a name already on the shelf, compared with
+case, accents and width folded and every dash read as an en dash.
+
+**The trail** (rule 5): "reference group made", "reference group renamed",
+"reference group removed", "reference course moved to a group", "reference
+groups started again" (with the name the unreadable copy was kept under), and
+"reference groups not changed" for a press that was refused. A group's name is the
+teacher's own words, like a course or folder name, and goes in quoted; it
+passes through `LogRedactor` like every line, so a 40-character name that
+looks like a token is taken out. "course created for reference" gains the
+group the wizard put it in.
+
+**Measured, by the must-fail proofs** (each by copying the file aside,
+breaking one line, running the test, and putting the file back): the lock
+taken out, 2 groups of 20 landed; the shelf rule comparing only the year,
+"the same code in a made group and in a year group" was refused; made groups
+inserted before the years, both order cases with made groups failed; an
+unreadable file read as no file, the half-written case read as absent and the
+next change OVERWROTE it; Remove Course… without forgetting, the freed name
+kept the group; a replace that recorded an arrival, the replacement lost its
+group. After the implementation review: the old cleaning rule, the emoji,
+Persian and override cases failed; Start the Groups Again deleting instead of
+moving, the kept copy was missing; moving a newer version's file, the newer
+case failed; the duplicate-id entry left in place, removing "Kept" brought
+"Twice" back; the year shape limited to today's years, "2027–28" was
+allowed; Cancel without the default key, the structure test failed; each of
+import, Keep a Copy and a backup restored where its course is gone without
+`recordArrival`, its real test kept the stale group.
+
+#### Rejected
+
+- **Converting today's layout into a stored list on first open.** It writes a
+  file into every working folder on upgrade, and year labels stored as names
+  drift from `reference_school_year` the first time a year is set.
+- **The group in each course's `course_config.json`.** A group must exist
+  with no course in it.
+- **Keeping placements when a course is removed**, so a restore brings it back
+  into its group (the plan's first answer): the freed folder name goes to the
+  next course of that code and year, which would inherit the group (H2). A
+  removed course comes back by its year, like every arrival.
+- **Withholding Remove Group while the group holds a course** (the plan's first
+  answer): the teacher would move every course out by hand to get rid of a
+  group, when sending them back to their years is what removing it means.
+- **The Group picker at every door** (M8), **renamable year groups**,
+  **nested groups**, **hand ordering** and **drag and drop** (Russell,
+  2026-11-12, and the plan).
+- **An assistant tool for groups.** Not asked for, and a routing change.
+- **Pruning on READ.** A reader that wrote would make every window that opens
+  a folder a writer, on every Mac sharing it; placements are pruned only by a
+  change the teacher made.
 
 ## Copying a page from one course into another
 
@@ -11015,21 +11569,32 @@ folder ready after an update (#473)"), with the mac's differences named:**
   again at the next build rather than refused for ever with a sentence
   naming a File menu it has not got. And, like the quit, the server never
   leaves mid-copy: at the end of its input it waits for a running copy
-  before exiting (the fixes review's finding 1). **Not done on purpose:** a cross-process marker.
-  Windows wrote `toolchain-copying.<pid>` so one process could see another's
-  copy; the mac does not, because every file is written atomically from the
-  same bundle, so two copies at once write the same bytes and the worse
-  outcome is wasted work, not a broken recipe.
-- **The scheduled run is unchanged**: `ScheduledDeploy` starts its own
-  `Process`, never a `ScriptRunner`, and never mirrors; a `--stop`
-  (`PreviewStopper`) is its own process too, so neither meets the backstop
-  (finding 1). **Windows' run is no longer the same** (#477, 2026-10-15):
-  it waits for a live copy of the folder's tools and makes its own before it
-  builds, and its copies take turns, because two copies at once were
-  MEASURED to fail there with sharing violations (07 → "On Windows since
-  bundle 3: the scheduled run is Plantoir"). Whether the mac's run builds
-  from an out-of-date or half-copied `.toolchain/` after an update is a
-  `mac` issue.
+  before exiting (the fixes review's finding 1). **Not done on purpose
+  (until #748):** a cross-process marker. Windows wrote
+  `toolchain-copying.<pid>` so one process could see another's copy; the mac
+  did not, because every file is written atomically from the same bundle, so
+  two copies at once write the same bytes and the worse outcome is wasted
+  work, not a broken recipe. #748 MEASURED that and found it half right: the
+  bytes were right every time, but one of the two copies counted the files
+  the other had removed as FAILED, in every run after an update, and a
+  failed copy greys Preview and Deploy. The mac now writes Windows' marker
+  for every copy and counts a file already gone as done ("A scheduled deploy
+  brings its folder up to date first (#748 part 4)", below). Precisely: the
+  `.toolchain/` copy `ToolchainReadiness.ensure` starts off the main actor
+  and the scheduled run's copy write it; the launcher refresh, the
+  synchronous copy and `BuilderWarmUp` (its own folder) do not.
+- **The scheduled run was unchanged by #476**: `ScheduledDeploy` starts its
+  own `Process`, never a `ScriptRunner`; a `--stop` (`PreviewStopper`) is its
+  own process too, so neither meets the backstop (finding 1). It did not
+  mirror either, until #748 part 4 (2026-11-13): it now brings the folder's
+  launchers and `.toolchain/` up to date itself before its script runs,
+  waiting for another program's live copy first ("A scheduled deploy brings
+  its folder up to date first (#748 part 4)", below). Windows' run has done
+  the same since #477 (2026-10-15), with its copies taking turns because two
+  copies at once were MEASURED to fail there with sharing violations (07 →
+  "On Windows since bundle 3: the scheduled run is Plantoir"). That answers
+  the `mac` issue #535 asked: yes, the mac's run built from the folder's old
+  `.toolchain/` after an update, until #748.
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
   the synced-folder notice) appears only once the copy has actually written
   or removed its first file (`syncDirectory` says so once, for a write or a
@@ -11362,6 +11927,168 @@ known folders. The trap this paragraph used to
 name (its `ToolchainFingerprintTests` writing to the real `AppDataRoot`) had
 already been closed by #285's suite-wide redirect; `documentation/12-windows-app.md`
 → "Pruning the index (#735)" has the Windows details.
+
+### A scheduled deploy brings its folder up to date first (#748 part 4, 2026-11-13)
+
+**The gap.** The `--run-scheduled-deploy` process is this app's own binary,
+so it carries the version installed now, and since #323 it writes its
+wrapper afresh at the run. But the wrapper runs the FOLDER's `preview.sh`
+and `deploy.sh`, and those hash the folder's `.toolchain/` to choose the
+website builder. Only a window (`refreshLaunchersIfNeeded`), the assistant's
+server and `BuilderWarmUp` (its own folder) ever copied them. So after an
+update installed overnight, a 6:30 deploy in a folder nobody had opened
+since ran the launchers and the recipe of the version that last touched
+it, and so the old builder. It did not even rebuild the site: #746's stamp
+check is in those same old launchers, whose image matched the old stamp.
+
+**What the run does now** (`ScheduledRunFolderRefresh`, called from
+`runScheduled` on the branch that deploys): after the settings decision,
+holding the course's `build` and `publish` leases, and before the script
+runs, it
+
+1. waits while another program's copy into the folder is live (Windows'
+   `toolchain-copying.<pid>` marker, `ToolchainCopyMarker`);
+2. writes its own marker, replaces any launcher at the folder's top that
+   differs from the bundle's (`refreshLaunchersReporting`), mirrors
+   `.toolchain/` (`copyToolchainFiles`, the same function and fingerprints
+   the window uses, #663), and removes its marker;
+3. waits again, because a window opened during step 2 copies too, and its
+   copy must be over before anything hashes the recipe;
+4. writes `scheduled deploy got its folder ready` unless it changed nothing
+   and waited for nobody, which is every run but the first after an update.
+
+The two waits share one limit, five minutes from the first look, looking
+every second; then it goes ahead. It never mirrors from a bundle with no
+`Dockerfile` at its root, because the mirror deletes what its source lacks,
+and never writes into a folder with no `preview.sh`. A plist from before
+v1.2.0 names no section, so it has no folder to copy into and copies
+nothing, as it reads no settings.
+
+**It goes ahead in every case**, and that is the decision this piece had to
+make: `contracts/shared-rules.json` → `scheduledRunGetsItsFolderReady` has the
+table (14 cases) and the reasons (`whyItAlwaysGoesAhead`). A deploy that
+silently does not happen at 6:30 is the worst outcome; one that goes ahead
+with the tools as they were and says so is better. A copy that wrote nothing
+(a folder that cannot be written, no tools in the app) leaves the folder's
+old set whole, which is what every scheduled run used before this. A copy
+that failed part way leaves some files new; if the build then fails, the
+build leg records it (`scheduledPublishStopped`) and the notification says
+so. Windows stands down instead (#477), and the difference is recorded in
+`platformDifferences`: its failures were sharing violations on files the
+other copy had written correctly, which on the mac no longer count at all.
+
+**The guard, and what two copies at once actually do.** MEASURED on an Apple
+M4 Pro, macOS 26.6, 2026-11-13, with `copyToolchainFiles` and
+`refreshLaunchers` compiled standalone from this branch's source, two
+processes started at the same instant on the app's own recipe (13,023 files,
+83 MB) into one folder:
+
+| Shape | Runs | Runs with a failure reported | Folder at the end |
+|---|---|---|---|
+| After an update (91 files changed, removed or added; every file restamped) | 5 | 5 (18 or 19 files in one of the two) | right, byte for byte, every run |
+| Into an empty folder | 8 | 5 (1 or 2 files) | right every run |
+| Both, with a file already gone counted as done | 13 | 0 | right every run |
+
+Every failure was a removal of a file the other copy had removed first, or
+of the other copy's temporary file (`<name>.sb-…`, which Foundation's atomic
+write makes beside the file) after it had been renamed into place. So the
+mac's two writers are safe for the bytes, as #476 said, but not for the
+COUNT, and a failed count greys Preview and Deploy in the window. Since
+#748 `WorkspaceModel.removeStrayFile` treats a file that is not there as
+done. The marker is for the READER: the run is the one copier that goes
+straight on to build with nobody watching, so it is the one that waits.
+Two copies write it: the `.toolchain/` copy a window or the assistant's
+server starts off the main actor (`ToolchainReadiness.ensure`), which waits
+for nobody, and the run's own. The window's launcher refresh
+(`refreshLaunchersIfNeeded`, milliseconds), the synchronous copy
+(`initializeWorkspace` and the suite) and `BuilderWarmUp` (its own folder)
+do not write it; each writes whole files atomically, so a reader never sees
+half of one.
+
+**Two different versions of Plantoir copying at once** (the 748b review's
+LOW 1, measured by the reviewer: a new and an old bundle started together
+into one folder): both reported no failure and the folder ended MIXED in 3
+of 4 runs, 8 to 14 files from the older recipe. Nothing compares the folder
+with the bundle after the run's second wait, so the trail would still say
+it copied its files. It needs two copies of the app on one Mac, a plist
+whose saved path is a different copy from the one the teacher opens, or an
+assistant server started from one; and a job whose saved path is an OLDER
+copy of the app copies that older version's files over a newer folder.
+That is accepted: on `dev` before this piece the same older binary wrote its
+own wrapper and ran whatever launchers the folder had, so the folder's
+launchers and the wrapper could come from different versions on every run;
+now the run's launchers, recipe and wrapper come from one version, and the
+next window of the newer app mirrors the folder back (the image tag is a
+hash of the recipe, so a mixed recipe gets a builder of its own, never the
+newer version's).
+
+**A launcher is never half written when the wrapper runs it.** Every
+launcher and recipe file is written whole to a temporary file and moved
+into place. Measured under `/bin/bash` 3.2 with a script that sleeps
+between two `echo`s: replaced by a move while it ran, bash finished the OLD
+text; overwritten in place, bash went on reading the NEW file from the
+byte it had reached.
+
+**The cost when nothing is stale** (same Mac, same recipe, a single copy;
+an unrelated `verify.sh` was running for the first set): 0.84 to 0.86 s, and
+3.9 to 6.6 s at background priority (`taskpolicy -b`). After an update: 1.33
+to 1.47 s (3.9 to 6.1 s at background priority). Into an empty folder: 4.1
+to 4.7 s (10.6 to 14.3 s). Not measured under launchd itself, because no
+real job may be registered in this run; a job with no `ProcessType`, as
+ours is, runs as Standard, which should sit between the two.
+
+**What the first run after an update then costs.** Any change in
+`.toolchain/` changes the image tag, so the launchers build the website
+builder again unless this version has already built it (`BuilderWarmUp`
+does at the first launch of a new version, so a Mac that was used after the
+update has it). Measured with `setup.sh --prepare-builder` on the same Mac,
+the earlier version's layers cached: a change to a script copied near the
+end of the recipe, 6 s; to one copied half way through (before wrangler is
+installed), 25 s; to the first layer, so everything is rebuilt and
+downloaded, 70 s. Then #746's stamp check remakes the folder's workspace and
+builds the site again (32 s from scratch, measured by verify-deploy.sh; 07 →
+"`verify-deploy.sh` — the publishing harness"),
+and a stopped virtual machine adds 22 to 27 s (#312). So the first scheduled
+deploy after an update can take between a few seconds and about two minutes
+longer than the one before it, which is why the trail line says so.
+
+**Two sections of one course set for the same time take turns** (the
+review's LOW 2). They wait for each other on the course's leases
+(`waitForTheCourse`, ten minutes, looking every fifteen seconds), and the
+first now holds them through its copy (0.84 to 4.7 s measured above, up to
+14.3 s at background priority), any wait for another program's copy (up to
+five minutes) and, after an update, the builder built again (6 to 70 s) and
+the site rebuilt (about 32 s). The second section's own copy then finds
+nothing to change (0.85 s) and its builder is already built, so it adds
+only its own deploy. It stands down `courseWasBusy` only if the first takes
+more than ten minutes in all, which needs the five-minute wait used up as
+well; it was not measured end to end, for want of a real launchd job.
+
+**Rejected:**
+- **Standing down when the copy fails** (Windows' choice): it turns a copy
+  that did no harm into a deploy that publishes nothing.
+- **Waiting with no limit**: a stuck copy would hold the deploy for ever,
+  and the other copy writes the same bytes.
+- **"Open the folder once after an update" in the notes**: nobody reads them
+  at 6:30, and Russell ruled the part in.
+- **Rewriting every folder's tools at the first launch after an update**:
+  the app does not know every folder, and a folder opened then is mirrored
+  anyway.
+- **A kernel lock (`flock`)**: a second mechanism beside the marker Windows
+  already writes, whose liveness rule already ignores a marker left by a
+  program that is gone.
+- **The window taking turns with the run, as Windows' copies do**: measured
+  above, two copies at once on the mac write the same bytes once a file
+  already gone is not a failure, and a window must never wait on a run that
+  may itself be waiting for the course.
+- **A fresh event name for Windows to adopt**: Windows already records the
+  same facts on `working folder tools copied` and `scheduled publish waited
+  for the course`; the mac's event says something Windows' cannot (it went
+  ahead with the tools as they were), so it is `appliesOn: ["mac"]`.
+
+**Tests:** `ScheduledRunFolderRefreshTests` (the contract's cases, the
+sentences, real folders, the waits with a pretend clock, the marker, a stray
+file already gone, and where the call sits in `runScheduled`).
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 

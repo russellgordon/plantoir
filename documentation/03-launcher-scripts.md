@@ -1909,7 +1909,8 @@ setup_course.py inside the Docker container", and the diagnostic trio
   printed: it is derived from the folder's path, which the trail records.
 - **A folder still holding the old launchers** is harmless during the
   change: the app replaces a folder's launchers whenever it opens it
-  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and so does a scheduled
+  deploy before it runs them since #748 part 4; an old copy run some
   other way (an MCP-driven preview in a folder no window has reopened)
   only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
   it has seen, so it never stalls on the missing one.

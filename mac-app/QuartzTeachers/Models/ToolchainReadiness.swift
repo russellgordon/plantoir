@@ -17,10 +17,16 @@ import Foundation
 ///
 /// **What this registry cannot see** is another PROCESS copying into the
 /// same folder — `Plantoir --mcp-stdio` runs its own copy, and so does a
-/// second copy of the app. Windows wrote a `toolchain-copying.<pid>` marker
-/// for that; the mac does not, on purpose: every file is written atomically
-/// from the same bundle, so two copies at once write the same bytes and the
-/// worse outcome is wasted work, not a broken recipe.
+/// second copy of the app, and since #748 a scheduled run. Every file is
+/// written atomically from the same bundle, so two copies at once write the
+/// same bytes; since #748 a file the other copy removed first is not counted
+/// as a failure (measured: it was, in every run, `syncDirectory`). The copy
+/// this registry starts off the main actor also writes Windows'
+/// `toolchain-copying.<pid>` marker while it runs (the synchronous one does
+/// not)
+/// (`ToolchainCopyMarker`), and the one reader is the scheduled run, which
+/// builds straight after and so waits for any other live copy first. The
+/// window and the assistant's server do not wait for one another.
 @MainActor
 @Observable
 final class ToolchainReadiness {
@@ -139,6 +145,10 @@ final class ToolchainReadiness {
             return nil
         }
         let task: Task<Void, Never> = Task.detached(priority: .userInitiated) {
+            // Said for as long as the copy runs (#748), so a scheduled run
+            // that fires meanwhile waits for it before its launchers hash the
+            // recipe. Not in the synchronous path, which is the suite's.
+            let marker: URL? = ToolchainCopyMarker.write(inWorkingFolder: workspaceURL)
             let outcome: WorkspaceModel.MirrorOutcome = WorkspaceModel.copyToolchainFiles(
                 into: workspaceURL,
                 firstChange: {
@@ -147,6 +157,7 @@ final class ToolchainReadiness {
                     }
                 }
             )
+            ToolchainCopyMarker.remove(at: marker)
             await MainActor.run {
                 ToolchainReadiness.shared.apply(outcome, to: workspaceURL, startedAt: startedAt)
             }
