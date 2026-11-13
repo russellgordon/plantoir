@@ -215,6 +215,16 @@ working Deploy button. A folder deploy with no folder is refused by every
 shipped version, in sentences it already has —
 `MultiDestinationDeployRunner.refusalReason` and `ScheduledDeploy.problem`.
 
+**A course can begin life as a reference course** (#572): one made from the
+New Course wizard with "Keep this course for reference" has `kept_for_reference`,
+`reference_school_year` and the neutralised destination written into its file
+BEFORE setup runs, inside the apps' hidden staging folder, and setup keeps
+them because it keeps every key it does not own. So the file says reference
+course for the whole of the run, not only once it is on the shelf. Its
+`course_code` is the real code (`ICS3U`) while its folder carries the year
+(`ICS3U-2026`), as for every other reference course. The keys and their values
+are `shared-rules.json` → `referenceCourses.creating.settingsWritten`.
+
 Measured on a real previous-generation working folder (four courses,
 `/Users/…/Class Websites`, read-only): those configs carry **no
 `deploy_target` at all**, and an absent `deploy_target` reads as `netlify`
