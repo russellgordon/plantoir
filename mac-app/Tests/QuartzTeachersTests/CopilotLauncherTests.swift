@@ -410,32 +410,33 @@ final class CopilotLauncherTests: XCTestCase {
     /// and one character off it refuses that same binary (review M3): a
     /// requirement that refused everything would hide the door from every
     /// teacher and pass every refusal test. Skipped, saying so, on a Mac with
-    /// no GitHub Copilot installed.
+    /// no Homebrew cask of GitHub Copilot.
+    ///
+    /// Looks only in Homebrew's cask folders, never in the home folder: the
+    /// suite does not read the real home except where `RealHomeTripwireTests`
+    /// names it, and the cask is GitHub's own signed binary (the install
+    /// script's `~/.local/bin` copy is the same release, measured by hand).
     func testTheRequirementAcceptsGitHubsRealCopilot() throws {
         var installed: String? = nil
-        var places: [String] = [
-            "/opt/homebrew/bin/copilot",
-            "/usr/local/bin/copilot",
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/copilot").path,
-        ]
-        if let casks = try? FileManager.default.contentsOfDirectory(atPath: "/opt/homebrew/Caskroom/copilot-cli") {
-            for version in casks {
-                places.append("/opt/homebrew/Caskroom/copilot-cli/\(version)/copilot")
+        var places: [String] = []
+        for caskroom in ["/opt/homebrew/Caskroom/copilot-cli", "/usr/local/Caskroom/copilot-cli"] {
+            if let versions = try? FileManager.default.contentsOfDirectory(atPath: caskroom) {
+                for version in versions {
+                    places.append("\(caskroom)/\(version)/copilot")
+                }
             }
         }
         for place in places where installed == nil {
             let resolved: String = URL(fileURLWithPath: place).resolvingSymlinksInPath().path
-            // Only where GitHub's own installs put it: Homebrew's `copilot`
-            // formula is AWS's tool at the same link (review L1 of the fix
-            // round), and an npm install is not a signed program.
-            let isGitHubsInstall: Bool = resolved.contains("/Caskroom/copilot-cli/")
-                || resolved.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/").path)
-            if FileManager.default.isExecutableFile(atPath: resolved) && isGitHubsInstall {
+            // Only the cask, GitHub's own install: Homebrew's `copilot`
+            // formula is AWS's tool at the link `bin/copilot` (review L1 of
+            // the fix round), and an npm install is not a signed program.
+            if FileManager.default.isExecutableFile(atPath: resolved) && resolved.contains("/Caskroom/copilot-cli/") {
                 installed = resolved
             }
         }
         guard let binary = installed else {
-            throw XCTSkip("No signed GitHub Copilot on this Mac, so the requirement's acceptance cannot be shown here.")
+            throw XCTSkip("No Homebrew cask of GitHub Copilot on this Mac, so the requirement's acceptance cannot be shown here.")
         }
         XCTAssertTrue(CopilotLauncher.carriesGitHubsSignature(atPath: binary), "GitHub's own \(binary) was refused")
         let teamOneOff: String = CopilotLauncher.signatureRequirement

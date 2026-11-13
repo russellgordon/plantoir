@@ -539,7 +539,15 @@ final class DoorCourseHoldTests: XCTestCase {
     func testTheReviseCasesAreTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold"])
         let cases: [[String: Any]] = try XCTUnwrap(block["reviseCases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 9)
+        // Every door and the local item is asked about at least once; the
+        // count itself is the contract's, so a case added there is run here.
+        var itemsAsked: Set<String> = []
+        for item in cases {
+            if let asked = item["item"] as? String {
+                itemsAsked.insert(asked)
+            }
+        }
+        XCTAssertEqual(itemsAsked, ["claude", "codex", "copilot", "local"])
         let folder: String = "/folder"
         for item in cases {
             let name: String = item["name"] as? String ?? "?"

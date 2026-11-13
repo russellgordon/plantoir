@@ -539,7 +539,7 @@ final class FixWithAssistantTests: XCTestCase {
 
     /// #776: while the buttons cannot be pressed, each tells VoiceOver why
     /// (`fixWith.notEnabledHelp`), and while they can, it says nothing more.
-    /// Both buttons take the hint from the one rule, so neither can drift.
+    /// Every button takes the hint from the one rule, so none can drift.
     func testTheButtonsSayWhyOnlyWhileTheyCannotBePressed() throws {
         let fixWith: [String: Any] = try FixWithAssistantTests.fixWith()
         let sentence: String = try XCTUnwrap(fixWith["notEnabledHelp"] as? String)
@@ -549,7 +549,11 @@ final class FixWithAssistantTests: XCTestCase {
         let view: String = try FixWithAssistantTests.readSource("QuartzTeachers/Views/Section/ProblemsTableView.swift")
         let buttons: String = try FixWithAssistantTests.body(of: "var fixButtons: some View {", in: view)
         let hint: String = ".accessibilityHint(Text(FixWithAssistant.buttonHint(hasRows: handover.hasRows)))"
-        XCTAssertEqual(buttons.components(separatedBy: hint).count - 1, 2, "both buttons carry the hint")
+        XCTAssertEqual(
+            buttons.components(separatedBy: hint).count - 1,
+            FixWithAssistant.Assistant.allCases.count,
+            "every button carries the hint, one per door"
+        )
     }
 
     // MARK: - Helpers
