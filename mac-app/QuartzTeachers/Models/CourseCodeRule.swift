@@ -16,7 +16,7 @@ import Foundation
 /// when a section is set to publish on its own. Each of those has its own
 /// opinion about what characters it will carry. One narrow rule everywhere
 /// beats four that disagree at the edges.
-enum CourseCodeRule {
+nonisolated enum CourseCodeRule {
 
     // MARK: - Stored properties
 

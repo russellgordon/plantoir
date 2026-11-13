@@ -583,8 +583,13 @@ a folder destination and 3,000 extra pages, so the deploy's build took 32 s):
 on return the window read "No Preview Running" with Deploy enabled. A press
 during the deploy's BUILD leg was worse than the report: it started a second
 `preview.sh --build-only`, and the first deploy's build ended "failed (exit 1)
-after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counts a
-running `deploy.sh`, and the first deploy had not reached it yet. After the
+after 17.5s". The launcher's guard (`deployWhileItsSectionDeploys`) counted a
+running `deploy.sh`, and the first deploy had not reached it yet. (Since #729
+the guard also counts a deploy's build leg, which the app now runs as
+`preview.sh C S --build-only --for-deploy`, and any other `--build-only` of
+the section, so a second program's press during the build leg is refused by
+the launcher in words: [03](03-launcher-scripts.md) → "A section being
+deployed cannot be deployed again (#439)".) After the
 fix, the same steps showed the live progress with Cancel, Deploy greyed, one
 launcher start in total (the press and ⇧⌘D started nothing), and a deploy
 that finished while the teacher was on section 2 showed "Done" on return.
@@ -686,12 +691,12 @@ run exists.
 **Known limits.**
 - The windowless assistant's deploy runs on `AssistSiteWork`'s own runner, so
   a section selected meanwhile greys Deploy but shows nothing in the console.
-- Another PROGRAM's deploy (a deploy set for later, an outside assistant, a
-  command line) does not grey the button. Work leases are per course and on
-  disk, and nothing in the app watches them change, so a button greyed from
-  them would stay grey after that program had finished. A press then is
-  refused in words: by `claimAPublish` (`builtElsewhere`) when that program
-  holds leases, or by the launcher when it holds none.
+- Until #729, another PROGRAM's deploy (a deploy set for later, an outside
+  assistant, a command line) did not grey the button, because nothing in the
+  app watched the leases. Since #729 a program that holds leases greys it
+  ("Deploy waits for another program (#729)", next). A program that holds
+  none, such as a deploy typed in Terminal, still does not: a press then is
+  refused in words by the launcher.
 
 Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 
@@ -730,6 +735,174 @@ Must-fail, by copy-and-restore:
 
 `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
 a stub `deploy.sh` that counts its own starts. It is part of no gate.
+
+## Deploy waits for another program (#729)
+
+**What it closes.** #706 greyed Deploy while THIS app deployed a section. A
+deploy set for later, an outside assistant (`Plantoir --mcp-stdio`) or another
+copy of Plantoir left the button pressable, and the press was then refused in
+the "Cannot Deploy Yet" alert (`claimAPublish` → `builtElsewhere`). Russell's
+ruling on #729, 2026-11-12: watch the activity folder so Deploy greys and
+un-greys honestly, and measure what a folder watch can be trusted with before
+relying on it.
+
+**What a teacher sees.**
+- Deploy, Section ▸ Deploy… and ⇧⌘D are greyed on EVERY section of a course
+  another program holds, in this working folder. A lease names the course,
+  never the section, and a press on a sibling section is refused the same way.
+- The button's help and its VoiceOver hint are
+  `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
+  ready still wins (`folderReadinessReason`).
+- When the other program removes its lease, or its process ends, the button
+  is available again with no click.
+- Another program's PREVIEW greys it too, because a press is refused for one
+  (`WorkLeaseFiles.kindsThatBlockABuild` holds `preview` since #156). This is
+  why the sentence says "previewed or deployed" and promises that Deploy comes
+  back "once that preview is stopped": a preview does not finish by itself
+  (the plan review's M6).
+- An `assist` lease (an outside assistant revising, building nothing) does
+  not grey it.
+
+**The shape.**
+- `Models/LeaseWatcher.swift`:
+  - `LeaseWatcher` is `@MainActor @Observable`, one per working folder. It
+    holds `holdingElsewhere[COURSE]`: what `WorkLeaseFiles.blocking(among:
+    heldElsewhere, asker: .aBuild, claim: nil)` answers. That is exactly the
+    question `deployWillBeRefused` asks at the press, so the grey and the
+    refusal cannot disagree.
+  - `LeaseWatchers.shared` keeps one watcher per folder the app's WINDOWS
+    show. `WorkspaceModel.watchTheLeasesOfTheOpenFolders()` keeps it in step:
+    a window registering or leaving, and `pointAtFolder`. It is never called
+    under the unit-test suite, whose windows sit on pretend folders.
+- `SectionDetailView.deployIsAvailable` gained `heldElsewhere`, and
+  `deployHelp` chooses the help.
+
+**The events. No timer anywhere.**
+- A directory watch on EVERY level of the path that exists: `courses/`,
+  `courses/.internal` and `courses/.internal/activity/`
+  (`ScheduledPublishWatcher.changes`, the permitted GCD use). A change in
+  the activity folder is a re-read. A change at a level above it (a folder
+  made, removed, renamed or replaced) re-arms every level from the path as
+  it is now, then re-reads. A watch is on an open folder, not on a path, so
+  this is what lets it follow `.internal` being made alone first, removed
+  and made again, or renamed away and back. The first build watched only
+  the deepest level that existed and moved down only when the activity
+  folder itself appeared: the implementation review measured it deaf for
+  the rest of the session when `.internal` was made alone first (0 of 20),
+  and its proposed fix (move to the deepest level whenever a deeper one
+  appears) still missed `.internal` renamed away and replaced, which a
+  watch on the old, renamed folder never hears. The watcher CREATES nothing.
+  Creating `courses/.internal` again after something removed it could make
+  that program's own `mv` of a replacement folder fail, since a rename over
+  a folder that is not empty fails.
+- One `ProcessEnding.ends(of:)` per distinct holder's process id. This is
+  what un-greys the button when a holder is killed and leaves its lease
+  behind: the lease then reads as stale (`ProcessLiveness`), and no file
+  event will ever come.
+- `reread()` is also called:
+  - when the section appears;
+  - when the app becomes active;
+  - when a window becomes key;
+  - when the Mac wakes from sleep (`NSWorkspace.didWakeNotification`: an app
+    that was already active does not become active again on wake; the
+    review's L-b2);
+  - when the pointer enters the Deploy button.
+
+  These are the plan review's M4. A stuck grey is the harmful failure,
+  because a disabled button cannot be pressed, and these are the moments the
+  teacher reaches for Deploy. Each is also a chance to re-arm a folder watch
+  that went deaf. Re-arming is always caused by an event; the watch's own
+  last read does not re-arm, so a folder that cannot be opened cannot spin.
+
+**What was measured.** M4 Pro, 12 cores, macOS 26.6, APFS, 2026-11-13,
+re-run in full on the watcher as merged (every level watched). A
+standalone harness compiled the REAL `LeaseWatcher.swift`, `WorkLeaseFiles`,
+`ProcessLiveness` and `ProcessEnding`, plus `changes(at:watching:)` copied
+verbatim. It ran 40 trials each, with holders as real child processes writing
+their own leases.
+
+| Trial | Result |
+|---|---|
+| W1, a lease written with `Data.write(.atomic)` is listed, with a readable name line (the liveness check reads it) | 40/40, slowest 3 ms, exactly 1 folder event per write |
+| W2, the lease removed is cleared | 40/40, 3 ms, 1 event |
+| W3, the holder `kill -9`ed with its lease left on disk | `ProcessEnding` fired 40/40 (3 ms); cleared 40/40 at that read |
+| W4, a lease assembled beside the folder by `bash` and `mv`ed in (Windows' shape, and a future launcher lease's) | 40/40, slowest 24 ms, 1 event |
+| W5, no activity folder (nor `.internal`) at the start; the first lease makes both | listed 40/40 |
+| W6, W1 to W3 again beside 12 `yes` processes, one per core (#417's lesson) | 40/40 each, slowest 15, 20 and 30 ms |
+| W7, a lease naming pid 1 (root's launchd) with its real name and start | listed as held; the process watch armed and stayed silent: 0 re-reads in 2 s, so no spin |
+| W8, a lease written and removed within a few milliseconds | final state clear 40/40 |
+| W9, two holders, one leaves | still held by the other 40/40 |
+| W10, `.internal` removed while watched, then made again by a lease | re-armed and listed 40/40 |
+| W12, switching folders | 40/40 left no descriptor on the old folder (`lsof -p`) and no process watch (3 descriptors while watched, one per level) |
+| W13, `.internal` made alone (a token folder in it), 0.3 s later the first lease | 40/40 (0 of 20 before the fix, the review's R1) |
+| W14, `.internal` removed while watched, made again alone, then a lease | 40/40 (0 of 20 before the fix, the review's R5) |
+| W15, `.internal` renamed away while watched, then a lease into a new one | 40/40 |
+
+W11 (sleep and wake with a holder that ended during sleep) was NOT measured.
+An agent may not sleep the Mac. The process-exit event is queued by the
+kernel and delivered on wake, and the section re-reads on the wake
+notification.
+
+**Why no fallback.** Every pass bar was met, so the 2 s re-read the plan held
+in reserve was not built.
+
+**What is still not seen.**
+- A program that holds no lease: a deploy typed in Terminal, or a leftover
+  run (#439). The launcher's guard refuses its press in words, and #729's
+  first part widened what that guard sees ([03](03-launcher-scripts.md) → "A
+  section being deployed cannot be deployed again (#439)").
+- A holder run by another account (its `Plantoir`, say). W7 shows that a
+  watch on such a process arms without firing at once. That it fires when
+  such a process ends was NOT measured, because no other account's process
+  could be ended here. Liveness is `ProcessLiveness`'s, which errs towards
+  alive, so such a holder can keep Deploy grey until the next event re-reads.
+
+**Rejected.**
+- Reading the process table to grey the button. It needs a timer, since no
+  event says a process started; it runs `ps` per redraw or per interval; and
+  it would copy the launchers' awk into Swift.
+- Polling the folder on a timer. The events exist.
+- `FSEventStream` and `NSFilePresenter`, for `ScheduledPublishWatcher`'s
+  reasons.
+- Leases per section. That is a format both apps and #245's readers share,
+  for a case the press refuses anyway, because `claimAPublish` is per course.
+- A trail line per grey and un-grey (#729 question 3). It is a state, not an
+  act: a refused press is already on the trail.
+- `deploy.sh` taking a lease itself, so a deploy typed in Terminal greys the
+  button. It has real value and is a follow-up (#729 question 2). It touches
+  `ProcessLiveness` (a bash holder's name and start), `workLeases` on both
+  platforms and three launchers.
+- The watcher creating the activity folder (above).
+
+**Tests.**
+- `LeaseWatcherTests`:
+  - every `heldElsewhere` case, through `deployIsAvailable` and `deployHelp`,
+    against real files with `/bin/sleep` holders;
+  - a killed holder un-greys with no file event;
+  - a lease written and removed is seen both ways;
+  - the watch moves down when the activity folder appears;
+  - each order the folders can appear in: `.internal` made alone first;
+    both together; `.internal` removed and made again alone; the activity
+    folder removed and made again; `.internal` renamed away and back. On the
+    first build, three of these fail (alone first, removed then alone,
+    renamed); on the review's proposed fix, one does (renamed). "Both
+    together" and "the activity folder removed" passed on the first build
+    too, and are kept so a later change cannot break them;
+  - stopping lets go of every watch;
+  - the help is the contract's sentence.
+- `SectionRunsTests`: source scans of the button, the menu, the hint, the five
+  re-reads and `WorkspaceModel`'s three calls.
+- Must-fail, by copy-and-restore, each rebuilt and run:
+  - no process watches: 4 failures, including the killed-holder test and its
+    contract case;
+  - `deployIsAvailable` ignoring `heldElsewhere`: 5 failures, the five cases
+    that start greyed.
+- `QuartzTeachersUITests` has no test for this yet. It needs the screen;
+  Russell's hand test covers it, and must check two things no test here
+  can: that hovering over a greyed Deploy reaches `.onHover` on a disabled
+  button, with the window key and with it behind another (a breakpoint on
+  `LeaseWatcher.reread` in a Debug build shows it), and that VoiceOver reads the sentence ONCE: it is both the `.help` and the
+  `.accessibilityHint`, and if it is read twice the hint goes.
 
 ## A section's Problems tab, its marker and its alert (#717)
 
@@ -10005,6 +10178,10 @@ wizard and the import already did (L4): if another window re-filed the old
 course meanwhile, `wording.notTheCourseInTheWay` is said and nothing is
 made or backed up.
 
+The replacement takes the replaced course's folder name and so keeps its
+group, a group the teacher made included (#572's third piece; "Groups on the
+reference shelf" below), and the warning names that group.
+
 Trail: "reference course replaced", "reference course could not be
 replaced", "unfinished replace of a reference course put right", "course
 restored from a backup". The door's own line ("created … for reference",
@@ -10028,6 +10205,205 @@ restored from a backup". The door's own line ("created … for reference",
   lose anything.
 - **Checking the backup by unpacking it.** Twice the time, and the listing
   answers the question asked.
+
+### Groups on the reference shelf (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's third piece says. Every rule is a case in `contracts/shared-rules.json` → `referenceCourses.groups` and the file is `contracts/file-formats.json` → `referenceShelf`; nothing here is shared code.
+
+A teacher can make groups of their own on the Reference Courses shelf
+("From colleagues", "Exemplars"), move a reference course into one, rename
+one, and remove one. Russell's ruling of 2026-11-12: **groups are flat; year
+groups keep their names; "Other" and groups the teacher makes can be
+renamed.**
+
+**Three kinds of group, one list** (`ReferenceShelf.groups`, pure, which the
+sidebar calls):
+
+- **Year groups**, derived from `reference_school_year` as before, named by the
+  year, never stored, never renamed, not drawn when empty.
+- **The no-year group**, derived the same way and not drawn when empty, whose
+  NAME is stored: "Other" until the teacher renames it.
+- **Made groups**, stored with an id and a name, drawn even when empty (the
+  teacher just made it), except while the filter field narrows the list.
+
+The order is years newest first, then made groups A to Z (Finder's comparison,
+so "Unit 2" comes before "Unit 10"), then the no-year group last. A course is
+in a made group only when the file places it there and that group exists;
+otherwise it is where its school year puts it. **So with no file the shelf is
+exactly the shelf before groups, and that is the whole migration.**
+`ReferenceShelfTests.testWithNoFileTheShelfIsTheShelfBeforeGroups` holds the
+new function to a copy of the one it replaced (`referenceYearGroups`), title
+for title and course for course, and from an empty or an unreadable file too.
+
+**Groups are a view.** No group act renames, moves, removes or writes into a
+course folder, and the move and remove tests compare every file under
+`courses/` byte for byte before and after. Remove Group never removes a
+course: its courses go back to their year groups or the no-year group. An
+empty group goes at once ("Remove Group", no question, since nothing is lost);
+one that holds courses is asked about first ("Remove Group…", saying where
+they go), and the removal is refused with `removeWouldClash` when one of its
+courses would land beside another course of the same code.
+
+**Where it is stored, and why there.** `courses/.internal/reference-shelf.json`
+(`ReferenceShelfStore`), beside `profile.json`, `timetable/` and `activity/`.
+The arrangement belongs to the working folder: a second Mac on the same folder
+in iCloud Drive sees the same groups. Not in each course's
+`course_config.json`, because a group exists with no course in it; not in the
+app's preferences, because two machines would then disagree about where every
+course is. It does NOT travel with a course's backup or archive, deliberately:
+those hold one course, and a group is the folder's. A backup restored where
+its course still is keeps the folder name, and so the group.
+
+| Who | Sees |
+|---|---|
+| Any window on this Mac | the same groups (a change is announced, and another window on the folder reads the file again); fold state stays per window |
+| Another Mac on the folder, this version | the same groups |
+| An older Plantoir, or Windows before it implements this | the year layout: a course in a made group shows under its year or Other. Nothing breaks |
+| A course's backup or archive | not its group |
+| The assistant | nothing new: no tool, no description moved (`test_tool_surface_digest.py` green) |
+
+**The file is the teacher's arrangement, so it is never written over by an app
+that could not read it.** Missing: the year layout, and the first change
+writes it. Unreadable (half synced, cut short, hand-edited): the year layout,
+and EVERY change is refused with `couldNotReadGroups`, which names the way
+out rather than saying "try again", since waiting does not help a hand-edited
+copy (implementation review M2). **The way out is Start the Groups Again…**,
+on the Reference Courses heading's menu only while the arrangement cannot be
+read, asked first (Cancel the default). It MOVES the unreadable file aside to
+`reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
+name is taken; never deleted, never written over), and the shelf is the year
+layout with every control working. A NEWER version's file is never moved by
+an older app: the heading's menu says so and offers nothing. Written by a newer
+Plantoir (`version` above 1): what is understood is drawn, and every change
+is refused with `arrangedByANewerPlantoir`. A key or an entry this version
+does not understand is written back as it was. A change that moves nothing
+leaves the file byte for byte as it is. Every change is read, decided and
+written under one exclusive `flock` on `courses/.internal`, taken by every
+window and every process (the MCP server is the app, run again), with the
+file read FRESH inside the lock and written atomically. Measured: twenty
+groups made at once from twenty concurrent tasks all land; with the lock taken
+out, 2 of the 20 did. Two Macs at the same moment through iCloud: the later
+write wins, which costs one move or one rename.
+
+**Placements are explicit (plan review H2), and this is the heart of the
+piece.** A placement is keyed on the course's FOLDER, its identity, and folder
+names are reused: `ReferenceCourseRule.proposedFolderName` gives the first
+free `CODE-YYYY`, so the name a removal frees is the name the next course of
+that code and year is given. A placement that outlived its course would file
+that stranger in the old course's group, where the shelf rule never looked,
+and two ICS3Us would sit in one group. So:
+
+- every door that lands a course writes its placement at the moment it lands,
+  BEFORE the course is visible: the wizard's chosen group, or none
+  (`ReferenceShelfStore.recordArrival`, called by `ReferenceCreation.finish`,
+  `ReferenceImporter.land`, `ReferenceCopier`'s copy, and `CourseRestorer`'s
+  archive restore and its restore of a backup whose course is gone);
+- Remove Course… forgets the placement (`CourseArchiver.archiveAndRemoveCourse`);
+- a replace KEEPS it, because the replacement takes the replaced course's
+  folder name, and so its group (`ReferenceReplacer` writes no placement, and a
+  scan holds it to that); a backup restored in place keeps it too;
+- every write drops a placement whose folder is not there, unless the hidden
+  folder of a replace or an import of that name is (`.plantoir-replacing-…`,
+  `.plantoir-importing-…`), so a change made in another window at that moment
+  does not take the course out of its group.
+
+A folder with no file gets no file from any of this: an arrival that clears a
+placement that was never there writes nothing. The residual, said so nobody
+chases it: a course removed OUTSIDE Plantoir (in Finder, or by an app that
+does not know the file) and a new course given its name by such an app before
+any change here is written would inherit the group. Any change made here
+afterwards drops nothing in that case, because the folder is there; Move to
+Group puts it right.
+
+**The shelf rule is by group.** `ReferenceCourseRule.Shelved` carries the made
+group a course is in, and `trouble(placing:in:named:among:ignoring:)` asks the
+target group, of any kind. A course in a made group is in no year group, so an
+ICS3U in "From colleagues" never blocks an ICS3U from 2025–26. The year
+sentences are unchanged; a made group's is `codeAlreadyInThatGroup`. Every
+door that lands a course by its year asks `trouble(placing:inYear:…)`
+unchanged and gets the right answer, because the year means the year group.
+The replace warning names a made group as its group, and the replacement keeps
+it.
+
+**Where it is offered.** New Group… on the Reference Courses heading's menu
+and inside every Move to Group submenu (it makes the group and moves that
+course in). Rename Group… on a made group's row and the no-year group's.
+Remove Group on a made group's row. **Move to Group ▸** on a reference
+course's row and in the Course menu after Set School Year…, so the keyboard
+reaches it through menu search (`subjectMenus` item `moveToGroup`, live where
+Set School Year is): the course's own year group (or the no-year group by its
+name) first, then every made group, the current one with a checkmark. The
+**Group picker** is in the New Course wizard's reference mode only (plan
+review M8), drawn only when a made group exists, "Its school year" first.
+Every other door lands by year; Move to Group does the rest. Set School Year…
+for a course in a made group changes the year its summary shows and leaves it
+where it is. The read-only summary shows the made group a course is in, by
+name. The year pickers in the wizard and in Set School Year… name the no-year
+choice as the shelf does, so a renamed "Other" reads the same in both places.
+Fold state of a made group is remembered by its id under a key of its own
+(`referenceGroups`), so a window remembered before groups restores as it did.
+Every menu item is a text label, so VoiceOver reads it, and the disclosure
+rows are the sidebar's own.
+
+**The name rule** (`groups.nameRule`): cleaned first by the SAME rule as a
+course's name (#780's `CourseName.cleaned`, `courseNameCharacters`), so the
+zero-width joiner an emoji needs and the non-joiner a Persian word needs are
+kept and the bidirectional overrides removed; then white space collapsed and
+trimmed (a pasted line break is a space). Foundation's `controlCharacters`,
+used at first, holds those joiners, and spacing them split "👩‍🏫" into two
+(implementation review M1). Then refused when empty, longer than 40
+characters, shaped like a school year at all (four digits, a dash, the next
+year's last two digits, so next year's "2027–28" too and not only today's
+offered years: review L3), or a name already on the shelf, compared with
+case, accents and width folded and every dash read as an en dash.
+
+**The trail** (rule 5): "reference group made", "reference group renamed",
+"reference group removed", "reference course moved to a group", "reference
+groups started again" (with the name the unreadable copy was kept under), and
+"reference groups not changed" for a press that was refused. A group's name is the
+teacher's own words, like a course or folder name, and goes in quoted; it
+passes through `LogRedactor` like every line, so a 40-character name that
+looks like a token is taken out. "course created for reference" gains the
+group the wizard put it in.
+
+**Measured, by the must-fail proofs** (each by copying the file aside,
+breaking one line, running the test, and putting the file back): the lock
+taken out, 2 groups of 20 landed; the shelf rule comparing only the year,
+"the same code in a made group and in a year group" was refused; made groups
+inserted before the years, both order cases with made groups failed; an
+unreadable file read as no file, the half-written case read as absent and the
+next change OVERWROTE it; Remove Course… without forgetting, the freed name
+kept the group; a replace that recorded an arrival, the replacement lost its
+group. After the implementation review: the old cleaning rule, the emoji,
+Persian and override cases failed; Start the Groups Again deleting instead of
+moving, the kept copy was missing; moving a newer version's file, the newer
+case failed; the duplicate-id entry left in place, removing "Kept" brought
+"Twice" back; the year shape limited to today's years, "2027–28" was
+allowed; Cancel without the default key, the structure test failed; each of
+import, Keep a Copy and a backup restored where its course is gone without
+`recordArrival`, its real test kept the stale group.
+
+#### Rejected
+
+- **Converting today's layout into a stored list on first open.** It writes a
+  file into every working folder on upgrade, and year labels stored as names
+  drift from `reference_school_year` the first time a year is set.
+- **The group in each course's `course_config.json`.** A group must exist
+  with no course in it.
+- **Keeping placements when a course is removed**, so a restore brings it back
+  into its group (the plan's first answer): the freed folder name goes to the
+  next course of that code and year, which would inherit the group (H2). A
+  removed course comes back by its year, like every arrival.
+- **Withholding Remove Group while the group holds a course** (the plan's first
+  answer): the teacher would move every course out by hand to get rid of a
+  group, when sending them back to their years is what removing it means.
+- **The Group picker at every door** (M8), **renamable year groups**,
+  **nested groups**, **hand ordering** and **drag and drop** (Russell,
+  2026-11-12, and the plan).
+- **An assistant tool for groups.** Not asked for, and a routing change.
+- **Pruning on READ.** A reader that wrote would make every window that opens
+  a folder a writer, on every Mac sharing it; placements are pruned only by a
+  change the teacher made.
 
 ## Copying a page from one course into another
 

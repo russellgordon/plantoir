@@ -103,11 +103,13 @@ def folder_id(path: str) -> str:
 # rule is exercised against the pid the real code compares.
 FAKE_PS = r"""#!/bin/bash
 echo "ps $*" >> "$FAKE/calls"
-# `ps -p PID -o pid=` (the liveness look, #737): the pid when the table lists
-# it and the case has not ended it since; nothing, and exit 1, otherwise.
+# `ps -p PID -o uid=` (the liveness and owner look, #737 and #729): the
+# owner's uid when the table lists the pid and the case has not ended it
+# since: the case's other account for a pid in otherAccount, this account
+# otherwise; nothing, and exit 1, for a pid that is gone.
 if [ "${1:-}" = "-p" ]; then
   if [ ! -f "$FAKE/gone/$2" ] && awk -v p="$2" '$1 == p { found = 1 } END { exit !found }' "$FAKE/table"; then
-    echo "$2"
+    if [ -f "$FAKE/uid/$2" ]; then cat "$FAKE/uid/$2"; else id -u; fi
     exit 0
   fi
   exit 1
@@ -152,7 +154,7 @@ class PretendMac:
         self.home = scratch / "home"
         self.here = scratch / "here"
         self.elsewhere = scratch / "elsewhere"
-        for folder in (self.fake, self.bin, self.home, self.here, self.elsewhere, self.fake / "cwd"):
+        for folder in (self.fake, self.bin, self.home, self.here, self.elsewhere, self.fake / "cwd", self.fake / "uid"):
             folder.mkdir(parents=True, exist_ok=True)
         for name, body in (("ps", FAKE_PS), ("lsof", FAKE_LSOF)):
             program = self.bin / name
@@ -184,6 +186,10 @@ class PretendMac:
         (self.fake / "gone").mkdir(exist_ok=True)
         for pid in case.get("endedAfterTheTableWasRead", []):
             (self.fake / "gone" / str(pid)).write_text("", encoding="utf-8")
+        # A process another account runs (#729 review, L-a1): lsof cannot say
+        # where it works, and `ps -p` names another uid.
+        for pid in case.get("otherAccount", []):
+            (self.fake / "uid" / str(pid)).write_text(str(os.getuid() + 7777), encoding="utf-8")
         for pid, where in case.get("cwd", {}).items():
             path = self.here_path if where == "here" else self.elsewhere_path
             (self.fake / "cwd" / str(pid)).write_text(path, encoding="utf-8")
@@ -273,9 +279,37 @@ class TheLauncherCases(unittest.TestCase):
         result, trail, _course, _section = self.run_case({"processes": ended["processes"], "cwd": {}})
         self.assertEqual(result.returncode, 1, "a live deploy whose folder cannot be asked still counts")
 
+    def test_another_accounts_deploy_does_not_refuse_a_preview(self):
+        # #729 review, L-a1: lsof cannot read another account's folder, and a
+        # folder that belongs to another account is not this one.
+        for args in ("/bin/bash ./deploy.sh ICS4U 2",
+                     "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"):
+            with self.subTest(args=args):
+                result, trail, _course, _section = self.run_case(
+                    {"processes": [[700, 1, args]], "cwd": {}, "otherAccount": [700]})
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(trail, [])
+
+    def test_a_build_leg_that_has_ended_since_the_table_was_read_does_not_refuse_a_preview(self):
+        # #737's race for the deploy's build leg #729 counts.
+        rows = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"]]
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {},
+                                                          "endedAfterTheTableWasRead": [700]})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(trail, [])
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {}})
+        self.assertEqual(result.returncode, 1, "a live build leg whose folder cannot be asked still counts")
+
+    def test_a_build_leg_being_stopped_is_not_a_deploy(self):
+        rows = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy --stop"]]
+        result, trail, _course, _section = self.run_case({"processes": rows, "cwd": {"700": "here"}})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(trail, [])
+
     def test_the_cases_cover_every_kind_of_deployer(self):
         names = " ".join(case["name"] for case in the_rule()["launcherCases"])
-        for words in ("command line", "set for later", "unreadable", "ANOTHER section", "--build-only"):
+        for words in ("command line", "set for later", "unreadable", "ANOTHER section", "--build-only",
+                      "--build-only --for-deploy", "build leg in ANOTHER working folder"):
             self.assertIn(words, names)
 
 

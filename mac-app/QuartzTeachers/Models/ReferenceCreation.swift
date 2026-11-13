@@ -116,6 +116,13 @@ enum ReferenceCreation {
         /// hidden name and given its folder name.
         var replacing: String? = nil
 
+        /// The group the teacher made that the wizard's Group picker chose
+        /// (#572, third piece), with its name as the shelf shows it; nil for
+        /// "Its school year". Written as the course's placement just before
+        /// it becomes visible.
+        var madeGroupID: String? = nil
+        var madeGroupName: String? = nil
+
         // MARK: - Computed properties
 
         /// The name setup is given.
@@ -183,7 +190,8 @@ enum ReferenceCreation {
         existingFolderNames: [String],
         keepsForReference: Bool,
         schoolYear: Int?,
-        shelved: [ReferenceCourseRule.Shelved]
+        shelved: [ReferenceCourseRule.Shelved],
+        madeGroup: ReferenceShelf.MadeGroup? = nil
     ) -> String? {
         if !keepsForReference {
             return CourseCodeRule.problem(typed, existingCodes: existingFolderNames)
@@ -191,7 +199,9 @@ enum ReferenceCreation {
         if let trouble = CourseCodeRule.trouble(typed, existingCodes: []) {
             return trouble.sentence
         }
-        if let trouble = ReferenceCreation.shelfTrouble(typed: typed, schoolYear: schoolYear, shelved: shelved) {
+        if let trouble = ReferenceCreation.shelfTrouble(
+            typed: typed, schoolYear: schoolYear, shelved: shelved, madeGroup: madeGroup
+        ) {
             return trouble.sentence
         }
         return nil
@@ -200,13 +210,21 @@ enum ReferenceCreation {
     /// The shelf rule's refusal as a VALUE, for a course kept for reference,
     /// or nil. The wizard's live check reads its sentence through
     /// `courseCodeProblem`; a later door that offers something beside the
-    /// refusal (572b's Replace) asks this.
+    /// refusal (572b's Replace) asks this. `madeGroup` is the group the
+    /// wizard's Group picker chose (#572, third piece), which the rule is
+    /// then asked of instead of the year.
     static func shelfTrouble(
         typed: String,
         schoolYear: Int?,
-        shelved: [ReferenceCourseRule.Shelved]
+        shelved: [ReferenceCourseRule.Shelved],
+        madeGroup: ReferenceShelf.MadeGroup? = nil
     ) -> ReferenceCourseRule.Trouble? {
-        return ReferenceCourseRule.trouble(placing: typed, inYear: schoolYear, among: shelved)
+        guard let madeGroup else {
+            return ReferenceCourseRule.trouble(placing: typed, inYear: schoolYear, among: shelved)
+        }
+        return ReferenceCourseRule.trouble(
+            placing: typed, in: .made(madeGroup.id), named: madeGroup.name, among: shelved
+        )
     }
 
     /// Whether a code is taken by a course folder here — the refusal the
@@ -251,7 +269,8 @@ enum ReferenceCreation {
         coursesDirectoryURL: URL,
         existingFolderNames: [String],
         shelved: [ReferenceCourseRule.Shelved],
-        replacing: String? = nil
+        replacing: String? = nil,
+        madeGroupID: String? = nil
     ) throws -> Prepared {
         let rawCode: String = (configuration["course_code"] as? String) ?? ""
         let code: String = CourseCodeRule.normalized(rawCode)
@@ -259,14 +278,34 @@ enum ReferenceCreation {
             throw Problem.noCode
         }
 
+        // The group the Group picker chose, as the arrangement says it NOW
+        // (#572, third piece). A group removed in another window since the
+        // picker was drawn is no longer a choice: the course goes where its
+        // school year puts it, and the shelf rule is asked of that.
+        var place: ReferenceShelf.Place = ReferenceShelf.Place.forYear(schoolYear)
+        var groupName: String?
+        if let madeGroupID {
+            let arrangement: ReferenceShelf.Arrangement = ReferenceShelfStore.read(
+                inCoursesDirectory: coursesDirectoryURL
+            ).arrangement
+            if let group = arrangement.group(withID: madeGroupID) {
+                place = .made(madeGroupID)
+                groupName = group.name
+            }
+        }
+        var chosenGroupID: String?
+        if case .made(let id) = place {
+            chosenGroupID = id
+        }
+
         // The shelf rule again, at the act, so the caption and the act agree.
         // A replace is the one answer to its refusal, and only for the course
         // the rule names: the course in the way must be the one the teacher
         // was warned about, or this is refused like any other clash.
         var replacingFolder: String?
-        if let trouble = ReferenceCourseRule.trouble(placing: code, inYear: schoolYear, among: shelved) {
+        if let trouble = ReferenceCourseRule.trouble(placing: code, in: place, named: groupName, among: shelved) {
             let inTheWay: ReferenceCourseRule.Shelved? = ReferenceCourseRule.courseInTheWay(
-                placing: code, inYear: schoolYear, among: shelved
+                placing: code, in: place, among: shelved
             )
             if let replacing, let inTheWay, inTheWay.folderName == replacing {
                 replacingFolder = replacing
@@ -332,7 +371,9 @@ enum ReferenceCreation {
             schoolYear: schoolYear,
             stagingURL: stagingURL,
             coursesDirectoryURL: coursesDirectoryURL,
-            replacing: replacingFolder
+            replacing: replacingFolder,
+            madeGroupID: chosenGroupID,
+            madeGroupName: groupName
         )
     }
 
@@ -367,6 +408,14 @@ enum ReferenceCreation {
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 throw Problem.folderAlreadyExists(prepared.folderName)
             }
+            // Where it goes, written BEFORE it becomes visible (plan review
+            // H2): the chosen group, or no placement at all, so a folder
+            // name freed by an earlier removal carries no stranger's group.
+            ReferenceShelfStore.recordArrival(
+                of: prepared.folderName,
+                inMadeGroup: prepared.madeGroupID,
+                coursesDirectoryURL: prepared.coursesDirectoryURL
+            )
             try FileManager.default.moveItem(at: prepared.stagingURL, to: destinationURL)
         } catch {
             ReferenceStaging.remove(at: prepared.stagingURL)
@@ -383,7 +432,9 @@ enum ReferenceCreation {
             schoolYear: staged.schoolYear,
             sectionCount: staged.sectionCount
         )
-        ActivityTrail.note(.courseCreatedForReference, ReferenceCreation.trailLine(for: made))
+        ActivityTrail.note(
+            .courseCreatedForReference, ReferenceCreation.trailLine(for: made, inGroup: prepared.madeGroupName)
+        )
         return made
     }
 
@@ -497,14 +548,22 @@ enum ReferenceCreation {
     /// The trail line for a course that was made — what a teacher would
     /// recognise: the folder it was given, the code it shows, its year and
     /// sections, and that it began from the ready-made pages.
-    static func trailLine(for made: ReferenceCopier.Made) -> String {
+    ///
+    /// `group` is the group the teacher made that it was put in (#572, third
+    /// piece), quoted, or nil; a course filed by its year leaves the line it
+    /// always did.
+    static func trailLine(for made: ReferenceCopier.Made, inGroup group: String? = nil) -> String {
         var year: String = ReferenceImportWording.noSchoolYear
         if let startingYear = made.schoolYear {
             year = SchoolYear.label(forStartingYear: startingYear)
         }
         let sections: String = made.sectionCount == 1 ? "1 section" : "\(made.sectionCount) sections"
-        return "created \(made.displayCode) for reference as \(made.folderName) — \(year), \(sections), "
+        var line: String = "created \(made.displayCode) for reference as \(made.folderName) — \(year), \(sections), "
              + "from the ready-made pages written for it"
+        if let group {
+            line += ", in the group \"\(group)\""
+        }
+        return line
     }
 
     /// The trail line for a course that was not made, and why — the reason

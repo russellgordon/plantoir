@@ -725,6 +725,55 @@ final class ReferenceReplacerTests: XCTestCase {
         ), "The claim was not given back.")
     }
 
+    /// The replacement keeps the replaced course's group (#572, third
+    /// piece): it takes the old folder name, and the group is the folder's.
+    /// The warning names the group the teacher made, and a course chosen
+    /// for that group in the wizard replaces the one in it.
+    func testTheReplacementKeepsTheReplacedCoursesGroup() async throws {
+        try prepareWorkingFolder()
+        try FileManager.default.createDirectory(
+            at: coursesDirectoryURL.appendingPathComponent(".internal"), withIntermediateDirectories: true
+        )
+        try Data((
+            "{\"version\": 1, \"groups\": [{\"id\": \"g-00000001\", \"name\": \"From colleagues\"}], "
+            + "\"placements\": {\"ICS3U-2025\": \"g-00000001\"}}"
+        ).utf8).write(to: ReferenceShelfStore.fileURL(inCoursesDirectory: coursesDirectoryURL))
+
+        let offer: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
+            toReplace: "ICS3U-2025", coursesDirectoryURL: coursesDirectoryURL, world: ReferenceReplacerTests.quietWorld()
+        )
+        guard case .warn(let warning) = offer else {
+            return XCTFail("Replace It… was refused: \(offer)")
+        }
+        XCTAssertEqual(warning.title, ReferenceReplaceWording.title(course: "ICS3U", group: "From colleagues"))
+
+        let shelved: [ReferenceCourseRule.Shelved] = [ReferenceCourseRule.Shelved(
+            displayCode: "ICS3U", schoolYear: 2025, folderName: "ICS3U-2025", madeGroupID: "g-00000001"
+        )]
+        // In its YEAR nothing is in the way: the course in From colleagues
+        // is in no year group.
+        XCTAssertNil(ReferenceCourseRule.courseInTheWay(placing: "ICS3U", inYear: 2025, among: shelved))
+        let prepared: ReferenceCreation.Prepared = try ReferenceCreation.prepare(
+            configuration: ["course_code": "ICS3U", "section_numbers": [1]], schoolYear: 2026,
+            coursesDirectoryURL: coursesDirectoryURL,
+            existingFolderNames: ["ICS3U", "ICS3U-2025"], shelved: shelved, replacing: "ICS3U-2025",
+            madeGroupID: "g-00000001"
+        )
+        XCTAssertEqual(prepared.folderName, "ICS3U-2025")
+        try ReferenceCreationTests.writeWhatSetupWrites(into: prepared.stagingURL, withPages: true)
+        _ = try await ReferenceCreation.finishByReplacing(
+            prepared, setupSucceeded: true, wasStopped: false,
+            transcript: "📖 \(ReferenceCreation.pagesInstalledMarker): 1 page",
+            world: ReferenceReplacerTests.quietWorld()
+        )
+        XCTAssertNotEqual(ReferenceReplacerTests.whatItSays(oldURL), "old", "The old course is still there.")
+        let arrangement: ReferenceShelf.Arrangement = ReferenceShelfStore.read(
+            inCoursesDirectory: coursesDirectoryURL
+        ).arrangement
+        XCTAssertEqual(arrangement.placements["ICS3U-2025"], "g-00000001", "The replacement left the group.")
+        XCTAssertTrue(trail.contains("(ICS3U, From colleagues)"), trail)
+    }
+
     /// An import of one course replaces only the course it was told to; the
     /// same import without the teacher's Replace is refused as before.
     func testAnImportReplacesOnlyWhenAskedAndOnlyThatCourse() async throws {

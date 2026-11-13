@@ -182,6 +182,7 @@ INCLUDE_SOCIAL=""
 FORCE_NPM_INSTALL=""
 FULL_REBUILD=""
 BUILD_ONLY=""   # NEW: replaces --no-preview
+FOR_DEPLOY=""   # #729: --for-deploy, a name in the process table only
 
 # Normalize COURSE to uppercase (avoid 'o' vs 'O' issues)
 COURSE="$(printf '%s' "$COURSE" | tr '[:lower:]' '[:upper:]')"
@@ -224,6 +225,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   echo "  --force-npm-install                Force npm install even if dependencies are present"
   echo "  --full-rebuild                     Clear entire output folder and re-copy Quartz scaffold"
   echo "  --build-only                       Build the static site only (no local preview server)"
+  echo "  --for-deploy                       With --build-only: this build is the first step of a deploy"
   echo "  --non-interactive                  Refuse rather than ask, for a build nobody is watching"
   echo "  --stop                             Stop this section's preview processes (build or server) and exit"
   echo "  --port N                           Serve the preview on port N (default 8081; 8081-8084 available)"
@@ -275,6 +277,13 @@ while [[ "$#" -gt 0 ]]; do
     --build-only)
       BUILD_ONLY="--build-only"
       ;;
+    --for-deploy)
+      # Changes nothing the build does. It is a word in the process table:
+      # it names this build as a deploy's first step, so the other launchers'
+      # guards say "being deployed" rather than "being built" (#729;
+      # contracts/app-rules.json -> launcherFlags.preview).
+      FOR_DEPLOY="--for-deploy"
+      ;;
     --stop)
       STOP_MODE="1"
       ;;
@@ -295,6 +304,13 @@ while [[ "$#" -gt 0 ]]; do
   esac
   shift
 done
+
+# --for-deploy names a deploy's BUILD, so it means nothing on a serving run.
+if [[ -n "${FOR_DEPLOY:-}" && -z "${BUILD_ONLY:-}" ]]; then
+  echo "❌ --for-deploy goes with --build-only."
+  echo "Use './preview.sh --help' to see usage instructions."
+  exit 1
+fi
 
 # Validate course and section
 if [ -z "$COURSE" ] || [ -z "$SECTION" ]; then
@@ -711,7 +727,8 @@ say_this_folder_cannot_be_reached() {
 #     program that started this work gone? (the_owners_of_the_work, in the
 #     PREVIEW PORT BLOCK);
 #   - deploy.sh's guard and preview.sh's build-leg guard (#439): is this
-#     section still being deployed by a scheduled script or another deploy.sh?
+#     section still being deployed by a scheduled script or another deploy.sh,
+#     or built by another `preview.sh --build-only` (#729)?
 #     (refuse_while_this_section_deploys, in the DEPLOY WHILE ITS SECTION
 #     DEPLOYS GUARD).
 # All three ask the_launchers_running, below, and each keeps its own POLICY —
@@ -761,8 +778,11 @@ say_this_folder_cannot_be_reached() {
 #            space ("Application Support"), so the word that ends in the
 #            name is looked for, never word 2.
 #   flags    the launcher's OWN words among --stop, --build-only,
-#            --builder-tag, --reset-token, --logout and --help (-h), without
-#            their dashes, ","-joined; "-" when none.
+#            --for-deploy, --builder-tag, --reset-token, --logout and --help
+#            (-h), without their dashes, ","-joined; "-" when none.
+#            --for-deploy (#729) is how a deploy's build leg, `preview.sh C S
+#            --build-only --for-deploy`, is told from the assistant's rebuild,
+#            which is the same line without it.
 #   folder   for a publish set for later, the folder id in its label, or "-"
 #            when the label carries none; "-" for everything else.
 #   places   the 1-based numbers of the PLACES this record is for,
@@ -891,7 +911,7 @@ the_launchers_running() {
           after = ""; flags = ""
           for (a = w + 1; a <= n; a++) {
             after = after " " word[a]
-            if (word[a] ~ /^--(stop|build-only|builder-tag|reset-token|logout|help)$/) {
+            if (word[a] ~ /^--(stop|build-only|for-deploy|builder-tag|reset-token|logout|help)$/) {
               flag = substr(word[a], 3)
               if (index("," flags ",", "," flag ",") == 0) flags = joined(flags, flag)
             } else if (word[a] == "-h" && index("," flags ",", ",help,") == 0) {
@@ -1022,13 +1042,15 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 #     writes it). launchd's `Plantoir --run-scheduled-deploy <script> …`
 #     lives for the whole run, both legs, so the build leg counts too. A
 #     label carrying ANOTHER folder's id is that folder's deploy.
-# NOT a deploy: `preview.sh C S --build-only`. It is a publish's build leg,
-# but it is also exactly what the assistant's "rebuild the preview" runs, and
-# nothing on the command line tells the two apart — counting it would refuse
-# every preview of a section while the assistant refreshed it, with a
-# sentence that is false. The window refuses its own build leg from its
-# publish record; a preview typed in Terminal during ANOTHER program's build
-# leg is the one gap left, and the contract names it.
+#   - a deploy's build leg: `preview.sh C S --build-only --for-deploy` as the
+#     program, working in this folder by the same lsof and `ps -p` rule as
+#     deploy.sh. A Plantoir app runs it before its deploy.sh starts, and
+#     since #729 it says so with --for-deploy, so a preview typed in Terminal
+#     during ANOTHER program's build leg is refused too.
+# NOT a deploy: `preview.sh C S --build-only` without --for-deploy. That is
+# the assistant's "rebuild the preview" (or a build typed in Terminal), and
+# counting it would refuse every preview of a section while the assistant
+# refreshed it, with a sentence that is false.
 # How the table is read — which processes are launchers, for which course
 # and section, with which flags; which name is a publish set for later; which
 # processes are this run's own family — is the_launchers_running's, in the
@@ -1041,7 +1063,7 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 # "blocked until a restart" again. The window's check and the leases still
 # stand when this one cannot see.
 a_deploy_is_running_for() {
-  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd owner
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
   # One place is asked about, so a record for it says "1".
@@ -1054,21 +1076,41 @@ a_deploy_is_running_for() {
         if [ "$folder" = "-" ] || [ "$folder" = "$folder_id" ]; then
           return 0
         fi ;;
-      deploy.sh)
-        # deploy.sh must be the PROGRAM, not merely named on a line.
+      deploy.sh|preview.sh)
+        # The launcher must be the PROGRAM, not merely named on a line.
         [ "$program" = "1" ] || continue
         case ",$flags," in
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
+        # A preview.sh counts only as a deploy's build leg (#729).
+        if [ "$what" = "preview.sh" ]; then
+          case ",$flags," in
+            *,stop,*) continue ;;
+            *,build-only,*) ;;
+            *) continue ;;
+          esac
+          case ",$flags," in
+            *,for-deploy,*) ;;
+            *) continue ;;
+          esac
+        fi
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-        # Nothing from lsof, and the process has ENDED since the table was
-        # read: skipped (#737). A deploy.sh that exits between the two looks,
-        # in any folder, used to count. One still running whose folder lsof
-        # cannot answer for still counts, as #381 decided. `ps -p`, never
-        # `kill -0`, which also fails for another account's process that is
-        # running, and which this guard must still count.
-        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
-          continue
+        # Nothing from lsof: ask `ps -p` who owns the process. Nobody, so it
+        # has ENDED since the table was read: skipped (#737). A deploy.sh that
+        # exits between the two looks, in any folder, used to count. ANOTHER
+        # ACCOUNT, which is why lsof could not say: skipped too, because a
+        # folder that belongs to another account is not this one (#729 review,
+        # L-a1; until then another account's build of the same course and
+        # section refused this teacher's deploy, in every folder). THIS
+        # account, and lsof still could not say: it counts, as #381 decided,
+        # because a deploy or build of this very section is proved and only
+        # its folder is not. `ps -p`, never `kill -0`, which also fails for
+        # another account's process that is running.
+        if [[ -z "$cwd" ]]; then
+          owner="$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')"
+          if [[ -z "$owner" || "$owner" != "$(id -u)" ]]; then
+            continue
+          fi
         fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           return 0
@@ -1111,8 +1153,8 @@ fi
 # is gone, so they read as stale (workLeases.liveness) and nothing else stops a
 # second deploy of the section overlapping it. This is the layer every caller
 # reaches: the window's Deploy and an assistant's deploy (their build leg is
-# `preview.sh --build-only`, then `deploy.sh`), the newly set run's own legs,
-# and a deploy typed in Terminal. The rule and its cases are
+# `preview.sh --build-only --for-deploy`, then `deploy.sh`), the newly set
+# run's own legs, and a deploy typed in Terminal. The rule and its cases are
 # contracts/shared-rules.json -> deployWhileItsSectionDeploys.
 #
 # Asked by deploy.sh (not with --reset-token or --logout, which deploy
@@ -1121,7 +1163,10 @@ fi
 # checked and before anything is changed.
 #
 # What counts, read from the LIVE process table, never a remembered process id
-# or a lease file — so nothing left on disk can refuse a deploy for ever:
+# or a lease file — so nothing left on disk can refuse a deploy for ever.
+# Since #729 (Russell, 2026-11-12) that is ANY second build of the section as
+# well as a deploy: two builds of one section clear and fill the same folder,
+# and the first one fails.
 #   - "later": a deploy set for later of C/S whose SCRIPT is running as the
 #     program (`/bin/bash …/<label>.sh`; the reader's `program` field), with
 #     this folder's id in its label or none (a label from before #237). A label
@@ -1136,6 +1181,17 @@ fi
 #     #381, while `ps -p` still finds it running - one that has ended since
 #     the table was read does not, #737), and not only clearing a token or
 #     printing its help.
+#   - "another" as well: `preview.sh C S --build-only --for-deploy` as the
+#     program, working in this folder by the same lsof and `ps -p` rule. That
+#     is a deploy's build leg, run by a Plantoir app (the window, the in-app
+#     assistant, an outside assistant's deploy_section) before its deploy.sh
+#     starts (#729).
+#   - "building": `preview.sh C S --build-only` WITHOUT --for-deploy, by the
+#     same rule: the assistant's rebuild of the preview, or one typed in
+#     Terminal. It is refused for the same reason as a deploy (#729, the
+#     review's M7), in words that say "built", because it is not a deploy.
+#     Never a serving preview (#381 is that rule, the other way round), and
+#     never `preview.sh --stop`.
 # This run, its ancestors and its descendants never count (the reader's
 # family rule), so a scheduled run's own legs are never refused by its own
 # wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
@@ -1148,11 +1204,13 @@ fi
 # run's own legs, for as long as `ps` fails, which costs more than the rare
 # overlap this guard exists for.
 #
-# Prints "later" or "another" and returns 0 when the section is being
-# deployed; returns 1, printing nothing, otherwise. "later" wins when both are
-# seen: a leftover run's own deploy.sh is in the table beside its script.
+# Prints "later", "another" or "building" and returns 0 when the section is
+# being deployed or built; returns 1, printing nothing, otherwise. "later"
+# wins when more than one is seen: a leftover run's own deploy.sh is in the
+# table beside its script. "another" wins over "building": a deploy.sh's own
+# rebuild is a plain `--build-only` beside the deploy.sh that started it.
 what_is_deploying_this_section() {
-  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd seen=""
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd owner seen=""
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
   # One place is asked about, so a record for it says "1".
@@ -1166,22 +1224,46 @@ what_is_deploying_this_section() {
           echo "later"
           return 0
         fi ;;
-      deploy.sh)
+      deploy.sh|preview.sh)
         case ",$flags," in
           *,reset-token,*|*,logout,*|*,help,*) continue ;;
         esac
+        # A preview.sh counts only while it BUILDS without serving: a
+        # --build-only run that is not a --stop.
+        if [ "$what" = "preview.sh" ]; then
+          case ",$flags," in
+            *,stop,*) continue ;;
+            *,build-only,*) ;;
+            *) continue ;;
+          esac
+        fi
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-        # Nothing from lsof, and the process has ENDED since the table was
-        # read: skipped (#737). A deploy.sh that exits between the two looks,
-        # in any folder, used to count. One still running whose folder lsof
-        # cannot answer for still counts, as #381 decided. `ps -p`, never
-        # `kill -0`, which also fails for another account's process that is
-        # running, and which this guard must still count.
-        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
-          continue
+        # Nothing from lsof: ask `ps -p` who owns the process. Nobody, so it
+        # has ENDED since the table was read: skipped (#737). A deploy.sh that
+        # exits between the two looks, in any folder, used to count. ANOTHER
+        # ACCOUNT, which is why lsof could not say: skipped too, because a
+        # folder that belongs to another account is not this one (#729 review,
+        # L-a1; until then another account's build of the same course and
+        # section refused this teacher's deploy, in every folder). THIS
+        # account, and lsof still could not say: it counts, as #381 decided,
+        # because a deploy or build of this very section is proved and only
+        # its folder is not. `ps -p`, never `kill -0`, which also fails for
+        # another account's process that is running.
+        if [[ -z "$cwd" ]]; then
+          owner="$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')"
+          if [[ -z "$owner" || "$owner" != "$(id -u)" ]]; then
+            continue
+          fi
         fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
-          seen="another"
+          if [ "$what" = "deploy.sh" ]; then
+            seen="another"
+          else
+            case ",$flags," in
+              *,for-deploy,*) seen="another" ;;
+              *) [ -n "$seen" ] || seen="building" ;;
+            esac
+          fi
         fi ;;
     esac
   done <<< "$records"
@@ -1193,20 +1275,31 @@ what_is_deploying_this_section() {
 }
 
 # refuse_while_this_section_deploys COURSE SECTION LEG — LEG is "deploy"
-# (deploy.sh) or "build" (preview.sh --build-only). The sentences are
+# (deploy.sh), "build" (preview.sh --build-only) or "deploy-build" (preview.sh
+# --build-only --for-deploy, a deploy's own build leg, #729). The sentences are
 # contracts/shared-rules.json -> deployWhileItsSectionDeploys.sentences, and
 # the trail lines that entry's launcherLines — both checked by
 # scripts/test_deploy_while_its_section_deploys.py. Exit 1, as #381's.
 refuse_while_this_section_deploys() {
-  local course="$1" section="$2" leg="$3" who what_stops not_again
+  local course="$1" section="$2" leg="$3" who what_stops not_again not_while_built
   who="$(what_is_deploying_this_section "$course" "$section")" || return 0
-  if [ "$leg" = "build" ]; then
-    what_stops="build"; not_again="built"
+  if [ "$leg" = "build" ] || [ "$leg" = "deploy-build" ]; then
+    what_stops="build"; not_again="built"; not_while_built="built again"
+    # A deploy's own build leg held up by another BUILD says what the
+    # teacher pressed: "cannot be deployed" (#729 review, L-a3).
+    if [ "$leg" = "deploy-build" ]; then
+      not_while_built="deployed"
+    fi
   else
-    what_stops="deploy"; not_again="deployed again"
+    what_stops="deploy"; not_again="deployed again"; not_while_built="deployed"
   fi
   echo ""
-  if [ "$who" = "later" ]; then
+  if [ "$who" = "building" ]; then
+    echo "❌ ${course} section ${section} is already being built, so it cannot be ${not_while_built} until that has finished."
+    echo "   Nothing was changed."
+    echo ""
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was already being built"
+  elif [ "$who" = "later" ]; then
     echo "❌ ${course} section ${section} is still being deployed by a deploy that was set for later, so it cannot be ${not_again} until that has finished."
     echo "   Nothing was changed."
     echo ""
@@ -1222,7 +1315,7 @@ refuse_while_this_section_deploys() {
 # <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<
 
 if [[ -n "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then
-  refuse_while_this_section_deploys "$COURSE" "$SECTION" build
+  refuse_while_this_section_deploys "$COURSE" "$SECTION" "${FOR_DEPLOY:+deploy-}build"
 fi
 
 # -------------------- Stop mode ----------------------------------------

@@ -128,7 +128,8 @@ class NewCourseCreator {
         existingFolderNames: [String],
         shelved: [ReferenceCourseRule.Shelved],
         replacing: String? = nil,
-        replaceWorld: ReferenceReplacer.World = ReferenceReplacer.World()
+        replaceWorld: ReferenceReplacer.World = ReferenceReplacer.World(),
+        madeGroupID: String? = nil
     ) {
         preparationProblem = nil
         finishingProblem = nil
@@ -148,7 +149,8 @@ class NewCourseCreator {
                 coursesDirectoryURL: coursesDirectoryURL,
                 existingFolderNames: existingFolderNames,
                 shelved: shelved,
-                replacing: replacing
+                replacing: replacing,
+                madeGroupID: madeGroupID
             )
         } catch {
             preparationProblem = error.localizedDescription

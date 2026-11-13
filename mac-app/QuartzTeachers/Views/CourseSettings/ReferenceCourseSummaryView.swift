@@ -29,6 +29,11 @@ struct ReferenceCourseSummaryView: View {
 
     let today: CalendarDay
 
+    /// The group the teacher put it in on the shelf (#572, third piece), or
+    /// nil when it sits where its school year puts it — in which case the
+    /// school year already says where it is.
+    let groupName: String?
+
     // MARK: - Computed properties
 
     var schoolYearText: String {
@@ -84,6 +89,13 @@ struct ReferenceCourseSummaryView: View {
                             .accessibilityIdentifier("referenceSetSchoolYear")
                         }
                     }
+                    if let groupName {
+                        GridRow {
+                            Text(ReferenceGroupWording.summaryGroupLabel).foregroundStyle(.secondary)
+                            Text(groupName)
+                                .accessibilityIdentifier("referenceGroup")
+                        }
+                    }
                     GridRow {
                         Text("Sections").foregroundStyle(.secondary)
                         Text(sectionsText)
@@ -123,9 +135,15 @@ struct ReferenceCourseSummaryView: View {
 
     // MARK: - Initializer
 
-    init(course: Course, today: CalendarDay = CalendarDay.today(), setSchoolYear: @escaping () -> Void) {
+    init(
+        course: Course,
+        today: CalendarDay = CalendarDay.today(),
+        groupName: String? = nil,
+        setSchoolYear: @escaping () -> Void
+    ) {
         self.course = course
         self.today = today
+        self.groupName = groupName
         self.setSchoolYear = setSchoolYear
     }
 }
