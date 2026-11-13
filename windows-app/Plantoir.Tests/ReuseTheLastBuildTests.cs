@@ -101,6 +101,27 @@ public class ReuseTheLastBuildTests : IDisposable
         Assert.Equal(BuildFreshness.ReasonPages, BuildFreshness.WhyRebuild(built.Course, built.Section));
     }
 
+    /// <summary>
+    /// <see cref="BuildFreshness.ChangedSince"/> on its own, the walk every
+    /// case above reaches through WhyRebuild: nothing changed since a time,
+    /// a page edited after it, a page deleted after it (only the folder's time
+    /// shows it), and a reference later than now.
+    /// </summary>
+    [Fact]
+    public void ChangedSinceIsTheWalkOnItsOwn()
+    {
+        var built = FreshnessCases.Build(_root, FreshnessCases.Case("nothing has changed since the build"));
+        DateTime reference = FreshnessCases.Reference(built.Section);
+        DateTime now = DateTime.UtcNow;
+
+        Assert.Null(BuildFreshness.ChangedSince(built.Course, reference, now));
+        Assert.Equal(BuildFreshness.ReasonClock, BuildFreshness.ChangedSince(built.Course, now.AddMinutes(5), now));
+
+        File.Delete(Path.Combine(built.Course, "notes", "day-2.md"));
+        Assert.Equal(BuildFreshness.ReasonPages, BuildFreshness.ChangedSince(built.Course, reference, DateTime.UtcNow));
+        Assert.Null(BuildFreshness.ChangedSince(built.Course, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(1)));
+    }
+
     [Fact]
     public void TheKnownLimitsOnWindowsAreSkippedByName()
     {

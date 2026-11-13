@@ -78,12 +78,24 @@ public static class BuildFreshness
         }
         catch { /* unreadable marker: index.html's time, as before */ }
 
-        // The clock guard: a build dated later than now would hide every
-        // change made since behind its date (knownLimits says when it stops
-        // firing).
-        if (builtDate > (nowUtc ?? DateTime.UtcNow)) return ReasonClock;
+        return ChangedSince(courseDirectory, builtDate, nowUtc ?? DateTime.UtcNow);
+    }
 
-        if (SomethingInTheCourseIsNewer(courseDirectory, builtDate)) return ReasonPages;
+    /// <summary>
+    /// The pages and clock half of the rule, on its own: <c>clock</c> when
+    /// <paramref name="referenceUtc"/> is later than <paramref name="nowUtc"/>
+    /// (a build dated ahead would hide every change made since behind its
+    /// date; <c>knownLimits</c> says when the guard stops firing), <c>pages</c>
+    /// when the course folder or anything in it not hidden by its name changed
+    /// after the reference (<see cref="SomethingInTheCourseIsNewer"/>), else
+    /// null. The ONE walk: <see cref="WhyRebuild(string, string, DateTime?)"/>
+    /// calls it, and so can any other reader that needs "has the course
+    /// changed since this time" (the Coverage tab, #811).
+    /// </summary>
+    public static string? ChangedSince(string courseDirectory, DateTime referenceUtc, DateTime nowUtc)
+    {
+        if (referenceUtc > nowUtc) return ReasonClock;
+        if (SomethingInTheCourseIsNewer(courseDirectory, referenceUtc)) return ReasonPages;
         return null;
     }
 
