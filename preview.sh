@@ -1063,7 +1063,7 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 # "blocked until a restart" again. The window's check and the leases still
 # stand when this one cannot see.
 a_deploy_is_running_for() {
-  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd owner
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
   # One place is asked about, so a record for it says "1".
@@ -1095,14 +1095,22 @@ a_deploy_is_running_for() {
           esac
         fi
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-        # Nothing from lsof, and the process has ENDED since the table was
-        # read: skipped (#737). A deploy.sh that exits between the two looks,
-        # in any folder, used to count. One still running whose folder lsof
-        # cannot answer for still counts, as #381 decided. `ps -p`, never
-        # `kill -0`, which also fails for another account's process that is
-        # running, and which this guard must still count.
-        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
-          continue
+        # Nothing from lsof: ask `ps -p` who owns the process. Nobody, so it
+        # has ENDED since the table was read: skipped (#737). A deploy.sh that
+        # exits between the two looks, in any folder, used to count. ANOTHER
+        # ACCOUNT, which is why lsof could not say: skipped too, because a
+        # folder that belongs to another account is not this one (#729 review,
+        # L-a1; until then another account's build of the same course and
+        # section refused this teacher's deploy, in every folder). THIS
+        # account, and lsof still could not say: it counts, as #381 decided,
+        # because a deploy or build of this very section is proved and only
+        # its folder is not. `ps -p`, never `kill -0`, which also fails for
+        # another account's process that is running.
+        if [[ -z "$cwd" ]]; then
+          owner="$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')"
+          if [[ -z "$owner" || "$owner" != "$(id -u)" ]]; then
+            continue
+          fi
         fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           return 0
@@ -1202,7 +1210,7 @@ fi
 # table beside its script. "another" wins over "building": a deploy.sh's own
 # rebuild is a plain `--build-only` beside the deploy.sh that started it.
 what_is_deploying_this_section() {
-  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd seen=""
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd owner seen=""
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
   # One place is asked about, so a record for it says "1".
@@ -1230,14 +1238,22 @@ what_is_deploying_this_section() {
           esac
         fi
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
-        # Nothing from lsof, and the process has ENDED since the table was
-        # read: skipped (#737). A deploy.sh that exits between the two looks,
-        # in any folder, used to count. One still running whose folder lsof
-        # cannot answer for still counts, as #381 decided. `ps -p`, never
-        # `kill -0`, which also fails for another account's process that is
-        # running, and which this guard must still count.
-        if [[ -z "$cwd" ]] && [[ -z "$(ps -p "$pid" -o pid= 2>/dev/null)" ]]; then
-          continue
+        # Nothing from lsof: ask `ps -p` who owns the process. Nobody, so it
+        # has ENDED since the table was read: skipped (#737). A deploy.sh that
+        # exits between the two looks, in any folder, used to count. ANOTHER
+        # ACCOUNT, which is why lsof could not say: skipped too, because a
+        # folder that belongs to another account is not this one (#729 review,
+        # L-a1; until then another account's build of the same course and
+        # section refused this teacher's deploy, in every folder). THIS
+        # account, and lsof still could not say: it counts, as #381 decided,
+        # because a deploy or build of this very section is proved and only
+        # its folder is not. `ps -p`, never `kill -0`, which also fails for
+        # another account's process that is running.
+        if [[ -z "$cwd" ]]; then
+          owner="$(ps -p "$pid" -o uid= 2>/dev/null | tr -d ' ')"
+          if [[ -z "$owner" || "$owner" != "$(id -u)" ]]; then
+            continue
+          fi
         fi
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           if [ "$what" = "deploy.sh" ]; then
@@ -1259,15 +1275,21 @@ what_is_deploying_this_section() {
 }
 
 # refuse_while_this_section_deploys COURSE SECTION LEG — LEG is "deploy"
-# (deploy.sh) or "build" (preview.sh --build-only). The sentences are
+# (deploy.sh), "build" (preview.sh --build-only) or "deploy-build" (preview.sh
+# --build-only --for-deploy, a deploy's own build leg, #729). The sentences are
 # contracts/shared-rules.json -> deployWhileItsSectionDeploys.sentences, and
 # the trail lines that entry's launcherLines — both checked by
 # scripts/test_deploy_while_its_section_deploys.py. Exit 1, as #381's.
 refuse_while_this_section_deploys() {
   local course="$1" section="$2" leg="$3" who what_stops not_again not_while_built
   who="$(what_is_deploying_this_section "$course" "$section")" || return 0
-  if [ "$leg" = "build" ]; then
+  if [ "$leg" = "build" ] || [ "$leg" = "deploy-build" ]; then
     what_stops="build"; not_again="built"; not_while_built="built again"
+    # A deploy's own build leg held up by another BUILD says what the
+    # teacher pressed: "cannot be deployed" (#729 review, L-a3).
+    if [ "$leg" = "deploy-build" ]; then
+      not_while_built="deployed"
+    fi
   else
     what_stops="deploy"; not_again="deployed again"; not_while_built="deployed"
   fi
@@ -1293,7 +1315,7 @@ refuse_while_this_section_deploys() {
 # <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<
 
 if [[ -n "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then
-  refuse_while_this_section_deploys "$COURSE" "$SECTION" build
+  refuse_while_this_section_deploys "$COURSE" "$SECTION" "${FOR_DEPLOY:+deploy-}build"
 fi
 
 # -------------------- Stop mode ----------------------------------------

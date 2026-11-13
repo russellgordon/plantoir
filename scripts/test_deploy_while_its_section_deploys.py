@@ -49,7 +49,7 @@ GUARD_END = "# <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<"
 DEPLOY_CALL = ('if [[ "$RESET_TOKEN" != "true" ]]; then\n'
                '  refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy\nfi\n')
 BUILD_CALL = ('if [[ -n "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then\n'
-              '  refuse_while_this_section_deploys "$COURSE" "$SECTION" build\nfi\n')
+              '  refuse_while_this_section_deploys "$COURSE" "$SECTION" "${FOR_DEPLOY:+deploy-}build"\nfi\n')
 
 
 def the_rule() -> dict:
@@ -117,7 +117,10 @@ def refuse(mac: PretendMac, launcher: str, leg: str, course: str, section: str,
 def expected_lines(who: str, leg: str, course: str, section: str) -> list:
     if who not in ("later", "another", "building"):
         raise AssertionError(f"a refused case names who as later, another or building, not {who!r}")
-    key = who + ("Deploy" if leg == "deploy" else "Build")
+    # A deploy's own build leg (#729 review, L-a3) says "deployed" only when
+    # another BUILD is in the way; otherwise it says what the build leg says.
+    says_deploy = leg == "deploy" or (leg == "deploy-build" and who == "building")
+    key = who + ("Deploy" if says_deploy else "Build")
     lines = []
     for line in the_rule()["sentences"]["launcher"][key]:
         lines.append(line.replace("{course}", course).replace("{section}", section))
@@ -130,7 +133,8 @@ def expected_trail(who: str, leg: str, course: str, section: str) -> str:
             "another": "launcherLineWhenItsSectionIsAlreadyBeingDeployed",
             "building": "launcherLineWhenItsSectionIsAlreadyBeingBuilt"}
     key = keys[who]
-    return entry[key].replace("{course}", course).replace("{section}", section).replace("{leg}", leg)
+    trail_leg = "deploy" if leg == "deploy" else "build"
+    return entry[key].replace("{course}", course).replace("{section}", section).replace("{leg}", trail_leg)
 
 
 @unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
@@ -212,6 +216,36 @@ class TheLauncherCases(unittest.TestCase):
                     self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                     self.assertEqual(len(trail), 1, trail)
 
+    def test_another_accounts_work_never_refuses_this_one(self):
+        # #729 review, L-a1: a process another account runs is listed by ps,
+        # but lsof cannot read its folder, and a folder that belongs to another
+        # account is not this one. Until then it refused, in every folder.
+        for args in ("/bin/bash ./deploy.sh ICS4U 2",
+                     "/bin/bash ./preview.sh ICS4U 2 --build-only",
+                     "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"):
+            for launcher in ("deploy.sh", "preview.sh"):
+                leg = "deploy" if launcher == "deploy.sh" else "build"
+                with self.subTest(args=args, launcher=launcher):
+                    result, trail, _course, _section, _leg = self.run_case(
+                        {"processes": [[700, 1, args]], "cwd": {}, "otherAccount": [700], "leg": leg}, launcher)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("ALLOWED", result.stdout)
+                    self.assertEqual(trail, [])
+
+    def test_this_accounts_work_whose_folder_cannot_be_read_still_counts(self):
+        # The choice kept from #381: THIS account's deploy or build of this
+        # very section is proved even when lsof cannot name its folder (it
+        # can fail for a process in the middle of exec, or under a sandbox),
+        # and the safe side for the deploy is to refuse.
+        for args, who in (("/bin/bash ./deploy.sh ICS4U 2", "another"),
+                          ("/bin/bash ./preview.sh ICS4U 2 --build-only", "building")):
+            with self.subTest(args=args):
+                result, trail, course, section, leg = self.run_case(
+                    {"processes": [[700, 1, args]], "cwd": {}}, "deploy.sh")
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                for line in expected_lines(who, leg, course, section):
+                    self.assertIn(line, result.stdout.splitlines())
+
     def test_this_run_is_never_its_own_overlap(self):
         # The worst fault #729 could add: a build leg refused by ITSELF. The
         # pretend ps lists this very run with the same words as the build it
@@ -233,7 +267,7 @@ class TheLauncherCases(unittest.TestCase):
         # kill -0 fails for another account's process that is still running,
         # which the guard must still count (#737).
         code = "\n".join(line for line in the_guard().splitlines() if not line.lstrip().startswith("#"))
-        self.assertIn('ps -p "$pid" -o pid=', code)
+        self.assertIn('ps -p "$pid" -o uid=', code)
 
     def test_the_cases_cover_what_the_review_asked_for(self):
         """#439 plan review, finding 3, and ruling 9."""
@@ -389,7 +423,7 @@ class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
                    ["ICS4U", "2"], "deploy")
 
     def test_the_real_preview_sh_build_only_refuses_while_a_leftover_run_works(self):
-        self.check("preview.sh", 'refuse_while_this_section_deploys "$COURSE" "$SECTION" build\n',
+        self.check("preview.sh", 'refuse_while_this_section_deploys "$COURSE" "$SECTION" "${FOR_DEPLOY:+deploy-}build"\n',
                    ["ICS4U", "2", "--build-only", "--image", "x"], "build")
 
     def test_the_real_launchers_refuse_while_another_build_of_the_section_runs(self):
@@ -397,12 +431,14 @@ class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
         --for-deploy and is accepted; a plain rebuild in this folder refuses
         it ("built"), and a deploy's build leg in this folder refuses a
         deploy.sh ("deployed")."""
-        build_call = 'refuse_while_this_section_deploys "$COURSE" "$SECTION" build\n'
+        build_call = 'refuse_while_this_section_deploys "$COURSE" "$SECTION" "${FOR_DEPLOY:+deploy-}build"\n'
         deploy_call = 'refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy\n'
         rebuild = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --non-interactive"]]
         build_leg = [[700, 1, "/bin/bash ./preview.sh ICS4U 2 --build-only --for-deploy"]]
         for launcher, call, arguments, rows, who, leg in (
                 ("preview.sh", build_call, ["ICS4U", "2", "--build-only", "--for-deploy", "--image", "x"],
+                 rebuild, "building", "deploy-build"),
+                ("preview.sh", build_call, ["ICS4U", "2", "--build-only", "--image", "x"],
                  rebuild, "building", "build"),
                 ("preview.sh", build_call, ["ICS4U", "2", "--for-deploy", "--build-only", "--image", "x"],
                  build_leg, "another", "build"),

@@ -126,7 +126,10 @@ class NewCourseCreator {
         schoolYear: Int?,
         workspaceURL: URL,
         existingFolderNames: [String],
-        shelved: [ReferenceCourseRule.Shelved]
+        shelved: [ReferenceCourseRule.Shelved],
+        replacing: String? = nil,
+        replaceWorld: ReferenceReplacer.World = ReferenceReplacer.World(),
+        madeGroupID: String? = nil
     ) {
         preparationProblem = nil
         finishingProblem = nil
@@ -145,7 +148,9 @@ class NewCourseCreator {
                 schoolYear: schoolYear,
                 coursesDirectoryURL: coursesDirectoryURL,
                 existingFolderNames: existingFolderNames,
-                shelved: shelved
+                shelved: shelved,
+                replacing: replacing,
+                madeGroupID: madeGroupID
             )
         } catch {
             preparationProblem = error.localizedDescription
@@ -167,12 +172,26 @@ class NewCourseCreator {
             await pumpAnswers()
             let succeeded: Bool = await runner.waitUntilFinished()
             do {
-                let made: ReferenceCopier.Made = try ReferenceCreation.finish(
-                    prepared,
-                    setupSucceeded: succeeded,
-                    wasStopped: wasCancelled,
-                    transcript: runner.transcript.displayText
-                )
+                let made: ReferenceCopier.Made
+                if prepared.replacing != nil {
+                    // A replace (#572): the old course is backed up, the
+                    // backup checked, and the new one swapped in under its
+                    // folder name, only now that the new one is complete.
+                    made = try await ReferenceCreation.finishByReplacing(
+                        prepared,
+                        setupSucceeded: succeeded,
+                        wasStopped: wasCancelled,
+                        transcript: runner.transcript.displayText,
+                        world: replaceWorld
+                    )
+                } else {
+                    made = try ReferenceCreation.finish(
+                        prepared,
+                        setupSucceeded: succeeded,
+                        wasStopped: wasCancelled,
+                        transcript: runner.transcript.displayText
+                    )
+                }
                 madeReferenceFolderName = made.folderName
             } catch {
                 finishingProblem = error.localizedDescription

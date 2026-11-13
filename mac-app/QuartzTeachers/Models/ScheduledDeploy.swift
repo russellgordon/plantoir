@@ -1180,9 +1180,13 @@ enum ScheduledDeploy {
         // `didNotFinish`, against the destination, not as the build's own
         // kinds. The advice those outcomes give (deploy it yourself) still
         // recovers. (This said a wrapper is written when the deploy is
-        // SCHEDULED; since #323 it is written at the run. What stays old is the
-        // folder's own launchers, last mirrored when the folder was opened:
-        // #748 part 4.) The same leg also builds when the folder's launchers
+        // SCHEDULED; since #323 it is written at the run. Since #748 part 4
+        // the run also brings the folder's own launchers and `.toolchain/` up
+        // to date before this script runs (`ScheduledRunFolderRefresh`), so
+        // the launchers that compare the stamp are this version's. Before
+        // that they were the version that last touched the folder, whose
+        // image matched the old stamp, so nothing was rebuilt at all.) The
+        // same leg also builds when the folder's launchers
         // ask the pages question (#768) and this check did not, which only a
         // change between the two can make happen. documentation/05-build-pipeline.md
         // → "Which toolchain built a site (#746)" and "A deploy asks for itself
@@ -2018,6 +2022,25 @@ enum ScheduledDeploy {
                 // pages that go out; written on the trail only once the run
                 // has deployed (#457 batch B's review, note 9).
                 classesDatedLaterGoingOut = classesDatedLaterLine(section: section)
+                // THE FOLDER'S OWN TOOLS, brought up to date (#748 part 4).
+                // The wrapper written just above is this version's, but it
+                // runs the folder's `preview.sh` and `deploy.sh`, which hash
+                // the folder's `.toolchain/` to choose the website builder;
+                // the window refreshes those when it opens a folder, and after
+                // an update installed overnight nobody has. Holding the
+                // course's leases, after the settings decision (so a run that
+                // stands down copies nothing) and after the classes going out
+                // are read, before anything runs. It never stops the deploy:
+                // `ScheduledRunFolderRefresh.decide`.
+                let refresh: ScheduledRunFolderRefresh.Report = ScheduledRunFolderRefresh.bringUpToDate(
+                    workingFolder: workingFolderURL(forCourseDirectory: section.courseDirectory)
+                )
+                if let line = ScheduledRunFolderRefresh.trailLine(for: refresh) {
+                    ActivityTrail.note(
+                        .scheduledDeployGotItsFolderReady, line,
+                        course: section.courseCode, section: section.sectionNumber
+                    )
+                }
             case .leaveQuietly:
                 for lease in leasesTaken {
                     WorkLeaseFiles.remove(at: lease)

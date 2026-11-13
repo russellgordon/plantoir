@@ -261,8 +261,12 @@ final class ReferenceCourseTests: XCTestCase {
     func testTheUniquenessRuleIsTheContractsRule() throws {
         let rules: [String: Any] = try ReferenceCourseTests.rules()
         let block: [String: Any] = try XCTUnwrap(rules["codeUniqueWithinAGroup"] as? [String: Any])
-        for testCase in try XCTUnwrap(block["cases"] as? [[String: Any]]) {
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 12, "a case was added or lost (#572's third piece added five)")
+        for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
+            // A made group is named in a case; the rule sees an id, one per
+            // name (#572, third piece).
             var shelf: [ReferenceCourseRule.Shelved] = []
             for entry in try XCTUnwrap(testCase["shelf"] as? [[String: Any]]) {
                 let code: String = try XCTUnwrap(entry["code"] as? String)
@@ -271,17 +275,45 @@ final class ReferenceCourseTests: XCTestCase {
                     ?? ReferenceCourseRule.proposedFolderName(
                         forCode: code, schoolYear: year, existingFolderNames: []
                     )
-                shelf.append(
-                    ReferenceCourseRule.Shelved(displayCode: code, schoolYear: year, folderName: folderName)
-                )
+                var madeGroupID: String?
+                if let groupName = entry["madeGroup"] as? String {
+                    madeGroupID = "id of " + groupName
+                }
+                shelf.append(ReferenceCourseRule.Shelved(
+                    displayCode: code, schoolYear: year, folderName: folderName, madeGroupID: madeGroupID
+                ))
             }
             let placing: [String: Any] = try XCTUnwrap(testCase["placing"] as? [String: Any])
-            let trouble: ReferenceCourseRule.Trouble? = ReferenceCourseRule.trouble(
-                placing: try XCTUnwrap(placing["code"] as? String),
-                inYear: placing["year"] as? Int,
-                among: shelf,
-                ignoring: testCase["ignoringFolderName"] as? String
-            )
+            let code: String = try XCTUnwrap(placing["code"] as? String)
+            var trouble: ReferenceCourseRule.Trouble?
+            if let groupName = placing["madeGroup"] as? String {
+                trouble = ReferenceCourseRule.trouble(
+                    placing: code, in: .made("id of " + groupName), named: groupName, among: shelf,
+                    ignoring: testCase["ignoringFolderName"] as? String
+                )
+                if let expectedSentence = testCase["expectSentence"] as? String {
+                    XCTAssertEqual(expectedSentence, "codeAlreadyInThatGroup", name)
+                    XCTAssertEqual(
+                        trouble?.sentence,
+                        ReferenceCourseRule.Trouble.codeAlreadyInThatGroup(code: code, group: groupName).sentence,
+                        name
+                    )
+                }
+            } else {
+                trouble = ReferenceCourseRule.trouble(
+                    placing: code,
+                    inYear: placing["year"] as? Int,
+                    among: shelf,
+                    ignoring: testCase["ignoringFolderName"] as? String
+                )
+                if testCase["expectSentence"] as? String == "codeAlreadyInThatYear" {
+                    XCTAssertEqual(
+                        trouble?.sentence,
+                        ReferenceCourseRule.Trouble.codeAlreadyInThatYear(code: code, schoolYear: placing["year"] as? Int).sentence,
+                        name
+                    )
+                }
+            }
             let expected: String = try XCTUnwrap(testCase["expect"] as? String)
             if expected == "refused" {
                 XCTAssertNotNil(trouble, name)

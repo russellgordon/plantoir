@@ -539,6 +539,7 @@ struct CopyPageSheet: View {
         let destinationDirectoryPath: String = destinationCourse.directoryURL.path
         let destinationFolderCode: String = destinationCourse.code
         let sourceFolderName: String = source.code
+        let sourceDirectoryURL: URL = source.directoryURL
         let takeABackup: Bool = backupFileName == nil
 
         Task { @MainActor in
@@ -564,7 +565,11 @@ struct CopyPageSheet: View {
                 }
             }
             stage = .copying
+            // Counted as reading from the source for the length of the pass,
+            // so a replace of that reference course waits (#572).
+            PageCopySourceReads.begin(sourceDirectoryURL)
             let done: CoursePageCopyOutcome = await CoursePageCopier.copying(request)
+            PageCopySourceReads.end(sourceDirectoryURL)
             outcome = done
             stage = .finished
             workspace.reloadCourses()

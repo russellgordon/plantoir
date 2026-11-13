@@ -22,6 +22,7 @@ final class SheetTitleScanTests: XCTestCase {
         ("KeepACopyForReferenceSheet", "Wizard/KeepACopyForReferenceSheet.swift", true),
         ("ImportCoursesForReferenceSheet", "Wizard/ImportCoursesForReferenceSheet.swift", false),
         ("SetSchoolYearSheet", "Wizard/SetSchoolYearSheet.swift", false),
+        ("ReferenceGroupNameSheet", "Wizard/ReferenceGroupNameSheet.swift", false),
         ("AddSectionSheet", "Wizard/AddSectionSheet.swift", true),
         ("CopyPageSheet", "CopyPage/CopyPageSheet.swift", false),
         ("LinksChecklistSheet", "Section/LinksChecklistSheet.swift", false),
@@ -48,10 +49,12 @@ final class SheetTitleScanTests: XCTestCase {
 
     // MARK: - Tests
 
-    /// Nineteen sheets (fifteen, batch B's, #454's and #709's two), each titled through `SheetTitle`, in the shape it is
-    /// listed with — and no title in those files at `.title2` or larger.
+    /// Twenty sheets (fifteen, batch B's, #454's, #709's two and #572's
+    /// New Group and Rename Group sheet), each titled through `SheetTitle`, in
+    /// the shape it is listed with — and no title in those files at `.title2`
+    /// or larger.
     func testEverySheetIsTitledByTheOneShape() throws {
-        XCTAssertEqual(SheetTitleScanTests.sheets.count, 19)
+        XCTAssertEqual(SheetTitleScanTests.sheets.count, 20)
         var problems: [String] = []
         for sheet in SheetTitleScanTests.sheets {
             let source: String = try SheetTitleScanTests.source(of: sheet.file)

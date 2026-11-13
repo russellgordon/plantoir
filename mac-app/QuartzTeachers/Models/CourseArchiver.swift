@@ -191,6 +191,10 @@ enum CourseArchiver {
         let archiveURL: URL = try await archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         try beforeRemoving()
         try FileManager.default.removeItem(at: course.directoryURL)
+        // Its folder name is free now, and the next course of that code and
+        // year is given it: the group it was in on the reference shelf goes
+        // with it, so the stranger is not filed there (#572 plan review H2).
+        ReferenceShelfStore.forgetRemoved(course.code, coursesDirectoryURL: coursesDirectoryURL)
         // The built website lives OUTSIDE the working folder now, so removing
         // the course folder no longer removes it — see `BuildOutputLocation`.
         // Two reasons it has to go with the course: it is otherwise invisible

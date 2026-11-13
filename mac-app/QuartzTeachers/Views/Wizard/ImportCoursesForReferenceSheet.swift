@@ -133,6 +133,15 @@ struct ImportCoursesForReferenceSheet: View {
     /// when the sheet goes; the zip itself is never written to.
     @State var openedZipFolderURL: URL?
 
+    /// The warning before a reference course is replaced, while it is up
+    /// (#572, second piece), and the sentence the summary says once one was.
+    @State var replaceWarning: ReferenceReplacer.Warning?
+    @State var replacedNote: String?
+
+    /// Why Replace It… was refused before its warning (the course is
+    /// previewing, or open in Obsidian), said under the button.
+    @State var replaceRefusal: String?
+
     /// The day the year lists are built from. A stored property rather than a
     /// call to the clock inside the body, so the lists cannot change under
     /// the teacher mid-sheet — and so a test can move it.
@@ -252,6 +261,22 @@ struct ImportCoursesForReferenceSheet: View {
         return result
     }
 
+    /// The course on the shelf this row would replace, when Replace It… is
+    /// offered for it: an import of ONE course (plan review M6: a refused row
+    /// in a run of several keeps its sentence and nothing else), ticked,
+    /// readable, and refused by the shelf rule because of a course already
+    /// on the shelf.
+    func courseInTheWay(of course: ReferenceImportSource.FoundCourse) -> ReferenceCourseRule.Shelved? {
+        if courses.count != 1 || course.problem != nil || !ticked.contains(course.id) {
+            return nil
+        }
+        return ReferenceCourseRule.courseInTheWay(
+            placing: course.courseCode,
+            inYear: schoolYear(for: course),
+            among: workspace.shelvedReferenceCourses(on: today)
+        )
+    }
+
     /// True when any row is a class kept a website folder per class, so the
     /// sheet says once what stays behind of those — and that it is not a
     /// loss.
@@ -302,6 +327,9 @@ struct ImportCoursesForReferenceSheet: View {
         .padding([.horizontal, .bottom], 20)
         .sheetTitle(ReferenceImportWording.title)
         .frame(width: 560)
+        .replaceReferenceCourseAlert($replaceWarning) { folderName in
+            startImporting(replacing: folderName)
+        }
         .task {
             await readTheFolder()
         }
@@ -454,6 +482,20 @@ struct ImportCoursesForReferenceSheet: View {
                             .foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("importTrouble-\(course.folderName)")
+                        // The one answer to the shelf rule's refusal (#572).
+                        if let inTheWay = courseInTheWay(of: course) {
+                            Button(ReferenceReplaceWording.replaceButton) {
+                                offerToReplace(inTheWay.folderName)
+                            }
+                            .accessibilityIdentifier("replaceReferenceCourseButton")
+                            if let replaceRefusal {
+                                Text(replaceRefusal)
+                                    .font(.callout)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityIdentifier("replaceRefusal")
+                            }
+                        }
                     }
 
                     if course.olderLayout != nil {
@@ -577,6 +619,12 @@ struct ImportCoursesForReferenceSheet: View {
                 }
             }
             .accessibilityIdentifier("importSummary")
+
+            if let replacedNote {
+                Text(replacedNote)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("importReplacedNote")
+            }
 
             Text(ReferenceImportWording.whereTheyAre)
                 .foregroundStyle(.secondary)
@@ -866,12 +914,45 @@ struct ImportCoursesForReferenceSheet: View {
         }
     }
 
-    func startImporting() {
+    /// Replace It…: the refusal, said in the sheet's own place for one, or
+    /// the warning (`ReferenceReplacer.offer`).
+    func offerToReplace(_ folderName: String) {
+        guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
+            return
+        }
+        let world: ReferenceReplacer.World = ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening)
+        Task { @MainActor in
+            let offer: ReferenceReplacer.Offer = await ReferenceReplacer.offer(
+                toReplace: folderName, coursesDirectoryURL: coursesDirectoryURL, world: world
+            )
+            switch offer {
+            case .refused(let sentence):
+                replaceRefusal = sentence
+            case .warn(let warning):
+                replaceRefusal = nil
+                replaceWarning = warning
+            }
+        }
+    }
+
+    /// - Parameter replacing: the reference course the teacher chose to
+    ///   replace in the warning (#572), for the one course of this import;
+    ///   the Import button passes nothing, so it never replaces anything.
+    func startImporting(replacing: String? = nil) {
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL,
               let source else {
             return
         }
-        let chosen: [ReferenceImporter.Request] = requests
+        var chosen: [ReferenceImporter.Request] = requests
+        if let replacing, chosen.count == 1 {
+            chosen = [ReferenceImporter.Request(
+                course: chosen[0].course, schoolYear: chosen[0].schoolYear, replacing: replacing
+            )]
+        }
+        var replacedGroup: String = SchoolYear.otherGroupName
+        if let year = chosen.first?.schoolYear {
+            replacedGroup = SchoolYear.label(forStartingYear: year)
+        }
         var folderNames: [String] = []
         for course in workspace.courses {
             folderNames.append(course.code)
@@ -888,11 +969,22 @@ struct ImportCoursesForReferenceSheet: View {
                 // A zip is named by its own file name on the trail, not by
                 // the folder it was opened into.
                 from: openedZipFolderURL == nil ? source.rootURL : chosenURL,
+                replaceWorld: ReferenceReplacer.World(obsidianOpening: workspace.obsidianOpening),
                 progress: { step in
                     progress = step
                 }
             )
             outcomes = results
+            if let replacing, chosen.count == 1, results.count == 1 {
+                switch results[0] {
+                case .imported(let made), .importedWithSomethingMissing(let made, _, _):
+                    replacedNote = ReferenceReplaceWording.replacedNote(
+                        course: made.displayCode, group: replacedGroup, folder: replacing
+                    )
+                default:
+                    break
+                }
+            }
             stage = .done
 
             var landed: [String] = []

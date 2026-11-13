@@ -1909,7 +1909,8 @@ setup_course.py inside the Docker container", and the diagnostic trio
   printed: it is derived from the folder's path, which the trail records.
 - **A folder still holding the old launchers** is harmless during the
   change: the app replaces a folder's launchers whenever it opens it
-  (`reloadCourses` → `refreshLaunchersIfNeeded`), and an old copy run some
+  (`reloadCourses` → `refreshLaunchersIfNeeded`), and so does a scheduled
+  deploy before it runs them since #748 part 4; an old copy run some
   other way (an MCP-driven preview in a folder no window has reopened)
   only makes a bar skip "Starting up…" — the bar takes the HIGHEST marker
   it has seen, so it never stalls on the missing one.
@@ -2491,6 +2492,41 @@ same folder (a developer's Debug build beside an installed copy; CLAUDE.md,
 Trap 2), the newer copy's `--for-deploy` can meet the older copy's
 `preview.sh`, which answers "Unknown option"; a teacher has one copy.
 
+**After the #729 implementation review.** Three changes, each with cases
+that fail on the code before them.
+
+- **Another account's work never counts (L-a1).** `ps -Ao` lists every
+  account's processes, and `lsof` cannot read another account's working
+  folder. Until this change the guard read "folder unknown" as "counts", so
+  another account's build or deploy of the same course code and section
+  refused this teacher's, in every folder. The reviewer measured that with a
+  pretend table. Now, when `lsof` says nothing, the guard asks `ps -p <pid>
+  -o uid=`. Nobody: the process has ended (#737), skipped. Another uid: its
+  folder is another account's, skipped. This account: it still counts, as
+  #381 decided, because a deploy or build of this very section is proved and
+  only its folder is not (`lsof` can fail for a process in the middle of an
+  `exec`, for example). All three guard copies say so; the three PROCESS
+  TABLE BLOCKs are unchanged. Tests: `otherAccount` in the pretend table
+  (`test_another_accounts_work_never_refuses_this_one`, and the #381 guard's
+  twin), and `test_this_accounts_work_whose_folder_cannot_be_read_still_counts`.
+- **Two builds at the same instant both refuse (L-a2).** Measured by the
+  reviewer with real processes (each run the guard, then a 2 s sleep), M4
+  Pro: started together, BOTH refused 20 of 20; started 50, 100, 200, 400 or
+  800 ms apart, exactly one refused, 10 of 10 at each. The overlap never gets
+  through. What a teacher sees is the refusal ("…is already being built…" or
+  "…already being deployed…"), and a second press goes ahead once the other
+  is gone. No tie-break was added: a provably right one needs an order both
+  runs agree on, and the process table gives none (a start time ties at the
+  same second, a process id wraps). Two `deploy.sh` runs had this shape
+  before (#439). `deployWhileItsSectionDeploys.knownLimits` says so.
+- **A deploy's build leg says "deployed" (L-a3).** `preview.sh` with
+  `--for-deploy` asks the guard with the leg `deploy-build`. When another
+  BUILD is in the way it prints `buildingDeploy` ("…cannot be deployed until
+  that has finished.") rather than "cannot be built again", because the
+  teacher pressed Deploy. With a deploy or a deploy set for later in the way
+  it keeps the build leg's words (`anotherBuild`, `laterBuild`), and its trail
+  line says `build`. Two `launcherCases` pin it.
+
 **Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
 script's process id (misses Terminal, leaves a gap, touches a shared format);
 refusing or deferring a re-set while the run works; letting the run survive a
@@ -2503,7 +2539,7 @@ in Terminal (its legs are refused and it is recorded as stopped).
 **Windows (#467).** The same guard is in `deploy.ps1` and in `preview.ps1`'s
 build leg, asked at the same points and printing the same lines, from
 `Win32_Process`. All 23 `launcherCases` of #467 run there
-(`test_launcher_rules.ps1` section 5); the 11 #729 added, and the one it
+(`test_launcher_rules.ps1` section 5); the 13 #729 added, and the one it
 changed ("a preview being served, or being stopped, is not a build", which
 held a plain `--build-only` until then), are owed by the Windows issue for
 #729. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
