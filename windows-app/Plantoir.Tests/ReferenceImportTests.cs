@@ -38,15 +38,26 @@ public class ReferenceImportTests : IDisposable
     [Fact]
     public void EverySentenceIsTheContracts()
     {
+        // A sentence about importing a backup or archive zip (#572's first
+        // piece, owed by #823) is held open by key. "Said here" is present AND
+        // equal: the import's explanation is CHANGED in the contract to name
+        // zips, and Windows, which cannot import one yet, keeps the true
+        // sentence until #823 lands; the entry closes the day it matches.
+        var sentences = Importing["wording"]!.AsObject().Where(pair => !ReferenceImport.IsNotSaidHere(pair.Key)).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.ImportWording, sentences.Select(pair => pair.Key),
+            sentences.Where(pair => ReferenceImport.Wording.TryGetValue(pair.Key, out string? said) && said == pair.Value!.ToString())
+                     .Select(pair => pair.Key));
         int compared = 0;
-        foreach (var (key, value) in Importing["wording"]!.AsObject())
+        foreach (var (key, value) in sentences)
         {
-            if (ReferenceImport.IsNotSaidHere(key)) continue;
+            if (deferred.Contains(key)) continue;
             Assert.True(ReferenceImport.Wording.TryGetValue(key, out string? mine), $"importing.wording.{key} is not said here");
             Assert.Equal(value!.ToString(), mine);
             compared++;
         }
-        Assert.True(compared >= 26, $"only {compared}");
+        // 26 said here when the floor was set; the held explanation is one of
+        // them, so the floor counts the compared and the held together.
+        Assert.True(compared + deferred.Count >= 26, $"only {compared}, and {deferred.Count} held");
     }
 
     [Fact]

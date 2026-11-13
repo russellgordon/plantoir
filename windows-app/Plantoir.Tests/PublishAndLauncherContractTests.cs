@@ -306,9 +306,15 @@ public class PublishAndLauncherContractTests
         foreach (var field in typeof(CredentialRequests).GetFields(BindingFlags.Public | BindingFlags.Static))
             if (field.GetValue(null) is CredentialRequest request) byName[request.Name] = request;
 
-        foreach (var entry in doc["credentialPrompts"]!["everyRequest"]!.AsArray())
+        // A request this app does not have yet is held open by name, the same
+        // entry ContractTests.AppRules_CredentialRequests_MatchesContract reads.
+        var everyRequest = doc["credentialPrompts"]!["everyRequest"]!.AsArray();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames,
+            everyRequest.Select(entry => entry!["name"]!.ToString()), byName.Keys);
+        foreach (var entry in everyRequest)
         {
             string name = entry!["name"]!.ToString();
+            if (deferred.Contains(name)) continue;
             Assert.True(byName.TryGetValue(name, out var request),
                 $"The contract describes a credential request called \"{name}\" that this app " +
                 "does not have.");
@@ -339,21 +345,29 @@ public class PublishAndLauncherContractTests
         var flags = doc["launcherFlags"]!["deployExtras"]!.AsArray();
         Assert.NotEmpty(flags);
 
+        // The PARSER, not the usage text. `--diagnose` appears three times
+        // in deploy.ps1 — twice in the help — so plain containment would
+        // stay green after the flag stopped being accepted, which is the
+        // whole failure this list is meant to catch: the launcher prints
+        // "Unknown option" and exits, and to a teacher that is a publish
+        // that just did not start. Coupled to the `'^--flag$'` switch idiom
+        // both launchers use on purpose; a rewrite that changes the idiom
+        // should change this line with it.
+        bool Parsed(string name) => launcher.Contains($"'^{name}$'", StringComparison.Ordinal)
+                                 || launcher.Contains($"'^{name}=", StringComparison.Ordinal);
+
+        // A flag deploy.ps1 does not parse yet (#709's unit-plan sharing and
+        // #833's, owed by #824) is held open by the name before the space.
+        // GapsIn takes sets, so --non-interactive, listed twice, is one name.
+        var names = flags.Select(entry => entry!["flag"]!.ToString().Split(' ')[0]).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.DeployLauncherExtras, names, names.Where(Parsed));
+
         foreach (var entry in flags)
         {
             string flag = entry!["flag"]!.ToString();
             string name = flag.Split(' ')[0];
-
-            // The PARSER, not the usage text. `--diagnose` appears three times
-            // in deploy.ps1 — twice in the help — so plain containment would
-            // stay green after the flag stopped being accepted, which is the
-            // whole failure this list is meant to catch: the launcher prints
-            // "Unknown option" and exits, and to a teacher that is a publish
-            // that just did not start. Coupled to the `'^--flag$'` switch idiom
-            // both launchers use on purpose; a rewrite that changes the idiom
-            // should change this line with it.
-            bool parsed = launcher.Contains($"'^{name}$'", StringComparison.Ordinal)
-                       || launcher.Contains($"'^{name}=", StringComparison.Ordinal);
+            if (deferred.Contains(name)) continue;
+            bool parsed = Parsed(name);
 
             if (entry["macOnly"]?.GetValue<bool>() == true)
             {
@@ -666,6 +680,7 @@ public class PublishAndLauncherContractTests
         var unguarded = new List<string>();
         bool insideAFunction = false;
         string function = "";
+        var guardedAtTheirTop = new SortedSet<string>(StringComparer.Ordinal);
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -684,16 +699,45 @@ public class PublishAndLauncherContractTests
 
             if (insideAFunction)
             {
-                // One function is allowed to hold a question, and it is checked
-                // separately below rather than waved through: the guard sits at
-                // its single call site, where the output goes to the screen and
-                // the exit code is the script's.
-                if (function != GuardedAtItsCallSite)
+                // Two shapes of function may hold a question, and each is
+                // checked below rather than waved through. (1) The one guarded
+                // at its single call site, because its output is captured.
+                // (2) A function guarded at its OWN top - its first statement
+                // after any `local` lines is assert_can_ask - and called only
+                // directly, never in a $( ), a pipeline or backticks, so the
+                // refusal reaches the screen and its exit is the script's
+                // (#709's ask_for_the_plan_credential; step 0, 2026-11-13).
+                if (function == GuardedAtItsCallSite) { }
+                else if (IsGuardedAtItsTop(lines, function))
+                    guardedAtTheirTop.Add(function);
+                else
                     unguarded.Add($"line {i + 1} is inside {function}(), where a guard's output " +
-                                  "and exit code belong to whoever calls it");
+                                  "and exit code belong to whoever calls it, and the function does not " +
+                                  "start with assert_can_ask");
             }
             else if (!guarded)
                 unguarded.Add($"line {i + 1} has no assert_can_ask above it");
+        }
+
+        // Shape (2) holds only while every call is direct: a call captured,
+        // piped or put in backticks runs in a subshell, where the guard's
+        // refusal and exit belong to the subshell again.
+        foreach (string guardedFunction in guardedAtTheirTop)
+        {
+            var calls = new List<int>();
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string trimmed = lines[i].TrimStart();
+                if (trimmed.StartsWith("#", StringComparison.Ordinal)) continue;
+                if (Regex.IsMatch(lines[i], @"^" + guardedFunction + @"\(\) \{")) continue;
+                if (!Regex.IsMatch(lines[i], @"(^|[^A-Za-z0-9_])" + guardedFunction + @"([^A-Za-z0-9_]|$)")) continue;
+                calls.Add(i);
+                if (!Regex.IsMatch(trimmed, @"^" + guardedFunction + @"(\s|$)") || Regex.IsMatch(trimmed, @"\$\(|`|\|"))
+                    unguarded.Add($"line {i + 1} calls {guardedFunction}() other than directly, so the guard " +
+                                  "at its top refuses into a subshell");
+            }
+            if (calls.Count == 0)
+                unguarded.Add($"{guardedFunction}() asks a question and nothing calls it directly");
         }
 
         Assert.True(unguarded.Count == 0,
@@ -728,6 +772,26 @@ public class PublishAndLauncherContractTests
     /// read it as an ordinary failure and leave no note.
     /// </remarks>
     private const string GuardedAtItsCallSite = "prompt_for_cf_account";
+
+    /// <summary>
+    /// Whether <paramref name="function"/>'s first statement, after blank
+    /// lines, comments and <c>local</c> declarations (plan review L1), is
+    /// <c>assert_can_ask</c>. Anything before it - an echo, a read - would
+    /// run before the refusal could.
+    /// </summary>
+    internal static bool IsGuardedAtItsTop(string[] lines, string function)
+    {
+        int start = Array.FindIndex(lines, line => Regex.IsMatch(line, @"^" + function + @"\(\) \{"));
+        if (start < 0) return false;
+        for (int i = start + 1; i < lines.Length; i++)
+        {
+            string trimmed = lines[i].Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith("#", StringComparison.Ordinal)) continue;
+            if (Regex.IsMatch(trimmed, @"^local(\s|$)")) continue;
+            return Regex.IsMatch(trimmed, @"^assert_can_ask(\s|$)");
+        }
+        return false;
+    }
 
     // ---- The address handed to the teacher's browser ----------------------
 

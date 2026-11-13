@@ -124,6 +124,53 @@ internal static class NamedGapLedger
     /// <summary><c>course-management.json</c> → <c>zipNames.cases</c>, by case <c>name</c> (the file name).</summary>
     internal const string ZipNameCases = "course-management.json → zipNames.cases";
 
+    // Wired in by step 0 of v2.0.0 (2026-11-13, #787): every area below holds
+    // only what a later piece of the same release builds, and each is read by
+    // the test named in its summary.
+
+    /// <summary><c>assist-wording.json</c> → <c>wording</c>, by key: a sentence this app HAS a member for and says in older words (<c>ContractTests.SaidAsTheContract</c>); a held sentence must still differ.</summary>
+    internal const string AssistWordingSaidDifferently = "assist-wording.json → wording (said in older words here)";
+
+    /// <summary><c>app-rules.json</c> → <c>credentialPrompts.cases</c>, by <c>prompt</c>: a prompt that matches no request here yet (<c>ContractTests.AppRules_CredentialPrompts_MatchesContract</c>); a held prompt must match nothing.</summary>
+    internal const string CredentialPromptCases = "app-rules.json → credentialPrompts.cases";
+
+    /// <summary><c>app-rules.json</c> → <c>credentialRequests.requests</c> and <c>credentialPrompts.everyRequest</c>, by <c>name</c> (<c>ContractTests.AppRules_CredentialRequests_MatchesContract</c>, <c>PublishAndLauncherContractTests.EachCredentialIsHiddenOrShownAsTheContractSays</c>).</summary>
+    internal const string CredentialRequestNames = "app-rules.json → credentialRequests.requests";
+
+    /// <summary><c>app-rules.json</c> → <c>launcherFlags.preview</c>, by the flag's name before the space (<c>ContractTests.AppRules_LauncherFlags_MatchesContract</c>).</summary>
+    internal const string PreviewLauncherFlags = "app-rules.json → launcherFlags.preview";
+
+    /// <summary><c>app-rules.json</c> → <c>launcherFlags.deployExtras</c>, by the flag's name before the space (<c>PublishAndLauncherContractTests.TheDeployLauncherAcceptsTheExtraFlagsTheContractGivesIt</c>).</summary>
+    internal const string DeployLauncherExtras = "app-rules.json → launcherFlags.deployExtras";
+
+    /// <summary><c>shared-rules.json</c> → <c>deployWhileItsSectionDeploys.sentences.launcher</c>, by key: a launcher line the app cannot read as its refusal yet (<c>DeployWhileItsSectionDeploysTests.EveryLauncherSentenceCarriesAMarkerTheAppReads</c>).</summary>
+    internal const string LauncherRefusalSentences = "shared-rules.json → deployWhileItsSectionDeploys.sentences.launcher";
+
+    /// <summary><c>shared-rules.json</c> → <c>referenceCourses.codeUniqueWithinAGroup.cases</c>, by case <c>name</c> (<c>ReferenceCourseTests.ACodeIsUniqueWithinOneSchoolYearGroup</c>).</summary>
+    internal const string ShelfCodeCases = "shared-rules.json → referenceCourses.codeUniqueWithinAGroup.cases";
+
+    /// <summary><c>shared-rules.json</c> → <c>referenceCourses.wording</c>, by key: missing here or said differently (<c>ReferenceCourseTests.EverySentenceIsTheContracts</c>).</summary>
+    internal const string ShelfWording = "shared-rules.json → referenceCourses.wording";
+
+    /// <summary><c>shared-rules.json</c> → <c>referenceCourses.importing.wording</c>, by key: missing here or said differently (<c>ReferenceImportTests.EverySentenceIsTheContracts</c>).</summary>
+    internal const string ImportWording = "shared-rules.json → referenceCourses.importing.wording";
+
+    /// <summary><c>shared-rules.json</c> → <c>subjectMenus.items</c>, by item name (both facts of <c>SubjectMenusContractTests</c>).</summary>
+    internal const string SubjectMenuItems = "shared-rules.json → subjectMenus.items";
+
+    /// <summary><c>shared-rules.json</c> → <c>specialNames.platformWording.machine.usedIn</c>, by entry (<c>MachineWordContractTests.EverySentenceTheContractWritesWithTheMachineIsSaidFilled</c>).</summary>
+    internal const string MachineWordUsedIn = "shared-rules.json → specialNames.platformWording.machine.usedIn";
+
+    /// <summary>
+    /// <c>windows-app/test_launcher_rules.ps1</c>'s rows, by <c>"&lt;list&gt;\t&lt;name&gt;"</c>,
+    /// the list spelled as the runner's <c>Report</c> names it (per launcher:
+    /// <c>deployWhileItsSectionDeploys/deploy.ps1</c>, …). Handed to the runner by
+    /// <c>LauncherRulesContractTests</c> in <c>PLANTOIR_LEDGERED_LAUNCHER_CASES</c>;
+    /// a held row prints <c>ledgered</c> while it fails in the shape it is held
+    /// for, and <c>CLOSED</c> (a failure) the day it passes.
+    /// </summary>
+    internal const string LauncherRunnerRows = "windows-app/test_launcher_rules.ps1 → Report rows";
+
     // The milestones, spelled EXACTLY as their GitHub titles. NamedGapLedgerTests
     // parses each entry's milestone as a version and requires it to be LATER
     // than Plantoir.csproj's <Version>; anything that is not a version fails
@@ -134,6 +181,7 @@ internal static class NamedGapLedger
     private const string V180 = "v1.8.0";
     private const string V191 = "v1.9.1";
     private const string V193 = "v1.9.3";
+    private const string V200 = "v2.0.0";
 
     /// <summary>
     /// One thing the contract names and this app does not have yet.
@@ -171,8 +219,103 @@ internal static class NamedGapLedger
     // #736's ("asked an assistant to fix problems") went the same day, with
     // the Fix with… buttons that write it.
 
+    // Step 0 of v2.0.0 (2026-11-13, #787): the reds the mac's v2.0.0 work
+    // brought, each owned by the open `windows` issue that builds it later in
+    // the same run. Each piece deletes its own entries as it lands, and the
+    // ledger fails, naming the entry, the moment a held thing exists here.
+    private const string Reason799 = "a deploy that builds the site again only when something changed is #799's piece of v2.0.0, not built here yet";
+    private const string Reason801 = "the course's Planning tab, its unit plans and Plan a Unit are #801's piece of v2.0.0, not built here yet";
+    private const string Reason811 = "a section's Coverage tab is #811's piece of v2.0.0, not built here yet";
+    private const string Reason820 = "Open in Browser on a unit plan is #820's piece of v2.0.0, not built here yet";
+    private const string Reason823 = "making a course straight onto the reference shelf and importing a backup or archive zip are #823's piece of v2.0.0; until it lands Windows cannot import a zip, so its own import sentence is the true one";
+    private const string Reason824 = "sharing a course's unit plans (with #848's look before a share) is #824's piece of v2.0.0, not built here yet";
+    private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
+    private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
+    private const string Reason828 = "the launchers refusing an overlapping build of a section (#729), and what the app reads from that refusal, are #828's piece of v2.0.0, not built here yet";
+    private const string Reason854 = "#835's first part (a hold from a scheduled deploy named as one that is running, not 'set for later') is #854's piece of v2.0.0, not built here yet";
+
+    /// <summary>A launcher-runner row key, as the runner builds it: the list label, a TAB, the case name.</summary>
+    private static string Row(string list, string name) => list + "\t" + name;
+
+    /// <summary>One case of a launcher list that BOTH launchers run, held for each.</summary>
+    private static IEnumerable<string> BothLaunchers(string list, params string[] names) =>
+        new[] { "deploy.ps1", "preview.ps1" }.SelectMany(launcher => names.Select(name => Row(list + "/" + launcher, name)));
+
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
+        // ---- step 0 of v2.0.0: activityTrail.mustRecord (22; "course
+        // restored from a backup" is built in step 0 itself, ruling F3).
+        Owed(ActivityTrailEvents, 823, V200, Reason823,
+             "course created for reference", "course could not be created for reference", "zip could not be read for reference"),
+        Owed(ActivityTrailEvents, 826, V200, Reason826,
+             "reference course replaced", "reference course could not be replaced", "unfinished replace of a reference course put right"),
+        Owed(ActivityTrailEvents, 827, V200, Reason827,
+             "reference group made", "reference group renamed", "reference group removed", "reference course moved to a group",
+             "reference groups not changed", "reference groups started again"),
+        Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
+        Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
+        Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
+        Owed(ActivityTrailEvents, 811, V200, Reason811,
+             "looked at a section's curriculum coverage", "asked to make a section's coverage map again"),
+        Owed(ActivityTrailEvents, 824, V200, Reason824,
+             "unit plans shared", "unit plan share refused", "unit plan sharing stopped", "unit plan password changed"),
+
+        // ---- step 0: assist-wording.json → wording
+        Owed(AssistWordingKeys, 828, V200, Reason828, "deployRefusedWhileItsSectionIsBeingBuilt"),
+        Owed(AssistWordingSaidDifferently, 854, V200, Reason854,
+             "courseIsBeingBuiltElsewhere", "deployRefusedWhileALaterDeployWorks"),
+
+        // ---- step 0: app-rules.json → credentials and launcher flags
+        Owed(CredentialPromptCases, 824, V200, Reason824,
+             "Choose a username for these unit plans: ",
+             "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: ",
+             "Choose a password for these unit plans (8 to 64 characters): ",
+             "Please choose a password of 8 to 64 letters, digits, spaces or symbols: "),
+        Owed(CredentialRequestNames, 824, V200, Reason824, "unitPlanUsername", "unitPlanPassword"),
+        Owed(PreviewLauncherFlags, 828, V200, Reason828, "--for-deploy"),
+        Owed(DeployLauncherExtras, 824, V200, Reason824,
+             "--plans", "--protect", "--remove-password", "--change-password", "--send-answer-keys-openly",
+             "--password-only", "--include-answer-keys", "--stop-sharing", "--year"),
+
+        // ---- step 0: shared-rules.json → deployWhileItsSectionDeploys
+        Owed(LauncherRefusalSentences, 828, V200, Reason828, "buildingDeploy", "buildingBuild"),
+        Owed(LauncherRefusalSentences, 854, V200, Reason854, "laterDeploy", "laterBuild"),
+
+        // ---- step 0: the launcher runner's rows. #828: fifteen launcherCases
+        // rows (seven cases on each launcher, one preview case) and the two
+        // "already being built" sentences on each launcher. #854: the two
+        // "later" sentences and the "later" trail line on each launcher.
+        Owed(LauncherRunnerRows, 828, V200, Reason828,
+             Row("previewWhileItsSectionDeploys", "a deploy's build leg (--build-only --for-deploy) is a deploy")),
+        Owed(LauncherRunnerRows, 828, V200, Reason828, BothLaunchers("deployWhileItsSectionDeploys",
+             "a deploy's build leg (--build-only --for-deploy) in this folder refuses a deploy",
+             "a deploy's build leg refuses the build leg of another deploy",
+             "a rebuild (--build-only, no --for-deploy) refuses a deploy, in words that say built",
+             "a deploy's own build leg held up by a rebuild says it cannot be deployed",
+             "a rebuild refuses another build of the section",
+             "a rebuild whose working folder cannot be asked still counts",
+             "two builds started by the same app are not one family").ToArray()),
+        Owed(LauncherRunnerRows, 828, V200, Reason828,
+             BothLaunchers("deployWhileItsSectionDeploys.sentences", "buildingDeploy", "buildingBuild").ToArray()),
+        Owed(LauncherRunnerRows, 854, V200, Reason854,
+             BothLaunchers("deployWhileItsSectionDeploys.sentences", "laterDeploy", "laterBuild").ToArray()),
+        Owed(LauncherRunnerRows, 854, V200, Reason854,
+             BothLaunchers("activityTrail", "launcherLineWhenALaterDeployIsStillWorking").ToArray()),
+
+        // ---- step 0: the reference shelf (#823, #827)
+        Owed(ShelfCodeCases, 827, V200, Reason827,
+             "the same code in one made group", "the same code in a made group and in a year group",
+             "the same code in two made groups"),
+        Owed(ShelfWording, 827, V200, Reason827, "codeAlreadyInThatGroup"),
+        Owed(SubjectMenuItems, 827, V200, Reason827, "moveToGroup"),
+        Owed(ImportWording, 823, V200, Reason823,
+             "explanation", "zipCouldNotBeOpened", "zipIsNotSafeToOpen", "zipHoldsNoCourse", "zipHoldsSeveralCourses",
+             "zipIsFarLargerThanACourse", "zipNeedsMoreRoom", "chooserMessage", "importForReferenceMenuItem"),
+
+        // ---- step 0: specialNames.platformWording.machine.usedIn (#811)
+        Owed(MachineWordUsedIn, 811, V200, Reason811,
+             "shared-rules.json:coverageTab.tab.words.cannotShowDescription", "shared-rules.json:coverageTab.tab.words.noObsidian"),
+
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
         // landed with batch 6; #581's four (Obsidian's add-ons for diagrams
@@ -216,18 +359,24 @@ internal static class NamedGapLedger
     /// comparison — a theory, where each case is its own test — and so checks
     /// the "it now passes" direction itself, with <see cref="ClosedMessage"/>.
     /// </summary>
-    internal static Entry? Holding(string area, string key) =>
-        Entries.FirstOrDefault(entry => entry.Area == area && entry.Key == key);
+    internal static Entry? Holding(string area, string key) => Holding(area, key, Entries);
+
+    /// <summary><see cref="Holding(string, string)"/> over entries a test makes up, so the mechanism stays proved whatever the ledger holds.</summary>
+    internal static Entry? Holding(string area, string key, IEnumerable<Entry> entries) =>
+        entries.FirstOrDefault(entry => entry.Area == area && entry.Key == key);
 
     /// <summary>
     /// The contract-direction half of <see cref="GapsIn"/> alone: every entry
     /// under <paramref name="area"/> names something the contract still has.
     /// Paired with <see cref="Holding"/> by a theory's runner.
     /// </summary>
-    internal static void StillNamed(string area, IEnumerable<string> namedByTheContract)
+    internal static void StillNamed(string area, IEnumerable<string> namedByTheContract) => StillNamed(area, namedByTheContract, Entries);
+
+    /// <summary><see cref="StillNamed(string, IEnumerable{string})"/> over entries a test makes up.</summary>
+    internal static void StillNamed(string area, IEnumerable<string> namedByTheContract, IEnumerable<Entry> entries)
     {
         var contract = namedByTheContract.ToHashSet(StringComparer.Ordinal);
-        foreach (var entry in Entries.Where(entry => entry.Area == area))
+        foreach (var entry in entries.Where(entry => entry.Area == area))
             Assert.True(contract.Contains(entry.Key), WithdrawnMessage(entry));
     }
 
@@ -241,11 +390,18 @@ internal static class NamedGapLedger
     internal static IReadOnlyCollection<string> GapsIn(
         string area,
         IEnumerable<string> namedByTheContract,
-        IEnumerable<string> implementedHere)
+        IEnumerable<string> implementedHere) => GapsIn(area, namedByTheContract, implementedHere, Entries);
+
+    /// <summary><see cref="GapsIn(string, IEnumerable{string}, IEnumerable{string})"/> over entries a test makes up.</summary>
+    internal static IReadOnlyCollection<string> GapsIn(
+        string area,
+        IEnumerable<string> namedByTheContract,
+        IEnumerable<string> implementedHere,
+        IEnumerable<Entry> entries)
     {
         var contract = namedByTheContract.ToHashSet(StringComparer.Ordinal);
         var here = implementedHere.ToHashSet(StringComparer.Ordinal);
-        var mine = Entries.Where(entry => entry.Area == area).ToList();
+        var mine = entries.Where(entry => entry.Area == area).ToList();
 
         foreach (var entry in mine)
         {

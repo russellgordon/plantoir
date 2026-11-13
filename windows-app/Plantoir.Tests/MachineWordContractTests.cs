@@ -57,6 +57,11 @@ public class MachineWordContractTests
         string word = Machine["windows"]!.ToString();
         var usedIn = Machine["usedIn"]!.AsArray().Select(e => e!.ToString()).ToList();
         Assert.NotEmpty(usedIn);
+        // A sentence of a surface this app does not have yet (the Coverage
+        // tab's, #811) is held open by its usedIn entry; it closes the day
+        // Said says it. Every other entry is compared and filled as before.
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.MachineWordUsedIn, usedIn, Said.Keys);
+        usedIn = usedIn.Where(entry => !deferred.Contains(entry)).ToList();
         Assert.Equal(usedIn.OrderBy(e => e, StringComparer.Ordinal), Said.Keys.OrderBy(e => e, StringComparer.Ordinal));
 
         foreach (string entry in usedIn)

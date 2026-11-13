@@ -106,10 +106,60 @@ function script:Get-PhysicalPath([string]$p) { return ([System.IO.Path]::GetFull
 $appRules = Get-Content -LiteralPath (Join-Path $repo 'contracts\app-rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $shared   = Get-Content -LiteralPath (Join-Path $repo 'contracts\shared-rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 
-$passed = 0; $failed = 0; $skipped = 0
+$passed = 0; $failed = 0; $skipped = 0; $ledgered = 0
 
-function Report([string]$List, [string]$Name, [bool]$Ok, [string]$Detail) {
+# Named gaps (step 0 of v2.0.0, #787). LauncherRulesContractTests hands this
+# runner the rows windows-app\Plantoir.Tests\NamedGapLedger.cs holds open, one
+# "<list><TAB><name>" per line, the list spelled as Report below names it, in
+# PLANTOIR_LEDGERED_LAUNCHER_CASES. A held row that fails in the shape its
+# entry holds prints "ledgered" and is not counted as failed; a held row that
+# PASSES prints "CLOSED" and IS counted as failed, so the entry cannot outlive
+# the work; a held row that fails some other way (refused by the wrong who,
+# say) is an ordinary failure. With the variable unset - a run by hand -
+# nothing is held, and every row is reported exactly as before.
+function Read-LedgeredRows([string]$Text) {
+    $rows = @{}
+    if ($Text) {
+        foreach ($line in ($Text -split "`n")) {
+            $line = $line.TrimEnd("`r")
+            if ($line) { $rows[$line] = $true }
+        }
+    }
+    return $rows
+}
+$ledgerHeld = Read-LedgeredRows $env:PLANTOIR_LEDGERED_LAUNCHER_CASES
+$ledgerSeen = @{}
+Write-Host ("ledger: {0} held pairs read" -f $ledgerHeld.Count)
+
+function Report([string]$List, [string]$Name, [bool]$Ok, [string]$Detail, [bool]$HeldShape = $true) {
+    $key = $List + "`t" + $Name
+    if ($script:ledgerHeld.ContainsKey($key)) {
+        $script:ledgerSeen[$key] = $true
+        if ($Ok) {
+            $script:failed++
+            Write-Host ("CLOSED [{0}] {1} - ledgered as not built, and it passes: delete its NamedGapLedger entry" -f $List, $Name)
+        } elseif ($HeldShape) {
+            $script:ledgered++
+            Write-Host ("ledgered [{0}] {1} - {2}" -f $List, $Name, $Detail)
+        } else {
+            $script:failed++
+            Write-Host ("FAIL [{0}] {1}: {2} (ledgered, but not in the shape its entry holds)" -f $List, $Name, $Detail)
+        }
+        return
+    }
     if ($Ok) { $script:passed++ } else { $script:failed++; Write-Host ("FAIL [{0}] {1}: {2}" -f $List, $Name, $Detail) }
+}
+# A held row this run never reported holds nothing open: a renamed list or
+# case would otherwise hide behind its entry. It is a failure. Called once,
+# at the end; a function so LauncherRulesContractTests can prove it alone.
+function Write-UnreportedLedgerRows {
+    foreach ($key in @($script:ledgerHeld.Keys)) {
+        if (-not $script:ledgerSeen.ContainsKey($key)) {
+            $script:failed++
+            $parts = $key -split "`t", 2
+            Write-Host ("FAIL [{0}] {1}: ledgered, and this runner has no such row" -f $parts[0], $parts[1])
+        }
+    }
 }
 function Skip([string]$List, [string]$Name, [string]$Why) {
     $script:skipped++; Write-Host ("skip [{0}] {1} - {2}" -f $List, $Name, $Why)
@@ -268,7 +318,8 @@ foreach ($case in @($guard.launcherCases) + @($windowsRows) + @($waitingRun)) {
     $table = New-CaseTable $case "powershell.exe -NoProfile -File `"$here\preview.ps1`" `"$course`" $section"
     $refused = Test-SectionIsBeingDeployed -Snapshot $table -Course $course -Section $section -Here $here -FolderId $hereId -Self 5000
     $got = if ($refused) { 'refused' } else { 'allowed' }
-    Report 'previewWhileItsSectionDeploys' $case.name ($got -eq $want) "expected $want, got $got"
+    # Held (a named gap) only in the shape #828 owes: refused there, allowed here.
+    Report 'previewWhileItsSectionDeploys' $case.name ($got -eq $want) "expected $want, got $got" (($want -eq 'refused') -and ($got -eq 'allowed'))
 }
 
 # ---- 3. A preview's build (#272 / #136 / #291) ----------------------
@@ -353,10 +404,13 @@ foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
         $table = New-CaseTable $case $selfLine
         $who = Get-WhatIsDeployingThisSection -Snapshot $table -Course $course -Section $section -Here $here -FolderId $hereId -Self 5000
         $got = if ($who) { 'refused' } else { 'allowed' }
+        # Held (a named gap) only in the shape #828 owes: refused there, not
+        # refused at all here. Refused by the WRONG who is a failure, held or not.
+        $heldShape = ($want -eq 'refused') -and ($got -eq 'allowed')
         if ($want -eq 'refused' -and $wantWho) {
-            Report $list $case.name (($got -eq $want) -and ("$who" -eq $wantWho)) "expected $want by '$wantWho', got $got by '$who'"
+            Report $list $case.name (($got -eq $want) -and ("$who" -eq $wantWho)) "expected $want by '$wantWho', got $got by '$who'" $heldShape
         } else {
-            Report $list $case.name ($got -eq $want) "expected $want, got $got"
+            Report $list $case.name ($got -eq $want) "expected $want, got $got" $heldShape
         }
     }
 }
@@ -740,6 +794,8 @@ function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-T
     }
 }
 
-Write-Host ("{0} passed, {1} failed, {2} skipped" -f $passed, $failed, $skipped)
+Write-UnreportedLedgerRows
+
+Write-Host ("{0} passed, {1} failed, {2} skipped, {3} ledgered" -f $passed, $failed, $skipped, $ledgered)
 if ($failed -gt 0) { exit 1 }
 exit 0
