@@ -4729,7 +4729,7 @@ fix is in what it is shown, and in a checker that fails:
   key's render, not the question copy's. The checker covers both copies
   from the source.
 - **`tools/check_handout.py`** (stdlib, an aid that is never required):
-  17 rules decided from the source, its wrappers, its PDFs and its folder
+  17 rules (19 with the fix round's `answers-in-media` and the `key-only-graph` note) decided from the source, its wrappers, its PDFs and its folder
   (the skill's section 8 lists them), one line per problem, exit 1, and
   at the end of every run the list of what it cannot decide, which the
   skill sends to the rendered pages. The graph rule evaluates the plotted
@@ -4780,6 +4780,68 @@ fix is in what it is shown, and in a checker that fails:
   be what the button offers, but only after the assistant says students
   who press Print will get the answers and the teacher says yes; an answer
   key alone never is.
+
+**The fix round on #859 B** (Opus implementation review; rulings on the
+issue). Three rules changed:
+
+- A graph only in the answer key is allowed where it serves the topic (owner,
+  2026-11-13: "Allow when it makes sense. Defer to the specific context and
+  topic."). His templates do it when students graph on their own paper. The
+  checker now prints such a graph as a `note:` line, once per graph, and the
+  note never makes it exit 1. The review found each graph reported twice
+  (an `axis` and its `tikzpicture`), and that is fixed too. A table only in
+  the key is still a failure.
+- An exercise page lives outside `section<N>/`, so it is shared by every
+  section, and renaming it changes what every section's link opens at the
+  same moment. The swap therefore happens ONCE, after the LAST section has
+  checked its homework. A section that is ready sooner gets the answers on
+  paper. The earlier text, "they may swap on different days", would have
+  pointed the other section's links at a hidden page.
+- Measured from the build's source: `patches/build.ts` runs `filterContent`
+  before `emitContent`, and `PublishFlag` (`patches/publish.ts`) drops a
+  `publish: false` page in that filter. So an unpublished page's text
+  appears on no page, in no search index and in no link. However,
+  `_ensure_media_symlink` in `build_site.py` mirrors the whole `Media`
+  folder into the site. So `Name - with Answers.pdf` stays in the handouts
+  folder during the hints period, and copying it into `Media` is step 4 of
+  the swap. The checker's new `answers-in-media` rule (with
+  `--course-config`) fails on two things: an answer key in `Media`, and a
+  joined answers file there beside the `- with Hints` file.
+
+The checker also gained:
+- `tabularx` and `tabular*` (the column spec is the second argument, and
+  `X` columns are read);
+- nested tables;
+- horizontal tables decided by shape (labels down the first column AND
+  more columns than rows), so a "Day | Low" table is checked;
+- layout tabulars (no rules, pictures in the cells or `@{}` at both ends)
+  skipped;
+- a firearms list of whole words that only ever mean a firearm. "Bullet"
+  and "gun" were dropped: "bullet points" and "a glue gun" were false
+  alarms.
+
+Run on the owner's two templates, the checker printed 36 lines before the
+fix round. It now prints 10 problems and 10 notes. The 10 problems are
+the key's changed `tasks` column count, which his written rule forbids
+and his templates do.
+
+The starters changed after the reviewer looked at the rendered pages:
+- six practice parts per group, two groups under the first example and six
+  solve parts under the second;
+- a four-line legend question in the starter itself;
+- the subtitle now says to work on your own paper and to write answers 4
+  to 7 on the sheet, so "Show all your work" no longer sits over questions
+  with no room;
+- the box with a table and a graph is shorter, because its table runs
+  across (it is used only to graph).
+
+One measured cause of the empty page feet. The `needspace` package's
+`\needspace` leaves `\penalty-100`, and with `\raggedbottom` every break
+costs only its penalty. TeX therefore ended a page at the last `\q` whose
+needspace came before an overflow, even when that question would have fitted.
+The starters' `\q` now uses `\roomfor`, the same test with a `\penalty0`.
+Pages 1 and 2 of the starter are now full. The owner's templates carry the
+same `\needspace`.
 
 REJECTED: shipping his "outer border drawn last" preamble as the default
 (nicematrix was measured better, #715); "older files move to this format"

@@ -184,7 +184,7 @@ class EveryStarterAndPatternCompilesAndPasses(unittest.TestCase):
 
     def test_the_hints_sheet_is_the_hints_alone(self):
         hints = pdf_text(self.folder / "Handout - Hints.pdf")
-        for number in range(1, 6):
+        for number in range(1, 8):
             self.assertIn("Question " + str(number), hints)
         self.assertNotIn("Evaluate each expression", hints)
         self.assertNotIn("Substitute and Evaluate\n", hints.replace("“", "").replace("”", ""))
@@ -221,8 +221,8 @@ BROKEN = [
     ("key-layout", "\\begin{tikzpicture}\\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,\n    xmin=-4,",
      "\\begin{tikzpicture}\\begin{axis}[gridgraph, x=\\qa{0.42cm}{0.3cm}, y=0.42cm,\n    xmin=-4,"),
     ("key-layout", "\\begin{tasks}(3)\n  \\task \\qa{$3x + y$}", "\\begin{tasks}(\\qa{3}{2})\n  \\task \\qa{$3x + y$}"),
-    ("arrowheads", "domain=-1.45:4.45", "domain=-4:6"),
-    ("arrowheads", "domain=-1.45:4.45", "domain=0:2"),
+    ("arrowheads", "domain=-0.95:3.95]{-2*x + 3}", "domain=-4:6]{-2*x + 3}"),
+    ("arrowheads", "domain=-0.95:3.95]{-2*x + 3}", "domain=0:2]{-2*x + 3}"),
     ("context-graph", "\\addplot[lineA, domain=0:4]{4.5*x};", "\\addplot[lineA, <->, >=latex, domain=0:4]{4.5*x};"),
     ("corners", "\\newcommand{\\schoolname}{}", "\\newcommand{\\schoolname}{School Name}"),
     ("hints", "\\end{document}\n\\fi\n", "\\fi\n"),
@@ -247,6 +247,42 @@ class EachBreakIsNamed(unittest.TestCase):
                 result = run_checker(folder / "Handout.tex")
                 self.assertEqual(result.returncode, 1, rule + ": " + result.stdout)
                 self.assertRegex(result.stdout, r"(?m)^" + rule + ":", rule)
+            # The owner's ruling: a graph only in the key is a note, printed once, never a problem.
+            key_only = starter.replace("\\begin{tikzpicture}\\begin{axis}[gridgraph, answerlegend",
+                                       "\\onlya{\\begin{tikzpicture}\\begin{axis}[xmin=0]\\end{axis}\\end{tikzpicture}}"
+                                       "\\begin{tikzpicture}\\begin{axis}[gridgraph, answerlegend", 1)
+            self.assertNotEqual(key_only, starter)
+            (folder / "Handout.tex").write_text(key_only, encoding="utf-8")
+            result = run_checker(folder / "Handout.tex")
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(len(re.findall(r"(?m)^note: key-only-graph:", result.stdout)), 1, result.stdout)
+            # A negative in a centred tabularx column, and in a table whose first column is words.
+            for table in ("\\begin{tabularx}{8cm}{|>{\\centering\\arraybackslash}X|>{\\centering\\arraybackslash}X|}\\hline\n"
+                          "$x$ & $y$ \\\\ \\hline\n$1$ & $-2$ \\\\ \\hline\n$2$ & $-4$ \\\\ \\hline\n\\end{tabularx}",
+                          "\\begin{tabular}{|l|c|}\\hline\nDay & Low \\\\ \\hline\nMonday & $4$ \\\\ \\hline\n"
+                          "Tuesday & $-3$ \\\\ \\hline\nFriday & $-1$ \\\\ \\hline\n\\end{tabular}"):
+                (folder / "Handout.tex").write_text(starter.replace("\\end{questions}\n\n\\end{document}",
+                                                                    "\\end{questions}\n" + table + "\n\\end{document}", 1),
+                                                    encoding="utf-8")
+                result = run_checker(folder / "Handout.tex")
+                self.assertRegex(result.stdout, r"(?m)^negative-column:", table[:30])
+            # "Bullet points" and a glue gun are not firearms.
+            (folder / "Handout.tex").write_text(starter.replace("A cyclist starts a ride",
+                                                                "Use bullet points and a glue gun. A cyclist starts a ride", 1),
+                                                encoding="utf-8")
+            self.assertEqual(run_checker(folder / "Handout.tex").returncode, 0)
+            # The answers file in the course's Media folder during the hints period.
+            course = Path(temporary) / "courses" / "MTH1W"
+            (course / "Media").mkdir(parents=True)
+            config = course / "course_config.json"
+            config.write_text("{}", encoding="utf-8")
+            (folder / "Handout.tex").write_text(starter, encoding="utf-8")
+            self.assertEqual(run_checker(folder / "Handout.tex", "--course-config", config).returncode, 0)
+            (course / "Media" / "Handout - with Hints.pdf").write_bytes(b"%PDF-1.4\n")
+            (course / "Media" / "Handout - with Answers.pdf").write_bytes(b"%PDF-1.4\n")
+            result = run_checker(folder / "Handout.tex", "--course-config", config)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertRegex(result.stdout, r"(?m)^answers-in-media:")
             (folder / "Handout.tex").write_text(starter, encoding="utf-8")
             (folder / "Handout.log").write_text("", encoding="utf-8")
             (folder / "Handout-1.png").write_bytes(b"")
@@ -257,7 +293,7 @@ class EachBreakIsNamed(unittest.TestCase):
     @unittest.skipUnless(HAVE_TOOLS, "needs tectonic and pdftotext; skipped")
     def test_a_centred_negative_column_prints_use_n_on_the_page(self):
         starter = fill_in((SKILL / "starters" / "Handout.tex").read_text(encoding="utf-8"))
-        broken = starter.replace("\\begin{NiceTabular}{N{$3$}N{$3$}}[hvlines]", "\\begin{NiceTabular}{CC}[hvlines]", 1)
+        broken = starter.replace("\\begin{NiceTabular}{N{$3$}N{$5$}}[hvlines]", "\\begin{NiceTabular}{CC}[hvlines]", 1)
         self.assertNotEqual(broken, starter)
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)

@@ -97,8 +97,9 @@ the same file is at `.agents/skills/plantoir-unit-planning/SKILL.md`).
     an exercise whose page gives hints (section 13).
   - A joined `Name - with Answers.pdf` (the questions, then the answer
     key, as one file) for a worksheet or handout whose page gives the
-    answers as well, when the teacher wants that. How to join two PDFs is
-    in section 3.
+    answers as well, when the teacher wants that; never while an exercise
+    is in its hints period (section 13). How to join two PDFs is in
+    section 3.
   - A quiz or test may go on the website if the teacher wants it there;
     its **solutions never do**.
   - Never a `.tex`. After every change to the source, compile again and
@@ -229,10 +230,17 @@ look the same:
   questions 2 and 3 do exactly this.
 - Never a vertical table in the question copy with a horizontal one in the
   key, never a smaller, more compressed or differently scaled grid in the
-  key, and never a grid that appears only in the key. The checker
-  (section 8) finds a table or graph inside an answers-only branch, axis
-  options or a column spec that switch between the copies, and a
-  `tasks` column count that switches.
+  key, and never a table that appears only in the key. The checker
+  (section 8) finds a table inside an answers-only branch, axis options or
+  a column spec that switch between the copies, and a `tasks` column count
+  that switches.
+- **A graph only in the key is allowed where it serves the topic**: for
+  example, when students graph on their own grid paper, the question copy
+  has no grid and the key draws each answer on a grid of its own. Decide
+  it by the topic and what the teacher asked; where students draw on the
+  sheet, the grid is in both copies. The checker prints each graph found
+  only in the key as a note, never a problem, so it is a judgement you can
+  name to the teacher.
 - **The key's instructions line says equivalent forms are fine**, with an
   example from the sheet: "Final answers only. Equivalent forms are fine
   (for example, $(0, 3)$ or "the $y$-intercept is 3")." The starter's key
@@ -465,7 +473,10 @@ strut, a table or graph only in the key, a relation with arrowheads that
 stops short of the grid's edge or runs past it, a context graph with
 arrowheads, a placeholder or a wrong corner, a missing wrapper, a hints
 block in the wrong place, build files or pictures left in the folder, a
-PDF older than its source, and the wrong paper. Run it, never import it,
+PDF older than its source, the wrong paper, and (with `--course-config`)
+an answer key in the course's `Media` folder or an answers file there
+during a hints period. A graph found only in the key is printed as a
+note, for your judgement, and never counts as a problem. Run it, never import it,
 from the working folder, when Python is on the computer:
 
 ```bash
@@ -473,7 +484,7 @@ python3 .claude/skills/plantoir-handouts/tools/check_handout.py "path/to/Name.te
 ```
 
 (the same file is at `.agents/skills/plantoir-handouts/tools/`). It exits
-1 and prints one line per problem; fix each, compile again and run it
+1 and prints one line per problem (a note, starting `note:`, is not one); fix each, compile again and run it
 again until it finds nothing. It changes nothing. It also prints what it
 cannot check, which is what you look for on the rendered pages. Without
 Python, check each line of the list below by looking.
@@ -502,8 +513,8 @@ Go through every line, on the rendered pages of every copy:
   with none; no curve runs through a label (section 12).
 - Every blank is two lines tall (section 4).
 - The key's tables and grids are the same as the question copy's, and no
-  answer shows on the student copy (section 3). The hints give no answer
-  away (section 13).
+  answer shows on the student copy (section 3); a graph only in the key
+  is one the topic needs. The hints give no answer away (section 13).
 - Every worked example teaches its method in full, with the value put in
   marked and a note beside the step that needs one (section 4).
 - No page is less than a third full except the last, nothing is clipped,
@@ -513,7 +524,9 @@ Go through every line, on the rendered pages of every copy:
 - Every answer was solved again independently, and new questions had a
   second reviewer (section 7); if not, say so.
 - No file is left but the ones listed above, and nothing was written in
-  `courses/` except `handouts.json` and a PDF a page hands out.
+  `courses/` except `handouts.json` and a PDF a page hands out. No answer
+  key is in the course's `Media` folder, and no answers file is there
+  while an exercise is in its hints period.
 
 ## 9. Tables
 
@@ -839,7 +852,9 @@ Whether an exercise has hints is the teacher's choice. When it has them:
 - Hints are reviewed like answers (section 7): the separate reviewer
   re-solves each question, checks each hint for anything that gives the
   answer away, and checks that the idea it points at was taught. A
-  rewrite that would itself give the answer away is softened.
+  rewrite that would itself give the answer away is softened. Nothing can
+  check this from the files (the checker says so), so this review is the
+  only check a hint gets.
 
 ### A suggestion: hints first, then the answers
 
@@ -869,26 +884,42 @@ topic, and other topics keep their answers from the start.
      come at the start of next class. Its `printPdf` (and any link to the
      PDF) is `Name - with Hints.pdf`.
   2. At the same time, make a second copy named "Practice - Answers" (its
-     file name and its `title`), the same page with folded answers and
-     `printPdf` set to `Name - with Answers.pdf`, and leave it
-     UNPUBLISHED (`unpublish_pages`, or `publish: false` in its settings).
-- **The swap**, when the teacher asks for it (homework checked). Back up
-  the course first (`back_up_course`). Show the teacher the whole plan and
-  wait for their yes before changing anything; say plainly that the
-  answers page TAKES the plain title, so the exercise keeps its address
-  and every class page that links to it opens the answers with no link
-  changed (naming the page by its old title makes it read as if a new
-  address were being made). With two or more sections, ask which section
-  or sections; they may swap on different days. Then, in this order:
-  1. unpublish "Practice" for those sections (`plan_unpublish_pages`,
-     then `unpublish_pages`);
+     file name and its `title`), the same page with folded answers, and
+     leave it UNPUBLISHED (`unpublish_pages`, or `publish: false` in its
+     settings). Do not give it a `printPdf` yet. The build drops a page
+     marked `publish: false` before it writes anything, so its text is on
+     no page, in no search and in no link of the site; but EVERY file in
+     the course's `Media` folder is copied to the site whatever links to
+     it. So **`Name - with Answers.pdf` stays in the handouts folder,
+     outside the course, for the whole hints period**: copying it into
+     `Media` is a step of the swap, below. Only `Name - with Hints.pdf`
+     goes into `Media` now.
+- **The swap**, when the teacher asks for it. An exercise page is shared
+  by every section of the course, so renaming it changes what EVERY
+  section's link opens, at the same moment. Say so plainly, and swap
+  ONCE, after the LAST section has had its homework checked. A section
+  that is ready sooner gets the answers on paper, or as the answers PDF
+  handed out in class. Back up the course first (`back_up_course`). Show
+  the teacher the whole plan and wait for their yes before changing
+  anything; say plainly that the answers page TAKES the plain title, so
+  the exercise keeps its address and every class page that links to it
+  opens the answers with no link changed (naming the page by its old
+  title makes it read as if a new address were being made). The answers
+  page's Print button will hand out a file that holds answers, so the
+  plan says that students who press Print will get the answers (section
+  2's alert): that is the point of the swap, and it is still said. Then,
+  in this order:
+  1. unpublish "Practice" for every section (`plan_unpublish_pages`, then
+     `unpublish_pages`);
   2. rename "Practice" to "Practice - Hints": its file name and its
      `title`;
   3. rename "Practice - Answers" to "Practice": its file name and its
      `title`;
-  4. publish "Practice" for those sections (`plan_publish_pages`, then
+  4. copy `Name - with Answers.pdf` into the course's `Media` folder and
+     set the answers page's `printPdf` (and any link to the PDF) to it;
+  5. publish "Practice" for every section (`plan_publish_pages`, then
      `publish_pages`);
-  5. preview the course again, and say what changed. Never deploy on the
+  6. preview the course again, and say what changed. Never deploy on the
      teacher's behalf; deploying is theirs.
   Plantoir has no tool that renames a page, so steps 2 and 3 are file
   edits you make yourself, and `undo_last_change` does not undo them: the

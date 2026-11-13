@@ -7,7 +7,10 @@ Check a handout made in the Plantoir house style before it is handed over.
     python3 check_handout.py --self-test
 
 It reads the source (and its wrappers, its PDFs and the folder it sits in),
-prints one line per problem, and exits 1 if there is any. It changes
+prints one line per problem, and exits 1 if there is any. A note, which
+starts "note:", is a judgement for the teacher and never makes it exit 1.
+Layout tabulars (graphs set side by side, no rules) are not tables of values
+and are not checked as tables. It changes
 nothing and deletes nothing. It is an aid, never a requirement: what it
 cannot decide from the files is listed at the end of every run, and those
 things are checked by looking at every rendered page (the skill's section 8).
@@ -20,9 +23,12 @@ Rules (each line it prints starts with the rule's name):
                     \\cellcolor or a bare \\rowcolor in a tabular
   blank-strut       a blank students write on without the strut that makes its line
                     two lines tall, or a blank typed by hand (underscores, \\hrulefill)
-  key-layout        a table or graph only in the answer key, a graph's size or a
-                    table's columns switched between the copies, or a tasks column
-                    count switched between the copies
+  key-layout        a table only in the answer key, a graph's size or a table's
+                    columns switched between the copies, or a tasks column count
+                    switched between the copies
+  key-only-graph    (a NOTE, never a problem) a graph only in the answer key: allowed
+                    where it serves the topic, such as students graphing on their own
+                    paper; printed once per graph for the teacher's judgement
   arrowheads        a relation drawn with arrowheads that stops short of the grid's
                     edge, or runs past it (the axis then clips the arrowheads off)
   context-graph     a graph with a context (axes from zero, contextgraph) drawn with
@@ -38,7 +44,10 @@ Rules (each line it prints starts with the rule's name):
   paper             a PDF that is not letter paper (legal is allowed for a quiz or test)
   courses-folder    the source kept inside a course folder, where the website copies it
   assessment-source an "Adapted from" line on a quiz or test
-  firearms          a word about firearms or ammunition
+  firearms          a word that only ever means a firearm or its ammunition
+  answers-in-media  (with --course-config) an answer key in the course's Media folder,
+                    which the website copies whole, or a joined answers file there
+                    while the exercise is in its hints period
 
 Standard library only. Python 3.8 or later.
 """
@@ -233,6 +242,12 @@ def expand_column_spec(spec):
             index = after if argument is not None else index + 1
             pending_centering = False
             continue
+        if character == "X":
+            columns.append(("centred" if pending_centering else "left", "X"))
+            seen_column = True
+            pending_centering = False
+            index += 1
+            continue
         if character in "pmb":
             argument, after = read_group(spec, index + 1)
             columns.append(("centred" if pending_centering else "left", character))
@@ -329,13 +344,40 @@ def split_top(text, separator):
     return parts
 
 
+def matching_end(text, kind, index):
+    """Where the environment that began before index ends, counting nested ones of the same kind."""
+    depth = 1
+    pattern = re.compile(r"\\(begin|end)\{" + re.escape(kind) + r"\}")
+    for found in pattern.finditer(text, index):
+        depth += 1 if found.group(1) == "begin" else -1
+        if depth == 0:
+            return found.start()
+    return -1
+
+
+def without_nested_tables(body):
+    """A table's body with every table inside it taken out, so its own rules are judged alone."""
+    result = body
+    while True:
+        found = re.search(r"\\begin\{(tabularx|tabular\*|tabular|NiceTabular)\}", result)
+        if found is None:
+            return result
+        end = matching_end(result, found.group(1), found.end())
+        if end < 0:
+            return result
+        close = end + len("\\end{" + found.group(1) + "}")
+        result = result[:found.start()] + " " + result[close:]
+
+
 def find_tables(text):
-    """Every tabular and NiceTabular: (kind, start offset, spec, options, body)."""
+    """Every tabular, tabularx, tabular* and NiceTabular: (kind, start offset, spec, options, body)."""
     tables = []
-    for match in re.finditer(r"\\begin\{(tabular|NiceTabular)\}", text):
+    for match in re.finditer(r"\\begin\{(tabularx|tabular\*|tabular|NiceTabular)\}", text):
         kind = match.group(1)
         index = match.end()
         options = ""
+        if kind in ("tabularx", "tabular*"):
+            width, index = read_group(text, index)     # the width comes first
         position, index_after = read_group(text, index, "[", "]")
         if position is not None:
             index = index_after
@@ -347,16 +389,46 @@ def find_tables(text):
             if trailing is not None:
                 options = trailing
                 index = after
-        end = text.find("\\end{" + kind + "}", index)
+        end = matching_end(text, kind, index)
         if end < 0:
             continue
         tables.append((kind, match.start(), spec, options, text[index:end]))
     return tables
 
 
+def is_layout(kind, spec, body):
+    """
+    A tabular that only sets things side by side (graphs, a label over a
+    picture): no rule anywhere, and either pictures in its cells or @{} at
+    both ends of its spec. It is not a table of values, so it carries no
+    border and is checked for nothing.
+    """
+    if kind == "NiceTabular":
+        return False
+    own = without_nested_tables(body)
+    if "|" in spec or "\\hline" in own or "\\cline" in own:
+        return False
+    has_picture = "\\begin{tikzpicture}" in body or "\\includegraphics" in body
+    stripped = spec.strip()
+    edges = stripped.startswith("@{") and stripped.endswith("}") and stripped.count("@{") >= 2
+    return has_picture or edges
+
+
+def layout_spans(text):
+    spans = []
+    for kind, start, spec, options, body in find_tables(text):
+        if is_layout(kind, spec, body):
+            begin = text.find("{", start)
+            end = matching_end(text, kind, start + 1)
+            spans.append((start, end if end > 0 else start + 1))
+    return spans
+
+
 def check_tables(text, problems):
     for kind, start, spec, options, body in find_tables(text):
         line = line_of(text, start)
+        if is_layout(kind, spec, body):
+            continue
         columns, left_rule, right_rule = expand_column_spec(spec)
         table_body = body
         if "\\CodeBefore" in table_body and "\\Body" in table_body:
@@ -365,11 +437,11 @@ def check_tables(text, problems):
         else:
             code_before = ""
         # Borders
-        if kind == "tabular":
+        if kind != "NiceTabular":
             stripped = table_body.strip()
             if not (left_rule and right_rule):
                 problems.append(("table-border", line,
-                                 "this tabular has no rule at both ends of its column spec ({" + spec.strip() + "}): "
+                                 "this " + kind + " has no rule at both ends of its column spec ({" + spec.strip() + "}): "
                                  "every table has a full outer border"))
             first_line = stripped.split("\n", 1)[0].strip()
             has_top = stripped.startswith("\\hline") or (stripped.startswith("\\rowcolor") and "\\hline" in first_line) \
@@ -406,16 +478,18 @@ def check_tables(text, problems):
         first_cells = []
         for row in rows:
             first_cells.append(row[0])
-        horizontal = True
+        # A horizontal table runs across: labels down its first column and
+        # more columns than rows (x across the top, y below). Each column then
+        # holds one value of each quantity, so nothing in it is aligned. A
+        # table with a word column and more rows than columns (a day beside its
+        # temperature) is vertical, and its number columns are checked.
+        labels_down = True
         for cell in first_cells:
-            numeric = False
             for value in cell_values(cell):
                 if NUMBER.match(value):
-                    numeric = True
-            if numeric:
-                horizontal = False
-        if horizontal:
-            continue   # a horizontal table: one value per column, so nothing to align
+                    labels_down = False
+        if labels_down and len(columns) > len(rows):
+            continue
         for column_index in range(len(columns)):
             kind_of_column, letter = columns[column_index]
             values = []
@@ -530,14 +604,26 @@ def check_key_layout(text, problems):
     hint_spans = []
     for start, true_end, false_start, end in if_branches(text, "hints"):
         hint_spans.append((start, true_end))
-    for match in re.finditer(r"\\begin\{(tabular|NiceTabular|axis|tikzpicture)\}", text):
-        if inside(match.start(), hint_spans):
+    layouts = layout_spans(text)
+    graphs_seen = []
+    for match in re.finditer(r"\\begin\{(tabularx|tabular\*|tabular|NiceTabular|axis|tikzpicture)\}", text):
+        if inside(match.start(), hint_spans) or not inside(match.start(), spans):
             continue
-        if inside(match.start(), spans):
-            what = "graph" if match.group(1) in ("axis", "tikzpicture") else "table"
-            problems.append(("key-layout", line_of(text, match.start()),
-                             "this " + what + " is only in the answer key: author it once, outside the switch, and "
-                             "switch only its cells or the plotted answer"))
+        if match.group(1) in ("axis", "tikzpicture"):
+            # One note per graph: an axis inside a tikzpicture already noted is the same graph.
+            if inside(match.start(), graphs_seen):
+                continue
+            end = text.find("\\end{" + match.group(1) + "}", match.start())
+            graphs_seen.append((match.start(), end if end > 0 else match.start() + 1))
+            problems.append(("key-only-graph", line_of(text, match.start()),
+                             "this graph is only in the answer key. That is allowed where it serves the topic (students "
+                             "graph on their own paper, say); otherwise author it once, outside the switch"))
+            continue
+        if inside(match.start(), layouts):
+            continue
+        problems.append(("key-layout", line_of(text, match.start()),
+                         "this table is only in the answer key: author it once, outside the switch, and switch only "
+                         "its cells"))
     for match in re.finditer(r"\\begin\{axis\}", text):
         options, after = read_group(text, match.end(), "[", "]")
         if options and re.search(r"\\(qa|onlya|onlyq|ifanswers)(?![A-Za-z])", options):
@@ -895,14 +981,18 @@ def check_hints(text, problems):
                              "answers compile exactly as they would without hints"))
 
 
-FIREARMS = re.compile(r"(?<!\\)\b(guns?|rifles?|pistols?|firearms?|ammunition|ammo|bullets?|shotguns?|revolvers?|"
-                      r"handguns?|muskets?|gunfire|gunshots?)\b", re.IGNORECASE)
+# Whole words that only ever mean a firearm or its ammunition. Left out on
+# purpose: "bullet" (bullet points), "gun" (a glue gun, a starting gun),
+# "shot" and "fire", which a handout uses in other senses every day.
+FIREARMS = re.compile(r"(?<![\\A-Za-z])(rifles?|pistols?|firearms?|ammunition|ammo|shotguns?|revolvers?|"
+                      r"handguns?|muskets?|gunfire|gunshots?|gunpowder)(?![A-Za-z])", re.IGNORECASE)
 
 
 def check_words(text, assessment, problems):
     for match in FIREARMS.finditer(text):
         problems.append(("firearms", line_of(text, match.start()),
-                         "'" + match.group(0) + "': contexts never involve firearms or ammunition"))
+                         "'" + match.group(0) + "': contexts you invent never involve firearms or ammunition (a "
+                         "teacher's own material, or a course whose subject requires the topic, is the teacher's)"))
     if assessment:
         for match in re.finditer(r"Adapted from", text):
             problems.append(("assessment-source", line_of(text, match.start()),
@@ -922,7 +1012,52 @@ CANNOT_CHECK = [
     "no answer shows on the student copy, and the hints give no answer away",
     "the key's tables and grids look the same as the question copy's",
     "every answer is right (solve each again, another way)",
+    "a hint gives no answer away, not even through a pointed first step (the separate reviewer checks each hint)",
+    "a graph only in the key serves its topic (each is printed above as a note, never a problem)",
+    "files in other folders, such as another unit's or day's, are not looked at",
 ]
+
+# Rules printed as a note for the teacher's and the assistant's judgement:
+# printed, but never a problem, and never the reason for exit 1.
+NOTE_RULES = {"key-only-graph"}
+
+
+def failures_in(problems):
+    result = []
+    for problem in problems:
+        if problem[0] not in NOTE_RULES:
+            result.append(problem)
+    return result
+
+
+def media_folder(course_dir):
+    if not course_dir.is_dir():
+        return None
+    for entry in course_dir.iterdir():
+        if entry.is_dir() and entry.name.lower() == "media":
+            return entry
+    return None
+
+
+def check_media(source, config_path, problems):
+    """No answer key in the course's Media folder, and no answers there while an exercise is in its hints period."""
+    if config_path is None:
+        return
+    media = media_folder(Path(config_path).resolve().parent)
+    if media is None:
+        return
+    stem = Path(source).stem
+    names = {}
+    for entry in media.iterdir():
+        names[entry.name.lower()] = entry.name
+    for ending in (" - answers.pdf", " - solutions.pdf"):
+        if (stem.lower() + ending) in names:
+            problems.append(("answers-in-media", 0, names[stem.lower() + ending] + " is in the course's Media folder, "
+                             "which the website copies whole: an answer key on its own never goes on the site"))
+    if (stem.lower() + " - with hints.pdf") in names and (stem.lower() + " - with answers.pdf") in names:
+        problems.append(("answers-in-media", 0, names[stem.lower() + " - with answers.pdf"] + " is in the course's "
+                         "Media folder while the exercise is in its hints period: anyone can download it from the site. "
+                         "Keep it in the handouts folder and copy it into Media as a step of the swap"))
 
 
 def check(source, config_path=None):
@@ -938,19 +1073,28 @@ def check(source, config_path=None):
     check_hints(text, problems)
     assessment = check_files(source, text, problems)
     check_words(text, assessment, problems)
+    check_media(source, config_path, problems)
     return problems
 
 
 def report(source, problems):
     lines = []
+    failures = failures_in(problems)
     for rule, line, message in problems:
         place = (" line " + str(line)) if line else ""
-        lines.append(rule + ":" + place + " " + message)
-    if problems:
-        lines.append("check_handout: " + str(len(problems)) + " problem(s) in " + Path(source).name
+        if rule in NOTE_RULES:
+            lines.append("note: " + rule + ":" + place + " " + message)
+        else:
+            lines.append(rule + ":" + place + " " + message)
+    notes = len(problems) - len(failures)
+    if failures:
+        lines.append("check_handout: " + str(len(failures)) + " problem(s) in " + Path(source).name
                      + ". Fix each, compile again, and run this again.")
     else:
         lines.append("check_handout: nothing found in " + Path(source).name + ".")
+    if notes:
+        lines.append("check_handout: " + str(notes) + " note(s): each is a judgement, not a problem; say it to the "
+                     "teacher if it is not what they asked for.")
     lines.append("Still to check by looking at every rendered page:")
     for item in CANNOT_CHECK:
         lines.append("  - " + item)
@@ -992,6 +1136,14 @@ $0$ & \qa{}{$-3$} \\
   \addplot[lineA, domain=0:4]{4.5*x};
 \end{axis}\end{tikzpicture}
 Its slope is \fillin{$-2$}.
+Use bullet points, a glue gun, or a starting gun.
+\begin{tabular}{@{}cc@{}}
+\begin{tikzpicture}\end{tikzpicture} & \begin{tabular}{|c|}\hline $1$ \\ \hline\end{tabular} \\
+\end{tabular}
+\begin{NiceTabular}{l*{3}{w{c}{1cm}}}[hvlines]
+$x$ & $-1$ & $0$ & $1$ \\
+$y$ & $2$ & $-1$ & $5$ \\
+\end{NiceTabular}
 \end{document}
 """
 
@@ -1005,7 +1157,12 @@ BREAKS = [
     ("blank-strut", r"\rule[-0.2em]{0pt}{2.1em}}", "}"),
     ("blank-strut", r"Its slope is \fillin{$-2$}.", r"Its slope is \rule{3cm}{0.4pt}."),
     ("blank-strut", r"Its slope is \fillin{$-2$}.", r"Its slope is \_\_\_\_\_."),
-    ("key-layout", r"\onlya{\addplot", r"\onlya{\begin{tikzpicture}\begin{axis}[xmin=0]\end{axis}\end{tikzpicture}\addplot"),
+    ("key-only-graph", r"\onlya{\addplot", r"\onlya{\begin{tikzpicture}\begin{axis}[xmin=0]\end{axis}\end{tikzpicture}\addplot"),
+    ("key-layout", r"\onlya{\addplot", r"\onlya{\begin{tabular}{|c|}\hline $1$ \\ \hline\end{tabular}\addplot"),
+    ("negative-column", r"Its slope is \fillin{$-2$}.",
+     "\\begin{tabularx}{8cm}{|>{\\centering\\arraybackslash}X|>{\\centering\\arraybackslash}X|}\\hline\n$x$ & $y$ \\\\ \\hline\n$1$ & $-2$ \\\\ \\hline\n$2$ & $-4$ \\\\ \\hline\n\\end{tabularx}"),
+    ("negative-column", r"Its slope is \fillin{$-2$}.",
+     "\\begin{tabular}{|l|c|}\\hline\nDay & Low \\\\ \\hline\nMonday & $4$ \\\\ \\hline\nTuesday & $-3$ \\\\ \\hline\nFriday & $-1$ \\\\ \\hline\n\\end{tabular}"),
     ("key-layout", r"[gridgraph, xmin=-4,", r"[gridgraph, \qa{width=6cm}{width=4cm}, xmin=-4,"),
     ("key-layout", r"\begin{tasks}(2)", r"\begin{tasks}(\qa{1}{3})"),
     ("arrowheads", "domain=-1.45:4.45", "domain=-4:6"),
@@ -1045,6 +1202,12 @@ def self_test():
                 found.append(found_rule)
             if rule not in found:
                 failures.append(rule + " did not fire for: " + new[:60])
+            if rule == "key-only-graph":
+                if found.count("key-only-graph") != 1:
+                    failures.append("a graph only in the key was reported " + str(found.count("key-only-graph"))
+                                    + " times, not once")
+                if failures_in(check(source)):
+                    failures.append("a graph only in the key counted as a problem, not a note")
         write(CLEAN)
         # Files beside the source
         (folder / "Lines.aux").write_text("", encoding="utf-8")
@@ -1098,6 +1261,24 @@ def self_test():
         found = [rule for rule, line, message in check(source, config)]
         if "corners" not in found:
             failures.append("corners did not fire for a missing Class # blank")
+        # Answers in Media
+        media = course / "Media"
+        media.mkdir()
+        (media / "Lines - with Hints.pdf").write_bytes(b"%PDF-1.4\n")
+        (media / "Lines - with Answers.pdf").write_bytes(b"%PDF-1.4\n")
+        config.write_text(json.dumps({}), encoding="utf-8")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-in-media" not in found:
+            failures.append("answers-in-media did not fire for a with-Answers file beside a with-Hints file in Media")
+        os.remove(media / "Lines - with Hints.pdf")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-in-media" in found:
+            failures.append("answers-in-media fired for a with-Answers file with no hints period")
+        (media / "Lines - Answers.pdf").write_bytes(b"%PDF-1.4\n")
+        found = [rule for rule, line, message in check(source, config)]
+        if "answers-in-media" not in found:
+            failures.append("answers-in-media did not fire for an answer key in Media")
+        shutil.rmtree(media)
         # Inside courses/
         inside_course = course / "Lines.tex"
         inside_course.write_text(CLEAN, encoding="utf-8")
@@ -1108,7 +1289,7 @@ def self_test():
         for failure in failures:
             print("SELF-TEST FAILED: " + failure)
         return 1
-    print("check_handout: self-test passed (" + str(len(BREAKS) + 10) + " cases)")
+    print("check_handout: self-test passed (" + str(len(BREAKS) + 14) + " cases)")
     return 0
 
 
@@ -1138,7 +1319,7 @@ def main(arguments):
             continue
         problems = check(path, config)
         print(report(path, problems))
-        if problems:
+        if failures_in(problems):
             status = 1
     return status
 

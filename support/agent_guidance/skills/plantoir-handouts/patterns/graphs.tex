@@ -167,8 +167,17 @@
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
   {\end{list}}
-% Optional argument: lines to keep together so a question is never split from its parts
-\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+% Optional argument: lines to keep together so a question is never split
+% from its parts. \roomfor is needspace's test with a neutral break: the
+% package's own \needspace leaves a \penalty-100, and with a ragged bottom
+% TeX then prefers to end the page THERE, before a question that would have
+% fitted (measured on this starter: a page a quarter empty).
+\makeatletter
+\newcommand{\roomfor}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
+\newcommand{\q}[2][5]{\roomfor{#1\baselineskip}\item[\textbf{#2.}]}
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 
@@ -285,13 +294,14 @@
 \begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
 % Each line's domain, on -6 to 6: a) y = x + 2 meets x = -6 (at y = -4) and
 % y = 6 (at x = 4); b) y = -2x + 1 meets y = 6 at x = -2.5 and y = -6 at
-% x = 3.5; c) y = x/2 - 3 meets both sides, x = -6 and x = 6; d) y = -x - 4
+% x = 3.5; c) y = x/2 - 4 meets y = -6 at x = -4 and x = 6 at y = -1 (a line
+% ending ON an axis would put its arrowhead on the axis arrow); d) y = -x - 4
 % meets x = -6 (at y = 2) and y = -6 (at x = 2).
 \begin{tikzpicture}\begin{axis}[gridgraph, answerlegend, x=0.36cm, y=0.36cm,
     xmin=-6, xmax=6, ymin=-6, ymax=6, xtick={-6,-4,...,6}, ytick={-6,-4,...,6}]
   \addplot[lineA, <->, >=latex, domain=-5.9:3.9]{x + 2};       \addlegendentry{a) $y = x + 2$}
   \addplot[lineB, <->, >=latex, domain=-2.45:3.45]{-2*x + 1};  \addlegendentry{b) $y = -2x + 1$}
-  \addplot[lineC, <->, >=latex, domain=-5.9:5.9]{x/2 - 3};     \addlegendentry{c) $y = \frac12x - 3$}
+  \addplot[lineC, <->, >=latex, domain=-3.9:5.9]{x/2 - 4};     \addlegendentry{c) $y = \frac12x - 4$}
   \addplot[lineD, <->, >=latex, domain=-5.9:1.9]{-x - 4};      \addlegendentry{d) $y = -x - 4$}
 \end{axis}\end{tikzpicture}
 \graphnote{E. Four lines and a legend without arrowheads.}

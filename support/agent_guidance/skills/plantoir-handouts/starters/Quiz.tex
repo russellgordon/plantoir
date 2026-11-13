@@ -114,7 +114,14 @@
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{1.2em}}}
   {\end{list}}
-\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+% \roomfor is needspace's test with a neutral break (the handout starter
+% says why: the package's \penalty-100 ends pages early on a ragged bottom).
+\makeatletter
+\newcommand{\roomfor}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
+\newcommand{\q}[2][5]{\roomfor{#1\baselineskip}\item[\textbf{#2.}]}
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 

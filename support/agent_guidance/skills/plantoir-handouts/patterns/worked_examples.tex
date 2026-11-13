@@ -165,8 +165,17 @@
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
   {\end{list}}
-% Optional argument: lines to keep together so a question is never split from its parts
-\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+% Optional argument: lines to keep together so a question is never split
+% from its parts. \roomfor is needspace's test with a neutral break: the
+% package's own \needspace leaves a \penalty-100, and with a ragged bottom
+% TeX then prefers to end the page THERE, before a question that would have
+% fitted (measured on this starter: a page a quarter empty).
+\makeatletter
+\newcommand{\roomfor}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
+\newcommand{\q}[2][5]{\roomfor{#1\baselineskip}\item[\textbf{#2.}]}
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 

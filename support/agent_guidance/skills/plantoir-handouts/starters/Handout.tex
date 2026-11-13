@@ -157,8 +157,17 @@
   {\begin{list}{}{\setlength{\leftmargin}{2.2em}\setlength{\labelwidth}{1.8em}
                   \setlength{\labelsep}{0.4em}\setlength{\itemsep}{0.7em}}}
   {\end{list}}
-% Optional argument: lines to keep together so a question is never split from its parts
-\newcommand{\q}[2][5]{\needspace{#1\baselineskip}\item[\textbf{#2.}]}
+% Optional argument: lines to keep together so a question is never split
+% from its parts. \roomfor is needspace's test with a neutral break: the
+% package's own \needspace leaves a \penalty-100, and with a ragged bottom
+% TeX then prefers to end the page THERE, before a question that would have
+% fitted (measured on this starter: a page a quarter empty).
+\makeatletter
+\newcommand{\roomfor}[1]{\par\penalty\z@\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
+\newcommand{\q}[2][5]{\roomfor{#1\baselineskip}\item[\textbf{#2.}]}
 
 \settasks{label=\alph*), label-width=1.4em, item-indent=1.8em, after-item-skip=0.35em}
 
@@ -216,10 +225,12 @@
 The answers come out at the start of next class.}
 \begin{description}[leftmargin=6.5em, style=nextline, itemsep=0.8em]
   \hint{1}{Look back at the worked example ``Substitute and Evaluate''. Each value goes where its letter was, in brackets.}
-  \hint{2}{Look back at ``Solve an Equation''. The side notes name each step in the order it was done.}
-  \hint{3}{Look back at ``Graph a Line from a Table of Values''. Each $y$ value comes from its own $x$ value.}
-  \hint{4}{Look back at what the lesson called the \emph{slope} and the \emph{$y$-intercept}, then at your table and graph from question 3.}
-  \hint{5}{Each second the cyclist goes the same distance. The graph stops where the ride stops.}
+  \hint{2}{The same method as question 1. A negative value squared is positive.}
+  \hint{3}{Look back at ``Solve an Equation''. The side notes name each step in the order it was done.}
+  \hint{4}{Look back at ``Graph a Line from a Table of Values''. Each $y$ value comes from its own $x$ value.}
+  \hint{5}{Look back at what the lesson called the \emph{slope} and the \emph{$y$-intercept}, then at your table and graph from question 4.}
+  \hint{6}{A table of values with three simple $x$ values is enough for each line.}
+  \hint{7}{Each second the cyclist goes the same distance. The graph stops where the ride stops.}
 \end{description}
 \end{document}
 \fi
@@ -230,7 +241,7 @@ The answers come out at the start of next class.}
   {\color{why} Final answers only. Equivalent forms are fine (for example, $(0, 3)$ or ``the $y$-intercept is $3$'').}
 \else
   {\color{why} Read each worked example, then try the questions that follow it.
-  Show all your work.}
+  Show all your work on your own paper. Write your answers to questions 4 to 7 on this sheet.}
 \fi
 
 % =====================================================================
@@ -258,6 +269,16 @@ Evaluate $2x^2 - 3y$ when $x = -3$ and $y = 4$.
   \task \qa{$xy + 7$}{$-3$}
   \task \qa{$\dfrac12x - y$}{$-6$}
 \end{tasks}
+
+\q{2} \onlyq{Evaluate each expression when $a = 3$ and $b = -4$.}
+\begin{tasks}(3)
+  \task \qa{$2a + b$}{$2$}
+  \task \qa{$a - 3b$}{$15$}
+  \task \qa{$a^2 + b$}{$5$}
+  \task \qa{$ab - 2$}{$-14$}
+  \task \qa{$-a - b$}{$1$}
+  \task \qa{$b^2 - a^2$}{$7$}
+\end{tasks}
 \end{questions}
 
 % =====================================================================
@@ -279,11 +300,14 @@ $3(\sv{5} - 2) + 4 = 3(3) + 4 = 13$, so $x = 5$ is right.
 \fi
 
 \begin{questions}
-\q[1]{2} \onlyq{Solve. Check each answer.}
+\q{3} \onlyq{Solve. Check each answer.}
 \begin{tasks}(3)
   \task \qa{$2(x + 3) = 14$}{$x = 4$}
   \task \qa{$5x - 7 = 3x + 9$}{$x = 8$}
   \task \qa{$4(x - 1) - 2 = 18$}{$x = 6$}
+  \task \qa{$3(x + 2) = x + 10$}{$x = 2$}
+  \task \qa{$7 - 2x = 15$}{$x = -4$}
+  \task \qa{$2(3x - 1) = 4(x + 2)$}{$x = 5$}
 \end{tasks}
 \end{questions}
 
@@ -304,17 +328,14 @@ Choose simple values for $x$. Find each $y$ value: when $x = \sv{0}$,
 $y = \sv{0} - 2 = -2$.
 
 \medskip
+% Inside a box, a table of values used only to graph (no finite
+% differences) may run across, two rows, one value per column.
 \begin{center}
-{\setvaluecol{$-3$}%
-\begin{NiceTabular}{N{$3$}N{$3$}}[hvlines]
-\CodeBefore \rowcolor{tablehead}{1} \Body
-\multicolumn{1}{c}{$x$} & \multicolumn{1}{c}{$y$} \\
-$-1$ & $-3$ \\
-$0$ & $-2$ \\
-$1$ & $-1$ \\
-$2$ & $0$ \\
-$3$ & $1$ \\
-\end{NiceTabular}}
+\begin{NiceTabular}{c*{5}{w{c}{0.75cm}}}[hvlines]
+\CodeBefore \columncolor{tablehead}{1} \Body
+\rowstrut{\valuepitch}$x$ & $-1$ & $0$ & $1$ & $2$ & $3$ \\
+\rowstrut{\valuepitch}$y$ & $-3$ & $-2$ & $-1$ & $0$ & $1$ \\
+\end{NiceTabular}
 \end{center}
 
 \medskip
@@ -334,7 +355,7 @@ Plot the points. Draw a line through them, to the edge of the grid.
 
 \onlyq{%
 \begin{groupnote}
-\textbf{\sffamily For questions 3 and 4:} use the table you complete in question 3 to draw the graph.
+\textbf{\sffamily For questions 4 to 6:} graph each line from a table of values, as in the example above.
 \end{groupnote}}
 
 \begin{questions}
@@ -343,7 +364,7 @@ Plot the points. Draw a line through them, to the edge of the grid.
 % so both copies have the same table, the same grid and the same size.
 % Both columns hold a negative, so both are N columns (N{$3$} and N{$5$}:
 % each one's widest value without its sign), their headings centred.
-\q[14]{3} \qa{Complete the table of values for $y = -2x + 3$. Then graph the line.}{$y = -2x + 3$:}
+\q[14]{4} \qa{Complete the table of values for $y = -2x + 3$. Then graph the line.}{$y = -2x + 3$:}
 
 \smallskip
 \begin{minipage}[t]{0.35\linewidth}\vspace{0pt}\centering
@@ -359,17 +380,45 @@ $3$ & \qa{}{$-3$} \\
 \end{NiceTabular}}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.6\linewidth}\vspace{0pt}\centering
-% It leaves the grid through y = 6 at x = -1.5 and y = -6 at x = 4.5.
+% It leaves the grid through y = 5 at x = -1 and y = -5 at x = 4.
 \begin{tikzpicture}\begin{axis}[gridgraph, x=0.42cm, y=0.42cm,
-    xmin=-4, xmax=6, ymin=-6, ymax=6, xtick={-4,-2,...,6}, ytick={-4,-2,...,4}]
+    xmin=-4, xmax=6, ymin=-5, ymax=5, xtick={-4,-2,...,6}, ytick={-4,-2,...,4}]
   \onlya{%
-  \addplot[lineA, <->, >=latex, domain=-1.45:4.45]{-2*x + 3};
+  \addplot[lineA, <->, >=latex, domain=-0.95:3.95]{-2*x + 3};
   \addplot[only marks, mark size=1.6pt, blue!70!black] coordinates {(-1,5) (0,3) (1,1) (2,-1) (3,-3)};}
 \end{axis}\end{tikzpicture}
 \end{minipage}
 
-\q{4} The line $y = -2x + 3$ crosses the $y$-axis at the point \fillin[2.4cm]{$(0, 3)$}.
+\q{5} The line $y = -2x + 3$ crosses the $y$-axis at the point \fillin[2.4cm]{$(0, 3)$}.
 Its slope is \fillin[2cm]{$-2$}. Each time $x$ goes up by 1, the value of $y$ \fillin[4cm]{goes down by 2}.
+
+% Four lines on ONE grid, the same grid in both copies; the key adds the
+% lines and a legend whose keys show no arrowheads. Each domain stops at the
+% first edge its line crosses: a) x = -5 and y = 5; b) y = 5 and x = 5;
+% c) y = -5 and y = 5; d) both side edges.
+\q[12]{6} Graph all four lines on the grid.
+
+\smallskip
+\begin{minipage}[t]{0.3\linewidth}\vspace{0pt}
+\begin{tasks}(1)
+  \task $y = x + 1$
+  \task $y = -x + 4$
+  \task $y = 2x - 3$
+  \task $y = -\dfrac12x - 2$
+\end{tasks}
+\end{minipage}\hfill
+% Set from the left, not centred, so the key's legend does not move the
+% grid: it sits at the same place on the page in both copies.
+\begin{minipage}[t]{0.66\linewidth}\vspace{0pt}\hspace*{1.2cm}%
+\begin{tikzpicture}\begin{axis}[gridgraph, answerlegend, x=0.36cm, y=0.36cm,
+    xmin=-5, xmax=5, ymin=-5, ymax=5, xtick={-4,-2,...,4}, ytick={-4,-2,...,4}]
+  \onlya{%
+  \addplot[lineA, <->, >=latex, domain=-4.9:3.9]{x + 1};        \addlegendentry{a) $y = x + 1$}
+  \addplot[lineB, <->, >=latex, domain=-0.9:4.9]{-x + 4};       \addlegendentry{b) $y = -x + 4$}
+  \addplot[lineC, <->, >=latex, domain=-0.95:3.95]{2*x - 3};    \addlegendentry{c) $y = 2x - 3$}
+  \addplot[lineD, <->, >=latex, domain=-4.9:4.9]{-x/2 - 2};     \addlegendentry{d) $y = -\frac12x - 2$}}
+\end{axis}\end{tikzpicture}
+\end{minipage}
 \end{questions}
 
 % =====================================================================
@@ -379,7 +428,7 @@ Its slope is \fillin[2cm]{$-2$}. Each time $x$ goes up by 1, the value of $y$ \f
 % (0.0, 9.0, 18.0) and it is an N column; the time column is whole numbers
 % only, so it is centred. The sentences say 9 m, never 9.0 m.
 \begin{questions}
-\q[16]{5} A cyclist starts a ride at the start line and rides at a steady speed of
+\q[16]{7} A cyclist starts a ride at the start line and rides at a steady speed of
 4.5 metres every second for 4 seconds.
 
 \smallskip
@@ -411,6 +460,7 @@ $4$ & \qa{}{$18.0$} \\
   \task How far has the cyclist gone after 2 seconds? \fillin[2.4cm]{9 m}
   \task After how many seconds has the cyclist gone 13.5 m? \fillin[2.4cm]{3 s}
 \end{tasks}
+
 \end{questions}
 
 \end{document}
