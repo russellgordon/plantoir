@@ -1069,6 +1069,20 @@ nonisolated enum ActivityTrail {
         /// because it changes things a teacher sees weeks later: the address
         /// can change, and a custom domain went with the deleted project.
         case cloudflareProjectMadeAgain = "cloudflare project made again"
+        /// A course's unit plans shared to Cloudflare Pages (#709), read from
+        /// `share_plan.py`'s marker by `PlanShareReport`: the course, the
+        /// school year, how many units, with a password or open, answer keys
+        /// left out, what a flood would do. Never the address, a username or
+        /// a password.
+        case unitPlansShared = "unit plans shared"
+        /// A share of a course's unit plans that did not happen, and why, by
+        /// the refusal's key in plain words (#709); written by the app from
+        /// the marker, and by deploy.sh itself when the plans were already
+        /// being shared.
+        case unitPlanShareRefused = "unit plan share refused"
+        /// Stop Sharing on a school year's unit plans, and how it ended:
+        /// deleted, already gone, or failed with the address still working.
+        case unitPlanSharingStopped = "unit plan sharing stopped"
         /// A preview's address was held by something else on this Mac
         /// (GitHub #310, found in the #204 rehearsal with two macOS accounts
         /// signed in). Carries where the preview was for, the address — a

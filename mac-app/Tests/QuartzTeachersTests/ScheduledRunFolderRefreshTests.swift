@@ -7,7 +7,7 @@ import XCTest
 /// trail's words are `activityTrail.mustRecord` → "scheduled deploy got its
 /// folder ready".
 ///
-/// Real folders under the home folder, never the teacher's: a pretend bundle
+/// Real folders under the suite's made-up home (`RealHome.forFiles`), never the teacher's: a pretend bundle
 /// and a pretend working folder, and the run's waits driven by a pretend
 /// clock and a pretend list of other copies. Nothing is scheduled, and no
 /// launcher runs.
@@ -22,7 +22,8 @@ final class ScheduledRunFolderRefreshTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        root = FileManager.default.homeDirectoryForCurrentUser
+        // The suite's own made-up home, never the teacher's (RealHomeTripwireTests).
+        root = RealHome.forFiles
             .appendingPathComponent("plantoir-run-refresh-test-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let created: URL = root

@@ -2016,6 +2016,12 @@ enum ScheduledDeploy {
             }
             switch step {
             case .run:
+                clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
+                // Classes dated after the next class (#475) go out as they
+                // are — there is nobody at half six to ask. Read NOW, as the
+                // pages that go out; written on the trail only once the run
+                // has deployed (#457 batch B's review, note 9).
+                classesDatedLaterGoingOut = classesDatedLaterLine(section: section)
                 // THE FOLDER'S OWN TOOLS, brought up to date (#748 part 4).
                 // The wrapper written just above is this version's, but it
                 // runs the folder's `preview.sh` and `deploy.sh`, which hash
@@ -2023,8 +2029,9 @@ enum ScheduledDeploy {
                 // the window refreshes those when it opens a folder, and after
                 // an update installed overnight nobody has. Holding the
                 // course's leases, after the settings decision (so a run that
-                // stands down copies nothing), and before anything runs. It
-                // never stops the deploy: `ScheduledRunFolderRefresh.decide`.
+                // stands down copies nothing) and after the classes going out
+                // are read, before anything runs. It never stops the deploy:
+                // `ScheduledRunFolderRefresh.decide`.
                 let refresh: ScheduledRunFolderRefresh.Report = ScheduledRunFolderRefresh.bringUpToDate(
                     workingFolder: workingFolderURL(forCourseDirectory: section.courseDirectory)
                 )
@@ -2034,12 +2041,6 @@ enum ScheduledDeploy {
                         course: section.courseCode, section: section.sectionNumber
                     )
                 }
-                clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
-                // Classes dated after the next class (#475) go out as they
-                // are — there is nobody at half six to ask. Read NOW, as the
-                // pages that go out; written on the trail only once the run
-                // has deployed (#457 batch B's review, note 9).
-                classesDatedLaterGoingOut = classesDatedLaterLine(section: section)
             case .leaveQuietly:
                 for lease in leasesTaken {
                     WorkLeaseFiles.remove(at: lease)

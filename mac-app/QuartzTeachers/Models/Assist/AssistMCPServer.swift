@@ -227,6 +227,10 @@ enum AssistMCPServer {
             sections.append(build)
         }
         for publish in CourseActivity.activePublishes {
+            // A share of unit plans (#709) builds nothing in a section.
+            if publish.sectionNumber == PlanSharing.leaseSection {
+                continue
+            }
             let asBuild: CourseActivity.PreviewBuildRecord = CourseActivity.PreviewBuildRecord(
                 folderPath: publish.folderPath,
                 courseCode: publish.courseCode,
