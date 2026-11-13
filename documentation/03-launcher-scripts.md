@@ -2750,7 +2750,13 @@ all XNU compares).
   (`containerized-quartz-unit-plan`, account `<folder id>/<CODE>`), and pipes
   them into a fresh 0600 file in a 0700 folder made for each share inside the
   website builder, passing only its name (`--credential-file`), never the
-  secret in argv. Both questions are read without echo, exactly as typed. Protection is sticky: with
+  secret in argv. Both questions are read without echo, exactly as typed.
+  `--change-password --password-only` (#833) saves the new username and
+  password and shares nothing: no credential file is made, and
+  `share_plan.py --new-password-waiting` notes in the year's marker that the
+  new password waits for a share; `--password-only` without
+  `--change-password`, or with a flag that shares or stops sharing, is
+  refused. Protection is sticky: with
   neither `--protect` nor `--remove-password` the launcher reads the year's
   marker (`the_plans_were_protected`). The school year is worked out on the
   Mac's clock and always passed to `share_plan.py` as `--year`. A share

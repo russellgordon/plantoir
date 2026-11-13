@@ -12537,3 +12537,20 @@ moving `plans-*.json` aside, and the plans leg of `verify-deploy.ps1`. The
 `windows` issue for #709 lists them; `NamedGapLedger` holds each open by name
 until done.
 
+**Since #833** the look before a share is two tables, Shared and Not
+shared, before EVERY share, protected ones too, with the Answer Keys folder
+as the rule and the names a hint (`documentation/07-deployment.md` → the
+rulings, items 4 to 8; `documentation/09-mac-app.md` → the share bar).
+Windows inherits the Python free again: the document rule, where each
+document starts, the remembered choices in the year's marker, the refusal
+of a list naming a file no share sends, the advice, `--new-password-waiting`,
+and the new marker lines. It owes the same two tables in WinUI (sortable
+columns, a search box, a Unit choice and Answer Keys Only, drag and drop of
+several rows, a move each way from the keyboard, an announcement of each
+move), the app's write of the settled places into the marker before it
+answers yes, the public-address warning after the tables as labelled rows
+(#834), `deploy.ps1 -ChangePassword -PasswordOnly` and the dialog after it,
+and the contract's `filterCases`, `countCases`, `startingPlace`,
+`rememberedChoices`, `warningSheet` and `changePasswordCases` run by its own
+suite. The `windows` issue for #833 lists them.
+

@@ -15715,19 +15715,65 @@ this is the app's half.
   `words.lastShareUnfinished` (the plans may be open), and one in state
   `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
   (`PlanSharing.barStatus`, `barCases`).
-- **Before an open share goes out** the launcher lists every file it will
-  share and every file it leaves out, by name, and asks. The app reads the
-  lists from their marker lines (`PlanShareLists`, kept out of the console)
-  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
-  scrolling, the by-name sentence, Share and Cancel with Cancel the default
-  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
-  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **Before EVERY share (#833)** the launcher lists the plan's documents, each
+  with where it starts, and asks. The app reads one JSON marker line per
+  document (`PlanShareLists`, `PlanShareDocument`, kept out of the console)
+  and answers ONLY in `PlanShareListsSheet` (`TaskProgressView
+  .questionSurface`; fix review H1): two `NSTableView`s side by side
+  (`PlanShareDocumentTable`), Shared and Not shared, each with Name, Unit,
+  Folder, Kind and Note columns, the system's sort indicator (each table
+  sorts on its own; by unit in the plan's order, then name, at first),
+  alternating rows, type-to-select and multiple selection. **Moving a
+  document**: drag one row or several to the other table (the whole table is
+  the drop target); the chevron buttons between the tables; ⌘→ and ⌘←; or
+  the context menu's Don't Share or Share, which shows the same keys. Every
+  move is said to VoiceOver (`PlanShareAnnouncer`, an announcement request).
+  A file of a kind no share takes cannot be dragged or moved. An answer key
+  in Shared in a share with no password carries a warning symbol and words
+  in its Note, never colour alone. **Filtering**: a standard `NSSearchField`
+  (⌘F) filters both tables by name, unit and kind, with a Unit popup and
+  Answer Keys Only (a popup for a choice of one, a checkbox for yes or no);
+  the headers read "Shared (3 of 12)" while anything is hidden, and the
+  sentence by Share gives the full counts (`PlanShareTablesModel`). Cancel is
+  the default and Escape. On Share the app writes the settled places into
+  the year's marker (`PlanSharing.writeChoices`: a temporary file and
+  rename(2), every other key kept) and only then answers y; a marker it
+  cannot write is answered n.
+
+  **Why `NSTableView`.** Dragging SEVERAL selected rows and dropping on the
+  table rather than on a row are its own data-source calls, and
+  `PlanShareTablesTests.testDraggingSeveralRowsToTheOtherTableMovesThemAll`
+  drives them against two real tables and a private pasteboard. SwiftUI's
+  `Table` was rejected: multi-row drag between two tables could be proved
+  only by driving the window, which no gate allows. **Why the keys are
+  watched rather than hung on buttons:** `KeyEquivalentPlacementScanTests`
+  keeps character shortcuts off buttons in views (#457), so the search
+  field's coordinator watches its own window's key presses for ⌘F, ⌘→ and
+  ⌘← (passing ⌘→ and ⌘← through while the cursor is in a text field) and
+  removes the watcher with the field; the context menu shows the arrows so
+  the keys can be found. Not measured: the drag itself by hand, VoiceOver's
+  reading, and the sheet's look; those are for the director's look at the
+  window.
 - **A plan's password** is sent from the credential sheet exactly as typed
   (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
-- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
-  comes before a choice exactly when `PlanSharing.warns` says
-  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
-  nothing and runs nothing.
+- **The warning** is owed exactly when `PlanSharing.warns` says
+  (`warningCases`), and since #833 it comes AFTER the tables: their Share
+  opens `PlanSharePublicWarningSheet` (#834's shape: the title asks, one
+  sentence, then labelled rows from `PlanSharing.warningRows` in a grouped
+  `Form` of `LabeledContent`, the answer-key row only when a key sits in
+  Shared), Cancel the default and Escape, back to the tables. The one-
+  paragraph `crawlerWarning` and `answerKeysClause` are retired. Cancel at
+  the Stop Sharing alert writes nothing and runs nothing.
+- **Change Password** (#833, `changePasswordCases`) runs `--change-password
+  --password-only`: the console asks for the new password, nothing is
+  shared, and when the run printed `PLANTOIR_PLAN_PASSWORD_SAVED: … waiting`
+  (`ScriptRunner.planPasswordSaved`) the console sheet asks
+  `PlanShareNewPasswordSheet`: Share Again (the default, `PlanShareRunner
+  .shareAgain`, the bar's own path and the tables first) or Later (Escape).
+  The bar shows `words.newPasswordNotInUse` while the marker says
+  `newPasswordWaiting`, so a relaunch, a failed share or a declined one
+  keeps it; `changePasswordNote` stays as the button's tooltip, no longer the
+  only place the fact is said.
 - **The run** is `PlanShareRunner`: `deploy.sh` with
   `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
   `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
@@ -15744,11 +15790,12 @@ this is the app's half.
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
-  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
-  Never the address, whose suffix is a line of defence, and never a username
-  or a password. The plan asked for the share line to say whether the
-  warning had been shown and the password changed; the markers do not carry
-  either, so the line does not, and that is a known gap for a later piece.
+  "unit plans shared" (since #833 with how many documents went and how many
+  were held back), "unit plan share refused", "unit plan sharing stopped",
+  and "unit plan password changed" (#833). Never the address, whose suffix
+  is a line of defence, never a file's name, and never a username or a
+  password. Whether the warning was shown is still not on the share line:
+  the marker does not carry it.
 - **A reference copy** of the course renames every year's marker aside
   (`PlanSharing.releasePlanMarkers`, called by
   `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the

@@ -1744,35 +1744,98 @@ and the credential item (the `windows` issue for #709).
    the bar lists each earlier year with its own Stop Sharing.
 3. **A random suffix on every plan site**, open or protected, so the address
    never changes when a password is added or removed.
-4. **Answer keys** are left out of a share without a password unless the
-   teacher ticks Include Answer Keys; a protected share includes them. The
-   rule (`answerKeys`) reads NAMES only and errs toward leaving out (the
-   director's ruling on the implementation review, M3): a PDF, image or text
-   file whose name, with case, dashes of every kind, underscores and spaces
-   taken away, holds "answer", "solution", "markingguide" or
-   "markingscheme", or has "key" as a word. The first rule knew only the
-   skills' own endings, and teachers name their own files (`Quiz 1
-   Answers.pdf`, `Answer Key.pdf`, `Quiz 1 – Solutions.pdf`, `Test KEY.pdf`
-   were all shared). A false positive such as `Dissolution Lab.pdf` costs a
-   PDF the teacher can still include; the other way costs a key a class can
-   read. No rule on names can see a key written inside a page or a PDF named
-   something else, so **before every open share the teacher is shown every
-   file that will be shared and every file left out, by name, and the share
-   goes only on their yes** (`openShareLists`); the sentence says the lists
-   are by name and that Plantoir has not read the files. In the app the
-   question is answered ONLY in a sheet of its own showing both lists in
-   full, with Cancel the default (fix review H1: the plain question alert
-   showed the `[y/N]` line alone, with the lists behind Show Details, so the
-   look the ruling relies on never happened). The app reads the lists from
-   marker lines `share_plan.py` prints beside the human ones
-   (`openShareLists.markers`), never from the console's text. Under
-   `--non-interactive` the lists are printed and the rule decides. Widened
-   again on the fix review: Mark Scheme, Soln, Ans, and the French Corrigé and
-   Réponses, with accents folded before the letters are read.
-5. **The public-address warning** comes before the first share without a
+4. **Answer keys.** Since #833 (Russell, 2026-11-13) **the `Answer Keys`
+   folder is the rule** (`answerKeysFolder`): everything inside a folder of
+   that name in a unit, at any depth and in any letter case, is an answer key,
+   and the two skills that make plans and tests write every key, solutions
+   file and marking guide there. The name rule from #709 shrank back to a
+   HINT (`answerKeys`): the obvious names only (answer key, answers, marking
+   guide or scheme, the French corrigé and réponses, and solution or key as a
+   name's last word or beside test, quiz, exam, worksheet, homework, review,
+   practice or assignment), so a plan made before the folder keeps its keys
+   out of an open share until they are moved. The widened rule the #709 fix
+   review ruled (anything holding "answer", "solution" or "key") is
+   REJECTED: it held back `Dissolution Lab.pdf`, `Answering Questions.pdf`,
+   `Key Terms.pdf` and `Solutions and Mixtures.pdf`, ordinary handouts, and
+   Russell ruled it out in favour of the folder. `check` names a hint match
+   outside the folder as ADVICE ("move it into its unit's Answer Keys
+   folder"), printed before the lists; advice never refuses a share
+   (`advice`). Nothing moves a teacher's file for them.
+5. **Two tables before EVERY share** (#833; protected shares too, which #709
+   did not ask). The launcher lists the plan's DOCUMENTS only (`documents`):
+   PDFs, text files, everything in an Answer Keys folder, and a picture
+   whose name the hint matches, all movable; a file of a kind no share takes
+   (a `.docx`, a `.tex`) listed in Not shared and not movable, with
+   `wordsForTheTables.noteCannotShare`; pages, pictures, stylesheets and fonts
+   never listed (they always go, counted in `ownFilesLine`); `plan.json` and
+   a teacher's own `_headers`, `_worker.js` and the like never listed and
+   never sent. Each document starts where `startingPlace` puts it: a
+   remembered choice first, then an answer key of either kind in Shared when
+   the share is protected or Include Answer Keys is ticked and in Not shared
+   otherwise, then Shared. The Answer Keys folder ruling says a hint match
+   "starts in Not shared"; it is read for an open share without the tick,
+   and a protected or ticked share treats it as any key (Shared), because
+   ruling 5 puts every key in Shared there. **The teacher's choices are
+   remembered per file** in the year's marker (`documents`, place to
+   `shared` or `notShared`, names only; `rememberedChoices`). Only MOVES are
+   recorded, with every earlier choice of a file still listed: recording
+   every file's place was rejected, because a protected share would then
+   fix every key in Shared for the next open share. A renamed or deleted
+   file is forgotten, and a new name starts from the rule. A successful Stop
+   Sharing removes the marker, the choices with it: a marker kept for the
+   choices alone would read to `deploy.sh` as a year still shared, and the
+   Keychain item would never go.
+
+   **How the choice reaches the share.** The app writes the settled places
+   into the year's marker (a temporary file and a rename, every other key
+   kept) while `share_plan.py` waits on its question, and only then answers
+   yes; `share_plan.py` re-reads them, refuses (`listNotShareable`) a list
+   that marks Shared a file it would never send (a cannot-be-moved one, a
+   hidden one, a path outside the plan) or holds another value, and stages
+   exactly the documents it LISTED that settle in Shared: a document that
+   appeared after the lists were printed is held back. Rejected: a choice
+   file under `/tmp` named on the command line (the share runs inside the
+   website builder, which shares only `courses/` with the app), and the
+   names on the question's answer line (a line break in a name ends the
+   answer, and the terminal echoes it). The app reads the rows from one
+   JSON marker line per document (`openShareLists.markers.document`, ASCII
+   only); the #709 `shared` and `leftOut` lines are no longer printed. The
+   by-name sentence is kept: Plantoir reads names and folders, never files,
+   so a key written inside a page or a PDF outside the folder is shared with
+   it. Under `--non-interactive` the remembered choices and the rule decide
+   and the lists are printed.
+
+   **Sort and filter** (Russell, 2026-11-13): each table sorts on its own
+   (by unit in the plan's order, then by name, at first); one search field
+   filters both by name, unit and kind, every word matching with case and
+   accents folded (`filterCases`); a Unit popup and Answer Keys Only narrow
+   further. A filter changes what is SHOWN, never what is shared: a hidden
+   document keeps its place, each header counts what is showing against its
+   total ("Shared (3 of 12)", `countCases`), the sentence by Share gives the
+   full counts, and a move acts only on rows that are both selected and
+   showing. The trail's "unit plans shared" line says how many documents
+   went and how many were held back, never a name.
+6. **The public-address warning** is owed at the first share without a
    password and again when a password is removed; never when protected, and
-   there is no tick to silence it (`warningCases`).
-6. **Fail closed**, set through the API and read back, with no flood test.
+   there is no tick to silence it (`warningCases`). Since #833 it comes
+   AFTER the two tables, when the teacher presses Share there, because only
+   then does it know what goes, and since #834 it is a small sheet of
+   labelled rows rather than a paragraph (`warningSheet`): one sentence,
+   then what search engines and AI crawlers are asked, how many documents
+   go and are held back, how many answer keys go (only when one does), and
+   how to require a password. Cancel goes back to the tables.
+7. **Change Password saves, then asks** (#833, `changePasswordCases`).
+   `--change-password --password-only` saves the new password and shares
+   nothing; `share_plan.py --new-password-waiting` sets `newPasswordWaiting`
+   in the marker of a year with an address, and the app's dialog offers
+   Share Again (the default, through the tables) or Later. The marker keeps
+   the flag through every share that does not PROVE the address, so the bar's
+   line survives a relaunch, a failed share and a declined one. Until #833
+   the fact was a tooltip and Change Password shared at once.
+8. **The verb is Share** (Russell, 2026-11-13, `theVerbIsShare`): Share Unit
+   Plans, Share Again, Stop Sharing. Deploy is for class websites; a test
+   reads every sentence in the share's words for "deploy" and "publish".
+9. **Fail closed**, set through the API and read back, with no flood test.
    The weaker sentence (`words.floodOpen`) is shown only when the setting
    could not be made.
 
