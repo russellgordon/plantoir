@@ -606,6 +606,16 @@ from Phase 5 apply here too.
   quoting it — describe the WORK, never the worker (Phase 2). A task with
   no success criteria cannot support assessment *as* learning, because
   there is nothing for a student to judge their own work against.
+  **GLC2O is the payload that also carries them as tick boxes** (#878):
+  each of its seven task pages closes with `### Success criteria` and one
+  `- [ ]` line per criterion, worded about the work ("Every figure in my
+  budget has its source and the date I looked"). A checklist under that
+  heading is what gives a section its My Progress page
+  (`plantoir-page-authoring`, section 11), so GLC2O is the one ready-made
+  course whose sites have one. A payload that gains such a list changes
+  the count in `contracts/shared-rules.json` → `myProgress.knownLimits`
+  and in `documentation/06-quartz-customizations.md` (section L); correct
+  both.
 - **Checklists on the site can be ticked** (since #519, v1.8.1). `- [ ]`
   outside a `[!quiz]` renders a box each student can tick for themselves;
   the ticks are kept in that student's own browser, on that computer, and
@@ -1227,6 +1237,44 @@ is the contract; what EXC2O needed:
   space/electricity library its 26 agendas never link) is fine — the
   linter's "no class links" notes list it; confirm the list reads as
   deliberate extras, not forgotten links.
+
+## Pictures and videos: openly licensed, and written down
+
+A payload may show a picture or a video only when it is in the public domain
+or openly licensed, and the licence was read on the work's own page (the
+museum's page for the object, the video's page on YouTube) on the day it was
+added. A wrong licence claim is worse than a gap: when a licence cannot be
+verified, choose another work.
+
+- **A video is embedded, never copied**: the YouTube picture form
+  `![](https://www.youtube.com/watch?v=...)` on a line of its own, as the
+  shipped `plantoir-page-authoring` skill gives it. Prefer an institution's
+  own channel (a national arts body, a museum, a school board, a public
+  broadcaster) to an individual's.
+- **A picture is carried by the payload, BESIDE the page that shows it**, in
+  that page's own folder, the way a `.ggb` is (Known traps, below): the
+  installer copies anything that is not `.md` as it is, and the build copies
+  a shared folder whole. Show it with the description form the shipped
+  `plantoir-page-authoring` skill gives, the path written from the course's
+  top: `![what it shows](Critiques/file-name.jpg)`. Name the file with
+  lower-case letters, digits and hyphens, so the path needs no escaping.
+  **Not in a `shared/Media` folder**: the installer
+  drops `Media` from the folders it pours (`setup_course.py`, where the
+  manifest's `shared_folders` are read), and both apps' contract tests refuse
+  a folder under `shared/` the manifest does not name
+  (`contracts/example-content.json`, the allow-list rule), so a picture put
+  there reaches no teacher. Keep each file to a few hundred KB; download it
+  from the museum itself.
+- **Every one is recorded in `SOURCES.md` beside `manifest.json`**: the page
+  that shows it, title, creator, year, the page it was taken from, the
+  licence as stated there, and the date checked. The file is a record for
+  whoever maintains the payload: it sits outside `shared/` and
+  `per_section/`, so it is never installed, and `lint_payload.py` leaves it
+  alone. AVI1O's and ATC1O's are the examples.
+- No picture of a living private person, no real student, and no firearms or
+  ammunition in any picture, video, question or scenario.
+- The owner approves or replaces each one at the review before a release, so
+  say in the piece's closing note which were not watched or seen in full.
 
 ## Known traps
 

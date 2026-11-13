@@ -122,15 +122,15 @@
         "why": "GitHub #668. Since Cloudflare Pages is the default for every new course (app-rules.json -> publishingDestinations), the new-course window no longer stops a teacher with no Account ID; the first DEPLOY does, before anything runs. That refusal is now the ordinary path for every new teacher, and a report of 'Deploy said Cannot Deploy Yet' was answered by an empty trail. The other line is 'deploy refused: the Cloudflare Account ID in Settings is not a whole ID'. Both are pinned with the refusal itself in publishingDestinations.deployWithoutAnAccountID. Written where a window is open: the Deploy button and the assistant in that window (one path, SectionDetailView.deployAndWait). A deploy asked for by an MCP client with no window open (AssistSiteWork.deploy) is refused with the same sentence and writes NO line — named here so a report from that path is not read as the trail missing something; a refused SCHEDULE has its own sentence and is not this event either."
       },
       {
-        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… add nothing: their message replaces the greeting.",
+        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…', 'GitHub Copilot…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… / Fix with GitHub Copilot… add nothing: their message replaces the greeting.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
       {
-        "carries": "the course a Claude or Codex session opened from Plantoir is holding - nothing else: no page, no section, no process id in the sentence",
+        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding, and which assistant's session it is, through the same slot the busy sentences use (doorCourseHold.naming: the name its door wrote into the server's environment, or all three when none was); nothing else: no page, no section, no process id",
         "event": "outside session held a course",
-        "line": "a Claude or Codex session started from Plantoir is holding {course} while it is open",
-        "why": "#458 (the mac) and #430 (Windows): while a Claude or Codex session is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold)."
+        "line": "a {assistant} session started from Plantoir is holding {course} while it is open",
+        "why": "#458 (the mac) and #430 (Windows): while a session from an outside door is open on a course, Rename Course, Add Section, restoring a backup and every Revise item wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold). Until #783 the line said 'a Claude or Codex session'; since #783 it names the door's assistant through {assistant} (doorCourseHold.naming), as the busy sentences do (Russell, 2026-11-13)."
       },
       {
         "carries": "course, section, and how long the engine took",
@@ -583,7 +583,7 @@
         "why": "Added with #397. When students see yesterday's class, the trail shows the teacher was asked and chose, or that the answer could not be carried out. A question never answered changed nothing, and a question not asked (Not Today already said for that class today) is not an action: neither writes a line."
       },
       {
-        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from and, separately, which ones a Claude or Codex session still open made (#458), and how many could not be deleted",
+        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from and, separately, which ones a session from an outside door still open made (#458), and how many could not be deleted",
         "event": "backups deleted",
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
@@ -594,7 +594,7 @@
       },
       {
         "event": "outside assistant worked while a preview was open",
-        "carries": "which course and section, and which of three things an outside assistant (Claude or Codex) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
+        "carries": "which course and section, and which of three things an outside assistant (Claude, Codex or GitHub Copilot) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
         "why": "Added with #433 (2026-10-03). An outside assistant's change while the teacher reads the preview is written and the preview left alone, so the page on screen is the page as it was until the teacher presses Stop Preview, then Preview. 'Claude said it changed the page and my preview still shows the old one', or 'my preview closed by itself', arrives next week with the conversation long closed; this line is what says the preview was left alone on purpose, or closed by a deploy that was asked for. The 'assistant chose a tool' line carries the tool, not what it met."
       },
       {
@@ -1113,9 +1113,9 @@
       },
       {
         "event": "asked an assistant to fix problems",
-        "carries": "the course and section, which assistant (Claude or Codex), how many problems were handed over and their KINDS (sectionProblems.kinds' names), how many of them the opening message names (at most app-rules.json -> outsideAgents.fixWith.mostRowsInThePrompt), and how many rows were left out - unticked, or fixed in the source - never a page, which is the teacher's own name",
+        "carries": "the course and section, which assistant (Claude, Codex or GitHub Copilot, as fixWith.buttons names them), how many problems were handed over and their KINDS (sectionProblems.kinds' names), how many of them the opening message names (at most app-rules.json -> outsideAgents.fixWith.mostRowsInThePrompt), and how many rows were left out - unticked, or fixed in the source - never a page, which is the teacher's own name",
         "line": "{course}/{section} · asked {assistant} to fix {count} problem(s) ({kinds}); named in the message: {named}; left out: {unticked} unticked, {fixed} fixed in the source",
-        "why": "#717 part two (717b): Fix with Claude… / Fix with Codex… on a section's Problems tab. The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, and a report of 'it changed the wrong page' starts there. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for ticking a row."
+        "why": "#717 part two (717b): Fix with Claude… / Fix with Codex… on a section's Problems tab, and Fix with GitHub Copilot… since #783. The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, and a report of 'it changed the wrong page' starts there. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for ticking a row."
       },
       {
         "event": "site built again before deploying",
@@ -1148,9 +1148,9 @@
       },
       {
         "event": "asked an assistant to plan a unit",
-        "carries": "the course and which assistant (Claude or Codex) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
+        "carries": "the course and which assistant (Claude, Codex or GitHub Copilot) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
         "line": "{course} · asked {assistant} to plan a unit from the Planning tab",
-        "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
+        "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab, and Plan a Unit with GitHub Copilot… since #783, (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
       },
       {
         "event": "looked at a section's curriculum coverage",
@@ -1234,6 +1234,24 @@
           "mac"
         ],
         "appliesOnWhy": "Windows' run has done the same since #477 (2026-10-15) and records it under the two events it already had: 'working folder tools copied' ('got the working folder ready for a scheduled deploy', a failure ending 'the scheduled deploy stood down') and 'scheduled publish waited for the course' for the wait. The mac gives it an event of its own because its run never stands down for the copy (scheduledRunGetsItsFolderReady.platformDifferences), so its line says something Windows' lines do not: that it went ahead with the tools as they were. Nothing is owed by Windows."
+      },
+      {
+        "event": "deployed folder opened in the web browser",
+        "carries": "the course and the section, after the course's own prefix ({course}/{section} · ); where Open in Browser was pressed (the deploy's result, the Section menu, the toolbar, the sidebar); whether it was already being shown; and whether its usual address was taken, so what the site remembered there is not shown. Never the folder's path or the address.",
+        "line": "opened the deployed folder in the web browser ({from}[, already open | , at a different address because its usual one was taken, so what the site remembered there is not shown])",
+        "why": "#850. 'My ticks were gone' is answerable only if the trail says the address moved, and 'it opened the wrong thing' only if it says where the press came from."
+      },
+      {
+        "event": "deployed folder no longer shown",
+        "carries": "the course and the section; why it stopped (Stop was pressed, Plantoir quit, the folder was gone, it stopped on its own); how many requests it answered and how many found nothing. Counts only, never an address: an address is a page name.",
+        "line": "stopped showing the deployed folder in the web browser — {Stop was pressed | Plantoir quit | the folder was gone | it stopped on its own} ({requests} requests, {missing} not found)",
+        "why": "#850. The not-found count is what makes 'a page would not open' reportable without asking which page."
+      },
+      {
+        "event": "deployed folder could not be opened",
+        "carries": "the course and the section, and why: the folder was not found, nothing deployed there, no address on this computer was free, or the browser did not open it.",
+        "line": "could not open the deployed folder in the web browser — {the folder was not found | nothing deployed there | no address on this computer was free | the browser did not open it}",
+        "why": "#850. Each arrives as 'Open in Browser did nothing', and only the trail can say which."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -15139,6 +15157,19 @@
         },
         "expectAsk": true,
         "why": "#351 (mac, 2026-09-27): a backup, or the archive made before a restore or a removal, is zipped off the main thread now, so the window stays live for the minute it can take and a quit mid-zip is possible. It leaves a half-written copy - and, before a restore or a removal, one that never happened. Before #351 the frozen window made the quit impossible."
+      },
+      {
+        "name": "a deployed folder is open in the browser",
+        "given": {
+          "publishesUnderWay": 0,
+          "previewsOpen": 0,
+          "previewsBeingBuilt": 0,
+          "copiesBeingSaved": 0,
+          "deployedFoldersShown": 1,
+          "quitReason": "theTeacherAskedToQuit"
+        },
+        "expectAsk": false,
+        "why": "#850 (Russell, 2026-11-13: it runs until Stop or quitting Plantoir). Nothing is built, copied or written while a deployed folder is shown, so nothing can be lost: like an open preview, quitting ends it, and the trail says Plantoir quit. deployedFoldersShown is 0 when a case leaves it out."
       }
     ]
   },
@@ -19746,7 +19777,7 @@
     "replacing": {
       "appliesOn": ["mac", "windows"],
       "note": "Replacing a course on the Reference Courses shelf with a new one, after a warning and a backup (#572, second piece). Offered beside the shelf rule's refusal (codeUniqueWithinAGroup) at three doors: the New Course wizard with Keep this course for reference on, Keep a Copy for Reference..., and an import of ONE course (Import Courses for Reference..., a folder or a backup or archive zip). Russell's ruling of 2026-11-12 (all of #572 in v1.9.4, the release called v1.10.0 from that day and v2.0.0 since 2026-11-13); scope as amended by the plan review (M6: no batch replace at Import; M7: no Restore from Backup submenu on the shelf row; M9: the warning says what the backup is called, where it is, and what restoring it does).",
-      "rule": "In order. (0) The door makes the NEW course first, exactly as it would with nothing in the way, under the hidden staging name of the OLD course's folder (.plantoir-importing-<OLD>), claimed and leased by ReferenceStaging.claim, and already marked, neutralised and locked. Nothing of the old course is touched until it exists. (1) Refuse anything that is not a reference course directly inside courses/ (kept_for_reference read from disk, never from a window's list), a course that is previewing, publishing, being copied, read from by a Copy a Page pass (implementation review L3) or held by a Claude or Codex session (replaceWhileBusy), and a course Obsidian holds (obsidianCases); an aside folder of that name already there refuses too (an earlier replace not yet settled). (2) Back the old course up as an ordinary TEACHER-kind backup (<OLD>_backup_<stamp>.zip, never pruned, listed by both apps). From here to the end of the act the course counts as being copied, so nothing else starts on it. (3) CHECK the backup (backupCheck): its listing must hold every file of the course on disk. (4) Ask (1) again, because the backup took time. (5) Rename the old course aside to .plantoir-replacing-<OLD>, one rename inside courses/, which works on a locked tree and keeps its lock. (6) Rename the new course to <OLD>: the replacement takes the replaced course's FOLDER NAME and so its group. If that fails, the old course is renamed back first, then the new one removed. (7) Remove the aside folder, unlocked first, and the old built website. Every failure before (5) leaves the old course exactly where it was, and every failure removes the staged new course. Nothing on any failure path deletes the old course; its only removal is (7), after the new one is in place with a checked backup on disk. A quit or a crash between (5) and (7) leaves the aside folder, which the next reading of the working folder settles (sweepCases).",
+      "rule": "In order. (0) The door makes the NEW course first, exactly as it would with nothing in the way, under the hidden staging name of the OLD course's folder (.plantoir-importing-<OLD>), claimed and leased by ReferenceStaging.claim, and already marked, neutralised and locked. Nothing of the old course is touched until it exists. (1) Refuse anything that is not a reference course directly inside courses/ (kept_for_reference read from disk, never from a window's list), a course that is previewing, publishing, being copied, read from by a Copy a Page pass (implementation review L3) or held by a session from an outside door (replaceWhileBusy), and a course Obsidian holds (obsidianCases); an aside folder of that name already there refuses too (an earlier replace not yet settled). (2) Back the old course up as an ordinary TEACHER-kind backup (<OLD>_backup_<stamp>.zip, never pruned, listed by both apps). From here to the end of the act the course counts as being copied, so nothing else starts on it. (3) CHECK the backup (backupCheck): its listing must hold every file of the course on disk. (4) Ask (1) again, because the backup took time. (5) Rename the old course aside to .plantoir-replacing-<OLD>, one rename inside courses/, which works on a locked tree and keeps its lock. (6) Rename the new course to <OLD>: the replacement takes the replaced course's FOLDER NAME and so its group. If that fails, the old course is renamed back first, then the new one removed. (7) Remove the aside folder, unlocked first, and the old built website. Every failure before (5) leaves the old course exactly where it was, and every failure removes the staged new course. Nothing on any failure path deletes the old course; its only removal is (7), after the new one is in place with a checked backup on disk. A quit or a crash between (5) and (7) leaves the aside folder, which the next reading of the working folder settles (sweepCases).",
       "why": "GitHub #572: 'the newer ICS3U example instead of last year's', within a group, carefully. The worst fault is a teacher's reference course gone with no way back: deleted or half-moved while the new one failed, a backup that does not hold it, or a roll-back that fails silently. Making the new course first means a failed setup, copy or import costs nothing. The checked backup is plan review M3: a zip nobody opened is not a backup, and every zip of a course leaves out names (build, out, dist, node_modules...) that can be a teacher's own folders in a course an older Plantoir or Windows made. The Obsidian refusal is M2: the folder is swapped, and Obsidian's file watcher is anchored to it. The old folder name is what makes Restore the ordinary in-place restore: it archives the replacement and puts the old course back; a new folder name would land the restored course beside the new one in the same group, which codeUniqueWithinAGroup forbids.",
       "whereOffered": [
         "The New Course wizard, with Keep this course for reference on: beside the shelf rule's sentence under the course code.",
@@ -22903,7 +22934,7 @@
         "#433, proposed in the plan and accepted by the director, then REVERSED by Russell 2026-10-03 23:00: holding an outside deploy_section back while a preview is only being served (because the deploy ends that section's open preview). His words: 'if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running.' The deploy goes ahead and the success sentence says the preview may have closed (wording.deployClosedAnOpenPreview)."
       ],
       "outsideChanges": {
-        "rule": "What an OUTSIDE assistant (Claude or Codex, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases. THE RESIDUAL, named the way takeThenCheck names its own: an outside change looks at the leases ONCE, at the door, and takes no lease of its own, so nothing it writes is visible to another program. A Deploy pressed in the window while a multi-page outside change is still being written can therefore build and deploy a half-applied change (some pages written, others not yet). Not new with #433: an outside write took no lease before it either. Accepted rather than closed, because a page write lasts milliseconds against a deploy's minutes and closing it means a new lease kind both apps would have to read; a deploy run again after the change has finished carries all of it.",
+        "rule": "What an OUTSIDE assistant (Claude, Codex or GitHub Copilot, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases. THE RESIDUAL, named the way takeThenCheck names its own: an outside change looks at the leases ONCE, at the door, and takes no lease of its own, so nothing it writes is visible to another program. A Deploy pressed in the window while a multi-page outside change is still being written can therefore build and deploy a half-applied change (some pages written, others not yet). Not new with #433: an outside write took no lease before it either. Accepted rather than closed, because a page write lasts milliseconds against a deploy's minutes and closing it means a new lease kind both apps would have to read; a deploy run again after the change has finished carries all of it.",
         "whatIsSaid": {
           "changeHeldBack": "wording.courseIsBeingBuilt - nothing was written, and it says so",
           "changeWrittenWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages, where the preview would have been refreshed - never a refusal word (busy, couldn't, wait): the change succeeded",
@@ -23057,7 +23088,7 @@
         {"name": "another program is publishing (build and publish held): declined", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}, {"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "a publish lease alone still declines a build: it uploads what its build wrote", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "ANOTHER program's preview declines a build here (#156, stricter than Windows' 'only build blocks') - a build ends that section's serving preview, and a preview is the teacher's live work", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "preview", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
-        {"name": "an assist lease never declines a build (a Claude or Codex session holding its course - Windows' plantoir-mcp since #430, the mac's Plantoir --mcp-stdio since #458 - only greys the Revise items and structural work: doorCourseHold)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
+        {"name": "an assist lease never declines a build (a session from an outside door holding its course - Windows' plantoir-mcp since #430, the mac's Plantoir --mcp-stdio since #458 - only greys the Revise items and structural work: doorCourseHold)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "an import lease is about a staging folder, never a build", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "import", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "a build lease whose owner is gone is ignored (workLeases.liveness decides who is gone)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": false}], "expect": "allowed"},
         {"name": "a build of ANOTHER course is not in the way", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "MPM2D", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
@@ -25399,7 +25430,7 @@
     ]
   },
   "previewWhileItsSectionDeploys": {
-    "rule": "A preview of a section cannot start while that same section is being deployed, whoever started the deploy: the same window, another window of the app, the in-app assistant, an outside assistant (Revise with Claude or Codex), a deploy set for later, or a command line. The preview is refused before anything is changed, with a sentence that says why. A preview of ANOTHER section of the same course is decided as it was before this rule: allowed from the same copy of the app, and refused by the other program's course-level work lease (workLeases) when another program deploys.",
+    "rule": "A preview of a section cannot start while that same section is being deployed, whoever started the deploy: the same window, another window of the app, the in-app assistant, an outside assistant (Revise with Claude, Codex or GitHub Copilot), a deploy set for later, or a command line. The preview is refused before anything is changed, with a sentence that says why. A preview of ANOTHER section of the same course is decided as it was before this rule: allowed from the same copy of the app, and refused by the other program's course-level work lease (workLeases) when another program deploys.",
     "why": "GitHub #381, split from #378 on 2026-09-29. Russell's decision 4 on #378: 'A preview of a section cannot start AT ALL while that same section is being deployed — from this window or another.' A preview builds into the same folder a deploy is uploading from, and a preview that has to set the folder up again removes the workspace a deploy is about to run in. Read from code on 2026-09-29 (the #378 plan review), the mac refused only four of the six ways in: the same window only through its disabled Preview button (startPreview itself asked nothing, and the in-app assistant and the restart path call it directly); another window of the app and the in-app assistant's windowless deploy NOT AT ALL (startPreview read other programs' leases, never this program's own publishes); a deploy set for later and an outside assistant through their work leases; a command line NOT AT ALL, either way round (a bare launcher writes no lease, and preview.sh checked nothing).",
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
@@ -25447,7 +25478,7 @@
         "why": "The same gap: the assistant's windowless deploy writes the same in-process record and no lease another window reads."
       },
       {
-        "name": "an outside assistant (Revise with Claude or Codex) is deploying the section",
+        "name": "an outside assistant (Revise with Claude, Codex or GitHub Copilot) is deploying the section",
         "deployer": "outsideAssistant",
         "previewFrom": "window",
         "section": "same",
@@ -26958,11 +26989,13 @@
   },
   "doorCourseHold": {
     "issue": "#458 (the mac, 2026-10-07), matching Windows' #430 (v1.4.3).",
-    "rule": "Both doors name the course they were opened from to their server's environment, as PLANTOIR_DOOR_COURSE (app-rules.json -> outsideAgents.doorCourseVariable): the Claude door in its MCP configuration's env, the Codex door as a fifth -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE override (each agent's serverEnvironment). The server - Plantoir --mcp-stdio on the mac, plantoir-mcp on Windows - takes an assist lease on that course for the life of the session, WITHOUT locking to it: the session still reaches every course in the folder (#430). The lease is what keeps the protections a session opened from Plantoir had before #430: the backup its conversation made is kept (#283), a second session on the course is refused, and structural work on the course waits.",
+    "rule": "Every outside door names the course it was opened from to its server's environment, as PLANTOIR_DOOR_COURSE (app-rules.json -> outsideAgents.doorCourseVariable): the Claude door in its MCP configuration's env, the Codex door as a fifth -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE override, the GitHub Copilot door in its connection file's env (#783) (each agent's serverEnvironment). The server - Plantoir --mcp-stdio on the mac, plantoir-mcp on Windows - takes an assist lease on that course for the life of the session, WITHOUT locking to it: the session still reaches every course in the folder (#430). The lease is what keeps the protections a session opened from Plantoir had before #430: the backup its conversation made is kept (#283), a second session on the course is refused, and structural work on the course waits.",
     "whichDoors": {
       "claude": true,
       "codex": true,
-      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
+      "copilot": true,
+      "copilotWhy": "#783 (2026-11-13): the third door holds its course as the other two do, written as env in mcp-{course}-copilot.json. Its sentences are the same ones, which since #783 name the assistant holding the course (naming, below).",
+      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences named both ('Claude or Codex') until #783. Since #783 every door also names itself (app-rules.json -> outsideAgents.doorAssistantVariable) and the sentences name the assistant holding the course (naming, below; Russell, 2026-11-13). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a server started by hand does.",
@@ -27015,7 +27048,7 @@
     },
     "holds": {
       "backups": "Each backup the session's conversation made is recorded beside its lease (file-formats.json -> heldBackupRecord); a delete keeps it while that process holds a live assist lease on any course in the folder. Said with assist-wording.json -> backupKeptForAClaudeSession / backupsKeptForAClaudeSession before a delete-several, and finishTheClaudeSessionToDeleteItsBackup(s) after one, or at once for the single Delete Backup. A backup the in-app assistant window holds keeps its own sentences - the two are told apart, never merged.",
-      "reviseItems": "All three Revise items on the course - Revise with Claude, Revise with Codex, Revise with Local AI Assistant - are greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
+      "reviseItems": "Every Revise item on the course - Revise with Claude, Revise with Codex, Revise with GitHub Copilot (#783), Revise with Local AI Assistant - is greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
       "structuralWork": [
         "Rename",
         "Add Section",
@@ -27035,7 +27068,46 @@
       "quit": "quittingWhileWorkIsUnderWay counts only this app's own work, so another program's assist lease never makes quitting ask - and the app's quit removes only its own leases, never a session's.",
       "update": "appUpdates.mayNotInstallWhile.doesNotCount: 'a lease of any other kind (assist, import)'."
     },
-    "reviseCasesNote": "item is claude, codex or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
+    "naming": {
+      "rule": "Russell, #783, 2026-11-13: each busy sentence names the assistant that is working on the course, through ONE slot, {assistant}, never a list to reword when a door is added. The nine assist-wording.json keys availableOnceYouFinishRevisingWithClaude, finishTheClaudeSessionFirst, claudeIsRevisingTheCourseRename, claudeIsRevisingTheCourseRestore, claudeIsRevisingTheCourseAddSection, backupKeptForAClaudeSession, backupsKeptForAClaudeSession, finishTheClaudeSessionToDeleteItsBackup and finishTheClaudeSessionToDeleteItsBackups carry it, and so does activityTrail.mustRecord -> 'outside session held a course'. Each door writes its key into its server's environment (app-rules.json -> outsideAgents.doorAssistantVariable), and the server writes it as its assist lease's fifth line (file-formats.json -> workLease.lines), set and cleared with the lease. A reader fills the slot from the keys of the live assist leases on the course: one name when they all name the same door; the names of different doors in the order Claude, Codex, GitHub Copilot joined with 'or' (a comma before the last but one); and anyAssistant when any lease names no door (an older Plantoir, Windows before it writes one, a key no door has) or the answer has not been read. For a kept backup, the keys are those of the sessions that made the backups the sentence counts.",
+      "names": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "copilot": "GitHub Copilot"
+      },
+      "namesWhy": "The names teachers see in the menus (each agent's menuItem without its ellipsis). 'GitHub Copilot', never bare 'Copilot' (Russell, #783: not Microsoft 365 Copilot).",
+      "anyAssistant": "Claude, Codex or GitHub Copilot",
+      "anyAssistantWhy": "What the sentences said before #783 ('Claude or Codex') with the third door added: true of any hold, so a hold that cannot say which is never named wrongly.",
+      "rejected": [
+        "Naming no assistant ('an assistant session opened from Plantoir'), ruled the same morning and reversed the same day (Russell, 2026-11-13): 'the assistant' is what Plantoir already calls its own window (AssistActivity.closeTheAssistantFirst), and a sentence naming nobody no longer told the teacher where to look.",
+        "Reading which program the server's parent is from the process table: it would name the program, not the door, and fails for a server started by hand; the door already knows which it is.",
+        "A new line on every lease kind, or a sidecar file beside the lease: the fifth line on the assist lease alone is set and cleared with the hold itself, and Windows' readers, which read the first lines by position, are not disturbed."
+      ],
+      "cases": [
+        {"name": "a GitHub Copilot session holds the course", "keys": ["copilot"], "expect": "GitHub Copilot"},
+        {"name": "a Claude session holds the course", "keys": ["claude"], "expect": "Claude"},
+        {"name": "a Codex session holds the course", "keys": ["codex"], "expect": "Codex"},
+        {"name": "the hold names no assistant (an older Plantoir, or Windows before it writes one)", "keys": [null], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "a key no door has is named as none", "keys": ["gemini"], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "the key is read without regard to case or space", "keys": [" Copilot "], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: a key in capitals is the same door", "keys": ["COPILOT"], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: two spellings of one door are one name", "keys": ["Codex", " codex"], "expect": "Codex"},
+        {"name": "#783 fix review H1: two doors, spelt loosely, in menu order", "keys": [" Copilot ", "CLAUDE"], "expect": "Claude or GitHub Copilot"},
+        {"name": "#783 fix review H1: an empty key names none", "keys": [""], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "#783 fix review H1: a key of spaces names none", "keys": ["   "], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "all three doors: all three, in menu order", "keys": ["copilot", "codex", "claude"], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "nothing read: all three", "keys": [], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "two holds of the same door: one name", "keys": ["copilot", "copilot"], "expect": "GitHub Copilot"},
+        {"name": "holds of two doors: both, in menu order", "keys": ["copilot", "claude"], "expect": "Claude or GitHub Copilot"},
+        {"name": "one hold names a door and another names none: all three", "keys": ["codex", null], "expect": "Claude, Codex or GitHub Copilot"}
+      ],
+      "leaseCases": [
+        {"name": "a door's assist lease records its key as its fifth line", "kind": "assist", "assistant": "copilot", "fifthLine": "copilot"},
+        {"name": "an assist lease from a server no door named has four lines", "kind": "assist", "assistant": null, "fifthLine": null},
+        {"name": "only an assist lease carries it", "kind": "build", "assistant": "copilot", "fifthLine": null}
+      ]
+    },
+    "reviseCasesNote": "item is claude, codex, copilot or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. revisingAssistant, where given, is the door key the holding lease records (naming); absent, the hold names none and the slot is naming.anyAssistant. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
     "reviseCases": [
       {
         "name": "nothing open: every item may be used",
@@ -27045,21 +27117,29 @@
         "expect": null
       },
       {
-        "name": "a Claude or Codex session holds the course: the Claude door is greyed",
+        "name": "a session from an outside door holds the course: the Claude door is greyed",
         "item": "claude",
         "revisedElsewhere": true,
         "active": null,
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "a Claude or Codex session holds the course: the Codex door is greyed too",
+        "name": "a session from an outside door holds the course: the Codex door is greyed too",
         "item": "codex",
         "revisedElsewhere": true,
         "active": null,
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "a Claude or Codex session holds the course: the local assistant is greyed too",
+        "name": "a session from an outside door holds the course: the GitHub Copilot door is greyed too (#783)",
+        "item": "copilot",
+        "revisedElsewhere": true,
+        "revisingAssistant": "copilot",
+        "active": null,
+        "expect": "availableOnceYouFinishRevisingWithClaude"
+      },
+      {
+        "name": "a session from an outside door holds the course: the local assistant is greyed too",
         "item": "local",
         "revisedElsewhere": true,
         "active": null,
@@ -27078,6 +27158,16 @@
       {
         "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door, saying WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}') since #468.",
         "item": "codex",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "ICS3U",
+          "section": 2
+        },
+        "expect": "closeTheAssistantFirst"
+      },
+      {
+        "name": "the in-app assistant is open on this course: the GitHub Copilot door names that window (#783)", "appliesOn": ["mac"], "onWindows": "As the Codex case above: on Windows the window's own lease greys the GitHub Copilot door, saying WindowHoldWording.AvailableOnceTheAssistantCloses.",
+        "item": "copilot",
         "revisedElsewhere": false,
         "active": {
           "course": "ICS3U",
@@ -27141,7 +27231,7 @@
     "afterwardsInTheLinksChecklist": "A class hidden at Deploy is a hidden class like any other: when a later build offers the links checklist (#379) it may appear among the classes not yet published, UNTICKED, as every class row starts. Publishing it from there is a choice, so the class is recorded as kept at its date (file-formats.json -> laterClassesKept) and the next Deploy does not offer to hide it again - without that, the two questions undid each other: hidden at Deploy, its link dead, offered back by the checklist, published, flagged again (#457 batch B's implementation review, finding 2).",
     "rejected": [
       "Asking on a scheduled deploy: there is nobody at half six to answer, and a deploy held for a question fails exactly the teacher who set it up to run unattended.",
-      "Refusing the outside assistant for ever: without the kept record, a teacher who posts a week ahead on purpose could never deploy from Claude or Codex - the same reason wording.deployNeedsAnAnswer ends 'after that it can be deployed from here'.",
+      "Refusing the outside assistant for ever: without the kept record, a teacher who posts a week ahead on purpose could never deploy from Claude, Codex or GitHub Copilot - the same reason wording.deployNeedsAnAnswer ends 'after that it can be deployed from here'.",
       "Asking before deployAndWait's refusals: a teacher could hide pages - a backup and a write - and then be refused, against the rule that a refusal never follows a change (the plan review's finding 6).",
       "Asking after the preview is stopped, in the assistant's deploy: a Cancel would leave the teacher's preview gone for nothing.",
       "Hiding with a quiet write of its own: the unticked classes go through Hide Pages...'s own call, so they are backed up, undoable and hidden by the same rule (pages only they link to go with them) as anywhere else.",
@@ -27154,7 +27244,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. OPEN IN BROWSER (#850, Russell 2026-11-13: one Open in Browser for both) is live on a SECTION row when a preview is showing (it opens the preview) or, with none showing, when the section's deployed folder can be opened (deployedFolderReady; it opens the folder, deployedFolderInBrowser.offeredCases); stopShowingDeployedFolder is live while that folder is being shown (deployedFolderShown), whatever else is happening. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all. Section > Preview carries an Option ALTERNATE (#504, previewStartPage): the item is titled by where the press will open the site, and the alternate does the opposite; the alternate is the same item for this rule (no new item), enabled exactly when Preview is, and absent while Preview reads Stop Preview. On Windows the alternate is a second visible item (a WinUI menu has no modifier alternates), and it is still the same item for this rule.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -27179,7 +27269,9 @@
       "lastChangeIsHere": false,
       "verbIsRunning": false,
       "canGoBack": false,
-      "canGoForward": false
+      "canGoForward": false,
+      "deployedFolderReady": false,
+      "deployedFolderShown": false
     },
     "situationKeys": {
       "hasFolder": "A Plantoir window is in front with a working folder open. False with no window, or with the assistant, Settings or About in front.",
@@ -27187,14 +27279,14 @@
       "sheetIsUp": "A sheet or alert is attached to the window in front, or the app is in a modal session. Greys EVERY item here, Open Working Folder… and Open Recent included: with a sheet up they would open a second window behind it.",
       "row": "What is selected in the sidebar: none, course, section, backup, archived, allBackups.",
       "keptForReference": "The selected course, or the selected section's course, is kept for reference.",
-      "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a Claude or Codex session is open on it in another program (#458).",
+      "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a session from an outside door is open on it in another program (#458).",
       "busy": "The course is previewing or deploying.",
       "copying": "A copy of the course is being zipped — a backup, or the archive before a restore or removal (#351).",
       "deploying": "A deploy of the course is running.",
       "hasSchedule": "The selected section has a deploy scheduled.",
       "hasStartOfYearUndo": "The selected section holds a start-of-the-year undo (#96).",
       "hasLinksOffer": "The selected section's last build left a links checklist (#379).",
-      "reviseBlocked": "Which Revise targets are greyed for a reason (#458): claude, codex, localAssistant.",
+      "reviseBlocked": "Which Revise targets are greyed for a reason (#458): claude, codex, copilot (#783), localAssistant.",
       "obsidianInstalled": "Obsidian is installed.",
       "settingsMaySave": "Course Settings is showing with an unsaved change Save would write.",
       "settingsMayRevert": "Course Settings is showing with an unsaved change Revert would discard.",
@@ -27205,7 +27297,9 @@
       "lastChangeIsHere": "The last change the Section menu made in THIS window was made in the selected section, so Undo Last Change would take it back (Russell's decision 4: the assistant's window keeps its own undo list).",
       "verbIsRunning": "One of the assistant's functions is running on the selected section - from this window's menu, another window's, or the in-app assistant's own window (#457 batch B plan review, note 14). They run one at a time.",
       "canGoBack": "The preview can go back a page.",
-      "canGoForward": "The preview can go forward a page."
+      "canGoForward": "The preview can go forward a page.",
+      "deployedFolderReady": "The selected section's deployed folder can be opened in the browser: deployedFolderInBrowser.offeredCases decides 'offered' (#850).",
+      "deployedFolderShown": "The selected section's deployed folder is being shown in the browser by this app (#850)."
     },
     "items": [
       "openWorkingFolder",
@@ -27226,6 +27320,7 @@
       "restoreFromBackup",
       "courseReviseWithClaude",
       "courseReviseWithCodex",
+      "courseReviseWithCopilot",
       "courseReviseWithLocalAssistant",
       "courseOpenInObsidian",
       "courseShowInFinder",
@@ -27236,6 +27331,7 @@
       "preview",
       "deploy",
       "openInBrowser",
+      "stopShowingDeployedFolder",
       "scheduleDeploy",
       "cancelScheduledDeploy",
       "getReadyForTheStartOfTheYear",
@@ -27243,6 +27339,7 @@
       "publishPagesLinksLeadTo",
       "sectionReviseWithClaude",
       "sectionReviseWithCodex",
+      "sectionReviseWithCopilot",
       "sectionReviseWithLocalAssistant",
       "sectionOpenInObsidian",
       "sectionShowInFinder",
@@ -27299,6 +27396,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27326,6 +27424,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27355,6 +27454,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "newCourse",
@@ -27379,6 +27479,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27398,7 +27499,8 @@
           "structuralHold": true,
           "reviseBlocked": [
             "claude",
-            "codex"
+            "codex",
+            "copilot"
           ]
         },
         "enabled": [
@@ -27452,6 +27554,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27505,6 +27608,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionShowInFinder",
           "undoGettingReady"
         ]
@@ -27535,6 +27639,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27701,6 +27806,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder",
           "undoLastChange"
@@ -27738,6 +27844,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27800,6 +27907,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27819,6 +27927,127 @@
           "lastChangeIsHere": true
         },
         "enabled": []
+      },
+      {
+        "why": "#850: a live section row with no preview showing, whose course deploys to a folder that holds this section's deployed site. Open in Browser is live and opens the deployed folder; Stop Showing Deployed Folder is not, because nothing is shown yet.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "deployedFolderReady": true
+        },
+        "enabled": [
+          "addNextClass",
+          "addSection",
+          "backUpNow",
+          "classDates",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "hidePages",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "makeRoomForClasses",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
+        "why": "#850: the same section while its deployed folder is being shown. Open in Browser stays live (pressed again it reopens the same address and starts nothing), and Stop Showing Deployed Folder is live.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "deployedFolderReady": true,
+          "deployedFolderShown": true
+        },
+        "enabled": [
+          "addNextClass",
+          "addSection",
+          "backUpNow",
+          "classDates",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "hidePages",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "makeRoomForClasses",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder",
+          "stopShowingDeployedFolder"
+        ]
+      },
+      {
+        "why": "#850: a section whose deployed folder is being shown while its course deploys. The folder is half copied, so it cannot be opened now (offeredCases: greyed while a deploy runs), but Stop is never held back: stopping writes nothing.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "deploying": true,
+          "structuralHold": true,
+          "busy": true,
+          "hasStartOfYearUndo": true,
+          "hasLinksOffer": true,
+          "deployedFolderShown": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeSection",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder",
+          "stopShowingDeployedFolder"
+        ]
       }
     ],
     "rejected": [
@@ -36640,7 +36869,7 @@
       "Only a heading that is a child of the page itself opens a section; a success-criteria heading inside a callout or a list does not.",
       "A dash the site's parser turns into a typographic one (-- into –) in a heading is a different word to the course's list.",
       "A page reached only through another page, or only from a hidden or undated class, is under Other pages, not under a class (the date pass's own rule).",
-      "None of the 39 example courses has a task item under one of the default headings (104 headings match, all over tables; measured on #545's plan review), so no example course gets the page until its pages say so.",
+      "One of the 39 example courses has task items under one of the default headings: GLC2O, whose seven task pages each close with tick boxes under a Success criteria heading since #878 (2026-11-13; measured with my_progress.page_has_counted_items over every page of every payload: GLC2O's seven, its held-back task template, and no other), so a course made from GLC2O gets the page. The other 38 have none (104 headings matched on #545's plan review, all over tables), so none of them gets the page until its pages say so.",
       "Class dates are in the manifest and not on the page (ruling Q6); the date and unit filter is #595's.",
       "Three shapes the two readings still read differently, each said on a `plantoir: note:` line (notes) when a real page has it (#545 implementation review 3, measured): a heading written in HTML (`<h2>Success criteria</h2>`) - the site counts its section, the build's gate does not; a task line inside a `$$` maths block - the gate counts it, the site draws maths; a callout whose TITLE holds `[!quiz]` - the gate reads it as a quiz, the site does not."
     ],
@@ -37532,14 +37761,15 @@
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
     ],
     "tab": {
-      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code, Codex or GitHub Copilot is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
       "tabCases": {
-        "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
+        "rule": "claude, codex and copilot say which assistant is installed (OutsideAssistantPresence on the mac; copilot since #783, and a reader that predates it treats it as false); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
         "cases": [
           {
             "name": "neither assistant, no plans",
             "claude": false,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": false,
             "expect": "absent"
@@ -37548,6 +37778,7 @@
             "name": "neither assistant, with plans",
             "claude": false,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "absent"
@@ -37556,6 +37787,7 @@
             "name": "Claude only, no plans",
             "claude": true,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": false,
             "expect": "shown"
@@ -37564,6 +37796,7 @@
             "name": "Codex only, with plans",
             "claude": false,
             "codex": true,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "shown"
@@ -37572,14 +37805,34 @@
             "name": "both",
             "claude": true,
             "codex": true,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "shown"
           },
           {
+            "name": "GitHub Copilot only, no plans (#783)",
+            "claude": false,
+            "codex": false,
+            "copilot": true,
+            "referenceCourse": false,
+            "plans": false,
+            "expect": "shown"
+          },
+          {
+            "name": "a course kept for reference, GitHub Copilot installed (#783)",
+            "claude": false,
+            "codex": false,
+            "copilot": true,
+            "referenceCourse": true,
+            "plans": false,
+            "expect": "absent"
+          },
+          {
             "name": "a course kept for reference, both installed",
             "claude": true,
             "codex": true,
+            "copilot": false,
             "referenceCourse": true,
             "plans": true,
             "expect": "absent"
@@ -41327,6 +41580,28 @@
       { "name": "a long value is cut", "header": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDE", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ…"] }
     ]
   },
+  "typescriptStrings": {
+    "note": "GitHub #871 (v2.0.0). Every value from a course's settings that the build writes INSIDE a string in a TypeScript file of the site: the title line (the emoji, the course code or a club's short label `custom_short_name`) and `locale`, `baseUrl` (a custom domain), the three font names and the colour values in quartz.config.ts, and `footer_html` in Footer.tsx. Written as typed, a double quote ended the string and the site did not build, a backslash was read as an escape (C:\\Club showed as C:Club, a backslash before a u that is not a hex escape stopped the build), and a dollar brace in the footer's template literal ran as code. Shared Python only: both apps write the settings and neither writes these files, so Windows inherits the rule with its builds.",
+    "rule": "The value is written as a JSON string (`json.dumps(value, ensure_ascii=False)`), which is a valid JavaScript string literal that reads back as exactly the value: a double quote, a backslash and every control character are escaped, and every other character is written as itself. A footer's `</` is then written `<\\/`, the same text in a JavaScript string, so the footer cannot close the `<footer>` element the next build looks for. The patterns that find a value from an earlier build match a whole string literal, escapes included, so a value written escaped is replaced whole. Nothing is cleaned here: removing control characters is `courseNameCharacters`' rule and is applied, where it is applied, before this.",
+    "whereItIsApplied": "`scripts/build_site.py` -> `typescript_string`, called by `update_page_title`, `patch_quartz_locale`, `patch_quartz_base_url`, `patch_typography_fonts` (through `_escape_font`), `format_colors_block` (and `apply_color_scheme_to_quartz_config`'s fallback, which inserts that block where the config has none) and `inject_custom_footer_components`. The front page's title goes through YAML (`set_landing_title`, python-frontmatter) and the hidden names into quartz.layout.ts through `json.dumps` already, and were not changed. Pinned by `scripts/test_typescript_strings.py`, which every case goes through, which `verify.sh` runs by name and which Windows' PythonToolchainTests discovers.",
+    "rejected": "Refusing a quote or a backslash in the short label: a teacher may want one (a club called \"The Quad\"), and the short label's field is free text on both apps. Escaping only the double quote, as `_escape_font` did: the backslash was then read as an escape. Keeping the footer's template literal and escaping a dollar brace too: a plain string literal has fewer special characters, and multi-line HTML reads back the same.",
+    "cases": [
+      { "name": "a double quote in a club's short label", "raw": "Chess \"Club\"", "written": "\"Chess \\\"Club\\\"\"" },
+      { "name": "a backslash", "raw": "C:\\Club", "written": "\"C:\\\\Club\"" },
+      { "name": "a backslash at the end, which would escape the closing quote", "raw": "Club\\", "written": "\"Club\\\\\"" },
+      { "name": "a backslash before a u that is not a hex escape", "raw": "C:\\users", "written": "\"C:\\\\users\"" },
+      { "name": "a backslash and a quote together", "raw": "A\\\"B", "written": "\"A\\\\\\\"B\"" },
+      { "name": "a backtick and a dollar brace, which a template literal would run", "raw": "Back`tick ${x}", "written": "\"Back`tick ${x}\"" },
+      { "name": "a single quote is kept as it is", "raw": "Teacher's Club", "written": "\"Teacher's Club\"" },
+      { "name": "a line feed, for a value no rule has cleaned", "raw": "Robotics\nClub", "written": "\"Robotics\\nClub\"" },
+      { "name": "a tab", "raw": "A\tB", "written": "\"A\\tB\"" },
+      { "name": "a NUL", "raw": "A\u0000B", "written": "\"A\\u0000B\"" },
+      { "name": "an emoji and accents are written as themselves", "raw": "📚 Échecs", "written": "\"📚 Échecs\"" },
+      { "name": "the teacher emoji, held together by U+200D", "raw": "👩\u200d🏫 Club", "written": "\"👩\u200d🏫 Club\"" },
+      { "name": "a closing tag in the footer", "raw": "<p>Made by us</p>", "written": "\"<p>Made by us</p>\"", "footerWritten": "\"<p>Made by us<\\/p>\"" },
+      { "name": "an empty value", "raw": "", "written": "\"\"" }
+    ]
+  },
   "courseNameCharacters": {
     "note": "GitHub #780 (v2.0.0), ruled by Russell on 2026-11-12: no control character is legitimate in a course's name. `course_config.json` -> `course_name` is a JSON string, and JSON can carry any code point as an escape, so a script, a hand edit or another tool can put a NUL, a line break or a right-to-left override in it. Both apps clean the name where they READ it, by this one rule, and the shared Python does the same, so no reader is left to remember on its own. The same rule cleans every line the apps write on the breadcrumb trail (`trailLines`).",
     "rule": "Work on Unicode code points (scalars), never on what a reader sees as one character and never on UTF-16 units. Every code point in `spacedOut` becomes ONE space (U+0020); every code point in `removed` is taken out; every other code point is kept as it is. Nothing is trimmed and nothing is collapsed. Applying the rule twice gives the same result as applying it once (`idempotent`).",
@@ -41586,6 +41861,223 @@
         "given": {"isAWorkingFolder": true, "appCarriesTheTools": true, "launchersRefreshed": 0, "launchersFailed": 0, "toolsChanged": 0, "toolsFailed": 2, "waitedFor": 4711, "waitedSeconds": 300, "stoppedWaiting": true},
         "expect": {"goesAhead": true, "line": "couldNotFinish", "saysItWaited": false, "saysItStoppedWaiting": true, "saysTheBuilderIsBuiltAgain": false}
       }
+    ]
+  },
+  "deployedFolderInBrowser": {
+    "note": "GitHub #850 (Russell, 2026-11-13). A section deployed to a folder on this computer can be opened in the web browser, served by the app itself on this computer, so its links and features work: Quartz writes every page link without .html, and opened straight from the folder 0 of 3,369 page links worked. The plan, as amended by its Opus review, is on the issue (#850); the review won where they differed (live input dropped, the Host check strict). The mac runs every case here in DeployedFolderResolutionTests (the resolver, and the real listener over a socket) and DeployedFolderOfferTests; documentation/09-mac-app.md -> 'A deployed folder opened in the browser (#850)' says why, what was measured and what was rejected.",
+    "rule": "ONE Open in Browser for both (Russell, 2026-11-13): the toolbar's button and Section > Open in Browser open the PREVIEW while one is showing, and the section's DEPLOYED FOLDER otherwise; the help says which (wording.previewHelp, wording.help) or why it is greyed (offeredCases). The deploy's result offers Open in Browser beside Show in Finder (wording.resultButton), and the section row's context menu offers it when the folder can be opened. It runs until Stop or quitting Plantoir, never until a window closes; Stop is a one-line notice in the section's window (wording.notice, wording.stopButton) and Section > Stop Showing Deployed Folder (wording.stopMenuItem). The folder is read at each request: a deploy to it does not stop it, and nothing is built, copied or leased. Bound to 127.0.0.1 only; another account on this computer can reach it while it runs, as it can a preview, which Russell accepted on 2026-11-13 as a known limit. The same address each time (address), so what the site keeps per address - ticked tasks, quiz answers - is still there.",
+    "wording": {
+      "resultButton": "Open in Browser",
+      "menuItem": "Open in Browser",
+      "stopMenuItem": "Stop Showing Deployed Folder",
+      "notice": "Section {section}’s deployed folder is open in your web browser.",
+      "stopButton": "Stop",
+      "stopHint": "Stop showing the deployed folder in your web browser",
+      "help": "Open the deployed folder in your web browser, so its links and features work",
+      "previewHelp": "Open this preview in your web browser",
+      "notDeployedYet": "Nothing has been deployed to this section’s folder yet. Deploy it first.",
+      "folderNotFound": "Plantoir can’t find this section’s deploy folder. If it’s on a drive, connect the drive, or deploy again.",
+      "stoppedFolderGone": "Your deployed folder is no longer where it was, so Plantoir stopped showing it.",
+      "couldNotOpenTitle": "Your Deployed Folder Could Not Be Opened",
+      "couldNotOpen": "Plantoir could not show this folder in your web browser. Try again, or restart your computer if it happens again.",
+      "renderNote": "Opened straight from the folder, its pages won’t work. Click Open in Browser to see them working.",
+      "dismissButton": "Dismiss",
+      "couldNotOpenButton": "OK"
+    },
+    "wordingWhy": "None of these promises how a web host will behave (the plan review's H1): a folder deploy is the one destination whose host is unknown, and #849 measured a plain host answering 404 for every page link. They say what Plantoir shows. renderNote replaces the note that said the pages only display properly once on a web host. No word for what answers the browser (rule 1).",
+    "offeredWhen": "Read on events, never on a clock: when the section shows, when a deploy ends, when a menu opens, when the pointer reaches the button, and when a show starts or stops. The folder is the course's folder destination (its first destination when that is a folder, else the first other one that is; a course has at most one), resolved exactly as folderPublishTarget resolves --to-folder, from the SAVED settings a deploy uses.",
+    "offeredCases": [
+      {"name": "no folder destination", "given": {"hasFolderDestination": false}, "expect": "absent", "why": "Netlify or Cloudflare only: the result panel has no button and Section > Open in Browser is greyed with no reason, as every menu item greys (subjectMenus.rule)."},
+      {"name": "a course kept for reference", "given": {"hasFolderDestination": true, "keptForReference": true, "folderExists": true, "sectionIndexExists": true}, "expect": "absent", "why": "It is never deployed, as Deploy is not offered on one."},
+      {"name": "deployed and there", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": true}, "expect": "offered"},
+      {"name": "the folder is there, the section is not", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": false}, "expect": {"greyed": "notDeployedYet"}},
+      {"name": "the folder cannot be found", "given": {"hasFolderDestination": true, "folderExists": false, "sectionIndexExists": false}, "expect": {"greyed": "folderNotFound"}, "why": "Moved, renamed, or on a drive that is not connected."},
+      {"name": "a deploy of the section is running", "given": {"hasFolderDestination": true, "folderExists": true, "sectionIndexExists": true, "deployIsRunning": true}, "expect": {"greyed": "deployIsRunning"}, "why": "The folder is half copied. From this app (CourseActivity) or another program (its publish work lease, which is per course, so another section's deploy greys it too while it runs). The reason is CourseActivity's existing sentence, shown once in the Section menu."}
+    ],
+    "offeredDefaults": {"hasFolderDestination": false, "keptForReference": false, "deployIsRunning": false, "folderExists": false, "sectionIndexExists": false},
+    "address": {
+      "rule": "http://127.0.0.1:<port>/, one listener per section's folder. Ports come from a block of their own, firstPort to firstPort + blockSize - 1, below the range the system hands out for outgoing connections (49152-65535, where Windows also reserves moving ranges for Hyper-V) and outside the preview walk (app-rules.json -> previewPorts, 8081-9474), so a preview and a deployed folder never take each other's address. The port remembered for the folder's canonical path is tried first; then the block, starting at firstPort + (FNV-1a 32-bit hash of the canonical path's UTF-8 bytes mod blockSize) and wrapping, so the same folder gets the same address after the remembered one is lost or from a second copy of the app. A walk that had to move on says so on the trail.",
+      "firstPort": 41000,
+      "blockSize": 400,
+      "hash": "FNV-1a, 32 bits: start 2166136261; for each byte, xor it in, then multiply by 16777619 modulo 2^32.",
+      "cases": [
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": null, "expectFirst": 41209, "why": "No remembered port: the walk starts where the path's hash says."},
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": 41007, "expectFirst": 41007, "why": "The remembered port is tried first."},
+        {"canonicalPath": "/Users/teacher/Sites/ics3u/section1", "remembered": 52000, "expectFirst": 41209, "why": "A remembered port outside the block is not used."},
+        {"canonicalPath": "", "remembered": null, "expectFirst": 41261, "why": "The empty path: the hash is its starting value."}
+      ],
+      "everyCandidate": "Each port of the block appears exactly once (plus the remembered one first, when it is in the block), and none is inside 8081-9474 or 49152-65535."
+    },
+    "limits": {
+      "maximumConnections": 64,
+      "maximumRequestLineBytes": 8192,
+      "maximumHeaderBytes": 16384,
+      "secondsToSendTheHeaders": 10,
+      "secondsIdleBetweenRequests": 30,
+      "secondsToTakeAPiece": 30,
+      "why": "The plan review's M1: a server with no limits held 300 of 300 half-sent requests open after 12 seconds. A request line over the limit is answered 414, headers over theirs 431, and both close; a connection that has not sent its headers in time, or sits idle between requests too long, is closed; when every place is taken, the connection that has been quiet longest is closed to make room, so a newcomer - the teacher's own browser - always gets in; and a piece of an answer left untaken for secondsToTakeAPiece closes its connection. The last two are the implementation review's M2: 64 readers that asked for a 200 MB file and never read held every place, and a normal request was refused at 2 s and at 47 s."
+    },
+    "connectionCases": [
+      {"kind": "requestLineTooLong", "expect": {"status": 414, "closes": true}},
+      {"kind": "headersTooLarge", "expect": {"status": 431, "closes": true}},
+      {"kind": "headersNotSentInTime", "expect": {"closedWithin": 15}},
+      {"kind": "aConnectionPastTheMaximumMakesRoom", "expect": {"newcomerAnswered": true, "oneQuietConnectionClosed": true}, "why": "With maximumConnections open and silent, one more is let in and answered, and the quietest is closed to make room."},
+      {"kind": "readersThatStopReading", "expect": {"aNormalRequestAnswered": true, "aStalledReaderClosedWithin": 40}, "why": "maximumConnections readers ask for a large file and never read: a normal request is still answered, and a stalled reader is closed once a piece has gone untaken for secondsToTakeAPiece (the implementation review's M2)."},
+      {"kind": "twoRequestsOnOneConnection", "expect": {"bothAnswered": true}},
+      {"kind": "theNetworkAddressIsRefused", "expect": {"refused": true}, "why": "Bound to 127.0.0.1 only, as previews since #684: a connection through this computer's own network address is refused."}
+    ],
+    "everyAnswer": {"headers": {"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "same-origin"}, "never": "Access-Control-", "why": "no-cache, not no-store (the plan review's L1): the browser asks again each time, so a redeploy shows on reload, and pages can still use the back and forward cache; an ETag answers a repeat with 304. nosniff, so a wrong type fails here as it would on a strict host. No cross-origin permission is ever given."},
+    "contentTypes": {
+      "html": "text/html; charset=utf-8",
+      "htm": "text/html; charset=utf-8",
+      "css": "text/css; charset=utf-8",
+      "js": "text/javascript; charset=utf-8",
+      "mjs": "text/javascript; charset=utf-8",
+      "json": "application/json",
+      "map": "application/json",
+      "wasm": "application/wasm",
+      "zip": "application/zip",
+      "svg": "image/svg+xml",
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "gif": "image/gif",
+      "webp": "image/webp",
+      "avif": "image/avif",
+      "heic": "image/heic",
+      "ico": "image/x-icon",
+      "bmp": "image/bmp",
+      "tif": "image/tiff",
+      "tiff": "image/tiff",
+      "woff2": "font/woff2",
+      "woff": "font/woff",
+      "ttf": "font/ttf",
+      "otf": "font/otf",
+      "pdf": "application/pdf",
+      "xml": "application/xml",
+      "txt": "text/plain; charset=utf-8",
+      "md": "text/plain; charset=utf-8",
+      "csv": "text/csv; charset=utf-8",
+      "mp4": "video/mp4",
+      "m4v": "video/mp4",
+      "webm": "video/webm",
+      "mov": "video/quicktime",
+      "mp3": "audio/mpeg",
+      "m4a": "audio/mp4",
+      "wav": "audio/wav",
+      "ogg": "audio/ogg",
+      "ggb": "application/octet-stream"
+    },
+    "unknownContentType": "application/octet-stream",
+    "resolution": {
+      "aim": "Every link the build writes resolves, and nothing a strict host refuses is accepted (the plan review's M7). It is not a copy of any one host: preview is Quartz's server, Netlify and Cloudflare are each their own, and a folder's host is unknown (#849). browser-checks/crawl_deployed_folder.py requests every link of every page through the real app; measured 2026-11-13 on a 307-page built site, 7,647 links (314 addresses), 0 not found, against 4,204 not found from python3 -m http.server on the same folder.",
+      "names": "The path is split at its query (and any #), split on /, and each name percent-decoded (a + stays a +) and put in NFC. A name is refused when it is empty (//), . or .., starts with a dot, ends with a dot or a space, holds a control character, /, \\ or :, decodes from %2F, %5C or %00, or is a host's control file (_headers, _redirects) or a name Windows reserves (con, prn, aux, nul, com1-9, lpt1-9, with any extension). EVERY name on the way down is matched against its folder's listing, exactly after NFC, so case counts on every disk. The file's real path must stay inside the folder's real path.",
+      "order": "No slash after the last name: that file; else that name + .html; else a folder of that name with an index.html, redirected 308 to the name with its slash; else not found. A slash after it: that folder's index.html; else that name + .html, redirected 308 to the name without its slash; else not found. Never a listing. Not found answers 404 with the site's own 404.html, or a short page of its own.",
+      "placeholders": "@PORT@ is the listener's port and @OTHERPORT@ one more; @OUTSIDE@ is a folder outside the served one holding secret.html; @BYTES200@ and @BYTES100@ are that many bytes. A `refused` expectation is a status of 400 or 404 and never a byte of a file outside the folder (Windows' HTTP.sys answers some of these itself, before the app). `headers` omitted means a Host of 127.0.0.1:@PORT@ alone.",
+      "cases": [
+        {"name": "the front page", "files": {"index.html": "home"}, "request": {"method": "GET", "target": "/"}, "expect": {"status": 200, "file": "index.html", "contentType": "text/html; charset=utf-8"}, "why": "Every host answers a folder's address with its index page."},
+        {"name": "a page written without .html", "files": {"a/b.html": "b"}, "request": {"method": "GET", "target": "/a/b"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "Quartz writes every page link without .html; a plain server answers 404 here (the measurement: 0 of 3,369 page links)."},
+        {"name": "a folder written without its slash", "files": {"a/b/index.html": "folder"}, "request": {"method": "GET", "target": "/a/b?x=1"}, "expect": {"status": 308, "location": "/a/b/?x=1"}, "why": "The slash is added, with the query kept, so the folder page's relative links resolve."},
+        {"name": "a page and a folder of the same name", "files": {"a/b.html": "page", "a/b/index.html": "folder"}, "request": {"method": "GET", "target": "/a/b"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "The page wins, as Quartz's own server orders it."},
+        {"name": "a folder with its slash", "files": {"a/index.html": "folder"}, "request": {"method": "GET", "target": "/a/"}, "expect": {"status": 200, "file": "a/index.html"}},
+        {"name": "a page asked for with a slash", "files": {"a.html": "page"}, "request": {"method": "GET", "target": "/a/"}, "expect": {"status": 308, "location": "/a"}},
+        {"name": "a page asked for with .html", "files": {"a/b.html": "b"}, "request": {"method": "GET", "target": "/a/b.html"}, "expect": {"status": 200, "file": "a/b.html"}, "why": "Cloudflare redirects this; the page and its base are the same either way, so no redirect is needed."},
+        {"name": "an index page asked for by name", "files": {"a/index.html": "i"}, "request": {"method": "GET", "target": "/a/index.html"}, "expect": {"status": 200, "file": "a/index.html"}},
+        {"name": "a dotted page name", "files": {"Curriculum/A1.1.html": "x"}, "request": {"method": "GET", "target": "/Curriculum/A1.1"}, "expect": {"status": 200, "file": "Curriculum/A1.1.html"}, "why": "594 dotted links in the measured site: adding .html must not stop at a dot."},
+        {"name": "an accented name", "files": {"Café-Notes-2.html": "x"}, "request": {"method": "GET", "target": "/Caf%C3%A9-Notes-2"}, "expect": {"status": 200, "file": "Café-Notes-2.html"}},
+        {"name": "a space", "files": {"Q and A.html": "x"}, "request": {"method": "GET", "target": "/Q%20and%20A"}, "expect": {"status": 200, "file": "Q and A.html"}},
+        {"name": "a plus is a plus", "files": {"a+b.html": "x"}, "request": {"method": "GET", "target": "/a+b"}, "expect": {"status": 200, "file": "a+b.html"}},
+        {"name": "a plus is never a space", "files": {"a b.html": "x"}, "request": {"method": "GET", "target": "/a+b"}, "expect": {"status": 404}},
+        {"name": "a hash in a name", "files": {"Notes-#2.html": "x"}, "request": {"method": "GET", "target": "/Notes-%232"}, "expect": {"status": 200, "file": "Notes-#2.html"}},
+        {"name": "an encoded slash is not a separator", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%2Fb"}, "expect": {"refused": true}},
+        {"name": "an encoded NUL", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%00b"}, "expect": {"refused": true}},
+        {"name": "an encoded backslash", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a%5Cb"}, "expect": {"refused": true}},
+        {"name": "case counts, at the last name", "files": {"Page.html": "x"}, "request": {"method": "GET", "target": "/page"}, "expect": {"status": 404}, "why": "Cloudflare is case-sensitive; compared against the folder's listing, so APFS and NTFS answer as a strict host does."},
+        {"name": "case counts, at a folder's name", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "/concepts/"}, "expect": {"status": 404}, "why": "The plan review's M4: a last-name-only check served this with 200 on APFS."},
+        {"name": "case counts, at a folder on the way", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "/CONCEPTS/index.html"}, "expect": {"status": 404}},
+        {"name": "a decomposed accent finds a composed name", "files": {"Crème.html": "x"}, "request": {"method": "GET", "target": "/Cre%CC%80me"}, "expect": {"status": 200, "file": "Crème.html"}, "why": "Both sides are compared in one Unicode form (NFC)."},
+        {"name": "a composed accent finds a decomposed name", "files": {"Crème.html": "x"}, "request": {"method": "GET", "target": "/Cr%C3%A8me"}, "expect": {"status": 200, "file": "Crème.html"}},
+        {"name": "a dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/../x"}, "expect": {"refused": true}},
+        {"name": "a dot-dot further down", "files": {"a/x.html": "x"}, "request": {"method": "GET", "target": "/a/../../x"}, "expect": {"refused": true}},
+        {"name": "an encoded dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/%2E%2E/x"}, "expect": {"refused": true}},
+        {"name": "a doubly encoded dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/%252e%252e/x"}, "expect": {"refused": true}},
+        {"name": "a raw backslash with a dot-dot", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/..\\x"}, "expect": {"refused": true}, "why": "A raw backslash is a separator on Windows."},
+        {"name": "a raw backslash", "files": {"a/b.html": "x"}, "request": {"method": "GET", "target": "/a\\b"}, "expect": {"refused": true}},
+        {"name": "a drive letter", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/C:/Windows/win.ini"}, "expect": {"refused": true}, "why": "Any name holding a colon is refused on both platforms: a drive on Windows, a stream on NTFS."},
+        {"name": "a double slash at the start", "files": {"server/share/x.html": "x"}, "request": {"method": "GET", "target": "//server/share/x"}, "expect": {"refused": true}, "why": "A Location built from it would start with // and a browser reads that as another host."},
+        {"name": "a double slash before a folder", "files": {"Concepts/index.html": "x"}, "request": {"method": "GET", "target": "//Concepts"}, "expect": {"refused": true, "noLocation": true}},
+        {"name": "a file linked from outside the folder", "files": {"link.html": {"symlinkTo": "@OUTSIDE@/secret.html"}}, "request": {"method": "GET", "target": "/link.html"}, "expect": {"refused": true}, "why": "The real path must stay inside the folder's real path."},
+        {"name": "a folder linked from outside the folder", "files": {"linkdir": {"symlinkTo": "@OUTSIDE@"}}, "request": {"method": "GET", "target": "/linkdir/secret.html"}, "expect": {"refused": true}},
+        {"name": "a dot file", "files": {".DS_Store": "x"}, "request": {"method": "GET", "target": "/.DS_Store"}, "expect": {"status": 404}},
+        {"name": "a dot folder", "files": {".publish_state/a.json": "x"}, "request": {"method": "GET", "target": "/.publish_state/a.json"}, "expect": {"status": 404}},
+        {"name": "a host's headers file", "files": {"_headers": "x"}, "request": {"method": "GET", "target": "/_headers"}, "expect": {"status": 404}},
+        {"name": "a host's headers file with a slash", "files": {"_headers": "x"}, "request": {"method": "GET", "target": "/_headers/"}, "expect": {"status": 404}},
+        {"name": "a host's redirects file", "files": {"_redirects": "x"}, "request": {"method": "GET", "target": "/_redirects"}, "expect": {"status": 404}},
+        {"name": "a stream name", "files": {"a.html": "x"}, "request": {"method": "GET", "target": "/a.html:x"}, "expect": {"refused": true}},
+        {"name": "a reserved name", "files": {"con.html": "x"}, "request": {"method": "GET", "target": "/con"}, "expect": {"refused": true}},
+        {"name": "a trailing dot", "files": {"a.html": "x"}, "request": {"method": "GET", "target": "/a."}, "expect": {"refused": true}},
+        {"name": "a folder with no index page", "files": {"folder/x.html": "x"}, "request": {"method": "GET", "target": "/folder/"}, "expect": {"status": 404, "bodyLacks": "x.html"}, "why": "Never a listing."},
+        {"name": "a missing page, with the site's own 404", "files": {"404.html": "the site's 404"}, "request": {"method": "GET", "target": "/missing"}, "expect": {"status": 404, "file": "404.html", "contentType": "text/html; charset=utf-8"}},
+        {"name": "a missing page, with no 404 of the site's", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/missing"}, "expect": {"status": 404, "contentType": "text/html; charset=utf-8"}},
+        {"name": "POST", "files": {"index.html": "x"}, "request": {"method": "POST", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "0"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "PUT", "files": {"index.html": "x"}, "request": {"method": "PUT", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "0"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "OPTIONS asking for the private network", "files": {"index.html": "x"}, "request": {"method": "OPTIONS", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "origin": "https://evil.example", "access-control-request-private-network": "true"}}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}, "noHeaderStartingWith": "Access-Control-"}},
+        {"name": "TRACE", "files": {"index.html": "x"}, "request": {"method": "TRACE", "target": "/"}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "CONNECT", "files": {"index.html": "x"}, "request": {"method": "CONNECT", "target": "127.0.0.1:@PORT@"}, "expect": {"status": 405, "headers": {"Allow": "GET, HEAD"}}},
+        {"name": "the one Host accepted", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/"}, "expect": {"status": 200, "file": "index.html"}},
+        {"name": "Host: localhost", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "localhost:@PORT@"}}, "expect": {"status": 400}, "why": "Only the address the app hands out. The plan review's H3."},
+        {"name": "Host: another port", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@OTHERPORT@"}}, "expect": {"status": 400}},
+        {"name": "Host: a name that starts with the address", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1.evil.example:@PORT@"}}, "expect": {"status": 400}, "why": "A prefix check answered 200 here: a page rebinding a name to this computer."},
+        {"name": "Host: a name that starts with localhost", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "localhost.evil.example:@PORT@"}}, "expect": {"status": 400}},
+        {"name": "Host: another site", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "evil.example"}}, "expect": {"status": 400}},
+        {"name": "no Host", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {}}, "expect": {"status": 400}},
+        {"name": "an absolute address in the request", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "http://evil.example/"}, "expect": {"status": 400}},
+        {"name": "a query and a fragment", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/x?v=1#frag"}, "expect": {"status": 200, "file": "x.html"}},
+        {"name": "HEAD", "files": {"x.html": "0123456789"}, "request": {"method": "HEAD", "target": "/x"}, "expect": {"status": 200, "file": "x.html", "noBody": true, "headers": {"Content-Length": "10"}}},
+        {"name": "another site asking", "files": {"x.html": "x"}, "request": {"method": "GET", "target": "/x", "headers": {"host": "127.0.0.1:@PORT@", "origin": "https://evil.example"}}, "expect": {"status": 200, "noHeaderStartingWith": "Access-Control-"}},
+        {"name": "a GET that says it has a body", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "content-length": "5"}}, "expect": {"status": 400, "closes": true}, "why": "A GET carries no body; this does not read past one, so the connection closes."},
+        {"name": "a GET sent in chunks", "files": {"index.html": "x"}, "request": {"method": "GET", "target": "/", "headers": {"host": "127.0.0.1:@PORT@", "transfer-encoding": "chunked"}}, "expect": {"status": 400, "closes": true}},
+        {"name": "a camera file named in capitals", "files": {"IMG_0042.JPG": "x"}, "request": {"method": "GET", "target": "/IMG_0042.JPG"}, "expect": {"status": 200, "contentType": "image/jpeg"}},
+        {"name": "a PDF named in capitals", "files": {"A.PDF": "x"}, "request": {"method": "GET", "target": "/A.PDF"}, "expect": {"status": 200, "contentType": "application/pdf"}},
+        {"name": "a video named in capitals", "files": {"A.MOV": "x"}, "request": {"method": "GET", "target": "/A.MOV"}, "expect": {"status": 200, "contentType": "video/quicktime"}},
+        {"name": "a phone picture", "files": {"A.HEIC": "x"}, "request": {"method": "GET", "target": "/A.HEIC"}, "expect": {"status": 200, "contentType": "image/heic"}},
+        {"name": "Python's runtime", "files": {"static/pyodide/pyodide.asm.wasm": "x"}, "request": {"method": "GET", "target": "/static/pyodide/pyodide.asm.wasm"}, "expect": {"status": 200, "contentType": "application/wasm"}, "why": "Pyodide waits 45 seconds and gives up on any other type (documentation/06, I5)."},
+        {"name": "a module script", "files": {"static/pyodide/pyodide.mjs": "x"}, "request": {"method": "GET", "target": "/static/pyodide/pyodide.mjs"}, "expect": {"status": 200, "contentType": "text/javascript; charset=utf-8"}},
+        {"name": "the first bytes of a video", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-99"}}, "expect": {"status": 206, "contentType": "video/mp4", "headers": {"Content-Range": "bytes 0-99/200", "Accept-Ranges": "bytes", "Content-Length": "100"}}, "why": "Safari plays a video only from a server that answers byte ranges."},
+        {"name": "the last bytes", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=-50"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 150-199/200"}}},
+        {"name": "from a byte to the end", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=100-"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 100-199/200"}}},
+        {"name": "a range past the end", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=200-"}}, "expect": {"status": 416, "headers": {"Content-Range": "bytes */200"}}},
+        {"name": "a range longer than the file", "files": {"clip.mp4": "@BYTES100@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-999999"}}, "expect": {"status": 206, "headers": {"Content-Range": "bytes 0-99/100"}}},
+        {"name": "several ranges", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=0-10,20-30"}}, "expect": {"status": 200, "headers": {"Content-Length": "200"}}},
+        {"name": "a range it cannot read", "files": {"clip.mp4": "@BYTES200@"}, "request": {"method": "GET", "target": "/clip.mp4", "headers": {"host": "127.0.0.1:@PORT@", "range": "bytes=abc"}}, "expect": {"status": 200, "headers": {"Content-Length": "200"}}},
+        {"name": "a redirect is encoded", "files": {"Café/index.html": "x"}, "request": {"method": "GET", "target": "/Caf%C3%A9"}, "expect": {"status": 308, "location": "/Caf%C3%A9/"}, "why": "Every Location is percent-encoded and single-slashed, built from the decoded names, never the raw path."}
+      ]
+    },
+    "stopCases": [
+      {"when": "Stop is pressed, in the notice or the Section menu", "then": "stopped; the trail says Stop was pressed"},
+      {"when": "Plantoir quits", "then": "stopped, never asked about (quittingWhileWorkIsUnderWay, 'a deployed folder is open in the browser'); the trail says Plantoir quit"},
+      {"when": "a request finds the folder gone", "then": "stopped; the window says wording.stoppedFolderGone until dismissed"},
+      {"when": "the section's window closes", "then": "NOT stopped: the browser tab outlives the window (Russell, 2026-11-13)"},
+      {"when": "a deploy to the same folder", "then": "NOT stopped: the next reload shows the new site"},
+      {"when": "two presses of Open in Browser before the first has started showing", "then": "ONE show: the second joins the first, both hand the browser the same address, and Stop ends it (the implementation review's M1)"},
+      {"when": "Stop is pressed while the show is still starting", "then": "it is stopped as soon as it has started; nothing is left listening"},
+      {"when": "Stop on a section with two shows, one started before its deploy folder was changed", "then": "both are stopped (the implementation review's L5)"},
+      {"when": "the listener ends without being asked", "then": "the show is dropped and the trail says it stopped on its own (the implementation review's L4)"},
+      {"when": "Open in Browser is pressed again while it runs", "then": "the same address opens again and nothing new starts; the trail says already open"}
+    ],
+    "rejected": [
+      "The website builder serving it, through a launcher flag: it sees only its two mounts, a mount cannot be added to a workspace without remaking it (about two minutes, refused while a preview is open, #94), a folder outside the home folder can never be mounted (#221), it takes 109 s to start cold (#225), and Windows has no workspace at all.",
+      "Python on the host: the Mac has none a teacher can rely on (/usr/bin/python3 is Apple's stub without the developer tools), and bundling one is about 50 MB for a file server.",
+      "A .command or .bat file beside the site: a Terminal window, a Gatekeeper prompt, a deprecated Ruby.",
+      "Making the folder browsable as files (#850's ruling).",
+      "One server for every folder under a path prefix: the site uses root-relative addresses (/index.css), so each site must sit at / of its own address.",
+      "Live input (COOP and COEP from a list kept beside the course, the plan's piece C): it would show a feature the folder's real host does not have, and the list describes what this working folder last deployed, not what the folder holds now (the plan review's H2).",
+      "A Host check by prefix: it answered 200 to 127.0.0.1.evil.example (the plan review's H3).",
+      "A port from the system's range, remembered: that range is where outgoing connections take their ports and, on Windows, where Hyper-V reserves moving ranges, so the address would change and the site's saved state be lost without a word (the plan review's M3).",
+      "A one-time key cookie against other accounts on a shared computer: Russell accepted the limit as Preview has it (2026-11-13).",
+      "An assistant tool: adding a tool is a routing change, and this is one button.",
+      "A separate, differently named menu item for the folder: Russell ruled one Open in Browser for both (2026-11-13).",
+      "URLProtocol (serves only the app's own web views), SwiftNIO (a dependency for about 400 lines), and NetworkListener behind #available (macOS 26 only, two code paths)."
     ]
   }
 }

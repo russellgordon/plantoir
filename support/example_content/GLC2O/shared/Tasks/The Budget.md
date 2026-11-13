@@ -59,6 +59,16 @@ paid on time, and how you would know when the plan was slipping.
 If your plan involves no tuition and no move, the budget is not easier —
 it is a different budget, and the same rules apply to every line of it.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] Every figure in my budget has its source and the date I looked.
+- [ ] My months differ from each other, and the running balance shows any month that falls short.
+- [ ] Where I borrow, I compare at least two forms by cost, requirement, and risk. Where I do not, I say what makes that possible.
+- [ ] The income side is plausible for my own circumstances.
+- [ ] I name what I could not find out, and who I would ask.
+
 %%curriculum-start%%
 ## Curriculum connection
 
