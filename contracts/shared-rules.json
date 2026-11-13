@@ -413,7 +413,7 @@
         "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
       },
       {
-        "carries": "what was under way - a publish, or since issue #232 a preview being built - in the words the teacher was shown, and which of the two buttons they pressed",
+        "carries": "what was under way - a publish, or since issue #232 a preview being built, since #351 a copy of a course being saved, and since #863 a course's unit plans being shared, having their password changed or being stopped (each named for what it is, beside any deploys) - in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
         "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out."
       },
@@ -12731,6 +12731,7 @@
         "mac": "Mac",
         "windows": "PC",
         "usedIn": [
+          "app-rules.json:credentialRequests.requests[7].explanation",
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
@@ -14705,6 +14706,331 @@
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
+    },
+    "whileUnitPlansAreShared": {
+      "rule": "A run of the unit plans' launcher (#709) holds the course under a lease of kind publish, so quitting while it runs asks first. It can be doing one of three things a teacher tells apart: SHARING (Share, Share Again, Add a Password, Remove Password), CHANGING THE PASSWORD (Change Password, which saves a new password and sends nothing) and STOPPING SHARING. Since #863 (Russell, 2026-11-13: sharing gets its own wording on quit) the question names each for what it is and never counts it as a section being deployed, and the message says what each could leave part way, and names the class website only when a section is being deployed. The lease cannot tell the three apart, so the app keeps a record beside it of what the run was started to do (on the mac `CourseActivity.PlanWorkRecord`, written by `PlanShareRunner.start` and removed with the lease).",
+      "words": {
+        "question": "Plantoir is still {underWay}.",
+        "deployingOne": "deploying Section {section} of {course}",
+        "deployingSeveral": "deploying {n} sections",
+        "sharingOne": "sharing the unit plans of {course}",
+        "sharingSeveral": "sharing the unit plans of {n} courses",
+        "changingPasswordOne": "changing the password for the unit plans of {course}",
+        "changingPasswordSeveral": "changing the password for the unit plans of {n} courses",
+        "stoppingOne": "stopping the sharing of the unit plans of {course}",
+        "stoppingSeveral": "stopping the sharing of the unit plans of {n} courses",
+        "listSeparator": ", ",
+        "lastSeparator": " and ",
+        "messageOne": "Quitting now could leave it unfinished, with {clauses}.",
+        "messageSeveral": "Quitting now could leave them unfinished, with {clauses}.",
+        "deployClause": "the class website part way updated",
+        "shareClause": "the plans part way shared",
+        "passwordClause": "the new password not saved yet",
+        "stopClause": "the plans' address still working",
+        "deployMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+        "trailLine": "asked whether to quit while still {underWay}, and the teacher {answer}"
+      },
+      "answers": {
+        "keepWorking": "chose to keep working",
+        "quitAnyway": "chose to quit anyway"
+      },
+      "trailEvent": "quit asked about work under way",
+      "howItIsAssembled": "{underWay} is a list of parts, in this order: the deploys (deployingOne for one section, deployingSeveral for more), then the shares, the password changes and the stops (each kind's One for one course, its Several for more). One part alone; two joined by lastSeparator; three or more with listSeparator between all but the last two. The message takes one clause per part present, in the same order (deployClause, shareClause, passwordClause, stopClause), joined the same way, in messageOne when there is one clause and messageSeveral when there are more. deployMessage is messageOne with deployClause, the sentence deploys alone have always had. {course} is a course's code, {section} a section's number, {n} how many, {answer} one of answers. The buttons are the question's usual two, in buttons' order with keepWorking the default.",
+      "whatEachLeaves": "Measured from the contract's own records of each run stopping early. A SHARE (unitPlanning.share.interruptionCases): once its upload began, the marker stays at sending and the Planning tab shows words.lastShareUnfinished until a Share Again finishes it or a Stop Sharing takes it down; stopped earlier, nothing was sent. So the plans could be part way shared, open or protected, until they are shared again or stopped (the bar offers both): shareClause, which makes no claim about who can open them, because a protected share re-shared with its password stays behind the password. A CHANGE PASSWORD (changePasswordCases): it sends nothing, so the shared plans do not change, and the new password may not have been saved yet: passwordClause. A STOP SHARING (stopSharing): until its delete is confirmed the address still answers, and the marker stays at stopping, so the bar offers Stop Sharing again: stopClause. Each runs deploy.sh on the app's terminal and can stop when the app goes, as a deploy can; hence 'could'.",
+      "casesHow": "given.sharesUnderWay, given.passwordChangesUnderWay and given.stopsUnderWay list the course codes with a plans run of that kind, one run each. given.sectionPublishesUnderWay is how many SECTIONS are being deployed, as sections 1, 2, ... of ADA1O (cases' publishesUnderWay with the plans runs left out, since each is also a publish). previewsBeingBuilt, copiesBeingSaved and quitReason mean what they mean in cases; previewsOpen is left out because an open preview never counts. expectAsk is the decision; when it is true, expectQuestion and expectMessage are the alert's two lines, and expectTrailKept and expectTrailQuit the trail line for each answer, exactly.",
+      "rejected": [
+        "The deploy's message for a share (the first commit's recording of the mac's old words): it told a teacher the class website was part way updated, which a share never touches.",
+        "'anyone with the address could still open the plans' (the first fix round): untrue for protected plans re-shared with their password, for a first share stopped before anything was sent, for a Change Password and for a Stop Sharing (the fix review's MEDIUM).",
+        "Calling a Change Password or a Stop Sharing 'sharing' because they hold the same lease: the run knows what it was started to do, so the app records it beside the lease.",
+        "A remedy inside each clause ('until you share them again or stop sharing them', the second fix round): a message of two or three clauses then misparsed, and the share bar already offers Share Again and Stop Sharing (the second fix review).",
+        "'stopping sharing the unit plans of', which reads as two verbs in a row beside 'sharing the unit plans of'.",
+        "A fixed sentence for every combination: 14 cases would need 10 sentences, and a fourth kind of run would double them. The parts and clauses are fixed text, and only their joining is a rule."
+      ],
+      "cases": [
+        {
+          "name": "one course's unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The moment #863 is about. Windows said a deploy was still going here, and a share is never called a deploy."
+        },
+        {
+          "name": "two courses' unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Two shares are two courses' plans, not two sections: until #863 the mac asked about them as 'deploying 2 sections'."
+        },
+        {
+          "name": "a share beside one section's deploy",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Both are named, the deploy first, and the message names what each could leave."
+        },
+        {
+          "name": "a share beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The sections are counted without the share."
+        },
+        {
+          "name": "two shares beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Each part counts its own kind."
+        },
+        {
+          "name": "a share and a preview being built: the share is named",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 1,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "A publish wins over a preview build (whatCountsAsUnderWay), and a plans run is held as a publish."
+        },
+        {
+          "name": "the Mac is logging out while a share runs",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theMacIsLoggingOutOrShuttingDown"
+          },
+          "expectAsk": false,
+          "why": "neverAskWhen holds for a share as for a publish: a question here would block the log out."
+        },
+        {
+          "name": "a Change Password is under way",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [
+              "SNC2D"
+            ],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still changing the password for the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the new password not saved yet.",
+          "expectTrailKept": "asked whether to quit while still changing the password for the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still changing the password for the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Change Password holds the same lease and sends nothing (changePasswordCases): it is not a share, and the plans are not part way shared."
+        },
+        {
+          "name": "a Change Password beside one section's deploy",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [
+              "SNC2D"
+            ],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the new password not saved yet.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Named after the deploy, with its own clause."
+        },
+        {
+          "name": "a Stop Sharing is under way",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still stopping the sharing of the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still stopping the sharing of the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still stopping the sharing of the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The opposite of a share, so never called one: the console's own title says stopping sharing, and a Stop Sharing stopped part way leaves the address answering (stopSharing, interruptionCases)."
+        },
+        {
+          "name": "a Stop Sharing beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and stopping the sharing of the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and stopping the sharing of the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and stopping the sharing of the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Named after the deploys, with its own clause."
+        },
+        {
+          "name": "two Stop Sharings",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still stopping the sharing of the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still stopping the sharing of the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still stopping the sharing of the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Counted as courses, as two shares are."
+        },
+        {
+          "name": "a share of one course and a Stop Sharing of another",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U.",
+          "expectMessage": "Quitting now could leave them unfinished, with the plans part way shared and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to quit anyway",
+          "why": "Each named for what it is, sharing before stopping, and each clause said."
+        },
+        {
+          "name": "a deploy, a share and a Stop Sharing at once",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated, the plans part way shared and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to quit anyway",
+          "why": "Three parts: joined 'A, B and C', in the order deploys, shares, password changes, stops."
+        }
+      ]
     },
     "cases": [
       {
@@ -41022,12 +41348,69 @@
     ],
     "noTrimming": "A control at the end becomes a trailing space and the space is kept. The mac's Course Settings field reads and writes the name through this rule on every keystroke, so a rule that trimmed would eat the space a teacher types before \"11\" one keystroke at a time. A reader that wants the ends trimmed trims AFTER cleaning: `build_site.computed_landing_title` does, and the New Course window does before it decides whether the name is empty.",
     "whereItIsApplied": {
-      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule.",
-      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780.",
-      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it.",
+      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule. Since #822 (Russell, 2026-11-13: 'fix both labels') the same rule cleans the two other teacher-typed labels where the app reads them: `CourseConfiguration.customShortName` (a club's short label, getter AND setter) and `emoji(forSection:)` / `setEmoji(_:forSection:)` (each section's label beside the title, cleaned before it is read as one emoji), `CourseConfiguration.write(to:)` through `cleanLabels(in:)`, so every Save writes both cleaned, and the New Course window's short label and section labels before it writes them.",
+      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780. Owed for #822: `CourseConfiguration.CustomShortName` and the section labels, where Windows reads and writes them, planned by Windows under #822 itself.",
+      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it. Since #822, also `build_site.resolve_header_label` (the short label, then trimmed, falling back to the code when nothing is left) and `build_site.resolve_section_emoji` (each section's label and the legacy course-wide `emojis.default`, then trimmed, falling back to the book emoji), both written into the `pageTitle` line of `quartz.config.ts` where a line feed breaks the line; `social_card.generate_card` (the section's label on the card); and `setup_course.setup_course` and `select_header_emojis_for_sections` (the saved short label and section labels before they are offered again, and a typed short label before it is written). Cases: `labelCases`.",
       "notHere": "Windows' `OutsideDoor.Clean` (#736) stays as it is: it also cleans the page names and the working folder an outside door carries, which are not course names, and it is the last layer before `cmd`. The file is not rewritten when a bad name is read: the next Save of ANY setting writes the cleaned name (the mac's `CourseConfiguration.write(to:)` cleans the key whatever was edited; a per-key merge would otherwise keep the raw name from the file)."
     },
     "idempotent": true,
+    "labelCasesHow": "Each case is a course_config.json (config) and a section. expectHeaderLabel is what build_site.resolve_header_label gives for it and expectSectionLabel what build_site.resolve_section_emoji gives, both written into the pageTitle line; a key that is absent is not checked. On the mac, CourseConfiguration.customShortName reads the short label cleaned and untrimmed, and emoji(forSection:) reads the section label cleaned (the legacy emojis.default is not read there).",
+    "labelCases": [
+      {
+        "name": "a short label with a line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "Code\nClub"},
+        "section": 1,
+        "expectHeaderLabel": "Code Club"
+      },
+      {
+        "name": "a short label with an override, a NUL and a trailing line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "\u202eRobots\u0000\n"},
+        "section": 1,
+        "expectHeaderLabel": "Robots"
+      },
+      {
+        "name": "a short label that is only controls falls back to the code",
+        "config": {"course_code": "CODING", "custom_short_name": "\n\u0000\u2066"},
+        "section": 1,
+        "expectHeaderLabel": "CODING"
+      },
+      {
+        "name": "an ordinary course code never shows the short label",
+        "config": {"course_code": "ICS3U", "custom_short_name": "X\nY"},
+        "section": 1,
+        "expectHeaderLabel": "ICS3U"
+      },
+      {
+        "name": "a section label with a line feed",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "📚\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "a section label of letters with an override inside",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section2": "C\u202eS"}}},
+        "section": 2,
+        "expectSectionLabel": "CS"
+      },
+      {
+        "name": "the teacher emoji keeps its joiner",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "👩\u200d🏫"}}},
+        "section": 1,
+        "expectSectionLabel": "👩\u200d🏫"
+      },
+      {
+        "name": "a section label that is only controls gets the book",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "\u0000\r\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "the legacy course-wide label is cleaned too",
+        "config": {"course_code": "ICS3U", "emojis": {"default": "\u001b🔬"}},
+        "section": 3,
+        "expectSectionLabel": "🔬"
+      }
+    ],
     "cases": [
       { "name": "French with accents", "raw": "Français, 11e année", "expect": "Français, 11e année" },
       { "name": "an en dash", "raw": "Physics – Grade 11", "expect": "Physics – Grade 11" },
@@ -41109,7 +41492,7 @@
       "Normalising the name to NFC at the same time. A different question, two spellings of one accented letter, with its own risks for comparisons (#189 is about folder names).",
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
-      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue. (That follow-up is #822, ruled by Russell on 2026-11-13: both labels are cleaned by this rule, and not the wider every-one-line-label option; see `whereItIsApplied` and `labelCases`.)"
     ]
   },
   "scheduledRunGetsItsFolderReady": {
