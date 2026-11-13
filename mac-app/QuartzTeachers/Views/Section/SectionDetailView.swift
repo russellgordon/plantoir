@@ -391,8 +391,53 @@ struct SectionDetailView: View {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             isBeingCopied: workspace.isBeingCopied(course.code),
-            folderIsGettingReady: workspace.folderIsGettingReady
+            folderIsGettingReady: workspace.folderIsGettingReady,
+            heldElsewhere: courseIsHeldElsewhere
         )
+    }
+
+    /// The watcher for this window's folder's leases (#729), or nil when
+    /// none runs (no folder yet, or the unit-test suite).
+    var leaseWatcher: LeaseWatcher? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return LeaseWatchers.shared.watcher(forFolder: folder)
+    }
+
+    /// Whether another program holds this course in a way that would refuse
+    /// a Deploy pressed here (#729). Read from the watcher, which is
+    /// observable, so the button greys and un-greys when its answer moves.
+    var courseIsHeldElsewhere: Bool {
+        return leaseWatcher?.holding(forCourse: course.code) != nil
+    }
+
+    /// The Deploy button's help, and its accessibility hint (#729). The
+    /// folder not being ready wins, as it does for every button; then
+    /// another program holding the course; then the ordinary words.
+    static func deployHelp(folderReadinessReason: String?, heldElsewhere: Bool, courseCode: String) -> String {
+        if let folderReadinessReason {
+            return folderReadinessReason
+        }
+        if heldElsewhere {
+            return SectionDetailView.deployIsHeldElsewhere(course: courseCode)
+        }
+        return SectionDetailView.deployOrdinaryHelp
+    }
+
+    /// The Deploy button's help when nothing is in its way.
+    static let deployOrdinaryHelp: String = "Deploy this section's website"
+
+    /// Why Deploy is greyed while another program holds the course (#729):
+    /// `shared-rules.json` → `returningToASectionMidDeploy.heldElsewhere
+    /// .help`. Names the three programs a lease can come from, as
+    /// `AssistWording.courseIsBeingBuiltElsewhere` does, and promises only
+    /// the end each can reach: a preview ends when it is stopped (the plan
+    /// review's M6).
+    static func deployIsHeldElsewhere(course: String) -> String {
+        return "\(course) is being previewed or deployed somewhere else on this computer, "
+            + "by an assistant working from another app, another copy of Plantoir, or a deploy set for later. "
+            + "Deploy will be available again once that preview is stopped or that deploy has finished."
     }
 
     /// Whether Deploy may be pressed for a section (#706) — the button,
@@ -401,16 +446,23 @@ struct SectionDetailView: View {
     ///
     /// Not while a copy of the course is being zipped (#351): a removal
     /// waiting on that zip deletes what this would publish. Not while the
-    /// folder's tools are still being copied (#476).
+    /// folder's tools are still being copied (#476). Not while another
+    /// program holds the course in a way that would refuse the press
+    /// (`heldElsewhere`, #729: `LeaseWatcher`), on every section of it,
+    /// because a lease names the course.
     static func deployIsAvailable(
         run: SectionDeployRun,
         folderPath: String?,
         courseCode: String,
         sectionNumber: Int,
         isBeingCopied: Bool,
-        folderIsGettingReady: Bool
+        folderIsGettingReady: Bool,
+        heldElsewhere: Bool
     ) -> Bool {
         if deployIsUnderWay(run: run, folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber) {
+            return false
+        }
+        if heldElsewhere {
             return false
         }
         return !(isBeingCopied || folderIsGettingReady)
@@ -421,8 +473,9 @@ struct SectionDetailView: View {
     /// window at all — `CourseActivity` has the section publishing. The
     /// second clause is what a view that came back to the section cannot
     /// see in its run when the deploy was started by somebody else in this
-    /// app. Another PROGRAM's deploy is not asked here: see
-    /// `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
+    /// app. Another PROGRAM's work is not asked here: `deployIsAvailable`
+    /// asks it separately, from `LeaseWatcher` (#729), and the press asks the
+    /// leases again (`deployWillBeRefused`).
     static func deployIsUnderWay(
         run: SectionDeployRun,
         folderPath: String?,
@@ -553,6 +606,9 @@ struct SectionDetailView: View {
             .navigationTitle(titleText)
             .task {
                 refreshEditedMarker()
+                // Another program's leases, read again as the section appears
+                // (#729): the watcher's events keep it current from here on.
+                leaseWatcher?.reread()
             }
             .onChange(of: isBusy) { _, nowBusy in
                 // A publish clears the marker; a preview leaves the content
@@ -564,6 +620,7 @@ struct SectionDetailView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 refreshEditedMarker()
+                leaseWatcher?.reread()
                 // A build this window did not watch — the MCP server's, a
                 // terminal's — may have rewritten the Problems record (#717).
                 reloadTheProblems()
@@ -571,6 +628,7 @@ struct SectionDetailView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
                 refreshEditedMarker()
+                leaseWatcher?.reread()
                 // A publish this window did not watch — scheduled, the assistant,
                 // the MCP server, a terminal — published as it is; the checklist
                 // is offered now (Russell's decision 3 on #379). Only when THIS
@@ -699,7 +757,25 @@ struct SectionDetailView: View {
                     // Nor while a copy of the course is being zipped (#351): a
                     // removal waiting on that zip deletes what this would publish.
                     .disabled(!deployButtonIsEnabled)
-                    .help(workspace.folderReadinessReason ?? "Deploy this section's website")
+                    .help(SectionDetailView.deployHelp(
+                        folderReadinessReason: workspace.folderReadinessReason,
+                        heldElsewhere: courseIsHeldElsewhere,
+                        courseCode: course.code
+                    ))
+                    // The same sentence for VoiceOver while another program
+                    // holds the course (#729); nothing extra otherwise.
+                    .accessibilityHint(courseIsHeldElsewhere && workspace.folderReadinessReason == nil
+                        ? SectionDetailView.deployIsHeldElsewhere(course: course.code)
+                        : "")
+                    // The pointer reaching for a greyed Deploy is the moment a
+                    // stale answer would cost the teacher, so read the leases
+                    // again then (#729, the plan review's M4). An event, not a
+                    // clock.
+                    .onHover { inside in
+                        if inside {
+                            leaseWatcher?.reread()
+                        }
+                    }
                     .accessibilityIdentifier("deployButton")
                     }
 

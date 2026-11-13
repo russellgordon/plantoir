@@ -168,6 +168,25 @@ class WorkspaceModel {
             }
         }
         windowModels.append(model)
+        watchTheLeasesOfTheOpenFolders()
+    }
+
+    /// One lease watcher per working folder a window shows, so Deploy greys
+    /// and un-greys while another program holds a course there (#729,
+    /// `LeaseWatcher`). Asked whenever a window registers, leaves, or points
+    /// at a folder. Never under the unit-test suite, whose windows are built
+    /// on pretend folders and must touch no disk this way.
+    static func watchTheLeasesOfTheOpenFolders() {
+        if isRunningTests {
+            return
+        }
+        var folders: [URL] = []
+        for model in windowModels {
+            if let folder = model.workspaceURL {
+                folders.append(folder)
+            }
+        }
+        LeaseWatchers.shared.follow(folders)
     }
 
     /// A course's settings file was just written by `writer`: bring every
@@ -258,6 +277,7 @@ class WorkspaceModel {
         if let path = model.workspaceURL?.path {
             releaseFolderIfUnused(path)
         }
+        watchTheLeasesOfTheOpenFolders()
     }
 
     /// True when this model is one a window shows — as against one the
@@ -1148,6 +1168,7 @@ class WorkspaceModel {
         rememberedBookmark = RememberedFolder.make(for: url).bookmark
         reloadCourses()
         sweepScheduledDeploysThatAreTooLate(inWorkingFolder: url)
+        WorkspaceModel.watchTheLeasesOfTheOpenFolders()
     }
 
     /// Clears this folder's scheduled deploys whose moment has long gone by.
