@@ -466,7 +466,13 @@ def interactive_pick_scheme_for_section(schemes, section_number, default_id=None
 # ---------- Original helpers (preserved) ------------------------------------
 
 def prompt_with_default(prompt_text, default_value):
-    response = input(f"{prompt_text} [Default: {default_value}]: ").strip()
+    # The default is SHOWN cleaned of control characters (#780), because it
+    # is often a saved value from course_config.json (a font, a short label,
+    # a folder count) and an ESC or a line break in it would reach the
+    # terminal. What is returned is the value itself: cleaning a stored
+    # value is each reader's decision, not this prompt's.
+    shown_default = course_names.cleaned(str(default_value))
+    response = input(f"{prompt_text} [Default: {shown_default}]: ").strip()
     return response if response else default_value
 
 # ---------- Course codes (GitHub #402) ----------------------------------------
@@ -634,10 +640,13 @@ def prompt_select_multiple(prompt_text, options, default_selection=None):
 
     print(f"\n{prompt_text}")
     for idx, option in enumerate(options):
+        # A folder or file name from the saved settings, shown cleaned of
+        # control characters (#780) so it cannot write to the terminal.
+        shown_option = course_names.cleaned(str(option))
         if default_selection and option in default_selection:
-            print(f"{BLUE}{idx + 1}. {option}{RESET_LOCAL}")
+            print(f"{BLUE}{idx + 1}. {shown_option}{RESET_LOCAL}")
         else:
-            print(f"{idx + 1}. {option}")
+            print(f"{idx + 1}. {shown_option}")
 
     if default_selection:
         default_indices = [str(options.index(item) + 1) for item in default_selection if item in options]
@@ -2928,14 +2937,18 @@ def setup_course(no_backup: bool = False):
         with open(config_path, "r", encoding="utf-8") as f:
             saved_config = json.load(f)
 
+    # Cleaned where it is read (#780): the saved name and a looked-up name
+    # before the prompt shows them as its default (an ESC or a line break
+    # from the file would otherwise reach the terminal), and the answer
+    # again, since a typed name can hold a tab, before it goes into
+    # course_config.json, the page templates and each section's front page
+    # title.
     if saved_config.get("course_name"):
-        course_name = prompt_with_default("Enter the course name you wish to use", saved_config["course_name"])
+        saved_name = course_names.cleaned(str(saved_config["course_name"]))
+        course_name = prompt_with_default("Enter the course name you wish to use", saved_name)
     else:
-        looked_up_name = get_course_name_from_json(course_code) or "Course Website"
+        looked_up_name = course_names.cleaned(get_course_name_from_json(course_code) or "Course Website")
         course_name = prompt_with_default("Enter the course name you wish to use", looked_up_name)
-    # Cleaned where it is read (#780): the saved name, a looked-up name and a
-    # typed one alike, before it goes into course_config.json, the page
-    # templates and each section's front page title.
     course_name = course_names.cleaned(course_name)
 
     

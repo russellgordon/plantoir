@@ -1150,7 +1150,7 @@ the sidebar, the title and the trail — was the follow-up, and is #780
 (v1.10.0): no, and the name is cleaned where it is READ, by
 `contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
 C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
-Python did their half on `issue/780-no-control-characters-in-a-course-name`;
+Python did their half in v1.10.0;
 this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
 `windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
 lands: a course name will reach it already clean, but it also cleans the page

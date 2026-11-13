@@ -800,19 +800,15 @@ nonisolated struct ProblemReportStore {
     ///   and their write either. The folder is the lock so that no extra
     ///   file appears in the folder a teacher is shown.
     ///
-    /// The line is cleaned and then redacted BEFORE any of this, so nothing
-    /// unredacted is ever held or written. **Cleaned first (#780):** a
-    /// control character becomes a space and a bidirectional control is
-    /// removed (`contracts/shared-rules.json` → `courseNameCharacters` →
+    /// The line is cleaned and redacted BEFORE any of this, so nothing
+    /// unredacted is ever held or written (#780, `safeTrailLine`): a control
+    /// character becomes a space and a bidirectional control is removed
+    /// (`contracts/shared-rules.json` → `courseNameCharacters` →
     /// `trailLines`), so a line break inside a course name, a page title or
-    /// a folder name cannot start a forged line of its own. The ORDER is the
-    /// point. `LogRedactor`'s rules look for white space and for words that
-    /// stay joined, so a NUL after `Bearer`, an isolate inside
-    /// `CLOUDFLARE_API_TOKEN` or an override before the `@` of an email
-    /// address hid the secret from it; cleaned afterwards, the secret would
-    /// have been written as plain readable text (measured in the #780 plan
-    /// review). `keepingLineBreaks` is for the assistant's turn record,
-    /// which is several lines on purpose.
+    /// a folder name cannot start a forged line of its own, and the line is
+    /// redacted both before and after that clean, because each order alone
+    /// lets a different shape of secret through. `keepingLineBreaks` is for
+    /// the assistant's turn record, which is several lines on purpose.
     ///
     /// If the folder cannot be opened, or `flock` refuses
     /// (`ENOTSUP` on some network volumes), the line is still written, just
@@ -822,8 +818,7 @@ nonisolated struct ProblemReportStore {
     /// held. ``documentation/09-mac-app.md` → "Two writers at once"` has the measurements and what
     /// was rejected.
     func appendActivityLine(_ line: String, keepingLineBreaks: Bool = false) {
-        let oneLine: String = OneLineText.cleaned(line, keepingLineBreaks: keepingLineBreaks)
-        let safeLine: String = LogRedactor.redacting(oneLine)
+        let safeLine: String = ProblemReportStore.safeTrailLine(line, keepingLineBreaks: keepingLineBreaks)
         do {
             try FileManager.default.createDirectory(
                 at: folderURL, withIntermediateDirectories: true
@@ -838,6 +833,31 @@ nonisolated struct ProblemReportStore {
         let url: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
         ProblemReportStore.addToTheEnd(of: url, text: safeLine + "\n")
         ProblemReportStore.trimIfTooLong(url)
+    }
+
+    /// `line` as the trail may hold it: one line (unless `keepingLineBreaks`)
+    /// and redacted (#780, `courseNameCharacters.trailLines.order`).
+    ///
+    /// A line with no control character in it is redacted once, as it
+    /// always was. A line that holds one is redacted, cleaned, and redacted
+    /// again. The first pass takes a secret with a control INSIDE it whole,
+    /// because `LogRedactor`'s `\S+` and its home-folder rule read a NUL, an
+    /// ESC or a DEL as part of the value; cleaning first turned that control
+    /// into a space, the rule stopped there, and the rest of the secret was
+    /// written out (the implementation review's H1, measured). The second
+    /// pass takes a secret a control was HIDING, one placed between `Bearer`
+    /// and its token, inside a label or before an email's `@` (the plan
+    /// review's H4). Each pass alone leaks one of the two; both together
+    /// leak neither, and `LogRedactor` leaves its own placeholders alone, so
+    /// the second pass adds nothing to what the first removed.
+    static func safeTrailLine(_ line: String, keepingLineBreaks: Bool) -> String {
+        let cleanedLine: String = OneLineText.cleaned(line, keepingLineBreaks: keepingLineBreaks)
+        if cleanedLine == line {
+            return LogRedactor.redacting(line)
+        }
+        let redactedOnce: String = LogRedactor.redacting(line)
+        let cleanedAfterRedacting: String = OneLineText.cleaned(redactedOnce, keepingLineBreaks: keepingLineBreaks)
+        return LogRedactor.redacting(cleanedAfterRedacting)
     }
 
     /// Opens the Logs folder and takes an exclusive lock on it, waiting for

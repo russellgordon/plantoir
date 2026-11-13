@@ -55,7 +55,7 @@ except ImportError:
 
 # A name holding a NUL, a line feed and a right-to-left override, and what
 # every reader must make of it before any trimming of its own.
-DIRTY_NAME = "Phys\u0000ics\n‮Grade 11"
+DIRTY_NAME = "Phys\u0000ics\n\u202eGrade 11"
 CLEAN_NAME = "Phys ics Grade 11"
 
 
@@ -138,6 +138,12 @@ class TheReaders(unittest.TestCase):
         title = build_site.computed_landing_title(config, 1, True)
         self.assertEqual(code_points(title), code_points(CLEAN_NAME + ", Section 1"))
 
+    def test_a_name_that_is_only_controls_falls_back_to_the_code(self):
+        import build_site
+        for raw in ("\u0000", "\n\u202e", "   "):
+            config = {"course_code": "SPH3U", "course_name": raw, "show_grade_in_title": False}
+            self.assertEqual(build_site.computed_landing_title(config, 1, True), "SPH3U, Section 1", repr(raw))
+
     @unittest.skipUnless(HAS_PILLOW, "the sharing card needs Pillow")
     def test_the_sharing_cards_title_is_cleaned(self):
         import social_card
@@ -177,7 +183,7 @@ class TheReaders(unittest.TestCase):
         course.mkdir(parents=True)
         saved = {
             "course_code": "ICS3U",
-            "course_name": "Physics\t11‮\u0000",
+            "course_name": "Physics\t11\u202e\u0000\u001b[2J",
             "num_sections": 1,
             "section_numbers": [1],
             "shared_folders": [],
@@ -202,7 +208,10 @@ class TheReaders(unittest.TestCase):
         original_getch = setup_course.getch
         prompts_seen = [0]
 
+        prompts_shown = []
+
         def answer(prompt: str = "") -> str:
+            prompts_shown.append(prompt)
             prompts_seen[0] += 1
             if prompts_seen[0] > 200:
                 raise RuntimeError("the wizard kept asking; it is looping")
@@ -225,12 +234,25 @@ class TheReaders(unittest.TestCase):
             setup_course.getch = original_getch
 
         written = json.loads(config_path.read_text(encoding="utf-8"))
-        self.assertEqual(code_points(written["course_name"]), code_points("Physics 11 "))
+        self.assertEqual(code_points(written["course_name"]), code_points("Physics 11  [2J"))
+
+        # The saved name is shown as the prompt's default CLEANED: an ESC or
+        # a line break from the file never reaches the terminal (#780 review
+        # M1). No prompt the run showed carries the name's NUL, override or
+        # ESC; the prompts' own line breaks are theirs and stay.
+        name_prompts = []
+        for prompt in prompts_shown:
+            if "course name" in prompt:
+                name_prompts.append(prompt)
+            for unwanted in ("\u0000", "\u202e", "\u001b[2J", "\t"):
+                self.assertNotIn(unwanted, prompt)
+        self.assertEqual(len(name_prompts), 1)
+        self.assertIn("[Default: Physics 11  [2J]", name_prompts[0])
         front_page = course / "section1" / "index.md"
         if front_page.exists():
             text = front_page.read_text(encoding="utf-8")
             self.assertNotIn("\t", text)
-            self.assertNotIn("‮", text)
+            self.assertNotIn("\u202e", text)
             self.assertNotIn("\u0000", text)
 
 

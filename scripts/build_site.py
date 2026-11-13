@@ -981,8 +981,11 @@ def computed_landing_title(cfg, section_number, show_marker):
     """
     # Cleaned before it is trimmed (#780): a NUL, a line break or a
     # right-to-left override in the name never reaches the site title, the
-    # front page heading or a printed page's footer.
-    name = course_names.cleaned(str(cfg.get("course_name") or cfg.get("course_code") or "")).strip()
+    # front page heading or a printed page's footer. A name that is nothing
+    # but such characters, or only spaces, falls back to the course code.
+    name = course_names.cleaned(str(cfg.get("course_name") or "")).strip()
+    if not name:
+        name = str(cfg.get("course_code") or "").strip()
     code = str(cfg.get("course_code") or "")
     # Deliberately literal: the switch alone decides. The app warns when
     # the name already carries the grade; what to do about it — edit the

@@ -119,8 +119,10 @@ was posted on the issue before any code and is what was built.
 
 **Where it is applied.** On the mac, `CourseConfiguration.courseName`'s
 getter AND setter (`CourseName.cleaned`, which is `OneLineText.cleaned`), so
-every reader of the name is covered at once and a Save writes the cleaned
-name; `ReferenceImportSource`, the one direct read of the key; the New Course
+every reader of the name is covered at once; `write(to:)`, so a Save of ANY
+setting writes the cleaned name, not only a Save that edited it (the
+implementation review's M2: the per-key merge kept the file's raw name for a
+key this copy had not changed); `ReferenceImportSource`, the one direct read of the key; the New Course
 window, before it trims; and the two older-layout importers. In the shared
 Python, `scripts/course_names.py`, called by `build_site.computed_landing_title`
 (the front page heading, the page title and a printed page's footer),
@@ -130,11 +132,23 @@ names come from the course code, and no launcher reads the name. Windows owes
 `CourseConfiguration.CourseName` and its New Course window (the `windows`
 issue for #780); the Python reaches it with no change. The file on disk is
 NOT rewritten when a bad name is read: a read that writes would surprise
-Obsidian and the other app, and the next Save heals it.
+Obsidian and the other app, and the next Save of any setting heals it.
 
-**The breadcrumb trail is cleaned by the same rule**, line by line, and the
-order is clean THEN redact; see [09 → "Two writers at once"](09-mac-app.md)
-and `courseNameCharacters.trailLines`.
+**The breadcrumb trail is cleaned by the same rule**, line by line, and
+redacted both before and after the clean whenever the clean changes the line,
+because each single order lets a different shape of secret through; see
+[09 → "One line per entry"](09-mac-app.md) and
+`courseNameCharacters.trailLines.order`.
+
+**`setup_course.py` shows the saved name cleaned** as its prompt's default,
+and `prompt_with_default` and `prompt_select_multiple` show every default and
+every listed folder cleaned, so an ESC or a line break in a saved value never
+reaches the terminal of whoever runs `./setup.sh` again (the implementation
+review's M1). What those two return is the value itself: cleaning a stored
+value other than the name is each reader's decision. No launcher prints a
+value read from `course_config.json`. A name that is nothing but control
+characters, or only spaces, falls back to the course code on the front page
+and the sharing card, as an absent one does (review L2).
 
 **What was measured.** The plan's 24 cases in Python and in Swift, all
 passing and idempotent; the plan review added French with U+202F (one code
@@ -151,7 +165,7 @@ refusing the name at entry (the character is invisible), cleaning only at the
 doors and the trail (every reader would need its own copy), rewriting the
 file on read, all of Unicode category Cf (breaks emoji and three scripts),
 normalising to NFC at the same time (a different question), trimming, and
-redacting a trail line before cleaning it.
+either single order of cleaning and redacting a trail line.
 
 **Not in this piece:** `custom_short_name` and the section labels can carry
 the same characters; that is a drafted follow-up, because the ruling is about

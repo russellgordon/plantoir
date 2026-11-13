@@ -106,7 +106,7 @@ final class CourseNameCharactersTests: XCTestCase {
     /// cleaned, and a name set through Course Settings is stored cleaned.
     func testTheNameIsCleanedWhereItIsRead() throws {
         let fileURL: URL = scratchFolderURL.appendingPathComponent("course_config.json")
-        let json: String = #"{"course_code": "SPH3U", "course_name": "Phys\u0000ics\n11‮"}"#
+        let json: String = #"{"course_code": "SPH3U", "course_name": "Phys\u0000ics\n11\u202e"}"#
         try Data(json.utf8).write(to: fileURL)
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
         XCTAssertEqual(scalars(of: configuration.courseName), scalars(of: "Phys ics 11"))
@@ -120,7 +120,7 @@ final class CourseNameCharactersTests: XCTestCase {
     /// NUL, a line break or an override in the course name never reaches it.
     func testTheDoorsGreetingCarriesNoControlFromTheName() throws {
         let fileURL: URL = scratchFolderURL.appendingPathComponent("course_config.json")
-        let json: String = #"{"course_code": "SPH3U", "course_name": "Phys\u0000ics\n‮Grade 11"}"#
+        let json: String = #"{"course_code": "SPH3U", "course_name": "Phys\u0000ics\n\u202eGrade 11"}"#
         try Data(json.utf8).write(to: fileURL)
         let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
         let greeting: String = ClaudeCodeLauncher.greeting(
@@ -175,6 +175,36 @@ final class CourseNameCharactersTests: XCTestCase {
         XCTAssertTrue(configurationSource.contains("set { values[\"course_name\"] = CourseName.cleaned(newValue) }"))
     }
 
+    /// Any Save writes the name cleaned, not only a Save that edited it: a
+    /// file whose name holds a NUL, saved after an unrelated setting changed,
+    /// holds the cleaned name afterwards.
+    func testAnySaveWritesTheNameCleaned() throws {
+        let fileURL: URL = scratchFolderURL.appendingPathComponent("course_config.json")
+        let json: String = #"{"course_code": "SPH3U", "course_name": "Phys\u0000ics\u202e 11", "footer_html": ""}"#
+        try Data(json.utf8).write(to: fileURL)
+        let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        configuration.values["footer_html"] = "<p>Room 204</p>"
+        try configuration.write(to: fileURL)
+        let written: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: fileURL)) as? [String: Any]
+        )
+        let name: String = try XCTUnwrap(written["course_name"] as? String)
+        XCTAssertEqual(scalars(of: name), scalars(of: "Phys ics 11"))
+        XCTAssertEqual(written["footer_html"] as? String, "<p>Room 204</p>")
+    }
+
+    /// The New Course window cleans the name before it trims it, so a name
+    /// that is only a line break gets the default.
+    func testTheNewCourseWindowCleansBeforeItTrims() {
+        let defaultName: String = WizardWording.panelWords(isClub: false).defaultSiteName
+        XCTAssertEqual(NewCourseWizardView.nameToWrite(typed: "\n", isClub: false), defaultName)
+        XCTAssertEqual(NewCourseWizardView.nameToWrite(typed: "\u{0}\u{202E}", isClub: false), defaultName)
+        XCTAssertEqual(
+            scalars(of: NewCourseWizardView.nameToWrite(typed: "Physics 11\u{0}", isClub: false)),
+            scalars(of: "Physics 11")
+        )
+    }
+
     /// The New Course window cleans the name before it writes it.
     func testTheNewCourseWindowWritesTheNameCleaned() throws {
         let wizard: NewCourseWizardView = NewCourseWizardView(
@@ -202,7 +232,7 @@ final class CourseNameCharactersTests: XCTestCase {
     func testEveryTrailLineCaseIsWrittenAsTheContractSays() throws {
         let trail: [String: Any] = try XCTUnwrap(rule["trailLines"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(trail["cases"] as? [[String: Any]])
-        XCTAssertEqual(cases.count, 6)
+        XCTAssertGreaterThanOrEqual(cases.count, 14)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let line: String = try XCTUnwrap(testCase["line"] as? String, name)
@@ -217,6 +247,37 @@ final class CourseNameCharactersTests: XCTestCase {
             )
             XCTAssertEqual(scalars(of: onDisk), scalars(of: written.joined(separator: "\n") + "\n"), name)
         }
+    }
+
+    /// Redacting a line again changes nothing, which is what lets the trail
+    /// writer redact both before and after it cleans.
+    func testRedactingTwiceChangesNothing() throws {
+        let rules: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(
+                with: try Data(contentsOf: CourseNameCharactersTests.repositoryRoot().appendingPathComponent("contracts/shared-rules.json"))
+            ) as? [String: Any]
+        )
+        let redaction: [String: Any] = try XCTUnwrap(rules["problemReportRedaction"] as? [String: Any])
+        let again: [String: Any] = try XCTUnwrap(redaction["redactedAgainCases"] as? [String: Any])
+        let cases: [[String: String]] = try XCTUnwrap(again["cases"] as? [[String: String]])
+        XCTAssertFalse(cases.isEmpty)
+        for testCase in cases {
+            let input: String = try XCTUnwrap(testCase["input"])
+            let expect: String = try XCTUnwrap(testCase["expect"])
+            XCTAssertEqual(LogRedactor.redacting(input), expect, input)
+        }
+    }
+
+    /// The turn record is one line whatever the model put in an argument's
+    /// name, because it is written with its line breaks kept.
+    func testATurnRecordIsOneLine() {
+        let record: AssistTurnRecord = AssistTurnRecord(
+            at: Date(timeIntervalSince1970: 1_786_000_000), courseCode: "ICS3U", sectionNumber: 1,
+            toolName: "publish_pages", argumentNames: ["course\n2026-11-12 09:00:00 · forged"],
+            seconds: 1.0, completionTokens: nil, stoppedAtGate: false
+        )
+        XCTAssertFalse(record.lines.contains("\n"), record.lines)
+        XCTAssertTrue(record.lines.contains("chose publish_pages(course 2026-11-12 09:00:00 · forged)"), record.lines)
     }
 
     /// `ActivityTrail.note` keeps line breaks only for a whole-line record.
