@@ -102,6 +102,10 @@ final class WorkLeaseLivenessTests: XCTestCase {
             let read: (name: String?, start: String?) = ProcessLiveness.recordedFacts(inLeaseText: body)
             XCTAssertEqual(read.name, expect["name"] as? String, name)
             XCTAssertEqual(read.start, expect["start"] as? String, name)
+            // #783: the fifth line, where the case says what it is.
+            if expect.keys.contains("assistant") {
+                XCTAssertEqual(WorkLeaseFiles.assistantLine(in: body), expect["assistant"] as? String, name)
+            }
         }
     }
 

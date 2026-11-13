@@ -425,8 +425,12 @@ final class CopilotLauncherTests: XCTestCase {
         }
         for place in places where installed == nil {
             let resolved: String = URL(fileURLWithPath: place).resolvingSymlinksInPath().path
-            if FileManager.default.isExecutableFile(atPath: resolved)
-                && !resolved.contains("/node_modules/") {
+            // Only where GitHub's own installs put it: Homebrew's `copilot`
+            // formula is AWS's tool at the same link (review L1 of the fix
+            // round), and an npm install is not a signed program.
+            let isGitHubsInstall: Bool = resolved.contains("/Caskroom/copilot-cli/")
+                || resolved.hasPrefix(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/").path)
+            if FileManager.default.isExecutableFile(atPath: resolved) && isGitHubsInstall {
                 installed = resolved
             }
         }

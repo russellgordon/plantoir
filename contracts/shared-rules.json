@@ -127,7 +127,7 @@
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
       {
-        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding - nothing else: and which assistant's session it is, through the same slot the busy sentences use (doorCourseHold.naming: the name its door wrote into the server's environment, or all three when none was) - nothing else: no page, no section, no process id in the sentence",
+        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding, and which assistant's session it is, through the same slot the busy sentences use (doorCourseHold.naming: the name its door wrote into the server's environment, or all three when none was); nothing else: no page, no section, no process id",
         "event": "outside session held a course",
         "line": "a {assistant} session started from Plantoir is holding {course} while it is open",
         "why": "#458 (the mac) and #430 (Windows): while a session from an outside door is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold). Until #783 the line said 'a Claude or Codex session'; since #783 it names the door's assistant through {assistant} (doorCourseHold.naming), as the busy sentences do (Russell, 2026-11-13)."
@@ -26733,6 +26733,12 @@
         {"name": "the hold names no assistant (an older Plantoir, or Windows before it writes one)", "keys": [null], "expect": "Claude, Codex or GitHub Copilot"},
         {"name": "a key no door has is named as none", "keys": ["gemini"], "expect": "Claude, Codex or GitHub Copilot"},
         {"name": "the key is read without regard to case or space", "keys": [" Copilot "], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: a key in capitals is the same door", "keys": ["COPILOT"], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: two spellings of one door are one name", "keys": ["Codex", " codex"], "expect": "Codex"},
+        {"name": "#783 fix review H1: two doors, spelt loosely, in menu order", "keys": [" Copilot ", "CLAUDE"], "expect": "Claude or GitHub Copilot"},
+        {"name": "#783 fix review H1: an empty key names none", "keys": [""], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "#783 fix review H1: a key of spaces names none", "keys": ["   "], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "all three doors: all three, in menu order", "keys": ["copilot", "codex", "claude"], "expect": "Claude, Codex or GitHub Copilot"},
         {"name": "nothing read: all three", "keys": [], "expect": "Claude, Codex or GitHub Copilot"},
         {"name": "two holds of the same door: one name", "keys": ["copilot", "copilot"], "expect": "GitHub Copilot"},
         {"name": "holds of two doors: both, in menu order", "keys": ["copilot", "claude"], "expect": "Claude or GitHub Copilot"},

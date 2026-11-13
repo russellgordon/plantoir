@@ -2092,26 +2092,33 @@ nonisolated enum AssistWording {
     /// none). One known name when every hold names the same one; the known
     /// names in menu order joined with "or" when holds name different ones;
     /// all three when any hold names none, or there is no hold to read.
+    ///
+    /// Each key is read as `outsideAssistantName(forKey:)` reads it (trimmed,
+    /// any case), and the function cannot trap whatever it is given: until
+    /// the second fix round of #783 it stored the key unread, so " Copilot "
+    /// matched no name and an empty list's `removeLast()` crashed (measured
+    /// with a copy under swiftc, exit 133).
     static func outsideAssistantNamed(_ keys: [String?]) -> String {
-        if keys.isEmpty {
-            return anyOutsideAssistant
-        }
         var seen: Set<String> = []
         for key in keys {
             guard let key, outsideAssistantName(forKey: key) != nil else {
                 return anyOutsideAssistant
             }
-            seen.insert(key)
+            seen.insert(key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
         }
         var names: [String] = []
         for entry in outsideAssistantNames where seen.contains(entry.key) {
             names.append(entry.name)
         }
+        if names.isEmpty {
+            return anyOutsideAssistant
+        }
         if names.count == 1 {
             return names[0]
         }
-        let last: String = names.removeLast()
-        return names.joined(separator: ", ") + " or " + last
+        var leading: [String] = names
+        let last: String = leading.removeLast()
+        return leading.joined(separator: ", ") + " or " + last
     }
 
     /// The name for one door key, or nil for a key no door has.
