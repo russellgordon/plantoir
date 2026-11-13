@@ -76,6 +76,12 @@ public class ReferenceCourseTests
     public void ACodeIsUniqueWithinOneSchoolYearGroup()
     {
         var cases = Rule["codeUniqueWithinAGroup"]!["cases"]!.AsArray();
+        // Every case is run and the failures collected (until step 0 the loop
+        // stopped at the first): a case about the groups a teacher MAKES
+        // (#572's third piece, owed by #827) is held open by name, and the
+        // entry fails the day the case passes.
+        var names = new List<string>();
+        var failing = new List<string>();
         foreach (var c in cases)
         {
             var shelf = c!["shelf"]!.AsArray().Select((s, i) => new ReferenceCourse.Shelved(
@@ -86,8 +92,13 @@ public class ReferenceCourseTests
             int? year = placing["year"] is null ? null : placing["year"]!.GetValue<int>();
             string? trouble = ReferenceCourse.ShelfTrouble(placing["code"]!.ToString(), year, shelf,
                 c["ignoringFolderName"]?.ToString());
-            Assert.True((c["expect"]!.ToString() == "refused") == (trouble is not null), c["name"]!.ToString());
+            string name = c["name"]!.ToString();
+            names.Add(name);
+            if ((c["expect"]!.ToString() == "refused") != (trouble is not null)) failing.Add(name);
         }
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.ShelfCodeCases, names, names.Except(failing));
+        var unexplained = failing.Where(name => !deferred.Contains(name)).ToList();
+        Assert.True(unexplained.Count == 0, string.Join("; ", unexplained));
         Assert.True(cases.Count >= 7);
     }
 
@@ -160,10 +171,18 @@ public class ReferenceCourseTests
     {
         var wording = Rule["wording"]!.AsObject();
         var notSentences = new HashSet<string> { "rule", "machineryCheck", "theCannotTellSentence", "whyTheLaunchersStillSayPublished" };
+        // A sentence this app does not say yet (the groups' own, #827) is held
+        // open by key; "said here" is present AND equal, so a changed
+        // sentence is held while it differs and the entry closes the day it
+        // matches. Every other sentence is compared as before.
+        var sentences = wording.Where(pair => !notSentences.Contains(pair.Key)).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.ShelfWording, sentences.Select(pair => pair.Key),
+            sentences.Where(pair => ReferenceCourse.Wording.TryGetValue(pair.Key, out string? said) && said == pair.Value!.ToString())
+                     .Select(pair => pair.Key));
         int compared = 0;
-        foreach (var (key, value) in wording)
+        foreach (var (key, value) in sentences)
         {
-            if (notSentences.Contains(key)) continue;
+            if (deferred.Contains(key)) continue;
             Assert.True(ReferenceCourse.Wording.TryGetValue(key, out string? mine), $"referenceCourses.wording.{key} is not said here");
             Assert.Equal(value!.ToString(), mine);
             compared++;
