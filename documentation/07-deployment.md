@@ -2246,7 +2246,11 @@ before building, matched by the section's own build directory.
 
 **It was written by PORT first, and that was wrong — do not go back to it.**
 `kill_existing_quartz(port)` looked like the obvious tool and is the right one
-for the SERVE path, where the port is known and leased. A build-only run is
+for the SERVE path, where the port is known and leased. (Leased in ONE
+process: since #835 a serving run also claims its address in the builder
+before it builds, and stops in words rather than kill another program's
+preview on the same address; `documentation/03-launcher-scripts.md` → "Two at
+once in one website builder (#835)".) A build-only run is
 never given a port: `preview.sh` defaults it to 8081 and the app's deploy
 passes no `--port` at all. So the first version killed whatever was serving on
 8081 — the first section to have previewed in that working folder, which is
