@@ -225,6 +225,7 @@ final class DeployedFolderShows {
         let started: Show? = await starting.value
         startsUnderWay.removeValue(forKey: canonicalRoot)
         startingFor.removeValue(forKey: canonicalRoot)
+        stopsAskedForWhileStarting.remove(canonicalRoot)
         guard let show = started else {
             return false
         }
@@ -252,6 +253,9 @@ final class DeployedFolderShows {
                 }
             })
         } catch {
+            // A Stop asked for while this failed must not stop the next
+            // Open (the fix review's L-b).
+            stopsAskedForWhileStarting.remove(canonicalRoot)
             noteCouldNotOpen(.noFreeAddress, courseCode: courseCode, sectionNumber: sectionNumber)
             return nil
         }

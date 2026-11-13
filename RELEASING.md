@@ -289,7 +289,8 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    a hand smoke of create → preview → publish on a real course. `./verify.sh`
    runs with `PLANTOIR_APP=<the Plantoir.app built from the release tree>`,
    or its crawl of a deployed folder through the app (#850) is skipped, and
-   a skipped line there is not a pass. **And a
+   a skipped line there is not a pass. Never with `PLANTOIR_APP` set while
+   Russell is at the keyboard: the crawl starts the app binary. **And a
    Release build of the mac app with Xcode 26.6, before anything is merged
    for the cut** — `cd mac-app; DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/Plantoir-euwbmkpykeyuztbpzedmiptcsqsg build`
    must end `** BUILD SUCCEEDED **` (about 90 s): the suite and every other

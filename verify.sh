@@ -6934,7 +6934,9 @@ fi
 # PLANTOIR_APP=<Plantoir.app>, and a named bundle that cannot serve FAILS.
 # Unnamed, it is skipped and says plainly that nothing ran. The crawl starts
 # the bundle with --serve-deployed-folder, which is decided before any
-# application exists (PlantoirMain), so it takes no focus from the teacher. The must-fail is the same crawl
+# application exists (PlantoirMain). That it takes no focus is NOT yet
+# measured (browser-checks/check_headless_modes.py), so never set
+# PLANTOIR_APP while the teacher is at the keyboard. The must-fail is the same crawl
 # against python3 -m http.server, which adds no .html.
 if [[ -n "${PLANTOIR_APP:-}" ]]; then
   if python3 -I browser-checks/crawl_deployed_folder.py --app "$PLANTOIR_APP" "$TC_OUT/section1" \

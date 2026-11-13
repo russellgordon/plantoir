@@ -54,9 +54,12 @@ actor DeployedFolderServer {
         /// An answer is being sent; the header deadline does not apply
         /// while it is, the send deadline does.
         var isAnswering: Bool = false
-        /// Bumped whenever a piece is handed over or taken; a send deadline
-        /// that fires with an older token is ignored.
-        var sendToken: Int = 0
+        /// When the piece being sent must have been taken by, or nil while
+        /// nothing is waiting to be taken.
+        var sendDeadline: ContinuousClock.Instant? = nil
+        /// Whether this connection's one send watcher is running (the fix
+        /// review's L-c: one per connection, not one per piece).
+        var hasSendWatcher: Bool = false
         /// When the connection last did anything: bytes arrived, or a piece
         /// was taken. The least recent makes room when the server is full.
         var lastActivity: ContinuousClock.Instant = ContinuousClock.now
@@ -264,40 +267,55 @@ actor DeployedFolderServer {
             }
         }
         if let chosen {
-            close(chosen)
+            reset(chosen)
         }
     }
 
-    /// Notes that a connection did something.
-    func noteActivity(_ identifier: Int) {
-        guard var state = connections[identifier] else {
-            return
-        }
-        state.lastActivity = ContinuousClock.now
-        connections[identifier] = state
-    }
-
-    /// A send deadline: the connection closes if this piece has not been
-    /// taken when it passes. A real timeout.
+    /// A send deadline: the connection is reset if this piece has not been
+    /// taken by then. A real timeout. One watcher per connection follows
+    /// the deadline as it moves, rather than a sleeping task per piece,
+    /// which a fast read of a large video would make thousands of.
     func armSendDeadline(_ identifier: Int) {
         guard var state = connections[identifier] else {
             return
         }
-        state.sendToken += 1
-        let token: Int = state.sendToken
+        state.sendDeadline = ContinuousClock.now + .seconds(DeployedFolderServer.secondsToTakeAPiece)
+        let startWatcher: Bool = !state.hasSendWatcher
+        state.hasSendWatcher = true
         connections[identifier] = state
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(DeployedFolderServer.secondsToTakeAPiece))
-            await self?.sendDeadlinePassed(identifier, token: token)
+        if startWatcher {
+            Task { [weak self] in
+                await self?.watchTheSendDeadline(identifier)
+            }
         }
     }
 
-    func sendDeadlinePassed(_ identifier: Int, token: Int) {
-        guard let state = connections[identifier] else {
-            return
-        }
-        if state.sendToken == token && state.isAnswering {
-            close(identifier)
+    /// Sleeps until the connection's send deadline, then resets it if the
+    /// piece is still untaken; follows a deadline that moved; ends when
+    /// nothing is waiting to be taken.
+    func watchTheSendDeadline(_ identifier: Int) async {
+        while true {
+            guard let state = connections[identifier] else {
+                return
+            }
+            guard let deadline = state.sendDeadline else {
+                var resting: ConnectionState = state
+                resting.hasSendWatcher = false
+                connections[identifier] = resting
+                return
+            }
+            if ContinuousClock.now >= deadline {
+                if state.isAnswering {
+                    reset(identifier)
+                    return
+                }
+                var resting: ConnectionState = state
+                resting.sendDeadline = nil
+                resting.hasSendWatcher = false
+                connections[identifier] = resting
+                return
+            }
+            try? await Task.sleep(until: deadline, clock: .continuous)
         }
     }
 
@@ -306,7 +324,7 @@ actor DeployedFolderServer {
         guard var state = connections[identifier] else {
             return
         }
-        state.sendToken += 1
+        state.sendDeadline = nil
         state.lastActivity = ContinuousClock.now
         connections[identifier] = state
     }
@@ -318,6 +336,18 @@ actor DeployedFolderServer {
     func close(_ identifier: Int) {
         if let state = connections[identifier] {
             state.connection.cancel()
+        }
+        connections.removeValue(forKey: identifier)
+    }
+
+    /// Closes a connection whose peer is misbehaving, with a reset rather
+    /// than a graceful close (the fix review's M-c): a graceful close waits
+    /// behind bytes a stalled reader will never take, so the reader would
+    /// see nothing and the kernel would hold the socket. Used for making
+    /// room and for the send deadline.
+    func reset(_ identifier: Int) {
+        if let state = connections[identifier] {
+            state.connection.forceCancel()
         }
         connections.removeValue(forKey: identifier)
     }

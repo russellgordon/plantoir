@@ -23,6 +23,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -101,7 +102,13 @@ def start_app(app, folder):
         [binary, "--serve-deployed-folder", folder],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
     )
-    line = process.stdout.readline().strip()
+    # Read on a thread with a bound, so a child that prints nothing fails
+    # this check instead of hanging it.
+    found = []
+    reader = threading.Thread(target=lambda: found.append(process.stdout.readline()), daemon=True)
+    reader.start()
+    reader.join(15)
+    line = found[0].strip() if found else "(nothing within 15 s)"
     if not line.startswith("DEPLOYED_FOLDER_ADDRESS="):
         process.kill()
         print(f"FAILED: Plantoir did not say where it was serving ({line!r})")

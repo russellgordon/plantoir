@@ -16234,7 +16234,9 @@ preview's, and a one-time key cookie was offered and declined.
   keyboard, so nothing that starts the app ran): `browser-checks/
   check_headless_modes.py --app <bundle>` (is the headless child an
   application, did the front application change, how fast does it leave)
-  on faac3da1b and on the fix; `DeployedFolderHeadlessTests`,
+  on faac3da1b and on the fix (the test strips XCTest's variables from the
+  child's environment and bounds every read, so on the old code it fails
+  rather than hangs); `DeployedFolderHeadlessTests`,
   `testReadersThatStopReadingDoNotShutTheSiteOut` and the two quick-press
   tests, with their numbers.
 - Not measured: a firewall prompt (this Mac's firewall is off; none is
@@ -16253,9 +16255,13 @@ HIGH). It runs from `verify.sh` and other checks while the teacher works,
 and at about 12:17 on 2026-11-13 the teacher's key window was taken while
 the reviewer started three of these; one printed nothing and two outlived
 their input. Not proven to be the cause, and the measurement is owed
-(above), but the code made it possible: the flag was read in
-`QuartzTeachersApp.init`, inside SwiftUI's `App.main`, after an
-`NSApplication` existed. It is now decided in `PlantoirMain`, the
+(above). The code allowed it but has not been shown to cause it: the flag
+was read in `QuartzTeachersApp.init`, inside SwiftUI's `App.main`, where an
+`NSApplication` MAY already exist. Whether one does at that point is the
+open question `browser-checks/check_headless_modes.py` settles on faac3da1b's
+bundle, and the same run says whether `--mcp-stdio`, still decided there,
+needs the same move (an issue of its own if so). It is now decided in
+`PlantoirMain`, the
 process's `@main`, before `QuartzTeachersApp.main()` is called, so the
 headless process never has an `NSApplication` at all and imports nothing
 that would make one. Its input is read on a thread of its own whose end
@@ -16286,9 +16292,10 @@ by the same script and reported, not changed, in #850.
   Mac too, so such a page answers 404 here and 200 on Cloudflare. Rare, and
   the price of the two apps answering alike.
 - **The section row's context menu reads the disk** when it is drawn (the
-  review's L6: the saved settings and the lease folder). Not measured; left
-  as it is, because a menu that offers Open in Browser without knowing the
-  folder is there would offer a press that does nothing.
+  review's L6: the saved settings and the lease folder). Left as it is
+  because it is not measured and no cost on a redraw has been seen. Reading
+  it on the menu's own events instead (`offeredWhen`) remains open if a cost
+  is ever measured.
 
 ### What Windows owes
 

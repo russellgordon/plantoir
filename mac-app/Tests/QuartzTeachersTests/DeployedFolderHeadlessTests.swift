@@ -10,9 +10,19 @@ import XCTest
 /// binary (the test host is Plantoir) as a child and asks the system about
 /// it.
 ///
-/// On faac3da1b the flag was read inside `QuartzTeachersApp.init`, after
-/// SwiftUI's `App.main` had made an `NSApplication`, so the child was a
-/// registered application; it is now decided in `PlantoirMain` before any.
+/// On faac3da1b the flag was read inside `QuartzTeachersApp.init`, inside
+/// SwiftUI's `App.main`, where an `NSApplication` MAY already exist; whether
+/// it did is not yet measured (`browser-checks/check_headless_modes.py` on
+/// that commit's bundle settles it). It is now decided in `PlantoirMain`
+/// before any, so this test holds the fix whatever that measurement says.
+///
+/// The child is started with the test host's environment stripped of
+/// everything XCTest and the loader put there (`childEnvironment()`): this
+/// test host is the same executable, and `XCInjectBundleInto` names it, so
+/// otherwise the child could load the test bundle and not be the process
+/// `verify.sh` starts (the fix review's M-a). Every read of its output is
+/// bounded, so a child that prints nothing fails the test in bounded time
+/// rather than hanging it (M-b).
 @MainActor
 final class DeployedFolderHeadlessTests: XCTestCase {
 
@@ -43,32 +53,41 @@ final class DeployedFolderHeadlessTests: XCTestCase {
         return folder
     }
 
-    /// Starts the child and waits up to `seconds` for its first line.
+    /// The environment the child is started with: the test host's, less
+    /// every `DYLD_*`, `XC*` and `__XPC_*` key.
+    static func childEnvironment() -> [String: String] {
+        var environment: [String: String] = [:]
+        for (key, value) in ProcessInfo.processInfo.environment {
+            if key.hasPrefix("DYLD_") || key.hasPrefix("XC") || key.hasPrefix("__XPC_") || key.hasPrefix("OS_ACTIVITY_DT") {
+                continue
+            }
+            environment[key] = value
+        }
+        return environment
+    }
+
+    /// Starts the child and waits at most `seconds` for its first line.
     static func start(serving folder: URL, seconds: Double) throws -> Child {
         let process: Process = Process()
         process.executableURL = try executable()
         process.arguments = [DeployedFolderCommandLine.flag, folder.path]
+        process.environment = childEnvironment()
         let input: Pipe = Pipe()
         let output: Pipe = Pipe()
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
+        let collected: LineCollector = LineCollector()
+        output.fileHandleForReading.readabilityHandler = { handle in
+            collected.add(handle.availableData)
+        }
         try process.run()
-        let reading: FileHandle = output.fileHandleForReading
-        var collected: Data = Data()
         let deadline: Date = Date().addingTimeInterval(seconds)
-        while Date() < deadline && !collected.contains(UInt8(ascii: "\n")) {
-            let chunk: Data = reading.availableData
-            if chunk.isEmpty {
-                break
-            }
-            collected.append(chunk)
+        while Date() < deadline && collected.firstLine() == nil {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         }
-        var firstLine: String? = nil
-        if let text = String(data: collected, encoding: .utf8), let line = text.split(separator: "\n").first {
-            firstLine = String(line)
-        }
-        return Child(process: process, input: input, firstLine: firstLine)
+        output.fileHandleForReading.readabilityHandler = nil
+        return Child(process: process, input: input, firstLine: collected.firstLine())
     }
 
     /// Whether the child has gone within `seconds`.
@@ -110,7 +129,7 @@ final class DeployedFolderHeadlessTests: XCTestCase {
                 child.process.terminate()
             }
         }
-        let line: String = try XCTUnwrap(child.firstLine, "it printed nothing")
+        let line: String = try XCTUnwrap(child.firstLine, "it printed nothing within 15 s")
         XCTAssertTrue(line.hasPrefix(DeployedFolderCommandLine.readyPrefix), "it printed \(line)")
         let pid: pid_t = child.process.processIdentifier
 
@@ -128,7 +147,7 @@ final class DeployedFolderHeadlessTests: XCTestCase {
             try? FileManager.default.removeItem(at: folder)
         }
         let child: Child = try DeployedFolderHeadlessTests.start(serving: folder, seconds: 15)
-        XCTAssertNotNil(child.firstLine, "it printed nothing")
+        XCTAssertNotNil(child.firstLine, "it printed nothing within 15 s")
         child.process.terminate()
         XCTAssertTrue(DeployedFolderHeadlessTests.ends(child.process, within: 5), "it did not end on TERM")
     }
@@ -141,9 +160,39 @@ final class DeployedFolderHeadlessTests: XCTestCase {
                 child.process.terminate()
             }
         }
-        let line: String = try XCTUnwrap(child.firstLine, "it printed nothing")
+        let line: String = try XCTUnwrap(child.firstLine, "it printed nothing within 15 s")
         XCTAssertTrue(line.hasPrefix(DeployedFolderCommandLine.failedPrefix), "it printed \(line)")
         XCTAssertTrue(DeployedFolderHeadlessTests.ends(child.process, within: 5), "it stayed after failing")
         XCTAssertNotEqual(child.process.terminationStatus, 0)
+    }
+}
+
+/// What the child printed, gathered on the pipe's own queue and read from
+/// the test, so a read never blocks.
+nonisolated final class LineCollector: @unchecked Sendable {
+
+    // MARK: - Stored properties
+
+    private let lock: NSLock = NSLock()
+    private var data: Data = Data()
+
+    // MARK: - Functions
+
+    func add(_ more: Data) {
+        lock.lock()
+        data.append(more)
+        lock.unlock()
+    }
+
+    /// The first whole line, or nil until one has arrived.
+    func firstLine() -> String? {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
+        guard let end = data.firstIndex(of: UInt8(ascii: "\n")) else {
+            return nil
+        }
+        return String(decoding: data[data.startIndex..<end], as: UTF8.self)
     }
 }

@@ -3,9 +3,11 @@ import Foundation
 /// Where the process starts (#850's fix round).
 ///
 /// `--serve-deployed-folder` is decided HERE, before SwiftUI's `App.main`
-/// creates an `NSApplication`, because a process that has one is an
-/// application to the window server: it can show in the Dock and take the
-/// key window from whatever the teacher is typing in. The headless server is
+/// creates an `NSApplication`, because a process that has one can be an
+/// application to the window server: it may show in the Dock and take the
+/// key window from whatever the teacher is typing in. (Whether the old
+/// dispatch, inside `App.main`, already had one is measured by
+/// `browser-checks/check_headless_modes.py`; this order holds either way.) The headless server is
 /// for checks run from the command line and from `verify.sh`, which run
 /// while the teacher works, so it must never become one. It imports no
 /// AppKit, touches no `NSApp`, and calls `exit` itself; nothing after the

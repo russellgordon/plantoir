@@ -381,14 +381,19 @@ final class DeployedFolderResolutionTests: XCTestCase {
             port: port, raw: Data("GET / HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nConnection: close\r\n\r\n".utf8)
         )
         XCTAssertEqual(normal?.status, 200, "64 readers that stopped reading shut a normal request out")
-        // One stalled reader the newcomer did not displace is closed once a
-        // piece has gone untaken for long enough.
-        let limit: Double = Double(DeployedFolderServer.secondsToTakeAPiece + 10)
+        // The newcomer made room by resetting one reader. The others are
+        // reset once a piece has gone untaken for long enough. Every reader
+        // is watched at once, within ONE bound (the fix review's M-c: one
+        // bound per reader could have run for 64 x 40 s).
+        let displaced: Int = RawHTTP.countClosed(readers)
+        let deadline: Date = Date().addingTimeInterval(Double(DeployedFolderServer.secondsToTakeAPiece + 15))
         var closedOne: Bool = false
-        for socket in readers.reversed() {
-            if RawHTTP.closedEvenAfterData(socket, seconds: limit) {
+        while Date() < deadline && !closedOne {
+            if RawHTTP.countClosed(readers) > displaced {
                 closedOne = true
-                break
+            } else {
+                // A socket's state from outside has no event to wait on.
+                try await Task.sleep(for: .milliseconds(500))
             }
         }
         XCTAssertTrue(closedOne, "a reader that stopped reading was never closed")
@@ -573,12 +578,25 @@ nonisolated enum RawHTTP {
                 }
             }
             var waiting: pollfd = pollfd(fd: socketHandle, events: Int16(POLLHUP), revents: 0)
-            _ = poll(&waiting, 1, 500)
+            let remaining: Double = deadline.timeIntervalSinceNow * 1000
+            _ = poll(&waiting, 1, Int32(max(0, min(500, remaining))))
             if (waiting.revents & Int16(POLLHUP)) != 0 {
                 return true
             }
         }
         return false
+    }
+
+    /// How many of `sockets` the peer has closed or reset, looking at each
+    /// once without waiting.
+    static func countClosed(_ sockets: [Int32]) -> Int {
+        var closed: Int = 0
+        for socket in sockets {
+            if closedEvenAfterData(socket, seconds: 0.001) {
+                closed += 1
+            }
+        }
+        return closed
     }
 
     /// Sends one request as the case writes it, with Connection: close

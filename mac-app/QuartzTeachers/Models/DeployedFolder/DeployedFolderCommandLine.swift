@@ -6,8 +6,9 @@ import Foundation
 /// line, `DEPLOYED_FOLDER_ADDRESS=http://127.0.0.1:<port>/` or
 /// `DEPLOYED_FOLDER_FAILED=<why>`, serves until its standard input closes,
 /// and exits. It is decided in `PlantoirMain`, before any application
-/// exists, so it shows no Dock icon and can never take the key window; it
-/// never returns.
+/// exists, so that it cannot show a Dock icon or take the key window
+/// (`DeployedFolderHeadlessTests` and `check_headless_modes.py` hold that
+/// from outside); it never returns.
 ///
 /// It remembers no address and writes no trail line: a check is not a
 /// teacher opening their site.
@@ -58,6 +59,13 @@ nonisolated enum DeployedFolderCommandLine {
 
         let reader: Thread = Thread {
             while readLine() != nil {
+            }
+            // Input that ended before the line was printed (a parent that
+            // closed at once, or /dev/null) still gets its one line (the fix
+            // review's L-a).
+            if state.claimTheOneLine() {
+                DeployedFolderCommandLine.say(failedPrefix + "its input was already closed")
+                exit(1)
             }
             exit(0)
         }
