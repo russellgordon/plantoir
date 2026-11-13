@@ -16077,28 +16077,35 @@ this is the app's half.
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. **Since #863 a share has its own words on quit**
-  (Russell, 2026-11-13), in the contract so Windows says the same ones:
-  `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words`, with seven
-  cases run by
-  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`.
-  `QuitConfirmation.workUnderWay` splits the publishes by
-  `PlanSharing.leaseSection`: shares are named "sharing the unit plans of
-  <CODE>" or "of N courses", deploys as before, and both together as "deploying
-  … and sharing …". Before the fix two shares, or a share beside a deploy,
-  were "deploying 2 sections". The message under a share
-  (`QuitConfirmation.shareMessage`) says what a share stopped part way leaves,
-  read off `unitPlanning.share.interruptionCases`: its marker stays at
-  `sending`, the Planning tab shows `lastShareUnfinished`, and the address may
-  serve what was sent until Share Again or Stop Sharing; it never names the
-  class website, which a share does not touch. With deploys as well,
-  `deployAndShareMessage` names both. The update banner borrows the same
-  phrase (`UpdateGate.workUnderWay`), so it says sharing too. REJECTED: the
-  deploy's message for a share (the first commit's recording of the mac's old
-  words), which told a teacher the class website was part way updated; and
-  naming a Stop Sharing in flight separately, which the activity record cannot
-  tell from a share (both hold the same lease), and which the message already
-  covers ("until you share them again or stop sharing them"). A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a run of the plans' launcher has
+  its own words on quit** (Russell, 2026-11-13), in the contract so Windows
+  says the same ones: `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`,
+  `words` and fourteen cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`,
+  with every fragment pinned key by key by
+  `testEveryShareFragmentIsTheContractsKeyByKey`. The lease is the same for
+  a share, a Change Password and a Stop Sharing, so `PlanShareRunner.start`
+  records what the run was started to do beside it
+  (`CourseActivity.beginPlanWork`, `PlanWork.of(choice)`), and removes it with
+  the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
+  password changes and stops; the question names each part ("sharing the unit
+  plans of <CODE>", "changing the password for the unit plans of <CODE>",
+  "stopping sharing the unit plans of <CODE>", or "of N courses"), deploys
+  first, joined "A and B" or "A, B and C". The message is
+  `messageOne`/`messageSeveral` with one clause per part: the class website
+  part way updated, the plans part way shared until shared again or stopped,
+  the new password not saved yet, the plans' address still working until
+  Stop Sharing is run again. Each clause was read off what that run leaves
+  when it stops early (`interruptionCases`, `changePasswordCases`,
+  `stopSharing`); deploys alone read exactly as before. The update banner
+  borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the
+  block's `rejected`: the deploy's message for a share (the first commit's
+  recording of the mac's old words); "anyone with the address could still
+  open the plans" (the first fix round), untrue for protected plans re-shared
+  with their password, a first share stopped before anything was sent, a
+  Change Password and a Stop Sharing; calling the latter two "sharing"
+  because they share a lease; and one fixed sentence per combination, which
+  would be ten sentences for these fourteen cases. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):

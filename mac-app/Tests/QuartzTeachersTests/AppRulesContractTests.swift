@@ -941,7 +941,7 @@ final class AppRulesContractTests: XCTestCase {
         let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
         let block: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(block["listCases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        XCTAssertGreaterThanOrEqual(cases.count, 10)
         let root: URL = URL(fileURLWithPath: "/pretend/courses", isDirectory: true)
 
         for testCase in cases {

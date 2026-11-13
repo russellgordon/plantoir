@@ -79,6 +79,114 @@ enum QuitConfirmation {
         case quitAnyway
     }
 
+    /// The publishes under way, sorted into deploys and the three kinds of
+    /// work the unit plans' launcher does (#863).
+    struct Kinds {
+
+        // MARK: - Stored properties
+
+        var deploys: [CourseActivity.PublishRecord] = []
+        var shares: [String] = []
+        var passwordChanges: [String] = []
+        var stops: [String] = []
+
+        // MARK: - Functions
+
+        /// Sorts `publishes`, reading `planWork` for what each plans run is
+        /// doing. A plans run with no record of its own is a share, which is
+        /// what every run was before the record existed.
+        static func of(
+            publishes: [CourseActivity.PublishRecord], planWork: [CourseActivity.PlanWorkRecord]
+        ) -> Kinds {
+            var kinds: Kinds = Kinds()
+            for publish in publishes {
+                if publish.sectionNumber != PlanSharing.leaseSection {
+                    kinds.deploys.append(publish)
+                    continue
+                }
+                var work: CourseActivity.PlanWork = .sharing
+                for record in planWork
+                where record.courseCode == publish.courseCode && record.folderPath == publish.folderPath {
+                    work = record.work
+                }
+                switch work {
+                case .sharing:
+                    kinds.shares.append(publish.courseCode)
+                case .changingPassword:
+                    kinds.passwordChanges.append(publish.courseCode)
+                case .stopping:
+                    kinds.stops.append(publish.courseCode)
+                }
+            }
+            return kinds
+        }
+
+        /// One kind's phrase: its course alone, or how many courses.
+        static func phrase(one: String, several: String, courses: [String]) -> String? {
+            if courses.count == 1 {
+                return one.replacingOccurrences(of: "{course}", with: courses[0])
+            }
+            if courses.count > 1 {
+                return several.replacingOccurrences(of: "{n}", with: String(courses.count))
+            }
+            return nil
+        }
+
+        /// What the question names, deploys first, or nil when nothing is
+        /// being deployed or done to unit plans.
+        func phrase() -> String? {
+            var parts: [String] = []
+            if deploys.count == 1 {
+                parts.append(QuitConfirmation.deployingOne
+                    .replacingOccurrences(of: "{section}", with: String(deploys[0].sectionNumber))
+                    .replacingOccurrences(of: "{course}", with: deploys[0].courseCode))
+            } else if deploys.count > 1 {
+                parts.append(QuitConfirmation.deployingSeveral
+                    .replacingOccurrences(of: "{n}", with: String(deploys.count)))
+            }
+            if let sharing = Kinds.phrase(
+                one: QuitConfirmation.sharingOne, several: QuitConfirmation.sharingSeveral, courses: shares
+            ) {
+                parts.append(sharing)
+            }
+            if let changing = Kinds.phrase(
+                one: QuitConfirmation.changingPasswordOne,
+                several: QuitConfirmation.changingPasswordSeveral,
+                courses: passwordChanges
+            ) {
+                parts.append(changing)
+            }
+            if let stopping = Kinds.phrase(
+                one: QuitConfirmation.stoppingOne, several: QuitConfirmation.stoppingSeveral, courses: stops
+            ) {
+                parts.append(stopping)
+            }
+            if parts.isEmpty {
+                return nil
+            }
+            return QuitConfirmation.joined(parts)
+        }
+
+        /// The message for what is under way, in the same order, or nil
+        /// when nothing is being deployed or done to unit plans.
+        func message() -> String? {
+            var clauses: [String] = []
+            if !deploys.isEmpty {
+                clauses.append(QuitConfirmation.deployClause)
+            }
+            if !shares.isEmpty {
+                clauses.append(QuitConfirmation.shareClause)
+            }
+            if !passwordChanges.isEmpty {
+                clauses.append(QuitConfirmation.passwordClause)
+            }
+            if !stops.isEmpty {
+                clauses.append(QuitConfirmation.stopClause)
+            }
+            return QuitConfirmation.message(clauses: clauses)
+        }
+    }
+
     /// One button, and what pressing it means.
     ///
     /// The pair travels together for a reason. `NSAlert` has no notion of
@@ -116,26 +224,37 @@ enum QuitConfirmation {
         OSType(kAEShutDown)
     ]
 
-    /// The sentence under the question when unit plans are being shared and
-    /// no section is being deployed (#863, Russell 2026-11-13: sharing gets
-    /// its own words). A share stopped part way leaves the plans' marker at
-    /// `sending`, which the Planning tab reads as `lastShareUnfinished`: the
-    /// address may already serve what was sent until the next Share Again
-    /// finishes it or Stop Sharing takes it down
-    /// (`unitPlanning.share.interruptionCases`). It never names the class
-    /// website, which a share does not touch.
-    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words.shareMessage`.
-    static let shareMessage: String =
-        "Quitting now could leave it unfinished, and anyone with the address could still "
-        + "open the plans until you share them again or stop sharing them."
+    /// What the quit question and its message say about the unit plans'
+    /// launcher and about deploys alongside it (#863, Russell 2026-11-13:
+    /// sharing gets its own words). Each is a contract key in
+    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words`, written
+    /// with `{course}`, `{section}` and `{n}` so the contract and this app
+    /// hold one template. The deploy phrases are the ones the question always
+    /// used.
+    static let deployingOne: String = "deploying Section {section} of {course}"
+    static let deployingSeveral: String = "deploying {n} sections"
+    static let sharingOne: String = "sharing the unit plans of {course}"
+    static let sharingSeveral: String = "sharing the unit plans of {n} courses"
+    static let changingPasswordOne: String = "changing the password for the unit plans of {course}"
+    static let changingPasswordSeveral: String = "changing the password for the unit plans of {n} courses"
+    static let stoppingOne: String = "stopping sharing the unit plans of {course}"
+    static let stoppingSeveral: String = "stopping sharing the unit plans of {n} courses"
 
-    /// The sentence when sections are being deployed AND unit plans shared:
-    /// both things a stopped run can leave, in one sentence.
-    /// `...whileUnitPlansAreShared.words.deployAndShareMessage`.
-    static let deployAndShareMessage: String =
-        "Quitting now could leave them unfinished: the class website could be part way "
-        + "updated, and anyone with the address could still open the plans until you share "
-        + "them again or stop sharing them."
+    /// The message, with one thing that could be left part way, or several.
+    static let messageOne: String = "Quitting now could leave it unfinished, with {clauses}."
+    static let messageSeveral: String = "Quitting now could leave them unfinished, with {clauses}."
+
+    /// What each kind of work could leave part way, read off what each one
+    /// leaves when it stops early (`unitPlanning.share.interruptionCases`,
+    /// `changePasswordCases`, `stopSharing`). A share stopped part way
+    /// leaves its marker at `sending` and the next share finishes it; a
+    /// Change Password sends nothing and may not have saved the password
+    /// yet; a Stop Sharing leaves the address answering until it is done.
+    /// None of the three plans' clauses names the class website.
+    static let deployClause: String = "the class website part way updated"
+    static let shareClause: String = "the plans part way shared until you share them again or stop sharing them"
+    static let passwordClause: String = "the new password not saved yet"
+    static let stopClause: String = "the plans' address still working until you stop sharing them again"
 
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
@@ -165,7 +284,8 @@ enum QuitConfirmation {
             publishes: CourseActivity.activePublishes,
             previews: PreviewLeases.active,
             previewBuilds: CourseActivity.activePreviewBuilds,
-            copies: CourseActivity.activeCopies
+            copies: CourseActivity.activeCopies,
+            planWork: CourseActivity.activePlanWork
         )
     }
 
@@ -187,40 +307,16 @@ enum QuitConfirmation {
         publishes: [CourseActivity.PublishRecord],
         previews: [PreviewLeases.Lease],
         previewBuilds: [CourseActivity.PreviewBuildRecord] = [],
-        copies: [CourseActivity.CopyRecord] = []
+        copies: [CourseActivity.CopyRecord] = [],
+        planWork: [CourseActivity.PlanWorkRecord] = []
     ) -> String? {
         _ = previews
-        // A share of unit plans is held as a publish under section 0, and is
-        // named as SHARING, never counted as a section being deployed (#863).
-        var deploys: [CourseActivity.PublishRecord] = []
-        var shares: [CourseActivity.PublishRecord] = []
-        for publish in publishes {
-            if publish.sectionNumber == PlanSharing.leaseSection {
-                shares.append(publish)
-            } else {
-                deploys.append(publish)
-            }
-        }
-        var deploying: String?
-        if deploys.count == 1 {
-            deploying = "deploying Section \(deploys[0].sectionNumber) of \(deploys[0].courseCode)"
-        } else if deploys.count > 1 {
-            deploying = "deploying \(deploys.count) sections"
-        }
-        var sharing: String?
-        if shares.count == 1 {
-            sharing = "sharing the unit plans of \(shares[0].courseCode)"
-        } else if shares.count > 1 {
-            sharing = "sharing the unit plans of \(shares.count) courses"
-        }
-        if let deploying, let sharing {
-            return "\(deploying) and \(sharing)"
-        }
-        if let deploying {
-            return deploying
-        }
-        if let sharing {
-            return sharing
+        // A run of the unit plans' launcher is held as a publish under
+        // section 0, and is named for what it is doing, never counted as a
+        // section being deployed (#863).
+        let kinds: Kinds = Kinds.of(publishes: publishes, planWork: planWork)
+        if let phrase = kinds.phrase() {
+            return phrase
         }
         if previewBuilds.count == 1 {
             let only: CourseActivity.PreviewBuildRecord = previewBuilds[0]
@@ -301,29 +397,38 @@ enum QuitConfirmation {
     /// so the question and its explanation are chosen from the same record
     /// at the same moment. A publish wins here exactly as it does there.
     static func explanation() -> String {
-        var deploying: Bool = false
-        var sharing: Bool = false
-        for publish in CourseActivity.activePublishes {
-            if publish.sectionNumber == PlanSharing.leaseSection {
-                sharing = true
-            } else {
-                deploying = true
-            }
+        let kinds: Kinds = Kinds.of(
+            publishes: CourseActivity.activePublishes, planWork: CourseActivity.activePlanWork
+        )
+        if let message = kinds.message() {
+            return message
         }
-        return explanation(deploying: deploying, sharing: sharing)
+        return explanation(publishing: false)
     }
 
-    /// The sentence under the question, told what is being deployed and
-    /// what shared (#863). A share has its own sentence; with neither, the
-    /// preview build's or the copy's sentence.
-    static func explanation(deploying: Bool, sharing: Bool) -> String {
-        if deploying && sharing {
-            return deployAndShareMessage
+    /// `parts` joined as a teacher reads a list: one alone, two as "A and
+    /// B", more as "A, B and C".
+    static func joined(_ parts: [String]) -> String {
+        if parts.count <= 1 {
+            return parts.first ?? ""
         }
-        if sharing {
-            return shareMessage
+        var text: String = ""
+        for index in 0..<(parts.count - 1) {
+            if index > 0 {
+                text += ", "
+            }
+            text += parts[index]
         }
-        return explanation(publishing: deploying)
+        return text + " and " + parts[parts.count - 1]
+    }
+
+    /// The message for the clauses that apply, or nil for none.
+    static func message(clauses: [String]) -> String? {
+        if clauses.isEmpty {
+            return nil
+        }
+        let template: String = clauses.count == 1 ? messageOne : messageSeveral
+        return template.replacingOccurrences(of: "{clauses}", with: joined(clauses))
     }
 
     /// The sentence under the question.

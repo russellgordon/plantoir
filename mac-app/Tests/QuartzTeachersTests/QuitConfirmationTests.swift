@@ -77,35 +77,70 @@ final class QuitConfirmationTests: XCTestCase {
         }
     }
 
-    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared` (#863): a share
-    /// of unit plans is asked about in its own words, alone and beside
-    /// deploys, and is never counted as a section being deployed. Run
-    /// through the no-argument forms the delegate calls, with each share held
-    /// the way `PlanShareRunner` holds it, so a change to the words or to the
-    /// record they are chosen from fails here.
-    func testSharingUnitPlansIsAskedAboutInTheContractsWords() throws {
+    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words` (#863):
+    /// every fragment the question and the message are made of is this
+    /// app's own template, key by key, so a fragment changed on one side
+    /// only fails here.
+    func testEveryShareFragmentIsTheContractsKeyByKey() throws {
         let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
         let block: [String: Any] = try XCTUnwrap(section["whileUnitPlansAreShared"] as? [String: Any])
         let words: [String: Any] = try XCTUnwrap(block["words"] as? [String: Any])
-        XCTAssertEqual(words["shareMessage"] as? String, QuitConfirmation.shareMessage)
-        XCTAssertEqual(words["deployAndShareMessage"] as? String, QuitConfirmation.deployAndShareMessage)
-        XCTAssertEqual(words["deployMessage"] as? String, QuitConfirmation.explanation(publishing: true))
-        XCTAssertNil(block["notSettledHere"], "Settled by Russell on 2026-11-13 (#863)")
-        let shareMessage: String = try XCTUnwrap(words["shareMessage"] as? String)
-        XCTAssertFalse(shareMessage.contains("class website"), "A share does not touch the class website")
+        let mine: [String: String] = [
+            "deployingOne": QuitConfirmation.deployingOne,
+            "deployingSeveral": QuitConfirmation.deployingSeveral,
+            "sharingOne": QuitConfirmation.sharingOne,
+            "sharingSeveral": QuitConfirmation.sharingSeveral,
+            "changingPasswordOne": QuitConfirmation.changingPasswordOne,
+            "changingPasswordSeveral": QuitConfirmation.changingPasswordSeveral,
+            "stoppingOne": QuitConfirmation.stoppingOne,
+            "stoppingSeveral": QuitConfirmation.stoppingSeveral,
+            "messageOne": QuitConfirmation.messageOne,
+            "messageSeveral": QuitConfirmation.messageSeveral,
+            "deployClause": QuitConfirmation.deployClause,
+            "shareClause": QuitConfirmation.shareClause,
+            "passwordClause": QuitConfirmation.passwordClause,
+            "stopClause": QuitConfirmation.stopClause,
+            "deployMessage": QuitConfirmation.explanation(publishing: true),
+            "question": QuitConfirmation.question(about: "{underWay}"),
+            "listSeparator": ", ",
+            "lastSeparator": " and ",
+        ]
+        for (key, value) in mine {
+            XCTAssertEqual(words[key] as? String, value, key)
+        }
+        XCTAssertEqual(
+            words["trailLine"] as? String,
+            QuitConfirmation.trailLine(workUnderWay: "{underWay}", choice: .keepWorking)
+                .replacingOccurrences(of: "chose to keep working", with: "{answer}")
+        )
+        XCTAssertEqual(QuitConfirmation.joined(["A", "B", "C"]), "A, B and C")
+        XCTAssertEqual(QuitConfirmation.joined(["A", "B"]), "A and B")
+        for key in ["shareClause", "passwordClause", "stopClause"] {
+            let clause: String = try XCTUnwrap(words[key] as? String, key)
+            XCTAssertFalse(clause.contains("class website"), "\(key): a plans run does not touch the class website")
+            XCTAssertFalse(clause.contains("anyone"), "\(key): says nothing about who can open the plans")
+        }
+    }
 
-        let questionTemplate: String = try XCTUnwrap(words["question"] as? String)
-        let trailTemplate: String = try XCTUnwrap(words["trailLine"] as? String)
-        let answers: [String: Any] = try XCTUnwrap(block["answers"] as? [String: Any])
-        let keptAnswer: String = try XCTUnwrap(answers["keepWorking"] as? String)
-        let quitAnswer: String = try XCTUnwrap(answers["quitAnyway"] as? String)
+    /// `whileUnitPlansAreShared.cases` (#863): sharing, changing the plans'
+    /// password and stopping sharing are each asked about in their own
+    /// words, alone and beside deploys, and none is counted as a section
+    /// being deployed. Run through the no-argument forms the delegate calls,
+    /// with each run held the way `PlanShareRunner` holds it: the lease and
+    /// the record of what it was started to do.
+    func testSharingUnitPlansIsAskedAboutInTheContractsWords() throws {
+        let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
+        let block: [String: Any] = try XCTUnwrap(section["whileUnitPlansAreShared"] as? [String: Any])
+        XCTAssertNil(block["notSettledHere"], "Settled by Russell on 2026-11-13 (#863)")
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        XCTAssertGreaterThanOrEqual(cases.count, 14)
 
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
             let shares: [String] = try XCTUnwrap(given["sharesUnderWay"] as? [String], name)
+            let passwordChanges: [String] = try XCTUnwrap(given["passwordChangesUnderWay"] as? [String], name)
+            let stops: [String] = try XCTUnwrap(given["stopsUnderWay"] as? [String], name)
             let publishCount: Int = try XCTUnwrap(given["sectionPublishesUnderWay"] as? Int, name)
             let buildCount: Int = try XCTUnwrap(given["previewsBeingBuilt"] as? Int, name)
             let copyCount: Int = try XCTUnwrap(given["copiesBeingSaved"] as? Int, name)
@@ -121,10 +156,16 @@ final class QuitConfirmationTests: XCTestCase {
                 CourseActivity.reset()
                 PreviewLeases.reset()
             }
-            for code in shares {
-                CourseActivity.beginPublish(
-                    folderPath: "/pretend", courseCode: code, sectionNumber: PlanSharing.leaseSection
-                )
+            let runs: [(courses: [String], work: CourseActivity.PlanWork)] = [
+                (shares, .sharing), (passwordChanges, .changingPassword), (stops, .stopping),
+            ]
+            for run in runs {
+                for code in run.courses {
+                    CourseActivity.beginPublish(
+                        folderPath: "/pretend", courseCode: code, sectionNumber: PlanSharing.leaseSection
+                    )
+                    CourseActivity.beginPlanWork(folderPath: "/pretend", courseCode: code, work: run.work)
+                }
             }
             for index in 0..<publishCount {
                 CourseActivity.beginPublish(
@@ -150,28 +191,36 @@ final class QuitConfirmationTests: XCTestCase {
                 continue
             }
             let asked: String = try XCTUnwrap(underWay, name)
-            let expectQuestion: String = try XCTUnwrap(testCase["expectQuestion"] as? String, name)
-            let expectMessage: String = try XCTUnwrap(testCase["expectMessage"] as? String, name)
-            let expectTrailKept: String = try XCTUnwrap(testCase["expectTrailKept"] as? String, name)
-            let expectTrailQuit: String = try XCTUnwrap(testCase["expectTrailQuit"] as? String, name)
-
-            XCTAssertEqual(QuitConfirmation.question(about: asked), expectQuestion, name)
-            XCTAssertEqual(QuitConfirmation.explanation(), expectMessage, name)
+            XCTAssertEqual(QuitConfirmation.question(about: asked), testCase["expectQuestion"] as? String, name)
+            XCTAssertEqual(QuitConfirmation.explanation(), testCase["expectMessage"] as? String, name)
             XCTAssertEqual(
-                QuitConfirmation.trailLine(workUnderWay: asked, choice: .keepWorking), expectTrailKept, name
+                QuitConfirmation.trailLine(workUnderWay: asked, choice: .keepWorking),
+                testCase["expectTrailKept"] as? String,
+                name
             )
             XCTAssertEqual(
-                QuitConfirmation.trailLine(workUnderWay: asked, choice: .quitAnyway), expectTrailQuit, name
+                QuitConfirmation.trailLine(workUnderWay: asked, choice: .quitAnyway),
+                testCase["expectTrailQuit"] as? String,
+                name
             )
-
-            // The templates give the case's words, so a reader building
-            // from the templates says what this app says.
-            XCTAssertEqual(questionTemplate.replacingOccurrences(of: "{underWay}", with: asked), expectQuestion, name)
-            let trailForWork: String = trailTemplate.replacingOccurrences(of: "{underWay}", with: asked)
-            XCTAssertEqual(trailForWork.replacingOccurrences(of: "{answer}", with: keptAnswer), expectTrailKept, name)
-            XCTAssertEqual(trailForWork.replacingOccurrences(of: "{answer}", with: quitAnswer), expectTrailQuit, name)
             if publishCount == 0 {
-                XCTAssertFalse(expectQuestion.lowercased().contains("deploy"), "\(name): a share is never called a deploy")
+                XCTAssertFalse(asked.contains("deploy"), "\(name): a plans run is never called a deploy")
+            }
+        }
+    }
+
+    /// The share bar's choices map to the work the question names: Change
+    /// Password and Stop Sharing are their own, every other choice shares.
+    func testEachShareChoiceIsTheWorkItStarts() {
+        for choice in PlanSharing.Choice.allCases {
+            let work: CourseActivity.PlanWork = CourseActivity.PlanWork.of(choice)
+            switch choice {
+            case .changePassword:
+                XCTAssertEqual(work, .changingPassword)
+            case .stop:
+                XCTAssertEqual(work, .stopping)
+            case .shareOpen, .shareProtected, .shareAgain, .removePassword, .addPassword:
+                XCTAssertEqual(work, .sharing, choice.rawValue)
             }
         }
     }
