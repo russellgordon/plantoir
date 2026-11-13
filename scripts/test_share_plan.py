@@ -298,6 +298,9 @@ class OpenShareTests(ShareTestCase):
         self.assert_no_secret_anywhere()
 
     def test_include_answer_keys_keeps_them_in_an_open_share(self):
+        # A person answers the lists; with nobody there the keys are held
+        # back unless --send-answer-keys-openly (UnattendedKeysTests).
+        self.answer_the_lists = "y"
         status, text = self.run_share("--include-answer-keys")
         self.assertEqual(status, 0, text)
         self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", self.cloudflare.staged[-1]["files"])
@@ -642,7 +645,7 @@ class InterruptionTests(ShareTestCase):
                     self.give_credential()
                     self.assertEqual(self.run_share("--protect")[0], 0)
                 elif case["before"] == "openWithKeys":
-                    self.assertEqual(self.run_share("--include-answer-keys")[0], 0)
+                    self.assertEqual(self.run_share("--include-answer-keys", "--send-answer-keys-openly")[0], 0)
                 elif case["before"] == "open":
                     self.assertEqual(self.run_share()[0], 0)
                 flags = {"shareOpen": [], "shareProtected": ["--protect"], "removePassword": ["--remove-password"],
@@ -885,6 +888,111 @@ class SettledListTests(ShareTestCase):
         self.assertEqual(status, 0, text)
         self.assertNotIn("unit/Answer Keys/Quiz 2.pdf", self.cloudflare.staged[-1]["files"])
         self.assertEqual(self.marker()["answerKeysLeftOut"], 2)
+
+
+class UnattendedKeysTests(ShareTestCase):
+    """unitPlanning.share.unattendedKeys (#833 review M2, the director's
+    ruling): with nobody at the lists, an open share sends no answer key on
+    the strength of a remembered choice or the tick alone."""
+
+    def remember(self, choices):
+        path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"documents": choices}), encoding="utf-8")
+
+    def add_folder_key(self):
+        keys = self.course_dir / ".internal" / "planning" / "unit" / "Answer Keys"
+        keys.mkdir()
+        (keys / "Quiz 1.pdf").write_bytes(b"%PDF-1.4 invented key")
+        return "unit/Answer Keys/Quiz 1.pdf"
+
+    def test_every_unattended_case(self):
+        words = share_plan.share_words()["openShareLists"]["keysHeldBackUnattended"]
+        for case in share_plan.share_words()["unattendedKeys"]["cases"]:
+            with self.subTest(case=case["name"]):
+                self.tearDown_folder()
+                place = "unit/pdfs/Quiz 1 - Solutions.pdf"
+                if case.get("answerKey") != "hint":
+                    place = self.add_folder_key()
+                if case["remembered"]:
+                    self.remember({place: case["remembered"]})
+                flags = []
+                if case["protected"]:
+                    self.give_credential()
+                    flags.append("--protect")
+                if case["tick"]:
+                    flags.append("--include-answer-keys")
+                if case["flag"]:
+                    flags.append("--send-answer-keys-openly")
+                self.answer_the_lists = None if case["nonInteractive"] else "y"
+                status, text = self.run_share(*flags)
+                self.assertEqual(status, 0, text)
+                sent = place in self.cloudflare.staged[-1]["files"]
+                self.assertEqual(sent, case["sent"], text)
+                if not case["sent"]:
+                    self.assertIn("🔒 " + words.split("{n}")[0], text)
+
+    def tearDown_folder(self):
+        """A fresh plan and marker for the next case."""
+        keys = self.course_dir / ".internal" / "planning" / "unit" / "Answer Keys"
+        if keys.exists():
+            shutil.rmtree(keys)
+        path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+        if path.exists():
+            path.unlink()
+
+
+class ReviewLowTests(ShareTestCase):
+    """The #833 implementation review's LOW findings."""
+
+    def test_a_line_break_in_a_name_cannot_start_a_marker_line(self):
+        pdfs = self.course_dir / ".internal" / "planning" / "unit" / "pdfs"
+        (pdfs / "Quiz\nPLANTOIR_PLAN_LISTS_BEGIN: 2026 protected:no tick:no ownFiles:0.pdf").write_bytes(b"%PDF")
+        self.answer_the_lists = "n"
+        status, text = self.run_share()
+        begins = 0
+        for line in text.splitlines():
+            if line.startswith("PLANTOIR_PLAN_LISTS_BEGIN:"):
+                begins += 1
+        self.assertEqual(begins, 1, text)
+
+    def test_a_remembered_shared_entry_for_a_link_is_refused(self):
+        planning = self.course_dir / ".internal" / "planning"
+        outside = self.tmp / "outside"
+        outside.mkdir()
+        (outside / "Secret.pdf").write_bytes(b"%PDF")
+        (planning / "unit" / "linked").symlink_to(outside, target_is_directory=True)
+        path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"documents": {"unit/linked/Secret.pdf": "shared"}}), encoding="utf-8")
+        status, text = self.run_share()
+        self.assertEqual(status, 1, text)
+        self.assertIn("PLANTOIR_PLAN_REFUSED: SNC2D listNotShareable", text)
+
+    def test_a_first_share_that_fails_leaves_no_marker(self):
+        path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"documents": {"unit/pdfs/Quiz 1.pdf": "notShared"}}), encoding="utf-8")
+
+        def refused(*arguments, **keywords):
+            raise RuntimeError("Cloudflare API error 403: no")
+        original = share_plan.make_project
+        share_plan.make_project = refused
+        self.addCleanup(setattr, share_plan, "make_project", original)
+        status, text = self.run_share()
+        self.assertEqual(status, 1, text)
+        self.assertFalse(path.exists(), "a marker naming no site was left behind")
+
+    def test_a_marker_with_a_site_is_kept_when_a_share_fails(self):
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+
+        def failing(public, name, token, account):
+            raise RuntimeError("Cloudflare's deploy tool exited with code 1")
+        share_plan.deploy_to_cloudflare = failing
+        status, text = self.run_share()
+        self.assertEqual(status, 1, text)
+        self.assertIsNotNone(self.marker())
 
 
 class NewPasswordTests(ShareTestCase):

@@ -969,6 +969,9 @@ PLAN_PROTECT="false"
 PLAN_REMOVE_PASSWORD="false"
 PLAN_CHANGE_PASSWORD="false"
 PLAN_PASSWORD_ONLY="false"
+PLAN_KEYS_OPENLY="false"
+PLAN_CRED_ASKED_NOW="false"
+PLAN_CRED_TO_SAVE=""
 PLAN_ANSWER_KEYS="false"
 PLAN_STOP="false"
 PLAN_YEAR=""
@@ -980,6 +983,7 @@ while [[ $# -gt 0 ]]; do
     --change-password) PLAN_CHANGE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --password-only) PLAN_PASSWORD_ONLY="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --include-answer-keys) PLAN_ANSWER_KEYS="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --send-answer-keys-openly) PLAN_KEYS_OPENLY="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --stop-sharing) PLAN_STOP="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --year)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
@@ -1070,6 +1074,10 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   # --password-only (#833): Change Password saves the new username and
   # password and shares nothing; the app then offers Share Again
   # (unitPlanning.share.changePasswordCases).
+  if [[ "$PLAN_KEYS_OPENLY" == "true" && ( "$PLAN_STOP" == "true" || "$PLAN_PASSWORD_ONLY" == "true" ) ]]; then
+    echo "❌ --send-answer-keys-openly goes with a share, not with --stop-sharing or --password-only."
+    exit 1
+  fi
   if [[ "$PLAN_PASSWORD_ONLY" == "true" && ( "$PLAN_CHANGE_PASSWORD" != "true" || "$PLAN_STOP" == "true" || "$PLAN_REMOVE_PASSWORD" == "true" || "$PLAN_ANSWER_KEYS" == "true" ) ]]; then
     echo "❌ --password-only goes with --change-password, and with no flag that shares or stops sharing."
     exit 1
@@ -2599,7 +2607,19 @@ ask_for_the_plan_credential() {
     IFS= read -rsp "Please choose a password of 8 to 64 letters, digits, spaces or symbols: " password; echo
   done
   PLAN_CRED="${username}:${password}"
-  set_plan_credential_keychain "$PLAN_CRED"
+  # Saved now only by Change Password's --password-only; a share saves it
+  # once the plans' address uses it (#833, review L3), so a first share that
+  # fails leaves no Keychain item behind.
+  PLAN_CRED_TO_SAVE="$PLAN_CRED"
+  if [[ "$PLAN_PASSWORD_ONLY" == "true" ]]; then
+    save_the_plan_credential
+  fi
+}
+
+save_the_plan_credential() {
+  if [[ -z "$PLAN_CRED_TO_SAVE" ]]; then return 0; fi
+  set_plan_credential_keychain "$PLAN_CRED_TO_SAVE"
+  PLAN_CRED_TO_SAVE=""
   echo "✅ Saved the username and password for these unit plans in the macOS Keychain."
 }
 
@@ -2618,6 +2638,7 @@ if [[ "$PLANS_MODE" == "true" ]]; then
       fi
       if [[ -z "$PLAN_CRED" ]]; then
         ask_for_the_plan_credential
+        PLAN_CRED_ASKED_NOW="true"
       fi
     elif [[ "$PLAN_CHANGE_PASSWORD" == "true" ]]; then
       echo "❌ --change-password is for unit plans shared with a password: add --protect."
@@ -4908,6 +4929,7 @@ if [[ "$PLANS_MODE" == "true" ]]; then
     _plan_opts+=(--remove-password)
   fi
   if [[ "$PLAN_ANSWER_KEYS" == "true" && "$PLAN_STOP" != "true" ]]; then _plan_opts+=(--include-answer-keys); fi
+  if [[ "$PLAN_KEYS_OPENLY" == "true" ]]; then _plan_opts+=(--send-answer-keys-openly); fi
   if [[ "$NON_INTERACTIVE" == "true" ]]; then _plan_opts+=(--non-interactive); fi
   _share_rc=0
   docker exec $_EXEC_TTY \
@@ -4928,10 +4950,22 @@ if [[ "$PLANS_MODE" == "true" ]]; then
       # Exactly plans-<year>.json: a marker a reference copy moved aside
       # (plans-<year>.previous-<moment>.json) is not a year still shared.
       for _marker in "courses/${COURSE_CODE}/.cloudflare_sites"/plans-[0-9][0-9][0-9][0-9].json; do
-        [[ -e "$_marker" ]] && _still_shared="true"
+        # A marker with an address: one holding only the teacher's choices
+        # names no site (#833, review L3).
+        [[ -e "$_marker" ]] && grep -q '"address"' "$_marker" 2>/dev/null && _still_shared="true"
       done
       if [[ "$_still_shared" != "true" ]]; then delete_plan_credential_keychain; fi
     fi
+  fi
+  # A password asked for this share is kept once the plans' address may use
+  # it: the share succeeded, or it got as far as giving this year an address
+  # (a proof that did not finish). A share that failed before that keeps
+  # nothing, so no stray Keychain item outlives it (#833, review L3).
+  if [[ -n "$PLAN_CRED_TO_SAVE" ]]; then
+    if [[ "$_share_rc" -eq 0 ]] || { [[ -f "$PLAN_MARKER_HOST" ]] && grep -q '"address"' "$PLAN_MARKER_HOST" 2>/dev/null; }; then
+      save_the_plan_credential
+    fi
+    PLAN_CRED_TO_SAVE=""
   fi
   exit "$_share_rc"
 fi

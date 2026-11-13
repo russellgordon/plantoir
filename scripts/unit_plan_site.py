@@ -464,10 +464,14 @@ def kind_of(name: str) -> str:
     return suffix[1:].upper() + " file"
 
 
-def class_of(place: str, unit_names: set | None = None) -> str:
+def class_of(place: str, unit_names: set | None = None, loaded: set | None = None) -> str:
     """documents.rule: document, cannotShare, alwaysGoes or neverListed, for
     a place the share would consider (not hidden, not a link, not in a
-    folder a backup leaves out)."""
+    folder a backup leaves out). `loaded` is every place a page of the plan
+    loads (`loaded_by_pages`): a picture a page shows is the plan's own and
+    always goes; any other picture is one a teacher attached, a handout or a
+    key, and is a document (review M1). With no `loaded` given, every
+    picture outside the folder and the hint is taken as the plan's own."""
     relative = Path(place)
     name = relative.name
     suffix = relative.suffix.lower()
@@ -486,7 +490,60 @@ def class_of(place: str, unit_names: set | None = None) -> str:
         return "document"
     if suffix in PICTURE_SUFFIXES and is_answer_key(name):
         return "document"
+    if suffix in PICTURE_SUFFIXES and loaded is not None and place not in loaded:
+        return "document"
     return "alwaysGoes"
+
+
+def _srcset_targets(value: str) -> list[str]:
+    targets = []
+    for part in value.split(","):
+        words = part.strip().split()
+        if words:
+            targets.append(words[0])
+    return targets
+
+
+def loaded_by_pages(planning_dir: Path) -> set:
+    """Every place in the plan a page LOADS (an img, a source, a link such
+    as an icon, a style's url()), as the page shows it rather than offers it
+    to be opened: the pictures that are the plan's own. A picture a page only
+    links to (an <a href>) is not among them."""
+    planning_dir = Path(planning_dir)
+    found: set = set()
+    if not planning_dir.is_dir():
+        return found
+    root = planning_dir.resolve()
+    for path, relative in _files_to_share(planning_dir):
+        if path.suffix.lower() != ".html":
+            continue
+        reader = _read_page(path)
+        targets = []
+        for target in reader.loads:
+            # A srcset ("a.png 1x, b.png 2x") names several; a src with a
+            # space in its name names one.
+            if re.search(r"\s\d+(?:\.\d+)?[wx]\s*(?:,|$)", target):
+                targets.extend(_srcset_targets(target))
+            else:
+                targets.append(target)
+        for style in reader.styles:
+            for match in _CSS_LOADS.finditer(style):
+                targets.append(match.group(1) or match.group(2) or "")
+        for target in targets:
+            if not _is_relative(target):
+                continue
+            decoded = unquote(target.split("#", 1)[0].split("?", 1)[0])
+            if not decoded:
+                continue
+            if decoded.startswith("/"):
+                resolved = (planning_dir / decoded.lstrip("/")).resolve()
+            else:
+                resolved = (path.parent / decoded).resolve()
+            try:
+                found.add(resolved.relative_to(root).as_posix())
+            except ValueError:
+                continue
+    return found
 
 
 def answer_key_of(place: str) -> str | None:
@@ -542,9 +599,10 @@ def list_documents(planning_dir: Path, bundled_assets: Path | None = None) -> Li
     unit_names = set(order.keys())
     if not planning_dir.is_dir():
         return listing
+    loaded = loaded_by_pages(planning_dir)
     for path, relative in _files_to_share(planning_dir):
         place = relative.as_posix()
-        kind = class_of(place, unit_names)
+        kind = class_of(place, unit_names, loaded)
         if kind == "alwaysGoes":
             listing.own_files += 1
             continue
@@ -588,11 +646,13 @@ def remembered_choices(marker: dict | None) -> dict:
     return choices
 
 
-def refused_choices(choices: dict, listing: Listing) -> list[str]:
+def refused_choices(choices: dict, listing: Listing, planning_dir: Path | None = None) -> list[str]:
     """rememberedChoices: the entries the share refuses, a Shared entry for
-    a place it would never send or a value that is neither of the two. An
-    entry for a place not listed (renamed, deleted, or a page that always
-    goes) is not refused: it is forgotten."""
+    a place it would never send (one listed as cannotShare, a path outside
+    the plan, a hidden one, one in a folder a backup leaves out, or, given
+    `planning_dir`, a link or a place under a linked folder) or a value that
+    is neither of the two. An entry for a place not listed (renamed,
+    deleted, or a page that always goes) is not refused: it is forgotten."""
     movable = set()
     listed = set()
     for document in listing.documents:
@@ -618,7 +678,20 @@ def refused_choices(choices: dict, listing: Listing) -> list[str]:
                 hidden = True
         if escapes or hidden:
             refused.append(place)
+            continue
+        if planning_dir is not None and _is_a_link_in(Path(planning_dir), relative):
+            refused.append(place)
     return refused
+
+
+def _is_a_link_in(planning_dir: Path, relative: Path) -> bool:
+    """Whether a place, or any folder on the way to it, is a link."""
+    current = Path(planning_dir)
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def settle(listing: Listing, protected: bool, include_answer_keys: bool, remembered: dict | None) -> dict:
@@ -627,6 +700,19 @@ def settle(listing: Listing, protected: bool, include_answer_keys: bool, remembe
     for document in listing.documents:
         settled[document.place] = starting_place(document, protected, include_answer_keys, remembered)
     return settled
+
+
+def hold_back_keys_with_nobody_to_look(listing: Listing, settled: dict) -> int:
+    """unitPlanning.share.unattendedKeys: with nobody at the lists, an open
+    share sends no answer key, of either kind, on the strength of a
+    remembered choice or the tick alone. Moves every key settled in Shared
+    to Not shared and returns how many moved."""
+    held = 0
+    for document in listing.documents:
+        if document.answer_key is not None and settled.get(document.place) == SHARED:
+            settled[document.place] = NOT_SHARED
+            held += 1
+    return held
 
 
 def kept_choices(choices: dict, listing: Listing) -> dict:
@@ -712,6 +798,7 @@ def stage(planning_dir: Path, out_dir: Path, bundled_assets: Path | None,
     staged = Staged()
     staged.units = len(_unit_folders(planning_dir))
     order = _unit_order(planning_dir, _unit_folders(planning_dir))
+    loaded = loaded_by_pages(planning_dir)
     if settled is None:
         settled = settle(list_documents(planning_dir), False, include_answer_keys, None)
     for path, relative in _files_to_share(planning_dir):
@@ -721,9 +808,11 @@ def stage(planning_dir: Path, out_dir: Path, bundled_assets: Path | None,
             # copy when there is one, and copied as they are otherwise.
             if bundled_assets is not None:
                 continue
-            kind = "alwaysGoes" if path.suffix.lower() in ALLOWED_SUFFIXES else "cannotShare"
+            # Only stylesheets, fonts and pictures: a document under assets/
+            # is never listed, so it never goes (review L4).
+            kind = "alwaysGoes" if path.suffix.lower() in (".css", ".woff2") + PICTURE_SUFFIXES else "cannotShare"
         else:
-            kind = class_of(place, set(order.keys()))
+            kind = class_of(place, set(order.keys()), loaded)
         if kind in ("neverListed", "cannotShare"):
             staged.left_out.append(place)
             continue
@@ -818,7 +907,7 @@ async function allowed(header) {
 function shared(pathname) {
   let path;
   try { path = decodeURIComponent(pathname); } catch (e) { return false; }
-  path = path.replace(/^\/+/, "");
+  path = path.replace(/^\\/+/, "");
   if (path === "" || path.endsWith("/")) return FILES.has(path + "index.html");
   return FILES.has(path) || FILES.has(path + ".html") || FILES.has(path + "/index.html");
 }

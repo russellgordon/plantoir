@@ -469,14 +469,16 @@ def confirm_the_share(course: str, year: int, listing, settled: dict, protected:
         print("   " + words["none"])
     for document in shared_documents:
         note = _note_for(document, unit_plan_site.SHARED, protected)
-        print(f"   • {document.place}" + (f" ({note})" if note else ""))
+        # one_line: a line break in a name can never start a marker line of
+        # its own (review L1); the JSON row escapes it.
+        print(f"   • {one_line(document.place)}" + (f" ({note})" if note else ""))
         print(f"{marks['document']} {json.dumps(document.line(unit_plan_site.SHARED), ensure_ascii=True)}")
     print(words["leftOutHeading"])
     if not held_documents:
         print("   " + words["none"])
     for document in held_documents:
         note = _note_for(document, unit_plan_site.NOT_SHARED, protected)
-        print(f"   • {document.place}" + (f" ({note})" if note else ""))
+        print(f"   • {one_line(document.place)}" + (f" ({note})" if note else ""))
         print(f"{marks['document']} {json.dumps(document.line(unit_plan_site.NOT_SHARED), ensure_ascii=True)}")
     print(tables["ownFilesLine"].replace("{n}", str(listing.own_files)))
     print(words["byName"])
@@ -501,6 +503,20 @@ def carried(before: dict | None, choices: dict, proven: bool = False) -> dict:
     return out
 
 
+def forget_a_marker_that_never_shared(course_dir: Path, year: int) -> None:
+    """A first share that failed leaves no marker behind (review L3): the
+    app wrote the teacher's choices into a marker of their own before the
+    yes, and a marker with no project name names no site, so it goes rather
+    than stay where deploy.sh would read it as a year still shared."""
+    path = marker_path(course_dir, year)
+    marker = unit_plan_site.read_json_file(path) if path.exists() else None
+    if marker is not None and not marker.get("name"):
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def note_new_password(course: str, course_dir: Path, year: int) -> int:
     """unitPlanning.share.changePasswordCases: Change Password saved a new
     password and shared nothing. The year's marker says the new password is
@@ -519,8 +535,20 @@ def note_new_password(course: str, course_dir: Path, year: int) -> int:
     return 0
 
 
+def settle_for_this_share(listing, protected: bool, include_answer_keys: bool, remembered: dict,
+                          send_keys_openly: bool) -> tuple[dict, int]:
+    """Where every listed document goes, and how many answer keys were held
+    back because nobody is here to look (unattendedKeys): an open share under
+    --non-interactive sends no key unless --send-answer-keys-openly says so."""
+    settled = unit_plan_site.settle(listing, protected, include_answer_keys, remembered)
+    held = 0
+    if deploy.NON_INTERACTIVE and not protected and not send_keys_openly:
+        held = unit_plan_site.hold_back_keys_with_nobody_to_look(listing, settled)
+    return settled, held
+
+
 def share(course: str, course_dir: Path, year: int, protect: bool, remove_password: bool,
-          include_answer_keys: bool, token: str, account: str) -> int:
+          include_answer_keys: bool, token: str, account: str, send_keys_openly: bool = False) -> int:
     path = marker_path(course_dir, year)
     marker = unit_plan_site.read_json_file(path) if path.exists() else None
     protected = decide_protected(marker, protect, remove_password)
@@ -551,16 +579,16 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
 
     # Advice never stops a share (unitPlanning.share.advice, #833).
     for note in unit_plan_site.advice(planning_dir):
-        print(f"💡 {note.detail}")
+        print(f"💡 {one_line(note.detail)}")
 
     # The documents the teacher sees, where each starts, and the choices
     # remembered from the last share of this year's plans (#833).
     listing = unit_plan_site.list_documents(planning_dir, unit_plan_site.bundled_assets_dir())
     remembered = unit_plan_site.remembered_choices(marker)
-    if unit_plan_site.refused_choices(remembered, listing):
+    if unit_plan_site.refused_choices(remembered, listing, planning_dir):
         say_refused(course, "listNotShareable")
         return 1
-    settled = unit_plan_site.settle(listing, protected, include_answer_keys, remembered)
+    settled, held = settle_for_this_share(listing, protected, include_answer_keys, remembered, send_keys_openly)
 
     share_id = secrets.token_hex(8)
     staging_root = Path(tempfile.mkdtemp(prefix="plantoir-plans-"))
@@ -576,10 +604,13 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
         # share exactly the documents that were listed and settle in Shared.
         marker = unit_plan_site.read_json_file(path) if path.exists() else None
         chosen = unit_plan_site.remembered_choices(marker)
-        if unit_plan_site.refused_choices(chosen, listing):
+        if unit_plan_site.refused_choices(chosen, listing, planning_dir):
             say_refused(course, "listNotShareable")
             return 1
-        settled = unit_plan_site.settle(listing, protected, include_answer_keys, chosen)
+        settled, held = settle_for_this_share(listing, protected, include_answer_keys, chosen, send_keys_openly)
+        if held:
+            print("🔒 " + share_words()["openShareLists"]["keysHeldBackUnattended"].replace("{n}", str(held)),
+                  flush=True)
         choices = unit_plan_site.kept_choices(chosen, listing)
         staged = unit_plan_site.stage(planning_dir, public, unit_plan_site.bundled_assets_dir(),
                                       include_answer_keys, settled=settled)
@@ -794,6 +825,8 @@ def main(argv=None) -> int:
     parser.add_argument("--year", type=int, default=None)
     parser.add_argument("--stop", action="store_true")
     parser.add_argument("--non-interactive", action="store_true")
+    parser.add_argument("--send-answer-keys-openly", action="store_true",
+                        help="With --non-interactive and no password: send the answer keys the lists settle in Shared.")
     parser.add_argument("--new-password-waiting", action="store_true",
                         help="Change Password saved a new password and shared nothing (#833): say so in the year's marker.")
     parser.add_argument("--credential-file", default=None,
@@ -841,13 +874,19 @@ def main(argv=None) -> int:
             account = discover_cloudflare_account(token)
         if args.stop:
             return stop(course, course_dir, year, token, account)
-        return share(course, course_dir, year, args.protect, args.remove_password,
-                     args.include_answer_keys, token, account)
+        status = share(course, course_dir, year, args.protect, args.remove_password,
+                       args.include_answer_keys, token, account, args.send_answer_keys_openly)
+        if status != 0:
+            forget_a_marker_that_never_shared(course_dir, year)
+        return status
     except RuntimeError as error:
         # Cloudflare's own words, which never carry the username or password:
         # neither is ever sent to its API.
         print(f" Cloudflare said: {error}")
         say_refused(course, "cloudflareSaidNo")
+        if not args.stop and not args.new_password_waiting:
+            forget_a_marker_that_never_shared(course_dir, args.year if args.year is not None
+                                              else unit_plan_site.school_year(today()))
         return 1
     finally:
         forget_credential()

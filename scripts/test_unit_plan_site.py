@@ -23,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY / "contracts"))
@@ -218,15 +219,26 @@ class DocumentTests(unittest.TestCase):
 
     def test_every_document_case(self):
         places = []
+        loaded = set()
+        shown = ""
         for case in share()["documents"]["cases"]:
             places.append(case["place"])
+            if case.get("loadedByAPage"):
+                loaded.add(case["place"])
+                # The unit's own page shows it, as a plan page shows a picture.
+                shown += '<img src="' + quote(case["place"].split("/", 1)[1]) + '" alt="">'
         folder, listing = self.listing_with(places)
+        if shown:
+            page = folder / "unit" / "index.html"
+            page.write_text(page.read_text(encoding="utf-8").replace("</body>", shown + "\n</body>"), encoding="utf-8")
+            listing = unit_plan_site.list_documents(folder, unit_plan_site.bundled_assets_dir())
+        self.assertEqual(unit_plan_site.loaded_by_pages(folder) & loaded, loaded)
         by_place = {}
         for document in listing.documents:
             by_place[document.place] = document
         for case in share()["documents"]["cases"]:
             with self.subTest(place=case["place"]):
-                self.assertEqual(unit_plan_site.class_of(case["place"]), case["class"])
+                self.assertEqual(unit_plan_site.class_of(case["place"], None, loaded), case["class"])
                 if case["class"] in ("document", "cannotShare"):
                     document = by_place[case["place"]]
                     self.assertEqual(document.movable, case["class"] == "document")

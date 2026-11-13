@@ -38414,11 +38414,25 @@
           ],
           [
             "reponses"
+          ],
+          [
+            "solutions",
+            "to"
+          ],
+          [
+            "solution",
+            "to"
+          ],
+          [
+            "solution",
+            "set"
           ]
         ],
         "atTheEndOrBeside": [
           "solution",
           "solutions",
+          "soln",
+          "solns",
           "key",
           "keys"
         ],
@@ -38432,7 +38446,7 @@
           "practice",
           "assignment"
         ],
-        "why": "Russell, 2026-11-13, undoing the widening the director ruled on the #709 review (M3): that rule caught every name holding 'answer', 'solution' or 'key' anywhere, and so held back Dissolution Lab.pdf, Answering Questions.pdf, Key Terms.pdf and Solutions and Mixtures.pdf, which are ordinary handouts. A teacher now puts keys in the unit's Answer Keys folder and the assistant does it for them; the hint only has to catch the obvious names a plan made before carries. A singular 'answer' is not a hint (Answer Sheet.pdf is a blank for students), nor is a lone 'key' that is neither last nor beside an assessment word (Key Ideas.pdf). A match outside the folder starts like a key and is marked 'may be an answer key' (startingPlace), and the teacher drags it either way.",
+        "why": "Russell, 2026-11-13, undoing the widening the director ruled on the #709 review (M3): that rule caught every name holding 'answer', 'solution' or 'key' anywhere, and so held back Dissolution Lab.pdf, Answering Questions.pdf, Key Terms.pdf and Solutions and Mixtures.pdf, which are ordinary handouts. A teacher now puts keys in the unit's Answer Keys folder and the assistant does it for them; the hint only has to catch the obvious names a plan made before carries. A singular 'answer' is not a hint (Answer Sheet.pdf is a blank for students), nor is a lone 'key' that is neither last nor beside an assessment word (Key Ideas.pdf). Widened again on the #833 implementation review (M1, measured): 'solutions to', 'solution to' and 'solution set' as phrases, and soln and solns at the end or beside an assessment word, so Solutions to Quiz 3.png, Lab 2 Solution Set.pdf, Test Solns.pdf and Unit 2 Soln.pdf are caught as #709's rule caught them; Solutions to Global Warming.pdf is the accepted false hit, and Dissolution Lab, Solutions and Mixtures, Solution Stoichiometry and Key Ideas stay out. 'ans' stays out: in a French course it is the word for years. A match outside the folder starts like a key and is marked 'may be an answer key' (startingPlace), and the teacher drags it either way.",
         "cases": [
           {
             "name": "Quiz 1 - Solutions.pdf",
@@ -38616,6 +38630,30 @@
           },
           {
             "name": "Unit 2 Soln.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test Solns.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz3_Soln.png",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions to Quiz 3.png",
+            "answerKey": true
+          },
+          {
+            "name": "Lab 2 Solution Set.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions to Global Warming.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Solution Stoichiometry.pdf",
             "answerKey": false
           },
           {
@@ -38712,7 +38750,7 @@
         ]
       },
       "documents": {
-        "rule": "#833 (Russell, 2026-11-13, ruling 2): the tables before a share list DOCUMENTS only. Of the files a share would consider (not hidden, not a link, not inside a folder in unitPlanning.neverFolderNames, not under the plan's own assets/, which the app's copy replaces), each place has one `class`: `document` (listed, and the teacher may move it): every .pdf and .txt but the root robots.txt, every file inside an answerKeysFolder whatever its kind when that kind can be shared, and a picture (.png, .jpg, .jpeg, .svg) whose name the answer-key hint matches; `cannotShare` (listed in Not shared, cannot be moved, with the reason `cannotShare`): any file whose kind is not in stage.allowedSuffixes and that is not one of `neverListed`; `alwaysGoes` (not listed; counted in `ownFilesLine`): pages, stylesheets, fonts and pictures; `neverListed` (never shared, not listed): `neverListed` by name anywhere, and the root 404.html, which the share writes itself. The root robots.txt is `alwaysGoes`, the plan's own. `unit` is the place's first folder when that is a unit folder (one with an index.html and a slug name), otherwise empty (wordsForTheTables.noUnit). `folder` is the rest of the path between the unit and the name. `kind` is from `kinds` by extension, compared without case, and otherwise the extension in capitals followed by ' file' (a file with no extension: 'File'). `answerKey` is folder (inside answerKeysFolder), hint (outside it, and the hint matches), or null.",
+        "rule": "#833 (Russell, 2026-11-13, ruling 2): the tables before a share list DOCUMENTS only. Of the files a share would consider (not hidden, not a link, not inside a folder in unitPlanning.neverFolderNames, not under the plan's own assets/, which the app's copy replaces), each place has one `class`: `document` (listed, and the teacher may move it): every .pdf and .txt but the root robots.txt, every file inside an answerKeysFolder whatever its kind when that kind can be shared, a picture (.png, .jpg, .jpeg, .svg) whose name the answer-key hint matches, and a picture NO page of the plan loads (#833 implementation review M1: a picture a teacher attached, a handout or a key, which a page links to with <a href> or does not name at all, is a document like a PDF, so nothing that is shared is listed nowhere); `cannotShare` (listed in Not shared, cannot be moved, with the reason `cannotShare`): any file whose kind is not in stage.allowedSuffixes and that is not one of `neverListed`; `alwaysGoes` (not listed; counted in `ownFilesLine`): pages, stylesheets, fonts, and the pictures a page of the plan LOADS (an <img src> or srcset, a <source>, a <link> such as an icon, a style's url(), each resolved from the page that names it: the plan's own pictures, which it shows rather than offers); `neverListed` (never shared, not listed): `neverListed` by name anywhere, and the root 404.html, which the share writes itself. The root robots.txt is `alwaysGoes`, the plan's own. `unit` is the place's first folder when that is a unit folder (one with an index.html and a slug name), otherwise empty (wordsForTheTables.noUnit). `folder` is the rest of the path between the unit and the name. `kind` is from `kinds` by extension, compared without case, and otherwise the extension in capitals followed by ' file' (a file with no extension: 'File'). `answerKey` is folder (inside answerKeysFolder), hint (outside it, and the hint matches), or null.",
         "neverListed": [
           "plan.json",
           "_headers",
@@ -38860,7 +38898,36 @@
           },
           {
             "place": "unit/diagram.png",
-            "class": "alwaysGoes"
+            "class": "alwaysGoes",
+            "loadedByAPage": true
+          },
+          {
+            "place": "unit/pdfs/Unit Test Answer.png",
+            "class": "document",
+            "unit": "unit",
+            "folder": "pdfs",
+            "name": "Unit Test Answer.png",
+            "kind": "PNG image",
+            "answerKey": null
+          },
+          {
+            "place": "unit/Lab Photo.jpg",
+            "class": "document",
+            "unit": "unit",
+            "folder": "",
+            "name": "Lab Photo.jpg",
+            "kind": "JPEG image",
+            "answerKey": null
+          },
+          {
+            "place": "unit/Quiz 2 Answers.png",
+            "class": "document",
+            "unit": "unit",
+            "folder": "",
+            "name": "Quiz 2 Answers.png",
+            "kind": "PNG image",
+            "answerKey": "hint",
+            "loadedByAPage": true
           },
           {
             "place": "index.html",
@@ -38899,7 +38966,7 @@
       },
       "startingPlace": {
         "rule": "#833: where a listed document starts in the two tables, in this order: a `cannotShare` file in Not shared, always; a document with a remembered choice (rememberedChoices) where the teacher put it; an answer key (in the folder, or matched by the hint outside it) in Shared when the share is protected or Include Answer Keys is ticked, and in Not shared otherwise; any other document in Shared. `mark` is what the table's Note column says beside the name: answerKey for a folder key, mayBeAnswerKey for a hint match, cannotShare for a file that cannot be moved, null otherwise. `warns` is whether the row carries the warning symbol and wordsForTheTables.noteOpenKey: an answer key of either kind that STARTS (or is moved) in Shared in a share with no password.",
-        "why": "Russell's rulings 3 to 5 (2026-11-13): remembered per file; the tick is a shortcut that starts every key in Shared; a protected share starts every key in Shared and the teacher can still hold one back. Read with the folder ruling: a hint match 'starts in Not shared' in an open share without the tick, and like any key in Shared when the share is protected or ticked (the implementer's reading, recorded in the plan for review). A remembered choice wins over the tick and over protection both ways, so a key a teacher held back stays back when they later tick the box, and a key they dragged into Shared in an open share stays there and is marked.",
+        "why": "Russell's rulings 3 to 5 (2026-11-13): remembered per file; the tick is a shortcut that starts every key in Shared; a protected share starts every key in Shared and the teacher can still hold one back. Read with the folder ruling: a hint match 'starts in Not shared' in an open share without the tick, and like any key in Shared when the share is protected or ticked. Ruled by Russell on the #833 implementation review (M3, 2026-11-13): a file outside the Answer Keys folder whose name only looks like a key starts in Shared when the share is protected or Include Answer Keys is ticked, keeping its 'may be an answer key' mark. And (M2): a key the teacher dragged into Shared stays where they left it, marked, even when the share later becomes open (Remove Password), because the sheet still opens for the look; with nobody to look, unattendedKeys holds it back. A remembered choice wins over the tick and over protection both ways, so a key a teacher held back stays back when they later tick the box, and a key they dragged into Shared in an open share stays there and is marked.",
         "cases": [
           {
             "name": "a handout, open share",
@@ -39058,7 +39125,7 @@
         ]
       },
       "rememberedChoices": {
-        "rule": "#833 (ruling 3): the teacher's choices are kept in the year's marker under `documents`, a JSON object from a document's place in the plan (as the tables' rows carry it) to `shared` or `notShared`; names only, never a file's contents. The app writes it when the teacher presses Share in the sheet, BEFORE it answers the question, atomically (a temporary file beside it, then a rename) and with every other key of the marker kept: every document whose place when Share was pressed differs from where it started gets an entry; every earlier entry of a document still listed is kept unless that document was moved again; an entry whose place is not listed this time is dropped, so a renamed or deleted file is forgotten and a new name starts from the rule. share_plan.py reads it after the yes, keeps it on every marker it writes, and prunes it the same way. A marker from before #833 has no `documents`: no choices yet. A successful Stop Sharing removes the marker and the choices with it. The share REFUSES (refusals.listNotShareable) when an entry marks Shared a place that is listed as cannotShare, or a place it would never share (outside the plan, hidden, inside a neverFolderNames folder, or a link), or holds a value other than the two; an entry for a page or a picture that always goes is dropped.",
+        "rule": "#833 (ruling 3): the teacher's choices are kept in the year's marker under `documents`, a JSON object from a document's place in the plan (as the tables' rows carry it) to `shared` or `notShared`; names only, never a file's contents. The app writes it when the teacher presses Share in the sheet, BEFORE it answers the question, atomically (a temporary file beside it, then a rename) and with every other key of the marker kept: every document whose place when Share was pressed differs from where it started gets an entry; every earlier entry of a document still listed is kept unless that document was moved again; an entry whose place is not listed this time is dropped, so a renamed or deleted file is forgotten and a new name starts from the rule. share_plan.py reads it after the yes, keeps it on every marker it writes, and prunes it the same way. A marker from before #833 has no `documents`: no choices yet. A successful Stop Sharing removes the marker and the choices with it, and so does a FIRST share that fails (a marker with no project name names no site; review L3). The share REFUSES (refusals.listNotShareable) when an entry marks Shared a place that is listed as cannotShare, or a place it would never share (outside the plan, hidden, inside a neverFolderNames folder, or a link or under a linked folder), or holds a value other than the two; an entry for a page or a picture that always goes is dropped.",
         "cases": [
           {
             "name": "a marker from before #833",
@@ -39369,6 +39436,7 @@
         "question": "Share these files with anyone who has the address? [y/N]: ",
         "questionProtected": "Share these files with anyone who has the address and the password? [y/N]: ",
         "nonInteractive": "Sharing as the lists say, because nobody is here to look at them.",
+        "keysHeldBackUnattended": "{n} answer key(s) were held back, because nobody is here to look at the lists and these plans have no password. To send them anyway, share again with --send-answer-keys-openly.",
         "declined": "Nothing was shared.",
         "markers": {
           "begin": "PLANTOIR_PLAN_LISTS_BEGIN:",
@@ -40045,6 +40113,67 @@
             ],
             "documentsRow": "6 shared, 0 held back",
             "answerKeysRow": "Includes 2 answer key(s)"
+          }
+        ]
+      },
+      "unattendedKeys": {
+        "rule": "#833 implementation review M2, the director's ruling (2026-11-13): with NOBODY to look at the lists (--non-interactive), a share with no password sends no answer key, in the Answer Keys folder or matched by the hint, on the strength of a remembered choice or the tick alone. Every key the lists would settle in Shared is moved to Not shared before the lists are printed, and after the share openShareLists.keysHeldBackUnattended says how many and how to send them on purpose: --send-answer-keys-openly, a flag that names the intent, through deploy.sh and share_plan.py alike. A protected share is unchanged, and so is a share a person answers in the tables (Russell's M2 ruling). The safe direction: a scheduled or scripted share never puts a key in front of anyone with the address because of a choice made in another share.",
+        "flag": "--send-answer-keys-openly",
+        "cases": [
+          {
+            "name": "a key remembered in Shared, open, nobody here",
+            "protected": false,
+            "nonInteractive": true,
+            "remembered": "shared",
+            "tick": false,
+            "flag": false,
+            "sent": false
+          },
+          {
+            "name": "the tick alone, open, nobody here",
+            "protected": false,
+            "nonInteractive": true,
+            "remembered": null,
+            "tick": true,
+            "flag": false,
+            "sent": false
+          },
+          {
+            "name": "a hint match remembered in Shared, open, nobody here",
+            "protected": false,
+            "nonInteractive": true,
+            "remembered": "shared",
+            "tick": false,
+            "flag": false,
+            "sent": false,
+            "answerKey": "hint"
+          },
+          {
+            "name": "the flag says so",
+            "protected": false,
+            "nonInteractive": true,
+            "remembered": null,
+            "tick": true,
+            "flag": true,
+            "sent": true
+          },
+          {
+            "name": "protected, nobody here",
+            "protected": true,
+            "nonInteractive": true,
+            "remembered": null,
+            "tick": false,
+            "flag": false,
+            "sent": true
+          },
+          {
+            "name": "a person at the tables",
+            "protected": false,
+            "nonInteractive": false,
+            "remembered": "shared",
+            "tick": false,
+            "flag": false,
+            "sent": true
           }
         ]
       },
