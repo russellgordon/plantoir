@@ -1,6 +1,7 @@
 import SwiftUI
 
-@main
+/// The app itself. Its entry point is `PlantoirMain`, which hands over to
+/// this only when the process is to be an application at all (#850).
 struct QuartzTeachersApp: App {
 
     // MARK: - Stored properties
