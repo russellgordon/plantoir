@@ -1833,6 +1833,12 @@ above and two more AUTHORED lists, `unitPlanning.share.interruptionCases.cases`
 (8) and `barCases.cases` (8). `answerKeys.cases` grew 12 → 36,
 `credentialPrompts.cases` by one more (the open share's question, no
 request). `activityTrail.mustRecord` is **162**; with #803 it is one more.
+Re-taken 2026-11-13 after the fix review and merging `origin/dev` e419ec68c
+(with #803, #780 and #572a; it reads **499**): **512**, dev's 499 and #709's
+thirteen AUTHORED lists, the twelve above and `unitPlanning.share.stopCases.cases`
+(10). `interruptionCases` grew 8 → 10 and `answerKeys.cases` 36 → 50.
+`activityTrail.mustRecord` reads **166**: dev's 163 (#803's "opened a unit
+plan in the browser" among them) and #709's three.
 
 **Re-taken 2026-11-12 for #750 (750a)**, on `issue/750a-marking-tests-from-scans` off `dev` aa1ec89eb, which read **458**: **462**. (The review-fixes rounds changed `scanCases.cases` and `boxCases` (8 each after the third), grew `namedCopies.cases` to 10, and added no list.) Four lists added, all AUTHORED, all under `shared-rules.json` → `assessment`: `identifiers.cases` (6), `redaction.boxCases` (4), `redaction.scanCases.cases` (12) and `namedCopies.cases` (7). They are read only by the `scripts/test_marking_*.py` files, which Windows already runs through `PythonToolchainTests`, so nothing turns Windows red. `mustSay` gained the `plantoir-marking` key and one `plantoir-handouts` phrase, which Windows' mirror of the mustSay walk (#758's `windows` issue) will read when it lands. `activityTrail.mustRecord` is unchanged (155 at that base): the app does nothing new. Whichever of this and a branch merged into `dev` since lands second re-takes the count rather than adding in its head.
 
