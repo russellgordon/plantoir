@@ -24,7 +24,7 @@ passes anything on:
     counted by kind as NOT checked and moved to the quarantine folder unread, so it is not opened; a link is
     moved as a link, never followed;
   - a printed line that holds any form of a name is withheld, and counted.
-It then prints the lines that hold none, and three counts: read and clean, holding a word from the table
+It then prints the lines that hold none, and three counts: read with no word from the table found in them, holding a word from the table
 and moved, and not checked and moved unread. Only folders it made, or wrote into, are moved. It exits 1 if anything was withheld, moved or left unchecked, and otherwise with the
 command's own exit code.
 
@@ -423,7 +423,7 @@ def main(arguments):
         print(line)
     unread_total = len(unread_paths)
     print(f"run_with_names: {withheld} printed lines were withheld, each holding a word from your table.")
-    print(f"Files new or changed in the marking folder: {clean} read and clean; "
+    print(f"Files new or changed in the marking folder: {clean} read, and no word from your table found in them; "
           f"{held_files} files and {held_folders} folders held a word from your table and were moved to the quarantine "
           f"folder; {unread_total} could not be read, so were NOT checked and were moved there unread" +
           (" (" + "; ".join(f"{count} {kind}" for kind, count in sorted(unread.items())) + ")" if unread else "") + ".")

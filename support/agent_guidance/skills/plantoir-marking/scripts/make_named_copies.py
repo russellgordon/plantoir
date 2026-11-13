@@ -83,8 +83,14 @@ FIRST_NAME_PLACEHOLDER = "first name"
 PRONOUN_PLACEHOLDERS = ("they", "them", "their", "theirs")
 PRONOUN_SETS = {"she/her": ("she", "her", "her", "hers"), "he/him": ("he", "him", "his", "his"),
                 "they/them": ("they", "them", "their", "theirs")}
-SHORT_PART = 4          # a name part shorter than this counts only beside another part of the same name
+SHORT_PART = 4          # a SURNAME part shorter than this counts in a draft only beside another part of its name
 ANYWHERE_PART = 6       # a name part this long counts inside another word too (as run_with_names.py does)
+# A first name counts as a whole word at ANY length of two letters or more (Ixo, Qo), in a draft and in a
+# file: a short first name alone is still a child's name (752 review H1). --check-file, which decides what
+# the assistant may READ, counts every short part alone, surnames too, as run_with_names.py does.
+CHANGING_VERB = re.compile(r"\{[Tt]hey\}(?:'|\u2019|\s+(?:is|was|are|were|has|have|does|do|isn't|wasn't|aren't|weren't|"
+                           r"hasn't|haven't|doesn't|don't|isn\u2019t|wasn\u2019t|aren\u2019t|weren\u2019t|hasn\u2019t|"
+                           r"haven\u2019t|doesn\u2019t|don\u2019t)\b)", re.IGNORECASE)
 
 ESCAPES = [("\\", "\\textbackslash{}"), ("&", "\\&"), ("%", "\\%"), ("$", "\\$"), ("#", "\\#"), ("_", "\\_"),
            ("{", "\\{"), ("}", "\\}"), ("~", "\\textasciitilde{}"), ("^", "\\textasciicircum{}")]
@@ -221,7 +227,7 @@ def check_table(table):
 # MARK: - Report card comments (#752)
 
 def folded(text):
-    """Case and accents taken off, so Zoë, ZOE and zoe are one word (as run_with_names.py compares)."""
+    """Case and accents taken off, so Qoë, QOE and qoe are one word (as run_with_names.py compares)."""
     decomposed = unicodedata.normalize("NFKD", text)
     kept = []
     for character in decomposed:
@@ -248,18 +254,24 @@ def first_name_of(row):
 
 
 def pronouns_of(row):
-    """(they, them, their, theirs) from the pronouns column, or None when it is empty or not understood."""
+    """(they, them, their, theirs) from the pronouns column, or None when it is empty or not understood.
+    she/her/hers, he/him/his and they/them/theirs are read as the two-word forms (752 review M2)."""
     value = row.get(PRONOUNS_COLUMN, "").replace(" ", "").lower()
     if value in PRONOUN_SETS:
         return PRONOUN_SETS[value]
     parts = value.split("/")
+    if len(parts) == 3:
+        forms = PRONOUN_SETS.get(parts[0] + "/" + parts[1])
+        if forms is not None and parts[2] in (forms[2], forms[3]):
+            return forms
     if len(parts) == 4 and all(parts):
         return tuple(parts)
     return None
 
 
 def name_parts_of(rows):
-    """For every row, the parts of its name and first name, folded: one list per student."""
+    """For every row, (the parts of its name and first name, the parts of its first name), folded. With no
+    first name to be read, every part of the name counts as a first name's would."""
     everyone = []
     for row in rows.values():
         parts = []
@@ -267,13 +279,20 @@ def name_parts_of(rows):
             for run in letter_runs(row.get(column, "")):
                 if len(run) >= 2 and run not in parts:
                     parts.append(run)
-        everyone.append(parts)
+        first = first_name_of(row)
+        firsts = []
+        for run in letter_runs(first if first is not None else row.get(NAME_COLUMN, "")):
+            if len(run) >= 2 and run not in firsts:
+                firsts.append(run)
+        everyone.append((parts, firsts))
     return everyone
 
 
-def words_from_the_table(text, everyone):
+def words_from_the_table(text, everyone, every_short_part_alone=False):
     """1-based positions of the words in text that hold a part of a name in the table, counting each
-    placeholder as one word. Never the word itself."""
+    placeholder as one word. Never the word itself. A first name's part counts as a whole word at any length;
+    a surname's part of two or three letters only beside another part of its name, unless
+    every_short_part_alone (--check-file), when it counts on its own as well, as in run_with_names.py."""
     words = PLACEHOLDER.sub("\x00", text).split()
     runs_by_word = []
     for word in words:
@@ -286,13 +305,13 @@ def words_from_the_table(text, everyone):
         if index + 1 < len(runs_by_word):
             beside.extend(runs_by_word[index + 1])
         found = False
-        for parts in everyone:
+        for parts, firsts in everyone:
             for part in parts:
                 if len(part) >= ANYWHERE_PART:
                     for run in runs:
                         if part in run:
                             found = True
-                elif len(part) >= SHORT_PART:
+                elif len(part) >= SHORT_PART or part in firsts or every_short_part_alone:
                     if part in runs:
                         found = True
                 elif part in runs:
@@ -304,11 +323,11 @@ def words_from_the_table(text, everyone):
     return positions
 
 
-def lines_from_the_table(text, everyone):
+def lines_from_the_table(text, everyone, every_short_part_alone=False):
     """1-based line numbers of the lines in text that hold a part of a name in the table."""
     numbers = []
     for number, line in enumerate(text.splitlines(), start=1):
-        if words_from_the_table(line, everyone):
+        if words_from_the_table(line, everyone, every_short_part_alone):
             numbers.append(number)
     return numbers
 
@@ -376,6 +395,8 @@ def read_drafts(path):
         section = entry.get("section")
         if isinstance(section, str) and section.isdigit():
             section = int(section)
+        if isinstance(section, bool):
+            raise Refusal(shape)
         identifier = entry.get("identifier")
         options = entry.get("options")
         if not isinstance(section, int) or not isinstance(identifier, str) or not re.match(IDENTIFIER, identifier):
@@ -436,27 +457,51 @@ def longest_first_name(table):
 
 
 def check_file(table, path):
-    """Say whether a file holds a word from the table, by line number only, so it can be read safely."""
+    """Say whether a file holds a word from the table, by line number only. It never calls a file clean: it
+    says what it looked for and found, and what it cannot see (752 review H1)."""
     _columns, rows = read_table_rows(table)
     try:
         text = Path(path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         raise Refusal("the file could not be read as text; it was not checked, so do not open it")
-    numbers = lines_from_the_table(text, name_parts_of(rows))
+    numbers = lines_from_the_table(text, name_parts_of(rows), every_short_part_alone=True)
     if numbers:
         print("A word from your mapping table is on " + plural(len(numbers), "line") + " of the file (line "
               + ", ".join(str(number) for number in numbers) + "). Do not open it until the teacher has changed it.")
         return 1
-    print(f"Checked {plural(len(text.splitlines()), 'line')}: none holds a word from your mapping table, of the "
-          "kinds this script looks for (a nickname, or a name the table does not hold, is not found).")
+    print(f"Looked for every part of every name in your mapping table in {plural(len(text.splitlines()), 'line')} "
+          "of the file, and found none. This cannot see a nickname, initials, or a name that is not in your table: "
+          "the teacher reads the file once for those before it is opened.")
     return 0
 
 
 def write_replacing(path, text, encoding):
     """Write next to the file and then put it in place, so a failed run leaves the last good file whole."""
     partial = path.with_name("." + path.name + ".partial")
-    partial.write_text(text, encoding=encoding, newline="")
+    with open(partial, "w", encoding=encoding, newline="") as handle:   # Path.write_text has newline= only from 3.10
+        handle.write(text)
     os.replace(partial, path)
+
+
+def set_earlier_run_aside(out):
+    """Rename the named comments of an earlier run, so a refused run never leaves comments that no longer
+    match the drafts looking current (752 review L2). Returns how many files were renamed."""
+    renamed = 0
+    for name in (COMMENTS_TABLE, COMMENTS_PAGE):
+        path = out / name
+        if path.is_file():
+            os.replace(path, out / name.replace("Report Comments", "Report Comments - earlier run, do not use"))
+            renamed += 1
+    return renamed
+
+
+def is_own_cite(cite, section, identifier):
+    """A cite is this student's own marks record (ends Section N/<identifier>.json) or the teacher's notes."""
+    text = cite.replace("\\", "/")
+    for own in (f"Section {section}/{identifier}.json", "Teacher Notes.md"):
+        if text == own or text.endswith("/" + own):
+            return True
+    return False
 
 
 def make_comments(table, comments, out, limit, count):
@@ -467,6 +512,9 @@ def make_comments(table, comments, out, limit, count):
         raise Refusal("the comments must stay outside the Plantoir working folder; nothing was written")
     if out == marking_folder or marking_folder in out.parents:
         raise Refusal("the named comments must go in the teacher-only folder, never in the marking folder; nothing was written")
+    teacher_only = Path(table).resolve().parent
+    if out != teacher_only and teacher_only not in out.parents:
+        raise Refusal("the named comments must go in the teacher-only folder that holds the mapping table; nothing was written")
     if count not in ("characters", "bytes"):
         raise Refusal("--count is characters or bytes; nothing was written")
     try:
@@ -497,6 +545,14 @@ def make_comments(table, comments, out, limit, count):
             if words_from_the_table(value, everyone):
                 problems.append(f"{label}: a field other than its options holds a word from your mapping table")
                 break
+        cites = entry.get("cites", [])
+        if not isinstance(cites, list):
+            cites = [cites]
+        for cite in cites:
+            if not isinstance(cite, str) or not is_own_cite(cite, section, identifier):
+                problems.append(f"{label}: cites a record that is not this student's own (each record it cites must "
+                                f"end Section {section}/{identifier}.json)")
+                break
         if not options:
             not_drafted.append(label)
             continue
@@ -508,6 +564,10 @@ def make_comments(table, comments, out, limit, count):
             if positions:
                 problems.append(f"{label} option {number}: word " + ", ".join(str(place) for place in positions) +
                                 " holds a word from your mapping table before the names went in")
+                continue
+            if CHANGING_VERB.search(option):
+                problems.append(f"{label} option {number}: a verb after {{they}} changes with the pronoun (they were, "
+                                "she was): write one that does not, such as a verb in the past tense other than was")
                 continue
             text, why = filled(option, row, has_pronouns_column)
             if text is None:
@@ -530,6 +590,9 @@ def make_comments(table, comments, out, limit, count):
     if problems:
         for problem in problems:
             print(problem)
+        if out.is_dir() and set_earlier_run_aside(out):
+            print("The named comments from an earlier run no longer match these drafts, so they were renamed "
+                  "\"earlier run, do not use\" in the teacher-only folder.")
         raise Refusal(f"{plural(len(problems), 'problem')} in the drafts; nothing was written")
     unit = "byte" if count == "bytes" else "character"
     out.mkdir(parents=True, exist_ok=True)
@@ -561,6 +624,16 @@ def make_comments(table, comments, out, limit, count):
               f"{plural(len(by_section[section][1]), 'student')}")
     for label in not_drafted:
         print(f"{label}: no comment drafted, so none was written")
+    drafted_sections = set()
+    for key in seen:
+        drafted_sections.add(key[0])
+    left_out = []
+    for key in sorted(rows):
+        if key[0] in drafted_sections and key not in seen:
+            left_out.append(f"Section {key[0]}/{key[1]}")
+    if left_out:
+        print(f"{plural(len(left_out), 'student')} in your mapping table, in the sections drafted, "
+              f"{'has' if len(left_out) == 1 else 'have'} no entry in the drafts: " + ", ".join(left_out))
     over_the_limit = []
     for comment in written:
         if comment["over"]:
@@ -678,7 +751,7 @@ def self_test_comments():
         table = root_path / "Teacher only" / "Name Mapping Table.csv"
         table.parent.mkdir(parents=True)
         table.write_text('section,identifier,name,first name\n1,Student A,"Testfamily, Bartholomewina",\n'
-                         '1,Student B,"Zedfamily, Zoe\u0308",\n', encoding="utf-8")
+                         '1,Student B,"Zedfamily, Qoe\u0308",\n', encoding="utf-8")
         at_the_limit = "{first name} balanced every equation in Part B."
         options = [at_the_limit, "Well done, {first name}.", "{first name} explained each step."]
         drafts.write_text(json.dumps({"students": [
@@ -704,7 +777,7 @@ def self_test_comments():
         comments = []
         for row in rows:
             comments.append(row.get("comment", ""))
-        if "Well done, Zo\u00eb." not in comments or "Well done, Bartholomewina." not in comments:
+        if "Well done, Qo\u00eb." not in comments or "Well done, Bartholomewina." not in comments:
             problems.append("the first names were not put in, or not as NFC")
         for path in (root_path / "Marking").rglob("*"):
             if path.is_file() and path != drafts:

@@ -78,6 +78,8 @@ def set_up(case, root):
     table.write_text(case["table"], encoding="utf-8")
     if case.get("out") == "marking":
         out = marking / "Term 1 Comments" / "Named"
+    elif case.get("out") == "elsewhere":
+        out = root / "Elsewhere" / "Named"
     else:
         out = teacher / "Term 1 Comments" / "Named"
     arguments = ["--comments", str(drafts), "--table", str(table), "--out", str(out), "--limit", str(case["limit"])]
@@ -136,8 +138,9 @@ class CommentNameCaseTests(unittest.TestCase):
             rows = written_rows(out)
             if case.get("written") is False:
                 self.assertIsNone(rows, f"{label}: a refused run wrote the named comments")
-                if case.get("out") != "marking":
+                if case.get("out") not in ("marking", "elsewhere"):
                     self.assertFalse(out.exists() and any(out.iterdir()), f"{label}: a refused run wrote something")
+                self.assertFalse((root / "Elsewhere").exists(), f"{label}: something was written outside both folders")
             else:
                 self.assertEqual(rows, case["filled"], label)
                 page = (out / "Report Comments.md").read_text(encoding="utf-8")
@@ -156,6 +159,50 @@ class CommentNameCaseTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.check_case(case, through_runner=True)
 
+    def test_every_check_file_case(self):
+        # 752 implementation review H1: a short first name alone in the notes, the one file the assistant reads
+        # on this check's word, was called clean.
+        for case in comment_names()["checkFileCases"]:
+            for through_runner in (False, True):
+                with self.subTest(case["name"], through_runner=through_runner), tempfile.TemporaryDirectory() as folder:
+                    root = Path(folder)
+                    marking, teacher = folders(root)
+                    notes = marking / "Term 1 Comments" / "Teacher Notes.md"
+                    notes.parent.mkdir(parents=True)
+                    notes.write_text(case["file"], encoding="utf-8")
+                    teacher.mkdir(parents=True)
+                    table = teacher / "Name Mapping Table.csv"
+                    table.write_text(case["table"], encoding="utf-8")
+                    command = [sys.executable, "-B", str(SCRIPT), "--check-file", str(notes), "--table", str(table)]
+                    if through_runner:
+                        command = [sys.executable, "-B", str(RUNNER), "--table", str(table), "--watch", str(marking),
+                                   "--quarantine", str(teacher / "Quarantine"), "--"] + command
+                    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", cwd=folder)
+                    said = result.stdout + result.stderr
+                    self.assertEqual(result.returncode, case["exit"], said)
+                    for line in case["says"]:
+                        self.assertIn(line, said)
+                    self.assertNotIn("clean", result.stdout.split("run_with_names:")[0])
+                    for word in table_words(case["table"]):
+                        self.assertIsNone(re.search(r"\b" + re.escape(word) + r"\b", said.casefold()), "a name was printed")
+
+    def test_a_refused_run_renames_the_earlier_named_comments(self):
+        # 752 implementation review L2: a refused run left the last run's comments looking current.
+        cases = comment_names()["cases"]
+        good = next(case for case in cases if case["name"] == "the first name twice in one comment")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            drafts, table, out, arguments = set_up(good, root)
+            first = subprocess.run([sys.executable, "-B", str(SCRIPT)] + arguments, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stdout)
+            drafts.write_text(json.dumps({"students": [{"section": 1, "identifier": "Student A", "cites": [],
+                                                         "options": ["{name} did well.", "b", "c"]}]}), encoding="utf-8")
+            refused = subprocess.run([sys.executable, "-B", str(SCRIPT)] + arguments, capture_output=True, text=True)
+            self.assertEqual(refused.returncode, 1)
+            self.assertIn('renamed "earlier run, do not use"', refused.stdout)
+            self.assertEqual(sorted(path.name for path in out.iterdir()),
+                             ["Report Comments - earlier run, do not use.csv", "Report Comments - earlier run, do not use.md"])
+
     def test_every_placeholder_the_contract_names_is_filled_by_the_script(self):
         source = SCRIPT.read_text(encoding="utf-8")
         for placeholder in comment_names()["placeholders"]:
@@ -165,12 +212,12 @@ class CommentNameCaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             table = Path(folder) / "Name Mapping Table.csv"
             table.write_text('section,identifier,name,first name\n1,Student A,"Testfamily, Bartholomewina",\n'
-                             '1,Student B,"Zedfamily, Zoë",Zoë\n', encoding="utf-8")
+                             '1,Student B,"Zedfamily, Qoë",Qoë\n', encoding="utf-8")
             result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--longest-first-name", "--table", str(table)],
                                     capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertIn("The longest first name in your mapping table is 14 characters (14 bytes)", result.stdout)
-            for word in ("Bartholomewina", "Testfamily", "Zedfamily", "Zoë"):
+            for word in ("Bartholomewina", "Testfamily", "Zedfamily", "Qoë"):
                 self.assertNotIn(word.casefold(), (result.stdout + result.stderr).casefold())
 
     def test_a_teachers_notes_are_checked_by_line_number_only(self):
@@ -190,8 +237,8 @@ class CommentNameCaseTests(unittest.TestCase):
             clean = subprocess.run([sys.executable, "-B", str(SCRIPT), "--check-file", str(notes), "--table", str(table)],
                                    capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(clean.returncode, 0, clean.stdout)
-            self.assertIn("none holds a word from your mapping table", clean.stdout)
-            self.assertIn("is not found", clean.stdout, "the clean line must say what it cannot find")
+            self.assertIn("and found none", clean.stdout)
+            self.assertIn("cannot see a nickname", clean.stdout, "the line must say what it cannot see")
 
     def test_its_own_self_test_passes(self):
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--self-test"], capture_output=True, text=True)
@@ -255,6 +302,21 @@ class SkillFileTests(unittest.TestCase):
             self.assertIn("{first name}", example)
             self.assertIsNone(re.search(r"\b(he|she|his|her|him|hers)\b", example, re.IGNORECASE), example)
             self.assertLessEqual(len(example.replace("{first name}", "Bartholomewina")), 450, example)
+
+    def test_the_shipped_scripts_keep_to_what_python_3_9_has(self):
+        # 752 implementation review H2: Path.write_text(newline=) is 3.10+, and macOS's own python3 is 3.9, so
+        # --comments crashed there and the self-test, which the marking skill makes a gate, failed.
+        for skill in ("plantoir-marking", "plantoir-report-comments", "plantoir-test-authoring"):
+            for path in sorted((SKILLS / skill).rglob("*.py")):
+                source = path.read_text(encoding="utf-8")
+                self.assertIsNone(re.search(r"\.(write_text|read_text)\([^)]*newline=", source), str(path))
+                self.assertIsNone(re.search(r"zip\([^)]*strict=", source), str(path))
+                self.assertIsNone(re.search(r"^\s*match \S.*:\s*$", source, re.MULTILINE), str(path))
+
+    @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no /usr/bin/python3 here (macOS's own Python)")
+    def test_the_self_test_passes_on_the_systems_own_python(self):
+        result = subprocess.run(["/usr/bin/python3", "-B", str(SCRIPT), "--self-test"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_no_file_carries_a_firearms_context(self):
         for path in sorted(SKILL.rglob("*")):

@@ -5275,7 +5275,8 @@ the trail, because it would be student data.
   path) to `Quarantine/`, counting both. Since the 750a review (H3) it
   tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
   a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
-  and XMP; it reports read and clean, moved, and NOT checked by kind, and
+  and XMP; it reports read with no word from the table found (it said "read
+  and clean" until the 752 review, H1), moved, and NOT checked by kind, and
   exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
   file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
   name were "checked, 0 held a name", and a folder named by a name stayed
@@ -5376,8 +5377,15 @@ script, because two copies of the name step drift.
   own notes, written by identifier in `Teacher Notes.md` and read only
   after `make_named_copies.py --check-file` (through the runner) finds no
   word of the mapping table in them. That check prints line numbers, never
-  the words, and its clean line says what it cannot find (a nickname, a name
-  the table does not hold).
+  the words, and counts EVERY part of two letters or more on its own,
+  surnames too, as the runner does, because it decides what the assistant
+  may read. It never calls a file clean: when it finds nothing it says what
+  it looked for, and that a nickname, initials or a name not in the table
+  cannot be seen by it, so the teacher reads the notes once first. MEASURED
+  by the implementation review (H1): with the first rule (a short part only
+  beside another part of its name), notes reading "Student A: Ixo led the
+  group project well." were reported clean, exit 0, and would have been read
+  and sent to the AI service; a three-letter first name is common.
 - **Whose shape.** The teacher's How I Teach page first, then the school's
   own report convention, ASKED: the limit and whether the system counts
   characters or bytes, line breaks, who the comment speaks about and in what
@@ -5399,19 +5407,35 @@ script, because two copies of the name step drift.
   assistant does not know them and must not hold them. Only when the
   teacher says the table has a `pronouns` column may a draft use `{they}`,
   `{them}`, `{their}`, `{theirs}` (capitalised at a sentence's start),
-  filled from that column (`she/her`, `he/him`, `they/them` or four words);
-  a pronoun placeholder with no column, or with an empty value, refuses the
-  run. The first name is the `first name` column, else the part after the
+  filled from that column (`she/her`, `he/him`, `they/them`, the same with a
+  third word such as `she/her/hers`, or four words); a pronoun placeholder
+  with no column, or with an empty value, refuses the run. A verb that
+  changes with the pronoun (is, was, are, were, has, have, does, do, their
+  negatives, a contraction) straight after `{they}` is REFUSED at the draft,
+  whatever the table holds. MEASURED by the review (M2): with they/them the
+  first version wrote "They was proud of their work, and they is
+  improving.", which is the misgendering the rule exists to avoid.
+  REJECTED: conjugating the verb at the fill, because a refusal can be
+  proved by cases and a conjugator for every verb cannot. The first name is the `first name` column, else the part after the
   comma of "Last, First", and otherwise refused, never guessed from a name
   with no comma.
 - **A name in a draft.** `--comments` refuses the whole run, writing
   nothing, when a draft already holds a word from the table before the
   names go in: in an option (named by option and word number, never the
   word), in another field of the student's entry such as `cites`, or on a
-  line of `Comments - Drafts.md` beside it. It compares as the runner does
-  (case and accents off; a part of four letters or more as a whole word, six
-  or more inside a word, two or three only beside another part of the same
-  name). This is what catches a comment that quotes a student's work
+  line of `Comments - Drafts.md` beside it. It compares case and accents
+  off, with every part of a first name as a whole word at ANY length of two
+  letters or more (review H1: "{first name} and Ixo compared answers" was
+  written into another child's comment, because a short part counted only
+  beside another part of its name), any part of six letters or more inside a
+  word, and a surname's part of four or more as a whole word and of two or
+  three only beside another part of its name, so a surname such as To does
+  not refuse every comment. It also refuses a `cites` entry that is not that
+  student's own record (`Section N/<identifier>.json`, or the teacher's
+  notes): MEASURED by the review (M1), Student A's comment citing Student
+  AA's record, or Section 2's Student A drafted under Section 1, was written
+  with exit 0, and the reviewer given "the records they cite" would have
+  checked it against the wrong child. This is what catches a comment that quotes a student's work
   holding their own or a classmate's name. The runner cannot, because the
   drafts existed before the run and it looks only at what a run writes in
   the marking folder. An everyday word that is also a name (May, Will) is
@@ -5422,9 +5446,12 @@ script, because two copies of the name step drift.
   one that looks over can fit with a short one; only the filled text counts.
   It is counted in Unicode characters of the NFC text, or UTF-8 bytes with
   `--count bytes`, because report systems differ and a system that counts
-  bytes counts an accented letter as two. MEASURED (`commentNames.cases`,
-  20, every comment typed and counted by hand): `Zoë` is 3 characters and 4
-  bytes; a table that holds it decomposed (e and a combining diaeresis)
+  bytes counts an accented letter as two (a web form counting UTF-16 units
+  counts some emoji as two, and a line break is one or two: the skill names
+  both when it asks). MEASURED (`commentNames.cases`, 30, every comment
+  typed and counted by hand; the invented names are made-up words such as
+  Qoë and Ixo, so the name check before a merge does not meet a real given
+  name): `Qoë` is 3 characters and 4 bytes; a table that holds it decomposed (e and a combining diaeresis)
   counts 3 only after NFC; a 47-character draft for a 14-letter first name
   is 2 over a limit of 47. `--longest-first-name` prints the longest first
   name's length in characters and bytes for the budget, never the name. A
@@ -5433,8 +5460,20 @@ script, because two copies of the name step drift.
   The line saying every comment is within the limit is printed only after
   each was counted. `Report Comments.csv` is UTF-8 with a byte order mark
   so a spreadsheet opens the accents; it and `Report Comments.md` go only
-  into the teacher-only folder, with the full name beside the identifier
-  for finding each student in the report system.
+  into the teacher-only folder that holds the mapping table (review L1: any
+  folder outside the marking folder was taken, and the line saying where the
+  names went was printed regardless), with the full name beside the
+  identifier for finding each student in the report system. A refused run
+  renames an earlier run's files "earlier run, do not use" (L2), and the
+  run names, by identifier, any student of a drafted section the drafts
+  left out (L4).
+- **Python 3.9.** MEASURED by the review (H2): `/usr/bin/python3` on macOS
+  is 3.9.6, and `Path.write_text(newline=)` is 3.10, so `--comments`
+  crashed there and the self-test, which the marking skill makes a gate,
+  failed, blocking 750a's named sheets too. The file is now written with
+  `open(..., newline="")`; every `--self-test` of both skills, and every
+  marking test, passes on 3.9.6 and 3.14.4, and a test guards the shipped
+  scripts against `write_text(newline=)`, `zip(strict=)` and `match`.
 - **Tests.** `scripts/test_marking_comments.py` runs every case directly and
   through the runner (which must withhold no line and move nothing), checks
   that no word of the table is printed and nothing new is in the marking
@@ -5446,7 +5485,16 @@ script, because two copies of the name step drift.
   because each covers the other), a pronoun filled with no column, the
   drafts page not looked at, an over-limit line carrying the name (directly
   and through the runner), the marking skill without
-  `make_named_copies.py`, and a pinned sentence taken out. `--self-test`
+  `make_named_copies.py`, and a pinned sentence taken out. After the
+  implementation review, each red as well: the beside rule for every short
+  part (the two classmate cases, and three of the four `checkFileCases`),
+  a short surname alone not counted by `--check-file`, the old "clean"
+  line, `write_text(newline=)` (the source guard, and the self-test on
+  `/usr/bin/python3`), `cites` not checked, the verb check removed,
+  three-word pronouns refused, `--out` anywhere, the earlier run left in
+  place, the left-out students not named, and each of seven privacy and
+  refusal sentences the review found unpinned, taken out one at a time.
+  `--self-test`
   now tests the comments always and the named sheets only where tectonic
   and pdftotext are installed, saying which. Before, a missing tectonic
   failed it outright, which would have stopped a teacher who only wants

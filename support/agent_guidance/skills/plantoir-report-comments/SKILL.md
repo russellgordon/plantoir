@@ -99,9 +99,12 @@ already records it:
 
 - the character limit, and whether the report system counts characters or
   bytes (if the teacher does not know: characters; a system that counts
-  bytes counts an accented letter as two). There is no default limit;
+  bytes counts an accented letter as two, and a web form may count an emoji
+  as two, which the script's count of characters does not). There is no
+  default limit;
 - whether it keeps line breaks (if not, or the teacher does not know, each
-  option is one paragraph);
+  option is one paragraph with no line break: a line break is counted, as
+  one character or two);
 - who the comment speaks about or to, and in what tense (about the student
   or to them; past or present);
 - the parts a comment must have (some boards ask for strengths and next
@@ -157,7 +160,10 @@ first.
   wants it in the comments, ask them to write notes by identifier, never
   with a name, in `<Term> Comments/Teacher Notes.md`. Before you read
   them, check them through the runner (section 7), and read them only if
-  it finds no word from the table:
+  it finds no word from the table. The check looks for every part of every
+  name in the table, a two-letter first name too, and cannot see a
+  nickname, initials or a name that is not in the table: ask the teacher to
+  read the notes once for those before you open them.
 
   ```text wrap
   python3 -B .claude/skills/plantoir-marking/scripts/run_with_names.py --table "<teacher-only>/Name Mapping Table.csv" --watch "<marking folder>" --quarantine "<teacher-only>/Quarantine" -- python3 -B "<marking folder>/Scripts/make_named_copies.py" --check-file "<marking folder>/<Term> Comments/Teacher Notes.md" --table "<teacher-only>/Name Mapping Table.csv"
@@ -178,12 +184,13 @@ Only if the teacher tells you that the mapping table has a `pronouns`
 column (the teacher fills it; you never see it), you may write `{they}`,
 `{them}`, `{their}` and `{theirs}`, or `{They}`, `{Them}`, `{Their}` and
 `{Theirs}` at the start of a sentence; the script fills them from that
-column (`she/her`, `he/him`, `they/them`, or four words such as
-`xe/xem/xyr/xyrs`). "They" takes "were" where "she" takes "was", so after a
-pronoun placeholder write only a verb that does not change ("{They}
-explained", never "{They} was" or "{They} is"). The script refuses any
-other placeholder, and refuses a pronoun placeholder the table cannot
-fill.
+column (`she/her`, `he/him`, `they/them`, the same with a third word such
+as `she/her/hers`, or four words such as `xe/xem/xyr/xyrs`). "They" takes
+"were" where "she" takes "was", so after a pronoun placeholder write only a
+verb that does not change ("{They} explained", never "{They} was" or
+"{They} is"): the script refuses a draft with is, was, are, were, has,
+have, does or do after `{they}`, whatever the table holds. It refuses any
+other placeholder too, and a pronoun placeholder the table cannot fill.
 
 ## 7. Length is checked after the names go in
 
@@ -193,7 +200,9 @@ so the script that puts the names in counts every comment again, and the
 count is the one that matters.
 
 Copy `make_named_copies.py` from `plantoir-marking`'s `scripts/` into the
-marking folder's `Scripts/` (if it is not there already) and run its
+marking folder's `Scripts/` (if it is not there already; a copy made before
+report comments existed has no `--comments` and stops with "give --sheets":
+copy the shipped one again and redo that teacher's changes) and run its
 `--self-test`, as `plantoir-marking` section 6 says; check the runner's
 SHA-256 as that section says before the first use in a session. **Every
 script that reads the name mapping table is run through
@@ -218,14 +227,21 @@ script that reads the name mapping table is run through
    (the teacher's limit, and `--count bytes` when their system counts
    bytes). It prints counts and identifiers only. It writes nothing at all
    when any draft needs fixing, and says which: a placeholder it does not
-   know or cannot fill, a student it cannot find, or a draft that already
-   holds a word from the mapping table, which it names by option and word
-   number, never the word. That last may be a name you were not meant to
+   know or cannot fill, a student it cannot find, a cite that is not that
+   student's own record, or a draft that already holds a word from the
+   mapping table (any part of a first name, however short), which it names
+   by option and word number, never the word. That last may be a name you
+   were not meant to
    see, or an everyday word that is also someone's name (May, Will, Stone):
    either way, rewrite that option without the word, and do not repeat it.
    When it names a comment as over the limit, rewrite that option shorter
    and run it again, until it says every comment is within the limit.
-   Never trim a comment by cutting off its end.
+   Never trim a comment by cutting off its end. `--out` must be inside the
+   teacher-only folder that holds the mapping table. When a run is
+   refused, the named files of an earlier run are renamed "earlier run, do
+   not use", so the teacher never mistakes them for the current ones; tell
+   the teacher. It also names, by identifier, any student of a drafted
+   section that the drafts leave out.
 
 Through these steps you learn nothing from the table but numbers and
 identifiers. (`python3 -B`; `python` or `py` on Windows. `.agents/` works
@@ -239,7 +255,9 @@ Write the drafts as `<Term> Comments/Comments.json`:
 {"term": "Term 1", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 1/Student A.json"], "options": ["{first name} ...", "...", "..."]}]}
 ```
 
-`cites` lists the records each student's options draw on. A student with
+`cites` lists the records each student's options draw on: only that
+student's own (`Section N/Student A.json` for Section N's Student A), and
+the teacher's `Teacher Notes.md`; the script refuses any other. A student with
 nothing to draft from has `"options": []`. Then write `Comments -
 Drafts.md` beside it for the teacher: the sentence from section 1 under
 its title, then each identifier with its three options and each one's
@@ -248,8 +266,10 @@ length with the placeholders in.
 - **Calibrate first, on ONE student** the teacher reads and adjusts. Only
   then draft the rest, in the shape they settled.
 - **A reviewer checks every option** before anything is handed over: a
-  separate agent, given only the drafts, the records they cite and the
-  convention in `Marking Settings.md`, never this conversation. It checks
+  separate agent, given only the drafts, the marks records and the
+  convention in `Marking Settings.md`, never this conversation. It opens
+  each student's record by that student's section and identifier, not only
+  by what `cites` says. It checks
   that each option claims nothing its records do not hold, misstates no
   mark or level, carries no name and no pronoun the teacher did not allow,
   follows the convention, and is kind. Fix what it finds. If you cannot
