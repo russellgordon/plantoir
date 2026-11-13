@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The sheets and alerts for the groups on the Reference Courses shelf
 /// (#572, third piece): New Group…, Rename Group…, the question before a
-/// group that holds courses is removed, and a change that did not happen.
+/// group that holds courses is removed (a sheet of facts since #834), Start
+/// the Groups Again, and a change that did not happen.
 /// On a view of its own, beside the sidebar's other presenters, so the
 /// sidebar's chain of modifiers stays one the compiler can read.
 ///
@@ -93,38 +94,38 @@ struct ReferenceGroupPresenter: ViewModifier {
             .sheet(item: renameRequest) { group in
                 ReferenceGroupNameSheet(purpose: .rename(group))
             }
-            .alert(
-                ReferenceGroupWording.removeGroupTitle(group: workspace.removeGroupRequest?.title ?? ""),
-                isPresented: isAskingToRemove
-            ) {
-                // Return presses neither button and Escape is Cancel (the
-                // contract's wording.rule): an alert gives each button ONE
-                // key, so a Cancel that took Return lost Escape (measured,
-                // #832; `QuestionKeysTests`). Destructive, so a Return typed
-                // out of habit never removes a group.
-                Button(ReferenceGroupWording.removeButton, role: .destructive) {
-                    if let group = workspace.removeGroupRequest {
+            // Sheets since #834: one sentence, then the facts as rows, and
+            // Cancel answering both Return and Escape, which an alert could
+            // not give one button (#832). The action takes no key.
+            .sheet(isPresented: isAskingToRemove) {
+                FactsQuestionSheet(
+                    question: ReferenceGroupWording.removeGroupQuestion(
+                        group: workspace.removeGroupRequest?.title ?? "", courseCount: removeGroupCourseCount
+                    ),
+                    identifier: "removeReferenceGroupQuestion",
+                    goAhead: {
+                        if let group = workspace.removeGroupRequest {
+                            workspace.removeGroupRequest = nil
+                            workspace.removeReferenceGroup(group)
+                        }
+                    },
+                    cancel: {
                         workspace.removeGroupRequest = nil
-                        workspace.removeReferenceGroup(group)
                     }
-                }
-                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
-                    workspace.removeGroupRequest = nil
-                }
-            } message: {
-                Text(ReferenceGroupWording.removeGroupMessage(courseCount: removeGroupCourseCount))
+                )
             }
-            .alert(ReferenceGroupWording.startAgainTitle, isPresented: isAskingToStartAgain) {
-                // The same keys as the removal question.
-                Button(ReferenceGroupWording.startAgainButton, role: .destructive) {
-                    workspace.isAskingToStartReferenceGroupsAgain = false
-                    workspace.startReferenceGroupsAgain()
-                }
-                Button(ReferenceGroupWording.cancelButton, role: .cancel) {
-                    workspace.isAskingToStartReferenceGroupsAgain = false
-                }
-            } message: {
-                Text(ReferenceGroupWording.startAgainMessage)
+            .sheet(isPresented: isAskingToStartAgain) {
+                FactsQuestionSheet(
+                    question: ReferenceGroupWording.startAgainQuestion,
+                    identifier: "startReferenceGroupsAgainQuestion",
+                    goAhead: {
+                        workspace.isAskingToStartReferenceGroupsAgain = false
+                        workspace.startReferenceGroupsAgain()
+                    },
+                    cancel: {
+                        workspace.isAskingToStartReferenceGroupsAgain = false
+                    }
+                )
             }
             .alert(workspace.referenceGroupProblem?.title ?? "", isPresented: isShowingAProblem) {
                 Button("OK") {

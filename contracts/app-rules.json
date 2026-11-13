@@ -1382,11 +1382,12 @@
             "--plans",
             "--protect",
             "--change-password",
+            "--password-only",
             "--year",
             "2026"
           ],
           "includeAnswerKeys" : false,
-          "name" : "change the password",
+          "name" : "change the password: saved only, and the dialog offers to share (#833)",
           "year" : 2026
         },
         {
@@ -2564,6 +2565,18 @@
         "meaning" : "With --plans --protect: ask for a new username and password even when one is saved.",
         "usedFor" : "Change Password.",
         "why" : "One credential per course across school years; a new one applies to this year's site once it is shared."
+      },
+      {
+        "flag" : "--send-answer-keys-openly",
+        "meaning" : "With --plans --non-interactive and no password: send the answer keys the lists settle in Shared, which a share with nobody to look otherwise holds back (unitPlanning.share.unattendedKeys).",
+        "usedFor" : "Nothing in the app: a person answers the tables there. A scripted or scheduled share that means to send keys openly.",
+        "why" : "#833 implementation review M2: a key a teacher once dragged into Shared, or the tick, must never put a key in front of anyone with the address when nobody is looking."
+      },
+      {
+        "flag" : "--password-only",
+        "meaning" : "With --plans --protect --change-password: save the new username and password and share nothing; share_plan.py --new-password-waiting marks the year's marker so the bar says the new password is not in use yet.",
+        "usedFor" : "Change Password, which is followed by the dialog that offers Share Again (#833).",
+        "why" : "unitPlanning.share.changePasswordCases: saving and sending are two steps a teacher can see now that every share opens the two tables first."
       },
       {
         "flag" : "--include-answer-keys",

@@ -147,13 +147,14 @@
     PATTERN: a day's materials. A section with the id the lesson card links
     to, "Day n materials", and span.ok "✓ reviewed" ONLY after the review.
     One article.card per handout. Its "Files" row links each PDF in pdfs/
-    beside this page, by its real name with spaces written %20, opening in a
-    new tab:
+    beside this page, and each answer key in Answer Keys/ beside it, by its
+    real name with spaces written %20, opening in a new tab:
 
-      <div><span>Files</span><p><a href="pdfs/Warm-up%20-%20Signs%20of%20Change.pdf" target="_blank">Warm-up</a> · <a href="pdfs/Warm-up%20-%20Signs%20of%20Change%20-%20Answers.pdf" target="_blank">Answers</a></p></div>
+      <div><span>Files</span><p><a href="pdfs/Warm-up%20-%20Signs%20of%20Change.pdf" target="_blank">Warm-up</a> · <a href="Answer%20Keys/Warm-up%20-%20Signs%20of%20Change%20-%20Answers.pdf" target="_blank">Answers</a></p></div>
 
-    Write a link only once the PDF has been copied into pdfs/: every link on
-    this page must open a file that is there.
+    Every answer key, solutions file and marking guide goes in Answer Keys/,
+    never in pdfs/. Write a link only once the PDF has been copied there:
+    every link on this page must open a file that is there.
   -->
   <div class="cards">
     <article class="card"><div class="top"><h3><span class="chip lesson">L1</span> Warm-up</h3><span class="src">One page</span></div>
@@ -200,7 +201,8 @@
   <!--
     PATTERN: an assessment card, article.card.assess with the chip
     span.chip.assess. Its rows say what it covers, and its "Files" row links
-    each version and its solutions in pdfs/, as a day's materials do. The test
+    each version in pdfs/ and its solutions in Answer Keys/, as a day's
+    materials do. The test
     card's last row links the curriculum correlation page.
   -->
   <div class="cards">

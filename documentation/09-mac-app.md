@@ -1302,8 +1302,13 @@ kept the first and lost the second without anybody noticing: the structure
 test pinned the modifier, not the key. The questions now use the destructive
 row of the table: **Escape is Cancel, and Return presses neither button**, so
 a Return typed out of habit still removes, replaces, starts again or shares
-nothing. That is Remove Group, Start the Groups Again, Replace It… and the
-public-address warning, whose Share Without a Password used to take Return.
+nothing. That was #832's answer for Remove Group, Start the Groups Again,
+Replace It… and the public-address warning, whose Share Without a Password
+used to take Return. **Since #834 the first three are sheets, where Cancel
+answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
+below), and so, since #833, is the public-address warning: it comes after
+the two tables before a share and is a `FactsQuestionSheet` too, so its
+Cancel answers Return and Escape.
 `QuestionKeysTests` presses both keys on each, through the real modifiers.
 
 **A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
@@ -1312,11 +1317,73 @@ Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
 console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
 own), measured and pinned, not changed.
 
-**Rejected:** turning the four questions into sheets so that Cancel could keep
-Return as well (four new sheets on the census, a different look from every
-other confirmation on the Mac, for a key that makes no difference to safety);
-and Cancel with Return and no Escape, which is what shipped to `dev` and what
-Russell reported.
+**Rejected in #832:** turning the questions into sheets only so that Cancel
+could keep Return as well; and Cancel with Return and no Escape, which is what
+shipped to `dev` and what Russell reported. #834 then made three of them
+sheets for a reason of its own (below), and with that Cancel got both keys.
+
+### Questions as one sentence and labelled facts (#834)
+
+**Ruled by Russell, 2026-11-13**, of the Replace It… warning: "This dialog
+reads as a wall of text. Separate pertinent information from the message the
+app is trying to convey." The shape, `FactsQuestionSheet` with a
+`FactsQuestion`: a title that asks; ONE short sentence, the message, under it
+in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
+`Form` (`LabeledContent`, the system's own form styling, scrolling off); then
+the action and Cancel. A fact that is missing is no row, never a blank one
+(Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
+accessibility element, so VoiceOver reads the title, the message, then
+"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
+the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
+the action takes no key.
+
+Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
+`message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
+Group (`referenceCourses.groups.wording.removeGroupSentence`, then where its
+courses go, none, one or many with no "(s)", and that no course is removed or
+changed) and Start the Groups Again (`startAgainSentence`, then why, the
+groups you made, what is kept, and that nothing inside the courses changes).
+The one-paragraph keys (`body`, `bodyWithoutADate`, `removeGroupMessageNone`,
+`…One`, `…Many`, `startAgainMessage`) are retired, not kept beside the new
+ones.
+
+**The form's height is its rows'**, by `.fixedSize(horizontal: false,
+vertical: true)`, which is allowed here because a sheet is hosted at the width
+it sets itself (460 points), unlike the detail column ("A blank window"). The
+first version gave the form a height of 30 points a row plus 40; measured in
+`FactsQuestionTests` (the form's scroll view against what it holds), it cut
+off the last row of every question, by 20 to 61 points, most where a
+value wrapped. The test fails on that version and passes on this one.
+
+**The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
+shape inside its dialog. When Obsidian is running, Add Them closes the whole of
+Obsidian, so any OTHER course open in it closes too, and only this course
+opens again; the sentence said neither. `offerWhileOpen` and
+`offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
+line as "label: value" (`closesLabel`/`closesValue`,
+`opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
+`obsidianAddOnsForFigures.wording.closingRule`). The offer stays a dialog,
+because its Don't ask again box is a dialog suppression toggle presented from
+a view of its own (#731), and a dialog's message holds lines, not a form.
+Rejected by Russell: leaving Obsidian alone and telling the teacher to
+restart it; offering both at that moment.
+
+**The Reference Courses heading has a visible button** (Russell, 2026-11-13):
+`ReferenceShelfHeading` draws the title and a borderless `ellipsis.circle`
+menu button that opens exactly the heading's right-click menu (both draw
+`ReferenceShelfHeadingMenu`): New Reference Course…, New Group…, and Start
+the Groups Again… while the arrangement cannot be read. Its accessibility
+label and help are `headingMenuLabel`. It is never disabled and never
+absent while the heading is drawn, because New Reference Course… always
+applies there (the heading itself is drawn only when the shelf holds a course
+or a group). The borderless menu style is the sidebar footer's own control
+look, so AppKit draws its hover and pressed states, and Tab reaches it with
+keyboard navigation on; neither was measured in a unit test, which cannot
+hover or open a menu. `FactsQuestionTests` measures that the button is drawn
+inside the heading and enabled, and pins that both doors draw one list. A
+row's own group menu (Rename Group…, Remove Group…) and Move to Group stay on
+the rows and in the Course menu: the heading's button is the door for the
+shelf as a whole.
 
 **Identifiers in the two tabs.** The Planning tab, the share bar, the
 Coverage tab's header and both tabs' empty states carried an
@@ -10256,14 +10323,14 @@ real courses; nor does the assistant, which has no tool for it.
 Replace It… first asks whether the course can be replaced at all (it must be
 a reference course, not previewing or being copied, and not open in
 Obsidian), and says why not where the door says its other problems. Then the
-warning: title `wording.title`, body `wording.body`, which gives the
-sections, pages and size, the day the folder was made, the name the backup
-will have in Backups (the folder's), and that restoring that backup puts the
-old course back in place of the new one (plan review M9). Escape is Cancel
-and Return presses neither button (#832: the shape that made Cancel the
-default took Escape off it; see "Return and Escape in this release's
-questions"). Composed by `ReferenceReplacer.offer`; the alert is the
-shared `ReplaceReferenceCourseAlert`.
+warning, a facts sheet since #834: title `wording.title`, the sentence
+`wording.message`, and rows for the sections, pages and size, the day the
+folder was made (absent when it cannot be read), the name the backup will
+have in Backups (the folder's), and that restoring that backup undoes it
+(plan review M9). Cancel is the default and answers Return and Escape (see
+"Questions as one sentence and labelled facts (#834)"). Composed by
+`ReferenceReplacer.offer`; presented by the shared
+`ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
 **The order is the design.** `ReferenceReplacer.replace`:
 
@@ -10453,7 +10520,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (Escape is Cancel; Return presses neither button, #832). It MOVES the unreadable file aside to
+read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by
@@ -15861,23 +15928,68 @@ this is the app's half.
   `words.lastShareUnfinished` (the plans may be open), and one in state
   `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
   (`PlanSharing.barStatus`, `barCases`).
-- **Before an open share goes out** the launcher lists every file it will
-  share and every file it leaves out, by name, and asks. The app reads the
-  lists from their marker lines (`PlanShareLists`, kept out of the console)
-  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
-  scrolling, the by-name sentence, Share and Cancel with Cancel the default
-  and Escape Cancel too, by `.onExitCommand` (#832: the sheet's
-  `.interactiveDismissDisabled()` had left Escape doing nothing)
-  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
-  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **Before EVERY share (#833)** the launcher lists the plan's documents, each
+  with where it starts, and asks. The app reads one JSON marker line per
+  document (`PlanShareLists`, `PlanShareDocument`, kept out of the console)
+  and answers ONLY in `PlanShareListsSheet` (`TaskProgressView
+  .questionSurface`; fix review H1): two `NSTableView`s side by side
+  (`PlanShareDocumentTable`), Shared and Not shared, each with Name, Unit,
+  Folder, Kind and Note columns, the system's sort indicator (each table
+  sorts on its own; by unit in the plan's order, then name, at first),
+  alternating rows, type-to-select and multiple selection. **Moving a
+  document**: drag one row or several to the other table (the whole table is
+  the drop target); the chevron buttons between the tables; ⌘→ and ⌘←; or
+  the context menu's Don't Share or Share, which shows the same keys. Every
+  move is said to VoiceOver (`PlanShareAnnouncer`, an announcement request).
+  A file of a kind no share takes cannot be dragged or moved. An answer key
+  in Shared in a share with no password carries a warning symbol and words
+  in its Note, never colour alone. **Filtering**: a standard `NSSearchField`
+  (⌘F) filters both tables by name, unit and kind, with a Unit popup and
+  Answer Keys Only (a popup for a choice of one, a checkbox for yes or no);
+  the headers read "Shared (3 of 12)" while anything is hidden, and the
+  sentence by Share gives the full counts (`PlanShareTablesModel`). Cancel is
+  the default and Escape. On Share the app writes the settled places into
+  the year's marker (`PlanSharing.writeChoices`: a temporary file and
+  rename(2), every other key kept) and only then answers y; a marker it
+  cannot write is answered n.
+
+  **Why `NSTableView`.** Dragging SEVERAL selected rows and dropping on the
+  table rather than on a row are its own data-source calls, and
+  `PlanShareTablesTests.testDraggingSeveralRowsToTheOtherTableMovesThemAll`
+  drives them against two real tables and a private pasteboard. SwiftUI's
+  `Table` was rejected: multi-row drag between two tables could be proved
+  only by driving the window, which no gate allows. **Why the keys are
+  watched rather than hung on buttons:** `KeyEquivalentPlacementScanTests`
+  keeps character shortcuts off buttons in views (#457), so the search
+  field's coordinator watches its own window's key presses for ⌘F, ⌘→ and
+  ⌘← (passing ⌘→ and ⌘← through while the cursor is in a text field) and
+  removes the watcher with the field; the context menu shows the arrows so
+  the keys can be found. Not measured: the drag itself by hand, VoiceOver's
+  reading, and the sheet's look; those are for the director's look at the
+  window.
 - **A plan's password** is sent from the credential sheet exactly as typed
   (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
-- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
-  comes before a choice exactly when `PlanSharing.warns` says
-  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
-  nothing and runs nothing. Share Without a Password is the destructive
-  button, so Escape is Cancel and Return presses neither (#832: it used to
-  take Return).
+- **The warning** is owed exactly when `PlanSharing.warns` says
+  (`warningCases`), and since #833 it comes AFTER the tables: their Share
+  opens #834's `FactsQuestionSheet` with `PlanSharing.warningQuestion` (the
+  title asks, one sentence, then the rows from `PlanSharing.warningRows`, the
+  answer-key row only when a key sits in Shared): Cancel answers Return and
+  Escape and goes back to the tables. The one-
+  paragraph `crawlerWarning` and `answerKeysClause` are retired. Cancel at
+  the Stop Sharing alert writes nothing and runs nothing.
+- **Change Password** (#833, `changePasswordCases`) runs `--change-password
+  --password-only`: the console asks for the new password, nothing is
+  shared, and when the run printed `PLANTOIR_PLAN_PASSWORD_SAVED: … waiting`
+  (`ScriptRunner.planPasswordSaved`) the console sheet asks
+  `PlanSharing.newPasswordQuestion` on the same `FactsQuestionSheet`, with
+  `goAheadIsTheDefault`: Share Again takes Return (Russell's choice; it goes
+  through `PlanShareRunner.shareAgain`, the bar's own path, the tables first)
+  and Later takes Escape. `goAheadIsTheDefault` is false for every other
+  question, which keeps Cancel on Return and Escape.
+  The bar shows `words.newPasswordNotInUse` while the marker says
+  `newPasswordWaiting`, so a relaunch, a failed share or a declined one
+  keeps it; `changePasswordNote` stays as the button's tooltip, no longer the
+  only place the fact is said.
 - **The run** is `PlanShareRunner`: `deploy.sh` with
   `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
   `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
@@ -15894,11 +16006,12 @@ this is the app's half.
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
-  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
-  Never the address, whose suffix is a line of defence, and never a username
-  or a password. The plan asked for the share line to say whether the
-  warning had been shown and the password changed; the markers do not carry
-  either, so the line does not, and that is a known gap for a later piece.
+  "unit plans shared" (since #833 with how many documents went and how many
+  were held back), "unit plan share refused", "unit plan sharing stopped",
+  and "unit plan password changed" (#833). Never the address, whose suffix
+  is a line of defence, never a file's name, and never a username or a
+  password. Whether the warning was shown is still not on the share line:
+  the marker does not carry it.
 - **A reference copy** of the course renames every year's marker aside
   (`PlanSharing.releasePlanMarkers`, called by
   `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the

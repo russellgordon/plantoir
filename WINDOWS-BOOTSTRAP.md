@@ -34,6 +34,15 @@ Do not start changing code until he has seen it. The plan should say, briefly:
 Once he has agreed, **work autonomously**: implement, test, and write up as you
 go, without stopping to ask permission for each step.
 
+**For release work, direct it the way the Mac session does** (Russell,
+2026-11-13: "I want the Windows agent to work like you do"). Invoke the
+[`direct-release` skill](.claude/skills/direct-release/SKILL.md): the main
+session runs on Fable and directs, Opus agents implement and review, the
+merged tree is gated before it reaches `dev`, and decisions go to Russell
+through the question dialog. `CLAUDE.md` rule 6's 2026-11-10 widening covers
+a director on this platform too, so a director here merges its own gated
+pieces into `dev`; a cut still starts with him asking.
+
 ---
 
 ## 1. Read these, in this order

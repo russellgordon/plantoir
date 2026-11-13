@@ -25,6 +25,13 @@ import XCTest
 /// already closed on Escape (SwiftUI closes a sheet that has no Cancel of
 /// its own), measured, so it is pinned here and not changed.
 ///
+/// **Since #834** Replace It…, Remove Group and Start the Groups Again are
+/// `FactsQuestionSheet`s, where Cancel answers BOTH keys (`.defaultButton`
+/// for Return, the sheet's `.onExitCommand` for Escape) and the action takes
+/// none, as Russell first asked. Since #833 the public-address warning is
+/// one too, after the two tables, and the dialog after Change Password is
+/// one whose Share Again is the default (Russell) and Later is Escape.
+///
 /// Measured failing on the code before #832: put
 /// `.keyboardShortcut(.defaultAction)` back under any question's Cancel
 /// (Escape stops closing it), take `role: .destructive` off the public
@@ -65,8 +72,9 @@ final class QuestionKeysTests: XCTestCase {
             Color.white
                 .sheet(isPresented: $answers.showing) {
                     PlanShareListsSheet(
-                        lists: PlanShareLists(shared: ["index.html"], leftOut: ["unit-1/answers.html"]),
-                        onShare: {
+                        lists: QuestionKeysTests.oneDocument(),
+                        warnsBeforeSharing: false,
+                        onShare: { (_: PlanShareTablesModel) in
                             answers.answer = "share"
                             answers.showing = false
                         },
@@ -77,6 +85,52 @@ final class QuestionKeysTests: XCTestCase {
                     )
                 }
         }
+    }
+
+    /// A question with its facts, as the tables' sheet presents the
+    /// public-address warning and the console presents the dialog after
+    /// Change Password (#833, on #834's sheet).
+    struct FactsPage: View {
+
+        // MARK: - Stored properties
+
+        let question: FactsQuestion
+        let goAheadIsTheDefault: Bool
+        let answers: Answers
+
+        // MARK: - Body
+
+        var body: some View {
+            @Bindable var answers = answers
+            Color.white
+                .sheet(isPresented: $answers.showing) {
+                    FactsQuestionSheet(
+                        question: question,
+                        identifier: "test",
+                        goAheadIsTheDefault: goAheadIsTheDefault,
+                        goAhead: {
+                            answers.answer = "go"
+                            answers.showing = false
+                        },
+                        cancel: {
+                            answers.answer = "cancel"
+                            answers.showing = false
+                        }
+                    )
+                }
+        }
+    }
+
+    /// The tables' rows, one document.
+    static func oneDocument() -> PlanShareLists {
+        var lists: PlanShareLists = PlanShareLists()
+        lists.year = 2026
+        lists.documents = [
+            PlanShareDocument(place: "unit-1/pdfs/Quiz 1.pdf", name: "Quiz 1.pdf", unit: "unit-1", unitOrder: 0,
+                              folder: "pdfs", kind: "PDF", answerKey: nil, movable: true, start: .shared),
+        ]
+        lists.isComplete = true
+        return lists
     }
 
     /// The share's console, presented as `PlanShareBar` presents it.
@@ -107,7 +161,16 @@ final class QuestionKeysTests: XCTestCase {
         // MARK: - Stored properties
 
         @State var warning: ReferenceReplacer.Warning? = ReferenceReplacer.Warning(
-            folderName: "EXC2O", title: "Replace EXC2O?", message: "A message."
+            folderName: "EXC2O", title: "Replace EXC2O in 2025–26?",
+            question: FactsQuestion(
+                title: "Replace EXC2O in 2025–26?",
+                message: ReferenceReplaceWording.message,
+                rows: ReferenceReplaceWording.rows(
+                    sections: "1 section", pages: "2 pages", size: "4 KB", date: "12 November 2026", folder: "EXC2O"
+                ),
+                action: ReferenceReplaceWording.confirmButton,
+                cancel: ReferenceReplaceWording.cancelButton
+            )
         )
 
         let replaced: Answers
@@ -253,84 +316,129 @@ final class QuestionKeysTests: XCTestCase {
         XCTAssertFalse(actedOn(), "\(what): Escape pressed \(action)")
     }
 
+    /// A facts sheet's keys as a teacher meets them (#834): Return and
+    /// Escape each close it through Cancel, and neither goes ahead. Each key
+    /// is pressed on a question opened afresh by `open`, which hands back
+    /// the window, whether it is still asked, and whether it went ahead.
+    func checkCancelAnswersBothKeys(
+        what: String,
+        open: () throws -> (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool)
+    ) rethrows {
+        for key in [Key.returnKey, Key.escape] {
+            let shown: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
+            XCTAssertTrue(shown.stillAsked(), "\(what): the question was not asked")
+            press(key, in: shown.window)
+            XCTAssertTrue(runUntil(timeout: 3) { !shown.stillAsked() }, "\(what): \(key) did not close the question")
+            _ = runUntil(timeout: 0.3) { false }
+            XCTAssertFalse(shown.wentAhead(), "\(what): \(key) went ahead instead of cancelling")
+            close(shown.window)
+        }
+    }
+
+    /// The trail as it stands, so a test can tell whether going ahead wrote
+    /// its line.
+    var trailNow: String {
+        return ActivityTrail.store.activityText(includingPrompts: false)
+    }
+
     // MARK: - Tests
 
-    func testEscapeClosesTheRemoveGroupQuestionAndReturnRemovesNothing() throws {
+    func testReturnAndEscapeAreCancelOnTheRemoveGroupQuestion() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
-        workspace.workspaceURL = root
-        let group: ReferenceShelfGroup = ReferenceShelfGroup(
-            group: ReferenceShelf.Group(place: .made("g-0000a001"), title: "Electives", folderNames: []),
-            courses: []
-        )
-        workspace.removeGroupRequest = group
-        let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
-        defer {
-            close(window)
+        try checkCancelAnswersBothKeys(what: "Remove Group") {
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.workspaceURL = root
+            workspace.removeGroupRequest = ReferenceShelfGroup(
+                group: ReferenceShelf.Group(place: .made("g-0000a001"), title: "Electives", folderNames: []),
+                courses: []
+            )
+            let before: String = trailNow
+            let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
+            return (window: window,
+                    stillAsked: { return workspace.removeGroupRequest != nil },
+                    wentAhead: { return self.trailNow != before || workspace.referenceGroupProblem != nil })
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceGroupWording.removeButton, cancel: ReferenceGroupWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return workspace.referenceGroupProblem != nil },
-            what: "Remove Group"
-        )
-        XCTAssertNil(workspace.removeGroupRequest, "Cancel cleared the request")
     }
 
-    func testEscapeClosesStartTheGroupsAgainAndReturnStartsNothing() throws {
+    func testReturnAndEscapeAreCancelOnStartTheGroupsAgain() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
-        workspace.workspaceURL = root
-        workspace.isAskingToStartReferenceGroupsAgain = true
-        let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
-        defer {
-            close(window)
+        try checkCancelAnswersBothKeys(what: "Start the Groups Again") {
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.workspaceURL = root
+            workspace.isAskingToStartReferenceGroupsAgain = true
+            let before: String = trailNow
+            let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
+            return (window: window,
+                    stillAsked: { return workspace.isAskingToStartReferenceGroupsAgain },
+                    wentAhead: { return self.trailNow != before || workspace.referenceGroupProblem != nil })
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceGroupWording.startAgainButton, cancel: ReferenceGroupWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return workspace.referenceGroupProblem != nil },
-            what: "Start the Groups Again"
-        )
-        XCTAssertFalse(workspace.isAskingToStartReferenceGroupsAgain)
     }
 
-    func testEscapeClosesTheReplaceWarningAndReturnReplacesNothing() {
+    func testReturnAndEscapeAreCancelOnTheReplaceWarning() {
+        checkCancelAnswersBothKeys(what: "Replace It…") {
+            let replaced: Answers = Answers()
+            let page: ReplacePage = ReplacePage(replaced: replaced)
+            let window: NSWindow = windowShowing(page)
+            return (window: window,
+                    stillAsked: { return window.attachedSheet != nil },
+                    wentAhead: { return replaced.answer == "replace" })
+        }
+    }
+
+    /// The facts sheet itself: its action button carries no key, and Cancel
+    /// is the default, measured on the buttons AppKit draws for it.
+    func testTheFactsSheetsActionTakesNoKey() {
         let replaced: Answers = Answers()
         let window: NSWindow = windowShowing(ReplacePage(replaced: replaced))
         defer {
             close(window)
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceReplaceWording.confirmButton, cancel: ReferenceReplaceWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return replaced.answer == "replace" },
-            what: "Replace It…"
-        )
+        let keys: [String: String] = buttonKeys(in: window)
+        if let action = keys[ReferenceReplaceWording.confirmButton] {
+            XCTAssertEqual(action, "", "Replace answers a key (\(keys))")
+        }
+        if let cancel = keys[ReferenceReplaceWording.cancelButton] {
+            XCTAssertEqual(cancel, "\r", "Cancel is not the default (\(keys))")
+        }
     }
 
     /// The public-address warning: Share Without a Password used to take
-    /// Return (the note in #832).
-    func testThePublicAddressWarningSharesNothingOnReturn() throws {
-        let root: URL = try FixtureWorkspace.materialize()
-        rootURL = root
-        let courses: [Course] = try WorkspaceModel.discoverCourses(in: root.appendingPathComponent("courses"))
-        let course: Course = try XCTUnwrap(courses.first)
-        let bar: PlanShareBar = PlanShareBar(course: course, folder: root, choiceAwaitingTheWarning: .shareOpen)
-        let window: NSWindow = windowShowing(bar.frame(width: 640, height: 200))
-        defer {
+    /// Return (the note in #832). Since #833 it comes after the two tables,
+    /// on #834's sheet, where Cancel answers Return and Escape.
+    func testReturnAndEscapeAreCancelOnThePublicAddressWarning() {
+        checkCancelAnswersBothKeys(what: "the public-address warning") {
+            let answers: Answers = Answers()
+            let page: FactsPage = FactsPage(
+                question: PlanSharing.warningQuestion(shared: 3, heldBack: 1, keysInShared: 1),
+                goAheadIsTheDefault: false,
+                answers: answers
+            )
+            let window: NSWindow = windowShowing(page)
+            return (window: window,
+                    stillAsked: { return window.attachedSheet != nil },
+                    wentAhead: { return answers.answer == "go" })
+        }
+    }
+
+    /// After Change Password (#833): Share Again is the default, Russell's
+    /// choice, and Escape is Later.
+    func testReturnIsShareAgainAndEscapeIsLaterAfterChangePassword() {
+        let expected: [(Key, String)] = [(Key.returnKey, "go"), (Key.escape, "cancel")]
+        for (key, answer) in expected {
+            let answers: Answers = Answers()
+            let page: FactsPage = FactsPage(
+                question: PlanSharing.newPasswordQuestion(earlierYearShared: true),
+                goAheadIsTheDefault: true,
+                answers: answers
+            )
+            let window: NSWindow = windowShowing(page)
+            press(key, in: window)
+            XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(key) did not answer the dialog")
+            XCTAssertEqual(answers.answer, answer, "\(key) after Change Password")
             close(window)
         }
-        checkTheAlertKeys(
-            in: window, action: PlanSharingWording.shareAnyway, cancel: "Cancel",
-            stillAsked: { return window.attachedSheet != nil },
-            // A share that started would open its console sheet in place
-            // of the warning, and leave its marker in the course.
-            actedOn: { return !PlanSharing.markers(courseDirectory: course.directoryURL).isEmpty },
-            what: "the public-address warning"
-        )
     }
 
     func testTheTwoListsSheetTakesReturnAndEscapeAsCancel() {

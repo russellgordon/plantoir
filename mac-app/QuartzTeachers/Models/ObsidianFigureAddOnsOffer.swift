@@ -48,13 +48,23 @@ nonisolated enum ObsidianFigureAddOnsWording {
     static let offerMessage: String = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button. Obsidian then opens its settings in a window of its own, showing the add-ons switched on; close that window and carry on."
 
     /// Added under the offer when the course is open in Obsidian now.
-    static let offerWhileOpen: String = "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept."
+    static let offerWhileOpen: String = "{course} is open in Obsidian now, so adding them closes Obsidian and opens it again."
 
     /// Added under the offer instead when Obsidian is running and Plantoir
     /// cannot tell whether the course is open in it (#742): its list of
     /// vaults is there but cannot be read. Add Them still closes Obsidian,
     /// so this says only what is known to be true.
-    static let offerWhileObsidianIsOpen: String = "Obsidian is open now, so it closes and opens again to show them. What you've written is kept."
+    static let offerWhileObsidianIsOpen: String = "Obsidian is open now, so adding them closes it and opens it again."
+
+    /// The facts under either sentence, a line each (#834, Russell on #742):
+    /// Add Them closes the whole of Obsidian, so every other course open in
+    /// it closes too, and only this course opens again.
+    static let closesLabel: String = "Closes"
+    static let closesValue: String = "Obsidian, with every course open in it, not only {course}"
+    static let opensAgainLabel: String = "Opens again"
+    static let opensAgainValue: String = "{course} only"
+    static let keptLabel: String = "Kept"
+    static let keptValue: String = "Everything you have written"
 
     /// The offer's answers.
     static let offerAdd: String = "Add Them"
@@ -83,12 +93,34 @@ nonisolated enum ObsidianFigureAddOnsWording {
         switch openState {
         case .open:
             text += "\n\n" + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: course)
+            text += "\n" + ObsidianFigureAddOnsWording.closingLines(course: course)
         case .cannotTell:
             text += "\n\n" + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen, course: course)
+            text += "\n" + ObsidianFigureAddOnsWording.closingLines(course: course)
         case .closed:
             break
         }
         return text
+    }
+
+    /// What closes, what opens again and what is kept, as labelled facts
+    /// (`closingRule`).
+    static func closingRows(course: String) -> [FactsQuestionRow] {
+        return [
+            FactsQuestionRow(label: closesLabel, value: filling(closesValue, course: course)),
+            FactsQuestionRow(label: opensAgainLabel, value: filling(opensAgainValue, course: course)),
+            FactsQuestionRow(label: keptLabel, value: filling(keptValue, course: course)),
+        ]
+    }
+
+    /// The same facts as the lines of the dialog's message: the offer is a
+    /// dialog with a Don't ask again box (#731), which holds no form.
+    static func closingLines(course: String) -> String {
+        var lines: [String] = []
+        for row in closingRows(course: course) {
+            lines.append(row.label + ": " + row.value)
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// A sentence with the course's code in it.

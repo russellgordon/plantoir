@@ -4,11 +4,12 @@ import SwiftUI
 /// shared by the three doors that offer Replace It…: the New Course wizard,
 /// Keep a Copy for Reference… and a one-course import.
 ///
-/// Escape is Cancel, and Return presses neither button, so a Return never
-/// replaces anything; Replace is the destructive one. (Until #832 Cancel
-/// carried Return, which in an alert takes Escape off it: measured, the
-/// warning could not be closed with Escape.) Nothing is made, backed up or
-/// moved until Replace is pressed.
+/// A sheet since #834 (Russell: "This dialog reads as a wall of text"): the
+/// title asks, one sentence says the new course takes the old one's place,
+/// and the facts are rows (what is being replaced, the day it was kept, the
+/// backup's name and how to undo). Cancel answers Return and Escape, which an
+/// alert could not give one button (#832); Replace takes no key. Nothing is
+/// made, backed up or moved until Replace is pressed.
 struct ReplaceReferenceCourseAlert: ViewModifier {
 
     // MARK: - Stored properties
@@ -20,41 +21,22 @@ struct ReplaceReferenceCourseAlert: ViewModifier {
     /// pressed.
     let onReplace: (String) -> Void
 
-    // MARK: - Computed properties
-
-    var isPresented: Binding<Bool> {
-        return Binding(
-            get: {
-                return warning != nil
-            },
-            set: { isShowing in
-                if !isShowing {
-                    warning = nil
-                }
-            }
-        )
-    }
-
     // MARK: - Functions
 
     func body(content: Content) -> some View {
         content
-            .alert(
-                warning?.title ?? "",
-                isPresented: isPresented,
-                presenting: warning
-            ) { shown in
-                Button(ReferenceReplaceWording.confirmButton, role: .destructive) {
-                    onReplace(shown.folderName)
-                }
-                .accessibilityIdentifier("replaceReferenceCourseConfirm")
-                // Escape is Cancel; Return presses neither (#832): an alert
-                // gives each button one key, and a Cancel given Return
-                // lost Escape (measured, `QuestionKeysTests`).
-                Button(ReferenceReplaceWording.cancelButton, role: .cancel) {
-                }
-            } message: { shown in
-                Text(shown.message)
+            .sheet(item: $warning) { (shown: ReferenceReplacer.Warning) in
+                FactsQuestionSheet(
+                    question: shown.question,
+                    identifier: "replaceReferenceCourse",
+                    goAhead: {
+                        warning = nil
+                        onReplace(shown.folderName)
+                    },
+                    cancel: {
+                        warning = nil
+                    }
+                )
             }
     }
 }
