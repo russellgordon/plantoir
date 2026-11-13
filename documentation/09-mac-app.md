@@ -6189,8 +6189,9 @@ built app: New Course's wizard up on a selected section, Section ▸ Deploy…
 greyed, ⇧⌘D did nothing, no deploy line on the trail.
 `MenuKeysBehindASheetTests` sends a real ⇧⌘D to the real window: the control
 press (no sheet) must reach the item, the press with a sheet must not; with
-both guards removed it went red (Deploy ran twice behind the sheet).
-Synthesising the key needs `charactersIgnoringModifiers: "d"` — "D" matched
+both guards removed it went red (Deploy ran twice behind the sheet). It
+skips, saying so, when another app takes the front midway (#846, "Another app
+taking the front midway" below). Synthesising the key needs `charactersIgnoringModifiers: "d"` — "D" matched
 nothing, measured.
 
 ### Key equivalents
@@ -15050,6 +15051,57 @@ unlocked reading, so the two are the same record. The first locked gate run
 settles it: 8 skips naming #315 and 0 failures means the key fired; the old
 16 failures mean it did not, and `IOConsoleLocked` is the fallback. Either
 way the result is a failure or a skip with a reason, never a silent pass.
+
+### Another app taking the front midway: `MenuKeysBehindASheetTests` (#846)
+
+`MenuKeysBehindASheetTests` reads the REAL menu's enabled state, and the menu
+bar takes its focused values from the key window of the ACTIVE app. An app
+that is not active has no key window at all, so its File menu sees no
+Plantoir window and shows the no-window rule: Open Working Folder… and Open
+Recent live, because with no window they open one. Deploy… stays grey either
+way, since it needs a selected section. That is exactly the gate's failure on
+2026-11-13: Open Working Folder… and both Open Recent entries "enabled while
+a sheet is up", Deploy… grey.
+
+**Measured, 2026-11-13, this Mac**, by logging `NSApp.isActive`,
+`NSApp.keyWindow` and the items at each step: with the app active and the
+sheet key, every item read grey; after another app came forward, the host was
+inactive, the key window was nil and the Open items read live; brought back,
+the sheet was key again and they read grey again. So the product is right:
+its menu cannot be used while another app is in front, and is validated
+again when it returns. The fault was in the test. Runs of the unchanged
+class, one launch each:
+
+| Condition | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Ordinary (another program's browser activating itself now and then) | 12 | 11 | 7 |
+| The Finder in front at the start | 9 | 0 | 1 |
+| The Finder brought forward once, 1.2 s after the host came forward | 0 | 9 | 1 |
+
+**What the test does now.** The rule for this window is asserted from the
+window's own model (`SubjectMenuRules.enabledItems` over
+`MenuSituation.assemble(workspace:…)` is empty with a sheet up), which holds
+whatever is in front. The real menu is read only while the host has stayed
+active since the control press (`ActiveAppWatch` records
+`didResignActiveNotification`, so a front taken and given back still counts)
+and the sheet is its key window; the check and the reads and key presses
+after it run with no `await` between them, so nothing can change in between.
+Otherwise the test skips with `frontWasTakenReason`. It never takes the
+front back to pass.
+
+**Rejected:** a wait or a retry until the menu reads grey (it would pass or
+fail on how soon the other app let go); taking the front again before the
+read (steals the keyboard from the person at the Mac, and only narrows the
+window); dropping the real-menu read and keeping only the rule (the read is
+what proves `.disabled` reaches SwiftUI's menu items, Open Recent's entries
+included).
+
+**Neighbours.** No other class reads the menu's enabled state:
+`MenuBarTreeTests` reads titles, keys and dividers only.
+`AssistRevealsSectionOnScreenTests`, the other class that activates the
+host, asserts on the model's selection, not on anything the front decides.
+`SaveEnablesTests` reads controls inside the window through accessibility,
+which does not depend on the key window.
 
 ## Testing: the unit test host shows nothing on any display (#633)
 
