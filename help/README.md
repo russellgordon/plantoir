@@ -85,8 +85,13 @@ every page, caption and alt text is written by Fable from a fact sheet
     search box) are in `interface-words.json`, by key: reword them there.
 12. **Search on the web** folds plurals and endings ("classes" finds class
     pages, "scheduled" finds schedule, "quizzes" finds quiz) and ranks a page
-    whose title or id holds the words first. Keywords still help: put the
-    words a teacher would type in `keywords:`.
+    whose title, question or keywords hold the words above one whose body
+    only mentions them. Keywords still help: put the words a teacher would
+    type in `keywords:`, a common misspelling included ("Cloudfare"), since
+    the search does not guess at spelling. A keyword of two or more words
+    that a query says outright ("snow day") counts extra.
+    **Two searches.** The web copy (plantoir.app/help, Windows) runs this ranking;
+    Help Viewer on the Mac runs Apple's own index, which we do not control.
 13. **Step numbers in prose.** Do not refer to a step by its number ("in
     step 4") on a page with an `{{assistant}}` run among its steps: the web
     copy renumbers the steps, and nothing checks numbers in prose. Say "the
@@ -426,24 +431,31 @@ and in a folder on the web alike. Once deployed at plantoir.app/help/, each
 id. Every page has a search form that sends `?q=` to the contents page, which
 lists the matches with `assets/search.js` (without scripts, the form lands on
 the contents); only the contents page loads `search-index.js`. The index holds
-each page's text as RENDERED, so menu paths, control labels, shortcuts and
+each page's question from the outline (checked for withheld words on every
+page, since it is searchable) and its text as RENDERED, so menu paths, control labels, shortcuts and
 `{{say:}}` sentences are searchable; hidden Windows runs and the interface
 words are left out. The search stems words (-s, -ies, -ed, -ing, and a
 final e on both sides, so "classes" meets "class" and
 "scheduled" meets "schedule"), drops small words ("how", "do", "I", "my",
 "after"), lets the last word match as the start of a word, and matches a key
-symbol inside a shortcut (⌘P finds ⇧⌘P). Pages need not hold every word: they
-rank by how many query words they hold, then by how much of the page's id and
-title the query covers, then by where the words are and how rare each is
-across the pages. A floor drops pages holding fewer than half the query's
-words when some hold at least half, and at most ten results are shown with a
-line counting the rest (`interface-words.json` → `searchMore`). Measured over
-the real stubs, with the switch on in a copy: ten teacher queries ("how do I
-deploy my site", "print a worksheet", "Coverage tab", "GitHub Copilot",
-"classes", "scheduled deploy", "how do I hide pages from students", "my
-students can't see the new page", "change the dates of my classes after a
-snow day", "make room for a class") each put the right page first
-(`test_build_help.py`). Fuzzy matching of misspellings was not built: it is a
+symbol inside a shortcut (⌘P finds ⇧⌘P). Pages need not hold every word. Each query word scores by
+where the page holds it (title 5, question 4, keywords 4, description 2, body
+1) times how rare it is across the pages, so a word nearly every page holds
+("page", "student") carries almost nothing; the best keyword phrase the query
+says outright adds its words' weight again; a page whose id and short title
+the query covers gains a share of the query's weight. Pages scoring below 0.4
+of the best are dropped, and at most ten results are shown with a line
+counting the rest (`interface-words.json` → `searchMore`). The first ranking
+(how many words a page held, then title and id) was tuned on stubs, whose
+text was little more than the question; on the 73 written pages it put
+`page-settings` above `missing-page` for "my students can't see the new page"
+(common words in long bodies decided it) and returned 26 pages for a snow-day
+question, so it was replaced. `test_build_help.py` holds twelve queries
+measured on the stubs and twenty-seven written against the written pages
+(misspellings, plurals, symptoms, menu item names), each with the page that
+must come first. Rejected: a floor by count of words held (a long query of
+common words kept dozens of pages), and counting every matching keyword
+phrase (a page listing "answer key" and "answer keys" scored twice). Fuzzy matching of misspellings was not built: it is a
 product choice for Russell. The assistant section, its pages and its contents heading are
 left out, and absent from the search index, while `facts.json` →
 `assistantOnTheWeb` is false. The site's integration (`website/build.py`

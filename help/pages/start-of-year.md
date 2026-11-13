@@ -10,6 +10,7 @@ covers:
 keywords:
 - start of the year
 - start of year
+- start of the school year
 - new school year
 - new year
 - new semester

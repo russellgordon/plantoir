@@ -543,8 +543,8 @@ class PageRenderer:
 
     def render_page(self, page: Page) -> str:
         self.scan_web(self.head(page.title, page.keywords, page.description, page.indexed), page, 1)
-        if page.is_stub:
-            self.scan_web(html.escape(page.question), page, 1)
+        # Every page's question is in the web search index, so it is checked on every page.
+        self.scan_web(html.escape(page.question), page, 1)
         parts: List[str] = [
             self.head(page.title, page.keywords, page.description, page.indexed),
             "<body>",

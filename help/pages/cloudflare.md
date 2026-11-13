@@ -13,6 +13,7 @@ covers:
 keywords:
 - Cloudflare
 - Cloudflare Pages
+- Cloudfare
 - pages.dev
 - account ID
 - API token
