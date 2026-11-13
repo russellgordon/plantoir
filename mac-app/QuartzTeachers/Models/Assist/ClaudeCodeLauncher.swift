@@ -303,6 +303,22 @@ nonisolated enum ClaudeCodeLauncher {
     static let howITeachGreetingSentence: String =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me."
 
+    /// The sentence that has the session tell the teacher it can make printed
+    /// handouts (#859), verbatim from `contracts/app-rules.json` →
+    /// `outsideAgents.greetingHandoutsSentence`.
+    ///
+    /// Said on EVERY door, for every assistant: the Revise greeting, Fix
+    /// with's message and Plan a Unit's message each carry it straight after
+    /// the sentence that holds every change until the teacher agrees. The same
+    /// in every session, because the `plantoir-handouts` guide is always
+    /// written into the working folder, so nothing is read from the disk at
+    /// the click. It names neither marking nor report comments, which are
+    /// never advertised in a greeting.
+    static let handoutsGreetingSentence: String =
+        "In your first reply, also tell me in one sentence that you can make printed handouts, "
+        + "worksheets and quizzes for this course, each with its answer key, as good-looking PDFs "
+        + "with diagrams and graphs, following the plantoir-handouts guide."
+
     /// The opening message. It names the course and points at the plan tools,
     /// because the safety of every write here depends on a plan being shown to
     /// the teacher first — and an assistant that starts by reading is far more
@@ -332,6 +348,11 @@ nonisolated enum ClaudeCodeLauncher {
         text.append(ClaudeCodeLauncher.howITeachGreetingSentence + " ")
         text.append("Before changing anything, use the matching plan tool first and show me what it says, ")
         text.append("in plain words, and wait for me to agree.")
+        // The handouts sentence (#859) comes straight after the plan-first
+        // sentence, before the reference courses and the unit plans, so the
+        // greeting with reference courses is still the plain greeting, a
+        // space and that sentence (`greetingReferenceCourses.casesHow`).
+        text.append(" " + ClaudeCodeLauncher.handoutsGreetingSentence)
         // **Decision (s): the two Revise doors are NOT offered on a reference
         // course. Instead a LIVE course's session is told the reference
         // courses exist**, so the agent's first reply can tell the teacher

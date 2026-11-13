@@ -4993,6 +4993,10 @@ brackets cut at `fixWith.courseNameMaxCharacters`, on one line), asks for
 greeting, and the guide's three opening questions, and holds the build until
 the teacher says go. It says "guide" rather than the assistants' own word
 because the teacher reads the message in the terminal as their own words.
+Since #859 its last sentence, after "Do not build anything until I say go.",
+is `greetingHandoutsSentence`, which every door carries
+(`documentation/10-local-ai-assistant.md` → "A sentence on every door:
+printed handouts (#859)").
 A door that did not open shows the door's could-not-start sentence. Once it
 has opened, `ActivityTrail` writes "asked an assistant to plan a unit"
 (`{course} · asked {assistant} to plan a unit from the Planning tab`).
