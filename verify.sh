@@ -384,6 +384,13 @@ else
   cat /tmp/verify_deploy_sh_destination_test.log
 fi
 
+if (cd scripts && python3 test_fetch_obsidian_addons.py) >/tmp/verify_fetch_obsidian_addons_test.log 2>&1; then
+  pass "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract, the escaped NULs #780 keeps in it included (scripts/test_fetch_obsidian_addons.py, #864)"
+else
+  fail "mac-app/Vendor/fetch-obsidian-addons.sh reads every pin out of the real contract (scripts/test_fetch_obsidian_addons.py, #864)"
+  cat /tmp/verify_fetch_obsidian_addons_test.log
+fi
+
 if (cd scripts && python3 test_setup_course_deploy_target.py) >/tmp/verify_setup_deploy_target_test.log 2>&1; then
   pass "setup_course.py: a re-run keeps the destination the new-course window wrote, and a command-line course is given none (scripts/test_setup_course_deploy_target.py, #668)"
 else
