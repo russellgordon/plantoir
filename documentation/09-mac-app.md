@@ -4557,11 +4557,12 @@ the trail, because it would be student data.
   R2).** Four points before any student work is opened: whatever is read
   goes to the AI service (with where to turn model training off, and the
   school's policy); identifiers only; a script boxes the name line of each
-  page whose blank test has a name blank and stops a page that does not
-  line up with it, and the teacher looks at ONE check sheet of every
-  page's top before the assistant reads anything, which the assistant
-  never opens (since Russell's ruling below; before it, a "name box check"
-  and a skim of the blanked papers); a name written anywhere else is not
+  page whose blank test has a name blank and puts the boxed papers in one
+  file, and the teacher looks through every page of it before the
+  assistant reads anything, which the assistant never opens, and the yes
+  is recorded and checked (since the third fixes round below; before it, a
+  check sheet of page tops, and before that a "name box check" and a
+  skim); a name written anywhere else is not
   boxed and is seen; a name seen is never repeated (the identifier and page only,
   `NAME VISIBLE page N` in `checks`); the files written stay on the
   computer. REJECTED: v1's "scans are redacted ... what I write stays on
@@ -4673,7 +4674,9 @@ the trail, because it would be student data.
   A limit, said in the skill: a rotation of 1.5 degrees is stopped
   although no ink survived it, since 0.1 in at the box's corners is about
   one degree.
-- **Russell's ruling, 2026-11-12: the teacher's eyes are the proof.**
+- **Russell's ruling, 2026-11-12: the teacher's eyes are the proof** (the
+  second fixes round; its registration gate, check sheet and warning were
+  then removed by the third, below).
   Two rounds of review kept finding names that survived while the script
   reported success (faint pencil, yellow highlighter, a surname after a
   gap, a Name blank drawn as underscores), and the fix review measured that
@@ -4719,6 +4722,49 @@ the trail, because it would be student data.
     paper, holes, two folds, a staple with grain), and of the branch's own
     written cases scaled 99 percent, turned 0.5 degrees and the paper marks
     warn; a name written under the name line warns, as it must.
+- **The redaction step, simple (the third fixes round; Russell,
+  2026-11-12, on #750: "script runs, teacher checks the papers, confirms
+  names are redacted, then agent based marking begins. Simple." and
+  "Teacher confirms full redacted papers.").** The review of the second
+  round MEASURED that registration by ink profile stopped 8 of 8 papers
+  with answers written to the foot of a page, with false reasons ("shrunk
+  by about 13 percent"), and that the read-back line-up stopped clean
+  house-style papers; every clever check had failed on papers unlike its
+  fixtures. So `redact_scans.py` went from 1,221 lines to 809 and does
+  three things:
+  - **The box comes from the blank test only**: its own text and drawing,
+    a label (Name, Student Name, Nom, any case; not "School Name" or
+    "Partner Name") followed by a place to write (a rule, underscores,
+    dots typed as one word or many, a table cell, a frame); a sentence
+    starting with Name is an instruction, not a blank; no blank anywhere,
+    or two on a page, stops and asks. The whole line, margin to margin,
+    from 0.35 in above the label to 18 pt below, on every page that
+    corresponds, in proportion to the scanned page's size. MEASURED: the
+    six drawn styles and the five label cases of the fixtures box as the
+    contract's `boxCases` say.
+  - **Only checks that need no judgement**: the page count is whole copies
+    of the blank's, and each page is the same way round and within 6
+    percent of its blank page's shape. A shifted, shrunk or upside-down
+    page is NOT detected, and the skill says so: on papers with answers to
+    the foot of every page, upright, speckled and 0.15 in shifts keep the
+    name in the box on both fixture blanks, while a 0.40 in shift, a 94
+    percent shrink and an upside-down page leave it showing, which is what
+    the teacher's look is for.
+  - **One file and a recorded yes**: the last batch is cleared; the boxed
+    papers and `Redacted papers to look through.pdf` (each paper after a
+    page naming it) are written in a holding folder on the teacher's side
+    and moved into place only when all are written, so a failure leaves no
+    paper where the assistant reads (MEASURED with a failing `pdfunite`).
+    The teacher looks through every page; `--confirm` records the yes
+    against the files' SHA-256 only when the combined file exists, so an
+    advance yes cannot be recorded; `--verify` is run before any paper is
+    read in any session and fails on a new batch, a changed file or a
+    record left from another batch.
+  REJECTED: registration, the read-back line-up, the ink warning and the
+  check sheet of page tops (the full papers are what the teacher looks
+  through). The runner now never passes a two- or three-letter surname
+  that appears on its own (750a fix review 2, M4): such a line is withheld
+  and such a file moved, counted, with exit 1.
 - **A whole class in one scan (review M4).** `--stack` splits it with
   Poppler into `Paper 01.pdf ...` in the teacher-only folder and writes
   `Papers to name.pdf`; the teacher fills a `paper` column in the mapping
