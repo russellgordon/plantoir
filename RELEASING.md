@@ -509,7 +509,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    - Credentials stored in notarytool: `xcrun notarytool store-credentials "notarytool-profile" --apple-id <email> --team-id <team-id> --password <app-specific-password>`
 
    The script builds Release, checks the BUILT bundle's update keys
-   (`release/check-update-keys.sh`: the feed, the public key, ask-first), signs
+   (`release/check-update-keys.sh`: the feed, the public key, ask-first),
+   refuses a bundle that carries compiled Python in its toolchain
+   (`release/check-no-bytecode.sh`, #747: a `__pycache__` or `.pyc` would
+   rename the website builder's image on every Mac), signs
    the updater's own code item by item (`release/sign-updater.sh`: Autoupdate,
    Updater.app, the framework last — never `--deep`, never the app's
    entitlements), then dylibs and executables bottom-up with Hardened Runtime,
