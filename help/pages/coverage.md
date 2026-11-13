@@ -41,9 +41,9 @@ A course that has a page for each curriculum expectation can show which expectat
 
 In the example course, the page Testing Conductivity in the Investigations folder is written this way.
 
-Showing the expectation's page this way is what counts. An expectation's code typed as plain words in a lesson counts for nothing.
+Showing the expectation's page this way, with the exclamation mark in front, is what counts. It counts wherever it is on the page. A plain link, such as `[[D2.1]]` or `[[D2.1|circuits]]`, does not count. Neither does an expectation's code typed as plain words.
 
-The Curriculum connection part of a page is never printed.
+The heading does not make anything count. It keeps this part of the page off paper: the Curriculum connection part of a page is never printed.
 
 ## Which pages count
 
@@ -91,5 +91,5 @@ The map is made each time the section is previewed or deployed. To make it witho
 - **The tab says this:**
   {{say:shared-rules#coverageTab.tab.words.emptyOtherVersion}}
 - **There is no {{control:coverageTab}} tab.** The course's curriculum folder holds no expectation page.
-- **A lesson is missing from the map.** Check that the lesson links to the expectation's page, and that a class page leads to the lesson.
+- **A lesson is missing from the map.** Check that the lesson shows the expectation's page with `![[` in front of its name, since a plain link does not count. Check also that a class page leads to the lesson.
 - **The tab says the section is being deployed, or that another program is working on the course.** Wait for that to finish.

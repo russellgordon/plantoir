@@ -49,7 +49,7 @@ The section's website gains a page named {{control:myProgressTitle}} when at lea
 - It is pinned in the sidebar.
 - A section with no such box has no {{control:myProgressTitle}} page.
 
-If your course has a page of its own named My Progress, yours is used. Plantoir writes nothing over it.
+If your course has a page of its own named My Progress at the top of the course folder, yours is used. Plantoir writes nothing over it. Capital letters in the name do not matter.
 
 ## What students see
 
@@ -68,9 +68,11 @@ Nothing reaches you. You cannot see a student's ticks or counts.
 
 The ticks are kept in one browser, for one website.
 
-- Another computer or another browser starts with empty boxes and counts of zero.
-- If you change the first line of a criterion, its box starts empty again.
-- If you rename or move a page, every box on it starts empty again.
+- Another computer or another browser starts without the student's ticks.
+- If you change the first line of a criterion, its box goes back to how you wrote it.
+- If you rename or move a page, every box on it goes back to how you wrote it.
+
+A box written as `- [ ]`, as in the example above, is empty.
 
 ## If it does not work
 

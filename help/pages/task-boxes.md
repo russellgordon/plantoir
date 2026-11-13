@@ -47,9 +47,11 @@ alt: A checklist on a class page of the class website, with some of its boxes ti
 
 ## What a student may notice
 
-- **Another computer or another browser starts with empty boxes.** The ticks belong to one browser on one website.
-- **A changed item loses its tick.** If you change the first line of an item, its box starts empty again for every student.
-- **A renamed or moved page loses all its ticks.** If you rename the page or move it to another folder, every box on it starts empty again.
+- **Another computer or another browser starts without the student's ticks.** The ticks belong to one browser on one website.
+- **A changed item loses its tick.** If you change the first line of an item, its box goes back to how you wrote it, for every student.
+- **A renamed or moved page loses all its ticks.** If you rename the page or move it to another folder, every box on it goes back to how you wrote it.
+
+A box you wrote as `- [ ]` is empty. A box you wrote as `- [x]` is ticked until a student unticks it.
 
 For this reason, settle a checklist's wording before students start to use it.
 

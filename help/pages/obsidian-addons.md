@@ -24,11 +24,11 @@ The class website does not need the add-ons. It draws diagrams and graphs either
 
 ## The first time Plantoir asks
 
-Plantoir asks once, and your answer applies to every course. The offer appears when you open in Obsidian a course that has such diagrams or graphs. Its title is {{control:addOnsOfferTitle}}
+The offer appears when you open in Obsidian a course that has such diagrams or graphs. Your answer applies to every course. The offer's title is {{control:addOnsOfferTitle}}
 
 - {{control:addOnsAddThem}} adds the add-ons to courses that have diagrams or graphs.
-- {{control:addOnsNotNow}} adds nothing this time.
-- {{control:addOnsDontAskAgain}} is a checkbox. Tick it, and Plantoir does not make the offer again.
+- {{control:addOnsNotNow}} adds nothing. Plantoir does not ask again until the next time it is started.
+- {{control:addOnsDontAskAgain}} is a checkbox. Tick it before you press {{control:addOnsNotNow}}, and Plantoir does not make the offer again.
 
 If Obsidian is open at that moment, the offer says so. It lists what adding them does under {{control:addOnsCloses}}, {{control:addOnsOpensAgain}} and {{control:addOnsKept}}. Obsidian closes, with every course that is open in it. Only this course opens again. Everything you have written is kept.
 

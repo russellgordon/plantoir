@@ -58,6 +58,7 @@ Change it to `publish: false` to hide the page.
 - **A page with no publish line is shown.** A missing line does not hide a page. To keep an unfinished page from students, give it the line with `false`.
 - **Type only `true` or `false`.** Other words are read in ways that may surprise you: `publish: no` and `publish: off` hide a page, and `publish: yes` shows it.
 - **Type `publish`, not `draft`.** Older pages may carry `draft: true`, or a line such as `draftSection1`. In that older form, `true` means hidden, the opposite of `publish`. Plantoir still reads both. The first time it changes such a page, it rewrites the lines in the new form.
+- **In Plantoir, a page in draft is a hidden page.** Some of Plantoir's sheets say that pages go into draft. Plantoir then sets the page's publish line to `false`, in the forms shown above. It does not write a `draft` line.
 - **Students see a change after the next deploy.** Changing a line changes your course. The website students read changes when the section is next deployed. See [Publishing and deploying](page:publish-and-deploy).
 
 ## If the settings cannot be read

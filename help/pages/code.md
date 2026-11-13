@@ -46,10 +46,11 @@ print("Hello,", name)
 
 A block without the word `run` is left as it is: students read it and cannot run it.
 
-Two more words may follow `run`:
+Three more words may follow `run`:
 
 - `readonly`, for Python only, lets students run the program but not change it.
-- `stdin` gives the block a box for the program's input.
+- `autorun` runs the program when the block comes into view on the page, before anyone presses {{control:codeRun}}.
+- `stdin` says that the program reads input. Plantoir notices `input()` in Python and `readLine()` in Swift by itself, so this word is needed only for a program that reads its input another way.
 
 ## Preview it
 
@@ -67,14 +68,24 @@ Python needs nothing more. Swift programs are made ready when the website is mad
 alt: A Python program on the class website with the Run, Stop and Reset buttons under it and its output below.
 
 - **The program.** Students can change a Python program in place. A Swift program can be run but not changed.
-- **A box for input**, when the program reads input with `input()` in Python or `readLine()` in Swift.
-- **{{control:codeRun}}, {{control:codeStop}} and {{control:codeReset}}**, a line that says what is happening, and the program's {{control:codeOutput}}. {{control:codeReset}} puts your own version of the program back.
+- **{{control:codeRun}}, {{control:codeStop}} and {{control:codeReset}}**, a line that says what is happening, and the program's {{control:codeOutput}}. {{control:codeReset}} puts the program back as you, the teacher, wrote it, and clears the output.
 
 Nothing is fetched until a student presses {{control:codeRun}}. Python programs run in the student's own browser.
 
 One program runs on a page at a time. When a student starts a second, the first says:
 
 {{say:shared-rules#codeRunnerBlocks.words.stoppedForAnother}}
+
+## A program that reads input
+
+A program reads input with `input()` in Python or `readLine()` in Swift. In Plantoir's preview, and on a website deployed to Netlify or Cloudflare Pages, the program stops and asks as it runs. Its question appears in the output. The student types the answer there and presses Return, and the program carries on. There is no separate box for input.
+
+In two cases the page cannot stop to ask. A box then appears between the program and the buttons, and the student types every answer into it before pressing {{control:codeRun}}, one line for each answer. The two cases are:
+
+- a website deployed to a folder;
+- a page that also shows a video, a PDF or another web page in a frame, or a picture from another website. Put the program on a page of its own, and students can answer as it asks.
+
+You write the page the same way in every case.
 
 ## Students' changes
 

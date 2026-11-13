@@ -64,8 +64,8 @@ alt: The Printing part of a course's settings, with the school name, the blanks 
 ## Print the handout
 
 1. Preview the section and open the page. The {{control:printButton}} button is on the page's date line, at its right end.
-2. Press {{control:printButton}}. A menu opens. {{control:printPaper}} is at its top, with {{control:printPortrait}} and {{control:printLandscape}}. Under it are the three ways of printing: {{control:printQuestionsOnly}}, {{control:printAnswersOnly}} and {{control:printBoth}}.
-3. Choose one of the three. Nothing prints until you do.
+2. Press {{control:printButton}}. A menu opens. {{control:printPaper}} is at its top, with {{control:printPortrait}} and {{control:printLandscape}}. Under it are the three ways of printing: {{control:printQuestionsOnly}}, {{control:printAnswersOnly}} and {{control:printBoth}}. A page with no answers offers {{control:printQuestionsOnly}} alone.
+3. Choose a way of printing. Nothing prints until you do.
 
 {{picture:printing-2}}
 alt: A printable page on the class website with the Print button's menu open, showing Paper and the three ways of printing.
