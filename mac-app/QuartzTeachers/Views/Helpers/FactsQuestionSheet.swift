@@ -62,6 +62,13 @@ struct FactsQuestionSheet: View {
     /// Prefixes the controls' accessibility identifiers.
     let identifier: String
 
+    /// True only for a question whose going ahead is the safe and expected
+    /// answer, so it is the default and takes Return (#833: after Change
+    /// Password, Share Again sends the new password, and Russell made it the
+    /// default). Cancel then answers Escape alone. False for every question
+    /// before something hard to take back.
+    var goAheadIsTheDefault: Bool = false
+
     let goAhead: () -> Void
     let cancel: () -> Void
 
@@ -93,15 +100,28 @@ struct FactsQuestionSheet: View {
             .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button(question.action, role: .destructive) {
-                    goAhead()
+                // The default button sits on the right, as macOS places it.
+                if goAheadIsTheDefault {
+                    Button(question.cancel, role: .cancel) {
+                        cancel()
+                    }
+                    .accessibilityIdentifier("\(identifier)Cancel")
+                    Button(question.action) {
+                        goAhead()
+                    }
+                    .defaultButton(isEnabled: true)
+                    .accessibilityIdentifier("\(identifier)GoAhead")
+                } else {
+                    Button(question.action, role: .destructive) {
+                        goAhead()
+                    }
+                    .accessibilityIdentifier("\(identifier)GoAhead")
+                    Button(question.cancel, role: .cancel) {
+                        cancel()
+                    }
+                    .defaultButton(isEnabled: true)
+                    .accessibilityIdentifier("\(identifier)Cancel")
                 }
-                .accessibilityIdentifier("\(identifier)GoAhead")
-                Button(question.cancel, role: .cancel) {
-                    cancel()
-                }
-                .defaultButton(isEnabled: true)
-                .accessibilityIdentifier("\(identifier)Cancel")
             }
             .padding([.horizontal, .bottom], 20)
         }

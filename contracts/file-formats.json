@@ -2040,6 +2040,13 @@
     "note": "A course's shared unit plans (#709), one file per school year: written by scripts/share_plan.py and read by the Planning tab's share bar (PlanSharing.markers) and by deploy.sh (whether protection is sticky, whether any year is still shared). Its keys and rules are contracts/shared-rules.json -> unitPlanning.share.markerFile.",
     "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
     "readOnlyExactly": "plans-<four digits>.json. A reference copy renames each aside to plans-<year>.previous-yyyy-MM-dd_HHmmss.json, as releaseSite does a section's marker, and no reader takes that name for a year still shared.",
-    "notASectionsMarker": "It sits beside the section markers in .cloudflare_sites but is not one of firstDeployMarkers.paths: a section's rollover (releaseSite) and Get Ready for the Start of the Year leave it alone."
+    "notASectionsMarker": "It sits beside the section markers in .cloudflare_sites but is not one of firstDeployMarkers.paths: a section's rollover (releaseSite) and Get Ready for the Start of the Year leave it alone.",
+    "keysSince833": {
+      "documents": "an object from a document's place in the plan (a path inside .internal/planning, forward slashes) to \"shared\" or \"notShared\": the teacher's remembered choices (unitPlanning.share.rememberedChoices). Written by the APP as well as by share_plan.py: when the teacher presses Share in the tables, before the share's question is answered, by a temporary file beside the marker and a rename, every other key kept as found. Names only.",
+      "documentsShared": "a whole number: how many listed documents the last share sent.",
+      "documentsHeldBack": "a whole number: how many listed documents the last share held back.",
+      "newPasswordWaiting": "true from a Change Password that saved a new password until a share proves the address (unitPlanning.share.changePasswordCases); absent otherwise. Never the password."
+    },
+    "olderMarkers": "A marker written before #833 has none of keysSince833 and reads as no remembered choices, nothing counted, and no password waiting. A marker holding only `documents` has no address and reads as not shared, to the bar and to deploy.sh's sticky protection alike."
   }
 }

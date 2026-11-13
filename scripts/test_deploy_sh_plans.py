@@ -86,6 +86,10 @@ docker() {
   case " $* " in
     *" -i "*) cat >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin" ;;
   esac
+  case "$*" in
+    # SHARE_RC fails only the share itself, after every step before it.
+    *"share_plan.py"*) return "${SHARE_RC:-${DOCKER_RC:-0}}" ;;
+  esac
   return "${DOCKER_RC:-0}"
 }
 '''
@@ -169,7 +173,7 @@ class PlansModeTests(unittest.TestCase):
     def test_a_plan_flag_without_plans_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = a_folder(tmp)
-            for flag in ("--protect", "--remove-password", "--change-password", "--include-answer-keys", "--stop-sharing"):
+            for flag in ("--protect", "--remove-password", "--change-password", "--password-only", "--include-answer-keys", "--send-answer-keys-openly", "--stop-sharing"):
                 with self.subTest(flag=flag):
                     done = subprocess.run(["bash", str(folder / "deploy.sh"), "SNC2D", "1", flag, "--image", "x"],
                                           capture_output=True, text=True, cwd=str(folder), timeout=60,
@@ -275,6 +279,28 @@ class PlansModeTests(unittest.TestCase):
             self.assertEqual(status, 0, out)
             self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:{PASSWORD}")
 
+    def test_password_only_saves_the_new_password_and_shares_nothing(self):
+        """#833 changePasswordCases: Change Password saves, then the app offers Share Again."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            (folder / "stub" / "plan_item").write_text("old:OldPassword1")
+            status, out = run(folder, ["--protect", "--change-password", "--password-only"], f"{USERNAME}\n{PASSWORD}\n")
+            self.assertEqual(status, 0, out)
+            self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:{PASSWORD}")
+            self.assertIn("--new-password-waiting", docker_args(folder))
+            self.assertNotIn("--credential-file", docker_args(folder))
+            self.assertNotIn(PASSWORD, docker_stdin(folder))
+
+    def test_password_only_goes_only_with_change_password(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            for flags in (["--password-only"], ["--protect", "--password-only"],
+                          ["--change-password", "--password-only", "--include-answer-keys"]):
+                with self.subTest(flags=flags):
+                    status, out = run(folder, flags)
+                    self.assertEqual(status, 1, out)
+                    self.assertIn("--password-only goes with --change-password", out)
+
     def test_protection_is_sticky_through_the_years_marker(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = a_folder(tmp)
@@ -302,7 +328,7 @@ class PlansModeTests(unittest.TestCase):
             folder = a_folder(tmp)
             markers = folder / "courses" / "SNC2D" / ".cloudflare_sites"
             markers.mkdir()
-            (markers / "plans-2025.json").write_text("{}")
+            (markers / "plans-2025.json").write_text(json.dumps({"name": "x", "address": "https://x.pages.dev/"}, indent=2))
             status, out = run(folder, ["--stop-sharing", "--year", "2026", "--non-interactive"])
             self.assertEqual(status, 0, out)
             self.assertIn("--stop", docker_args(folder))
@@ -312,6 +338,57 @@ class PlansModeTests(unittest.TestCase):
             status, out = run(folder, ["--stop-sharing", "--year", "2025", "--non-interactive"])
             self.assertEqual(status, 0, out)
             self.assertTrue((folder / "stub" / "plan_item_deleted").exists())
+
+    def test_a_marker_holding_only_the_choices_is_no_year_still_shared(self):
+        """#833 review L3: the app's choices alone name no site."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            markers = folder / "courses" / "SNC2D" / ".cloudflare_sites"
+            markers.mkdir()
+            (markers / "plans-2027.json").write_text(json.dumps({"documents": {"u/pdfs/A.pdf": "notShared"}}, indent=2))
+            status, out = run(folder, ["--stop-sharing", "--year", "2026", "--non-interactive"])
+            self.assertEqual(status, 0, out)
+            self.assertTrue((folder / "stub" / "plan_item_deleted").exists())
+
+    def test_a_first_protected_share_that_fails_keeps_no_password(self):
+        """#833 review L3: a password asked for a share that never happened."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            for failing in ({"DOCKER_RC": "1"}, {"SHARE_RC": "1"}):
+                with self.subTest(failing=failing):
+                    status, out = run(folder, ["--protect"], f"{USERNAME}\n{PASSWORD}\n", extra_env=failing)
+                    self.assertEqual(status, 1, out)
+                    self.assertFalse((folder / "stub" / "plan_item_set").exists(), "a password nothing uses was kept")
+
+    def test_a_share_that_reached_an_address_keeps_the_password_it_used(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            markers = folder / "courses" / "SNC2D" / ".cloudflare_sites"
+            markers.mkdir()
+            (markers / f"plans-{the_school_year()}.json").write_text(
+                json.dumps({"name": "x", "address": "https://x.pages.dev/", "state": "sending"}, indent=2))
+            status, out = run(folder, ["--protect", "--change-password"], f"{USERNAME}\n{PASSWORD}\n",
+                              extra_env={"SHARE_RC": "1"})
+            self.assertEqual(status, 1, out)
+            self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:{PASSWORD}")
+
+    def test_a_failed_share_keeps_a_password_saved_before_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            (folder / "stub" / "plan_item").write_text(f"{USERNAME}:{PASSWORD}")
+            status, out = run(folder, ["--protect", "--non-interactive"], extra_env={"DOCKER_RC": "1"})
+            self.assertEqual(status, 1, out)
+            self.assertFalse((folder / "stub" / "plan_item_deleted").exists())
+
+    def test_send_answer_keys_openly_reaches_share_plan_and_only_with_a_share(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            status, out = run(folder, ["--send-answer-keys-openly", "--non-interactive"])
+            self.assertEqual(status, 0, out)
+            self.assertIn("--send-answer-keys-openly", docker_args(folder))
+            status, out = run(folder, ["--stop-sharing", "--send-answer-keys-openly"])
+            self.assertEqual(status, 1, out)
+            self.assertIn("--send-answer-keys-openly goes with a share", out)
 
     def test_a_stop_that_cannot_be_confirmed_keeps_the_saved_password(self):
         with tempfile.TemporaryDirectory() as tmp:

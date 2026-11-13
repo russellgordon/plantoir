@@ -28,8 +28,9 @@ import XCTest
 /// **Since #834** Replace It…, Remove Group and Start the Groups Again are
 /// `FactsQuestionSheet`s, where Cancel answers BOTH keys (`.defaultButton`
 /// for Return, the sheet's `.onExitCommand` for Escape) and the action takes
-/// none, as Russell first asked; only the public-address warning is still an
-/// alert, with Escape alone.
+/// none, as Russell first asked. Since #833 the public-address warning is
+/// one too, after the two tables, and the dialog after Change Password is
+/// one whose Share Again is the default (Russell) and Later is Escape.
 ///
 /// Measured failing on the code before #832: put
 /// `.keyboardShortcut(.defaultAction)` back under any question's Cancel
@@ -71,8 +72,9 @@ final class QuestionKeysTests: XCTestCase {
             Color.white
                 .sheet(isPresented: $answers.showing) {
                     PlanShareListsSheet(
-                        lists: PlanShareLists(shared: ["index.html"], leftOut: ["unit-1/answers.html"]),
-                        onShare: {
+                        lists: QuestionKeysTests.oneDocument(),
+                        warnsBeforeSharing: false,
+                        onShare: { (_: PlanShareTablesModel) in
                             answers.answer = "share"
                             answers.showing = false
                         },
@@ -83,6 +85,52 @@ final class QuestionKeysTests: XCTestCase {
                     )
                 }
         }
+    }
+
+    /// A question with its facts, as the tables' sheet presents the
+    /// public-address warning and the console presents the dialog after
+    /// Change Password (#833, on #834's sheet).
+    struct FactsPage: View {
+
+        // MARK: - Stored properties
+
+        let question: FactsQuestion
+        let goAheadIsTheDefault: Bool
+        let answers: Answers
+
+        // MARK: - Body
+
+        var body: some View {
+            @Bindable var answers = answers
+            Color.white
+                .sheet(isPresented: $answers.showing) {
+                    FactsQuestionSheet(
+                        question: question,
+                        identifier: "test",
+                        goAheadIsTheDefault: goAheadIsTheDefault,
+                        goAhead: {
+                            answers.answer = "go"
+                            answers.showing = false
+                        },
+                        cancel: {
+                            answers.answer = "cancel"
+                            answers.showing = false
+                        }
+                    )
+                }
+        }
+    }
+
+    /// The tables' rows, one document.
+    static func oneDocument() -> PlanShareLists {
+        var lists: PlanShareLists = PlanShareLists()
+        lists.year = 2026
+        lists.documents = [
+            PlanShareDocument(place: "unit-1/pdfs/Quiz 1.pdf", name: "Quiz 1.pdf", unit: "unit-1", unitOrder: 0,
+                              folder: "pdfs", kind: "PDF", answerKey: nil, movable: true, start: .shared),
+        ]
+        lists.isComplete = true
+        return lists
     }
 
     /// The share's console, presented as `PlanShareBar` presents it.
@@ -357,25 +405,40 @@ final class QuestionKeysTests: XCTestCase {
     }
 
     /// The public-address warning: Share Without a Password used to take
-    /// Return (the note in #832).
-    func testThePublicAddressWarningSharesNothingOnReturn() throws {
-        let root: URL = try FixtureWorkspace.materialize()
-        rootURL = root
-        let courses: [Course] = try WorkspaceModel.discoverCourses(in: root.appendingPathComponent("courses"))
-        let course: Course = try XCTUnwrap(courses.first)
-        let bar: PlanShareBar = PlanShareBar(course: course, folder: root, choiceAwaitingTheWarning: .shareOpen)
-        let window: NSWindow = windowShowing(bar.frame(width: 640, height: 200))
-        defer {
+    /// Return (the note in #832). Since #833 it comes after the two tables,
+    /// on #834's sheet, where Cancel answers Return and Escape.
+    func testReturnAndEscapeAreCancelOnThePublicAddressWarning() {
+        checkCancelAnswersBothKeys(what: "the public-address warning") {
+            let answers: Answers = Answers()
+            let page: FactsPage = FactsPage(
+                question: PlanSharing.warningQuestion(shared: 3, heldBack: 1, keysInShared: 1),
+                goAheadIsTheDefault: false,
+                answers: answers
+            )
+            let window: NSWindow = windowShowing(page)
+            return (window: window,
+                    stillAsked: { return window.attachedSheet != nil },
+                    wentAhead: { return answers.answer == "go" })
+        }
+    }
+
+    /// After Change Password (#833): Share Again is the default, Russell's
+    /// choice, and Escape is Later.
+    func testReturnIsShareAgainAndEscapeIsLaterAfterChangePassword() {
+        let expected: [(Key, String)] = [(Key.returnKey, "go"), (Key.escape, "cancel")]
+        for (key, answer) in expected {
+            let answers: Answers = Answers()
+            let page: FactsPage = FactsPage(
+                question: PlanSharing.newPasswordQuestion(earlierYearShared: true),
+                goAheadIsTheDefault: true,
+                answers: answers
+            )
+            let window: NSWindow = windowShowing(page)
+            press(key, in: window)
+            XCTAssertTrue(runUntil(timeout: 3) { !answers.showing }, "\(key) did not answer the dialog")
+            XCTAssertEqual(answers.answer, answer, "\(key) after Change Password")
             close(window)
         }
-        checkTheAlertKeys(
-            in: window, action: PlanSharingWording.shareAnyway, cancel: "Cancel",
-            stillAsked: { return window.attachedSheet != nil },
-            // A share that started would open its console sheet in place
-            // of the warning, and leave its marker in the course.
-            actedOn: { return !PlanSharing.markers(courseDirectory: course.directoryURL).isEmpty },
-            what: "the public-address warning"
-        )
     }
 
     func testTheTwoListsSheetTakesReturnAndEscapeAsCancel() {

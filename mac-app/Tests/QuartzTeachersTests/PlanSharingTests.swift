@@ -223,7 +223,7 @@ final class PlanSharingTests: XCTestCase {
         for entry in required {
             names.append(entry["event"] as? String ?? "")
         }
-        for event in [ActivityTrail.Event.unitPlansShared, .unitPlanShareRefused, .unitPlanSharingStopped] {
+        for event in [ActivityTrail.Event.unitPlansShared, .unitPlanShareRefused, .unitPlanSharingStopped, .unitPlanPasswordChanged] {
             XCTAssertTrue(names.contains(event.rawValue), event.rawValue)
         }
     }
@@ -238,6 +238,9 @@ final class PlanSharingTests: XCTestCase {
         runner.receiveOutput("PLANTOIR_PLAN_REFUSED: SNC2D checkFound 4\r\n")
         runner.receiveOutput("PLANTOIR_PLAN_STOPPED: SNC2D 2025 \(address) failed\r\n")
         runner.receiveOutput("PLANTOIR_PLAN_STOPPED: SNC2D 2024 \(address) unconfirmed\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_SHARED: MPM2D 2026 \(address) protected:no failClosed:yes answerKeys:out units:2 oldCopies:0 documents:5 heldBack:2\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_PASSWORD_SAVED: SNC2D 2026 waiting\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_PASSWORD_SAVED: MPM2D 2026 notShared\r\n")
         XCTAssertFalse(runner.transcript.displayText.contains("PLANTOIR_PLAN_"))
         let trail: String = trailText()
         XCTAssertFalse(trail.contains("k3x9qa8m"), "the address reached the trail")
@@ -251,6 +254,13 @@ final class PlanSharingTests: XCTestCase {
         XCTAssertTrue(trail.contains("SNC2D · unit plans not shared: 4 thing(s) in them needed fixing first"), trail)
         XCTAssertTrue(trail.contains("SNC2D · stopped sharing the 2025-26 unit plans (failed, so the address still works)"), trail)
         XCTAssertTrue(trail.contains("SNC2D · stopped sharing the 2024-25 unit plans (not confirmed, so the address may still work)"), trail)
+        XCTAssertTrue(trail.contains(
+            "MPM2D · unit plans for 2026-27 shared to Cloudflare Pages, 2 units, open to anyone with the link, "
+                + "answer keys left out, 5 document(s) shared and 2 held back"
+        ), trail)
+        XCTAssertTrue(trail.contains("SNC2D · new password saved for the 2026-27 unit plans, not in use until they are shared again"), trail)
+        XCTAssertTrue(trail.contains("MPM2D · new password saved for the 2026-27 unit plans, nothing shared yet"), trail)
+        XCTAssertEqual(runner.planPasswordSaved, "notShared", "the last line the run printed")
     }
 
     func testALineThatIsNotAMarkersShapeReportsNothing() {
@@ -271,50 +281,58 @@ final class PlanSharingTests: XCTestCase {
         }
     }
 
-    // MARK: - Tests: the open share's lists (fix review H1)
+    // MARK: - Tests: the lists before every share (#709, #833)
 
     func testTheListsSheetsWordsAndMarkersAreTheContracts() throws {
         let section: [String: Any] = try XCTUnwrap(try PlanSharingTests.share()["openShareLists"] as? [String: Any])
         XCTAssertEqual(section["sheetTitle"] as? String, PlanSharingWording.listsSheetTitle)
-        XCTAssertEqual(section["sharedHeading"] as? String, PlanSharingWording.listsSharedHeading)
-        XCTAssertEqual(section["leftOutHeading"] as? String, PlanSharingWording.listsLeftOutHeading)
-        XCTAssertEqual(section["none"] as? String, PlanSharingWording.listsNone)
         XCTAssertEqual(section["byName"] as? String, PlanSharingWording.listsByName)
         XCTAssertEqual(section["shareButton"] as? String, PlanSharingWording.listsShareButton)
-        let question: String = try XCTUnwrap(section["question"] as? String)
-        XCTAssertTrue(PlanShareLists.isTheListsQuestion(
-            ScriptRunner.separateDefaultAnswer(from: question.trimmingCharacters(in: .whitespaces)).question
-        ))
+        for key in ["question", "questionProtected"] {
+            let question: String = try XCTUnwrap(section[key] as? String)
+            XCTAssertTrue(PlanShareLists.isTheListsQuestion(
+                ScriptRunner.separateDefaultAnswer(from: question.trimmingCharacters(in: .whitespaces)).question
+            ), key)
+        }
         let markers: [String: Any] = try XCTUnwrap(section["markers"] as? [String: Any])
         XCTAssertEqual(markers["begin"] as? String, PlanShareLists.beginMarker)
-        XCTAssertEqual(markers["shared"] as? String, PlanShareLists.sharedMarker)
-        XCTAssertEqual(markers["leftOut"] as? String, PlanShareLists.leftOutMarker)
+        XCTAssertEqual(markers["document"] as? String, PlanShareLists.documentMarker)
         XCTAssertEqual(markers["end"] as? String, PlanShareLists.endMarker)
+        XCTAssertNil(markers["shared"], "the #709 lines are not printed since #833")
     }
 
-    /// The sheet shows what the launcher printed: its marker lines, read
+    /// The tables show what the launcher printed: its marker lines, read
     /// through the real runner, and none of it reaches the console.
-    func testTheSheetsListsAreTheLaunchersMarkerLines() {
+    func testTheSheetsRowsAreTheLaunchersMarkerLines() throws {
         let runner: ScriptRunner = ScriptRunner()
-        runner.receiveOutput("PLANTOIR_PLAN_LISTS_BEGIN:\r\nThese files will be shared with anyone who has the address:\r\n")
-        runner.receiveOutput("   • index.html\r\nPLANTOIR_PLAN_LISTS_SHARED: index.html\r\n")
-        runner.receiveOutput("PLANTOIR_PLAN_LISTS_SHARED: unit/pdfs/Quiz 1, Part A.pdf\r\n")
-        runner.receiveOutput("These files are left out:\r\nPLANTOIR_PLAN_LISTS_LEFT_OUT: unit/pdfs/Quiz 1 - Solutions.pdf\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_LISTS_BEGIN: 2026 protected:no tick:yes ownFiles:14\r\nThese files will be shared with anyone who has the address:\r\n")
+        runner.receiveOutput("   • unit/pdfs/Quiz 1, Part A.pdf\r\n")
+        runner.receiveOutput(#"PLANTOIR_PLAN_LISTS_DOCUMENT: {"place": "unit/pdfs/Quiz 1, Part A.pdf", "name": "Quiz 1, Part A.pdf", "unit": "unit", "unitOrder": 0, "folder": "pdfs", "kind": "PDF", "answerKey": null, "movable": true, "start": "shared"}"# + "\r\n")
+        runner.receiveOutput(#"PLANTOIR_PLAN_LISTS_DOCUMENT: {"place": "unit/Answer Keys/R\u00e9ponses.pdf", "name": "R\u00e9ponses.pdf", "unit": "unit", "unitOrder": 0, "folder": "Answer Keys", "kind": "PDF", "answerKey": "folder", "movable": true, "start": "notShared"}"# + "\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_LISTS_DOCUMENT: not a row\r\n")
         runner.receiveOutput("PLANTOIR_PLAN_LISTS_END:\r\nShare these files with anyone who has the address? [y/N]: ")
-        XCTAssertEqual(runner.planShareLists, PlanShareLists(
-            shared: ["index.html", "unit/pdfs/Quiz 1, Part A.pdf"],
-            leftOut: ["unit/pdfs/Quiz 1 - Solutions.pdf"],
-            isComplete: true
-        ))
+        let lists: PlanShareLists = try XCTUnwrap(runner.planShareLists)
+        XCTAssertTrue(lists.isComplete)
+        XCTAssertEqual(lists.year, 2026)
+        XCTAssertFalse(lists.isProtected)
+        XCTAssertTrue(lists.answerKeysTicked)
+        XCTAssertEqual(lists.ownFiles, 14)
+        XCTAssertEqual(lists.documents.count, 2)
+        XCTAssertEqual(lists.documents[1].name, "Réponses.pdf")
+        XCTAssertEqual(lists.documents[1].answerKey, "folder")
+        XCTAssertEqual(lists.documents[1].start, .notShared)
         XCTAssertFalse(runner.transcript.displayText.contains("PLANTOIR_PLAN_LISTS"))
     }
 
-    /// The open share's question is answered only in the lists' sheet: the
+    /// The share's question is answered only in the tables' sheet: the
     /// plain question alert and the credential sheet never take it.
     func testTheListsQuestionCanOnlyBeAnsweredInTheListsSheet() {
-        let asked = ScriptRunner.separateDefaultAnswer(from: "Share these files with anyone who has the address? [y/N]:")
-        XCTAssertTrue(PlanShareLists.isTheListsQuestion(asked.question))
-        XCTAssertNil(CredentialRequest.matching(asked.question))
+        for line in ["Share these files with anyone who has the address? [y/N]:",
+                     "Share these files with anyone who has the address and the password? [y/N]:"] {
+            let asked = ScriptRunner.separateDefaultAnswer(from: line)
+            XCTAssertTrue(PlanShareLists.isTheListsQuestion(asked.question), line)
+            XCTAssertNil(CredentialRequest.matching(asked.question))
+        }
         let runner: ScriptRunner = ScriptRunner()
         runner.isAwaitingInput = true
         runner.isAskingAboutPlanShareLists = true

@@ -128,6 +128,17 @@ struct TaskProgressView: View {
         case planShareLists
     }
 
+    /// Writes the tables' choices into the year's marker; false when there
+    /// is no course folder to write them in or the write failed.
+    static func writeTheChoices(of model: PlanShareTablesModel, runner: ScriptRunner) -> Bool {
+        guard let course = runner.planShareCourseDirectory, model.lists.year > 0 else {
+            return false
+        }
+        let markerURL: URL = PlanSharing.markerURL(courseDirectory: course, year: model.lists.year)
+        let previous: [String: String] = PlanSharing.rememberedChoices(markerURL: markerURL)
+        return PlanSharing.writeChoices(model.choicesToWrite(previous: previous), to: markerURL)
+    }
+
     static func questionSurface(for runner: ScriptRunner) -> QuestionSurface {
         if !runner.isAwaitingInput {
             return .none
@@ -420,8 +431,13 @@ struct TaskProgressView: View {
         .sheet(isPresented: awaitingPlanShareListsBinding) {
             PlanShareListsSheet(
                 lists: runner.planShareLists ?? PlanShareLists(),
-                onShare: {
-                    runner.send(line: "y")
+                warnsBeforeSharing: runner.planShareWarns,
+                onShare: { (model: PlanShareTablesModel) in
+                    // The places the teacher settled go into the year's
+                    // marker BEFORE the yes (rememberedChoices); a marker
+                    // that cannot be written is a no, never a share that
+                    // ignores the moves.
+                    runner.send(line: TaskProgressView.writeTheChoices(of: model, runner: runner) ? "y" : "n")
                 },
                 onCancel: {
                     runner.send(line: "n")

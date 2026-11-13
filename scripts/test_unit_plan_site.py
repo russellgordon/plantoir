@@ -23,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 os.environ.setdefault("PLANTOIR_CONTRACTS_DIR", str(REPOSITORY / "contracts"))
@@ -188,6 +189,142 @@ class AnswerKeyTests(unittest.TestCase):
         for case in share()["answerKeys"]["cases"]:
             with self.subTest(name=case["name"]):
                 self.assertEqual(unit_plan_site.is_answer_key(case["name"]), case["answerKey"])
+
+
+    def test_the_three_ordinary_names_russell_named_are_not_caught(self):
+        """2026-11-13: the hint shrinks back to the obvious names."""
+        for name in ("Dissolution Lab.pdf", "Keyboard Shortcuts.pdf", "Key Ideas.pdf"):
+            self.assertFalse(unit_plan_site.is_answer_key(name), name)
+
+    def test_every_answer_keys_folder_case(self):
+        for case in share()["answerKeysFolder"]["cases"]:
+            with self.subTest(place=case["place"]):
+                self.assertEqual(unit_plan_site.in_answer_keys_folder(case["place"]), case["inTheFolder"])
+
+
+class DocumentTests(unittest.TestCase):
+    """unitPlanning.share.documents, startingPlace and rememberedChoices
+    (#833): what the two tables list, where each starts, what is kept."""
+
+    def listing_with(self, places):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        folder = a_planning_folder(tmp)
+        for place in places:
+            target = folder / place
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists():
+                target.write_bytes(b"x")
+        return folder, unit_plan_site.list_documents(folder, unit_plan_site.bundled_assets_dir())
+
+    def test_every_document_case(self):
+        places = []
+        loaded = set()
+        shown = ""
+        for case in share()["documents"]["cases"]:
+            places.append(case["place"])
+            if case.get("loadedByAPage"):
+                loaded.add(case["place"])
+                # The unit's own page shows it, as a plan page shows a picture.
+                shown += '<img src="' + quote(case["place"].split("/", 1)[1]) + '" alt="">'
+        folder, listing = self.listing_with(places)
+        if shown:
+            page = folder / "unit" / "index.html"
+            page.write_text(page.read_text(encoding="utf-8").replace("</body>", shown + "\n</body>"), encoding="utf-8")
+            listing = unit_plan_site.list_documents(folder, unit_plan_site.bundled_assets_dir())
+        self.assertEqual(unit_plan_site.loaded_by_pages(folder) & loaded, loaded)
+        by_place = {}
+        for document in listing.documents:
+            by_place[document.place] = document
+        for case in share()["documents"]["cases"]:
+            with self.subTest(place=case["place"]):
+                self.assertEqual(unit_plan_site.class_of(case["place"], None, loaded), case["class"])
+                if case["class"] in ("document", "cannotShare"):
+                    document = by_place[case["place"]]
+                    self.assertEqual(document.movable, case["class"] == "document")
+                    self.assertEqual(document.unit, case["unit"])
+                    self.assertEqual(document.folder, case["folder"])
+                    self.assertEqual(document.name, case["name"])
+                    self.assertEqual(document.kind, case["kind"])
+                    self.assertEqual(document.answer_key, case["answerKey"])
+                else:
+                    self.assertNotIn(case["place"], by_place)
+
+    def test_pages_stylesheets_and_fonts_are_counted_not_listed(self):
+        folder, listing = self.listing_with([])
+        self.assertEqual(listing.documents, [])
+        self.assertGreater(listing.own_files, 5)
+
+    def test_every_starting_place_case(self):
+        for case in share()["startingPlace"]["cases"]:
+            with self.subTest(case=case["name"]):
+                document = unit_plan_site.Document(
+                    place="u/x.pdf", name="x.pdf", unit="u", unit_order=0, folder="", kind="PDF",
+                    answer_key=case["answerKey"], movable=case["class"] == "document")
+                remembered = {}
+                if case["remembered"] is not None:
+                    remembered["u/x.pdf"] = case["remembered"]
+                start = unit_plan_site.starting_place(document, case["protected"], case["tick"], remembered)
+                self.assertEqual(start, case["start"])
+                self.assertEqual(unit_plan_site.mark_of(document), case["mark"])
+                self.assertEqual(unit_plan_site.warns(document, start, case["protected"]), case["warns"])
+
+    def test_every_remembered_choice_case(self):
+        for case in share()["rememberedChoices"]["cases"]:
+            with self.subTest(case=case["name"]):
+                listing = unit_plan_site.Listing()
+                for place in case["listed"]:
+                    listing.documents.append(unit_plan_site.Document(
+                        place=place, name=Path(place).name, unit="u", unit_order=0, folder="",
+                        kind="PDF", answer_key=None, movable=True))
+                choices = dict(unit_plan_site.remembered_choices({"documents": case["before"]}
+                                                                 if case["before"] is not None else {}))
+                choices.update(case["moved"])
+                self.assertEqual(unit_plan_site.kept_choices(choices, listing), case["after"])
+
+    def test_every_advice_case_and_advice_never_refuses(self):
+        for case in share()["advice"]["cases"]:
+            with self.subTest(case=case["name"]):
+                folder, _ = self.listing_with(case["add"])
+                places = []
+                for note in unit_plan_site.advice(folder):
+                    places.append(note.place)
+                    self.assertEqual(note.kind, "keyOutsideFolder")
+                    self.assertIn("Answer Keys", note.detail)
+                self.assertEqual(places, case["advice"])
+                self.assertEqual(kinds_of(unit_plan_site.check(folder, unit_plan_site.bundled_assets_dir())), [])
+
+    def test_the_units_are_in_the_order_the_list_of_plans_links_them(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        folder = a_planning_folder(tmp)
+        shutil.copytree(folder / "unit", folder / "alpha")
+        index = folder / "index.html"
+        index.write_text(index.read_text(encoding="utf-8").replace("</body>", '<a href="alpha/">a</a>\n</body>'),
+                         encoding="utf-8")
+        (folder / "unit" / "pdfs").mkdir(exist_ok=True)
+        (folder / "unit" / "pdfs" / "A.pdf").write_bytes(b"x")
+        (folder / "alpha" / "pdfs").mkdir(exist_ok=True)
+        (folder / "alpha" / "pdfs" / "B.pdf").write_bytes(b"x")
+        orders = {}
+        for document in unit_plan_site.list_documents(folder).documents:
+            orders[document.unit] = document.unit_order
+        self.assertLess(orders["unit"], orders["alpha"], "unit is linked first, so it comes first")
+
+
+class TheVerbIsShareTests(unittest.TestCase):
+
+    def test_no_sentence_a_teacher_reads_says_deploy_or_publish(self):
+        rule = share()["theVerbIsShare"]
+        found = []
+        for block in rule["checks"]:
+            for key, value in share()[block].items():
+                if key == "rule" or not isinstance(value, str):
+                    continue
+                for word in rule["forbidden"]:
+                    if word in value.lower():
+                        found.append(f"{block}.{key}")
+        self.assertEqual(found, [])
 
 
 class NameAndYearTests(unittest.TestCase):

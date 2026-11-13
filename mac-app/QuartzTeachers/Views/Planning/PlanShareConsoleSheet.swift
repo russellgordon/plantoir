@@ -33,5 +33,26 @@ struct PlanShareConsoleSheet: View {
         .padding([.horizontal, .bottom], 20)
         .sheetTitle(PlanSharingWording.consoleSheetTitle)
         .frame(minWidth: 520, minHeight: 320)
+        // After Change Password (#833): the teacher must answer.
+        .sheet(isPresented: Binding(
+            get: { planRunner.isAskingAboutNewPassword },
+            set: { (showing: Bool) in
+                if !showing {
+                    planRunner.isAskingAboutNewPassword = false
+                }
+            }
+        )) {
+            FactsQuestionSheet(
+                question: PlanSharing.newPasswordQuestion(earlierYearShared: planRunner.earlierYearShared),
+                identifier: "planShareNewPassword",
+                goAheadIsTheDefault: true,
+                goAhead: {
+                    planRunner.shareAgain()
+                },
+                cancel: {
+                    planRunner.isAskingAboutNewPassword = false
+                }
+            )
+        }
     }
 }
