@@ -6,7 +6,7 @@ Part of the plantoir-marking skill. A STARTING POINT: copy it into the marking f
 adjust it to this teacher's header (see the two MARK blocks below), run --self-test, and only then use it.
 
     python3 -B redact_scans.py ORIGINALS REDACTED --blank BLANK.pdf --check-dir CHECK [--label "Name"]
-                               [--box x0,y0,x1,y1] [--dpi 150] [--identifiers REGEX]
+                               [--box x0,y0,x1,y1] [--dpi 150]
     python3 -B redact_scans.py --box-from BLANK.pdf [--label "Name"]
     python3 -B redact_scans.py --confirm REDACTED --check-dir CHECK      (only on the teacher's yes)
     python3 -B redact_scans.py --verify REDACTED --check-dir CHECK       (before reading any paper)
@@ -48,7 +48,7 @@ import tempfile
 from pathlib import Path
 
 # MARK: - What you may change for this teacher
-#   the labels (--label, LABELS), the box below (never shrink it), the identifier pattern, the folder and
+#   the labels (--label, LABELS), the box below (never shrink it), the folder and
 #   file names, the wording of the lines it prints (never claiming a name is covered, removed or safe),
 #   and the resolution.
 LABELS = ["Student Name", "Name", "Nom"]   # the words a name blank starts with, any case
@@ -60,7 +60,6 @@ BOX_BELOW_LABEL_PT = 18          # to this far below the label (handwriting fall
 LABEL_SEARCH_DEPTH_IN = 2.0      # the name blank is looked for in the top of each page
 DPI = 150                        # pixels per inch for the boxed pages
 JPEG_QUALITY = 75
-IDENTIFIER = r"^Student [A-Z]{1,2}$"
 SECTION = r"^Section \d+$"
 COMBINED = "Redacted papers to look through.pdf"
 BATCH = "Batch.json"
@@ -79,6 +78,20 @@ PAPERS_TO_NAME = "Papers to name.pdf"
 SHAPE_TOLERANCE = 0.06           # how far a page's height-to-width ratio may differ from its blank page's
 
 TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
+
+
+# >>> The identifier rule. ONE rule, carried byte for byte in every plantoir-marking script that reads an
+# identifier (redact_scans.py, build_test_sheet.py, make_named_copies.py, class_results.py; 750c fix review M1:
+# a loose pattern let a record named like a person through, and the scripts disagreed). An identifier is the
+# WHOLE name, matched in full: Student A to Student ZZ, and nothing else. scripts/test_marking_results.py fails if
+# the copies differ or the contract's assessment.identifiers.pattern is not this one. A teacher whose papers are
+# named another way renames them (redact_scans.py --name-papers does it from the mapping table).
+IDENTIFIER = r"^Student [A-Z]{1,2}$"
+
+
+def is_identifier(text):
+    return isinstance(text, str) and re.fullmatch(IDENTIFIER, text) is not None
+# <<< The identifier rule.
 
 
 class Refusal(Exception):
@@ -652,11 +665,11 @@ def identifier_files(originals, identifier):
             for inner in sorted(entry.iterdir(), key=lambda path: natural(path.name)):
                 if inner.name.startswith("."):
                     continue
-                if inner.is_file() and inner.suffix.lower() == ".pdf" and re.match(identifier, inner.stem):
+                if inner.is_file() and inner.suffix.lower() == ".pdf" and is_identifier(inner.stem):
                     found.append((f"{entry.name}/{inner.stem}", inner))
                 else:
                     left_alone += 1
-        elif entry.is_file() and entry.suffix.lower() == ".pdf" and re.match(identifier, entry.stem):
+        elif entry.is_file() and entry.suffix.lower() == ".pdf" and is_identifier(entry.stem):
             found.append((entry.stem, entry))
         else:
             left_alone += 1
@@ -704,7 +717,7 @@ def name_papers(table, section, into, identifier):
     for row in rows:
         if row.get("section", "") != str(section) or not row.get("paper"):
             continue
-        if not re.match(identifier, row.get("identifier", "")) or not row["paper"].isdigit():
+        if not is_identifier(row.get("identifier", "")) or not row["paper"].isdigit():
             bad_rows += 1
             continue
         plan[f"Paper {int(row['paper']):02d}"] = row["identifier"]
@@ -812,7 +825,7 @@ def main(arguments):
     if "--self-test" in arguments:
         return self_test()
     labels = [option(arguments, "--label")] if option(arguments, "--label") else LABELS
-    identifier = option(arguments, "--identifiers", IDENTIFIER)
+    identifier = IDENTIFIER          # one rule for every script: the identifier block above
     global DPI
     DPI = int(option(arguments, "--dpi", str(DPI)))
     given_box = None

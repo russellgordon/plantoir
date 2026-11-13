@@ -2738,17 +2738,18 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
   09 → "Tests, marking and report comments"), `plantoir-marking` (#750
-  piece 750a, four Python scripts in `scripts/` that an assistant runs
-  against a teacher's scans and the app never does, four templates and two
-  references; `assessment.agentGuidance.markingSkill`, 09 → "Tests,
-  marking and report comments") and `plantoir-report-comments` (#752, a
+  pieces 750a and 750c, five Python scripts in `scripts/` that an assistant
+  runs against a teacher's scans and marks records and the app never does,
+  four templates and three references; `assessment.agentGuidance.markingSkill`
+  and `assessment.results`, 09 → "Tests, marking and report comments") and `plantoir-report-comments` (#752, a
   `SKILL.md` and one reference, no scripts of its own: it uses
   `plantoir-marking`'s `make_named_copies.py --comments` through the
   runner, which needs Python only, neither Poppler nor tectonic;
   `assessment.agentGuidance.reportCommentsSkill`, 09 → the same
   section). A Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
-  `pdfseparate`) and tectonic on PATH; which installs work, and how a
+  `pdfseparate`) and tectonic on PATH (the class results need Python only
+  for their tables, and tectonic and `pdftotext` for their PDF); which installs work, and how a
   teacher gets them, is NOT MEASURED here yet and is the `windows` issue
   for 750a's to measure and write down in this section. The
   handouts skill has an assistant write ONE file inside a course,
