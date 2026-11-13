@@ -319,6 +319,18 @@ class BoxThePapersTests(unittest.TestCase):
         self.assertIn("Moved the 2 papers", printed)
         self.assertNothingLeaked(printed)
 
+    def test_a_path_an_adapted_script_prints_is_never_passed_on(self):
+        # An adapted boxing script may well print the folders it was given; the teacher-only one is put back as
+        # "your teacher-only folder" in every line the launcher prints and in what it writes for the assistant.
+        script = self.a_class.marking / "Scripts" / "redact_scans.py"
+        source = script.read_text(encoding="utf-8")
+        script.write_text(source.replace('if __name__ == "__main__":',
+                                         'if __name__ == "__main__":\n    print("Boxing from " + " ".join(sys.argv[1:3]))', 1),
+                          encoding="utf-8")
+        printed, _status, _killed = box_the_papers(self.a_class, the_folder(self.a_class, "yes"))
+        self.assertIn("Boxing from your teacher-only folder/Unit 1 Test/Originals", printed)
+        self.assertNothingLeaked(printed)
+
     def test_a_refusal_prints_no_name_and_no_path(self):
         os.remove(self.a_class.teacher_only / "Name Mapping Table.csv")
         printed, _status, _killed = box_the_papers(self.a_class, [(FOLDER_PROMPT, str(self.a_class.teacher_only)),
@@ -356,13 +368,17 @@ class BoxThePapersTests(unittest.TestCase):
 
     def test_the_launcher_and_the_script_refuse_without_a_terminal(self):
         # An assistant's command has no terminal: what it would run stops before anything is asked.
-        for command in (["/bin/bash", str(self.a_class.marking / "Box the papers.command")],
-                        ["/bin/bash", str(self.a_class.marking / "Put names on the sheets.command")],
-                        [sys.executable, "-I", "-B", str(TEACHER_ONLY), "box", str(self.a_class.marking)]):
+        # Each layer refuses on its own: the launcher first, and teacher_only.py if it is run past the launcher.
+        for command, refusal in ((["/bin/bash", str(self.a_class.marking / "Box the papers.command")],
+                                  "Stopped: Box the papers is for the teacher to double-click"),
+                                 (["/bin/bash", str(self.a_class.marking / "Put names on the sheets.command")],
+                                  "Stopped: Put names on the sheets is for the teacher to double-click"),
+                                 ([sys.executable, "-I", "-B", str(TEACHER_ONLY), "box", str(self.a_class.marking)],
+                                  "Stopped: this step is for the teacher to run by double-clicking it")):
             result = subprocess.run(command, input=str(self.a_class.teacher_only) + "\nyes\n", capture_output=True,
                                     text=True, cwd=str(self.a_class.marking), env=environment())
             self.assertEqual(result.returncode, 1, result.stdout)
-            self.assertIn("for the teacher", result.stdout)
+            self.assertIn(refusal, result.stdout)
             self.assertNotIn("Drag it", result.stdout)
         self.assertEqual(self.a_class.boxed_papers_in_the_marking_folder(), [])
 
