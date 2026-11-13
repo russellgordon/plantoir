@@ -260,7 +260,8 @@ def generate_card(course_config, section_number, output_path):
     subtitle_text = f"{course_code} S{section_number}" if shows_marker else course_code
 
     emoji_map = (course_config.get("emojis") or {}).get("sections") or {}
-    emoji = emoji_map.get(section_key, "")
+    # The section's label, cleaned by the course name's rule (#822).
+    emoji = course_names.cleaned(str(emoji_map.get(section_key) or "")).strip()
 
     fonts_config = course_config.get("fonts") or {}
     section_fonts = (fonts_config.get("sections") or {}).get(section_key) or fonts_config.get("default") or {}
