@@ -2751,7 +2751,11 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   section). Both are in `held/agent_guidance/skills/`, which
   `AgentGuidance.Write` never reads, so the hold needs no Windows code;
   their Python tests still run in `PythonToolchainTests` from there
-  (`printablePages.agentGuidance.held`, 09 → "Held from v1.10.0"). When
+  (`printablePages.agentGuidance.held`, 09 → "Held from v1.10.0"). Not
+  measured on Windows: `support\**` is copied with `PreserveNewest`, which
+  does not delete a file from `bin\` when it leaves the source, so an
+  incremental build of a clone that built them before may still carry the
+  two folders; build clean before checking the hold. When
   they ship (v1.11.0), a Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
   `pdfseparate`) and tectonic on PATH; which installs work, and how a
