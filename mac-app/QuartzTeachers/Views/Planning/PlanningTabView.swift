@@ -343,12 +343,17 @@ struct PlanningTabView: View {
             chosen: chosenPage,
             planningFolder: planningFolder,
             courseCode: course.code,
-            opener: { (page: URL, done: @escaping @MainActor (Bool) -> Void) in
+            opener: { (page: URL, done: @escaping @MainActor (PlanInTheBrowser.Opening) -> Void) in
                 PlanBrowserOpener.openInTheDefaultBrowser(page, done: done)
             },
-            finished: { (opened: Bool) in
-                if !opened {
+            finished: { (opening: PlanInTheBrowser.Opening) in
+                switch opening {
+                case .opened:
+                    break
+                case .couldNotOpen:
                     browserProblem = PlanInTheBrowser.couldNotOpen
+                case .noBrowser:
+                    browserProblem = PlanInTheBrowser.noBrowser
                 }
             }
         )

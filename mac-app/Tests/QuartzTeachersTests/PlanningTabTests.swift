@@ -192,6 +192,8 @@ final class PlanningTabTests: XCTestCase {
             "openInBrowserPageIsGone": PlanInTheBrowser.pageIsGone,
             "openInBrowserCouldNotOpenTitle": PlanInTheBrowser.couldNotOpenTitle,
             "openInBrowserCouldNotOpen": PlanInTheBrowser.couldNotOpen,
+            "openInBrowserNotAPage": PlanInTheBrowser.notAPage,
+            "openInBrowserNoBrowser": PlanInTheBrowser.noBrowser,
         ]
         XCTAssertEqual(Set(words.keys), Set(mine.keys), "every word in the contract has a constant, and only those")
         for (key, value) in mine {
@@ -515,11 +517,13 @@ final class PlanningTabTests: XCTestCase {
     }
 
     /// A case's `onScreen` or `chosen`: a path resolved against the planning
-    /// folder as a browser resolves it, or an address with its own scheme.
+    /// folder as a browser resolves it, or an address with its own scheme,
+    /// where `{planning}` stands for the planning folder's absolute path.
     private static func address(_ written: Any?, planningFolder: URL) throws -> URL? {
-        guard let text = written as? String else {
+        guard let written = written as? String else {
             return nil
         }
+        let text: String = written.replacingOccurrences(of: "{planning}", with: planningFolder.path)
         let base: URL = URL(fileURLWithPath: planningFolder.path, isDirectory: true)
         return try XCTUnwrap(URL(string: text, relativeTo: base)?.absoluteURL, text)
     }
@@ -527,7 +531,7 @@ final class PlanningTabTests: XCTestCase {
     func testOpenInBrowserOpensAsTheContractSays() throws {
         let block: [String: Any] = try XCTUnwrap(try tab()["openInBrowser"] as? [String: Any])
         let openCases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(openCases.count, 14)
+        XCTAssertGreaterThanOrEqual(openCases.count, 23)
         for (index, testCase) in openCases.enumerated() {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let planning: URL = try planningFolderFor(openCase: testCase, index: index)
@@ -578,15 +582,15 @@ final class PlanningTabTests: XCTestCase {
         try "<html></html>".write(to: correlation, atomically: true, encoding: .utf8)
 
         var handed: [URL] = []
-        var answers: [Bool] = []
-        var browserSays: Bool = true
-        let opener: @MainActor (URL, @escaping @MainActor (Bool) -> Void) -> Void = {
-            (page: URL, done: @escaping @MainActor (Bool) -> Void) in
+        var answers: [PlanInTheBrowser.Opening] = []
+        var browserSays: PlanInTheBrowser.Opening = .opened
+        let opener: @MainActor (URL, @escaping @MainActor (PlanInTheBrowser.Opening) -> Void) -> Void = {
+            (page: URL, done: @escaping @MainActor (PlanInTheBrowser.Opening) -> Void) in
             handed.append(page)
             done(browserSays)
         }
-        let finished: @MainActor (Bool) -> Void = { (opened: Bool) in
-            answers.append(opened)
+        let finished: @MainActor (PlanInTheBrowser.Opening) -> Void = { (opening: PlanInTheBrowser.Opening) in
+            answers.append(opening)
         }
 
         let outside: PlanInTheBrowser.Answer = PlanInTheBrowser.open(
@@ -599,7 +603,14 @@ final class PlanningTabTests: XCTestCase {
             courseCode: "SNC2D", opener: opener, finished: finished
         )
         XCTAssertEqual(web.refusal, .outsideThePlan)
-        XCTAssertEqual(handed, [], "nothing outside the planning folder reaches the browser")
+        let script: URL = unit.appendingPathComponent("run.command")
+        try "echo".write(to: script, atomically: true, encoding: .utf8)
+        let notAPage: PlanInTheBrowser.Answer = PlanInTheBrowser.open(
+            onScreen: script, chosen: correlation, planningFolder: planning,
+            courseCode: "SNC2D", opener: opener, finished: finished
+        )
+        XCTAssertEqual(notAPage.refusal, .notAPage)
+        XCTAssertEqual(handed, [], "nothing outside the planning folder, and nothing but a page, reaches the browser")
         XCTAssertFalse(ActivityTrail.store.activityText(includingPrompts: true).contains("in the browser"))
 
         PlanInTheBrowser.open(
@@ -607,13 +618,13 @@ final class PlanningTabTests: XCTestCase {
             courseCode: "SNC2D", opener: opener, finished: finished
         )
         XCTAssertEqual(handed, [correlation])
-        XCTAssertEqual(answers, [true])
-        browserSays = false
+        XCTAssertEqual(answers, [.opened])
+        browserSays = .couldNotOpen
         PlanInTheBrowser.open(
             onScreen: correlation, chosen: nil, planningFolder: planning,
             courseCode: "SNC2D", opener: opener, finished: finished
         )
-        XCTAssertEqual(answers, [true, false])
+        XCTAssertEqual(answers, [.opened, .couldNotOpen])
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
         let opened: String = PlanInTheBrowser.trailText(courseCode: "SNC2D", kind: .correlation)
@@ -658,5 +669,18 @@ final class PlanningTabTests: XCTestCase {
         XCTAssertTrue(view.contains("PlanInTheBrowser.open("))
         XCTAssertTrue(view.contains("onScreen: model.controller?.webView.url,"))
         XCTAssertFalse(view.contains("NSWorkspace"), "the view opens nothing itself")
+    }
+
+    /// With no default browser the opener opens NOTHING (#803 review L3):
+    /// the Mac's own app for a file's type would run a script. Read from the
+    /// source, because no test can unset the Mac's browser.
+    func testWithNoBrowserNothingIsOpened() throws {
+        let source: String = try PlanningTabTests.readSource("QuartzTeachers/Views/Planning/PlanWebView.swift")
+        let start: Range<String.Index> = try XCTUnwrap(source.range(of: "enum PlanBrowserOpener {"))
+        let end: Range<String.Index> = try XCTUnwrap(source.range(of: "struct PlanWebView", range: start.upperBound..<source.endIndex))
+        let opener: String = String(source[start.upperBound..<end.lowerBound])
+        XCTAssertTrue(opener.contains("done(.noBrowser)"))
+        XCTAssertFalse(opener.contains("NSWorkspace.shared.open(page)"), "never the file's own app")
+        XCTAssertTrue(opener.contains("withApplicationAt: browser"))
     }
 }

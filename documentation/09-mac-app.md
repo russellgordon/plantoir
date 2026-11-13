@@ -4732,8 +4732,9 @@ a course built by hand) it still falls back to the greeting's order. The day
 is handed in (`CalendarDay.today()` in the view), never read in a test.
 `choiceCases` holds the first day, the last day, both sides of a gap, no
 units, one undated unit, two units overlapping today, a unit with only a
-last class, and the two no-course-page fallbacks; six of #708's cases changed
-their expected start to All Plans.
+last class, and the two no-course-page fallbacks; five of #708's cases changed
+their expected start to All Plans (the old rule fails six cases, the five
+and the new day-after case).
 
 **Open in Browser.** A button beside Reload (`planningOpenInBrowser`,
 the `safari` symbol, icon only like its neighbours) hands the page now
@@ -4741,11 +4742,14 @@ showing to the teacher's default browser as a `file:` address. The planning
 folder is hidden in Finder (`.internal`), so this is how a teacher reaches a
 plan outside Plantoir, to print it, keep it open beside something else, or
 read it with Plantoir closed. The rule is `PlanInTheBrowser.pageToOpen`
-(`unitPlanning.tab.openInBrowser`, 14 cases):
+(`unitPlanning.tab.openInBrowser`, 23 cases):
 
 - It follows the page the web view is ON, not the popup: after a link to the
-  correlation page or a PDF the teacher means what they are looking at, and
-  a correlation page opens at its `#` anchor. The popup's page is used only
+  correlation page or a PDF the teacher means what they are looking at. The
+  page is handed over without its `#` and `?` parts and opens at its top:
+  an anchor handed to a browser as an open-document event was never shown
+  to survive, so none is promised (implementation review L1). The popup's
+  page is used only
   before any page has loaded. A page on screen that has since been deleted
   is refused, never swapped silently for the popup's page.
 - Only a `file:` address inside the course's planning folder opens, judged by
@@ -4754,16 +4758,28 @@ read it with Plantoir closed. The rule is `PlanInTheBrowser.pageToOpen`
   folder). Anything else is refused before the browser is asked:
   `PlanningTabTests.testOpenInBrowserHandsTheBrowserOnlyAPageOfThePlan`
   hands the action a recording browser and proves the course's own
-  `course_config.json` and a web address never reach it.
+  `course_config.json`, a web address and a `.command` script never reach
+  it. A `file:` address naming a host other than `localhost` is refused too
+  (review L4).
+- Only pages and PDFs open (`html`, `htm`, `pdf`, in any case), judged as
+  the address is written and again as it resolves through links, so a link
+  named like a page cannot lead to a script. Anything else, a `.command`,
+  an `.app`, a `.sh`, a `.webloc` or a file with no extension, is refused
+  as `notAPage` (review L3). The planning folder is written by an outside
+  assistant, so the rule fails closed: a browser can hand a file it does
+  not show on to another app, and nothing a plan is made of needs that.
 - Dimmed while refused, with the reason as its help
   (`words.openInBrowserNothingToOpen`, `openInBrowserOutsideThePlan`,
-  `openInBrowserPageIsGone`); otherwise `words.openInBrowserHelp`. The rule
+  `openInBrowserPageIsGone`, `openInBrowserNotAPage`); otherwise
+  `words.openInBrowserHelp`. The rule
   runs again at the click with the web view's address at that moment, and a
   refusal then, or a Mac that could not open the page, is an alert
   (`openInBrowserCouldNotOpenTitle`), never a click that does nothing.
 - `PlanBrowserOpener` asks for the DEFAULT BROWSER by name (the app that
   opens an `https:` address) and opens the file with it. With no browser set
-  it opens the file as the Mac does.
+  it opens NOTHING, and the alert says `words.openInBrowserNoBrowser`. It
+  never falls back to the Mac's own app for the file's type, which for a
+  `.command` would run it in Terminal (review L3).
 - The trail writes "opened a unit plan in the browser" once the browser has
   answered: the course and the kind of page (the list of plans, a unit's
   plan, its correlation page, a file from a unit's plan), or that the Mac
@@ -4793,25 +4809,40 @@ and WebKit report them; Firefox reports none for `file:`); and every link
 between pages, followed by a real click, arrived with its stylesheet
 applied. Each PDF link resolved: WebKit opened it in a new page, and headless
 Chromium and Firefox, which have no PDF viewer, downloaded it under its real
-name. Nothing in the template or in what writes a plan needed changing. NOT
-MEASURED: Safari itself and the Chrome and Firefox PDF viewers with a
-window, which the hand test sees.
+name. Nothing in the template or in what writes a plan needed changing. The
+implementation review rebuilt this measurement on its own and got the same,
+with the plan under parents named with a space, an accent, `#`, `?` and a
+decomposed `é`.
+
+NOT MEASURED: Safari itself (Playwright's WebKit is Safari's engine, not the
+sandboxed app), and Chrome and Firefox with a window, which may ask for
+Desktop access the first time; a teacher's working folder is often under
+`~/Desktop`, which macOS protects. Russell's hand test checks it: from a
+course inside `~/Desktop`, Open in Browser in Safari on a unit's plan shows
+the plan's fonts and stylesheet, and its links to the correlation page and
+to a PDF work.
 
 MEASURED, the rules in a standalone harness (this branch's
 `PlanningTab.swift`, `UnitPlans.swift` and `CalendarDay.swift` with four
-stubs, swiftc 6): the 21 `choiceCases`, 14 `openInBrowser` cases and 7
+stubs, swiftc 6): the 21 `choiceCases`, 23 `openInBrowser` cases and 7
 `followsThePage` cases held, and the action passed only the plan's page to a
 recording browser. `UnitPlans.namedFirst` gave the same order as before the
 change for 84,000 random pairs of plans and days. Made to fail: #708's
 `startingChoice` put back failed 6 `choiceCases`; the inside-the-folder check
 taken out failed 3 cases and let the course's settings reach the browser;
 falling back to the popup's page when the page on screen is gone failed the
-deleted-page case.
+deleted-page case; the rule as it stood before the review's fixes failed 10
+of the 23, every new case among them (the script, app, shell script, web
+shortcut, no extension, link to a script and other-host cases, and the three
+it now answers differently: a stylesheet, the planning folder, an anchor).
 
 REJECTED: starting on the next unit to begin when none covers today (#708's
 behaviour; Russell, 2026-11-12); opening the file with whatever app opens its
 type (`NSWorkspace.open` alone: an `.html` file can belong to a text editor,
-a PDF to Preview, and the button says Browser); opening the popup's unit
+a PDF to Preview, and the button says Browser), and that as the fallback
+with no browser set (it would run a `.command`); handing the browser any
+file in the folder rather than pages and PDFs only; promising the page's
+`#` anchor; opening the popup's unit
 rather than the page on screen; serving the plan over a local web server for
 the browser (measured unnecessary, and a server would have to be running for
 the page to open); the trail naming the unit or the page; dates beside each

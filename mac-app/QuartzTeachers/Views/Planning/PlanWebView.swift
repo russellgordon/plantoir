@@ -361,10 +361,13 @@ final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
 /// the app that opens `https:` links, rather than whatever app opens the
 /// file's type: an `.html` file can belong to a text editor on a teacher's
 /// Mac, and a PDF to Preview, and the button says "Browser". With no browser
-/// set, the file is opened as the Mac opens it.
+/// set it opens NOTHING and says so (#803 review L3, failing closed): the
+/// Mac's own choice of app for a file is never used, because a planning
+/// folder is written by an outside assistant.
 ///
 /// `PlanInTheBrowser.pageToOpen` has already refused anything outside the
-/// course's planning folder; this only opens.
+/// course's planning folder, and anything that is not a page or a PDF; this
+/// only opens.
 enum PlanBrowserOpener {
 
     // MARK: - Stored properties
@@ -374,10 +377,10 @@ enum PlanBrowserOpener {
 
     // MARK: - Functions
 
-    static func openInTheDefaultBrowser(_ page: URL, done: @escaping @MainActor (Bool) -> Void) {
+    static func openInTheDefaultBrowser(_ page: URL, done: @escaping @MainActor (PlanInTheBrowser.Opening) -> Void) {
         guard let probe = browserProbe,
               let browser = NSWorkspace.shared.urlForApplication(toOpen: probe) else {
-            done(NSWorkspace.shared.open(page))
+            done(.noBrowser)
             return
         }
         let configuration: NSWorkspace.OpenConfiguration = NSWorkspace.OpenConfiguration()
@@ -389,7 +392,7 @@ enum PlanBrowserOpener {
                 if !opened {
                     AppLog.interface.error("the Planning tab could not open a page in the browser: \(reason, privacy: .public)")
                 }
-                done(opened)
+                done(opened ? .opened : .couldNotOpen)
             }
         }
     }

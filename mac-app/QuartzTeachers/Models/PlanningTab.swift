@@ -345,7 +345,7 @@ nonisolated enum PlanInTheBrowser {
         case plan
         /// A unit's curriculum correlation page, `<unit>/correlation.html`.
         case correlation
-        /// Anything else in the planning folder: a PDF, a picture.
+        /// Any other page or PDF in the planning folder.
         case file
     }
 
@@ -358,6 +358,20 @@ nonisolated enum PlanInTheBrowser {
         case outsideThePlan
         /// The page was inside the planning folder and is not there now.
         case pageIsGone
+        /// A file a plan is not made of: only its pages and its PDFs go to
+        /// the browser, so nothing a browser would hand on to another app
+        /// (a script, an app, a web shortcut) is ever opened from here.
+        case notAPage
+    }
+
+    /// What the browser did with a page it was handed.
+    enum Opening: Equatable {
+        /// The browser has the page.
+        case opened
+        /// A browser was asked and the Mac could not open the page.
+        case couldNotOpen
+        /// No web browser is set on this Mac, so nothing was opened.
+        case noBrowser
     }
 
     /// What the button would open, or why it cannot.
@@ -382,6 +396,14 @@ nonisolated enum PlanInTheBrowser {
     static let pageIsGone: String = "This page is no longer in the course’s unit plans. Reload to see what is there now."
     static let couldNotOpenTitle: String = "Can’t Open in Your Browser"
     static let couldNotOpen: String = "Your Mac could not open this page in your web browser."
+    static let notAPage: String = "Only a page of the plan or one of its PDFs can be opened in your browser."
+    static let noBrowser: String = "No web browser is set on this Mac, so the page was not opened."
+
+    /// The kinds of file a plan is made of that a browser shows: the pages
+    /// the template writes and the PDFs a unit links. Anything else is
+    /// refused, failing closed, because a planning folder is written by an
+    /// outside assistant.
+    static let pageExtensions: Set<String> = ["html", "htm", "pdf"]
 
     /// `activityTrail.mustRecord` → "opened a unit plan in the browser".
     static let trailLine: String = "opened {what} in the browser"
@@ -396,10 +418,11 @@ nonisolated enum PlanInTheBrowser {
     /// `openInBrowser.cases`: the page the web view is ON (`onScreen`,
     /// which follows a link the teacher clicked inside the plan), or, before
     /// the first page has loaded, the page chosen in the popup. Opened only
-    /// when it is a `file:` address inside `planningFolder` once `..` and
-    /// every link on the way are followed (`PlanNavigation.isInside`), and
-    /// a file that is there. Its `#` part is kept, so a correlation page
-    /// opens where the plan was.
+    /// when it is a `file:` address of this Mac (no other host) inside
+    /// `planningFolder` once `..` and every link on the way are followed
+    /// (`PlanNavigation.isInside`), a page or a PDF both as written and as
+    /// it resolves (`pageExtensions`), and a file that is there. It is
+    /// handed over without its `#` part and opens at its top.
     static func pageToOpen(onScreen: URL?, chosen: URL?, planningFolder: URL) -> Answer {
         guard let candidate = onScreen ?? chosen else {
             return Answer(page: nil, refusal: .nothingToOpen)
@@ -407,10 +430,20 @@ nonisolated enum PlanInTheBrowser {
         if !candidate.isFileURL {
             return Answer(page: nil, refusal: .outsideThePlan)
         }
+        // A `file:` address naming another machine (#803 review L4): only
+        // this Mac's own files, written with no host or as `localhost`.
+        let host: String = (candidate.host ?? "").lowercased()
+        if !host.isEmpty && host != "localhost" {
+            return Answer(page: nil, refusal: .outsideThePlan)
+        }
         if !PlanNavigation.isInside(candidate, folder: planningFolder) {
             return Answer(page: nil, refusal: .outsideThePlan)
         }
-        let resolved: String = PlanNavigation.resolvedPath(candidate.standardizedFileURL.path)
+        let written: String = candidate.standardizedFileURL.path
+        let resolved: String = PlanNavigation.resolvedPath(written)
+        if !isAPage(written) || !isAPage(resolved) {
+            return Answer(page: nil, refusal: .notAPage)
+        }
         var isFolder: ObjCBool = false
         if !FileManager.default.fileExists(atPath: resolved, isDirectory: &isFolder) {
             return Answer(page: nil, refusal: .pageIsGone)
@@ -418,7 +451,25 @@ nonisolated enum PlanInTheBrowser {
         if isFolder.boolValue {
             return Answer(page: nil, refusal: .nothingToOpen)
         }
-        return Answer(page: candidate, refusal: nil)
+        return Answer(page: withoutItsAnchor(candidate), refusal: nil)
+    }
+
+    /// Whether a path ends in one of `pageExtensions`, in any case.
+    static func isAPage(_ path: String) -> Bool {
+        let fileExtension: String = (path as NSString).pathExtension.lowercased()
+        return pageExtensions.contains(fileExtension)
+    }
+
+    /// The address without its `#` and `?` parts: the browser is handed
+    /// the file, and opens it at its top (#803 review L1: an open-document
+    /// event is not shown to keep an anchor, so the app does not promise one).
+    static func withoutItsAnchor(_ page: URL) -> URL {
+        guard var components = URLComponents(url: page, resolvingAgainstBaseURL: false) else {
+            return page
+        }
+        components.fragment = nil
+        components.query = nil
+        return components.url ?? page
     }
 
     /// The kind of page `page` is, by where it sits in the planning folder.
@@ -462,6 +513,8 @@ nonisolated enum PlanInTheBrowser {
             return outsideThePlan
         case .pageIsGone:
             return pageIsGone
+        case .notAPage:
+            return notAPage
         }
     }
 
@@ -501,7 +554,7 @@ extension PlanInTheBrowser {
     // MARK: - Functions
 
     /// Opens what `pageToOpen` allows, and once the browser has answered
-    /// writes the trail line and calls `finished` with whether it opened.
+    /// writes the trail line and calls `finished` with what the browser did.
     /// Returns the answer, so a refusal can be shown at once.
     @MainActor
     @discardableResult
@@ -510,23 +563,23 @@ extension PlanInTheBrowser {
         chosen: URL?,
         planningFolder: URL,
         courseCode: String,
-        opener: @MainActor (URL, @escaping @MainActor (Bool) -> Void) -> Void,
-        finished: @escaping @MainActor (Bool) -> Void
+        opener: @MainActor (URL, @escaping @MainActor (Opening) -> Void) -> Void,
+        finished: @escaping @MainActor (Opening) -> Void
     ) -> Answer {
         let answer: Answer = pageToOpen(onScreen: onScreen, chosen: chosen, planningFolder: planningFolder)
         guard let page = answer.page else {
             return answer
         }
         let pageKind: Kind = kind(of: page, planningFolder: planningFolder)
-        opener(page) { (opened: Bool) in
-            if opened {
+        opener(page) { (opening: Opening) in
+            if opening == .opened {
                 ActivityTrail.note(.openedAUnitPlanInTheBrowser, trailText(courseCode: courseCode, kind: pageKind))
             } else {
                 ActivityTrail.note(
                     .openedAUnitPlanInTheBrowser, couldNotOpenTrailText(courseCode: courseCode, kind: pageKind)
                 )
             }
-            finished(opened)
+            finished(opening)
         }
         return answer
     }
