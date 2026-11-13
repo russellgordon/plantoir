@@ -46,10 +46,13 @@ public class LauncherRulesContractTests
         // ReclaimedProcessesTests for why a sequential read can hang).
         var standardOutput = process!.StandardOutput.ReadToEndAsync();
         var standardError = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(180_000))
+        // 300 s since #799, which added eighteen scratch deploys to §10: the
+        // whole runner took 121 s alone on the Lenovo 20QES70500 (2026-11-13),
+        // and 150 s inside a full suite BEFORE them (the af2da6473 baseline).
+        if (!process.WaitForExit(300_000))
         {
             try { process.Kill(entireProcessTree: true); } catch { }
-            Assert.Fail("the launcher rules runner did not finish within 180 s");
+            Assert.Fail("the launcher rules runner did not finish within 300 s");
         }
         string output = string.Concat(standardOutput.GetAwaiter().GetResult(), standardError.GetAwaiter().GetResult());
 
@@ -80,6 +83,10 @@ public class LauncherRulesContractTests
     /// deploy.ps1's stay <c>Single()</c>. The start of each line is lifted by
     /// the mac's <c>liftedSentence</c> rule (everything before the first ASCII
     /// letter or digit goes), so deploy.sh's 🔁 goes as its ❌ always did.</para>
+    ///
+    /// <para>Since #799 (mac #768) the pages and clock pairs are pinned too,
+    /// and every line is printed from ONE function, Invoke-BuildFirstWhenAsked,
+    /// called before every destination.</para>
     /// </summary>
     [Theory]
     [InlineData("Rebuilding it before it is deployed")]
@@ -89,6 +96,10 @@ public class LauncherRulesContractTests
     [InlineData("The rebuilt site has not appeared")]
     [InlineData("has been updated since this site was built")]
     [InlineData("building it again before it is deployed")]
+    [InlineData("Something in this course has changed since its site was last built")]
+    [InlineData("so the site is being built again before it is deployed")]
+    [InlineData("This site's last build is dated later than now")]
+    [InlineData("has changed since and the site is being built again")]
     public void TheRebuildLinesAreDeploySHsWordForWord(string anchor)
     {
         IEnumerable<string> Echoed(string file, string prefix) =>

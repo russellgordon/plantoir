@@ -21,8 +21,10 @@ Notes:
   where it goes, as Plantoir's Deploy button does: every destination they
   name is deployed in turn, and a course that names none goes to Netlify.
 - --target chooses where the built site goes instead: netlify or cloudflare.
-- A site an earlier version of Plantoir built is built again before it is
-  deployed to a folder.
+- The last build is deployed as it stands when nothing has changed since it
+  was made. It is built again first, for any destination, when something in
+  the course has changed since, when an earlier version of Plantoir or a
+  preview built it, or when it is dated later than now.
 - The token for whichever service you deploy to is stored as a Windows Generic
   Credential and injected securely at runtime. Netlify and Cloudflare tokens are
   stored separately, so using one never disturbs the other.
@@ -764,52 +766,180 @@ function Resolve-PublishFolder([string]$Asked, [string]$WorkingFolder) {
   return [IO.Path]::GetFullPath((Join-Path -Path $WorkingFolder -ChildPath $p))
 }
 
-# ---- Did THIS version build the site? (#749, mac #746) ----
-# A site is deployed as it was built, and nothing a teacher wrote had to
-# change for the toolchain to change: 1.9.1's tick-box and quiz print rules
-# were in the app and in .toolchain, and a section redeployed under 1.9.1 still
-# served 1.9.0's stylesheet because its pages had not changed. Every build
-# stamps the folder that holds public\ with the toolchain that built it
-# (.built-with-toolchain), and the shared Python is asked whether that is this
-# toolchain - its identity on Windows is a hash of .toolchain and the runtime's
-# manifest, remembered between runs (scripts/toolchain_paths.py). Only the
-# folder branch asks here: Netlify and Cloudflare go through deploy.py, whose
-# ensure_base_url_and_rebuild asks the same question.
+# ---- Does this deploy have to build first? (#799, mac #768) ----
+# Russell's ruling, 2026-11-12: any deploy, typed here or pressed in the app,
+# reuses the last build when nothing has changed and builds again otherwise
+# (contracts/app-rules.json -> buildFreshness.reuseTheLastBuild). The shared
+# Python answers, in its order: a preview's site first (a preview never stamps
+# its site, so "only ever previewed" must say preview, never the update line),
+# then the toolchain (#749: 1.9.1 served 1.9.0's stylesheet because no page had
+# changed), then the clock and the pages - the course folder itself and every
+# entry under it whose NAME does not start with a dot, modified or created
+# after the build that made the site STARTED (a deleted page shows only in its
+# folder's time, #741).
 #
-# True only when the answer is a plain yes. ANY failure of the check - Python
-# missing, an import that fails, a traceback, a stamp that cannot be read -
-# is "build again", the safe direction: a wrong answer that way costs one
-# build, and the other way publishes a stale site and says it succeeded.
-# Nothing is redirected, because under this script's
-# $ErrorActionPreference = 'Stop' a native program's stderr read through a
-# redirection on Windows PowerShell 5.1 becomes a terminating error, and the
-# deploy would exit 1 instead of building; the Python says nothing on stderr
-# itself, and the call is inside try/catch for the program that cannot start.
-# The code has no double quotes: Windows PowerShell 5.1 does not escape them
-# when it hands an argument to a native program.
-function Test-BuiltByThisToolchain([string]$Python, [string]$ScriptsDir, [string]$SectionDir) {
+# It prints one word, and only a plain 'reuse' with exit 0 reuses: a POSITIVE
+# token, because an empty answer is also what a Python that died after
+# replacing stdout prints. One of preview, toolchain, pages or clock is that
+# reason; ANYTHING else - Python missing, an import that fails, a traceback, a
+# stamp that cannot be read, two words - builds, with the toolchain's words,
+# the safe direction: a wrong answer that way costs one build, and the other
+# way publishes a stale site and says it succeeded. A site with files but no
+# front page (neverBuilt; the preflight has refused an empty one) is a
+# preview's if any page carries the client, else deployed as it stands when
+# this toolchain stamped it, as deploy.py maps it. Nothing is redirected,
+# because under this script's $ErrorActionPreference = 'Stop' a native
+# program's stderr read through a redirection on Windows PowerShell 5.1
+# becomes a terminating error; the Python silences its own stderr, flushes
+# before os._exit (which does not), and the call is inside try/catch for the
+# program that cannot start. The code has no double quotes: Windows PowerShell
+# 5.1 does not escape them when it hands an argument to a native program. The
+# scheduled wrapper asks with the same code, pinned byte for byte
+# (TaskScheduling, BuildBeforeDeployingQuestion.PythonLines).
+function Get-WhyBuildBeforeDeploying([string]$Python, [string]$ScriptsDir, [string]$CourseDir, [string]$SectionDir) {
   $check = @'
 import os, sys
 sys.stderr = open(os.devnull, 'w')
+answer = 'failed'
 try:
     sys.path.insert(0, sys.argv[1])
-    import toolchain_paths
-    same = toolchain_paths.site_was_built_by_this_toolchain(sys.argv[2])
+    import toolchain_paths as t
+    from pathlib import Path
+    reason = t.why_build_before_deploying(sys.argv[2], sys.argv[3])
+    if reason == t.REASON_NEVER_BUILT:
+        if t.site_carries_preview_client(Path(sys.argv[3]) / 'public'):
+            reason = t.REASON_PREVIEW
+        elif t.site_was_built_by_this_toolchain(sys.argv[3]):
+            reason = None
+        else:
+            reason = t.REASON_TOOLCHAIN
+    answer = reason if reason else 'reuse'
 except BaseException:
-    same = False
-os._exit(0 if same is True else 1)
+    answer = 'failed'
+sys.stdout.write(answer)
+sys.stdout.flush()
+os._exit(0)
 '@
   $saved = $ErrorActionPreference
   try {
     $ErrorActionPreference = 'Continue'
     $global:LASTEXITCODE = 1
-    & $Python -c $check $ScriptsDir $SectionDir | Out-Null
-    return ($LASTEXITCODE -eq 0)
+    $answer = (@(& $Python -c $check $ScriptsDir $CourseDir $SectionDir) -join "`n").Trim()
+    if ($LASTEXITCODE -ne 0) { return 'toolchain' }
+    if ($answer -ceq 'reuse') { return $null }
+    if (@('preview', 'toolchain', 'pages', 'clock') -ccontains $answer) { return $answer }
+    return 'toolchain'
   } catch {
-    return $false
+    return 'toolchain'
   } finally {
     $ErrorActionPreference = $saved
   }
+}
+
+# ---- Build first when the question says so: ONE place, every destination ----
+# Called at the top of the folder branch and at the top of the native run,
+# right after Enter-NativeRuntime and BEFORE any token is put in the
+# environment, so a build never inherits a deploy token (the #799 plan
+# review's M3). Two call sites rather than one before the branch: asking there
+# would build for a minute and THEN meet a Netlify or Cloudflare token
+# refusal, which this script never did before. Nothing between the two places
+# writes inside the course folder (the token functions write
+# courses\.internal\), so asking later sees the same thing. deploy.py then
+# asks again for itself (PLANTOIR_PAGES_ALREADY_ASKED is never set here),
+# finds this build current, and builds only for a new address.
+#
+# Every line it prints is printed from here only, ASCII (three dots for
+# deploy.sh's ellipsis, no picture in front), and LauncherRulesContractTests
+# pins each against deploy.sh. A build that went through writes one trail line
+# (activityTrail.mustRecord -> "site built again before deploying") with the
+# reason it built for; a build that failed, needed an answer, or left a
+# preview's site or no front page behind writes nothing. Not for
+# --reset-token, which deploys nothing.
+function Invoke-BuildFirstWhenAsked([string]$Python) {
+  $reason = Get-WhyBuildBeforeDeploying $Python $env:PLANTOIR_SCRIPTS_DIR $COURSE_DIR_HOST $SECTION_DIR_HOST
+  if (-not $reason) { return }
+  if ($reason -eq 'preview') {
+    # Plain words (#296, rule 1): this used to say "bakes in a live-reload
+    # script". deploy.sh took this wording (#407) and changed "for
+    # publishing" to "before it is deployed", because publishing marks a
+    # page for the website and this step is the deploy; taken back here
+    # word for word (#438).
+    Write-Host "This site was built by a preview, which adds live updating"
+    Write-Host "  that students' browsers would ask about. Rebuilding it before it is deployed..."
+  } elseif ($reason -eq 'pages') {
+    Write-Host "Something in this course has changed since its site was last built,"
+    Write-Host "   so the site is being built again before it is deployed..."
+  } elseif ($reason -eq 'clock') {
+    Write-Host "This site's last build is dated later than now, so this computer's clock"
+    Write-Host "   has changed since and the site is being built again before it is deployed..."
+  } else {
+    # deploy.sh's two lines (#746), also for a question that failed.
+    Write-Host "Plantoir has been updated since this site was built, so it is"
+    Write-Host "   building it again before it is deployed..."
+  }
+  # Forward the flag. Without it this rebuild is a SECOND way a scheduled
+  # publish can meet a question nobody is there to answer: preview.ps1 asks
+  # about a course code ending in a zero, and about a section the
+  # configuration does not list. Under the wrapper's -NonInteractive
+  # PowerShell an unanswered Read-Host THROWS, and preview.ps1's
+  # $ErrorActionPreference = 'Stop' turns that into a bare exit 1 with
+  # nothing said - measured, not assumed; see the long note at the top of
+  # preview.ps1. Mirrors deploy.sh, which has forwarded it since 2026-09-09
+  # (GitHub issue #124). Any later flag is one more line here.
+  $previewExtra = @()
+  if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
+  & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
+  if ($LASTEXITCODE -eq 3) {
+    # Passed straight through, because 3 means one thing: a question went
+    # unanswered. A caller that saw 1 here would tell the teacher their
+    # deploy failed, when what it needs to say is which question nobody
+    # was there to answer.
+    Write-Host "Could not rebuild this site before deploying it: it needed an answer."
+    exit 3
+  }
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Could not rebuild this site before deploying it."
+    exit 1
+  }
+  # Wait for the rebuild to become VISIBLE here before going on: the
+  # filesystem settling after a large write, and OneDrive can add to it.
+  # Waits on the condition (a front page and no page carrying the preview's
+  # client), not a guessed interval, and is bounded. The WHOLE TREE, not the
+  # front page: serve mode bakes the client into every page and the mirror is
+  # replaced file by file, so a clean front page with stale pages behind it is
+  # a real state - and deploying that mixture is worse than deploying the
+  # preview wholesale, because the front page looks fine. See the same comment
+  # in deploy.sh, which asks this for every destination too.
+  $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
+  for ($w = 0; $w -lt 150; $w++) {
+    if ((Test-Path -LiteralPath $publishedIndex) -and
+        -not (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { break }
+    Start-Sleep -Milliseconds 200
+  }
+  if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
+    Write-Host "The rebuilt site still carries the preview's live updating."
+    # "Nothing was deployed", as deploy.sh says it (#407, #438).
+    Write-Host "  Nothing was deployed, rather than deploying pages students'"
+    Write-Host "  browsers would ask about."
+    exit 1
+  }
+  # deploy.sh has had this since the empty-publish bug; this side did not,
+  # so after a timeout with no front page the HTML scan found nothing, the
+  # loop fell through, and robocopy mirrored an empty directory while
+  # reporting success. Found by review on 2026-09-05.
+  if (-not (Test-Path -LiteralPath $publishedIndex)) {
+    Write-Host "The rebuilt site has not appeared. Nothing was deployed."
+    exit 1
+  }
+  # The words are the contract's (whyWords), in ASCII: the dot and the dash
+  # as code points, as the guard block writes its own.
+  $why = switch ($reason) {
+    'preview' { 'the last build was made by a preview' }
+    'pages'   { 'something in the course had changed since it was last built' }
+    'clock'   { "its last build was dated later than now, so the computer's clock had changed" }
+    default   { 'Plantoir had been updated since it was last built' }
+  }
+  Write-TrailLine ("{0}/{1} {2} built the website again before deploying it {3} {4}" -f $COURSE_CODE, $SECTION_NUM, [char]0x00B7, [char]0x2014, $why)
 }
 
 function Test-CarriesLiveReload([string]$root) {
@@ -1008,105 +1138,13 @@ if ($TO_FOLDER) {
   $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
   # Not New-Item -Path, which reads [ and ] in a folder name as wildcards.
   $null = [IO.Directory]::CreateDirectory($targetDir)
-  # A PREVIEW build must never reach a published site. Serve mode bakes a
-  # live-reload client into every page, and on a published site that script
-  # makes a student's browser ask permission to access other apps and
-  # services on this device. deploy.py already refuses this, but ONLY for
-  # Netlify and Cloudflare: this branch publishes host-to-host and never
-  # enters the container, so deploy.py never runs. The app's own publish path
-  # is protected by BuildFreshness; the command line was not. Mirrors the fix
-  # made in deploy.sh on 2026-09-05 — see GUI-IMPROVEMENTS row 392.
-  # The whole HTML tree, not just the front page — see the same comment in
-  # deploy.sh. Detection that read only `index.html` could not see the one
-  # state the wait below exists for.
-  $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
-  # Two reasons to build again first, asked in deploy.sh's order and folded
-  # into ONE rebuild, so each line below is printed from one place: a site an
-  # earlier version of Plantoir built (#749, above Test-BuiltByThisToolchain),
-  # and a site a preview built. A build-only build answers both - it is this
-  # toolchain's and carries no live updating - so the wait and the checks
-  # after it are the same for either. Not for --reset-token, which deploys
-  # nothing.
-  $rebuildReason = $null
-  if (-not $RESET_TOKEN) {
-    $stampPython = Enter-NativeRuntime
-    if (-not (Test-BuiltByThisToolchain $stampPython $env:PLANTOIR_SCRIPTS_DIR $SECTION_DIR_HOST)) { $rebuildReason = 'toolchain' }
-  }
-  if (-not $rebuildReason -and (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { $rebuildReason = 'preview' }
-  if ($rebuildReason) {
-    if ($rebuildReason -eq 'toolchain') {
-      # deploy.sh's two lines (#746), in ASCII: three dots for its ellipsis,
-      # and no picture in front. LauncherRulesContractTests pins them.
-      Write-Host "Plantoir has been updated since this site was built, so it is"
-      Write-Host "   building it again before it is deployed..."
-    } else {
-      # Plain words (#296, rule 1): this used to say "bakes in a live-reload
-      # script". deploy.sh took this wording (#407) and changed "for
-      # publishing" to "before it is deployed", because publishing marks a
-      # page for the website and this step is the deploy; taken back here
-      # word for word (#438). Three dots rather than deploy.sh's ellipsis
-      # character: every line this file prints is ASCII.
-      Write-Host "This site was built by a preview, which adds live updating"
-      Write-Host "  that students' browsers would ask about. Rebuilding it before it is deployed..."
-    }
-    # Forward the flag. Without it this rebuild is a SECOND way a scheduled
-    # publish can meet a question nobody is there to answer: preview.ps1 asks
-    # about a course code ending in a zero, and about a section the
-    # configuration does not list. Under the wrapper's -NonInteractive
-    # PowerShell an unanswered Read-Host THROWS, and preview.ps1's
-    # $ErrorActionPreference = 'Stop' turns that into a bare exit 1 with
-    # nothing said — measured, not assumed; see the long note at the top of
-    # preview.ps1, which also says why the "takes the default and builds the
-    # WRONG course" story belongs to preview.sh and not here.
-    #
-    # Mirrors deploy.sh, which has forwarded it since 2026-09-09; this side had
-    # not, and GitHub issue #124 is where that gap was named.
-    $previewExtra = @()
-    if ($NON_INTERACTIVE) { $previewExtra += '--non-interactive' }
-    & ".\preview.bat" $COURSE_CODE $SECTION_NUM "--build-only" @previewExtra
-    if ($LASTEXITCODE -eq 3) {
-      # Passed straight through, because 3 means one thing: a question went
-      # unanswered. A caller that saw 1 here would tell the teacher their
-      # publish failed, when what it needs to say is which question nobody
-      # was there to answer.
-      Write-Host "Could not rebuild this site before deploying it: it needed an answer."
-      exit 3
-    }
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host "Could not rebuild this site before deploying it."
-      exit 1
-    }
-    # Wait for the rebuild to become VISIBLE here before copying. On the mac
-    # the lag is the container's bind mount; natively on Windows it is the
-    # filesystem settling after a large write, and OneDrive can add to it.
-    # Waits on the condition (a front page without the live-reload client),
-    # not a guessed interval, and is bounded.
-    # The WHOLE TREE, not the front page. Serve mode bakes the client into
-    # every page and the mirror is replaced file by file, so a clean front page
-    # with stale pages behind it is a real state — and publishing that mixture
-    # is worse than publishing the preview wholesale, because the front page
-    # looks fine. See the same comment in deploy.sh.
-    for ($w = 0; $w -lt 150; $w++) {
-      if ((Test-Path -LiteralPath $publishedIndex) -and
-          -not (Test-CarriesLiveReload $PUBLIC_DIR_HOST)) { break }
-      Start-Sleep -Milliseconds 200
-    }
-    if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
-      Write-Host "The rebuilt site still carries the preview's live updating."
-      # "Nothing was deployed", as deploy.sh says it (#407, #438).
-      Write-Host "  Nothing was deployed, rather than deploying pages students'"
-      Write-Host "  browsers would ask about."
-      exit 1
-    }
-    # deploy.sh has had this since the empty-publish bug; this side did not,
-    # so after a timeout with no front page the HTML scan found nothing, the
-    # loop fell through, and robocopy mirrored an empty directory while
-    # reporting success. Found by review on 2026-09-05.
-    if (-not (Test-Path -LiteralPath $publishedIndex)) {
-      Write-Host "The rebuilt site has not appeared. Nothing was deployed."
-      exit 1
-    }
-  }
+  # A PREVIEW build must never reach a deployed site, a site an earlier
+  # version built is built again, and so is one the course has changed since
+  # (#749, #799): Invoke-BuildFirstWhenAsked, above, asks the shared Python
+  # and builds once. This branch deploys host-to-host and never enters
+  # deploy.py, so it is the only check a folder deploy gets. Not for
+  # --reset-token, which deploys nothing.
+  if (-not $RESET_TOKEN) { Invoke-BuildFirstWhenAsked (Enter-NativeRuntime) }
 
   Write-Host ("Deploying {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
@@ -1627,6 +1665,10 @@ this computer.
 # ======================
 if ($NATIVE_RUNTIME) {
   $py = Enter-NativeRuntime
+  # Asked HERE, before any token is put in the environment below, so the
+  # build and its node processes never inherit one (#799; the reasons for
+  # this place, and for two call sites, are above Invoke-BuildFirstWhenAsked).
+  if (-not $RESET_TOKEN) { Invoke-BuildFirstWhenAsked $py }
   $env:HOST_TZ_OFFSET = $HOST_TZ_OFFSET
   Write-Host ("Deploying {0} S{1} from this PC ..." -f $COURSE_CODE, $SECTION_NUM)
   $deployArgs = @('--host-os','windows')

@@ -574,15 +574,20 @@ Report 'savedDestinations.sentences' 'unknownKind' ($sampleKind -ceq ([string]$d
 # ---- 10. The real deploy.ps1, offline, in a scratch working folder ----
 # What the pure functions above cannot show: that the launcher itself reads
 # the saved legs, runs each one, keeps going after a failed leg and ends with
-# the first failing leg's code (#739); that a folder publish asks which
-# toolchain built the site and builds again when the answer is anything but
-# a plain yes, a check that THROWS included (#749); and that a saved token is
-# kept when its check hears nothing (#705). A COPY of deploy.ps1 (it runs
-# from its own folder), the real runtime only for its Python
-# (PLANTOIR_RUNTIME, read only), LOCALAPPDATA pointed into the scratch folder
-# so the builds root is the scratch folder's, a stand-in preview.bat that says
-# it was asked and exits with PREVIEW_STUB_EXIT, and a stand-in
-# scripts\toolchain_paths.py whose answer is STAMP_STUB.
+# the first failing leg's code (#739); that a deploy asks whether it must
+# build first, before EVERY destination, and builds when the answer is
+# anything but a plain 'reuse' - a check that THROWS, prints nothing or
+# prints a word it does not know included - printing the reason's two lines
+# and writing ONE trail line after a build that went through (#749, #799);
+# and that a saved token is kept when its check hears nothing (#705). A COPY
+# of deploy.ps1 (it runs from its own folder), the real runtime only for its
+# Python (PLANTOIR_RUNTIME, read only), LOCALAPPDATA pointed into the scratch
+# folder so the builds root is the scratch folder's, a stand-in preview.bat
+# that says it was asked (and whether a deploy token reached it) and exits
+# with PREVIEW_STUB_EXIT, and a stand-in scripts\toolchain_paths.py whose
+# answer is STAMP_STUB (STAMP_STUB_COUNTER: the first ask answers it, every
+# later one 'reuse'). The real reader is proved by the Python suite and
+# ReuseTheLastBuildTests; this proves how deploy.ps1 reads its answer.
 $runtime = $env:PLANTOIR_RUNTIME
 if (-not $runtime -or -not (Test-Path -LiteralPath (Join-Path $runtime 'python\python.exe'))) {
     $runtime = Join-Path $repo 'windows-app\Vendor\runtime'
@@ -593,7 +598,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python\python.exe'))) {
     $work = Join-Path ([IO.Path]::GetTempPath()) ('deploy-run-' + [Guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Force -Path $work
     $saved = @{}
-    foreach ($name in @('LOCALAPPDATA', 'PLANTOIR_RUNTIME', 'PLANTOIR_TRAIL_DIR', 'PREVIEW_STUB_EXIT', 'STAMP_STUB', 'TOKEN_CHECK_STUB_URL')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+    foreach ($name in @('LOCALAPPDATA', 'PLANTOIR_RUNTIME', 'PLANTOIR_TRAIL_DIR', 'PREVIEW_STUB_EXIT', 'STAMP_STUB', 'STAMP_STUB_COUNTER', 'TOKEN_CHECK_STUB_URL', 'TOKEN_ANSWER_STUB', 'PREVIEW_STUB_WRITES')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
     try {
         # The copy is STUBBED wherever it would touch this PC's real
         # credentials: its credential functions only say what they were asked
@@ -602,8 +607,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $runtime 'python\python.exe'))) {
         # test_deploy_token_refusal.py stubs deploy.sh. So no run here, and no
         # launcher made wrong by a mutation, can deploy anything or clear a token.
         $source = [IO.File]::ReadAllText((Join-Path $repo 'deploy.ps1'))
-        $marker = "# ======================`r`n# Native run (no container)"
-        if (-not $source.Contains($marker)) { $marker = "# ======================`n# Native run (no container)" }
+        # The copy stops at deploy.py's own line (#799, the plan review's M3):
+        # AFTER the ask before every destination, which sits at the top of the
+        # native run, so a Netlify or Cloudflare run shows its ask too.
+        $marker = "& `$py -u (Join-Path `$env:PLANTOIR_SCRIPTS_DIR 'deploy.py') @deployArgs"
         $stubbed = $source
         foreach ($pair in @(
             @('https://api.cloudflare.com/client/v4/user/tokens/verify', $null),
@@ -621,16 +628,52 @@ function Get-TokenFromCredMan { 'stub-token-never-leaves-this-test' }
 function Remove-TokenInCredMan { Write-Host 'CLEARED-THE-NETLIFY-TOKEN' }
 function Set-TokenInCredMan([string]$token) { Write-Host 'WROTE-A-NETLIFY-TOKEN' }
 function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-TOKEN' }
+# The token check itself, answered by TOKEN_ANSWER_STUB when it is set (the
+# web cases of #799, which must reach the native run); the real function, and
+# so the closed port, otherwise (the #705 cases).
+$script:realSavedTokenAnswer = ${function:Get-SavedTokenAnswer}
+function Get-SavedTokenAnswer([string]$Service, [string]$Token) { if ($env:TOKEN_ANSWER_STUB) { return $env:TOKEN_ANSWER_STUB }; & $script:realSavedTokenAnswer $Service $Token }
 '@
         $anchor = 'if ($RESET_TOKEN -and $TARGET -eq ''cloudflare'') {'
         Report 'realDeploy' 'deploy.ps1 still carries the place the stubs go' ($stubbed.Contains($anchor) -and $stubbed.Contains($marker)) 'a marker moved'
-        $stubbed = $stubbed.Replace($anchor, $stubs + "`r`n" + $anchor).Replace($marker, "Write-Host 'REACHED-THE-WEBSITE-BUILDER'`r`nexit 0`r`n" + $marker)
+        $stubbed = $stubbed.Replace($anchor, $stubs + "`r`n" + $anchor).Replace($marker, "Write-Host 'REACHED-THE-WEBSITE-BUILDER'; exit 0")
         [IO.File]::WriteAllText((Join-Path $work 'deploy.ps1'), $stubbed)
         $env:TOKEN_CHECK_STUB_URL = 'http://127.0.0.1:9/'
         $null = New-Item -ItemType Directory -Force -Path (Join-Path $work 'scripts'), (Join-Path $work 'courses\ICS3U')
-        [IO.File]::WriteAllText((Join-Path $work 'preview.bat'), "@echo off`r`necho PREVIEW-WAS-ASKED %*`r`nexit /b %PREVIEW_STUB_EXIT%`r`n")
-        [IO.File]::WriteAllText((Join-Path $work 'scripts\toolchain_paths.py'),
-            "import os`nwhat = os.environ.get('STAMP_STUB', '')`nif what == 'throw':`n    raise RuntimeError('a check that throws')`ndef site_was_built_by_this_toolchain(section_dir):`n    return what == 'yes'`n")
+        # It says whether a deploy token reached the build (#799, M3): never.
+        [IO.File]::WriteAllText((Join-Path $work 'preview.bat'), "@echo off`r`necho PREVIEW-WAS-ASKED %*`r`necho TOKEN-IN-BUILD=[%NETLIFY_AUTH_TOKEN%%CLOUDFLARE_API_TOKEN%]`r`nif not `"%PREVIEW_STUB_WRITES%`"==`"`" (echo ^<html^>rebuilt^</html^>> `"%PREVIEW_STUB_WRITES%`")`r`nexit /b %PREVIEW_STUB_EXIT%`r`n")
+        [IO.File]::WriteAllText((Join-Path $work 'scripts\toolchain_paths.py'), @'
+import os
+what = os.environ.get('STAMP_STUB', '')
+counter = os.environ.get('STAMP_STUB_COUNTER', '')
+if counter:
+    asked = int(open(counter).read() or '0') if os.path.exists(counter) else 0
+    with open(counter, 'w') as handle:
+        handle.write(str(asked + 1))
+    if asked > 0:
+        what = 'reuse'
+if what == 'throw':
+    raise RuntimeError('a check that throws')
+REASON_NEVER_BUILT = 'neverBuilt'
+REASON_PREVIEW = 'preview'
+REASON_TOOLCHAIN = 'toolchain'
+def why_build_before_deploying(course_dir, section_dir):
+    with open(os.path.join(os.path.dirname(__file__), 'asked-about.txt'), 'w') as handle:
+        handle.write(str(course_dir) + '|' + str(section_dir))
+    if what == 'empty':
+        os._exit(0)
+    if what in ('yes', 'reuse'):
+        return None
+    if what == 'no':
+        return REASON_TOOLCHAIN
+    if what.startswith('neverBuilt'):
+        return REASON_NEVER_BUILT
+    return what
+def site_carries_preview_client(public_dir):
+    return what == 'neverBuilt-preview-stamped'
+def site_was_built_by_this_toolchain(section_dir, toolchain_id=None):
+    return what in ('neverBuilt-stamped', 'neverBuilt-preview-stamped')
+'@)
         $env:LOCALAPPDATA = Join-Path $work 'home'
         $env:PLANTOIR_RUNTIME = $runtime
         $env:PLANTOIR_TRAIL_DIR = Join-Path $work 'trail'
@@ -666,18 +709,108 @@ function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-T
             $null = New-Item -ItemType Directory -Force -Path (Join-Path $sectionDir 'public')
             [IO.File]::WriteAllText((Join-Path $sectionDir 'public\index.html'), '<html>a built site</html>')
 
-            # #749: a plain yes publishes as it is; no, or a check that throws, builds first.
-            foreach ($c in @(
-                @{ stamp = 'yes';   rebuild = $false; code = 0 },
-                @{ stamp = 'no';    rebuild = $true;  code = 3 },
-                @{ stamp = 'throw'; rebuild = $true;  code = 3 })) {
-                $env:STAMP_STUB = $c.stamp; $env:PREVIEW_STUB_EXIT = '3'
-                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--to-folder', (Join-Path $work 'published'))
-                $asked = $run.Said.Contains('PREVIEW-WAS-ASKED ICS3U 1 --build-only')
-                $said = $run.Said.Contains('Plantoir has been updated since this site was built, so it is')
-                Report 'realDeploy' ("toolchain check answering '" + $c.stamp + "'") (($asked -eq $c.rebuild) -and ($said -eq $c.rebuild) -and ($run.Code -eq $c.code)) ("exit $($run.Code), rebuilt $asked; said: " + $run.Said)
+            # #749 and #799: only a plain 'reuse' deploys the last build. Each
+            # reason prints its own two lines (their first line here, the pairs
+            # pinned against deploy.sh by TheRebuildLinesAreDeploySHsWordForWord)
+            # and, once the build went through, writes ONE trail line whose
+            # words are the contract's. A check that throws, prints nothing or
+            # prints a word it does not know builds with the toolchain's words.
+            # A site with files and no front page is deployed as it stands when
+            # this toolchain stamped it, unless a page carries a preview's client
+            # (the plan review's M1: asked before the stamp).
+            $trailEntry = @((Get-Content -LiteralPath (Join-Path $repo 'contracts\shared-rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).activityTrail.mustRecord |
+                Where-Object { $_.event -ceq 'site built again before deploying' })[0]
+            $firstLines = @{
+                preview   = 'This site was built by a preview, which adds live updating'
+                toolchain = 'Plantoir has been updated since this site was built, so it is'
+                pages     = 'Something in this course has changed since its site was last built,'
+                clock     = "This site's last build is dated later than now, so this computer's clock"
             }
+            $trailFile = Join-Path $work 'trail\activity.txt'
+            function Get-BuiltLines { if (Test-Path -LiteralPath $trailFile) { @(Get-Content -LiteralPath $trailFile -Encoding UTF8 | Where-Object { $_ -like '*before deploying it*' }) } else { @() } }
+            $indexFile = Join-Path $sectionDir 'public\index.html'
+            foreach ($c in @(
+                @{ stamp = 'reuse';  reason = $null },
+                @{ stamp = 'yes';    reason = $null },
+                @{ stamp = 'neverBuilt-stamped'; reason = $null; noFrontPage = $true },
+                @{ stamp = 'neverBuilt-preview-stamped'; reason = 'preview'; noFrontPage = $true },
+                @{ stamp = 'no';     reason = 'toolchain' },
+                @{ stamp = 'pages';  reason = 'pages' },
+                @{ stamp = 'clock';  reason = 'clock' },
+                @{ stamp = 'preview'; reason = 'preview' },
+                @{ stamp = 'throw';  reason = 'toolchain' },
+                @{ stamp = 'empty';  reason = 'toolchain' },
+                @{ stamp = 'banana'; reason = 'toolchain' })) {
+                $env:STAMP_STUB = $c.stamp; $env:PREVIEW_STUB_EXIT = '0'
+                # The stand-in build writes a clean front page, as a real one would.
+                $env:PREVIEW_STUB_WRITES = $indexFile
+                if ($c.noFrontPage) {
+                    Remove-Item -LiteralPath $indexFile -Force
+                    [IO.File]::WriteAllText((Join-Path $sectionDir 'public\other.html'), '<html>a page</html>')
+                }
+                $before = @(Get-BuiltLines).Count
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--to-folder', (Join-Path $work 'published'))
+                $lines = @(Get-BuiltLines)
+                $asked = $run.Said.Contains('PREVIEW-WAS-ASKED ICS3U 1 --build-only')
+                $ok = ($asked -eq ($null -ne $c.reason))
+                $detail = "exit $($run.Code), rebuilt $asked"
+                foreach ($k in $firstLines.Keys) {
+                    if ($run.Said.Contains($firstLines[$k]) -ne ($k -eq $c.reason)) { $ok = $false; $detail += "; the $k lines were " + $(if ($k -eq $c.reason) { 'missing' } else { 'printed' }) }
+                }
+                if ($c.noFrontPage) {
+                    [IO.File]::WriteAllText($indexFile, '<html>a built site</html>')
+                    Remove-Item -LiteralPath (Join-Path $sectionDir 'public\other.html') -Force
+                }
+                if ($c.reason) {
+                    $want = ([string]$trailEntry.line).Replace('{course}', 'ICS3U').Replace('{section}', '1').Replace('{why}', [string]$trailEntry.whyWords.($c.reason))
+                    $new = @($lines | Select-Object -Skip $before)
+                    if ($run.Code -ne 0 -or $new.Count -ne 1 -or -not $new[0].EndsWith(' ' + [char]0x00B7 + ' ' + $want)) { $ok = $false; $detail += "; trail: " + ($new -join ' / ') }
+                } elseif ($run.Code -ne 0 -or $lines.Count -ne $before) { $ok = $false; $detail += '; a reuse wrote a trail line or failed' }
+                Report 'realDeploy' ("the build question answering '" + $c.stamp + "'") $ok ($detail + "; said: " + $run.Said)
+            }
+            $askedAbout = [IO.File]::ReadAllText((Join-Path $work 'scripts\asked-about.txt'))
+            Report 'realDeploy' 'the question is asked about the course folder and the section built for it' ($askedAbout -ceq ((Join-Path $work 'courses\ICS3U') + '|' + $sectionDir)) "asked about $askedAbout"
             Report 'realDeploy' 'a site this version built is published' (Test-Path -LiteralPath (Join-Path $work 'published\section1\index.html')) 'nothing reached the folder'
+
+            # A build that fails or needs an answer writes no trail line.
+            foreach ($c in @(@{ exit = '1'; code = 1 }, @{ exit = '3'; code = 3 })) {
+                $env:STAMP_STUB = 'pages'; $env:PREVIEW_STUB_EXIT = $c.exit
+                $before = @(Get-BuiltLines).Count
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--to-folder', (Join-Path $work 'published'))
+                Report 'realDeploy' ("a build that exits " + $c.exit + " writes no trail line") (($run.Code -eq $c.code) -and (@(Get-BuiltLines).Count -eq $before)) ("exit $($run.Code); said: " + $run.Said)
+            }
+
+            # Before EVERY destination (#799): a Netlify and a Cloudflare deploy
+            # ask too, build before the website builder is reached, and no
+            # deploy token reaches the build (the plan review's M3).
+            Set-Settings '{"course_code":"ICS3U"}'
+            $env:TOKEN_ANSWER_STUB = 'accepted'
+            foreach ($service in @('netlify', 'cloudflare')) {
+                $env:STAMP_STUB = 'pages'; $env:PREVIEW_STUB_EXIT = '0'
+                $before = @(Get-BuiltLines).Count
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--target', $service, '--non-interactive')
+                $builtAt = $run.Said.IndexOf('PREVIEW-WAS-ASKED ICS3U 1 --build-only --non-interactive')
+                $reachedAt = $run.Said.IndexOf('REACHED-THE-WEBSITE-BUILDER')
+                $ok = ($builtAt -ge 0) -and ($reachedAt -gt $builtAt) -and $run.Said.Contains('TOKEN-IN-BUILD=[]') -and (@(Get-BuiltLines).Count -eq $before + 1) -and ($run.Code -eq 0)
+                Report 'realDeploy' "a $service deploy asks, and builds before the website builder with no token" $ok ("exit $($run.Code); said: " + $run.Said)
+                $env:STAMP_STUB = 'reuse'
+                $run = Invoke-ScratchDeploy @('ICS3U', '1', '--target', $service, '--non-interactive')
+                Report 'realDeploy' "a $service deploy of an unchanged site builds nothing" ((-not $run.Said.Contains('PREVIEW-WAS-ASKED')) -and $run.Said.Contains('REACHED-THE-WEBSITE-BUILDER')) ("exit $($run.Code); said: " + $run.Said)
+            }
+            $env:TOKEN_ANSWER_STUB = $null
+
+            # Two saved folder legs, the course changed: the first leg builds and
+            # writes the one line, the second finds the build current.
+            $counter = Join-Path $work 'asks.txt'
+            $env:STAMP_STUB_COUNTER = $counter; $env:STAMP_STUB = 'pages'; $env:PREVIEW_STUB_EXIT = '0'
+            $twoA = (Join-Path $work 'legA').Replace('\', '/'); $twoB = (Join-Path $work 'legB').Replace('\', '/')
+            Set-Settings ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $twoA + '","additional_deploy_targets":[{"type":"local_folder","path":"' + $twoB + '"}]}')
+            $before = @(Get-BuiltLines).Count
+            $run = Invoke-ScratchDeploy @('ICS3U', '1', '--non-interactive')
+            $builds = ([regex]::Matches($run.Said, 'PREVIEW-WAS-ASKED')).Count
+            Report 'realDeploy' 'two saved legs: one build, one trail line' (($builds -eq 1) -and (@(Get-BuiltLines).Count -eq $before + 1) -and ($run.Code -eq 0)) ("$builds builds, exit $($run.Code); said: " + $run.Said)
+            $env:STAMP_STUB_COUNTER = $null
+            Set-Settings '{"course_code":"ICS3U"}'
 
             # #739: two saved folder legs. The first is refused by the leg
             # itself (a drive-relative folder, exit 1); the second builds first
