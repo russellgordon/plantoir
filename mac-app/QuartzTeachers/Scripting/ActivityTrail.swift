@@ -1148,6 +1148,21 @@ nonisolated enum ActivityTrail {
         /// Stop Sharing on a school year's unit plans, and how it ended:
         /// deleted, already gone, or failed with the address still working.
         case unitPlanSharingStopped = "unit plan sharing stopped"
+        /// A section's deployed folder opened in the web browser (#850):
+        /// where Open in Browser was pressed, whether it was already being
+        /// shown, and whether its usual address was taken (so what the site
+        /// remembered there is not shown). Never the folder's path or the
+        /// address.
+        case deployedFolderOpened = "deployed folder opened in the web browser"
+        /// A section's deployed folder stopped being shown (#850): Stop was
+        /// pressed, Plantoir quit, or the folder was gone; with how many
+        /// requests it answered and how many found nothing, which is what
+        /// makes "a page would not open" answerable. Counts only.
+        case deployedFolderNoLongerShown = "deployed folder no longer shown"
+        /// Open in Browser on a deployed folder did not happen (#850): the
+        /// folder was not found, nothing was deployed there, no address on
+        /// this computer was free, or the browser did not open it.
+        case deployedFolderCouldNotBeOpened = "deployed folder could not be opened"
         /// Change Password saved a new password for a course's unit plans
         /// and shared nothing (#833): the school year, and whether the new
         /// password now waits for a share or nothing was shared yet. Never

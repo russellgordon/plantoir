@@ -40,6 +40,11 @@ struct TaskProgressView: View {
     /// view, not for one line of it. `nil` everywhere in the app.
     let reportsRenderNoteHeight: ((CGFloat) -> Void)?
 
+    /// Opens a folder the deploy named in the web browser (#850): the
+    /// section window's own action, so the result panel and Section ▸ Open
+    /// in Browser open the same show. Nil where no deploy is shown.
+    let openFolderInBrowser: ((URL) -> Void)?
+
     @State var isShowingDetails: Bool = false
     @State var isShowingWhyTakingLong: Bool = false
 
@@ -53,7 +58,8 @@ struct TaskProgressView: View {
         hidesSiteLink: Bool = false,
         allLegs: [MultiDestinationDeployRunner.Leg]? = nil,
         onCancel: (() -> Void)? = nil,
-        reportsRenderNoteHeight: ((CGFloat) -> Void)? = nil
+        reportsRenderNoteHeight: ((CGFloat) -> Void)? = nil,
+        openFolderInBrowser: ((URL) -> Void)? = nil
     ) {
         self.runner = runner
         self.title = title
@@ -62,6 +68,7 @@ struct TaskProgressView: View {
         self.allLegs = allLegs
         self.onCancel = onCancel
         self.reportsRenderNoteHeight = reportsRenderNoteHeight
+        self.openFolderInBrowser = openFolderInBrowser
         _isShowingDetails = State(initialValue: showingDetailsForTesting)
     }
 
@@ -286,7 +293,7 @@ struct TaskProgressView: View {
                         // "Show details", never down past the console.
                         if hidesSiteLink {
                             if let allLegs {
-                                DeployDestinationLinks(legs: allLegs)
+                                DeployDestinationLinks(legs: allLegs, openFolderInBrowser: openFolderInBrowser)
                             }
                         } else if !runner.wasCancelled, exitCode == 0, let siteURL = runner.publishedSiteURL {
                             VStack(alignment: .leading, spacing: 4) {
@@ -314,7 +321,9 @@ struct TaskProgressView: View {
                                 // slid out of the visible band the moment a
                                 // folder publish said "Done". Measured, and
                                 // pinned by `ProgressViewSizeTests`.
-                                Text("One thing to know: the pages won’t look right if you open them straight from the folder — your website only displays properly once it’s on your web host.")
+                                // #850: the note says how to see the pages working,
+                                // and promises nothing about a web host (#849).
+                                Text(DeployedFolderWording.renderNote)
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("publishedFolderRenderNote")
@@ -323,10 +332,19 @@ struct TaskProgressView: View {
                                     } action: { renderedHeight in
                                         reportsRenderNoteHeight?(renderedHeight)
                                     }
-                                Button("Show in Finder", systemImage: "finder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([folderURL])
+                                HStack(spacing: 8) {
+                                    if let openFolderInBrowser {
+                                        Button(DeployedFolderWording.resultButton, systemImage: "safari") {
+                                            openFolderInBrowser(folderURL)
+                                        }
+                                        .help(DeployedFolderWording.help)
+                                        .accessibilityIdentifier("publishedFolderOpenInBrowserButton")
+                                    }
+                                    Button("Show in Finder", systemImage: "finder") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([folderURL])
+                                    }
+                                    .accessibilityIdentifier("publishedFolderButton")
                                 }
-                                .accessibilityIdentifier("publishedFolderButton")
                             }
                         }
                     }

@@ -28,6 +28,13 @@ struct SectionDetailView: View {
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
 
+    /// Whether this section's deployed folder can be opened in the browser,
+    /// read again on events (#850, `SectionDetailDeployedFolder.swift`).
+    @State var deployedFolderLookup: DeployedFolderShows.Lookup? = nil
+
+    /// Opening the deployed folder failed, so the alert is up.
+    @State var deployedFolderCouldNotOpen: Bool = false
+
     /// Whether this window is the key window, for the Preview button's
     /// Option title (#504).
     @Environment(\.controlActiveState) var controlActiveState
@@ -512,7 +519,8 @@ struct SectionDetailView: View {
         let alerting: some View = presentingTheAlerts(registered)
         let followingTheAlerts: some View = followingWhatTheAlertsLeave(alerting)
         let withSheets: some View = presentingTheSheets(followingTheAlerts)
-        return followingRequestsAndDeployEndings(withSheets)
+        let following: some View = followingRequestsAndDeployEndings(withSheets)
+        return watchingTheDeployedFolder(following)
     }
 
     /// The notices, the tabs and the stack the site is laid over — what the
@@ -544,6 +552,9 @@ struct SectionDetailView: View {
                     dismiss: dismissScheduledPublishNotice
                 )
             }
+            // While this section's deployed folder is open in the browser,
+            // with Stop (#850).
+            deployedFolderNotice
             if let unsavedSettingsNotice {
                 // Its own view, and never `fixedSize` — see the view. Since
                 // #335 it may be a deploy's sentence, named for UI tests by
@@ -786,11 +797,19 @@ struct SectionDetailView: View {
                     .accessibilityIdentifier("deployButton")
                     }
 
-                    Button("Open in Browser", systemImage: "safari") {
-                        openInBrowser()
+                    // One Open in Browser for both (#850): the preview while
+                    // one shows, the deployed folder otherwise, and the help
+                    // says which.
+                    Button(DeployedFolderWording.menuItem, systemImage: "safari") {
+                        openInBrowserPressed(from: .toolbar)
                     }
-                    .disabled(previewURL == nil)
-                    .help("Open this preview in your web browser")
+                    .disabled(!openInBrowserIsEnabled)
+                    .help(openInBrowserHelp)
+                    .onHover { inside in
+                        if inside {
+                            refreshTheDeployedFolder()
+                        }
+                    }
                     .accessibilityIdentifier("openInBrowserButton")
 
                 }
@@ -807,6 +826,9 @@ struct SectionDetailView: View {
                 previewButtonEnabled: previewButtonIsEnabled,
                 deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
                 previewIsShowing: previewURL != nil,
+                deployedFolderReady: deployedFolderIsReady,
+                deployedFolderShown: deployedFolderShowHere != nil,
+                deployedFolderReason: deployedFolderMenuReason,
                 lastChangeIsHere: lastMenuChangeIsHere,
                 verbIsRunning: verbIsRunningHere,
                 previewOpensAt: AppSettings.shared.previewOpensAt,
@@ -1816,9 +1838,9 @@ struct SectionDetailView: View {
                 startDeploy()
             }
         case .openInBrowser:
-            if previewURL != nil {
-                openInBrowser()
-            }
+            openInBrowserPressed(from: .sectionMenu)
+        case .stopShowingDeployedFolder:
+            stopShowingTheDeployedFolder()
         case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
              .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
             performVerb(item)
@@ -1970,6 +1992,9 @@ struct SectionDetailView: View {
                             allLegs: deployRunner.legs.count > 1 ? deployRunner.legs : nil,
                             onCancel: {
                                 cancelDeploy()
+                            },
+                            openFolderInBrowser: { sectionFolder in
+                                openTheFolderADeployNamed(sectionFolder)
                             }
                         )
                     }

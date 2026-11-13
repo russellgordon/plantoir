@@ -79,6 +79,8 @@ nonisolated enum SubjectMenuRules {
         case preview
         case deploy
         case openInBrowser
+        /// Stop Showing Deployed Folder (#850).
+        case stopShowingDeployedFolder
         case scheduleDeploy
         case cancelScheduledDeploy
         case getReadyForTheStartOfTheYear
@@ -167,6 +169,11 @@ nonisolated enum SubjectMenuRules {
         var verbIsRunning: Bool = false
         var canGoBack: Bool = false
         var canGoForward: Bool = false
+        /// The selected section's deployed folder can be opened in the
+        /// browser (#850, `DeployedFolderOffer.decide` says offered).
+        var deployedFolderReady: Bool = false
+        /// This app is showing the selected section's deployed folder.
+        var deployedFolderShown: Bool = false
     }
 
     // MARK: - Functions
@@ -269,8 +276,14 @@ nonisolated enum SubjectMenuRules {
             if situation.deployButtonEnabled && isLive {
                 enabled.insert(.deploy)
             }
-            if situation.previewIsShowing {
+            // One Open in Browser for both (#850, Russell 2026-11-13): the
+            // preview while one shows, the deployed folder otherwise.
+            if situation.previewIsShowing || situation.deployedFolderReady {
                 enabled.insert(.openInBrowser)
+            }
+            // Stop writes nothing, so nothing holds it back.
+            if situation.deployedFolderShown {
+                enabled.insert(.stopShowingDeployedFolder)
             }
             // Neither on a course kept for reference: nothing deploys from
             // one, and its section row's context menu offers neither — the

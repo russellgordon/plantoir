@@ -63,6 +63,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   Preview at Last Viewed  [⌥⇧⌘P]  (alternate)
   Deploy…  [⇧⌘D]
   Open in Browser
+  Stop Showing Deployed Folder
   ----
   Publish Pages…
   Hide Pages…

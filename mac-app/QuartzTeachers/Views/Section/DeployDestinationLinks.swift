@@ -24,6 +24,9 @@ struct DeployDestinationLinks: View {
 
     let legs: [MultiDestinationDeployRunner.Leg]
 
+    /// Opens a folder leg's folder in the web browser (#850), or nil.
+    var openFolderInBrowser: ((URL) -> Void)? = nil
+
     // MARK: - Body
 
     var body: some View {
@@ -44,10 +47,19 @@ struct DeployDestinationLinks: View {
                             Link(siteURL.absoluteString, destination: siteURL)
                                 .accessibilityIdentifier("publishedSiteLink-\(leg.destination.type)")
                         } else if let folderURL = leg.runner.publishedFolderURL {
-                            Button("Show in Finder", systemImage: "finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([folderURL])
+                            HStack(spacing: 8) {
+                                if let openFolderInBrowser {
+                                    Button(DeployedFolderWording.resultButton, systemImage: "safari") {
+                                        openFolderInBrowser(folderURL)
+                                    }
+                                    .help(DeployedFolderWording.help)
+                                    .accessibilityIdentifier("publishedFolderOpenInBrowserButton-\(leg.destination.type)")
+                                }
+                                Button("Show in Finder", systemImage: "finder") {
+                                    NSWorkspace.shared.activateFileViewerSelecting([folderURL])
+                                }
+                                .accessibilityIdentifier("publishedFolderButton-\(leg.destination.type)")
                             }
-                            .accessibilityIdentifier("publishedFolderButton-\(leg.destination.type)")
                         }
                     }
                 }

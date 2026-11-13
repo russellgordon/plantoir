@@ -33,6 +33,8 @@ final class QuitConfirmationTests: XCTestCase {
             let copyCount: Int = try XCTUnwrap(
                 given["copiesBeingSaved"] as? Int, "\(name): no copiesBeingSaved"
             )
+            // #850: 0 when a case leaves it out (the contract says so).
+            let shownCount: Int = (given["deployedFoldersShown"] as? Int) ?? 0
             let reasonName: String = try XCTUnwrap(given["quitReason"] as? String)
             let reason: QuitConfirmation.Reason = reasonName == "theMacIsLoggingOutOrShuttingDown"
                 ? .theMacIsLoggingOutOrShuttingDown
@@ -40,10 +42,13 @@ final class QuitConfirmationTests: XCTestCase {
 
             CourseActivity.reset()
             PreviewLeases.reset()
+            DeployedFolderShows.shared.resetForTests()
             defer {
                 CourseActivity.reset()
                 PreviewLeases.reset()
+                DeployedFolderShows.shared.resetForTests()
             }
+            DeployedFolderShows.shared.pretendShownForTests = shownCount
             for index in 0..<publishCount {
                 CourseActivity.beginPublish(
                     folderPath: "/pretend", courseCode: "ADA1O", sectionNumber: index + 1

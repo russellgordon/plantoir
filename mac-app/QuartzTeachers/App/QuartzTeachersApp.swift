@@ -43,6 +43,12 @@ struct QuartzTeachersApp: App {
             AssistMCPServer.serve(workingFolder: folder)
         }
 
+        // A deployed folder served with no window, for checks run from the
+        // command line (#850). Never returns.
+        if let folder = DeployedFolderCommandLine.requestedFolder(from: CommandLine.arguments) {
+            DeployedFolderCommandLine.serve(folder: folder)
+        }
+
         // A scheduled deploy, fired by launchd. Checked before anything that
         // puts a window on screen, and it never returns.
         //

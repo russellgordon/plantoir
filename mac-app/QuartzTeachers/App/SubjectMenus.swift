@@ -243,7 +243,13 @@ struct SectionMenu: Commands {
             }
             item("Deploy…", .deploy, enabled)
                 .keyboardShortcut("d", modifiers: [.command, .shift])
-            item("Open in Browser", .openInBrowser, enabled)
+            // One Open in Browser for both (#850): the preview while one
+            // shows, the deployed folder otherwise.
+            item(DeployedFolderWording.menuItem, .openInBrowser, enabled)
+            if current.row == .section, let reason = site?.deployedFolderReason {
+                Text(reason)
+            }
+            item(DeployedFolderWording.stopMenuItem, .stopShowingDeployedFolder, enabled)
 
             Divider()
 
@@ -336,7 +342,7 @@ struct SectionMenu: Commands {
     func run(_ item: SubjectMenuRules.Item) {
         MenuRoute.run(item, in: workspace?.window) {
             switch item {
-            case .preview, .deploy, .openInBrowser,
+            case .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder,
                  .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
                  .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
                 site?.perform(item)

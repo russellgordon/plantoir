@@ -1697,6 +1697,7 @@ struct SidebarView: View {
         reviseWithSubmenu(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
         openInObsidianItem(course: course, sectionNumber: sectionNumber, row: row)
+        deployedFolderItems(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
         // The assistant's four everyday functions (#457 batch B; Russell's
         // decision 10 on the plan), run by the section window through the
@@ -1756,6 +1757,30 @@ struct SidebarView: View {
         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
         Divider()
         removeItem("Remove Section…", course: course, row: row)
+    }
+
+    /// Open in Browser and Stop Showing Deployed Folder on a section row
+    /// (#850), drawn only when they apply, as this menu's rule is: Open in
+    /// Browser while the deployed folder can be opened, Stop while it is
+    /// shown. Read when the menu is drawn, which is when it opens. The row
+    /// is selected first and its window acts, so the one Open in Browser
+    /// opens the preview there if one is showing.
+    @ViewBuilder
+    func deployedFolderItems(course: Course, sectionNumber: Int, row: SidebarSelection) -> some View {
+        if let folder = workspace.workspaceURL?.path {
+            let lookup: DeployedFolderShows.Lookup = DeployedFolderShows.lookUp(
+                course: course, sectionNumber: sectionNumber, workingFolderPath: folder
+            )
+            let shown: Bool = DeployedFolderShows.shared.show(
+                courseCode: course.code, sectionNumber: sectionNumber, workingFolderPath: folder
+            ) != nil
+            if lookup.decision == .offered {
+                sectionVerbItem(DeployedFolderWording.menuItem, .openInBrowser, course: course, sectionNumber: sectionNumber, row: row)
+            }
+            if shown {
+                sectionVerbItem(DeployedFolderWording.stopMenuItem, .stopShowingDeployedFolder, course: course, sectionNumber: sectionNumber, row: row)
+            }
+        }
     }
 
     /// One of the assistant's functions on a section row's context menu: the
@@ -2104,7 +2129,7 @@ struct SidebarView: View {
             }
         case .openWorkingFolder, .openRecent, .newCourse, .importCoursesForReference, .restoreFromArchive, .reloadCourses,
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
-             .preview, .deploy, .openInBrowser, .back, .forward, .reloadPage,
+             .preview, .deploy, .openInBrowser, .stopShowingDeployedFolder, .back, .forward, .reloadPage,
              .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
              .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
             // Not the sidebar's: File, Course Settings and the section

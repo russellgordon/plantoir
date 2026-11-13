@@ -50,6 +50,8 @@ final class SubjectMenuRulesTests: XCTestCase {
         situation.verbIsRunning = try XCTUnwrap(merged["verbIsRunning"] as? Bool)
         situation.canGoBack = try XCTUnwrap(merged["canGoBack"] as? Bool)
         situation.canGoForward = try XCTUnwrap(merged["canGoForward"] as? Bool)
+        situation.deployedFolderReady = try XCTUnwrap(merged["deployedFolderReady"] as? Bool)
+        situation.deployedFolderShown = try XCTUnwrap(merged["deployedFolderShown"] as? Bool)
         return situation
     }
 
