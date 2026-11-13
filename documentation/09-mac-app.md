@@ -691,12 +691,12 @@ run exists.
 **Known limits.**
 - The windowless assistant's deploy runs on `AssistSiteWork`'s own runner, so
   a section selected meanwhile greys Deploy but shows nothing in the console.
-- Another PROGRAM's deploy (a deploy set for later, an outside assistant, a
-  command line) does not grey the button. Work leases are per course and on
-  disk, and nothing in the app watches them change, so a button greyed from
-  them would stay grey after that program had finished. A press then is
-  refused in words: by `claimAPublish` (`builtElsewhere`) when that program
-  holds leases, or by the launcher when it holds none.
+- Until #729, another PROGRAM's deploy (a deploy set for later, an outside
+  assistant, a command line) did not grey the button, because nothing in the
+  app watched the leases. Since #729 a program that holds leases greys it
+  ("Deploy waits for another program (#729)", next). A program that holds
+  none, such as a deploy typed in Terminal, still does not: a press then is
+  refused in words by the launcher.
 
 Both are in `shared-rules.json` → `returningToASectionMidDeploy.knownLimits`.
 
@@ -735,6 +735,174 @@ Must-fail, by copy-and-restore:
 
 `QuartzTeachersUITests.testReturningToASectionMidDeployShowsTheDeploy` drives
 a stub `deploy.sh` that counts its own starts. It is part of no gate.
+
+## Deploy waits for another program (#729)
+
+**What it closes.** #706 greyed Deploy while THIS app deployed a section. A
+deploy set for later, an outside assistant (`Plantoir --mcp-stdio`) or another
+copy of Plantoir left the button pressable, and the press was then refused in
+the "Cannot Deploy Yet" alert (`claimAPublish` → `builtElsewhere`). Russell's
+ruling on #729, 2026-11-12: watch the activity folder so Deploy greys and
+un-greys honestly, and measure what a folder watch can be trusted with before
+relying on it.
+
+**What a teacher sees.**
+- Deploy, Section ▸ Deploy… and ⇧⌘D are greyed on EVERY section of a course
+  another program holds, in this working folder. A lease names the course,
+  never the section, and a press on a sibling section is refused the same way.
+- The button's help and its VoiceOver hint are
+  `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
+  ready still wins (`folderReadinessReason`).
+- When the other program removes its lease, or its process ends, the button
+  is available again with no click.
+- Another program's PREVIEW greys it too, because a press is refused for one
+  (`WorkLeaseFiles.kindsThatBlockABuild` holds `preview` since #156). This is
+  why the sentence says "previewed or deployed" and promises that Deploy comes
+  back "once that preview is stopped": a preview does not finish by itself
+  (the plan review's M6).
+- An `assist` lease (an outside assistant revising, building nothing) does
+  not grey it.
+
+**The shape.**
+- `Models/LeaseWatcher.swift`:
+  - `LeaseWatcher` is `@MainActor @Observable`, one per working folder. It
+    holds `holdingElsewhere[COURSE]`: what `WorkLeaseFiles.blocking(among:
+    heldElsewhere, asker: .aBuild, claim: nil)` answers. That is exactly the
+    question `deployWillBeRefused` asks at the press, so the grey and the
+    refusal cannot disagree.
+  - `LeaseWatchers.shared` keeps one watcher per folder the app's WINDOWS
+    show. `WorkspaceModel.watchTheLeasesOfTheOpenFolders()` keeps it in step:
+    a window registering or leaving, and `pointAtFolder`. It is never called
+    under the unit-test suite, whose windows sit on pretend folders.
+- `SectionDetailView.deployIsAvailable` gained `heldElsewhere`, and
+  `deployHelp` chooses the help.
+
+**The events. No timer anywhere.**
+- A directory watch on EVERY level of the path that exists: `courses/`,
+  `courses/.internal` and `courses/.internal/activity/`
+  (`ScheduledPublishWatcher.changes`, the permitted GCD use). A change in
+  the activity folder is a re-read. A change at a level above it (a folder
+  made, removed, renamed or replaced) re-arms every level from the path as
+  it is now, then re-reads. A watch is on an open folder, not on a path, so
+  this is what lets it follow `.internal` being made alone first, removed
+  and made again, or renamed away and back. The first build watched only
+  the deepest level that existed and moved down only when the activity
+  folder itself appeared: the implementation review measured it deaf for
+  the rest of the session when `.internal` was made alone first (0 of 20),
+  and its proposed fix (move to the deepest level whenever a deeper one
+  appears) still missed `.internal` renamed away and replaced, which a
+  watch on the old, renamed folder never hears. The watcher CREATES nothing.
+  Creating `courses/.internal` again after something removed it could make
+  that program's own `mv` of a replacement folder fail, since a rename over
+  a folder that is not empty fails.
+- One `ProcessEnding.ends(of:)` per distinct holder's process id. This is
+  what un-greys the button when a holder is killed and leaves its lease
+  behind: the lease then reads as stale (`ProcessLiveness`), and no file
+  event will ever come.
+- `reread()` is also called:
+  - when the section appears;
+  - when the app becomes active;
+  - when a window becomes key;
+  - when the Mac wakes from sleep (`NSWorkspace.didWakeNotification`: an app
+    that was already active does not become active again on wake; the
+    review's L-b2);
+  - when the pointer enters the Deploy button.
+
+  These are the plan review's M4. A stuck grey is the harmful failure,
+  because a disabled button cannot be pressed, and these are the moments the
+  teacher reaches for Deploy. Each is also a chance to re-arm a folder watch
+  that went deaf. Re-arming is always caused by an event; the watch's own
+  last read does not re-arm, so a folder that cannot be opened cannot spin.
+
+**What was measured.** M4 Pro, 12 cores, macOS 26.6, APFS, 2026-11-13,
+re-run in full on the watcher as merged (every level watched). A
+standalone harness compiled the REAL `LeaseWatcher.swift`, `WorkLeaseFiles`,
+`ProcessLiveness` and `ProcessEnding`, plus `changes(at:watching:)` copied
+verbatim. It ran 40 trials each, with holders as real child processes writing
+their own leases.
+
+| Trial | Result |
+|---|---|
+| W1, a lease written with `Data.write(.atomic)` is listed, with a readable name line (the liveness check reads it) | 40/40, slowest 3 ms, exactly 1 folder event per write |
+| W2, the lease removed is cleared | 40/40, 3 ms, 1 event |
+| W3, the holder `kill -9`ed with its lease left on disk | `ProcessEnding` fired 40/40 (3 ms); cleared 40/40 at that read |
+| W4, a lease assembled beside the folder by `bash` and `mv`ed in (Windows' shape, and a future launcher lease's) | 40/40, slowest 24 ms, 1 event |
+| W5, no activity folder (nor `.internal`) at the start; the first lease makes both | listed 40/40 |
+| W6, W1 to W3 again beside 12 `yes` processes, one per core (#417's lesson) | 40/40 each, slowest 15, 20 and 30 ms |
+| W7, a lease naming pid 1 (root's launchd) with its real name and start | listed as held; the process watch armed and stayed silent: 0 re-reads in 2 s, so no spin |
+| W8, a lease written and removed within a few milliseconds | final state clear 40/40 |
+| W9, two holders, one leaves | still held by the other 40/40 |
+| W10, `.internal` removed while watched, then made again by a lease | re-armed and listed 40/40 |
+| W12, switching folders | 40/40 left no descriptor on the old folder (`lsof -p`) and no process watch (3 descriptors while watched, one per level) |
+| W13, `.internal` made alone (a token folder in it), 0.3 s later the first lease | 40/40 (0 of 20 before the fix, the review's R1) |
+| W14, `.internal` removed while watched, made again alone, then a lease | 40/40 (0 of 20 before the fix, the review's R5) |
+| W15, `.internal` renamed away while watched, then a lease into a new one | 40/40 |
+
+W11 (sleep and wake with a holder that ended during sleep) was NOT measured.
+An agent may not sleep the Mac. The process-exit event is queued by the
+kernel and delivered on wake, and the section re-reads on the wake
+notification.
+
+**Why no fallback.** Every pass bar was met, so the 2 s re-read the plan held
+in reserve was not built.
+
+**What is still not seen.**
+- A program that holds no lease: a deploy typed in Terminal, or a leftover
+  run (#439). The launcher's guard refuses its press in words, and #729's
+  first part widened what that guard sees ([03](03-launcher-scripts.md) → "A
+  section being deployed cannot be deployed again (#439)").
+- A holder run by another account (its `Plantoir`, say). W7 shows that a
+  watch on such a process arms without firing at once. That it fires when
+  such a process ends was NOT measured, because no other account's process
+  could be ended here. Liveness is `ProcessLiveness`'s, which errs towards
+  alive, so such a holder can keep Deploy grey until the next event re-reads.
+
+**Rejected.**
+- Reading the process table to grey the button. It needs a timer, since no
+  event says a process started; it runs `ps` per redraw or per interval; and
+  it would copy the launchers' awk into Swift.
+- Polling the folder on a timer. The events exist.
+- `FSEventStream` and `NSFilePresenter`, for `ScheduledPublishWatcher`'s
+  reasons.
+- Leases per section. That is a format both apps and #245's readers share,
+  for a case the press refuses anyway, because `claimAPublish` is per course.
+- A trail line per grey and un-grey (#729 question 3). It is a state, not an
+  act: a refused press is already on the trail.
+- `deploy.sh` taking a lease itself, so a deploy typed in Terminal greys the
+  button. It has real value and is a follow-up (#729 question 2). It touches
+  `ProcessLiveness` (a bash holder's name and start), `workLeases` on both
+  platforms and three launchers.
+- The watcher creating the activity folder (above).
+
+**Tests.**
+- `LeaseWatcherTests`:
+  - every `heldElsewhere` case, through `deployIsAvailable` and `deployHelp`,
+    against real files with `/bin/sleep` holders;
+  - a killed holder un-greys with no file event;
+  - a lease written and removed is seen both ways;
+  - the watch moves down when the activity folder appears;
+  - each order the folders can appear in: `.internal` made alone first;
+    both together; `.internal` removed and made again alone; the activity
+    folder removed and made again; `.internal` renamed away and back. On the
+    first build, three of these fail (alone first, removed then alone,
+    renamed); on the review's proposed fix, one does (renamed). "Both
+    together" and "the activity folder removed" passed on the first build
+    too, and are kept so a later change cannot break them;
+  - stopping lets go of every watch;
+  - the help is the contract's sentence.
+- `SectionRunsTests`: source scans of the button, the menu, the hint, the five
+  re-reads and `WorkspaceModel`'s three calls.
+- Must-fail, by copy-and-restore, each rebuilt and run:
+  - no process watches: 4 failures, including the killed-holder test and its
+    contract case;
+  - `deployIsAvailable` ignoring `heldElsewhere`: 5 failures, the five cases
+    that start greyed.
+- `QuartzTeachersUITests` has no test for this yet. It needs the screen;
+  Russell's hand test covers it, and must check two things no test here
+  can: that hovering over a greyed Deploy reaches `.onHover` on a disabled
+  button, with the window key and with it behind another (a breakpoint on
+  `LeaseWatcher.reread` in a Debug build shows it), and that VoiceOver reads the sentence ONCE: it is both the `.help` and the
+  `.accessibilityHint`, and if it is read twice the hint goes.
 
 ## A section's Problems tab, its marker and its alert (#717)
 
