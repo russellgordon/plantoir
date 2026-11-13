@@ -103,7 +103,7 @@ nonisolated struct SetUpDependencies: Sendable {
             },
             identity: DeveloperIDCheck(),
             accountShell: SetUpRunner.accountShell(),
-            userName: NSUserName(),
+            userName: RealHome.accountName,
             longestRun: .seconds(SetUpRunner.longestRunMinutes * 60),
             stopGrace: .seconds(SetUpRunner.stopGraceSeconds)
         )
@@ -174,16 +174,9 @@ nonisolated final class SetUpRunner: Sendable {
 
     // MARK: - Functions
 
-    /// The login shell the account record names, or `/bin/zsh`, macOS's own
-    /// default, when it names none.
+    /// The login shell the account record names (`RealHome.accountShell`).
     static func accountShell() -> String {
-        if let entry = getpwuid(getuid()), let shell = entry.pointee.pw_shell {
-            let text: String = String(cString: shell)
-            if !text.isEmpty {
-                return text
-            }
-        }
-        return "/bin/zsh"
+        return RealHome.accountShell
     }
 
     /// The child's whole environment, built from nothing.
