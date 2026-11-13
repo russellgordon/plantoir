@@ -50,7 +50,8 @@
 #   ./verify-deploy.sh <folder> <CODE> <N>
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
 #                                          # Cloudflare (#665) and its retry of a
-#                                          # new site's files (#740), offline, ~25 s
+#                                          # new site's files (#740) and pages
+#                                          # (#869), offline, ~50 s
 #   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
 #                                          # publishes as a NEW teacher would:
 #                                          # new sites, both questions asked (#712)
@@ -232,28 +233,61 @@ wait_for_new_address() {  # wait_for_new_address <label> <url>
 # for a race, and the edges disagree file by file, so "long enough" for one
 # file says nothing about the next); retrying on a plain run too (it would
 # hide a real 404 on a site that has existed for weeks).
+#
+# Pages too, since #869. Measured at #835 part 2's gate (2026-11-13, two
+# --first-publish runs): the borrowed page of runnable code, fetched once
+# with no second asking, answered Netlify's new site HTTP 404 in run 1 and
+# Cloudflare's new project HTTP 522 in run 2, a different host each time,
+# seconds after the site went live, and failed two checks each time ("carries
+# no runnable block" and "carries no Swift program", which reads the same
+# fetched page). The same page passed on the next leg of the same run, and in
+# run 2 a file one line earlier got #740's retry and passed. So every fetch
+# of a brand-new site that judged it on one answer now goes through this
+# helper: the page of runnable code (wanting its runnable block), the same
+# page's isolation headers, the front page's headers and the page's CSP (the
+# last two are checks for an ABSENT header, which a 404 or a 522 used to pass
+# without the page ever being read), and in check_page_links the two pages it
+# starts from and every link it asks for. check_url and the waits above
+# already ask again on their own, in every run.
 NS_POLL="${VERIFY_DEPLOY_NS_POLL:-5}"
 NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
 
-# fetch_headers <want: 200|coep> <url> [-o <file>]
-# Prints the response headers (\r stripped), as `curl -s -D -` did. "200"
-# wants HTTP 200; "coep" wants HTTP 200 and COEP require-corp.
+# The last block of `curl -L -D -`'s headers: the answer the redirects led to.
+last_header_block() {
+  awk 'BEGIN{RS=""} {last=$0} END{print last}'
+}
+
+# fetch_headers <want> <url> [-o <file>]
+# Prints the response headers (\r stripped), as `curl -s -D -` did. Wants
+# that do not follow a redirect: "200" wants HTTP 200; "coep" wants HTTP 200
+# and COEP require-corp. Wants that follow redirects (#869), and print every
+# block as `curl -sL -D -` did: "page" wants the final answer HTTP 200;
+# "runner" wants that and the body (-o) carrying the runnable block;
+# "isolated" wants that and COOP same-origin with COEP require-corp.
 fetch_headers() {
-  local want="$1" url="$2" out="/dev/null" headers code start deadline waited tries=0 good
+  local want="$1" url="$2" out="/dev/null" headers final code start deadline waited tries=0 good follow=""
   [ "${3:-}" = "-o" ] && out="$4"
+  case "$want" in page|runner|isolated) follow="-L" ;; esac
   # A deadline fixed once, not a count of polls: how many retries fit before
   # it depends on how long each answer takes, so nothing may pin that number
   # (the self-test asserts a range).
   start=$(date +%s)
   deadline=$(( start + NS_WAIT ))
   while :; do
-    headers=$(curl -s -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
-    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    headers=$(curl -s $follow -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
+    final=$(printf '%s\n' "$headers" | last_header_block)
+    code=$(printf '%s\n' "$final" | awk 'NR==1{print $2}')
     good=false
     if [ "$code" = "200" ]; then
-      if [ "$want" != "coep" ] || printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
-        good=true
-      fi
+      case "$want" in
+        coep|isolated)
+          printf '%s\n' "$final" | grep -qi '^cross-origin-embedder-policy: require-corp' && good=true
+          if [ "$want" = isolated ] && ! printf '%s\n' "$final" | grep -qi '^cross-origin-opener-policy: same-origin'; then
+            good=false
+          fi ;;
+        runner) grep -q 'class="plantoir-runner"' "$out" 2>/dev/null && good=true ;;
+        *) good=true ;;
+      esac
     fi
     waited=$(( $(date +%s) - start ))
     [ "$good" = true ] && break
@@ -270,15 +304,287 @@ fetch_headers() {
   printf '%s\n' "$headers"
 }
 
-# One line per site for the Result block: how many of its files a brand-new
-# site needed asking again, and the most it took.
-measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in />
+# One line per site for the Result block: how many of its files (and, since
+# #869, its pages) a brand-new site needed asking again, and the most it took.
+measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in /> [what]
   local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
   [ "$FIRST_PUBLISH" = true ] || return 0
   case "$2" in http://localhost:*) return 0 ;; esac
   line=$(awk -F '\t' -v b="$2" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
     END { if (n == 0) print "no file needed asking again"; else printf "%d file(s) needed asking again, %d retries in all, at most %d for one file, the longest %d s", n, t, m, w }' "$log" 2>/dev/null)
-  MEASURED+=("$1, a brand-new site's files (#740): ${line:-no file needed asking again}")
+  local what="${3:-}"
+  [ -n "$what" ] || what="a brand-new site's files and pages (#740, #869)"
+  MEASURED+=("$1, $what: ${line:-no file needed asking again}")
+}
+
+# ------------------------------- what a published site is checked for
+# check_engine and check_page_links are defined here, ahead of the self-test,
+# so the self-test runs the real checks against a stub site (#869).
+
+# Runnable code (#455) and the site's own KaTeX (#494): every host must send
+# the engine's files with types a browser will run - .wasm as
+# application/wasm (WebAssembly.instantiateStreaming refuses anything else),
+# .mjs and the worker as JavaScript - and any CSP it sends must let wasm
+# compile ('unsafe-eval' or 'wasm-unsafe-eval'); KaTeX's stylesheet and a
+# face must come back from the site itself, and Netlify's CSP must no longer
+# name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
+check_engine() {  # check_engine <label> <site base url ending in />
+  # Each call keeps its own retry log, so a pairing leg that checks a site
+  # an earlier leg already checked counts only its own retries (#740 review).
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
+  local base="$2" name type code headers csp
+  for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
+    headers=$(fetch_headers 200 "${base}static/pyodide/$name")
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    case "$name" in
+      *.wasm) want="application/wasm" ;;
+      *.mjs|*.js) want="javascript" ;;
+      *) want="" ;;
+    esac
+    if [ "$code" != "200" ]; then
+      no "$1 answered HTTP $code for static/pyodide/$name"
+    elif [ -n "$want" ] && ! printf '%s' "$type" | grep -q "$want"; then
+      no "$1 sends static/pyodide/$name as '$type', which a browser will not run as $want"
+    else
+      ok "$1 sends static/pyodide/$name (HTTP 200${type:+, $type})"
+    fi
+  done
+  headers=$(fetch_headers 200 "${base}static/pyodide/plantoir-worker.js")
+  csp=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-security-policy:"{ $1=""; print }' | tail -1)
+  if [ -z "$csp" ] || printf '%s' "$csp" | grep -Eq "'(unsafe-eval|wasm-unsafe-eval)'"; then
+    ok "$1's worker may compile WebAssembly (${csp:+CSP allows it}${csp:-no CSP})"
+  else
+    no "$1's worker CSP allows no wasm: $csp"
+  fi
+  # Hosts answer the .html address with a redirect to the pretty one (Netlify
+  # 301, Cloudflare 308), so the page is fetched following it.
+  # A brand-new site's page is asked again like its files (#869).
+  code=$(fetch_headers runner "${base}Runner-Deploy-Check" -o "$WORK/runner-page.html" | last_header_block | awk 'NR==1{print $2}')
+  if [ "$code" = "200" ] && grep -q 'class="plantoir-runner"' "$WORK/runner-page.html"; then
+    ok "$1's page of runnable code carries its runnable block"
+  else
+    no "$1's page of runnable code answered HTTP $code or carries no runnable block"
+  fi
+  # Runnable Swift (#493): the page's thread and its WASI shim as JavaScript
+  # (a module worker refuses anything else), and the block's program. The
+  # program is compiled from its bytes, so its type does not decide whether
+  # it runs; it is said, not required (review N4).
+  for name in plantoir-swift-worker.js plantoir-wasi.mjs; do
+    headers=$(fetch_headers 200 "${base}static/swift/$name")
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    if [ "$code" = "200" ] && printf '%s' "$type" | grep -q javascript; then
+      ok "$1 sends static/swift/$name (HTTP 200, $type)"
+    else
+      no "$1 answered HTTP $code, '$type' for static/swift/$name (a module worker needs JavaScript)"
+    fi
+  done
+  local program
+  program=$(grep -aoE 'data-runner-wasm="static/swift-wasm/[0-9a-f]{64}\.wasm"' "$WORK/runner-page.html" | head -1 | sed 's/^data-runner-wasm="//; s/"$//')
+  if [ -z "$program" ]; then
+    no "$1's page of runnable code carries no Swift program"
+  else
+    headers=$(fetch_headers 200 "${base}$program" -o "$WORK/program.wasm")
+    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
+    if [ "$code" = "200" ] && [ "$(head -c 4 "$WORK/program.wasm" | od -An -tx1 | tr -d ' \n')" = "0061736d" ]; then
+      ok "$1 sends the page's Swift program (HTTP 200, ${type:-no type}, $(wc -c < "$WORK/program.wasm" | tr -d ' ') bytes)"
+    else
+      no "$1 answered HTTP $code for $program, or not a WebAssembly program"
+    fi
+  fi
+  # Live input (#583): the page of runnable code (it reads input, and shows
+  # nothing from another website) is sent the headers that isolate it -
+  # following the host's redirect, since Netlify answers the address with
+  # capitals with a 301 to its lower-case form - the engine folders carry
+  # COEP, and a page with no runnable code carries neither
+  # (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
+  headers=$(fetch_headers isolated "${base}Runner-Deploy-Check" | last_header_block)
+  if printf '%s\n' "$headers" | grep -qi '^cross-origin-opener-policy: same-origin' \
+     && printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+    ok "$1 isolates the page of runnable code (COOP same-origin, COEP require-corp), so it asks for input as it runs"
+  else
+    no "$1 does not send COOP and COEP on the page of runnable code, so it keeps the input box"
+  fi
+  for name in pyodide/pyodide.mjs pyodide/plantoir-worker.js swift/plantoir-wasi.mjs swift/plantoir-swift-worker.js; do
+    headers=$(fetch_headers coep "${base}static/$name")
+    if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
+      ok "$1 sends COEP on static/$name"
+    else
+      no "$1 sends no COEP on static/$name, which an isolated page's worker needs"
+    fi
+  done
+  headers=$(fetch_headers page "${base}" | last_header_block)
+  if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy:'; then
+    no "$1 sends COEP on the front page, which has no runnable code - its frames would break"
+  else
+    ok "$1 sends no COEP on the front page, which has no runnable code"
+  fi
+  headers=$(fetch_headers 200 "${base}static/katex/katex.min.css")
+  if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
+    ok "$1 serves KaTeX's stylesheet itself (text/css)"
+  else
+    no "$1 does not serve static/katex/katex.min.css as text/css"
+  fi
+  code=$(fetch_headers 200 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" | awk 'NR==1{print $2}')
+  [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
+  headers=$(fetch_headers page "${base}Runner-Deploy-Check")
+  if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
+    no "$1's CSP still names cdn.jsdelivr.net"
+  else
+    ok "$1's CSP names no CDN for the maths"
+  fi
+  measure_new_site_retries "$1" "$base"
+}
+
+# Page addresses on Netlify (#628, contracts/shared-rules.json ->
+# netlifyPageAddresses). Every same-site <a href> on the front page and the
+# borrowed page of runnable code, resolved against the page and asked for
+# WITHOUT following a redirect. On Netlify each one must answer 200 and the
+# page must wear the marker the publish adds: a 301 to the same path in lower
+# case is the rewrite failing. Three other redirects are Quartz's own link
+# shapes, not the rewrite, and are counted as their own classes rather than
+# failed: `/index` -> `/`, `%2C` -> `,`, and a file link with a trailing slash.
+# On Cloudflare Pages (case-sensitive) the links stay in the build's mixed case,
+# the page carries no marker, every link answers 200 apart from those classes,
+# and one control - a mixed-case page link asked for in lower case - says what
+# Cloudflare does with an address it does not hold.
+check_page_links() {  # check_page_links <label> <site base url ending in /> <netlify|cloudflare>
+  local said status
+  # Its own retry log, counted in the Result block like check_engine's (#869).
+  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
+  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
+  : >"$NS_RETRY_LOG"
+  said=$(python3 - "$2" "$3" "$FIRST_PUBLISH" "$NS_POLL" "$NS_WAIT" "$NS_RETRY_LOG" <<'PY'
+import html, re, sys, time, urllib.error, urllib.parse, urllib.request
+base, host_kind = sys.argv[1], sys.argv[2]
+# The four after them are optional, because Windows' verify-deploy.ps1 runs
+# this same program read out of this file and passes the first two only
+# (Get-PageLinksProgram): without them nothing is asked again, as before #869.
+extra = sys.argv[3:7] if len(sys.argv) >= 7 else ["false", "5", "60", ""]
+first_publish, ns_poll, ns_wait, retry_log = extra[0] == "true", float(extra[1]), float(extra[2]), extra[3]
+own = urllib.parse.urlsplit(base).netloc.lower()
+def asked_again(url, attempt, settled):
+    # fetch_headers' rule (#740, #869), for the fetches made here: on a first
+    # publish only, an answer that is not settled is asked again every NS_POLL
+    # s until NS_WAIT s have passed, each retry written down and counted, and
+    # the last answer is what is judged.
+    start = time.time()
+    tries = 0
+    while True:
+        answer = attempt(url)
+        good = settled(answer)
+        if good or not first_publish or url.startswith("http://localhost:") or time.time() >= start + ns_wait:
+            break
+        tries += 1
+        time.sleep(ns_poll)
+    if tries:
+        waited = int(time.time() - start)
+        print(f"  ↻ a brand-new site: {url} needed {tries} retr{'y' if tries == 1 else 'ies'} over {waited} s ({'then answered' if good else 'never answered as wanted'})", file=sys.stderr)
+        with open(retry_log, "a", encoding="utf-8") as log:
+            log.write(f"{url}\t{tries}\t{waited}\t{'true' if good else 'false'}\n")
+    return answer
+class Stay(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+plain = urllib.request.build_opener(Stay)
+def ask(url):
+    try:
+        response = plain.open(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30)
+        return response.status, "", response.read().decode("utf-8", "ignore")
+    except urllib.error.HTTPError as error:
+        return error.code, error.headers.get("Location") or "", ""
+    except Exception as error:
+        return 0, str(error), ""
+def page(url):
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30) as response:
+        return response.geturl(), response.read().decode("utf-8", "ignore")
+def page_or_error(url):
+    try:
+        return page(url)
+    except Exception as error:
+        return error
+def link_has_settled(answer):
+    # 200, or a redirect, which the checks below judge by class; a 404, a 5xx
+    # or no answer is a brand-new site's "not yet".
+    return answer[0] == 200 or answer[0] in (301, 302, 307, 308)
+problems, notes, links, marked, mixed = [], {}, {}, [], 0
+for start in (base, base + ("runner-deploy-check" if host_kind == "netlify" else "Runner-Deploy-Check")):
+    fetched = asked_again(start, page_or_error, lambda answer: not isinstance(answer, Exception))
+    if isinstance(fetched, Exception):
+        problems.append(f"could not fetch {start}: {fetched}")
+        continue
+    where, text = fetched
+    marked.append('data-plantoir-paths="lowercase"' in text)
+    for raw in re.findall(r'<a\s[^>]*?href="([^"]*)"', text):
+        href = html.unescape(raw).strip()
+        if not href or href.startswith(("#", "//")) or (re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", href) and not href.lower().startswith(("http://", "https://"))):
+            continue
+        absolute = urllib.parse.urljoin(where, href)
+        parts = urllib.parse.urlsplit(absolute)
+        if parts.netloc.lower() != own:
+            continue
+        # %-escapes' hex digits are not capitals (`%2C`): as test_netlify_paths.path_has_capitals.
+        if re.search(r"[A-Z]", re.sub(r"%[0-9A-Fa-f]{2}", "", parts.path)):
+            mixed += 1
+        links.setdefault(urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, "")), raw)
+answered = 0
+control = ""
+for url, raw in sorted(links.items()):
+    status, location, _ = asked_again(url, ask, link_has_settled)
+    if status == 200:
+        answered += 1
+        continue
+    path = urllib.parse.urlsplit(url).path
+    target = urllib.parse.urlsplit(urllib.parse.urljoin(url, location)).path if location else ""
+    if status in (301, 302, 307, 308) and target == path.lower() and path != path.lower():
+        problems.append(f"{raw} -> {status} to {target} (the capitals were not taken out)")
+    elif status in (301, 302, 307, 308) and path.endswith("/index") and target == path[: -len("index")]:
+        notes.setdefault("/index -> /", []).append(raw)
+    elif status in (301, 302, 307, 308) and target == path.replace("%2C", ",").replace("%2c", ","):
+        notes.setdefault("%2C -> ,", []).append(raw)
+    elif status in (301, 302, 307, 308) and path.endswith("/") and target == path.rstrip("/"):
+        notes.setdefault("a file link with a trailing slash", []).append(raw)
+    else:
+        problems.append(f"{raw} -> HTTP {status}{' to ' + target if target else ''}")
+if host_kind == "netlify":
+    if not all(marked) or not marked:
+        problems.append("a page does not carry data-plantoir-paths, which the Netlify publish adds")
+    if mixed:
+        problems.append(f"{mixed} same-site link(s) still have a capital in their path")
+else:
+    if any(marked):
+        problems.append("a Cloudflare page carries data-plantoir-paths, which only a Netlify publish adds")
+    if not mixed:
+        problems.append("no link has a capital: Cloudflare was sent the Netlify rewrite")
+    for url in sorted(links):
+        path = urllib.parse.urlsplit(url).path
+        if re.search(r"[A-Z]", path):
+            status, location, _ = ask(url.replace(path, path.lower(), 1))
+            control = f"{path.lower()} answers {status}{' to ' + location if location else ''}"
+            if status == 200:
+                problems.append(f"Cloudflare answered 200 for {path.lower()}, so it is not case-sensitive any more and this check's premise has moved")
+            break
+print(f"SUMMARY {len(links)} same-site links, {answered} answered 200" + "".join(f"; {name}: {len(items)}" for name, items in sorted(notes.items())) + (f"; control: {control}" if control else ""))
+for problem in problems:
+    print("PROBLEM " + problem)
+PY
+)
+  status=$?
+  if [ "$status" -ne 0 ] || [ -z "$said" ]; then
+    no "$1's page links could not be checked"
+    return
+  fi
+  if printf '%s\n' "$said" | grep -q '^PROBLEM '; then
+    no "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
+    printf '%s\n' "$said" | sed -n 's/^PROBLEM /       /p'
+  else
+    ok "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
+  fi
+  measure_new_site_retries "$1" "$2" "a brand-new site's page links (#869)"
 }
 
 # ----------------------------------------------------------------- self-test
@@ -511,6 +817,186 @@ STUB
     ok "a plain run's long-lived site answers 404: judged at once, never asked again"
   else
     no "a plain run's 404: HTTP $(code_of "$out"), said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  hdr "Self-test — a brand-new site's pages, asked again (#869)"
+  # A whole site on 127.0.0.1, so the REAL check_engine and check_page_links
+  # run against it: every engine file at its type with COEP, the page of
+  # runnable code with its block, its Swift program and its isolation, and a
+  # front page with one more link. The page of runnable code, the front page
+  # or the extra link can be made to answer 404 or 522 (Netlify's and
+  # Cloudflare's measured answers at #835's gate), or 200 without the
+  # runnable block, for the first K requests.
+  cat >"$ST_DIR/whole.py" <<'STUB'
+import http.server, os, pathlib, sys
+portfile, runner_mode, front_mode, lesson_mode = sys.argv[1:5]
+program = "static/swift-wasm/" + "ab" * 32 + ".wasm"
+links = '<a href="/Runner-Deploy-Check">code</a> <a href="/Lesson-One">lesson</a>'
+runner = f'<html><body>{links}<div class="plantoir-runner" data-runner-wasm="{program}"></div></body></html>'.encode()
+front = f"<html><body>{links}</body></html>".encode()
+types = {".wasm": "application/wasm", ".mjs": "application/javascript", ".js": "application/javascript",
+         ".zip": "application/zip", ".json": "application/json", ".css": "text/css", ".woff2": "font/woff2"}
+counts = {}
+def early(path, mode):
+    kind, _, limit = mode.partition(":")
+    seen = counts.get(path, 0)
+    counts[path] = seen + 1
+    if kind == "good" or not (limit == "inf" or seen < int(limit)):
+        return ""
+    return kind
+class Handler(http.server.BaseHTTPRequestHandler):
+    def answer(self, status, body, kind, extra=()):
+        self.send_response(status)
+        self.send_header("Content-Type", kind)
+        for name, value in extra:
+            self.send_header(name, value)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def not_yet(self, kind):
+        if kind == "404":
+            self.answer(404, b"Not Found - Request ID: stub\n", "text/plain")
+        elif kind == "522":
+            self.answer(522, b"error code: 522\n", "text/plain")
+        else:
+            self.answer(200, b"<html><body>a placeholder</body></html>", "text/html")
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path == "/Runner-Deploy-Check.html":
+            self.send_response(308)
+            self.send_header("Location", "/Runner-Deploy-Check")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if path == "/Runner-Deploy-Check":
+            kind = early(path, runner_mode)
+            if kind:
+                return self.not_yet(kind)
+            return self.answer(200, runner, "text/html", (("Cross-Origin-Opener-Policy", "same-origin"),
+                                                          ("Cross-Origin-Embedder-Policy", "require-corp")))
+        if path == "/":
+            kind = early(path, front_mode)
+            if kind:
+                return self.not_yet(kind)
+            return self.answer(200, front, "text/html")
+        if path == "/Lesson-One":
+            kind = early(path, lesson_mode)
+            if kind:
+                return self.not_yet(kind)
+            return self.answer(200, front, "text/html")
+        if path == "/" + program:
+            return self.answer(200, b"\0asm\1\0\0\0", "application/wasm")
+        if path.startswith("/static/"):
+            return self.answer(200, b"x", types.get(pathlib.PurePosixPath(path).suffix, "application/octet-stream"),
+                               (("Cross-Origin-Embedder-Policy", "require-corp"),))
+        self.answer(404, b"no such page\n", "text/plain")
+    def log_message(self, *args):
+        pass
+server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+pathlib.Path(portfile + ".part").write_text(str(server.server_port))
+os.replace(portfile + ".part", portfile)
+server.serve_forever()
+STUB
+  ws_start() {  # ws_start <runner mode> <front mode> <lesson mode>: good, 404:K, 522:K or bare:K
+    rm -f "$ST_DIR/wport"
+    python3 -I "$ST_DIR/whole.py" "$ST_DIR/wport" "$1" "$2" "$3" &
+    STUB_PID=$!
+    for _ in $(seq 1 100); do [ -s "$ST_DIR/wport" ] && break; sleep 0.1; done
+    WS_URL="http://127.0.0.1:$(cat "$ST_DIR/wport" 2>/dev/null)/"
+  }
+  # Each check runs in a subshell so its ✅ and ❌ are read here rather than
+  # counted, and the Result block's lines it would add are printed after it.
+  ws_run() {  # ws_run <check_engine|check_page_links> -> its lines, then MEASURED lines
+    ( MEASURED=(); NS_LEG=0
+      if [ "$1" = check_engine ]; then check_engine "case" "$WS_URL"; else check_page_links "case" "$WS_URL" cloudflare; fi
+      for line in ${MEASURED[@]+"${MEASURED[@]}"}; do printf 'MEASURED %s\n' "$line"; done ) 2>"$ST_DIR/said.txt"
+  }
+  WORK="$ST_DIR/work"; mkdir -p "$WORK"
+  NS_POLL=1; NS_WAIT=4
+
+  ws_start good good good
+  FIRST_PUBLISH=true
+  out=$(ws_run check_engine)
+  if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] && [ "$(printf '%s\n' "$out" | grep -c '✅')" -ge 20 ] && [ ! -s "$ST_DIR/said.txt" ]; then
+    ok "control: the whole stub site passes every check_engine check at once, so the cases below test only the page"
+  else
+    no "control: the whole stub site did not pass check_engine at once: $(printf '%s\n' "$out" | grep '❌' | head -3) $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  for mode in 404:2 522:2 bare:2; do
+    ws_start "$mode" good good
+    out=$(ws_run check_engine)
+    if [ "$(printf '%s\n' "$out" | grep -c '❌')" -eq 0 ] \
+       && printf '%s\n' "$out" | grep -q "page of runnable code carries its runnable block" \
+       && printf '%s\n' "$out" | grep -q "sends the page's Swift program" \
+       && grep -q 'Runner-Deploy-Check needed 2 retries' "$ST_DIR/said.txt" \
+       && printf '%s\n' "$out" | grep -q '^MEASURED case, .*(#740, #869): 1 file(s) needed asking again, 2 retries in all'; then
+      ok "a brand-new site's page of runnable code answers ${mode%%:*} twice, then the page: asked again, the runnable block and Swift program checks pass, counted in the Result block"
+    else
+      no "a brand-new site's page of runnable code answers ${mode%%:*} twice: $(printf '%s\n' "$out" | grep -E '❌|^MEASURED' | head -4) said: $(cat "$ST_DIR/said.txt")"
+    fi
+    st_stop
+  done
+
+  # Three fetches of the page (its block, its isolation, its CSP) each ask
+  # again until NS_WAIT, so at least 12 s; measured 12 to 13 s on a quiet
+  # Mac and 28 s on a busy one, hence the wide ceiling.
+  ws_start 522:inf good good
+  started=$(date +%s)
+  out=$(ws_run check_engine)
+  elapsed=$(( $(date +%s) - started ))
+  if printf '%s\n' "$out" | grep -q "page of runnable code answered HTTP 522 or carries no runnable block" \
+     && printf '%s\n' "$out" | grep -q "page of runnable code carries no Swift program" \
+     && grep -q 'Runner-Deploy-Check needed [0-9]* retr.*never answered as wanted' "$ST_DIR/said.txt" \
+     && [ "$elapsed" -ge 12 ] && [ "$elapsed" -le 60 ]; then
+    ok "a brand-new site's page that never comes is still the checks' failure, judged on the last answer (HTTP 522, ${elapsed} s in all)"
+  else
+    no "a brand-new site's page that never comes: ${elapsed} s, $(printf '%s\n' "$out" | grep '❌' | head -4) said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  ws_start good 404:2 404:1
+  out=$(ws_run check_page_links)
+  if printf '%s\n' "$out" | grep -q "✅ case's page links: 2 same-site links, 2 answered 200" \
+     && grep -q '127.0.0.1:[0-9]*/ needed 2 retries' "$ST_DIR/said.txt" \
+     && grep -q 'Lesson-One needed 1 retry' "$ST_DIR/said.txt" \
+     && printf '%s\n' "$out" | grep -q "^MEASURED case, a brand-new site's page links (#869): 2 file(s) needed asking again, 3 retries in all"; then
+    ok "a brand-new site's front page and one link answer 404 at first: the page links are asked again, pass, and are counted in the Result block"
+  else
+    no "a brand-new site's page links: $(printf '%s\n' "$out" | head -4) said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  # Windows' verify-deploy.ps1 reads check_page_links' program out of this
+  # file with its own expression and runs it with two arguments only. Read
+  # the same way here, it must still run, and judge each answer once.
+  ws_start good good 404:1
+  python3 - "$0" "$ST_DIR/page_links.py" <<'READ'
+import re, sys
+text = open(sys.argv[1], encoding="utf-8").read().replace("\r", "")
+found = re.search(r"(?m)^check_page_links\(\) \{[^\n]*\n(?:(?!\}\n)[^\n]*\n)*?[^\n]*<<'PY'\n((?:(?!PY\n)[^\n]*\n)*?)PY\n", text)
+open(sys.argv[2], "w", encoding="utf-8").write(found.group(1) + "\n" if found else "")
+READ
+  out=$(python3 -I "$ST_DIR/page_links.py" "$WS_URL" cloudflare 2>"$ST_DIR/said.txt"); rc=$?
+  if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q '^SUMMARY 2 same-site links, 1 answered 200' \
+     && printf '%s\n' "$out" | grep -q '^PROBLEM /Lesson-One -> HTTP 404' && [ ! -s "$ST_DIR/said.txt" ]; then
+    ok "the page-links program read out of this file as Windows reads it, given two arguments, runs and judges each answer once"
+  else
+    no "the page-links program as Windows reads it: rc $rc, said: $(printf '%s\n' "$out" | head -3) $(head -3 "$ST_DIR/said.txt")"
+  fi
+  st_stop
+
+  FIRST_PUBLISH=false
+  ws_start 404:2 good 404:1
+  out=$(ws_run check_engine; ws_run check_page_links)
+  if printf '%s\n' "$out" | grep -q "page of runnable code answered HTTP 404 or carries no runnable block" \
+     && printf '%s\n' "$out" | grep -q "❌ case's page links" \
+     && ! printf '%s\n' "$out" | grep -q '^MEASURED' && [ ! -s "$ST_DIR/said.txt" ]; then
+    ok "a plain run's long-lived site answers 404 for its page and a link: judged at once, never asked again"
+  else
+    no "a plain run's page and link 404: $(printf '%s\n' "$out" | grep -E '❌|^MEASURED' | head -4) said: $(cat "$ST_DIR/said.txt")"
   fi
   st_stop
 
@@ -943,124 +1429,6 @@ url_from_log() {  # url_from_log <logfile>
   grep -aoE "https://[a-zA-Z0-9._-]+\.(netlify\.app|pages\.dev)" "$1" | tail -1
 }
 
-# Runnable code (#455) and the site's own KaTeX (#494): every host must send
-# the engine's files with types a browser will run - .wasm as
-# application/wasm (WebAssembly.instantiateStreaming refuses anything else),
-# .mjs and the worker as JavaScript - and any CSP it sends must let wasm
-# compile ('unsafe-eval' or 'wasm-unsafe-eval'); KaTeX's stylesheet and a
-# face must come back from the site itself, and Netlify's CSP must no longer
-# name the CDN. contracts/shared-rules.json -> codeRunnerBlocks.loading.
-check_engine() {  # check_engine <label> <site base url ending in />
-  # Each call keeps its own retry log, so a pairing leg that checks a site
-  # an earlier leg already checked counts only its own retries (#740 review).
-  NS_LEG=$(( ${NS_LEG:-0} + 1 ))
-  NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
-  : >"$NS_RETRY_LOG"
-  local base="$2" name type code headers csp
-  for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
-    headers=$(fetch_headers 200 "${base}static/pyodide/$name")
-    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
-    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
-    case "$name" in
-      *.wasm) want="application/wasm" ;;
-      *.mjs|*.js) want="javascript" ;;
-      *) want="" ;;
-    esac
-    if [ "$code" != "200" ]; then
-      no "$1 answered HTTP $code for static/pyodide/$name"
-    elif [ -n "$want" ] && ! printf '%s' "$type" | grep -q "$want"; then
-      no "$1 sends static/pyodide/$name as '$type', which a browser will not run as $want"
-    else
-      ok "$1 sends static/pyodide/$name (HTTP 200${type:+, $type})"
-    fi
-  done
-  headers=$(fetch_headers 200 "${base}static/pyodide/plantoir-worker.js")
-  csp=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-security-policy:"{ $1=""; print }' | tail -1)
-  if [ -z "$csp" ] || printf '%s' "$csp" | grep -Eq "'(unsafe-eval|wasm-unsafe-eval)'"; then
-    ok "$1's worker may compile WebAssembly (${csp:+CSP allows it}${csp:-no CSP})"
-  else
-    no "$1's worker CSP allows no wasm: $csp"
-  fi
-  # Hosts answer the .html address with a redirect to the pretty one (Netlify
-  # 301, Cloudflare 308), so the page is fetched following it.
-  code=$(curl -sL -o "$WORK/runner-page.html" -w "%{http_code}" --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null)
-  if [ "$code" = "200" ] && grep -q 'class="plantoir-runner"' "$WORK/runner-page.html"; then
-    ok "$1's page of runnable code carries its runnable block"
-  else
-    no "$1's page of runnable code answered HTTP $code or carries no runnable block"
-  fi
-  # Runnable Swift (#493): the page's thread and its WASI shim as JavaScript
-  # (a module worker refuses anything else), and the block's program. The
-  # program is compiled from its bytes, so its type does not decide whether
-  # it runs; it is said, not required (review N4).
-  for name in plantoir-swift-worker.js plantoir-wasi.mjs; do
-    headers=$(fetch_headers 200 "${base}static/swift/$name")
-    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
-    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
-    if [ "$code" = "200" ] && printf '%s' "$type" | grep -q javascript; then
-      ok "$1 sends static/swift/$name (HTTP 200, $type)"
-    else
-      no "$1 answered HTTP $code, '$type' for static/swift/$name (a module worker needs JavaScript)"
-    fi
-  done
-  local program
-  program=$(grep -aoE 'data-runner-wasm="static/swift-wasm/[0-9a-f]{64}\.wasm"' "$WORK/runner-page.html" | head -1 | sed 's/^data-runner-wasm="//; s/"$//')
-  if [ -z "$program" ]; then
-    no "$1's page of runnable code carries no Swift program"
-  else
-    headers=$(fetch_headers 200 "${base}$program" -o "$WORK/program.wasm")
-    code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
-    type=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-type:"{print tolower($2)}' | tail -1 | tr -d ';')
-    if [ "$code" = "200" ] && [ "$(head -c 4 "$WORK/program.wasm" | od -An -tx1 | tr -d ' \n')" = "0061736d" ]; then
-      ok "$1 sends the page's Swift program (HTTP 200, ${type:-no type}, $(wc -c < "$WORK/program.wasm" | tr -d ' ') bytes)"
-    else
-      no "$1 answered HTTP $code for $program, or not a WebAssembly program"
-    fi
-  fi
-  # Live input (#583): the page of runnable code (it reads input, and shows
-  # nothing from another website) is sent the headers that isolate it -
-  # following the host's redirect, since Netlify answers the address with
-  # capitals with a 301 to its lower-case form - the engine folders carry
-  # COEP, and a page with no runnable code carries neither
-  # (contracts/shared-rules.json -> codeRunnerBlocks.isolation).
-  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r' | awk 'BEGIN{RS=""} {last=$0} END{print last}')
-  if printf '%s\n' "$headers" | grep -qi '^cross-origin-opener-policy: same-origin' \
-     && printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
-    ok "$1 isolates the page of runnable code (COOP same-origin, COEP require-corp), so it asks for input as it runs"
-  else
-    no "$1 does not send COOP and COEP on the page of runnable code, so it keeps the input box"
-  fi
-  for name in pyodide/pyodide.mjs pyodide/plantoir-worker.js swift/plantoir-wasi.mjs swift/plantoir-swift-worker.js; do
-    headers=$(fetch_headers coep "${base}static/$name")
-    if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy: require-corp'; then
-      ok "$1 sends COEP on static/$name"
-    else
-      no "$1 sends no COEP on static/$name, which an isolated page's worker needs"
-    fi
-  done
-  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}" 2>/dev/null | tr -d '\r' | awk 'BEGIN{RS=""} {last=$0} END{print last}')
-  if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy:'; then
-    no "$1 sends COEP on the front page, which has no runnable code - its frames would break"
-  else
-    ok "$1 sends no COEP on the front page, which has no runnable code"
-  fi
-  headers=$(fetch_headers 200 "${base}static/katex/katex.min.css")
-  if printf '%s\n' "$headers" | head -1 | grep -q " 200" && printf '%s\n' "$headers" | grep -iq "^content-type: text/css"; then
-    ok "$1 serves KaTeX's stylesheet itself (text/css)"
-  else
-    no "$1 does not serve static/katex/katex.min.css as text/css"
-  fi
-  code=$(fetch_headers 200 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" | awk 'NR==1{print $2}')
-  [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
-  headers=$(curl -sL -D - -o /dev/null --max-time 30 "${base}Runner-Deploy-Check" 2>/dev/null | tr -d '\r')
-  if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
-    no "$1's CSP still names cdn.jsdelivr.net"
-  else
-    ok "$1's CSP names no CDN for the maths"
-  fi
-  measure_new_site_retries "$1" "$base"
-}
-
 # The pinned engine files, byte for byte, in a folder publish.
 check_engine_folder() {  # check_engine_folder <label> <dir>
   local problems
@@ -1094,114 +1462,6 @@ PY
 )
   [ -z "$problems" ] && ok "$1 carries the pinned Python engine, KaTeX and Swift's thread, byte for byte, and the page's Swift program" \
                      || no "$1 lacks or changed: $problems"
-}
-
-# Page addresses on Netlify (#628, contracts/shared-rules.json ->
-# netlifyPageAddresses). Every same-site <a href> on the front page and the
-# borrowed page of runnable code, resolved against the page and asked for
-# WITHOUT following a redirect. On Netlify each one must answer 200 and the
-# page must wear the marker the publish adds: a 301 to the same path in lower
-# case is the rewrite failing. Three other redirects are Quartz's own link
-# shapes, not the rewrite, and are counted as their own classes rather than
-# failed: `/index` -> `/`, `%2C` -> `,`, and a file link with a trailing slash.
-# On Cloudflare Pages (case-sensitive) the links stay in the build's mixed case,
-# the page carries no marker, every link answers 200 apart from those classes,
-# and one control - a mixed-case page link asked for in lower case - says what
-# Cloudflare does with an address it does not hold.
-check_page_links() {  # check_page_links <label> <site base url ending in /> <netlify|cloudflare>
-  local said status
-  said=$(python3 - "$2" "$3" <<'PY'
-import html, re, sys, urllib.error, urllib.parse, urllib.request
-base, host_kind = sys.argv[1], sys.argv[2]
-own = urllib.parse.urlsplit(base).netloc.lower()
-class Stay(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
-plain = urllib.request.build_opener(Stay)
-def ask(url):
-    try:
-        response = plain.open(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30)
-        return response.status, "", response.read().decode("utf-8", "ignore")
-    except urllib.error.HTTPError as error:
-        return error.code, error.headers.get("Location") or "", ""
-    except Exception as error:
-        return 0, str(error), ""
-def page(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "plantoir-verify-deploy"}), timeout=30) as response:
-        return response.geturl(), response.read().decode("utf-8", "ignore")
-problems, notes, links, marked, mixed = [], {}, {}, [], 0
-for start in (base, base + ("runner-deploy-check" if host_kind == "netlify" else "Runner-Deploy-Check")):
-    try:
-        where, text = page(start)
-    except Exception as error:
-        problems.append(f"could not fetch {start}: {error}")
-        continue
-    marked.append('data-plantoir-paths="lowercase"' in text)
-    for raw in re.findall(r'<a\s[^>]*?href="([^"]*)"', text):
-        href = html.unescape(raw).strip()
-        if not href or href.startswith(("#", "//")) or (re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", href) and not href.lower().startswith(("http://", "https://"))):
-            continue
-        absolute = urllib.parse.urljoin(where, href)
-        parts = urllib.parse.urlsplit(absolute)
-        if parts.netloc.lower() != own:
-            continue
-        # %-escapes' hex digits are not capitals (`%2C`): as test_netlify_paths.path_has_capitals.
-        if re.search(r"[A-Z]", re.sub(r"%[0-9A-Fa-f]{2}", "", parts.path)):
-            mixed += 1
-        links.setdefault(urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, "")), raw)
-answered = 0
-control = ""
-for url, raw in sorted(links.items()):
-    status, location, _ = ask(url)
-    if status == 200:
-        answered += 1
-        continue
-    path = urllib.parse.urlsplit(url).path
-    target = urllib.parse.urlsplit(urllib.parse.urljoin(url, location)).path if location else ""
-    if status in (301, 302, 307, 308) and target == path.lower() and path != path.lower():
-        problems.append(f"{raw} -> {status} to {target} (the capitals were not taken out)")
-    elif status in (301, 302, 307, 308) and path.endswith("/index") and target == path[: -len("index")]:
-        notes.setdefault("/index -> /", []).append(raw)
-    elif status in (301, 302, 307, 308) and target == path.replace("%2C", ",").replace("%2c", ","):
-        notes.setdefault("%2C -> ,", []).append(raw)
-    elif status in (301, 302, 307, 308) and path.endswith("/") and target == path.rstrip("/"):
-        notes.setdefault("a file link with a trailing slash", []).append(raw)
-    else:
-        problems.append(f"{raw} -> HTTP {status}{' to ' + target if target else ''}")
-if host_kind == "netlify":
-    if not all(marked) or not marked:
-        problems.append("a page does not carry data-plantoir-paths, which the Netlify publish adds")
-    if mixed:
-        problems.append(f"{mixed} same-site link(s) still have a capital in their path")
-else:
-    if any(marked):
-        problems.append("a Cloudflare page carries data-plantoir-paths, which only a Netlify publish adds")
-    if not mixed:
-        problems.append("no link has a capital: Cloudflare was sent the Netlify rewrite")
-    for url in sorted(links):
-        path = urllib.parse.urlsplit(url).path
-        if re.search(r"[A-Z]", path):
-            status, location, _ = ask(url.replace(path, path.lower(), 1))
-            control = f"{path.lower()} answers {status}{' to ' + location if location else ''}"
-            if status == 200:
-                problems.append(f"Cloudflare answered 200 for {path.lower()}, so it is not case-sensitive any more and this check's premise has moved")
-            break
-print(f"SUMMARY {len(links)} same-site links, {answered} answered 200" + "".join(f"; {name}: {len(items)}" for name, items in sorted(notes.items())) + (f"; control: {control}" if control else ""))
-for problem in problems:
-    print("PROBLEM " + problem)
-PY
-)
-  status=$?
-  if [ "$status" -ne 0 ] || [ -z "$said" ]; then
-    no "$1's page links could not be checked"
-    return
-  fi
-  if printf '%s\n' "$said" | grep -q '^PROBLEM '; then
-    no "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
-    printf '%s\n' "$said" | sed -n 's/^PROBLEM /       /p'
-  else
-    ok "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
-  fi
 }
 
 # A folder publish is sent the build's bytes: no marker, links as built.
