@@ -177,12 +177,23 @@ release starts, and the cut CHECKS it rather than raising it.**
      When `git rev-list --first-parent --merges v<last tag>..main` prints
      nothing, no merge has reached `main` since the tag and the branch may
      be made from `main`'s head.
-  3. Tag the hotfix branch's head, merge the branch into `main` with
-     `--no-ff` (the tag is then reachable from `main`), and make the website
-     commit on `main`. If a merge of `dev` brought a higher number to `main`,
-     git stops on the version line: keep the higher number. Then merge
-     `main` back into `dev` and resolve the version line to `dev`'s side
-     (2.0.0), and delete the hotfix branch.
+  3. Merge the branch into `main` with `--no-ff`, and put the TAG on that
+     merge commit on `main` (CLAUDE.md rule 6: release tags point at
+     `main`), never on the hotfix branch. For the tagged commit to be what
+     the bundle was built from, `main` must hold nothing of the hotfixing
+     platform's beyond the tag:
+     `git diff --stat v<last tag> main -- mac-app` (or `windows-app`, and
+     the shared `scripts support patches contracts`) prints nothing before
+     the merge. If it prints anything (a merge of `dev` brought code), or if
+     the base is older than `main`'s tip because a newer release is already
+     out, this procedure does not cover it: the director asks Russell.
+     Then make the website commit on `main`.
+  4. Merge `main` back into `dev`, as after any cut. Both sides have changed
+     the version line from the last release (`main` to 1.9.4, `dev` to
+     2.0.0), so git stops on `project.yml` (and the csproj): resolve it to
+     `dev`'s side, because `dev` keeps the next release's number. The next
+     cut's check (checklist step 1) confirms it, since the platform it ships
+     must read that cut's tag. Delete the hotfix branch.
   If the hotfix takes the very number `dev` is heading for (`dev` at 1.9.4
   and a 1.9.4 hotfix), `dev`'s release has to move up: that is a question
   for Russell, since its milestone moves with it.

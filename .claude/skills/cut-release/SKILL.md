@@ -147,12 +147,20 @@ picture cannot show.
      nothing (on 2026-11-13, `v1.9.3..main` printed 8107d8723 and 5ff48304b,
      so `main` would rightly fail), and READ
      `git diff --stat <base> hotfix/<version> -- mac-app windows-app scripts support patches contracts`,
-     which must list only the hotfix's files and the version line. Tag the
-     branch head, merge it into `main` with `--no-ff` (keep the higher number
-     if the version line conflicts), make the website commit, merge `main`
-     back into `dev` resolving the version line to `dev`'s side. If the
-     hotfix takes the number `dev` is heading for, `dev`'s release moves up
-     with its milestone: ask Russell.
+     which must list only the hotfix's files and the version line. Both
+     checks run on the branch, BEFORE it merges. Then merge it into `main`
+     with `--no-ff` and put the TAG on that merge commit on `main` (CLAUDE.md
+     rule 6), never on the hotfix branch. First confirm `git diff --stat
+     v<last tag> main -- mac-app` (or `windows-app`, plus `scripts support
+     patches contracts`) prints nothing, so the tagged commit is what the
+     bundle was built from; if it prints anything, or the base is older than
+     `main`'s tip because a newer release is out, this procedure does not
+     cover it: ask Russell. Make the website commit, then merge `main` back
+     into `dev`: git stops on the version line (`main` 1.9.4, `dev` 2.0.0),
+     and it resolves to `dev`'s side, which keeps the next release's number;
+     the next cut's step 5 check confirms it. If the hotfix takes the number
+     `dev` is heading for, `dev`'s release moves up with its milestone: ask
+     Russell.
 
    **After the cut, each platform's number on `dev` is the next release THAT
    platform will ship.** Once `main` is merged back into `dev` (step 4),
