@@ -5,7 +5,7 @@
     dot-sourced: that would run the launcher).
 
 .DESCRIPTION
-    Ten sections; the lists are deserialised and never retyped:
+    Eleven sections; the lists are deserialised and never retyped:
 
     1. app-rules.json -> previewPorts.hostBlockCases, through preview.ps1's
        Find-FreePreviewPort (#286). A native walk binds ONE pair per block,
@@ -39,8 +39,10 @@
     5. shared-rules.json -> deployWhileItsSectionDeploys.launcherCases (#467 /
        mac #439), every one, through Get-WhatIsDeployingThisSection as EACH
        launcher carries it (one marked block, the same in both), checking
-       who refused as well as whether; then the four sentences and the trail
-       lines word for word against the contract.
+       who refused as well as whether, plus Windows-only build rows (#828);
+       then which sentence each who and leg says (Get-DeployRefusalSentence),
+       and the six sentences and three trail lines word for word against the
+       contract.
 
     6. app-rules.json -> launcherTrailFolder.cases (#682, the Windows half of
        mac #664), every one, through Write-TrailLine as EACH launcher
@@ -69,6 +71,12 @@
         plain yes (#749), and a saved token whose check hears nothing is kept.
         Needs the runtime's Python (PLANTOIR_RUNTIME or windows-app\Vendor\
         runtime) and skips by name without it.
+
+    11. The deploy guard against the REAL process table (#828 / mac #729):
+        a stand-in build of the section, really running, refuses a cut-off
+        copy of each launcher with the contract's sentence and trail line;
+        one in another folder does not; and the real preview.ps1 refuses
+        --for-deploy without --build-only.
 
     Run with:  powershell -NoProfile -File windows-app\test_launcher_rules.ps1
 #>
@@ -254,12 +262,16 @@ function ConvertTo-WindowsRow([string]$Text, $Cwd, [string]$ProcessId) {
         # lsof's working directory is the mac's folder evidence; on Windows
         # the folder is the script's own path, so the case's 'here' or
         # 'elsewhere' is written INTO the path. With neither, a relative
-        # path names no folder at all.
+        # path names no folder at all. The case's cwd comes FIRST, even over
+        # a {here} path (#828 plan review, M1): on the mac the folder is
+        # lsof's answer whatever the script's path says, so a row written
+        # `{here}/preview.sh` with cwd 'elsewhere' is ANOTHER folder's run, and
+        # on Windows the script's path is the only folder evidence there is.
         $where = $null
         if ($Cwd -and ($Cwd.PSObject.Properties.Name -contains $ProcessId)) { $where = $Cwd.$ProcessId }
         $folder = '.\'
-        if ($path -like "$here*" -or $where -eq 'here') { $folder = "$here\" }
-        elseif ($where -eq 'elsewhere') { $folder = "$elsewhere\" }
+        if ($where -eq 'elsewhere') { $folder = "$elsewhere\" }
+        elseif ($path -like "$here*" -or $where -eq 'here') { $folder = "$here\" }
         elseif ($path -match '^/') { $folder = 'C:' + $path.Replace('/', '\') }
         return "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"${folder}$($program.Groups['launcher'].Value).ps1`"" + (ConvertTo-QuotedArguments $program.Groups['rest'].Value)
     }
@@ -311,7 +323,14 @@ $windowsRows = @(
 # A run still waiting for the course, its task's token on the line too.
 $waitingRun = [PSCustomObject]@{ name = 'a scheduled run still waiting for the course, with its token (Windows)'; processes = @(,@(800, 1, "`"C:\Program Files\Plantoir\Plantoir.exe`" --run-scheduled-deploy `"Plantoir deploy ICS4U section 2 $hereId`" --token 0f3c")) }
 
-foreach ($case in @($guard.launcherCases) + @($windowsRows) + @($waitingRun)) {
+# A deploy's build leg, and a rebuild, in shapes only Windows has (#828):
+# the leg for a quoted spaced course is a deploy; a rebuild preview.bat
+# started is not.
+$previewBuildRows = @(
+    [PSCustomObject]@{ name = 'a deploy''s build leg for a quoted course with a space is a deploy (Windows)'; course = 'AP CALC'; processes = @(,@(700, 600, "powershell -NoProfile -ExecutionPolicy Bypass -File `"$here\preview.ps1`" `"AP CALC`" 2 --build-only --for-deploy")); expect = 'refused' },
+    [PSCustomObject]@{ name = 'a rebuild started by preview.bat is not a deploy (Windows)'; processes = @(@(699, 1, "C:\Windows\system32\cmd.exe /c `"`"$here\preview.bat`" ICS4U 2 --build-only`""), @(700, 699, "powershell -NoProfile -ExecutionPolicy Bypass -File `"$here\preview.ps1`" ICS4U 2 --build-only")); expect = 'allowed' }
+)
+foreach ($case in @($guard.launcherCases) + @($windowsRows) + @($previewBuildRows) + @($waitingRun)) {
     $course = Get-CaseValue $case 'course' 'ICS4U'
     $section = Get-CaseValue $case 'section' '2'
     $want = Get-CaseValue $case 'expect' 'refused'
@@ -382,10 +401,21 @@ foreach ($c in @(
 # rows are translated by section 2's ConvertTo-WindowsRow. Cases marked
 # appliesOn without 'windows' are skipped by that field, never by name.
 $deployGuard = $shared.deployWhileItsSectionDeploys
+# Builds in the shapes only Windows has (#828 / mac #729): preview.ps1 started
+# by preview.bat (the bat's own cmd.exe line names no program, its
+# powershell.exe child is the build), a quoted spaced course on a deploy's
+# build leg, and a -Command that runs the script (the known limit, written
+# down: that script is only MENTIONED on its line, so it is not counted).
+$psPreview = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$here\preview.ps1`""
+$buildRows = @(
+    [PSCustomObject]@{ name = 'a rebuild started by preview.bat counts as a build (Windows)'; processes = @(@(699, 1, "C:\Windows\system32\cmd.exe /c `"`"$here\preview.bat`" ICS4U 2 --build-only`""), @(700, 699, "$psPreview ICS4U 2 --build-only")); expect = 'refused'; who = 'building' },
+    [PSCustomObject]@{ name = 'a deploy''s build leg for a quoted course with a space (Windows)'; course = 'AP CALC'; processes = @(,@(700, 600, "$psPreview `"AP CALC`" 2 --build-only --for-deploy")); expect = 'refused'; who = 'another' },
+    [PSCustomObject]@{ name = 'a build run by -Command is only mentioned, so it is not counted (Windows, a known limit)'; processes = @(,@(700, 1, "powershell.exe -NoProfile -Command `"& '$here\preview.ps1' ICS4U 2 --build-only`"")); expect = 'allowed' }
+)
 foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
-    Import-LauncherFunctions (Join-Path $repo $launcher) @('Split-CommandLine', 'Get-LaunchedScriptIndex', 'Get-ScheduledDeployTaskNames', 'Get-ScheduledDeployScriptNames', 'Get-WhatIsDeployingThisSection', 'Test-SectionIsBeingDeployed')
+    Import-LauncherFunctions (Join-Path $repo $launcher) @('Split-CommandLine', 'Get-LaunchedScriptIndex', 'Get-ScheduledDeployTaskNames', 'Get-ScheduledDeployScriptNames', 'Get-WhatIsDeployingThisSection', 'Test-SectionIsBeingDeployed', 'Get-DeployRefusalSentence')
     $waitingForDeploy = [PSCustomObject]@{ name = $waitingRun.name; processes = $waitingRun.processes; expect = 'allowed' }
-    foreach ($case in @($deployGuard.launcherCases) + @($windowsRows) + @($waitingForDeploy)) {
+    foreach ($case in @($deployGuard.launcherCases) + @($windowsRows) + @($buildRows) + @($waitingForDeploy)) {
         $list = "deployWhileItsSectionDeploys/$launcher"
         if ($case.PSObject.Properties.Name -contains 'appliesOn' -and -not (@($case.appliesOn) -contains 'windows')) {
             Skip $list $case.name ('appliesOn ' + (@($case.appliesOn) -join ', '))
@@ -398,6 +428,8 @@ foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
         $wantWho = Get-CaseValue $case 'who' ''
         if ($leg -eq 'build') {
             $selfLine = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$here\preview.ps1`" `"$course`" $section --build-only"
+        } elseif ($leg -eq 'deploy-build') {
+            $selfLine = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$here\preview.ps1`" `"$course`" $section --build-only --for-deploy"
         } else {
             $selfLine = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$here\deploy.ps1`" `"$course`" $section"
         }
@@ -412,6 +444,29 @@ foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
         } else {
             Report $list $case.name ($got -eq $want) "expected $want, got $got" $heldShape
         }
+    }
+
+    # Which sentence each (who, leg) prints (#828 / mac #729): every pair the
+    # cases name, through the launcher's own Get-DeployRefusalSentence, must
+    # be a key of sentences.launcher; and the nine pairs launcherCasesShape
+    # describes, one per who and leg, must be the keys it names.
+    $keys = @($deployGuard.sentences.launcher.PSObject.Properties.Name)
+    $pairs = @{}
+    foreach ($case in @($deployGuard.launcherCases)) {
+        if ((Get-CaseValue $case 'expect' 'refused') -ne 'refused') { continue }
+        $pairs[(Get-CaseValue $case 'who' '') + '|' + (Get-CaseValue $case 'leg' 'deploy')] = $true
+    }
+    foreach ($pair in $pairs.Keys) {
+        $parts = $pair -split '\|'
+        $key = Get-DeployRefusalSentence $parts[0] $parts[1]
+        Report "deployWhileItsSectionDeploys.sentenceFor/$launcher" ("a case's who and leg: " + $pair) ($keys -contains $key) "says '$key', which sentences.launcher does not name"
+    }
+    foreach ($fixed in @(
+        @('later', 'deploy', 'laterDeploy'), @('later', 'build', 'laterBuild'), @('later', 'deploy-build', 'laterBuild'),
+        @('another', 'deploy', 'anotherDeploy'), @('another', 'build', 'anotherBuild'), @('another', 'deploy-build', 'anotherBuild'),
+        @('building', 'deploy', 'buildingDeploy'), @('building', 'build', 'buildingBuild'), @('building', 'deploy-build', 'buildingDeploy'))) {
+        $key = Get-DeployRefusalSentence $fixed[0] $fixed[1]
+        Report "deployWhileItsSectionDeploys.sentenceFor/$launcher" ($fixed[0] + ' on the ' + $fixed[1] + ' leg') (($key -ceq $fixed[2]) -and ($keys -contains $key)) "says '$key', launcherCasesShape '$($fixed[2])'"
     }
 }
 
@@ -437,7 +492,7 @@ foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
         Report "deployWhileItsSectionDeploys.sentences/$launcher" $sentence.Name ($source.Contains('Write-Host ("' + $first + '" -f $cross, $Course, $Section)')) "does not print '$first' word for word" (-not $source.Contains($words))
         Report "deployWhileItsSectionDeploys.sentences/$launcher" ($sentence.Name + ' (second line)') ($source.Contains('Write-Host "' + $lines[1] + '"')) "does not print '$($lines[1])'"
     }
-    foreach ($field in @('launcherLineWhenALaterDeployIsStillWorking', 'launcherLineWhenItsSectionIsAlreadyBeingDeployed')) {
+    foreach ($field in @('launcherLineWhenALaterDeployIsStillWorking', 'launcherLineWhenItsSectionIsAlreadyBeingDeployed', 'launcherLineWhenItsSectionIsAlreadyBeingBuilt')) {
         $format = ([string]$declined.$field).Replace('{course}', '{0}').Replace('{section}', '{1}').Replace($dotText, '{2}').Replace('{leg}', '{3}').Replace($dashText, '{4}')
         # Held only while the line's words after its last slot appear nowhere in the launcher.
         $words = $format.Substring($format.LastIndexOf('}') + 1)
@@ -798,6 +853,141 @@ function Set-CfTokenInCredMan([string]$token) { Write-Host 'WROTE-A-CLOUDFLARE-T
         $env:TOKEN_CHECK_STUB_URL = $null
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+# ---- 11. The guard against the REAL process table (#828 / mac #729) ----
+# Every row above is a translated table. This is the one check that reads
+# real Win32_Process lines: a stand-in build saved as preview.ps1 in a scratch
+# working folder and run as `powershell -File <folder>\preview.ps1 ICS4U 2
+# --build-only [--for-deploy]` (its line is the evidence; it only sleeps),
+# then a COPY of the real deploy.ps1 or preview.ps1 in the same folder, cut
+# off right after its guard (so a guard made wrong can reach nothing past
+# it: no credential, no build, no network). PLANTOIR_RUNTIME points at a
+# folder holding only manifest.json, which is all either launcher looks for
+# before its guard. Also: the real preview.ps1 refuses --for-deploy alone.
+$scratchRun = Join-Path ([IO.Path]::GetTempPath()) ('guard-run-' + [Guid]::NewGuid().ToString('N'))
+$savedRun = @{}
+foreach ($name in @('PLANTOIR_RUNTIME', 'PLANTOIR_TRAIL_DIR')) { $savedRun[$name] = [Environment]::GetEnvironmentVariable($name) }
+$sleepers = New-Object System.Collections.Generic.List[System.Diagnostics.Process]
+try {
+    $thisFolder = Join-Path $scratchRun 'here'
+    $otherFolder = Join-Path $scratchRun 'elsewhere'
+    $lonely = Join-Path $scratchRun 'lonely'
+    $fakeRuntime = Join-Path $scratchRun 'runtime'
+    foreach ($dir in @($thisFolder, $otherFolder, $lonely, $fakeRuntime, (Join-Path $thisFolder 'courses\ICS4U'), (Join-Path $lonely 'courses\ICS4U'))) { $null = New-Item -ItemType Directory -Force -Path $dir }
+    [IO.File]::WriteAllText((Join-Path $fakeRuntime 'manifest.json'), '{}')
+    foreach ($dir in @($thisFolder, $lonely)) { [IO.File]::WriteAllText((Join-Path $dir 'courses\ICS4U\course_config.json'), '{"course_code":"ICS4U","section_numbers":[2]}') }
+    $env:PLANTOIR_RUNTIME = $fakeRuntime
+    $env:PLANTOIR_TRAIL_DIR = Join-Path $scratchRun 'trail'
+
+    # The real launchers, each cut off after its guard. A missing anchor is a
+    # failure, never a run of the uncut launcher.
+    $cuts = @{
+        'deploy.ps1'  = "if (-not `$RESET_TOKEN) { Stop-WhileThisSectionDeploys `$COURSE_CODE ([string]`$SECTION_NUM) 'deploy' }"
+        'preview.ps1' = "Stop-WhileThisSectionDeploys `$COURSE ([string]`$SECTION) `$guardLeg"
+    }
+    $cutOk = $true
+    foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
+        $text = [IO.File]::ReadAllText((Join-Path $repo $launcher))
+        $anchor = $cuts[$launcher]
+        $found = $text.Contains($anchor)
+        Report 'realTable' "$launcher still carries its guard call" $found 'the call moved, so the cut below would not stop the launcher'
+        if (-not $found) { $cutOk = $false; continue }
+        $cut = $text.Replace($anchor, $anchor + "; Write-Host 'PASSED-THE-GUARD'; exit 0")
+        # The stand-in build in THIS folder has to be this folder's own
+        # preview.ps1 (the guard reads the script's path and name), so the
+        # cut copy sleeps instead when the stand-in's variable says so.
+        if ($launcher -eq 'preview.ps1') { $cut = "if (`$env:GUARD_STAND_IN -eq '1') { Start-Sleep -Seconds 90; exit 0 }`r`n" + $cut }
+        [IO.File]::WriteAllText((Join-Path $thisFolder $launcher), $cut)
+    }
+    # The real preview.ps1, uncut, for --for-deploy alone: it exits at its flags.
+    [IO.File]::Copy((Join-Path $repo 'preview.ps1'), (Join-Path $lonely 'preview.ps1'))
+
+    function Invoke-ScratchLauncher([string]$Folder, [string]$Launcher, [string[]]$Arguments) {
+        $info = New-Object System.Diagnostics.ProcessStartInfo
+        $info.FileName = 'powershell.exe'
+        $info.Arguments = (@('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + (Join-Path $Folder $Launcher) + '"')) + $Arguments) -join ' '
+        $info.WorkingDirectory = $Folder
+        $info.UseShellExecute = $false
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $info.RedirectStandardInput = $true
+        $process = [Diagnostics.Process]::Start($info)
+        $process.StandardInput.Close()
+        $out = $process.StandardOutput.ReadToEndAsync(); $err = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(120000)) { try { $process.Kill() } catch {}; return [pscustomobject]@{ Code = -1; Said = 'TIMED OUT' } }
+        $process.WaitForExit()
+        return [pscustomobject]@{ Code = $process.ExitCode; Said = ($out.Result + $err.Result) }
+    }
+    function Start-Sleeper([string]$Folder, [string[]]$Arguments) {
+        $standIn = Join-Path $Folder 'preview.ps1'
+        if (-not (Test-Path -LiteralPath $standIn)) { [IO.File]::WriteAllText($standIn, "Start-Sleep -Seconds 90`r`n") }
+        $info = New-Object System.Diagnostics.ProcessStartInfo
+        $info.FileName = 'powershell.exe'
+        $info.Arguments = (@('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $standIn + '"')) + $Arguments) -join ' '
+        $info.UseShellExecute = $false
+        $info.CreateNoWindow = $true
+        $info.EnvironmentVariables['GUARD_STAND_IN'] = '1'
+        $process = [Diagnostics.Process]::Start($info)
+        $script:sleepers.Add($process)
+        return $process
+    }
+    function Stop-Sleepers {
+        foreach ($p in $script:sleepers) { try { if (-not $p.HasExited) { $p.Kill(); $p.WaitForExit(10000) | Out-Null } } catch {} }
+        $script:sleepers.Clear()
+    }
+    function Read-Trail {
+        $file = Join-Path $env:PLANTOIR_TRAIL_DIR 'activity.txt'
+        if (Test-Path -LiteralPath $file) { return [IO.File]::ReadAllText($file) } else { return '' }
+    }
+    function Get-Sentence([string]$Key) {
+        return ([string]@($deployGuard.sentences.launcher.$Key)[0]).Replace('{course}', 'ICS4U').Replace('{section}', '2')
+    }
+    function Get-TrailWords([string]$Field, [string]$Leg) {
+        return ([string]$declined.$Field).Replace('{course}', 'ICS4U').Replace('{section}', '2').Replace('{leg}', $Leg)
+    }
+
+    $alone = Invoke-ScratchLauncher $lonely 'preview.ps1' @('ICS4U', '2', '--for-deploy')
+    $aloneLine = [regex]::Match([string]@($appRules.launcherFlags.preview | Where-Object { $_.flag -eq '--for-deploy' })[0].meaning, '"([^"]+)"').Groups[1].Value
+    Report 'realTable' 'preview.ps1 refuses --for-deploy alone, with the contract''s line' (($alone.Code -eq 1) -and $aloneLine -and $alone.Said.Contains($aloneLine)) ("exit $($alone.Code); said: " + $alone.Said)
+
+    if ($cutOk) {
+        # Nothing else running: each copy passes its guard (the control).
+        foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
+            $extra = @(); if ($launcher -eq 'preview.ps1') { $extra = @('--build-only', '--for-deploy') }
+            $run = Invoke-ScratchLauncher $thisFolder $launcher (@('ICS4U', '2') + $extra)
+            Report 'realTable' "$launcher passes its guard with nothing else building" ($run.Said.Contains('PASSED-THE-GUARD') -and $run.Code -eq 0) ("exit $($run.Code); said: " + $run.Said)
+        }
+        # The asker, its arguments, the stand-in's arguments and folder, and
+        # what must be said: the sentence key, the trail field and its leg.
+        $realCases = @(
+            @{ name = 'a rebuild in this folder refuses a deploy (buildingDeploy)'; launcher = 'deploy.ps1'; asked = @('ICS4U', '2'); sleeper = @('ICS4U', '2', '--build-only'); folder = $thisFolder; key = 'buildingDeploy'; field = 'launcherLineWhenItsSectionIsAlreadyBeingBuilt'; leg = 'deploy' },
+            @{ name = 'a deploy''s build leg in this folder refuses a deploy (anotherDeploy)'; launcher = 'deploy.ps1'; asked = @('ICS4U', '2'); sleeper = @('ICS4U', '2', '--build-only', '--for-deploy'); folder = $thisFolder; key = 'anotherDeploy'; field = 'launcherLineWhenItsSectionIsAlreadyBeingDeployed'; leg = 'deploy' },
+            @{ name = 'a rebuild refuses a deploy''s own build leg, which says deployed (buildingDeploy)'; launcher = 'preview.ps1'; asked = @('ICS4U', '2', '--build-only', '--for-deploy'); sleeper = @('ICS4U', '2', '--build-only'); folder = $thisFolder; key = 'buildingDeploy'; field = 'launcherLineWhenItsSectionIsAlreadyBeingBuilt'; leg = 'build' },
+            @{ name = 'a rebuild in ANOTHER folder does not refuse'; launcher = 'deploy.ps1'; asked = @('ICS4U', '2'); sleeper = @('ICS4U', '2', '--build-only'); folder = $otherFolder; key = $null }
+        )
+        foreach ($c in $realCases) {
+            try {
+                $null = Start-Sleeper $c.folder $c.sleeper
+                Start-Sleep -Milliseconds 300
+                $before = Read-Trail
+                $run = Invoke-ScratchLauncher $thisFolder $c.launcher $c.asked
+                $added = (Read-Trail).Substring($before.Length)
+                if ($c.key) {
+                    $ok = ($run.Code -eq 1) -and $run.Said.Contains((Get-Sentence $c.key)) -and -not $run.Said.Contains('PASSED-THE-GUARD') -and $added.Contains((Get-TrailWords $c.field $c.leg))
+                    Report 'realTable' $c.name $ok ("exit $($run.Code); said: " + $run.Said + "; trail added: " + $added)
+                } else {
+                    Report 'realTable' $c.name ($run.Said.Contains('PASSED-THE-GUARD') -and $run.Code -eq 0 -and -not $added) ("exit $($run.Code); said: " + $run.Said)
+                }
+            } finally {
+                Stop-Sleepers
+            }
+        }
+    }
+} finally {
+    Stop-Sleepers
+    foreach ($name in $savedRun.Keys) { [Environment]::SetEnvironmentVariable($name, $savedRun[$name]) }
+    Remove-Item -LiteralPath $scratchRun -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 Write-UnreportedLedgerRows

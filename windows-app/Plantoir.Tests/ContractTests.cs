@@ -269,6 +269,9 @@ public class ContractTests
                           AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"), heldAndAsked);
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
+        // #828 (mac #729): another build of the section was in the way.
+        Assert.Equal(wording["deployRefusedWhileItsSectionIsBeingBuilt"]!.ToString(),
+                     AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt("{course}", "{section}"));
 
         // #489 (mac #457 batch B): the Section menu's twins and its dialog's
         // words, rendered with the contract's placeholders and the generator's

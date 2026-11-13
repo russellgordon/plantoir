@@ -1549,20 +1549,19 @@ public class AssistWorkspaceTests : IDisposable
         var build = await workspace.Deploy("ICS3U", 1);
         Assert.False(build.Succeeded);
         Assert.DoesNotContain(_launcher.Runs, run => run.Launcher == "deploy");
-        // The contract's "later" build line is in #835's words, which this
-        // app does not read as a later deploy until #854 lands; while the
-        // sentence is held as said differently, the answer must still not be
-        // the later deploy's, and the day it is, the entry is closed.
-        if (NamedGapLedger.Holding(NamedGapLedger.AssistWordingSaidDifferently, "deployRefusedWhileALaterDeployWorks") is { } owed)
-        {
-            Assert.False(AssistWording.DeployRefusedWhileALaterDeployWorks("ICS3U", "1") == build.Message, NamedGapLedger.ClosedMessage(owed));
-            // What Windows says today, by key: the line is not read as a
-            // later deploy's, so the answer is the other section-deploy
-            // refusal; anything else is a second fault the entry must not hide.
-            Assert.Equal(AssistWording.DeployRefusedWhileItsSectionDeploys("ICS3U", "1"), build.Message);
-        }
-        else
-            Assert.Equal(AssistWording.DeployRefusedWhileALaterDeployWorks("ICS3U", "1"), build.Message);
+        // The contract's "later" build line, in #835's words (Windows #854).
+        Assert.Equal(AssistWording.DeployRefusedWhileALaterDeployWorks("ICS3U", "1"), build.Message);
+
+        // #828 (mac #729): another BUILD of the section in the way of the
+        // deploy's build leg, the launcher's buildingDeploy line.
+        string buildingDeploy = cases.Single(c => c!["assistant"]!.ToString() == "deployRefusedWhileItsSectionIsBeingBuilt"
+                                                  && c["output"]!.ToString().Contains("cannot be deployed", StringComparison.Ordinal))!["output"]!.ToString();
+        _launcher.Runs.Clear();
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\n" + buildingDeploy;
+        var byABuild = await workspace.Deploy("ICS3U", 1);
+        Assert.False(byABuild.Succeeded);
+        Assert.DoesNotContain(_launcher.Runs, run => run.Launcher == "deploy");
+        Assert.Equal(AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt("ICS3U", "1"), byABuild.Message);
 
         _launcher.Runs.Clear();
         _launcher.FailOn = "deploy";
@@ -1575,6 +1574,41 @@ public class AssistWorkspaceTests : IDisposable
         _launcher.FailMessage = "It went wrong.";
         var failed = await workspace.Deploy("ICS3U", 1);
         Assert.Equal(AssistWording.DeployDidNotFinish("ICS3U", "1"), failed.Message);
+    }
+
+    /// <summary>
+    /// #828 (mac #729): an assistant's DEPLOY builds with
+    /// <c>--build-only --for-deploy</c> and its rebuild without the flag,
+    /// in a folder holding the real <c>preview.ps1</c>; in a folder whose
+    /// <c>preview.ps1</c> is older and does not take the flag (plantoir-mcp
+    /// never refreshes a folder's launchers, review M4) the deploy builds
+    /// without it, so the launcher cannot refuse it as an unknown option.
+    /// </summary>
+    [Fact]
+    public async Task ADeploysBuildLegSaysItIsADeployOnlyWhereTheLauncherTakesIt()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        string current = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "preview.ps1"));
+        Assert.Contains("'" + Plantoir.Core.Scripting.PreviewCommand.ForDeployFlag + "'", current);
+        var workspace = Open();
+
+        File.WriteAllText(Path.Combine(_folder, "preview.ps1"), current);
+        await workspace.Deploy("ICS3U", 1);
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive", "--for-deploy" },
+                     _launcher.Runs.Single(run => run.Launcher == "preview").Arguments);
+        _launcher.Runs.Clear();
+        await workspace.RebuildPreview("ICS3U", 1);
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" },
+                     _launcher.Runs.Single(run => run.Launcher == "preview").Arguments);
+
+        // An older launcher: the same file with the flag's case taken out.
+        string older = string.Join("\n", current.Replace("\r\n", "\n").Split('\n')
+            .Where(line => !line.Contains("'" + Plantoir.Core.Scripting.PreviewCommand.ForDeployFlag + "'", StringComparison.Ordinal)));
+        File.WriteAllText(Path.Combine(_folder, "preview.ps1"), older);
+        _launcher.Runs.Clear();
+        await workspace.Deploy("ICS3U", 1);
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" },
+                     _launcher.Runs.Single(run => run.Launcher == "preview").Arguments);
     }
 
     [Fact]

@@ -110,19 +110,31 @@ public static partial class AssistWording
         $"The deploy of {course} Section {section} did not finish. {WhereTheOutputIs}";
 
     /// <summary>
-    /// #467 / mac #439: every leg that ran was refused because a deploy that
-    /// was set for later is still deploying this section. Said instead of
-    /// "did not finish" (and, for a refused build leg, instead of "could not
-    /// be built"), by the window's assistant and plantoir-mcp's deploy_section.
+    /// #467 / mac #439: every leg that ran was refused because a scheduled
+    /// deploy's run is still deploying this section. Said instead of "did not
+    /// finish" (and, for a refused build leg, instead of "could not be
+    /// built"), by the window's assistant and plantoir-mcp's deploy_section.
+    /// Named as RUNNING since #835 (Windows #854, #868): a schedule that has
+    /// not fired holds nothing.
     /// </summary>
     public static string DeployRefusedWhileALaterDeployWorks(string course, string section) =>
-        $"{course} Section {section} is still being deployed by a deploy that was set for later, " +
+        $"{course} Section {section} is still being deployed by a scheduled deploy that is still running, " +
         "so it was not deployed again. Try again once that deploy has finished.";
 
     /// <summary>The same refusal when another deploy of the section was in the way (#467 / mac #439).</summary>
     public static string DeployRefusedWhileItsSectionDeploys(string course, string section) =>
         $"{course} Section {section} is already being deployed, so it was not deployed again. " +
         "Try again once that deploy has finished.";
+
+    /// <summary>
+    /// The same refusal when another BUILD of the section was in the way (mac
+    /// #729, Windows #828): the launcher's <c>buildingDeploy</c> or
+    /// <c>buildingBuild</c> line, an assistant's rebuild or one typed at a
+    /// command line.
+    /// </summary>
+    public static string DeployRefusedWhileItsSectionIsBeingBuilt(string course, string section) =>
+        $"{course} Section {section} is already being built, so it was not deployed. " +
+        "Try again once that build has finished.";
 
     /// <summary>
     /// Said only when a course has MORE THAN ONE deploy destination
@@ -377,7 +389,7 @@ public static partial class AssistWording
     /// </summary>
     public static string CourseIsBeingBuiltElsewhere(string course) =>
         $"{course} is being previewed or deployed somewhere else on this computer right now — by an assistant " +
-        "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
+        "working from another app, another copy of Plantoir, or a scheduled deploy that is running. Both would build the same " +
         "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
 
     // MARK: - Previewing

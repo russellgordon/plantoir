@@ -281,7 +281,11 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                 if (buildsFirst)
                 {
                     runner.Milestones = BuildAndDeployMilestones(destination.Type);
-                    runner.Run("preview.ps1", new[] { course.Code, sectionNumber.ToString(), "--build-only" }, workingDirectory);
+                    // A DEPLOY's build leg: --for-deploy, so another program's
+                    // launcher reads it as a deploy (#828, mac #729).
+                    runner.Run("preview.ps1",
+                        PreviewCommand.BuildOnlyArguments(workingDirectory, course.Code, sectionNumber, forADeploy: true, nonInteractive: false),
+                        workingDirectory);
                     if (runner.LaunchProblem is not null)
                     {
                         leg.IsFinished = true;
@@ -460,14 +464,17 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
 
     /// <summary>
     /// The sentence for a deploy refused because its section was still being
-    /// deployed (#467 / mac #439): which one depends on whether a deploy set
-    /// for later is the one working.
+    /// deployed (#467 / mac #439): which one depends on whether a scheduled
+    /// deploy's run is the one working, or (#828, mac #729) another BUILD of
+    /// the section rather than a deploy.
     /// </summary>
     public static AssistResult RefusalAnswer(string course, string section, FailureExplainer.SectionDeployRefusal refusal) =>
         new(false,
             refusal.ByALaterDeploy
                 ? AssistWording.DeployRefusedWhileALaterDeployWorks(course, section)
-                : AssistWording.DeployRefusedWhileItsSectionDeploys(course, section),
+                : refusal.ByAnotherBuild
+                    ? AssistWording.DeployRefusedWhileItsSectionIsBeingBuilt(course, section)
+                    : AssistWording.DeployRefusedWhileItsSectionDeploys(course, section),
             null);
 
     private void Notify([CallerMemberName] string? property = null) =>

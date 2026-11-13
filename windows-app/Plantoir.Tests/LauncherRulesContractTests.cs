@@ -164,7 +164,7 @@ public class LauncherRulesContractTests
                 yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key);
                 yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key + " (second line)");
             }
-            foreach (string field in new[] { "launcherLineWhenALaterDeployIsStillWorking", "launcherLineWhenItsSectionIsAlreadyBeingDeployed" })
+            foreach (string field in new[] { "launcherLineWhenALaterDeployIsStillWorking", "launcherLineWhenItsSectionIsAlreadyBeingDeployed", "launcherLineWhenItsSectionIsAlreadyBeingBuilt" })
                 if (declined[field] is not null)
                     yield return Row("activityTrail/" + launcher, field);
         }
@@ -286,7 +286,8 @@ public class LauncherRulesContractTests
         Assert.True(at < deploy.IndexOf("$py = Enter-NativeRuntime", StringComparison.Ordinal), "asked after the runtime is entered");
 
         string preview = Launcher("preview.ps1");
-        const string previewCall = "if ($BUILD_ONLY -and -not $STOP_MODE) {\n    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) 'build'\n}";
+        // A deploy's own build leg (--for-deploy, #828 / mac #729) asks as 'deploy-build'.
+        const string previewCall = "if ($BUILD_ONLY -and -not $STOP_MODE) {\n    $guardLeg = 'build'; if ($FOR_DEPLOY) { $guardLeg = 'deploy-build' }\n    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) $guardLeg\n}";
         Assert.Single(Occurrences(preview, "Stop-WhileThisSectionDeploys $"));
         int build = preview.IndexOf(previewCall, StringComparison.Ordinal);
         Assert.True(build > 0, "preview.ps1 no longer asks on a --build-only run");
