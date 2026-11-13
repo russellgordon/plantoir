@@ -1293,8 +1293,11 @@ kept the first and lost the second without anybody noticing: the structure
 test pinned the modifier, not the key. The questions now use the destructive
 row of the table: **Escape is Cancel, and Return presses neither button**, so
 a Return typed out of habit still removes, replaces, starts again or shares
-nothing. That is Remove Group, Start the Groups Again, Replace It… and the
-public-address warning, whose Share Without a Password used to take Return.
+nothing. That was #832's answer for Remove Group, Start the Groups Again,
+Replace It… and the public-address warning, whose Share Without a Password
+used to take Return. **Since #834 the first three are sheets, where Cancel
+answers Return AND Escape, as Russell first asked** (`FactsQuestionSheet`,
+below); the public-address warning is still an alert with Escape alone.
 `QuestionKeysTests` presses both keys on each, through the real modifiers.
 
 **A sheet can have both**, and the two-lists sheet does: Cancel keeps Return
@@ -1303,11 +1306,73 @@ Escape, which its `.interactiveDismissDisabled()` had taken away. The share's
 console already closed on Escape (SwiftUI closes a sheet with no Cancel of its
 own), measured and pinned, not changed.
 
-**Rejected:** turning the four questions into sheets so that Cancel could keep
-Return as well (four new sheets on the census, a different look from every
-other confirmation on the Mac, for a key that makes no difference to safety);
-and Cancel with Return and no Escape, which is what shipped to `dev` and what
-Russell reported.
+**Rejected in #832:** turning the questions into sheets only so that Cancel
+could keep Return as well; and Cancel with Return and no Escape, which is what
+shipped to `dev` and what Russell reported. #834 then made three of them
+sheets for a reason of its own (below), and with that Cancel got both keys.
+
+### Questions as one sentence and labelled facts (#834)
+
+**Ruled by Russell, 2026-11-13**, of the Replace It… warning: "This dialog
+reads as a wall of text. Separate pertinent information from the message the
+app is trying to convey." The shape, `FactsQuestionSheet` with a
+`FactsQuestion`: a title that asks; ONE short sentence, the message, under it
+in `SheetTitle`'s two-line shape; the facts as labelled rows in a grouped
+`Form` (`LabeledContent`, the system's own form styling, scrolling off); then
+the action and Cancel. A fact that is missing is no row, never a blank one
+(Replace It…'s "Kept on" when the folder's day cannot be read). Each row is one
+accessibility element, so VoiceOver reads the title, the message, then
+"label, value". Cancel is the default (`.defaultButton(isEnabled: true)`) and
+the sheet's `.onExitCommand` is Cancel too, so it answers Return and Escape;
+the action takes no key.
+
+Three questions use it: Replace It… (`referenceCourses.replacing.wording`:
+`message`, then Being replaced, Kept on, Backed up first as, To undo), Remove
+Group (`referenceCourses.groups.wording.removeGroupSentence`, then where its
+courses go, none, one or many with no "(s)", and that no course is removed or
+changed) and Start the Groups Again (`startAgainSentence`, then why, the
+groups you made, what is kept, and that nothing inside the courses changes).
+The one-paragraph keys (`body`, `bodyWithoutADate`, `removeGroupMessageNone`,
+`…One`, `…Many`, `startAgainMessage`) are retired, not kept beside the new
+ones.
+
+**The form's height is its rows'**, by `.fixedSize(horizontal: false,
+vertical: true)`, which is allowed here because a sheet is hosted at the width
+it sets itself (460 points), unlike the detail column ("A blank window"). The
+first version gave the form a height of 30 points a row plus 40; measured in
+`FactsQuestionTests` (the form's scroll view against what it holds), it cut
+off the last row of every question, by 20 to 61 points, most where a
+value wrapped. The test fails on that version and passes on this one.
+
+**The Obsidian add-ons offer** (#742, Russell 2026-11-13) takes the same
+shape inside its dialog. When Obsidian is running, Add Them closes the whole of
+Obsidian, so any OTHER course open in it closes too, and only this course
+opens again; the sentence said neither. `offerWhileOpen` and
+`offerWhileObsidianIsOpen` are now short leads, followed by three facts, one a
+line as "label: value" (`closesLabel`/`closesValue`,
+`opensAgainLabel`/`opensAgainValue`, `keptLabel`/`keptValue`;
+`obsidianAddOnsForFigures.wording.closingRule`). The offer stays a dialog,
+because its Don't ask again box is a dialog suppression toggle presented from
+a view of its own (#731), and a dialog's message holds lines, not a form.
+Rejected by Russell: leaving Obsidian alone and telling the teacher to
+restart it; offering both at that moment.
+
+**The Reference Courses heading has a visible button** (Russell, 2026-11-13):
+`ReferenceShelfHeading` draws the title and a borderless `ellipsis.circle`
+menu button that opens exactly the heading's right-click menu (both draw
+`ReferenceShelfHeadingMenu`): New Reference Course…, New Group…, and Start
+the Groups Again… while the arrangement cannot be read. Its accessibility
+label and help are `headingMenuLabel`. It is never disabled and never
+absent while the heading is drawn, because New Reference Course… always
+applies there (the heading itself is drawn only when the shelf holds a course
+or a group). The borderless menu style is the sidebar footer's own control
+look, so AppKit draws its hover and pressed states, and Tab reaches it with
+keyboard navigation on; neither was measured in a unit test, which cannot
+hover or open a menu. `FactsQuestionTests` measures that the button is drawn
+inside the heading and enabled, and pins that both doors draw one list. A
+row's own group menu (Rename Group…, Remove Group…) and Move to Group stay on
+the rows and in the Course menu: the heading's button is the door for the
+shelf as a whole.
 
 **Identifiers in the two tabs.** The Planning tab, the share bar, the
 Coverage tab's header and both tabs' empty states carried an
@@ -10247,14 +10312,14 @@ real courses; nor does the assistant, which has no tool for it.
 Replace It… first asks whether the course can be replaced at all (it must be
 a reference course, not previewing or being copied, and not open in
 Obsidian), and says why not where the door says its other problems. Then the
-warning: title `wording.title`, body `wording.body`, which gives the
-sections, pages and size, the day the folder was made, the name the backup
-will have in Backups (the folder's), and that restoring that backup puts the
-old course back in place of the new one (plan review M9). Escape is Cancel
-and Return presses neither button (#832: the shape that made Cancel the
-default took Escape off it; see "Return and Escape in this release's
-questions"). Composed by `ReferenceReplacer.offer`; the alert is the
-shared `ReplaceReferenceCourseAlert`.
+warning, a facts sheet since #834: title `wording.title`, the sentence
+`wording.message`, and rows for the sections, pages and size, the day the
+folder was made (absent when it cannot be read), the name the backup will
+have in Backups (the folder's), and that restoring that backup undoes it
+(plan review M9). Cancel is the default and answers Return and Escape (see
+"Questions as one sentence and labelled facts (#834)"). Composed by
+`ReferenceReplacer.offer`; presented by the shared
+`ReplaceReferenceCourseAlert` modifier, which keeps its name.
 
 **The order is the design.** `ReferenceReplacer.replace`:
 
@@ -10444,7 +10509,7 @@ and EVERY change is refused with `couldNotReadGroups`, which names the way
 out rather than saying "try again", since waiting does not help a hand-edited
 copy (implementation review M2). **The way out is Start the Groups Again…**,
 on the Reference Courses heading's menu only while the arrangement cannot be
-read, asked first (Escape is Cancel; Return presses neither button, #832). It MOVES the unreadable file aside to
+read, asked first (a facts sheet, Cancel the default, #834). It MOVES the unreadable file aside to
 `reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
 name is taken; never deleted, never written over), and the shelf is the year
 layout with every control working. A NEWER version's file is never moved by

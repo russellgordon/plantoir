@@ -25,6 +25,12 @@ import XCTest
 /// already closed on Escape (SwiftUI closes a sheet that has no Cancel of
 /// its own), measured, so it is pinned here and not changed.
 ///
+/// **Since #834** Replace It…, Remove Group and Start the Groups Again are
+/// `FactsQuestionSheet`s, where Cancel answers BOTH keys (`.defaultButton`
+/// for Return, the sheet's `.onExitCommand` for Escape) and the action takes
+/// none, as Russell first asked; only the public-address warning is still an
+/// alert, with Escape alone.
+///
 /// Measured failing on the code before #832: put
 /// `.keyboardShortcut(.defaultAction)` back under any question's Cancel
 /// (Escape stops closing it), take `role: .destructive` off the public
@@ -107,7 +113,16 @@ final class QuestionKeysTests: XCTestCase {
         // MARK: - Stored properties
 
         @State var warning: ReferenceReplacer.Warning? = ReferenceReplacer.Warning(
-            folderName: "EXC2O", title: "Replace EXC2O?", message: "A message."
+            folderName: "EXC2O", title: "Replace EXC2O in 2025–26?",
+            question: FactsQuestion(
+                title: "Replace EXC2O in 2025–26?",
+                message: ReferenceReplaceWording.message,
+                rows: ReferenceReplaceWording.rows(
+                    sections: "1 section", pages: "2 pages", size: "4 KB", date: "12 November 2026", folder: "EXC2O"
+                ),
+                action: ReferenceReplaceWording.confirmButton,
+                cancel: ReferenceReplaceWording.cancelButton
+            )
         )
 
         let replaced: Answers
@@ -253,62 +268,92 @@ final class QuestionKeysTests: XCTestCase {
         XCTAssertFalse(actedOn(), "\(what): Escape pressed \(action)")
     }
 
+    /// A facts sheet's keys as a teacher meets them (#834): Return and
+    /// Escape each close it through Cancel, and neither goes ahead. Each key
+    /// is pressed on a question opened afresh by `open`, which hands back
+    /// the window, whether it is still asked, and whether it went ahead.
+    func checkCancelAnswersBothKeys(
+        what: String,
+        open: () throws -> (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool)
+    ) rethrows {
+        for key in [Key.returnKey, Key.escape] {
+            let shown: (window: NSWindow, stillAsked: () -> Bool, wentAhead: () -> Bool) = try open()
+            XCTAssertTrue(shown.stillAsked(), "\(what): the question was not asked")
+            press(key, in: shown.window)
+            XCTAssertTrue(runUntil(timeout: 3) { !shown.stillAsked() }, "\(what): \(key) did not close the question")
+            _ = runUntil(timeout: 0.3) { false }
+            XCTAssertFalse(shown.wentAhead(), "\(what): \(key) went ahead instead of cancelling")
+            close(shown.window)
+        }
+    }
+
+    /// The trail as it stands, so a test can tell whether going ahead wrote
+    /// its line.
+    var trailNow: String {
+        return ActivityTrail.store.activityText(includingPrompts: false)
+    }
+
     // MARK: - Tests
 
-    func testEscapeClosesTheRemoveGroupQuestionAndReturnRemovesNothing() throws {
+    func testReturnAndEscapeAreCancelOnTheRemoveGroupQuestion() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
-        workspace.workspaceURL = root
-        let group: ReferenceShelfGroup = ReferenceShelfGroup(
-            group: ReferenceShelf.Group(place: .made("g-0000a001"), title: "Electives", folderNames: []),
-            courses: []
-        )
-        workspace.removeGroupRequest = group
-        let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
-        defer {
-            close(window)
+        try checkCancelAnswersBothKeys(what: "Remove Group") {
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.workspaceURL = root
+            workspace.removeGroupRequest = ReferenceShelfGroup(
+                group: ReferenceShelf.Group(place: .made("g-0000a001"), title: "Electives", folderNames: []),
+                courses: []
+            )
+            let before: String = trailNow
+            let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
+            return (window: window,
+                    stillAsked: { return workspace.removeGroupRequest != nil },
+                    wentAhead: { return self.trailNow != before || workspace.referenceGroupProblem != nil })
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceGroupWording.removeButton, cancel: ReferenceGroupWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return workspace.referenceGroupProblem != nil },
-            what: "Remove Group"
-        )
-        XCTAssertNil(workspace.removeGroupRequest, "Cancel cleared the request")
     }
 
-    func testEscapeClosesStartTheGroupsAgainAndReturnStartsNothing() throws {
+    func testReturnAndEscapeAreCancelOnStartTheGroupsAgain() throws {
         let root: URL = try FixtureWorkspace.materialize()
         rootURL = root
-        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
-        workspace.workspaceURL = root
-        workspace.isAskingToStartReferenceGroupsAgain = true
-        let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
-        defer {
-            close(window)
+        try checkCancelAnswersBothKeys(what: "Start the Groups Again") {
+            let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+            workspace.workspaceURL = root
+            workspace.isAskingToStartReferenceGroupsAgain = true
+            let before: String = trailNow
+            let window: NSWindow = windowShowing(Color.white.modifier(ReferenceGroupPresenter()).environment(workspace))
+            return (window: window,
+                    stillAsked: { return workspace.isAskingToStartReferenceGroupsAgain },
+                    wentAhead: { return self.trailNow != before || workspace.referenceGroupProblem != nil })
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceGroupWording.startAgainButton, cancel: ReferenceGroupWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return workspace.referenceGroupProblem != nil },
-            what: "Start the Groups Again"
-        )
-        XCTAssertFalse(workspace.isAskingToStartReferenceGroupsAgain)
     }
 
-    func testEscapeClosesTheReplaceWarningAndReturnReplacesNothing() {
+    func testReturnAndEscapeAreCancelOnTheReplaceWarning() {
+        checkCancelAnswersBothKeys(what: "Replace It…") {
+            let replaced: Answers = Answers()
+            let page: ReplacePage = ReplacePage(replaced: replaced)
+            let window: NSWindow = windowShowing(page)
+            return (window: window,
+                    stillAsked: { return window.attachedSheet != nil },
+                    wentAhead: { return replaced.answer == "replace" })
+        }
+    }
+
+    /// The facts sheet itself: its action button carries no key, and Cancel
+    /// is the default, measured on the buttons AppKit draws for it.
+    func testTheFactsSheetsActionTakesNoKey() {
         let replaced: Answers = Answers()
         let window: NSWindow = windowShowing(ReplacePage(replaced: replaced))
         defer {
             close(window)
         }
-        checkTheAlertKeys(
-            in: window, action: ReferenceReplaceWording.confirmButton, cancel: ReferenceReplaceWording.cancelButton,
-            stillAsked: { return window.attachedSheet != nil },
-            actedOn: { return replaced.answer == "replace" },
-            what: "Replace It…"
-        )
+        let keys: [String: String] = buttonKeys(in: window)
+        if let action = keys[ReferenceReplaceWording.confirmButton] {
+            XCTAssertEqual(action, "", "Replace answers a key (\(keys))")
+        }
+        if let cancel = keys[ReferenceReplaceWording.cancelButton] {
+            XCTAssertEqual(cancel, "\r", "Cancel is not the default (\(keys))")
+        }
     }
 
     /// The public-address warning: Share Without a Password used to take

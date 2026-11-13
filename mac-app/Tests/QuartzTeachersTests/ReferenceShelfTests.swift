@@ -197,6 +197,7 @@ final class ReferenceShelfTests: XCTestCase {
         let wording: [String: Any] = try XCTUnwrap(try ReferenceShelfTests.groupRules()["wording"] as? [String: Any])
         let pairs: [(String, String)] = [
             ("newGroupMenuItem", ReferenceGroupWording.newGroupMenuItem),
+            ("headingMenuLabel", ReferenceGroupWording.headingMenuLabel),
             ("newGroupTitle", ReferenceGroupWording.newGroupTitle),
             ("nameLabel", ReferenceGroupWording.nameLabel),
             ("createButton", ReferenceGroupWording.createButton),
@@ -206,9 +207,13 @@ final class ReferenceShelfTests: XCTestCase {
             ("removeGroupMenuItem", ReferenceGroupWording.removeGroupMenuItem),
             ("removeGroupAskingMenuItem", ReferenceGroupWording.removeGroupAskingMenuItem),
             ("removeGroupTitle", ReferenceGroupWording.removeGroupTitle(group: "{group}")),
-            ("removeGroupMessageNone", ReferenceGroupWording.removeGroupMessage(courseCount: 0)),
-            ("removeGroupMessageOne", ReferenceGroupWording.removeGroupMessage(courseCount: 1)),
-            ("removeGroupMessageMany", ReferenceGroupWording.removeGroupMessageMany(count: 0).replacingOccurrences(of: "0", with: "{count}")),
+            ("removeGroupSentence", ReferenceGroupWording.removeGroupSentence),
+            ("removeGroupCoursesLabel", ReferenceGroupWording.removeGroupCoursesLabel),
+            ("removeGroupCoursesNone", ReferenceGroupWording.removeGroupCourses(courseCount: 0)),
+            ("removeGroupCoursesOne", ReferenceGroupWording.removeGroupCourses(courseCount: 1)),
+            ("removeGroupCoursesMany", ReferenceGroupWording.removeGroupCoursesMany(count: 0).replacingOccurrences(of: "0", with: "{count}")),
+            ("removeGroupStaysLabel", ReferenceGroupWording.removeGroupStaysLabel),
+            ("removeGroupStaysValue", ReferenceGroupWording.removeGroupStaysValue),
             ("removeButton", ReferenceGroupWording.removeButton),
             ("cancelButton", ReferenceGroupWording.cancelButton),
             ("removeWouldClash", ReferenceGroupWording.removeWouldClash(group: "{group}", course: "{course}", target: "{target}")),
@@ -223,7 +228,15 @@ final class ReferenceShelfTests: XCTestCase {
             ("nameIsAYear", ReferenceGroupWording.nameIsAYear),
             ("startAgainMenuItem", ReferenceGroupWording.startAgainMenuItem),
             ("startAgainTitle", ReferenceGroupWording.startAgainTitle),
-            ("startAgainMessage", ReferenceGroupWording.startAgainMessage),
+            ("startAgainSentence", ReferenceGroupWording.startAgainSentence),
+            ("startAgainWhyLabel", ReferenceGroupWording.startAgainWhyLabel),
+            ("startAgainWhyValue", ReferenceGroupWording.startAgainWhyValue),
+            ("startAgainOwnGroupsLabel", ReferenceGroupWording.startAgainOwnGroupsLabel),
+            ("startAgainOwnGroupsValue", ReferenceGroupWording.startAgainOwnGroupsValue),
+            ("startAgainKeptLabel", ReferenceGroupWording.startAgainKeptLabel),
+            ("startAgainKeptValue", ReferenceGroupWording.startAgainKeptValue),
+            ("startAgainCoursesLabel", ReferenceGroupWording.startAgainCoursesLabel),
+            ("startAgainCoursesValue", ReferenceGroupWording.startAgainCoursesValue),
             ("startAgainButton", ReferenceGroupWording.startAgainButton),
             ("couldNotStartAgainTitle", ReferenceGroupWording.couldNotStartAgainTitle),
             ("nameIsTaken", ReferenceGroupWording.nameIsTaken(name: "{name}")),
@@ -241,9 +254,18 @@ final class ReferenceShelfTests: XCTestCase {
         }
         XCTAssertEqual(ReferenceGroupWording.courses(1), "1 course")
         XCTAssertEqual(ReferenceGroupWording.courses(3), "3 courses")
-        XCTAssertTrue(ReferenceGroupWording.removeGroupMessage(courseCount: 3).hasPrefix("Its 3 courses go back"))
+        XCTAssertTrue(ReferenceGroupWording.removeGroupCourses(courseCount: 3).hasPrefix("3 courses, back"))
         for count in [0, 1, 2, 7] {
-            XCTAssertFalse(ReferenceGroupWording.removeGroupMessage(courseCount: count).contains("(s)"))
+            XCTAssertFalse(ReferenceGroupWording.removeGroupCourses(courseCount: count).contains("(s)"))
+        }
+        // #834: each question is one sentence, then its facts as rows.
+        let removal: FactsQuestion = ReferenceGroupWording.removeGroupQuestion(group: "Electives", courseCount: 2)
+        XCTAssertEqual(removal.message, ReferenceGroupWording.removeGroupSentence)
+        XCTAssertEqual(removal.rows.count, 2)
+        XCTAssertEqual(removal.rows[0].value, ReferenceGroupWording.removeGroupCoursesMany(count: 2))
+        XCTAssertEqual(ReferenceGroupWording.startAgainQuestion.rows.count, 4)
+        for retired in ["removeGroupMessageNone", "removeGroupMessageOne", "removeGroupMessageMany", "startAgainMessage"] {
+            XCTAssertNil(wording[retired], "\(retired) was retired by #834")
         }
         XCTAssertFalse(
             ReferenceGroupWording.couldNotReadGroups.localizedCaseInsensitiveContains("try again"),
@@ -916,26 +938,21 @@ final class ReferenceShelfTests: XCTestCase {
         }
     }
 
-    /// Escape is Cancel on both of the groups' questions, and Return
-    /// presses neither button, as the contract says (#832). In an alert a
-    /// button takes ONE key: Cancel given Return (the shape until #832) took
-    /// Escape off it, measured. So the action is destructive, which takes no
-    /// key, and Cancel is the cancel button with no other key. The keys
-    /// themselves are pressed in `QuestionKeysTests`; this pins the shape
-    /// the contract's rule names.
-    func testEscapeIsCancelAndReturnPressesNothingOnBothQuestions() throws {
+    /// Both of the groups' questions are facts sheets (#834), where Cancel
+    /// is the default and answers Return and Escape; the keys are pressed for
+    /// real in `QuestionKeysTests`. This pins the shape the contract's rule
+    /// names.
+    func testBothQuestionsAreFactsSheetsWithCancelTheDefault() throws {
         let url: URL = ReferenceShelfTests.repositoryURL()
             .appendingPathComponent("mac-app/QuartzTeachers/Views/Wizard/ReferenceGroupPresenter.swift")
         let text: String = try String(contentsOf: url, encoding: .utf8)
-        XCTAssertEqual(text.components(separatedBy: "Button(ReferenceGroupWording.cancelButton, role: .cancel)").count - 1, 2,
+        XCTAssertEqual(text.components(separatedBy: "FactsQuestionSheet(").count - 1, 2,
                        "the removal question and the start-again question")
-        XCTAssertNil(text.range(of: ".keyboardShortcut(.defaultAction)"), "a Cancel given Return loses Escape in an alert")
-        XCTAssertNotNil(text.range(of: "Button(ReferenceGroupWording.removeButton, role: .destructive)"))
-        XCTAssertNotNil(text.range(of: "Button(ReferenceGroupWording.startAgainButton, role: .destructive)"))
+        XCTAssertNil(text.range(of: ".alert(\n                ReferenceGroupWording.removeGroupTitle"), "the removal question is an alert again")
         let rule: String = try XCTUnwrap(
             (try ReferenceShelfTests.groupRules()["wording"] as? [String: Any])?["rule"] as? String
         )
-        XCTAssertTrue(rule.contains("Escape is Cancel on the removal question and on the start-again question, and Return presses neither button"), rule)
+        XCTAssertTrue(rule.contains("Cancel is the default and answers Return and Escape"), rule)
     }
 
     // MARK: - The three arrival doors, for real (implementation review L5)
