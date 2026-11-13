@@ -2698,7 +2698,10 @@ public sealed partial class SectionDetailView : UserControl
             // until 2026-09-06 nothing in the app could, so this asked about
             // <course>\.merged_output, which Windows stopped writing to when
             // builds moved out of the working folder.
-            bool needsBuild = BuildFreshness.NeedsRebuild(
+            // WHY it builds, or null to deploy the last build (#799,
+            // buildFreshness.reuseTheLastBuild); the reason goes on the trail
+            // once the build has gone through.
+            string? buildReason = BuildFreshness.WhyRebuild(
                 saved, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
@@ -2735,7 +2738,7 @@ public sealed partial class SectionDetailView : UserControl
             // never the previous one's stale outcome (row 318a's beat).
             ranTheRunner = true;
             var running = run.Runner.RunAsync(saved, _sectionNumber, destinations, cloudflareAccount,
-                workspacePath, needsBuild);
+                workspacePath, buildReason);
             run.IsPreparing = false;
             await running;
             // The single place that decides which sentence a teacher (or the

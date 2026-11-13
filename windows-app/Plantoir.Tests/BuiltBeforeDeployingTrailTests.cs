@@ -60,6 +60,44 @@ public class BuiltBeforeDeployingTrailTests
         foreach (string word in words) Assert.True(reasons.ContainsKey(word), word + " is not a reason in reuseTheLastBuild.reasons");
     }
 
+    // ---- The app's Deploy button (MultiDestinationDeployRunner) -------------
+
+    [Fact]
+    public void ABuildThatWentThroughWritesItsReasonAndNothingElseWritesAtAll()
+    {
+        Assert.Equal(ActivityTrail.BuiltBeforeDeployingWords(BuildFreshness.ReasonPages),
+            MultiDestinationDeployRunner.TrailLineAfterBuild(BuildFreshness.ReasonPages, built: true, cancelled: false, stopped: false));
+        Assert.Equal(ActivityTrail.BuiltBeforeDeployingWords(BuildFreshness.ReasonNeverBuilt),
+            MultiDestinationDeployRunner.TrailLineAfterBuild(BuildFreshness.ReasonNeverBuilt, true, false, false));
+        Assert.Null(MultiDestinationDeployRunner.TrailLineAfterBuild(null, true, false, false));           // reused: no build
+        Assert.Null(MultiDestinationDeployRunner.TrailLineAfterBuild(BuildFreshness.ReasonPages, false, false, false)); // failed or refused
+        Assert.Null(MultiDestinationDeployRunner.TrailLineAfterBuild(BuildFreshness.ReasonPages, true, true, false));   // cancelled
+        Assert.Null(MultiDestinationDeployRunner.TrailLineAfterBuild(BuildFreshness.ReasonPages, true, false, true));   // stopped
+    }
+
+    /// <summary>
+    /// RunAsync has no seam for a real build (its legs are ConPTY runners),
+    /// so the ORDER is pinned in its source: the line is written after the
+    /// build was awaited and after the cancel and failure checks, and
+    /// exactly once.
+    /// </summary>
+    [Fact]
+    public void RunAsyncWritesTheLineOnlyAfterTheBuildsOwnChecks()
+    {
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "windows-app", "Plantoir.Core", "Scripting", "MultiDestinationDeployRunner.cs"));
+        int run = source.IndexOf("public async Task RunAsync(", StringComparison.Ordinal);
+        int awaited = source.IndexOf("bool built = await runner.WaitUntilFinished();", run, StringComparison.Ordinal);
+        int cancelCheck = source.IndexOf("if (runner.WasCancelled || runner.WasStoppedByUser)", awaited, StringComparison.Ordinal);
+        int failureCheck = source.IndexOf("if (!built)", awaited, StringComparison.Ordinal);
+        int written = source.IndexOf("TrailLineAfterBuild(buildReason, built, runner.WasCancelled, runner.WasStoppedByUser)", run, StringComparison.Ordinal);
+        int deploy = source.IndexOf("runner.Run(DeployCommand.ScriptName", run, StringComparison.Ordinal);
+        Assert.True(awaited > run && cancelCheck > awaited && failureCheck > awaited, "the build's checks moved");
+        Assert.True(written > cancelCheck && written > failureCheck, "the line is written before the build's own checks");
+        Assert.True(written < deploy, "the line is written after the deploy started");
+        Assert.Equal(written, source.LastIndexOf("TrailLineAfterBuild(buildReason", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void TheEventIsNamedAsTheContractNamesIt()
     {
