@@ -55,6 +55,13 @@ namespace Plantoir.Core.Assist;
 /// </remarks>
 public static class OutsideDoor
 {
+    /// <summary>
+    /// What a door hands its program and writes on the trail once it opened:
+    /// the argv after the program, and the "assistant opened" line
+    /// (<see cref="ClaudeCodeLauncher.Prepare"/>, <see cref="CodexLauncher.Prepare"/>).
+    /// </summary>
+    public sealed record Session(IReadOnlyList<string> Arguments, string TrailText);
+
     /// <summary>cmd itself, by its full path, never whatever is called cmd.exe on PATH.</summary>
     public static string Cmd => Path.Combine(Environment.SystemDirectory, "cmd.exe");
 
