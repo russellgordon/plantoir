@@ -22,8 +22,13 @@ public sealed class PlanAUnitTests
         Assert.Equal(block["message"]!.ToString(), PlanAUnit.Message);
         Assert.Equal(block["trailLine"]!.ToString(), "{course}" + UnitPlans.TrailSeparator + PlanAUnit.TrailLine);
         var buttons = block["buttons"]!.AsArray();
-        Assert.Equal(Enum.GetValues<FixWithAssistant.Assistant>().Length, buttons.Count);
-        foreach (var button in buttons)
+        var doorsHere = Enum.GetValues<FixWithAssistant.Assistant>().Select(a => a.ToString().ToLowerInvariant()).ToList();
+        // GitHub Copilot's button (#783 on the mac) waits for Windows' Copilot door, #884.
+        var held = NamedGapLedger.GapsIn(NamedGapLedger.PlanAUnitButtons,
+                                         buttons.Select(b => b!["assistant"]!.ToString()), doorsHere);
+        var built = buttons.Where(b => !held.Contains(b!["assistant"]!.ToString())).ToList();
+        Assert.Equal(doorsHere.Count, built.Count);
+        foreach (var button in built)
         {
             var assistant = Enum.Parse<FixWithAssistant.Assistant>(button!["assistant"]!.ToString(), ignoreCase: true);
             Assert.Equal(button["title"]!.ToString(), PlanAUnit.ButtonTitle(assistant));

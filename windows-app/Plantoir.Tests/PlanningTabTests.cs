@@ -40,7 +40,8 @@ public sealed class PlanningTabTests : IDisposable
         foreach (var testCase in tabCases)
         {
             bool shown = PlanningTab.IsShown(testCase!["claude"]!.GetValue<bool>(), testCase["codex"]!.GetValue<bool>(),
-                                             testCase["referenceCourse"]!.GetValue<bool>());
+                                             testCase["referenceCourse"]!.GetValue<bool>(),
+                                             testCase["copilot"]?.GetValue<bool>() ?? false);
             Assert.True((shown ? "shown" : "absent") == testCase["expect"]!.ToString(), testCase["name"]!.ToString());
         }
     }

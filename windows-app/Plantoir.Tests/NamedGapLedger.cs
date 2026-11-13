@@ -161,6 +161,9 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>specialNames.platformWording.machine.usedIn</c>, by entry (<c>MachineWordContractTests.EverySentenceTheContractWritesWithTheMachineIsSaidFilled</c>).</summary>
     internal const string MachineWordUsedIn = "shared-rules.json → specialNames.platformWording.machine.usedIn";
 
+    /// <summary><c>app-rules.json</c> → <c>outsideAgents.planAUnit.buttons</c>, by <c>assistant</c> (<c>PlanAUnitTests.TheWordsAreTheContracts</c>).</summary>
+    internal const string PlanAUnitButtons = "app-rules.json → outsideAgents.planAUnit.buttons";
+
     /// <summary>
     /// <c>windows-app/test_launcher_rules.ps1</c>'s rows, by <c>"&lt;list&gt;\t&lt;name&gt;"</c>,
     /// the list spelled as the runner's <c>Report</c> names it (per launcher:
@@ -232,6 +235,7 @@ internal static class NamedGapLedger
     private const string Reason826 = "replacing a reference course is #826's piece of v2.0.0, not built here yet";
     private const string Reason827 = "the groups a teacher makes on the reference shelf are #827's piece of v2.0.0, not built here yet";
     private const string Reason828 = "the launchers refusing an overlapping build of a section (#729), and what the app reads from that refusal, are #828's piece of v2.0.0, not built here yet";
+    private const string Reason884 = "GitHub Copilot as a third outside assistant (the mac's #783) is #884's piece of v2.0.0; Windows has no Copilot door yet";
     private const string Reason854 = "#835's first part (a hold from a scheduled deploy named as one that is running, not 'set for later') is #854's piece of v2.0.0, not built here yet";
 
     /// <summary>A launcher-runner row key, as the runner builds it: the list label, a TAB, the case name.</summary>
@@ -255,6 +259,8 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
         Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
         Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
+        // 790a (2026-11-13): Plan a Unit's third button arrived with the mac's #783.
+        Owed(PlanAUnitButtons, 884, V200, Reason884, "copilot"),
         Owed(ActivityTrailEvents, 811, V200, Reason811,
              "looked at a section's curriculum coverage", "asked to make a section's coverage map again"),
         Owed(ActivityTrailEvents, 824, V200, Reason824,

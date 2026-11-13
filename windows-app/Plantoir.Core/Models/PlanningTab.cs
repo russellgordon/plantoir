@@ -52,12 +52,16 @@ public static class PlanningTab
     public const string PageName = "index.html";
 
     /// <summary>
-    /// <c>tabCases</c>: the tabs are on a course's page only while Claude Code
-    /// or Codex is installed, and never on a course kept for reference. Absent,
-    /// never disabled (Russell, 2026-11-01); whether plans exist never matters.
+    /// <c>tabCases</c>: the tabs are on a course's page only while an outside
+    /// assistant is installed (Claude Code, Codex, or since #783 GitHub
+    /// Copilot), and never on a course kept for reference. Absent, never
+    /// disabled (Russell, 2026-11-01); whether plans exist never matters. This
+    /// app has no Copilot door until #884, so its caller passes false there,
+    /// which the contract allows ("a reader that predates it treats it as false").
     /// </summary>
-    public static bool IsShown(bool claudeIsInstalled, bool codexIsInstalled, bool courseIsKeptForReference) =>
-        !courseIsKeptForReference && (claudeIsInstalled || codexIsInstalled);
+    public static bool IsShown(bool claudeIsInstalled, bool codexIsInstalled, bool courseIsKeptForReference,
+                               bool copilotIsInstalled = false) =>
+        !courseIsKeptForReference && (claudeIsInstalled || codexIsInstalled || copilotIsInstalled);
 
     /// <summary>
     /// <c>choiceCases</c> → <c>choices</c>: All Plans first when the planning
