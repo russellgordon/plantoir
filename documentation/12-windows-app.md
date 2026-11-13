@@ -7365,9 +7365,10 @@ the code before the item went, every state checked:
 - *A task whose course folder was moved or renamed by hand:* the old item found
   tasks the same way the sweep does (`TaskScheduling.InFolder` + `SameCode`),
   so it never found that task either; removing it took nothing away.
-- *Becoming reference:* only by copy (`ReferenceCopier`, a NEW code, so no
-  task is addressed to it) or by hand-editing the marker, which the next read
-  meets.
+- *Becoming reference:* only by Keep a Copy (`ReferenceCopier`) or Import
+  Courses for Reference… (`ReferenceImport`), each a NEW folder and code, so
+  no task is addressed to it, or by hand-editing the marker, which the next
+  read meets.
 
 REJECTED: keeping the item "to be safe" — it could only appear for a task the
 last read had not removed, it contradicted the menu bar beside it, and the

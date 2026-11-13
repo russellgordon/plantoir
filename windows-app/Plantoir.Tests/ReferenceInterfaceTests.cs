@@ -20,8 +20,9 @@ public class ReferenceInterfaceTests
         int from = text.IndexOf(start, StringComparison.Ordinal);
         Assert.True(from >= 0, start);
         int to = text.IndexOf(end, from + start.Length, StringComparison.Ordinal);
+        Assert.True(to >= 0, end);   // a missing end would scan to the end of the file and pass for the wrong reason
         // Comments say what is withheld; only code is asserted on.
-        return string.Join(Environment.NewLine, text[from..(to < 0 ? text.Length : to)].Split(Environment.NewLine[^1])
+        return string.Join(Environment.NewLine, text[from..to].Split(Environment.NewLine[^1])
             .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
     }
 
@@ -30,7 +31,7 @@ public class ReferenceInterfaceTests
     {
         string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
         string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
-        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "private MenuFlyoutItem ReferenceObsidianItem(");
+        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
         foreach (string withheld in new[] { "Rename", "Add Section", "KeepACopyMenuItem", "Revise", "Schedule Deploy", "Restore Section" })
         {
             Assert.DoesNotContain(withheld, courseMenu);
@@ -53,7 +54,7 @@ public class ReferenceInterfaceTests
     {
         string sidebar = Source("Plantoir", "Views", "SidebarPane.Reference.cs");
         string courseMenu = Between(sidebar, "private MenuFlyout ReferenceCourseMenu(", "private MenuFlyout ReferenceSectionMenu(");
-        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "private MenuFlyoutItem ReferenceObsidianItem(");
+        string sectionMenu = Between(sidebar, "private MenuFlyout ReferenceSectionMenu(", "// ---- The calm note");
         foreach (string door in new[] { "Cancel Scheduled Deploy", "ConfirmCancelScheduledDeploy", "TaskScheduling" })
         {
             Assert.DoesNotContain(door, sectionMenu);
