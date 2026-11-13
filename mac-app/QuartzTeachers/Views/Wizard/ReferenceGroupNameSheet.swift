@@ -71,7 +71,7 @@ struct ReferenceGroupNameSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField(ReferenceGroupWording.nameLabel, text: $name)
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .accessibilityLabel(ReferenceGroupWording.nameLabel)
                 .accessibilityIdentifier("referenceGroupName")
                 .onSubmit {
