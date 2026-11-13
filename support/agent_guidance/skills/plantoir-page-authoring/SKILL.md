@@ -759,8 +759,8 @@ of these pages, whether or not anything is printed.
   `.internal/handouts/handouts.json`, the folder where a course's handouts
   are kept, `plantoir-unit-planning`'s `.internal/planning/`, where a
   course's unit plans are kept, and `plantoir-marking`'s
-  `.internal/marking/marking.json`, the two folders where a course's
-  marking is kept.)
+  `.internal/marking/marking.json`, where a course's marking folder is
+  recorded.)
 
 ## 24. Check it
 

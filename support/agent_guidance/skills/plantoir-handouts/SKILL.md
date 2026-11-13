@@ -320,7 +320,8 @@ pdftoppm -png -r 80 "Name - Answers.pdf" /tmp/handout-check/Answers
 comes with Poppler: `brew install poppler` on a Mac.) If you
 cannot render the pages, tell the teacher they have not been looked at.
 Render and look at everything you make, except anything in a teacher-only
-folder (the `plantoir-marking` skill's), which is never opened.
+folder (the `plantoir-marking` skill's), which is never looked for or
+opened.
 
 Leave no build files behind. Of THIS handout's files, only `Name.tex`,
 `Name - Answers.tex`, `Name.pdf` and `Name - Answers.pdf` (and a merged

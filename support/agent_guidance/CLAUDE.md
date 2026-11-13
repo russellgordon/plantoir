@@ -34,7 +34,9 @@ matches the task before writing:
 - **Marking a test or quiz from scanned papers, and its feedback sheets**:
   the `plantoir-marking` skill (`.claude/skills/plantoir-marking/SKILL.md`).
   Read it before opening any student work: it keeps students' names on
-  this computer.
+  this computer. Never ask where the teacher's teacher-only folder is, and
+  never search for, list or open it: the teacher runs the steps that read
+  it, by double-clicking a file the skill sets up.
 - **Report card comments** for a class, drafted from the marking: the
   `plantoir-report-comments` skill
   (`.claude/skills/plantoir-report-comments/SKILL.md`), after

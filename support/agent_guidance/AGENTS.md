@@ -38,7 +38,10 @@ that matches the task before writing:
 - **Marking a test or quiz from scanned papers, and its feedback sheets**:
   read `.agents/skills/plantoir-marking/SKILL.md` (the same file is at
   `.claude/skills/plantoir-marking/SKILL.md`) before opening any student
-  work: it keeps students' names on this computer.
+  work: it keeps students' names on this computer. Never ask where the
+  teacher's teacher-only folder is, and never search for, list or open it:
+  the teacher runs the steps that read it, by double-clicking a file the
+  skill sets up.
 - **Report card comments** for a class, drafted from the marking: three
   options per student, identifiers only, the first names put in by script
   at the end, are in `.agents/skills/plantoir-report-comments/SKILL.md`

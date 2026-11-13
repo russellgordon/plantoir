@@ -822,8 +822,10 @@ final class PrintablePagesTests: XCTestCase {
     }
 
     /// #750 (750a): the marking skill travels the same way, with every
-    /// script, template and reference `assessment.agentGuidance.markingSkill`
-    /// lists, and both root files name it. Each skill in `mentionedBy` names
+    /// script, launcher (750d: the two files the teacher double-clicks, and
+    /// their Windows twins), template and reference
+    /// `assessment.agentGuidance.markingSkill` lists, and both root files
+    /// name it. Each skill in `mentionedBy` names
     /// it (the test-authoring skill's one-time offer, and the two lists of
     /// the places under `.internal` a skill may write), the skill says where
     /// its pointer file lives and how to run its never-adapted runner, and
@@ -834,6 +836,7 @@ final class PrintablePagesTests: XCTestCase {
         let guidance: [String: Any] = try XCTUnwrap(agentGuidance["markingSkill"] as? [String: Any])
         let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
         let scripts: [String] = try XCTUnwrap(guidance["scripts"] as? [String])
+        let launchers: [String] = try XCTUnwrap(guidance["launchers"] as? [String])
         let templates: [String] = try XCTUnwrap(guidance["templates"] as? [String])
         let references: [String] = try XCTUnwrap(guidance["references"] as? [String])
         let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
@@ -843,6 +846,7 @@ final class PrintablePagesTests: XCTestCase {
         let pointerPath: String = try XCTUnwrap(pointerFile["path"] as? String)
         XCTAssertTrue(scripts.contains(runner), "the runner is written with the skill")
         XCTAssertFalse(scripts.isEmpty)
+        XCTAssertFalse(launchers.isEmpty, "750d: the teacher's two launchers travel with the skill")
         XCTAssertFalse(templates.isEmpty)
         XCTAssertFalse(references.isEmpty)
         XCTAssertFalse(mentionedBy.isEmpty)
@@ -863,6 +867,7 @@ final class PrintablePagesTests: XCTestCase {
             XCTAssertTrue(skill.contains(pointerInSkill), "\(home): the skill must say where its pointer file lives")
             XCTAssertTrue(skill.contains(runner), "\(home): the skill must say how to run \(runner)")
             var files: [String] = scripts
+            files.append(contentsOf: launchers)
             files.append(contentsOf: templates)
             files.append(contentsOf: references)
             for file in files {
