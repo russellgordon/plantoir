@@ -800,7 +800,16 @@ relying on it.
   never the section, and a press on a sibling section is refused the same way.
 - The button's help and its VoiceOver hint are
   `returningToASectionMidDeploy.heldElsewhere.help`. The folder not being
-  ready still wins (`folderReadinessReason`).
+  ready still wins (`folderReadinessReason`). Its third program is "a
+  scheduled deploy that is running now" since #835 (Russell, 2026-11-13). It
+  said "a deploy set for later" until then, and he read that as "having a
+  deploy scheduled stops me deploying", which is false: a schedule that has
+  not fired takes no lease, and only its run, while it works, greys the
+  button. `wording.courseIsBeingBuiltElsewhere` says "a scheduled deploy that
+  is running" (that sentence already says "right now"), and the launchers'
+  refusal for a leftover scheduled run (`laterDeploy`, `laterBuild`) and
+  `wording.deployRefusedWhileALaterDeployWorks` say "a scheduled deploy that
+  is still running".
 - When the other program removes its lease, or its process ends, the button
   is available again with no click.
 - Another program's PREVIEW greys it too, because a press is refused for one

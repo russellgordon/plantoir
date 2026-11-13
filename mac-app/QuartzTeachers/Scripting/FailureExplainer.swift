@@ -167,7 +167,7 @@ struct FailureExplainer {
 
     /// The part of the first line that says the deploy set for later was
     /// the reason, rather than another deploy of the section.
-    static let laterDeployMarker: String = "is still being deployed by a deploy that was set for later"
+    static let laterDeployMarker: String = "is still being deployed by a scheduled deploy that is still running"
 
     /// The part of the first line that says another build of the section
     /// was the reason, rather than a deploy (#729).

@@ -431,12 +431,13 @@ struct SectionDetailView: View {
     /// Why Deploy is greyed while another program holds the course (#729):
     /// `shared-rules.json` → `returningToASectionMidDeploy.heldElsewhere
     /// .help`. Names the three programs a lease can come from, as
-    /// `AssistWording.courseIsBeingBuiltElsewhere` does, and promises only
+    /// `AssistWording.courseIsBeingBuiltElsewhere` does (the third as a
+    /// scheduled deploy that is running now, #835), and promises only
     /// the end each can reach: a preview ends when it is stopped (the plan
     /// review's M6).
     static func deployIsHeldElsewhere(course: String) -> String {
         return "\(course) is being previewed or deployed somewhere else on this computer, "
-            + "by an assistant working from another app, another copy of Plantoir, or a deploy set for later. "
+            + "by an assistant working from another app, another copy of Plantoir, or a scheduled deploy that is running now. "
             + "Deploy will be available again once that preview is stopped or that deploy has finished."
     }
 

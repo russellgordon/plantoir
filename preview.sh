@@ -1300,10 +1300,10 @@ refuse_while_this_section_deploys() {
     echo ""
     note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was already being built"
   elif [ "$who" = "later" ]; then
-    echo "❌ ${course} section ${section} is still being deployed by a deploy that was set for later, so it cannot be ${not_again} until that has finished."
+    echo "❌ ${course} section ${section} is still being deployed by a scheduled deploy that is still running, so it cannot be ${not_again} until that has finished."
     echo "   Nothing was changed."
     echo ""
-    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was still being deployed by a deploy that was set for later"
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was still being deployed by a scheduled deploy that was still running"
   else
     echo "❌ ${course} section ${section} is already being deployed, so it cannot be ${not_again} until that has finished."
     echo "   Nothing was changed."
