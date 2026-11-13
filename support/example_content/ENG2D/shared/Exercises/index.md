@@ -11,6 +11,7 @@ created: __CREATED__
 > [!success]- Try it: click this line
 > That is a folded answer. Click the title again to close it.
 
+- [[The Prologue, Line by Line]] — fourteen lines, read closely, on a sheet that prints
 - [[Paraphrase Practice]] — turning Shakespeare into your own words
 - [[Quotation and Citation Practice]] — proving a claim properly
 - [[Paragraph Practice]] — claim, evidence, analysis, link
