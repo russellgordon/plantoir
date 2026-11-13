@@ -21,11 +21,17 @@ nonisolated enum DeployedFolderCommandLine {
     // MARK: - Functions
 
     /// The folder named after the flag, or nil when the flag is not there.
+    /// The flag with no folder after it never falls through to the app (the
+    /// Fable sweep's LOW 6): it says so on its one line and leaves.
     static func requestedFolder(from arguments: [String]) -> URL? {
         var index: Int = 0
         while index < arguments.count {
-            if arguments[index] == flag && index + 1 < arguments.count {
-                return URL(fileURLWithPath: arguments[index + 1])
+            if arguments[index] == flag {
+                if index + 1 < arguments.count {
+                    return URL(fileURLWithPath: arguments[index + 1])
+                }
+                say(failedPrefix + "no folder was named")
+                exit(2)
             }
             index += 1
         }

@@ -92,11 +92,6 @@ final class DeployedFolderShows {
     /// Folders whose Stop was pressed while their start was still under way.
     private var stopsAskedForWhileStarting: Set<String> = []
 
-    /// Tests only: how many shows the quit case says are open. The quit
-    /// rule reads none of this on purpose (a shown folder is never asked
-    /// about); the case holds a later change that counted shows to account.
-    var pretendShownForTests: Int = 0
-
     // MARK: - Functions: looking
 
     /// The show for a section, if one is running.
@@ -416,6 +411,5 @@ final class DeployedFolderShows {
         shows = []
         stoppedBecauseTheFolderWentAway = []
         stopsAskedForWhileStarting = []
-        pretendShownForTests = 0
     }
 }

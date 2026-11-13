@@ -27966,6 +27966,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -28009,6 +28010,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder",
           "stopShowingDeployedFolder"
@@ -28041,6 +28043,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder",
           "stopShowingDeployedFolder"
@@ -41861,7 +41864,7 @@
     ]
   },
   "deployedFolderInBrowser": {
-    "note": "GitHub #850 (Russell, 2026-11-13). A section deployed to a folder on this computer can be opened in the web browser, served by the app itself on this computer, so its links and features work: Quartz writes every page link without .html, and opened straight from the folder 0 of 3,369 page links worked. Plan S/plans/850-plan.md as amended by its Opus review; the review won where they differed (live input dropped, the Host check strict). The mac runs every case here in DeployedFolderResolutionTests (the resolver, and the real listener over a socket) and DeployedFolderOfferTests; documentation/09-mac-app.md -> 'A deployed folder opened in the browser (#850)' says why, what was measured and what was rejected.",
+    "note": "GitHub #850 (Russell, 2026-11-13). A section deployed to a folder on this computer can be opened in the web browser, served by the app itself on this computer, so its links and features work: Quartz writes every page link without .html, and opened straight from the folder 0 of 3,369 page links worked. The plan, as amended by its Opus review, is on the issue (#850); the review won where they differed (live input dropped, the Host check strict). The mac runs every case here in DeployedFolderResolutionTests (the resolver, and the real listener over a socket) and DeployedFolderOfferTests; documentation/09-mac-app.md -> 'A deployed folder opened in the browser (#850)' says why, what was measured and what was rejected.",
     "rule": "ONE Open in Browser for both (Russell, 2026-11-13): the toolbar's button and Section > Open in Browser open the PREVIEW while one is showing, and the section's DEPLOYED FOLDER otherwise; the help says which (wording.previewHelp, wording.help) or why it is greyed (offeredCases). The deploy's result offers Open in Browser beside Show in Finder (wording.resultButton), and the section row's context menu offers it when the folder can be opened. It runs until Stop or quitting Plantoir, never until a window closes; Stop is a one-line notice in the section's window (wording.notice, wording.stopButton) and Section > Stop Showing Deployed Folder (wording.stopMenuItem). The folder is read at each request: a deploy to it does not stop it, and nothing is built, copied or leased. Bound to 127.0.0.1 only; another account on this computer can reach it while it runs, as it can a preview, which Russell accepted on 2026-11-13 as a known limit. The same address each time (address), so what the site keeps per address - ticked tasks, quiz answers - is still there.",
     "wording": {
       "resultButton": "Open in Browser",

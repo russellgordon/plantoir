@@ -343,13 +343,17 @@ final class DeployedFolderResolutionTests: XCTestCase {
         XCTAssertEqual(silent.count, DeployedFolderServer.maximumConnections)
         let newcomer: RawHTTP.Answer? = RawHTTP.exchange(port: port, raw: Data("GET / HTTP/1.1\r\n\(host)Connection: close\r\n\r\n".utf8))
         XCTAssertEqual(newcomer?.status, 200, "with every place taken by silent connections, a newcomer was not answered")
+        // Counted at once, well inside the 10 s header deadline, so only the
+        // eviction can have closed one (the Fable sweep: polling each for
+        // 0.2 s let the header deadline close them, and the line could not
+        // fail).
         var closed: Int = 0
-        for socket in silent {
-            if RawHTTP.closesWithin(socket, seconds: 0.2) {
-                closed += 1
-            }
+        let lookUntil: Date = Date().addingTimeInterval(1)
+        while closed == 0 && Date() < lookUntil {
+            closed = RawHTTP.countClosed(silent)
         }
         XCTAssertGreaterThanOrEqual(closed, 1, "no quiet connection was closed to make room")
+        XCTAssertLessThan(closed, silent.count, "the silent connections were all closed, so this proves nothing about making room")
         for socket in silent {
             close(socket)
         }

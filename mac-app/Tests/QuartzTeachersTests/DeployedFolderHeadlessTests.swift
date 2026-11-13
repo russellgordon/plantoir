@@ -11,10 +11,11 @@ import XCTest
 /// it.
 ///
 /// On faac3da1b the flag was read inside `QuartzTeachersApp.init`, inside
-/// SwiftUI's `App.main`, where an `NSApplication` MAY already exist; whether
-/// it did is not yet measured (`browser-checks/check_headless_modes.py` on
-/// that commit's bundle settles it). It is now decided in `PlantoirMain`
-/// before any, so this test holds the fix whatever that measurement says.
+/// SwiftUI's `App.main`. Measured on 2026-11-13 with
+/// `browser-checks/check_headless_modes.py`, 3 of 3: that bundle was not
+/// an application and did not take the front either, as the fix is not. It
+/// is now decided in `PlantoirMain`, before any application exists, as a
+/// structural guarantee, and this test holds that.
 ///
 /// The child is started with the test host's environment stripped of
 /// everything XCTest and the loader put there (`childEnvironment()`): this
@@ -150,6 +151,34 @@ final class DeployedFolderHeadlessTests: XCTestCase {
         XCTAssertNotNil(child.firstLine, "it printed nothing within 15 s")
         child.process.terminate()
         XCTAssertTrue(DeployedFolderHeadlessTests.ends(child.process, within: 5), "it did not end on TERM")
+    }
+
+    /// The flag with no folder after it never starts the app (the Fable
+    /// sweep's LOW 6): it fails, on its one line, and leaves.
+    func testTheFlagAloneNeverStartsTheApp() throws {
+        let process: Process = Process()
+        process.executableURL = try DeployedFolderHeadlessTests.executable()
+        process.arguments = [DeployedFolderCommandLine.flag]
+        process.environment = DeployedFolderHeadlessTests.childEnvironment()
+        let output: Pipe = Pipe()
+        let collected: LineCollector = LineCollector()
+        output.fileHandleForReading.readabilityHandler = { handle in
+            collected.add(handle.availableData)
+        }
+        process.standardOutput = output
+        process.standardInput = Pipe()
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        defer {
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        XCTAssertTrue(DeployedFolderHeadlessTests.ends(process, within: 5), "the flag alone kept running, as the app")
+        output.fileHandleForReading.readabilityHandler = nil
+        let line: String = try XCTUnwrap(collected.firstLine(), "it printed nothing")
+        XCTAssertTrue(line.hasPrefix(DeployedFolderCommandLine.failedPrefix), "it printed \(line)")
+        XCTAssertNotEqual(process.terminationStatus, 0)
     }
 
     func testAFolderThatIsNotThereGetsItsFailedLineAndAnExit() throws {

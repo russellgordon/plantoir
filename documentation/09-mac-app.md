@@ -16331,18 +16331,17 @@ preview's, and a one-time key cookie was offered and declined.
   answered; a connection that sent only its request line closed after
   10.5 s; of 65 silent connections, 1 closed (the first version, which
   refused the newcomer; it now closes the quietest and answers the
-  newcomer, to be measured, below); a connection to this Mac's
+  newcomer, held by `testEveryConnectionCase`); a connection to this Mac's
   network address (192.168.1.x) refused; `Host: 127.0.0.1.evil.example`
   400.
-- **Owed, with the screen free** (the fix round ran with the teacher at the
-  keyboard, so nothing that starts the app ran): `browser-checks/
-  check_headless_modes.py --app <bundle>` (is the headless child an
-  application, did the front application change, how fast does it leave)
-  on faac3da1b and on the fix (the test strips XCTest's variables from the
-  child's environment and bounds every read, so on the old code it fails
-  rather than hangs); `DeployedFolderHeadlessTests`,
-  `testReadersThatStopReadingDoNotShutTheSiteOut` and the two quick-press
-  tests, with their numbers.
+- **The headless mode, at the director's gate** (2026-11-13):
+  `browser-checks/check_headless_modes.py --app <bundle>` 3 of 3 on the fix
+  AND on faac3da1b's bundle: `isAnApplication` False, `frontChanged` False,
+  `secondsToLeave` 0.0; `--mcp-stdio` the same, so it needs no change.
+  `verify.sh` with `PLANTOIR_APP`: the crawl 0 not found of 7,522 links, its
+  must-fail failing. `testReadersThatStopReadingDoNotShutTheSiteOut` passes
+  in about 30 s (the send deadline), and each of the quick-press, make-room
+  and send-deadline tests was shown to fail with its one rule disabled.
 - Not measured: a firewall prompt (this Mac's firewall is off; none is
   expected for a loopback-only listener, as `llama-server` already binds
   127.0.0.1 from this app), and Safari playing a video through it.
@@ -16364,27 +16363,23 @@ first build was not measurably an application either**:
 bundle as on the fix (`isAnApplication` False, `frontChanged` False,
 `secondsToLeave` 0.0), and `--mcp-stdio` the same. So the claim that the old
 mode took focus is not supported, and the 12:17 cause is unknown. The fix
-is kept as a structural guarantee. The code allowed it but was not shown to
-cause it: the flag
-was read in `QuartzTeachersApp.init`, inside SwiftUI's `App.main`, where an
-`NSApplication` MAY already exist. Whether one does at that point is the
-open question `browser-checks/check_headless_modes.py` settles on faac3da1b's
-bundle, and the same run says whether `--mcp-stdio`, still decided there,
-needs the same move (an issue of its own if so). It is now decided in
-`PlantoirMain`, the
+is kept as a structural guarantee: the flag was read in
+`QuartzTeachersApp.init`, inside SwiftUI's `App.main`, and it is now decided
+in `PlantoirMain`, the
 process's `@main`, before `QuartzTeachersApp.main()` is called, so the
 headless process never has an `NSApplication` at all and imports nothing
 that would make one. Its input is read on a thread of its own whose end
 calls `exit`, so nothing on the concurrency pool can keep it alive, and a
 watchdog prints the failed line and leaves if starting takes more than
 10 s, so a check never waits on silence. Rejected: setting the activation
-policy to prohibited after start-up (an application has already been made
-by then, and registered, which is the thing to prevent) and `LSUIElement`
-(it would hide the real app's Dock icon too).
+policy to prohibited after start-up (it would rest on SwiftUI's start-up
+order, which the guarantee is meant not to) and `LSUIElement` (it would
+hide the real app's Dock icon too).
 
 `--mcp-stdio` and `--write-contracts` are still decided in
-`QuartzTeachersApp.init`. Whether they are seen as applications is checked
-by the same script and reported, not changed, in #850.
+`QuartzTeachersApp.init`. The same script measured `--mcp-stdio` on
+2026-11-13 (3 of 3: not an application, the front unchanged), so it is left
+as it is.
 
 ### What was left out, and why
 

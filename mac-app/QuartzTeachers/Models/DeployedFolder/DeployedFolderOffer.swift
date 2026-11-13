@@ -1,7 +1,7 @@
 import Foundation
 
 /// Whether a section's deployed folder can be opened in the browser, and if
-/// not, why (#850). Pure: the facts are gathered by `facts(for:...)` when the
+/// not, why (#850). Pure: the facts are gathered by `DeployedFolderShows.lookUp` when the
 /// menu opens, the section shows, a deploy ends, or the pointer reaches the
 /// button (events, never a clock), and the decision is
 /// `contracts/shared-rules.json` → `deployedFolderInBrowser.offeredCases`.

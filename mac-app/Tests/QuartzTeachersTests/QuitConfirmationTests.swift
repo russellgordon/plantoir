@@ -13,7 +13,16 @@ final class QuitConfirmationTests: XCTestCase {
 
     /// `contracts/shared-rules.json` → `quittingWhileWorkIsUnderWay.cases`,
     /// run rather than retyped.
-    func testTheRuleIsTheOneTheContractWritesDown() throws {
+    func testTheRuleIsTheOneTheContractWritesDown() async throws {
+        // The shows a case starts write trail lines: into a scratch trail.
+        let trailFolder: URL = FileManager.default.temporaryDirectory.appendingPathComponent("quit-trail-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        defer {
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: trailFolder)
+        }
         let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
         let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
         XCTAssertGreaterThan(cases.count, 3, "The case list has shrunk — a rule with no cases is a paragraph")
@@ -48,7 +57,29 @@ final class QuitConfirmationTests: XCTestCase {
                 PreviewLeases.reset()
                 DeployedFolderShows.shared.resetForTests()
             }
-            DeployedFolderShows.shared.pretendShownForTests = shownCount
+            // REAL shows, so a quit rule that counted them would fail here
+            // (the Fable sweep: a pretended count was read by nothing).
+            var shownFolders: [URL] = []
+            for index in 0..<shownCount {
+                let folder: URL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("quit-shown-\(UUID().uuidString)")
+                    .appendingPathComponent("section\(index + 1)")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try Data("home".utf8).write(to: folder.appendingPathComponent("index.html"))
+                shownFolders.append(folder)
+                let opened: Bool = await DeployedFolderShows.shared.open(
+                    sectionFolder: folder, courseCode: "MPM2D", sectionNumber: index + 1,
+                    workingFolderPath: folder.deletingLastPathComponent().path, from: .result,
+                    defaults: TestDefaults.make(), openInBrowser: { _ in true }
+                )
+                XCTAssertTrue(opened, "\(name): the show for the case did not start")
+            }
+            defer {
+                for folder in shownFolders {
+                    try? FileManager.default.removeItem(at: folder.deletingLastPathComponent())
+                }
+            }
+            XCTAssertEqual(DeployedFolderShows.shared.shows.count, shownCount, name)
             for index in 0..<publishCount {
                 CourseActivity.beginPublish(
                     folderPath: "/pretend", courseCode: "ADA1O", sectionNumber: index + 1
