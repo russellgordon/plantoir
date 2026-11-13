@@ -475,13 +475,76 @@ final class SharedRulesContractTests: XCTestCase {
     func testProblemReportRedactionMatchesTheContract() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("problemReportRedaction")
         for testCase in try XCTUnwrap(section["cases"] as? [[String: Any]]) {
-            let input: String = try XCTUnwrap(testCase["input"] as? String)
+            let template: String = try XCTUnwrap(testCase["input"] as? String)
+            let input: String = try SharedRulesContractTests.assembledRedactionInput(for: testCase)
             XCTAssertEqual(
                 LogRedactor.redacting(input),
                 try XCTUnwrap(testCase["expect"] as? String),
-                "input \(input.debugDescription)"
+                "input \(template.debugDescription)"
             )
         }
+    }
+
+    /// A case that holds its credential in pieces (#844,
+    /// `problemReportRedaction.assembledInput`) really is filled before it
+    /// is redacted. A template read as it stands redacts to the same
+    /// `expect` (`{basic}'` is whatever follows `Basic`, and
+    /// `{user}:{password}@` is a userinfo of its own), so a reader that
+    /// forgot to fill it would stay green while proving less: braces are not
+    /// characters the email rule takes, so the unfilled address no longer
+    /// shows that `urlUserinfo` must run before `emailAddress`.
+    func testAnAssembledRedactionCaseIsFilledBeforeItIsRedacted() throws {
+        let section: [String: Any] = try SharedRulesContractTests.section("problemReportRedaction")
+        let notation: [String: Any] = try XCTUnwrap(section["assembledInput"] as? [String: Any])
+        XCTAssertNotNil(notation["rule"] as? String)
+        XCTAssertNotNil(notation["why"] as? String)
+
+        var assembledCount: Int = 0
+        for testCase in try XCTUnwrap(section["cases"] as? [[String: Any]]) {
+            let template: String = try XCTUnwrap(testCase["input"] as? String)
+            let input: String = try SharedRulesContractTests.assembledRedactionInput(for: testCase)
+            XCTAssertFalse(input.contains("{user}"), template)
+            XCTAssertFalse(input.contains("{password}"), template)
+            XCTAssertFalse(input.contains("{basic}"), template)
+            if testCase["assembledFrom"] != nil {
+                assembledCount += 1
+                XCTAssertNotEqual(input, template, "a case with assembledFrom whose input has nothing to fill")
+                XCTAssertNotEqual(LogRedactor.redacting(input), input, "the assembled credential was left in")
+            }
+        }
+        XCTAssertEqual(assembledCount, 2, "the Basic header case and the address with a username and password in it")
+
+        // The header really is the base64 of the pair, so the Basic case is
+        // what a browser sends, not a word that only looks like it. Decoded
+        // here rather than compared with a stored value, which would be the
+        // very literal #844 took out.
+        let basicCase: [String: Any] = [
+            "assembledFrom": ["user": "example-user", "password": "example-password"],
+            "input": "Basic {basic}",
+        ]
+        let header: String = try SharedRulesContractTests.assembledRedactionInput(for: basicCase)
+        XCTAssertTrue(header.hasPrefix("Basic "), header)
+        let encoded: String = String(header.dropFirst("Basic ".count))
+        let decoded: Data = try XCTUnwrap(Data(base64Encoded: encoded), header)
+        XCTAssertEqual(String(decoding: decoded, as: UTF8.self), "example-user:example-password")
+    }
+
+    /// A redaction case's `input`, with its template filled from
+    /// `assembledFrom` when it has one (`problemReportRedaction.assembledInput`,
+    /// #844). A case without `assembledFrom` comes back as it stands.
+    static func assembledRedactionInput(for testCase: [String: Any]) throws -> String {
+        let template: String = try XCTUnwrap(testCase["input"] as? String)
+        guard let pieces: [String: String] = testCase["assembledFrom"] as? [String: String] else {
+            return template
+        }
+        let user: String = try XCTUnwrap(pieces["user"])
+        let password: String = try XCTUnwrap(pieces["password"])
+        let basic: String = Data((user + ":" + password).utf8).base64EncodedString()
+        var filled: String = template
+        filled = filled.replacingOccurrences(of: "{user}", with: user)
+        filled = filled.replacingOccurrences(of: "{password}", with: password)
+        filled = filled.replacingOccurrences(of: "{basic}", with: basic)
+        return filled
     }
 
     /// The phrases left behind are named in the contract rather than
