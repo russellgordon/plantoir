@@ -127,10 +127,10 @@
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
       {
-        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding - nothing else: no page, no section, no process id, and no assistant's name in the sentence, because the server cannot tell which door started it (Russell, #783, 2026-11-13: the hold's sentences name no assistant)",
+        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding - nothing else: and which assistant's session it is, through the same slot the busy sentences use (doorCourseHold.naming: the name its door wrote into the server's environment, or all three when none was) - nothing else: no page, no section, no process id in the sentence",
         "event": "outside session held a course",
-        "line": "an assistant session started from Plantoir is holding {course} while it is open",
-        "why": "#458 (the mac) and #430 (Windows): while a session from an outside door is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold). Until #783 the line said 'a Claude or Codex session'; it names no assistant since, as the hold's sentences do."
+        "line": "a {assistant} session started from Plantoir is holding {course} while it is open",
+        "why": "#458 (the mac) and #430 (Windows): while a session from an outside door is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold). Until #783 the line said 'a Claude or Codex session'; since #783 it names the door's assistant through {assistant} (doorCourseHold.naming), as the busy sentences do (Russell, 2026-11-13)."
       },
       {
         "carries": "course, section, and how long the engine took",
@@ -26637,8 +26637,8 @@
       "claude": true,
       "codex": true,
       "copilot": true,
-      "copilotWhy": "#783 (2026-11-13): the third door holds its course as the other two do, written as env in mcp-{course}-copilot.json. Its sentences are the same ones, which name no assistant since #783 (Russell's ruling): the server still cannot tell which door started it.",
-      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences named both ('Claude or Codex') until #783, and name no assistant since (Russell, 2026-11-13). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
+      "copilotWhy": "#783 (2026-11-13): the third door holds its course as the other two do, written as env in mcp-{course}-copilot.json. Its sentences are the same ones, which since #783 name the assistant holding the course (naming, below).",
+      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences named both ('Claude or Codex') until #783. Since #783 every door also names itself (app-rules.json -> outsideAgents.doorAssistantVariable) and the sentences name the assistant holding the course (naming, below; Russell, 2026-11-13). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a server started by hand does.",
@@ -26711,7 +26711,40 @@
       "quit": "quittingWhileWorkIsUnderWay counts only this app's own work, so another program's assist lease never makes quitting ask - and the app's quit removes only its own leases, never a session's.",
       "update": "appUpdates.mayNotInstallWhile.doesNotCount: 'a lease of any other kind (assist, import)'."
     },
-    "reviseCasesNote": "item is claude, codex, copilot or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
+    "naming": {
+      "rule": "Russell, #783, 2026-11-13: each busy sentence names the assistant that is working on the course, through ONE slot, {assistant}, never a list to reword when a door is added. The nine assist-wording.json keys availableOnceYouFinishRevisingWithClaude, finishTheClaudeSessionFirst, claudeIsRevisingTheCourseRename, claudeIsRevisingTheCourseRestore, claudeIsRevisingTheCourseAddSection, backupKeptForAClaudeSession, backupsKeptForAClaudeSession, finishTheClaudeSessionToDeleteItsBackup and finishTheClaudeSessionToDeleteItsBackups carry it, and so does activityTrail.mustRecord -> 'outside session held a course'. Each door writes its key into its server's environment (app-rules.json -> outsideAgents.doorAssistantVariable), and the server writes it as its assist lease's fifth line (file-formats.json -> workLease.lines), set and cleared with the lease. A reader fills the slot from the keys of the live assist leases on the course: one name when they all name the same door; the names of different doors in the order Claude, Codex, GitHub Copilot joined with 'or' (a comma before the last but one); and anyAssistant when any lease names no door (an older Plantoir, Windows before it writes one, a key no door has) or the answer has not been read. For a kept backup, the keys are those of the sessions that made the backups the sentence counts.",
+      "names": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "copilot": "GitHub Copilot"
+      },
+      "namesWhy": "The names teachers see in the menus (each agent's menuItem without its ellipsis). 'GitHub Copilot', never bare 'Copilot' (Russell, #783: not Microsoft 365 Copilot).",
+      "anyAssistant": "Claude, Codex or GitHub Copilot",
+      "anyAssistantWhy": "What the sentences said before #783 ('Claude or Codex') with the third door added: true of any hold, so a hold that cannot say which is never named wrongly.",
+      "rejected": [
+        "Naming no assistant ('an assistant session opened from Plantoir'), ruled the same morning and reversed the same day (Russell, 2026-11-13): 'the assistant' is what Plantoir already calls its own window (AssistActivity.closeTheAssistantFirst), and a sentence naming nobody no longer told the teacher where to look.",
+        "Reading which program the server's parent is from the process table: it would name the program, not the door, and fails for a server started by hand; the door already knows which it is.",
+        "A new line on every lease kind, or a sidecar file beside the lease: the fifth line on the assist lease alone is set and cleared with the hold itself, and Windows' readers, which read the first lines by position, are not disturbed."
+      ],
+      "cases": [
+        {"name": "a GitHub Copilot session holds the course", "keys": ["copilot"], "expect": "GitHub Copilot"},
+        {"name": "a Claude session holds the course", "keys": ["claude"], "expect": "Claude"},
+        {"name": "a Codex session holds the course", "keys": ["codex"], "expect": "Codex"},
+        {"name": "the hold names no assistant (an older Plantoir, or Windows before it writes one)", "keys": [null], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "a key no door has is named as none", "keys": ["gemini"], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "the key is read without regard to case or space", "keys": [" Copilot "], "expect": "GitHub Copilot"},
+        {"name": "nothing read: all three", "keys": [], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "two holds of the same door: one name", "keys": ["copilot", "copilot"], "expect": "GitHub Copilot"},
+        {"name": "holds of two doors: both, in menu order", "keys": ["copilot", "claude"], "expect": "Claude or GitHub Copilot"},
+        {"name": "one hold names a door and another names none: all three", "keys": ["codex", null], "expect": "Claude, Codex or GitHub Copilot"}
+      ],
+      "leaseCases": [
+        {"name": "a door's assist lease records its key as its fifth line", "kind": "assist", "assistant": "copilot", "fifthLine": "copilot"},
+        {"name": "an assist lease from a server no door named has four lines", "kind": "assist", "assistant": null, "fifthLine": null},
+        {"name": "only an assist lease carries it", "kind": "build", "assistant": "copilot", "fifthLine": null}
+      ]
+    },
+    "reviseCasesNote": "item is claude, codex, copilot or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. revisingAssistant, where given, is the door key the holding lease records (naming); absent, the hold names none and the slot is naming.anyAssistant. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
     "reviseCases": [
       {
         "name": "nothing open: every item may be used",
@@ -26738,6 +26771,7 @@
         "name": "a session from an outside door holds the course: the GitHub Copilot door is greyed too (#783)",
         "item": "copilot",
         "revisedElsewhere": true,
+        "revisingAssistant": "copilot",
         "active": null,
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },

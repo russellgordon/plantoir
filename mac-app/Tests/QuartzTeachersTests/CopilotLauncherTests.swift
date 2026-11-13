@@ -1,3 +1,4 @@
+import Security
 import XCTest
 @testable import QuartzTeachers
 
@@ -93,7 +94,10 @@ final class CopilotLauncherTests: XCTestCase {
         XCTAssertEqual(plantoir["type"] as? String, "local")
         XCTAssertEqual(plantoir["command"] as? String, plainServer)
         XCTAssertEqual(plantoir["args"] as? [String], ["--mcp-stdio", awkwardFolder])
-        XCTAssertEqual(plantoir["env"] as? [String: String], [AssistMCPServer.doorCourseVariable: "ICS3U_COPILOT_JSON_TEST"])
+        XCTAssertEqual(plantoir["env"] as? [String: String], [
+            AssistMCPServer.doorCourseVariable: "ICS3U_COPILOT_JSON_TEST",
+            AssistMCPServer.doorAssistantVariable: "copilot",
+        ])
         XCTAssertEqual(plantoir["tools"] as? [String], ["*"])
     }
 
@@ -133,6 +137,9 @@ final class CopilotLauncherTests: XCTestCase {
             XCTAssertFalse(line.contains(flag), "\(flag) in: \(line)")
         }
         XCTAssertTrue(line.contains(" --disable-builtin-mcps"), line)
+        // GitHub's desktop-control server is off in a session Plantoir opens
+        // (review M2). MUST FAIL if the flag is dropped.
+        XCTAssertTrue(line.contains(" --disable-mcp-server computer-use"), line)
     }
 
     /// The script's command line arrives at Copilot as exactly the contract's
@@ -170,7 +177,10 @@ final class CopilotLauncherTests: XCTestCase {
         if arrived.last == "" {
             arrived.removeLast()
         }
-        XCTAssertEqual(arrived, ["--additional-mcp-config", "@" + configPath, "--disable-builtin-mcps", "-i", greeting])
+        XCTAssertEqual(arrived, [
+            "--additional-mcp-config", "@" + configPath, "--disable-builtin-mcps",
+            "--disable-mcp-server", "computer-use", "-i", greeting,
+        ])
         XCTAssertTrue(configPath.hasPrefix("/"), "the @ path is absolute, so it is not read against Copilot's folder")
     }
 
@@ -200,6 +210,29 @@ final class CopilotLauncherTests: XCTestCase {
 
         let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
         XCTAssertTrue(script.contains("-lt \(CopilotLauncher.stoppedAtOnceSeconds)"), script)
+    }
+
+    /// The teacher's own Control-C in the first seconds is not "stopped as
+    /// soon as it started" (review L1): a status of 128 or more is a signal.
+    /// MUST FAIL if any non-zero status prints the sentence.
+    func testAnInterruptInTheFirstSecondsIsNotExplainedAsAFailure() throws {
+        let folder: URL = try makeFolder(named: "copilot-interrupted")
+        let stubFolder: URL = try makeFolder(named: "copilot-stub-interrupted")
+        let stub: URL = stubFolder.appendingPathComponent("copilot")
+        try writeExecutable("""
+        #!/bin/sh
+        exit 130
+        """, to: stub)
+        let scriptPath: String = try CopilotLauncher.writeLauncherScript(
+            workspacePath: folder.path,
+            courseCode: "ICS3U_COPILOT_INTERRUPT_TEST",
+            copilotPath: stub.path,
+            configPath: "/tmp/mcp-ICS3U_COPILOT_INTERRUPT_TEST-copilot.json",
+            prompt: "hello"
+        )
+        madePaths.append(scriptPath)
+        let printed: String = try run(scriptPath: scriptPath)
+        XCTAssertFalse(printed.contains(CopilotLauncher.stoppedAtOnceSentence), printed)
     }
 
     /// The doors must not share a script or a connection file: each is read
@@ -371,6 +404,53 @@ final class CopilotLauncherTests: XCTestCase {
             }
         )
         XCTAssertNil(none, "only another vendor's copilot: no door")
+    }
+
+    /// The requirement ACCEPTS GitHub's real `copilot` when this Mac has one,
+    /// and one character off it refuses that same binary (review M3): a
+    /// requirement that refused everything would hide the door from every
+    /// teacher and pass every refusal test. Skipped, saying so, on a Mac with
+    /// no GitHub Copilot installed.
+    func testTheRequirementAcceptsGitHubsRealCopilot() throws {
+        var installed: String? = nil
+        var places: [String] = [
+            "/opt/homebrew/bin/copilot",
+            "/usr/local/bin/copilot",
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/copilot").path,
+        ]
+        if let casks = try? FileManager.default.contentsOfDirectory(atPath: "/opt/homebrew/Caskroom/copilot-cli") {
+            for version in casks {
+                places.append("/opt/homebrew/Caskroom/copilot-cli/\(version)/copilot")
+            }
+        }
+        for place in places where installed == nil {
+            let resolved: String = URL(fileURLWithPath: place).resolvingSymlinksInPath().path
+            if FileManager.default.isExecutableFile(atPath: resolved)
+                && !resolved.contains("/node_modules/") {
+                installed = resolved
+            }
+        }
+        guard let binary = installed else {
+            throw XCTSkip("No signed GitHub Copilot on this Mac, so the requirement's acceptance cannot be shown here.")
+        }
+        XCTAssertTrue(CopilotLauncher.carriesGitHubsSignature(atPath: binary), "GitHub's own \(binary) was refused")
+        let teamOneOff: String = CopilotLauncher.signatureRequirement
+            .replacingOccurrences(of: CopilotLauncher.signedTeam, with: "VEKTX9H2N8")
+        XCTAssertFalse(CopilotLauncher.carriesSignature(atPath: binary, meeting: teamOneOff))
+        let identifierOff: String = CopilotLauncher.signatureRequirement
+            .replacingOccurrences(of: "identifier \"copilot\"", with: "identifier \"copilots\"")
+        XCTAssertFalse(CopilotLauncher.carriesSignature(atPath: binary, meeting: identifierOff))
+    }
+
+    /// The requirement is one the system can read: a typo in it would make
+    /// every check fail, which the door would show only as being missing.
+    func testTheRequirementIsWellFormed() {
+        var requirement: SecRequirement?
+        XCTAssertEqual(
+            SecRequirementCreateWithString(CopilotLauncher.signatureRequirement as CFString, [], &requirement),
+            errSecSuccess
+        )
+        XCTAssertNotNil(requirement)
     }
 
     /// The requirement names GitHub's identifier and team, as the contract does.

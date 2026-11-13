@@ -339,15 +339,28 @@ enum CourseActivity {
     /// its own. This process's own lease never counts (`heldElsewhere`), and
     /// neither does one whose owner has gone.
     static func isRevisedElsewhere(folderPath: String, courseCode: String) -> Bool {
+        return revisingAssistant(folderPath: folderPath, courseCode: courseCode) != nil
+    }
+
+    /// Who is revising this course elsewhere, as the busy sentences' slot
+    /// says it (#783): the assistant each live `assist` lease on the course
+    /// records (`WorkLeaseFiles.Holding.assistant`), through
+    /// `AssistWording.outsideAssistantNamed`, so a hold that names none
+    /// gives all three. Nil when nothing holds the course.
+    static func revisingAssistant(folderPath: String, courseCode: String) -> String? {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
         let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
             courseCode: courseCode, coursesDirectory: coursesDirectory
         )
+        var keys: [String?] = []
         for holding in holdings where holding.kind.lowercased() == WorkLeaseFiles.assistKind {
-            return true
+            keys.append(holding.assistant)
         }
-        return false
+        if keys.isEmpty {
+            return nil
+        }
+        return AssistWording.outsideAssistantNamed(keys)
     }
 
     /// The short line naming what stands in the way of STRUCTURAL work on a
@@ -363,19 +376,28 @@ enum CourseActivity {
     /// neither (#458's ruling 2), so they stay on `busyDescription`.
     ///
     /// `revisedElsewhere` is the answer already read, for a menu drawn from
-    /// a window's snapshot (`WorkspaceModel.coursesRevisedElsewhere`); nil
-    /// reads the disk now, which is what every click-time check does.
+    /// a window's snapshot (`WorkspaceModel.coursesRevisedElsewhere`), with
+    /// `revisingAssistant` the snapshot's name for who (nil lists all three);
+    /// nil reads the disk now, which is what every click-time check does.
     static func structuralHoldReason(
         folderPath: String,
         courseCode: String,
-        revisedElsewhere: Bool? = nil
+        revisedElsewhere: Bool? = nil,
+        revisingAssistant: String? = nil
     ) -> String? {
         if let busy = busyDescription(folderPath: folderPath, courseCode: courseCode) {
             return busy
         }
-        let held: Bool = revisedElsewhere ?? isRevisedElsewhere(folderPath: folderPath, courseCode: courseCode)
-        if held {
-            return AssistWording.availableOnceYouFinishRevisingWithClaude
+        if let revisedElsewhere {
+            if revisedElsewhere {
+                return AssistWording.availableOnceYouFinishRevising(
+                    with: revisingAssistant ?? AssistWording.anyOutsideAssistant
+                )
+            }
+            return nil
+        }
+        if let named = CourseActivity.revisingAssistant(folderPath: folderPath, courseCode: courseCode) {
+            return AssistWording.availableOnceYouFinishRevising(with: named)
         }
         return nil
     }
@@ -397,10 +419,13 @@ enum CourseActivity {
         courseCode: String,
         sectionNumber: Int?,
         revisedElsewhere: Bool,
+        revisingAssistant: String? = nil,
         active: AssistActivity.Session?
     ) -> String? {
         if revisedElsewhere {
-            return AssistWording.availableOnceYouFinishRevisingWithClaude
+            return AssistWording.availableOnceYouFinishRevising(
+                with: revisingAssistant ?? AssistWording.anyOutsideAssistant
+            )
         }
         guard let active else {
             return nil

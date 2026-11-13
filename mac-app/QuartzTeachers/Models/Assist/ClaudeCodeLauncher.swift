@@ -402,7 +402,9 @@ nonisolated enum ClaudeCodeLauncher {
                     // HOLD (#458, as Windows since #430): an `assist` lease,
                     // never a narrowing — `args` stays the folder alone.
                     "env": [
-                        AssistMCPServer.doorCourseVariable: courseCode
+                        AssistMCPServer.doorCourseVariable: courseCode,
+                        // Which door, so the hold can name it (#783).
+                        AssistMCPServer.doorAssistantVariable: "claude"
                     ]
                 ]
             ]

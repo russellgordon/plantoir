@@ -3452,7 +3452,8 @@
         "macHandsOverWith" : "launch-{course}.command",
         "menuItem" : "Claude…",
         "serverEnvironment" : {
-          "PLANTOIR_DOOR_COURSE" : "{course}"
+          "PLANTOIR_DOOR_COURSE" : "{course}",
+          "PLANTOIR_DOOR_ASSISTANT" : "claude"
         },
         "serverEnvironmentWhy" : "Written as \"env\" beside \"args\" in mcp-{course}.json, so the server holds an assist lease on the course the door was opened from (shared-rules.json -> doorCourseHold). Windows since #430, the mac since #458. The argv stays the folder alone (serverArguments).",
         "trailLine" : "started Claude Code for {course}",
@@ -3473,9 +3474,11 @@
           "mcp_servers.plantoir.tool_timeout_sec=1800",
           "-c",
           "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"{course}\"",
+          "-c",
+          "mcp_servers.plantoir.env.PLANTOIR_DOOR_ASSISTANT=\"codex\"",
           "{greeting}"
         ],
-        "argumentsNote" : "Five dotted -c overrides (the fifth names the course to the server's environment, serverEnvironment) and the greeting as a positional first message. No sandbox flag and no approval flag: Codex asks the teacher itself before any tool that changes a page, and passing a flag would quietly widen permissions they set for themselves. Dotted keys rather than one inline table because they merge into a teacher's configuration one key at a time and match the published documentation.",
+        "argumentsNote" : "Six dotted -c overrides (the fifth names the course to the server's environment, and since #783 the sixth names the door, serverEnvironment) and the greeting as a positional first message. No sandbox flag and no approval flag: Codex asks the teacher itself before any tool that changes a page, and passing a flag would quietly widen permissions they set for themselves. Dotted keys rather than one inline table because they merge into a teacher's configuration one key at a time and match the published documentation.",
         "couldNotStart" : "Plantoir couldn’t start a Codex session for {course}. If Codex was updated or moved recently, restarting Plantoir may be enough.",
         "didNotOpenTitle" : "Codex didn’t open",
         "executable" : "codex",
@@ -3487,7 +3490,8 @@
         "menuItem" : "Codex…",
         "scriptNameCarriesTheAgentWhy" : "The second door's script is named after the agent as well as the course. The script is read by the terminal AFTER Plantoir has handed it over, so two doors sharing one name would let a second launch seconds later reach the first window with the wrong command line - which is the same race the per-course naming already exists to stop.",
         "serverEnvironment" : {
-          "PLANTOIR_DOOR_COURSE" : "{course}"
+          "PLANTOIR_DOOR_COURSE" : "{course}",
+          "PLANTOIR_DOOR_ASSISTANT" : "codex"
         },
         "serverEnvironmentWhy" : "Passed as a fifth override, -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"{course}\" (escaped for TOML, then for the shell, like every value), so the server holds an assist lease on the course the door was opened from, exactly as the Claude door's env does (shared-rules.json -> doorCourseHold.whichDoors). The mac since #458 (Russell, 2026-10-07: both doors); Windows since #468 (2026-10-08, CodexLauncher.Arguments). Codex 0.155.1 reads the form: measured with codex mcp get --json.",
         "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
@@ -3503,6 +3507,8 @@
           "--additional-mcp-config",
           "@{config}",
           "--disable-builtin-mcps",
+          "--disable-mcp-server",
+          "computer-use",
           "-i",
           "{greeting}"
         ],
@@ -3516,7 +3522,8 @@
               ],
               "command" : "{server}",
               "env" : {
-                "PLANTOIR_DOOR_COURSE" : "{course}"
+                "PLANTOIR_DOOR_COURSE" : "{course}",
+                "PLANTOIR_DOOR_ASSISTANT" : "copilot"
               },
               "timeout" : 1800000,
               "tools" : [
@@ -3532,7 +3539,8 @@
         "executable" : "copilot",
         "flagsWhy" : {
           "--additional-mcp-config" : "Adds Plantoir's server for this session only. It predates Copilot's oldest changelog entry (0.0.328). Copilot reads, in order, the teacher's ~/.copilot/mcp-config.json, the folder's .mcp.json or .github/mcp.json, plugins, then this flag, and the later one wins on a name, so Plantoir's 'plantoir' is the one used.",
-          "--disable-builtin-mcps" : "Turns off GitHub's own repository server (github-mcp-server): tools about repositories and pull requests in every choice the model makes are how routing degrades, and a course session has no business acting on a teacher's repositories. It also predates the oldest changelog entry. Measured 2026-11-13 with copilot mcp list: with the flag github-mcp-server is listed 'disabled' and computer-use, a local built-in, is still listed.",
+          "--disable-builtin-mcps" : "Turns off GitHub's own repository server (github-mcp-server): tools about repositories and pull requests in every choice the model makes are how routing degrades, and a course session has no business acting on a teacher's repositories. It also predates the oldest changelog entry. Measured 2026-11-13 with copilot mcp list: with the flag github-mcp-server is listed 'disabled' and computer-use, a local plugin, is still listed, which is why --disable-mcp-server computer-use follows it.",        "--disable-mcp-server computer-use" : "Turns off computer-use, GitHub's desktop-control server (a local plugin that takes screenshots and clicks; its plugin.json calls it in preview), which --disable-builtin-mcps leaves on: 1.0.108's own built-in list is github-mcp-server, WorkIQ, browser-use and github-copilot-browser. A course session has no use for it, and a teacher's or school's allow-all would remove its consent prompt. Measured 2026-11-13: with the flag, copilot mcp list shows computer-use (local, disabled); naming a server an older Copilot does not have exits 0, so it raises no version floor. It turns the server off for this session only: a teacher who wants it can still start Copilot on their own, and their own settings are not changed (review M2, taken by the director).",
+
           "-i" : "Starts an interactive session with the greeting already sent (-p is the one-shot form, which cannot ask the teacher anything)."
         },
         "folderTrust" : "The first time Copilot is started in a folder it asks whether to trust it (Yes, Yes and remember, No; No ends the session). Plantoir does not answer it for the teacher, as it does not for Claude Code, which asks the same kind of question.",
@@ -3549,14 +3557,14 @@
           "requirement" : "identifier \"copilot\" and anchor apple generic and certificate leaf[subject.OU] = \"VEKTX9H2N7\"",
           "npmPackage" : "@github/copilot",
           "why" : "Homebrew's own copilot formula is a different vendor's program (Amazon's ECS and Fargate tool, deprecated but installable until 2027-07-06) and writes the same /opt/homebrew/bin/copilot as GitHub's cask copilot-cli (measured, brew info, 2026-11-13). Without this check a teacher who typed brew install copilot would be shown GitHub Copilot… and the door would open a program that stops at once on --additional-mcp-config. This checks which program it is, never whether anybody is signed in (neverProbedForSignIn still holds). #855 calls the same check after it installs Copilot.",
-          "measured" : "2026-11-13, this Mac (Apple silicon, macOS 26): codesign -dv on the cask's binary (1.0.105, which runs 1.0.108) gives Identifier=copilot, TeamIdentifier=VEKTX9H2N7. The check with the program's pages left unhashed (kSecCSDoNotValidateExecutable) took 6 to 10 ms on the 196 MB binary against 0.51 to 0.55 s for a full check, so it runs at launch and on activation with no cache; it refused an unsigned script, Claude Code's own signed program and /bin/ls. Not yet measured: whether GitHub's install script's binary in {home}/.local/bin carries the same identifier and team (it downloads the same release; an npm install is recognised by its path either way).",
+          "measured" : "2026-11-13, this Mac (Apple silicon, macOS 26): codesign -dv on the cask's binary (1.0.105, which runs 1.0.108) gives Identifier=copilot, TeamIdentifier=VEKTX9H2N7. The check with the program's pages left unhashed (kSecCSDoNotValidateExecutable) took 6 to 10 ms on the 196 MB binary against 0.51 to 0.55 s for a full check, so it runs at launch and on activation with no cache; it refused an unsigned script, Claude Code's own signed program and /bin/ls. Measured by the implementation reviewer the same day: the binary in GitHub's install script's archive (releases/latest/download/copilot-darwin-arm64.tar.gz, the same file the cask fetches) is signed Identifier=copilot, Authority 'Developer ID Application: GitHub (VEKTX9H2N7)', and is accepted; /bin/ls re-signed ad hoc with identifier copilot is refused. What it proves: that the program started is GitHub's launcher. It does not prove every byte it runs is (the signed cask binary 1.0.105 runs the auto-updated, unsigned JavaScript package from ~/Library/Caches/copilot/pkg/…/1.0.108), and a GitHub binary altered after signing still passes, since its pages are not hashed. An npm install is a #!/usr/bin/env node script and needs node on the Terminal's PATH, as an npm Claude Code does.",
           "onWindows" : "Windows owes its own form of the same check (the windows issue for #783): Homebrew does not exist there, but any copilot.exe on PATH is not proof of GitHub's."
         },
         "isolatesTheTeachersOwnServers" : false,
         "isolationNote" : "Copilot has no equivalent of --strict-mcp-config: --additional-mcp-config ADDS to the teacher's own configuration, so their own MCP servers load beside Plantoir's, as with Codex. Copilot also reads the teacher's own instructions and personal skills (~/.agents/skills), as Claude Code reads ~/.claude; neither door can stop an assistant reading its owner's own set-up. A teacher who once turned Plantoir's server off in Copilot (/mcp disable plantoir, saved in disabledMcpServers) gets sessions with no Plantoir tools: --enable-mcp-server would turn it on for one run but arrived only in 1.0.80, so it is not passed, and Help names the case.",
         "key" : "copilot",
         "macHandsOverWith" : "launch-{course}-copilot.command",
-        "measured" : "Copilot CLI 1.0.108 (Homebrew cask copilot-cli, auto-updated past the cask's 1.0.105), this Mac, 2026-11-13. The trial (copilot-trial/RESULTS.md, section 4) started it with this connection file shape and all 38 tools worked, named plantoir-{tool} and found through Copilot's own tool search; AGENTS.md, CLAUDE.md and the skills under .claude/skills and .agents/skills were read with no change. Measured here without starting a session: an unknown flag prints 'unexpected argument' and exits 1 in 0.07 s; copilot mcp list does NOT read --additional-mcp-config (it lists only the teacher's and the built-in servers), so the file is checked against Copilot's own schema (schemas/api.schema.json, McpServerConfigStdio: command required, no other keys allowed beyond the schema's) rather than by listing.",
+        "measured" : "Copilot CLI 1.0.108 (Homebrew cask copilot-cli, auto-updated past the cask's 1.0.105), this Mac, 2026-11-13. The trial (copilot-trial/RESULTS.md, section 4) started it with this connection file shape and all 38 tools worked, named plantoir-{tool} and found through Copilot's own tool search; AGENTS.md, CLAUDE.md and the skills under .claude/skills and .agents/skills were read with no change. Measured here without starting a session: an unknown flag prints 'unexpected argument' and exits 1 in 0.07 s; copilot mcp list does NOT read --additional-mcp-config (it lists only the teacher's and the built-in servers), so the file was checked another way. The plan review's implementation reviewer called Copilot's own reader (mcpConfigReadAndMergeAdditional in 1.0.108's runtime.node, with a scratch HOME, no session, no sign-in) on the file this door writes, for a folder holding a space, an apostrophe, a double quote and an accented letter: every key came back, timeout 1800000 included. A wrong top-level key, a missing command, a bad type, a string timeout and a missing file each throw, and the CLI then stops, which stoppedAtOnce explains. The one silent failure is a misspelt optional key (timeoutMs was dropped with no warning, leaving the 60 s default), so the whole written file is pinned to connectionFile by the mac's contract test. The schema's additionalProperties false is not enforced by that reader.",
         "menuItem" : "GitHub Copilot…",
         "namesToolsAs" : "plantoir-{tool}",
         "oldestVersionMeasured" : "1.0.108",
@@ -3573,15 +3581,16 @@
           "Accepting any executable called copilot (identity.why)."
         ],
         "serverEnvironment" : {
-          "PLANTOIR_DOOR_COURSE" : "{course}"
+          "PLANTOIR_DOOR_COURSE" : "{course}",
+          "PLANTOIR_DOOR_ASSISTANT" : "copilot"
         },
         "serverEnvironmentWhy" : "Written as env beside args in mcp-{course}-copilot.json, as the Claude door writes it, so the server holds an assist lease on the course the door was opened from (shared-rules.json -> doorCourseHold.whichDoors.copilot). The argv stays the folder alone (serverArguments).",
         "stoppedAtOnce" : {
           "sentence" : "GitHub Copilot stopped as soon as it started. It may need updating: open it once on its own, or ask for help.",
           "withinSeconds" : 10,
-          "why" : "The door has already said it opened (the trail line is written when the window is handed over), so a Copilot that stops at once - an argument it does not know, a start-up failure - would otherwise leave a window holding Copilot's own 'unexpected argument' error, which names its help and tells a teacher nothing. The mac's script prints this sentence after Copilot exits with a failure within withinSeconds of starting; measured, an unknown flag exits 1 in 0.07 s. The window's own text, so rule 1 applies. Not measured: what Copilot's exit status is when the teacher answers No to folderTrust within the first seconds (the hand test). Claude's and Codex's doors have the same gap and are not changed here."
+          "why" : "The door has already said it opened (the trail line is written when the window is handed over), so a Copilot that stops at once - an argument it does not know, a start-up failure - would otherwise leave a window holding Copilot's own 'unexpected argument' error, which names its help and tells a teacher nothing. The mac's script prints this sentence after Copilot exits with a status from 1 to 127 within withinSeconds of starting; measured, an unknown flag exits 1 in 0.07 s. A status of 128 or more is a signal, such as the teacher's own Control-C, and is not this failure (review L1: a stub killed by SIGINT at once printed the sentence before the fix). The window's own text, so rule 1 applies. Not measured: what Copilot's exit status is when the teacher answers No to folderTrust within the first seconds (the hand test). Claude's and Codex's doors have the same gap and are not changed here."
         },
-        "timeoutWhy" : "Copilot's timeout on a local server, in milliseconds, covers tool discovery and every tool call (its schema: 'Timeout in milliseconds for tool discovery and tool calls'). With none, 1.0.108 falls back to 60 seconds (W0=6e4 in cli-main.js's callTool, read from the bundle 2026-11-13, not yet measured with a slow tool), and deploy_section is awaited and a first deploy takes minutes: Copilot would tell the model the deploy failed while Plantoir was still deploying. 1800000 is thirty minutes, as Codex's tool_timeout_sec=1800.",
+        "timeoutWhy" : "Copilot's timeout on a local server, in milliseconds, covers tool discovery and every tool call (its schema: 'Timeout in milliseconds for tool discovery and tool calls'). With none, 1.0.108 falls back to 60 seconds (W0=6e4 in cli-main.js's callTool, read from the bundle 2026-11-13, not yet measured with a slow tool), and deploy_section is awaited and a first deploy takes minutes: Copilot would tell the model the deploy failed while Plantoir was still deploying. 1800000 is thirty minutes, as Codex's tool_timeout_sec=1800. Known limit: the same key covers tool DISCOVERY (Copilot's changelog: 'MCP server timeout settings now apply to tool discovery, with a 30-second default'), so a Plantoir server that hangs while starting would keep Copilot waiting up to thirty minutes for its tools; whether that holds up the prompt is not measured.",
         "trailLine" : "started GitHub Copilot for {course}",
         "writesForTheConnection" : [
           "mcp-{course}-copilot.json"
@@ -3591,6 +3600,8 @@
       }
     ],
     "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. What points a session at one course is the greeting. Both doors ALSO name their course to the server, in its environment (doorCourseVariable) - to HOLD it, never to narrow: the server takes an assist lease on it (shared-rules.json -> doorCourseHold), and every course stays reachable. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
+    "doorAssistantVariable" : "PLANTOIR_DOOR_ASSISTANT",
+    "doorAssistantVariableWhy" : "#783 (Russell, 2026-11-13: the busy sentences name the assistant that is working on the course). Every door writes its own key (claude, codex, copilot: each agent's key) beside doorCourseVariable in its server's environment (each agent's serverEnvironment), and the server writes it as its assist lease's fifth line (file-formats.json -> workLease.lines), so another program's sentences can name it (shared-rules.json -> doorCourseHold.naming). Unset, or a key no door has, names none: the sentences then list all three, which is still true. Windows' doors and plantoir-mcp owe it (#783's windows issue); until then a Windows hold names none.",
     "doorCourseVariable" : "PLANTOIR_DOOR_COURSE",
     "doorCourseVariableWhy" : "The one name both platforms read: both doors write it into their server's environment (each agent's serverEnvironment: the Claude door in its configuration's env, the Codex door as a -c override), and the server - Plantoir --mcp-stdio on the mac since #458, plantoir-mcp on Windows since #430 - holds an assist lease on that course when the folder has it. An environment variable rather than an argument because the argv is the folder alone (serverArguments) and #430's trap was a course in the argv being read as a lock.",
     "fixWith" : {

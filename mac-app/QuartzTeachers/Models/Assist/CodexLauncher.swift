@@ -215,6 +215,8 @@ nonisolated enum CodexLauncher {
         overrides.append(
             "mcp_servers.plantoir.env.\(AssistMCPServer.doorCourseVariable)=\"\(escapeForTOMLString(courseCode))\""
         )
+        // The sixth names which door, so the hold can name it (#783).
+        overrides.append("mcp_servers.plantoir.env.\(AssistMCPServer.doorAssistantVariable)=\"codex\"")
         return overrides
     }
 

@@ -11520,7 +11520,7 @@ pruner" above for why.
   first or together.
 
 
-**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it", never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
+**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it" until #783 and since then with the slot naming the session's own assistant ("a GitHub Copilot session still open on {CODE} made it", or all three when its lease names none: `shared-rules.json` → `doorCourseHold.naming`), never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
 ## Notifications: the one permission, and where it is asked (#212)
 
@@ -12008,7 +12008,7 @@ an application was NOT measured — the dress rehearsal (`RELEASING.md`, V3) che
    one from a shell (plan and review). The scan also names the folder an
    assistant working from another app has open, so step 2 can read its leases.
    An assistant that holds no build or publish lease is not under way — it can
-   stay connected for days. (Since #458 a Claude or Codex session's server always holds
+   stay connected for days. (Since #458 an outside door's session's server (Claude, Codex or GitHub Copilot) always holds
    an `assist` lease on its door's course; `UpdateGate.leaseKindsThatHold` is
    build and publish only, so that lease never holds an update.)
 

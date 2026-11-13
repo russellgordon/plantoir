@@ -45,6 +45,7 @@ final class CodexLauncherTests: XCTestCase {
                 "mcp_servers.plantoir.startup_timeout_sec=60",
                 "mcp_servers.plantoir.tool_timeout_sec=1800",
                 "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"ICS3U\"",
+                "mcp_servers.plantoir.env.PLANTOIR_DOOR_ASSISTANT=\"codex\"",
             ]
         )
     }
@@ -329,8 +330,8 @@ final class CodexLauncherTests: XCTestCase {
             arrived.removeLast()
         }
 
-        XCTAssertEqual(arrived.count, 11, "Eleven arguments: five -c pairs and the greeting.\n\(arrived)")
-        guard arrived.count == 11 else {
+        XCTAssertEqual(arrived.count, 13, "Thirteen arguments: six -c pairs and the greeting.\n\(arrived)")
+        guard arrived.count == 13 else {
             return
         }
         XCTAssertEqual(arrived[0], "-c")
@@ -340,7 +341,9 @@ final class CodexLauncherTests: XCTestCase {
         XCTAssertEqual(arrived[6], "-c")
         XCTAssertEqual(arrived[8], "-c")
         XCTAssertEqual(arrived[9], "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"-AP CALC-\"")
-        XCTAssertEqual(arrived[10], ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science"))
+        XCTAssertEqual(arrived[10], "-c")
+        XCTAssertEqual(arrived[11], "mcp_servers.plantoir.env.PLANTOIR_DOOR_ASSISTANT=\"codex\"")
+        XCTAssertEqual(arrived[12], ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science"))
 
         // And the value Codex would parse really is an ARRAY of two strings,
         // not the raw string its parser falls back to.

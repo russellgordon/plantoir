@@ -284,6 +284,9 @@ struct AllBackupsView: View {
             active: AssistActivity.active,
             heldByOtherSessions: WorkspaceModel.backupPathsHeldByOtherSessions(
                 inWorkingFolder: workspace.workspaceURL
+            ),
+            sessionAssistants: WorkspaceModel.sessionAssistantsOfHeldBackups(
+                inWorkingFolder: workspace.workspaceURL
             )
         )
     }

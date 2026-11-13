@@ -1250,8 +1250,13 @@ inherits by reading the contract: the arguments, the connection file's shape
 (`connectionFile`, with its 30-minute `timeout`), the titles, the
 `stoppedAtOnce` sentence, the identity rule's npm package name, the
 `fixWith.buttonCases`, `planAUnit.buttons`, `doorCourseHold` and `tabCases`
-entries, and the nine hold sentences in `assist-wording.json`, which name no
-assistant since #783. What it owes, and the windows issue for #783 lists:
+entries, and the nine hold sentences in `assist-wording.json`, which since #783
+name the assistant holding the course through one `{assistant}` slot
+(`doorCourseHold.naming`). For that, every Windows door owes
+`PLANTOIR_DOOR_ASSISTANT` (its own key) in its server's environment, and
+`plantoir-mcp` owes the key as its `assist` lease's fifth line
+(`file-formats.json` → `workLease.lines`); until then a Windows hold names
+none and the mac's sentences list all three, which is still true. What it owes, and the windows issue for #783 lists:
 a `CopilotLauncher` that writes `mcp-<CODE>-copilot.json` into Plantoir's data
 folder and starts `copilot.exe` by argument vector, or npm's `copilot.cmd`
 through `OutsideDoor.CmdArguments` (the `@` path's quoting measured per parse,

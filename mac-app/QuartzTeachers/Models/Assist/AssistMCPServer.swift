@@ -59,6 +59,13 @@ enum AssistMCPServer {
     /// Codex door has passed it as a fifth `-c` override since #468.
     nonisolated static let doorCourseVariable: String = "PLANTOIR_DOOR_COURSE"
 
+    /// Which door started this server, by key ("claude", "codex",
+    /// "copilot"), written into its environment by each door beside
+    /// `doorCourseVariable` (#783), so the hold records it and the other
+    /// programs' busy sentences name the assistant. Unset or unknown names
+    /// none, and the sentences then list all three.
+    nonisolated static let doorAssistantVariable: String = "PLANTOIR_DOOR_ASSISTANT"
+
     // MARK: - Functions
 
     /// The working folder given on the command line, when the flag is present.
@@ -125,15 +132,34 @@ enum AssistMCPServer {
         ) else {
             return
         }
-        WorkLeaseRegistry.holdForTheConversation(folderPath: folderPath, courseCode: held)
+        let assistant: String? = doorAssistant(environment[doorAssistantVariable])
+        WorkLeaseRegistry.holdForTheConversation(folderPath: folderPath, courseCode: held, assistant: assistant)
         if WorkLeaseRegistry.holdsACourseForTheConversation {
-            ActivityTrail.note(.outsideSessionHeldACourse, AssistMCPServer.holdingTrailLine(courseCode: held))
+            ActivityTrail.note(
+                .outsideSessionHeldACourse,
+                AssistMCPServer.holdingTrailLine(courseCode: held, assistant: assistant)
+            )
         }
     }
 
-    /// The trail line for a session that holds its course (#458).
-    nonisolated static func holdingTrailLine(courseCode: String) -> String {
-        return "an assistant session started from Plantoir is holding \(courseCode) while it is open"
+    /// The door key a server's environment names, trimmed and lower-cased,
+    /// or nil when it names none or a door nobody has (#783).
+    nonisolated static func doorAssistant(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let key: String = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if AssistWording.outsideAssistantName(forKey: key) == nil {
+            return nil
+        }
+        return key
+    }
+
+    /// The trail line for a session that holds its course (#458), naming
+    /// its assistant as the busy sentences do (#783).
+    nonisolated static func holdingTrailLine(courseCode: String, assistant: String?) -> String {
+        let named: String = AssistWording.outsideAssistantNamed([assistant])
+        return "a \(named) session started from Plantoir is holding \(courseCode) while it is open"
     }
 
     /// Read requests from stdin, write replies to stdout, until stdin closes.

@@ -56,7 +56,7 @@ ready.
   after them: revising a course (Revise With ▸ GitHub Copilot…), fixing a
   section's problems (Fix with GitHub Copilot…) and planning a unit (Plan a
   Unit with GitHub Copilot…). It asks you in its own window before it changes
-  anything, as the other two do. GitHub has its own plans and an education
+  anything, as the other two do, unless you have set it not to ask. GitHub has its own plans and an education
   programme for teachers; Help will say what they include, with the date it
   was checked.
   ([#783](https://github.com/russellgordon/plantoir/issues/783))

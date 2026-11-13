@@ -926,6 +926,7 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
         XCTAssertEqual(section["serverName"] as? String, "plantoir")
         XCTAssertEqual(section["doorCourseVariable"] as? String, AssistMCPServer.doorCourseVariable)
+        XCTAssertEqual(section["doorAssistantVariable"] as? String, AssistMCPServer.doorAssistantVariable)
         XCTAssertFalse(greeting.contains("\""), "greetingCarriesNoDoubleQuotes")
         // The How I Teach sentence (#209), verbatim, in the one greeting both
         // doors send.
@@ -1080,7 +1081,10 @@ final class AppRulesContractTests: XCTestCase {
                 let plantoir: [String: Any] = try XCTUnwrap(servers["plantoir"] as? [String: Any])
                 let environment: [String: String] = (plantoir["env"] as? [String: String]) ?? [:]
                 XCTAssertEqual(environment, filledEnvironment, "The \(key) door's server environment")
-                XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode])
+                XCTAssertEqual(filledEnvironment, [
+                    AssistMCPServer.doorCourseVariable: courseCode,
+                    AssistMCPServer.doorAssistantVariable: key,
+                ], "every door names its course and itself (#783)")
                 if key == "copilot" {
                     // The whole file is the contract's connectionFile, filled
                     // in: the server's name, type, command, folder, course,
@@ -1122,7 +1126,10 @@ final class AppRulesContractTests: XCTestCase {
                     index += 1
                 }
                 XCTAssertEqual(environment, filledEnvironment, "The \(key) door's server environment")
-                XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode], key)
+                XCTAssertEqual(filledEnvironment, [
+                    AssistMCPServer.doorCourseVariable: courseCode,
+                    AssistMCPServer.doorAssistantVariable: key,
+                ], key)
             }
 
             // What each door writes for the CONNECTION, and what it therefore

@@ -550,6 +550,11 @@ class WorkspaceModel {
     /// read the disk themselves; this is only what a menu shows.
     var coursesRevisedElsewhere: Set<String> = []
 
+    /// Who is revising each course in `coursesRevisedElsewhere`, as the busy
+    /// sentences' slot says it (#783: "GitHub Copilot", or all three when the
+    /// hold names none), upper-cased course code to words, refreshed with it.
+    var assistantsRevisingElsewhere: [String: String] = [:]
+
     /// A rename waiting on the teacher's answer about Obsidian, because
     /// this course's vault is open in it right now.
     var obsidianRenameRequest: CourseRenamer.ObsidianRequest?
@@ -2422,7 +2427,8 @@ class WorkspaceModel {
         return CourseActivity.structuralHoldReason(
             folderPath: workspaceURL.path,
             courseCode: course.code,
-            revisedElsewhere: isRevisedElsewhere(course.code)
+            revisedElsewhere: isRevisedElsewhere(course.code),
+            revisingAssistant: revisingAssistant(course.code)
         )
     }
 
@@ -2432,20 +2438,30 @@ class WorkspaceModel {
         return coursesRevisedElsewhere.contains(courseCode.uppercased())
     }
 
+    /// The snapshot's words for who holds this course (#783), or nil.
+    func revisingAssistant(_ courseCode: String) -> String? {
+        return assistantsRevisingElsewhere[courseCode.uppercased()]
+    }
+
     /// Re-reads which courses another program's Claude, Codex or GitHub Copilot session holds (#458).
     /// Assigned only when the answer changed, so an unchanged folder does not
     /// redraw every row that reads it.
     func refreshCoursesRevisedElsewhere() {
         var held: Set<String> = []
+        var named: [String: String] = [:]
         if let workspacePath = workspaceURL?.path {
             for course in courses {
-                if CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: course.code) {
+                if let assistant = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: course.code) {
                     held.insert(course.code.uppercased())
+                    named[course.code.uppercased()] = assistant
                 }
             }
         }
         if held != coursesRevisedElsewhere {
             coursesRevisedElsewhere = held
+        }
+        if named != assistantsRevisingElsewhere {
+            assistantsRevisingElsewhere = named
         }
     }
 
@@ -2459,10 +2475,10 @@ class WorkspaceModel {
         if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode) {
             return whenBusy
         }
-        let held: Bool = CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: courseCode)
+        let holder: String? = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: courseCode)
         refreshCoursesRevisedElsewhere()
-        if held {
-            return AssistWording.claudeIsRevisingTheCourse(course: courseCode, then: act)
+        if let holder {
+            return AssistWording.sessionIsRevisingTheCourse(course: courseCode, then: act, assistant: holder)
         }
         return nil
     }
@@ -2492,11 +2508,11 @@ class WorkspaceModel {
         guard let workspacePath = workspaceURL?.path else {
             return nil
         }
-        let held: Bool = CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: courseCode)
+        let holder: String? = CourseActivity.revisingAssistant(folderPath: workspacePath, courseCode: courseCode)
         refreshCoursesRevisedElsewhere()
         let title: String = AssistWording.courseIsAlreadyBeingRevised(course: courseCode)
-        if held {
-            return ReviseRefusal(title: title, message: AssistWording.finishTheClaudeSessionFirst)
+        if let holder {
+            return ReviseRefusal(title: title, message: AssistWording.finishTheSessionFirst(assistant: holder))
         }
         // The local item's one-window rule is the menu's alone, as it was
         // before #458: the window it would open names the one already open.
@@ -2877,6 +2893,11 @@ class WorkspaceModel {
         /// another program made them (#458) — kept apart from
         /// `keptForTheAssistant` so each is told as what it is.
         var keptForAClaudeSession: [BackupItem] = []
+
+        /// Which door's session made each of `keptForAClaudeSession`, by its
+        /// comparable path: the key its `assist` lease records, or "" when it
+        /// names none (#783), so the sentence can name the assistant.
+        var sessionAssistants: [String: String] = [:]
     }
 
     /// Deletes several backups for good, each permanently, as the single
@@ -2903,7 +2924,13 @@ class WorkspaceModel {
         following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
     ) -> BackupDeletion {
         let heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
-        let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
+        let sessionAssistants: [String: String] = WorkspaceModel.sessionAssistantsOfHeldBackups(
+            inWorkingFolder: workspaceURL
+        )
+        var heldByASession: Set<String> = []
+        for (path, _) in sessionAssistants {
+            heldByASession.insert(path)
+        }
 
         var deleted: [BackupItem] = []
         var kept: [BackupItem] = []
@@ -2928,7 +2955,7 @@ class WorkspaceModel {
 
         let deletion: BackupDeletion = BackupDeletion(
             deleted: deleted, keptForTheAssistant: kept, failed: failed,
-            keptForAClaudeSession: keptForASession
+            keptForAClaudeSession: keptForASession, sessionAssistants: sessionAssistants
         )
         if !deleted.isEmpty {
             ActivityTrail.note(
@@ -3034,15 +3061,40 @@ class WorkspaceModel {
     /// nothing, because its lease is ignored.
     static func backupPathsHeldByOtherSessions(inWorkingFolder workingFolder: URL?) -> Set<String> {
         var heldPaths: Set<String> = []
-        guard let workingFolder else {
-            return heldPaths
-        }
-        let coursesDirectory: URL = workingFolder.appendingPathComponent("courses", isDirectory: true)
-        for record in WorkLeaseFiles.backupsHeldByOtherSessions(coursesDirectory: coursesDirectory) {
-            let url: URL = URL(fileURLWithPath: record.path)
-            heldPaths.insert(FolderIdentity.canonicalPath(url.standardizedFileURL.path))
+        for (path, _) in WorkspaceModel.sessionAssistantsOfHeldBackups(inWorkingFolder: workingFolder) {
+            heldPaths.insert(path)
         }
         return heldPaths
+    }
+
+    /// The same backups, each with the door key the session that made it
+    /// records on its `assist` lease, or "" when it names none (#783).
+    static func sessionAssistantsOfHeldBackups(inWorkingFolder workingFolder: URL?) -> [String: String] {
+        var assistants: [String: String] = [:]
+        guard let workingFolder else {
+            return assistants
+        }
+        let coursesDirectory: URL = workingFolder.appendingPathComponent("courses", isDirectory: true)
+        let holders: [Int32: String?] = WorkLeaseFiles.assistantsOfAssistHolders(coursesDirectory: coursesDirectory)
+        for record in WorkLeaseFiles.backupsHeldByOtherSessions(coursesDirectory: coursesDirectory) {
+            let url: URL = URL(fileURLWithPath: record.path)
+            var key: String = ""
+            if let recorded = holders[record.pid], let named = recorded {
+                key = named
+            }
+            assistants[FolderIdentity.canonicalPath(url.standardizedFileURL.path)] = key
+        }
+        return assistants
+    }
+
+    /// The slot's words for the sessions that made these kept backups (#783).
+    static func assistantNamed(for items: [BackupItem], from assistants: [String: String]) -> String {
+        var keys: [String?] = []
+        for item in items {
+            let key: String = assistants[WorkspaceModel.comparablePath(of: item)] ?? ""
+            keys.append(key.isEmpty ? nil : key)
+        }
+        return AssistWording.outsideAssistantNamed(keys)
     }
 
     /// Every backup a delete in this working folder must keep: the open
@@ -3085,11 +3137,14 @@ class WorkspaceModel {
             ))
             return
         }
-        let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
-        if heldByASession.contains(WorkspaceModel.comparablePath(of: item)) {
+        let sessionAssistants: [String: String] = WorkspaceModel.sessionAssistantsOfHeldBackups(
+            inWorkingFolder: workspaceURL
+        )
+        if sessionAssistants[WorkspaceModel.comparablePath(of: item)] != nil {
             backupProblemTitle = BackupProblemTitle.deletingBackups(count: 1)
             backupProblem = WorkspaceModel.problem(with: BackupDeletion(
-                deleted: [], keptForTheAssistant: [], failed: [], keptForAClaudeSession: [item]
+                deleted: [], keptForTheAssistant: [], failed: [], keptForAClaudeSession: [item],
+                sessionAssistants: sessionAssistants
             ))
             return
         }
@@ -3113,7 +3168,8 @@ class WorkspaceModel {
         sizes: [String: Int64],
         heldPaths: Set<String>,
         active: AssistActivity.Session?,
-        heldByOtherSessions: Set<String> = []
+        heldByOtherSessions: Set<String> = [],
+        sessionAssistants: [String: String] = [:]
     ) -> String {
         var going: [BackupItem] = []
         var keptCount: Int = 0
@@ -3121,6 +3177,7 @@ class WorkspaceModel {
         // the sentence names the course whose session made them.
         var keptForASessionByCourse: [String: Int] = [:]
         var sessionCourses: [String] = []
+        var keptItemsByCourse: [String: [BackupItem]] = [:]
         for item in items {
             let path: String = WorkspaceModel.comparablePath(of: item)
             if heldPaths.contains(path) {
@@ -3130,6 +3187,7 @@ class WorkspaceModel {
                     sessionCourses.append(item.courseCode)
                 }
                 keptForASessionByCourse[item.courseCode, default: 0] += 1
+                keptItemsByCourse[item.courseCode, default: []].append(item)
             } else {
                 going.append(item)
             }
@@ -3159,7 +3217,12 @@ class WorkspaceModel {
         }
         for courseCode in sessionCourses {
             let count: Int = keptForASessionByCourse[courseCode] ?? 0
-            message += "\n\n" + AssistWording.backupsKeptForAClaudeSession(course: courseCode, count: count)
+            let assistant: String = WorkspaceModel.assistantNamed(
+                for: keptItemsByCourse[courseCode] ?? [], from: sessionAssistants
+            )
+            message += "\n\n" + AssistWording.backupsKeptForASession(
+                course: courseCode, count: count, assistant: assistant
+            )
         }
         message += "\n\nThe courses themselves are not touched."
         return message
@@ -3181,15 +3244,21 @@ class WorkspaceModel {
         // A Claude, Codex or GitHub Copilot session's own backups (#458), one sentence per course.
         var sessionCourses: [String] = []
         var sessionCounts: [String: Int] = [:]
+        var sessionItems: [String: [BackupItem]] = [:]
         for item in deletion.keptForAClaudeSession {
             if sessionCounts[item.courseCode] == nil {
                 sessionCourses.append(item.courseCode)
             }
             sessionCounts[item.courseCode, default: 0] += 1
+            sessionItems[item.courseCode, default: []].append(item)
         }
         for courseCode in sessionCourses {
-            sentences.append(AssistWording.finishTheClaudeSessionToDeleteItsBackup(
-                course: courseCode, count: sessionCounts[courseCode] ?? 0
+            sentences.append(AssistWording.finishTheSessionToDeleteItsBackup(
+                course: courseCode,
+                count: sessionCounts[courseCode] ?? 0,
+                assistant: WorkspaceModel.assistantNamed(
+                    for: sessionItems[courseCode] ?? [], from: deletion.sessionAssistants
+                )
             ))
         }
         if !deletion.failed.isEmpty {
@@ -3244,7 +3313,9 @@ class WorkspaceModel {
                 keptNames.append(item.fileURL.lastPathComponent)
             }
             line += "; kept " + keptNames.joined(separator: ", ")
-                + ", which an assistant session still open made"
+                + ", which a "
+                + WorkspaceModel.assistantNamed(for: deletion.keptForAClaudeSession, from: deletion.sessionAssistants)
+                + " session still open made"
         }
         if !deletion.failed.isEmpty {
             line += "; \(deletion.failed.count) could not be deleted"

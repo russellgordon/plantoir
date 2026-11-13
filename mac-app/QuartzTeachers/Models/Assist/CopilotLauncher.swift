@@ -26,7 +26,9 @@ import Security
 ///   strict mode, and `--additional-mcp-config` ADDS to their own
 ///   configuration. The later source wins on a name, so Plantoir's `plantoir`
 ///   beats one of theirs. `--disable-builtin-mcps` turns off GitHub's own
-///   repository servers, which have no business in a course session.
+///   built-in servers, and `--disable-mcp-server computer-use` its
+///   desktop-control plugin, which the first leaves on; neither has any
+///   business in a course session.
 /// * **No permission flag at all** (Russell, 2026-11-13): Copilot asks the
 ///   teacher in its own window before each tool that changes something,
 ///   before the commands a printable handout needs, and before deploying.
@@ -142,13 +144,20 @@ nonisolated enum CopilotLauncher {
     /// maker's program this is, and a program that has been tampered with
     /// after signing is not a case this menu item has to answer.
     static func carriesGitHubsSignature(atPath path: String) -> Bool {
+        return carriesSignature(atPath: path, meeting: signatureRequirement)
+    }
+
+    /// Whether the program at `path` meets `requirementText`, split out so a
+    /// test can prove a requirement one character off refuses GitHub's own
+    /// binary, and that the real one accepts it (review M3).
+    static func carriesSignature(atPath path: String, meeting requirementText: String) -> Bool {
         var staticCode: SecStaticCode?
         let created: OSStatus = SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &staticCode)
         guard created == errSecSuccess, let staticCode else {
             return false
         }
         var requirement: SecRequirement?
-        let parsed: OSStatus = SecRequirementCreateWithString(signatureRequirement as CFString, [], &requirement)
+        let parsed: OSStatus = SecRequirementCreateWithString(requirementText as CFString, [], &requirement)
         guard parsed == errSecSuccess, let requirement else {
             return false
         }
@@ -279,7 +288,8 @@ nonisolated enum CopilotLauncher {
                 workspacePath
             ],
             "env": [
-                AssistMCPServer.doorCourseVariable: courseCode
+                AssistMCPServer.doorCourseVariable: courseCode,
+                AssistMCPServer.doorAssistantVariable: "copilot"
             ],
             "tools": ["*"],
             "timeout": toolTimeoutMilliseconds
@@ -315,6 +325,12 @@ nonisolated enum CopilotLauncher {
         line.append(" --additional-mcp-config ")
         line.append(ClaudeCodeLauncher.escapeForShell("@" + configPath))
         line.append(" --disable-builtin-mcps")
+        // GitHub's desktop-control server (screenshots and clicks), a local
+        // plugin that --disable-builtin-mcps leaves on: a course session has
+        // no use for it, and a teacher's allow-all would let it act without
+        // asking. Naming a server an older Copilot lacks does not stop it
+        // (measured 2026-11-13: exit 0).
+        line.append(" --disable-mcp-server computer-use")
         line.append(" -i ")
         line.append(ClaudeCodeLauncher.escapeForShell(prompt))
         return line
@@ -327,7 +343,9 @@ nonisolated enum CopilotLauncher {
     /// After Copilot exits, a failure within `stoppedAtOnceSeconds` of the
     /// start prints `stoppedAtOnceSentence`, because the door has already said
     /// it opened, and Copilot's own "unexpected argument" error names its
-    /// help, which tells a teacher nothing.
+    /// help, which tells a teacher nothing. Only an exit status of 1 to 127:
+    /// 128 and above is a signal, such as the teacher's own Control-C, and a
+    /// teacher who left is not told Copilot needs updating (review L1).
     static func writeLauncherScript(
         workspacePath: String,
         courseCode: String,
@@ -343,7 +361,7 @@ nonisolated enum CopilotLauncher {
         started=$SECONDS
         \(commandLine(copilotPath: copilotPath, configPath: configPath, prompt: prompt))
         status=$?
-        if [ "$status" -ne 0 ] && [ $((SECONDS - started)) -lt \(stoppedAtOnceSeconds) ]; then
+        if [ "$status" -ge 1 ] && [ "$status" -le 127 ] && [ $((SECONDS - started)) -lt \(stoppedAtOnceSeconds) ]; then
           echo
           echo \(ClaudeCodeLauncher.escapeForShell(stoppedAtOnceSentence))
         fi

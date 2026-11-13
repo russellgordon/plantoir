@@ -1187,7 +1187,8 @@ struct SidebarView: View {
         return CourseActivity.structuralHoldReason(
             folderPath: workspaceURL.path,
             courseCode: course.code,
-            revisedElsewhere: workspace.isRevisedElsewhere(course.code)
+            revisedElsewhere: workspace.isRevisedElsewhere(course.code),
+            revisingAssistant: workspace.revisingAssistant(course.code)
         )
     }
 
@@ -1204,6 +1205,7 @@ struct SidebarView: View {
             courseCode: course.code,
             sectionNumber: sectionNumber,
             revisedElsewhere: workspace.isRevisedElsewhere(course.code),
+            revisingAssistant: workspace.revisingAssistant(course.code),
             active: AssistActivity.active
         )
     }

@@ -7510,8 +7510,8 @@ reconcile after the session's own preview or deploy ended. It survives the
 `isLeaving` window too, and `releaseEverything()` clears it. The trail gets
 `outside session held a course` ("a Claude or Codex session started from
 Plantoir is holding ICS3U while it is open" as written in #458; since #783 it
-names no assistant, like the hold's sentences: "The third door: GitHub
-Copilot (#783)").
+names the door's own assistant through a slot, like the hold's sentences:
+"Naming the assistant that holds a course (#783)").
 
 **The three protections**, each read from another live process's files, never
 this process's own (`heldElsewhere` skips its own pid and dead owners):
@@ -7529,9 +7529,9 @@ this process's own (`heldElsewhere` skips its own pid and dead owners):
   with "Available once you finish revising with Claude or Codex" once under
   them — the sentence Windows' `BusyReason` has said since #430, with "or
   Codex" added because the server cannot tell which door started it. (Since
-  #783 every one of these sentences names no assistant, by Russell's ruling,
-  so the third door needed no fourth name; see "The third door: GitHub
-  Copilot (#783)".) The two
+  #783 every door names itself to its server, the hold records it, and these
+  sentences name the assistant actually holding the course through one slot;
+  see "Naming the assistant that holds a course (#783)".) The two
   doors also grey while the in-app window is open on that course, with the
   sentence that names the window (`AssistActivity.closeTheAssistantFirst`), not
   the session's: two causes, two sentences (`CourseActivity
@@ -7839,9 +7839,9 @@ listed after Codex everywhere; Plantoir passes it no permissions, so it asks
 in its own window before each tool that changes something, before the three
 commands a handout needs (`tectonic`, `pdftoppm`, `mkdir`), and before
 deploying, as the other two do; and **the sentences that say a course is
-busy because an outside session is working on it name no assistant**, so
-they never need rewording when another door is added. Those are the nine
-`assist-wording.json` keys `availableOnceYouFinishRevisingWithClaude`,
+busy because an outside session is working on it name the assistant that is
+working on it** (below; first ruled "name none", reversed the same day). Those
+are the nine `assist-wording.json` keys `availableOnceYouFinishRevisingWithClaude`,
 `finishTheClaudeSessionFirst`, `claudeIsRevisingTheCourseRename`,
 `claudeIsRevisingTheCourseRestore`, `claudeIsRevisingTheCourseAddSection`,
 `backupKeptForAClaudeSession`, `backupsKeptForAClaudeSession`,
@@ -7859,12 +7859,12 @@ dated wording.
 ```text wrap
 cd '<working folder>' || exit 1
 started=$SECONDS
-'<copilot>' --additional-mcp-config '@<absolute path>/mcp-<CODE>-copilot.json' --disable-builtin-mcps -i '<greeting>'
+'<copilot>' --additional-mcp-config '@<absolute path>/mcp-<CODE>-copilot.json' --disable-builtin-mcps --disable-mcp-server computer-use -i '<greeting>'
 status=$?
-if [ "$status" -ne 0 ] && [ $((SECONDS - started)) -lt 10 ]; then echo; echo '<stoppedAtOnce sentence>'; fi
+if [ "$status" -ge 1 ] && [ "$status" -le 127 ] && [ $((SECONDS - started)) -lt 10 ]; then echo; echo '<stoppedAtOnce sentence>'; fi
 ```
 
-and the file is `{"mcpServers":{"plantoir":{"type":"local","command":<Plantoir>,"args":["--mcp-stdio",<folder>],"env":{"PLANTOIR_DOOR_COURSE":<CODE>},"tools":["*"],"timeout":1800000}}}`,
+and the file is `{"mcpServers":{"plantoir":{"type":"local","command":<Plantoir>,"args":["--mcp-stdio",<folder>],"env":{"PLANTOIR_DOOR_ASSISTANT":"copilot","PLANTOIR_DOOR_COURSE":<CODE>},"tools":["*"],"timeout":1800000}}}`,
 written with `JSONSerialization`. What each piece is for, and what was
 measured:
 
@@ -7877,7 +7877,12 @@ measured:
   deploying. Thirty minutes, as Codex's `tool_timeout_sec`. **Not yet
   measured with a slow tool**: the run that would prove it starts a Copilot
   session, which this piece's implementer was not allowed to do (the brief's
-  hard rule); the closing comment says what the director ran.
+  hard rule); the closing comment says what the director ran. Known limit:
+  the same key covers tool DISCOVERY (Copilot's changelog: "MCP server
+  timeout settings now apply to tool discovery, with a 30-second default"),
+  so a Plantoir server that hung while starting would keep Copilot waiting up
+  to thirty minutes for its tools; whether that holds up the prompt is not
+  measured.
 - **No `-C` (plan review H2).** Any argument the installed Copilot does not
   know prints `error: unexpected argument '…' found` and exits 1, in 0.07 s
   (measured, 1.0.108). `-C` arrived in 1.0.42 and `--enable-mcp-server` in
@@ -7885,20 +7890,42 @@ measured:
   oldest changelog entry (0.0.328). The script's own `cd` does `-C`'s job, so
   the door's floor is as low as it can be. Because the trail already says the
   door opened, the script ends with `outsideAgents.agents[copilot].stoppedAtOnce.sentence`
-  when Copilot fails within ten seconds of starting. Claude's and Codex's
-  doors have the same gap and are not changed here.
-- **`--disable-builtin-mcps`** turns off GitHub's repository server, which has
+  when Copilot exits with a status from 1 to 127 within ten seconds of
+  starting. A status of 128 or more is a signal, such as the teacher's own
+  Control-C, and is left alone (the implementation review found a stub killed
+  by SIGINT at once printed the sentence, which would tell a teacher who simply
+  left that Copilot needs updating; 127, "not found", still prints it).
+  Claude's and Codex's doors have the same gap and are not changed here.
+- **`--disable-builtin-mcps`** turns off GitHub's built-in servers, which have
   no business in a course session and would add choices to every routing
-  decision. Measured with `copilot mcp list`: with the flag
-  `github-mcp-server` is listed disabled and `computer-use`, a local
-  built-in, is still listed.
+  decision. 1.0.108's own list of them is `github-mcp-server`, `WorkIQ`,
+  `browser-use` and `github-copilot-browser` (read by the implementation
+  reviewer from its `runtime.node`).
+- **`--disable-mcp-server computer-use`** turns off what that flag leaves on:
+  `computer-use`, GitHub's desktop-control server, a local plugin in preview
+  (its `plugin.json`) that takes screenshots and clicks. It asks before it
+  acts, but a teacher's or school's allow-all setting removes that, and a
+  course session has no use for it. Measured with `copilot mcp list`: with
+  both flags it lists `computer-use (local, disabled)` and `github-mcp-server
+  (http, disabled)`; naming a server an older Copilot does not have exits 0,
+  so the flag raises no version floor. It applies to the session Plantoir
+  opens and nothing else: a teacher's own Copilot settings are not changed,
+  and starting Copilot on their own still gives them the server (review M2,
+  taken by the director).
 - **`copilot mcp list` does not read `--additional-mcp-config`** (measured: it
   lists only the teacher's and the built-in servers), so the file cannot be
-  proved by listing. It was checked against Copilot's own schema
-  (`schemas/api.schema.json` → `McpServerConfigStdio`: `command` required,
-  no keys beyond the schema's). `"type": "local"` is the measured form;
-  1.0.108's schema calls it a legacy alias of `"stdio"`, which an older
-  Copilot may not know.
+  proved by listing. The implementation reviewer called Copilot's own reader
+  (`mcpConfigReadAndMergeAdditional` in 1.0.108's `runtime.node`, a scratch
+  HOME, no session, no sign-in) on the file this door writes, for a folder
+  holding a space, `'`, `"` and `é`: every key came back, `timeout` included.
+  A wrong top-level key, a missing `command`, a bad `type`, a string timeout
+  and a missing file each throw, and the CLI then stops (which the
+  stopped-at-once line explains). The one silent failure is a misspelt
+  optional key (`timeoutMs` was dropped with no warning, leaving 60 s), so the
+  whole written file is pinned to `connectionFile` by the contract test. The
+  schema's `additionalProperties: false` is not enforced by that reader.
+  `"type": "local"` is the measured form; 1.0.108's schema calls it a legacy
+  alias of `"stdio"`, which an older Copilot may not know.
 
 **Which `copilot` is GitHub's (plan review H3).** Homebrew's own `copilot`
 formula is Amazon's ECS and Fargate tool (deprecated, installable until
@@ -7914,8 +7941,18 @@ binary). The check reads the signature without hashing the program
 against **0.51 to 0.55 s** for a full check, measured on this Mac (Apple
 silicon), so it runs where presence already refreshes (launch and
 activation) with no cache. The menus read `OutsideAssistantPresence.copilotIsInstalled`
-rather than asking while they draw. Not yet measured: the identifier and
-team of the binary GitHub's install script puts in `~/.local/bin`. This is a
+rather than asking while they draw. The implementation reviewer measured the
+binary GitHub's install script fetches (the same release archive the cask
+uses): Identifier=copilot, "Developer ID Application: GitHub (VEKTX9H2N7)",
+accepted; `/bin/ls` re-signed ad hoc as `copilot` is refused. A test shows
+the requirement accepts the real binary when one is installed and refuses it
+with the team or identifier one character off (review M3), since a
+requirement that refused everything would hide the door silently. What the
+check does not prove: the signed cask binary (1.0.105 here) runs the
+auto-updated, unsigned JavaScript package from
+`~/Library/Caches/copilot/pkg/…/1.0.108`, so it proves the launcher is
+GitHub's, not every byte it runs, and a GitHub binary altered after signing
+still passes because its pages are not hashed. This is a
 check of which program it is, never of sign-in (`neverProbedForSignIn`
 still holds; Copilot has no status command to probe with), and #855 calls
 the same function after it installs Copilot.
@@ -7978,6 +8015,42 @@ adding `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` to the child's
 environment, because Copilot signs in from any of them ahead of the teacher's
 stored sign-in. The mac's script runs in the teacher's own Terminal or iTerm,
 so Plantoir's environment never reaches it.
+
+### Naming the assistant that holds a course (#783)
+
+**Ruling (Russell, 2026-11-13, reversing the same day's "name none"): "Let's
+name the assistant (Codex, Claude, or GitHub Copilot)."** The first build
+made the nine busy sentences name nobody ("an assistant session opened from
+Plantoir"); the implementation review showed why that reads badly: "the
+assistant" is what Plantoir already calls its own window
+(`AssistActivity.closeTheAssistantFirst`), and a sentence that names nobody no
+longer tells the teacher which window to finish.
+
+**How it works.** Each sentence has ONE slot, `{assistant}`, never a list
+to reword when a door is added. Each door writes its own key into its
+server's environment beside the course, as `PLANTOIR_DOOR_ASSISTANT`
+(`claude`, `codex` or `copilot`; `outsideAgents.doorAssistantVariable`): in
+the Claude and Copilot doors' connection files' `env`, and as a sixth `-c`
+override for Codex. The server reads it (`AssistMCPServer.doorAssistant`) and
+the hold writes it as the `assist` lease's FIFTH line
+(`file-formats.json` → `workLease.lines`), so it is set and removed with the
+lease itself on every path, a kill included. A reader
+(`CourseActivity.revisingAssistant`, the window's snapshot
+`WorkspaceModel.assistantsRevisingElsewhere`, and for kept backups the record's
+own process) fills the slot through `AssistWording.outsideAssistantNamed`:
+one name when every live hold names the same door; different doors in menu
+order joined with "or"; and "Claude, Codex or GitHub Copilot" when any hold
+names none (an older Plantoir, Windows until it writes the line, a key no door
+has). The rule and its cases are `shared-rules.json` →
+`doorCourseHold.naming`. The sentences keep the shape they had before #783
+("a Claude or Codex session"), with the slot where the names were.
+
+REJECTED: naming none (above); reading which program is the server's
+parent from the process table (it names a program, not a door, and fails for
+a server started by hand); a sidecar file or a line on every lease kind (the
+fifth line of the assist lease alone lives and dies with the hold, and
+Windows' readers read lines by index, so they are undisturbed: `WorkLease.cs`
+reads `lines[2]` and below).
 
 ## #610: Open in Obsidian from the assistant
 

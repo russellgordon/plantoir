@@ -38,6 +38,13 @@ nonisolated enum WorkLeaseFiles {
         /// The lease's third line — the moment it was taken, in .NET's "O"
         /// shape — or nil when the file has none.
         let moment: String?
+
+        /// An `assist` lease's fifth line: the key of the outside door whose
+        /// session holds the course ("claude", "codex", "copilot"), so the
+        /// busy sentences can name it (#783). Nil for every other kind, and
+        /// for an `assist` lease that names none (an older Plantoir, or
+        /// Windows until it writes one) or names a door nobody has.
+        var assistant: String? = nil
     }
 
     /// This process's own claim, which the tiebreak compares against.
@@ -190,7 +197,8 @@ nonisolated enum WorkLeaseFiles {
         kind: String,
         courseCode: String,
         coursesDirectory: URL,
-        moment: Date = Date()
+        moment: Date = Date(),
+        assistant: String? = nil
     ) -> (url: URL, moment: String)? {
         var isDirectory: ObjCBool = false
         let exists: Bool = FileManager.default.fileExists(
@@ -203,7 +211,12 @@ nonisolated enum WorkLeaseFiles {
         let url: URL = directory.appendingPathComponent(
             WorkLeaseFiles.fileName(courseCode: courseCode, kind: kind, pid: getpid())
         )
-        let body: String = ProcessLiveness.leaseBody(at: moment)
+        var body: String = ProcessLiveness.leaseBody(at: moment)
+        // The fifth line, on an `assist` lease only: which door's session
+        // holds the course (#783, `file-formats.json` → `workLease.lines`).
+        if kind == assistKind, let assistant, AssistWording.outsideAssistantName(forKey: assistant) != nil {
+            body += assistant.lowercased() + "\n"
+        }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try Data(body.utf8).write(to: url, options: .atomic)
@@ -270,8 +283,8 @@ nonisolated enum WorkLeaseFiles {
         coursesDirectory: URL,
         ownPID: Int32 = getpid(),
         ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
-    ) -> [(path: String, courseCode: String)] {
-        var held: [(path: String, courseCode: String)] = []
+    ) -> [(path: String, courseCode: String, pid: Int32)] {
+        var held: [(path: String, courseCode: String, pid: Int32)] = []
         let living: Set<Int32> = WorkLeaseFiles.assistHolders(
             coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
         )
@@ -305,7 +318,7 @@ nonisolated enum WorkLeaseFiles {
             if let range = name.range(of: marker, options: .backwards) {
                 courseCode = String(name[name.startIndex..<range.lowerBound])
             }
-            held.append((path: path, courseCode: courseCode))
+            held.append((path: path, courseCode: courseCode, pid: pid))
         }
         return held
     }
@@ -375,7 +388,12 @@ nonisolated enum WorkLeaseFiles {
             }
             held.append((
                 course: parsed.course,
-                holding: Holding(kind: parsed.kind, pid: parsed.pid, moment: WorkLeaseFiles.momentLine(in: text))
+                holding: Holding(
+                    kind: parsed.kind,
+                    pid: parsed.pid,
+                    moment: WorkLeaseFiles.momentLine(in: text),
+                    assistant: parsed.kind.lowercased() == assistKind ? WorkLeaseFiles.assistantLine(in: text) : nil
+                )
             ))
         }
         return held
@@ -484,6 +502,40 @@ nonisolated enum WorkLeaseFiles {
         }
         let characters: [Character] = Array(text)
         return characters[10] == "T" && characters[19] == "." && characters[27] == "Z"
+    }
+
+    /// An `assist` lease's fifth line, as a door key a sentence can name, or
+    /// nil when there is none or it names no door (#783).
+    static func assistantLine(in text: String) -> String? {
+        let unixText: String = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let lines: [Substring] = unixText.split(separator: "\n", omittingEmptySubsequences: false)
+        if lines.count < 5 {
+            return nil
+        }
+        let key: String = String(lines[4]).trimmingCharacters(in: .whitespaces).lowercased()
+        if AssistWording.outsideAssistantName(forKey: key) == nil {
+            return nil
+        }
+        return key
+    }
+
+    /// The door keys the OTHER live programs' `assist` leases record, by the
+    /// process holding each: the session whose held-backup records count
+    /// (`assistHolders`) and which assistant it is (#783). A value of nil is
+    /// a hold that names no door.
+    static func assistantsOfAssistHolders(
+        coursesDirectory: URL,
+        ownPID: Int32 = getpid(),
+        ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
+    ) -> [Int32: String?] {
+        var assistants: [Int32: String?] = [:]
+        let held: [(course: String, holding: Holding)] = WorkLeaseFiles.everyLeaseHeldElsewhere(
+            coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
+        )
+        for entry in held where entry.holding.kind.lowercased() == assistKind {
+            assistants[entry.holding.pid] = .some(entry.holding.assistant)
+        }
+        return assistants
     }
 
     /// A lease's third line, trimmed, or nil.
