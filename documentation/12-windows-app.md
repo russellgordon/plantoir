@@ -2796,7 +2796,12 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `sandbox-exec`. A script that writes to `%TEMP%`, `%LOCALAPPDATA%` or a
   network share by name is not stopped there, and the boxing step's snapshot
   sees only the marking and teacher-only folders; the `windows` issue says
-  what is owed. They are checked out with
+  what is owed. Since the verification (09 → "The verification of
+  the write routes"): a step's standard input is the null device and its
+  output goes to pipes on Windows too, so it cannot answer the teacher's
+  question through them; the new session, the token search with `ps`, the
+  lifeline pipe and the System V check are POSIX only, so a child a
+  Windows step leaves running is not ended (owed: a job object). They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft

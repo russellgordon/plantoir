@@ -86,6 +86,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -903,9 +904,16 @@ def runner_command(teacher_only, marking, command):
             "--quarantine", str(teacher_only / QUARANTINE), "--"] + command
 
 
-SCRATCH = "Scratch"   # a teacher-run script's own temporary folder, on the teacher's side; emptied after every step
+# A teacher-run script's own temporary folder, on the teacher's side; emptied after every step. Its name starts
+# with a dot, which no assessment's folder may (plain_folder_name), so it can never be an assessment's own folder
+# (750d verification: "Scratch" was a legal assessment name, and the names step's sweep would have removed it).
+SCRATCH = ".step scratch"
 SCRATCH_ENVIRONMENT = ("TMPDIR", "TMP", "TEMP", "TEMPDIR")
-SANDBOX_DEVICES = ("/dev/null", "/dev/zero", "/dev/tty", "/dev/dtracehelper", "/dev/random", "/dev/urandom")
+# The one device a walled step may write: /dev/null, where what is written is thrown away. /dev/tty is NOT among
+# them (750d verification: a script put "yes" into the window's input with an ioctl on it), nor /dev/zero,
+# /dev/random, /dev/urandom or /dev/dtracehelper, which nothing the step runs needs to write.
+SANDBOX_DEVICES = ("/dev/null",)
+STEP_TOKEN = "PLANTOIR_MARKING_STEP"   # in the environment of everything a step starts, to find and end it all
 
 
 def walled(command, writable):
@@ -927,8 +935,31 @@ def walled(command, writable):
         allowed += ' (literal "' + device + '")'
     allowed += ' (regex #"^/dev/fd/")'
     profile = ("(version 1)(allow default)(deny file-write*)(allow file-write*" + allowed + ")"
-               "(deny network*)(deny mach-lookup)(deny ipc-posix-shm*)(deny ipc-sysv*)(deny signal (target others))")
+               + "".join("(deny " + operation + ")" for operation in SANDBOX_DENIED))
     return [sandbox, "-p", profile] + command
+
+
+# Everything but a write into the allowed places that could carry a value out of a walled step, each denied, as
+# measured on macOS 26.6 (750d verification): network and local sockets; every system service (the clipboard,
+# preferences, notify posts, opening a file, Apple events); registering a service of its own; POSIX shared memory
+# and named semaphores; System V shared memory; every ioctl (the terminal's input among them); IOKit; signals to
+# other programs. System V message queues and semaphore sets cannot be refused by the profile on this macOS: the
+# step looks for any it made and stops (sysv_objects).
+SANDBOX_DENIED = ("network*", "mach-lookup", "mach-register", "ipc-posix*", "ipc-sysv*", "file-ioctl", "iokit-open",
+                  "signal (target others)")
+
+
+def sweep_the_scratch(teacher_only):
+    """Empty every step's temporary folder a killed step or a closed window left in the teacher-only folder: its
+    own, and each assessment's."""
+    teacher_only = Path(teacher_only)
+    empty_the_scratch(teacher_only / SCRATCH)
+    try:
+        folders = [entry for entry in teacher_only.iterdir() if entry.is_dir() and not entry.is_symlink()]
+    except OSError:
+        folders = []
+    for folder in folders:
+        empty_the_scratch(folder / SCRATCH)
 
 
 def a_step_scratch(folder):
@@ -974,8 +1005,9 @@ def a_boxing_step(script_command, allowed, teacher_only, marking, assessment, sa
     on the teacher's side; then move anything it wrote outside `allowed` (in the marking folder or the
     teacher-only folder) to the teacher's Quarantine, unread and never deleted, and stop when there was any."""
     quarantine = teacher_only / QUARANTINE
-    scratch, environment = a_step_scratch(teacher_only / assessment)
-    try:
+    scratch = teacher_only / assessment / SCRATCH
+    try:   # made inside the try, so that a window closed in between still has it emptied (750d verification)
+        scratch, environment = a_step_scratch(teacher_only / assessment)
         return a_walled_boxing_step(script_command, allowed, teacher_only, marking, assessment, say, said, scratch,
                                     environment, quarantine)
     finally:
@@ -986,9 +1018,11 @@ def a_walled_boxing_step(script_command, allowed, teacher_only, marking, assessm
                          quarantine):
     allowed = [Path(path) for path in allowed] + [quarantine, scratch]
     before = {**written_state(marking, []), **written_state(teacher_only, allowed)}
+    first = len(said)
     code = run_and_say(runner_command(teacher_only, marking, walled(script_command, [teacher_only / assessment])),
                        teacher_only, say, said, environment)
     after = {**written_state(marking, []), **written_state(teacher_only, allowed)}
+    the_wall_refused(said[first:], "the boxing script")
     strays = []
     for path, state in sorted(after.items()):
         if before.get(path) == state or (state[0] == "folder" and path in before):
@@ -1009,15 +1043,134 @@ def a_walled_boxing_step(script_command, allowed, teacher_only, marking, assessm
     return code
 
 
+REFUSED = re.compile(r"Operation not permitted|PermissionError|Errno 1\b")
+
+
+def the_wall_refused(lines, what):
+    """A Refusal saying what was refused, when the wall refused anything the step tried (750d verification: the
+    Stopped line gave only the consequence, "no paper was boxed", and the refusal was two lines above it)."""
+    refused = 0
+    for line in lines:
+        if REFUSED.search(line):
+            refused += 1
+    if refused:
+        raise Refusal(f"{what} tried to write or reach something outside the folders it was given, and was refused "
+                      f"({refused} lines above say so); nothing was put together for you to look through, and nothing "
+                      "was moved. Tell your assistant the script needs looking at")
+
+
+def processes_carrying(token):
+    """The process ids of every program, anywhere on this computer and in any session, whose environment holds this
+    step's token: everything the step started, a child that detached itself into a session of its own included."""
+    if os.name != "posix":
+        return []
+    try:
+        listed = subprocess.run(["/bin/ps", "-A", "-E", "-ww", "-o", "pid=,command="], capture_output=True,
+                                text=True, errors="replace").stdout
+    except OSError:
+        return []
+    found = []
+    for line in listed.splitlines():
+        if f"{STEP_TOKEN}={token}" in line:
+            first = line.split(None, 1)[0] if line.strip() else ""
+            if first.isdigit() and int(first) != os.getpid():
+                found.append(int(first))
+    return found
+
+
+def the_lifeline_is_closed(lifeline, wait):
+    """True once no process holds the write end of the step's lifeline pipe (every process the step started
+    inherits it), after waiting at most `wait` seconds."""
+    import select
+    ready, _, _ = select.select([lifeline], [], [], wait)
+    if not ready:
+        return False
+    return os.read(lifeline, 4096) == b"" or the_lifeline_is_closed(lifeline, 0)
+
+
+def end_everything_the_step_started(process, token, lifeline):
+    """End the step's whole process group, and every process that carries its token or holds its lifeline, and
+    confirm they are gone. True when something could not be ended (750d verification: a child that detached
+    itself wrote six seconds after the step's checks had run)."""
+    if os.name != "posix":
+        return False
+    for attempt in range(30):
+        found = processes_carrying(token)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        for pid in found:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+        try:
+            process.wait(timeout=0.1)
+        except subprocess.TimeoutExpired:
+            pass
+        if not found and the_lifeline_is_closed(lifeline, 0.1 if attempt else 0.0):
+            return False
+    return True
+
+
+def sysv_objects():
+    """{(kind, id)} of the System V message queues, shared memory and semaphore sets owned by this account."""
+    if os.name != "posix" or shutil.which("ipcs") is None:
+        return set()
+    import getpass
+    listed = subprocess.run(["ipcs", "-a"], capture_output=True, text=True, errors="replace").stdout
+    found = set()
+    for line in listed.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0] in ("q", "m", "s") and parts[1].isdigit() and parts[4] == getpass.getuser():
+            found.add((parts[0], parts[1]))
+    return found
+
+
 def run_and_say(command, teacher_only, say, said, environment=None):
     """Run a command with its output captured, and pass on its lines with the teacher-only folder's path put back
-    as 'your teacher-only folder'. Returns its exit code."""
-    result = subprocess.run(command, capture_output=True, env=environment)
-    output = (result.stdout + result.stderr).decode("utf-8", "replace")
+    as 'your teacher-only folder'. Returns its exit code.
+
+    The step can never answer the teacher's question (750d verification: a script put "yes" into the window's
+    input with an ioctl, and the teacher's no became a recorded yes). Its standard input is /dev/null and its
+    output goes to pipes; it runs in a session of its own, so it has no controlling terminal and /dev/tty cannot
+    be opened; the wall refuses every ioctl. When it ends, everything it started is ended and confirmed gone
+    before anything else happens, and the window's input is emptied before the next question is asked."""
+    environment = dict(os.environ if environment is None else environment)
+    token = os.urandom(12).hex()
+    environment[STEP_TOKEN] = token
+    before = sysv_objects()
+    posix = os.name == "posix"
+    lifeline, held = os.pipe() if posix else (None, None)
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=environment, start_new_session=posix, pass_fds=(held,) if posix else ())
+    finally:
+        if posix:
+            os.close(held)
+    try:
+        out, err = process.communicate()
+    finally:
+        still_running = end_everything_the_step_started(process, token, lifeline) if posix else False
+        if posix:
+            os.close(lifeline)
+    output = (out + err).decode("utf-8", "replace")
     for line in hide_the_folder(output, teacher_only).splitlines():
         say(line)
         said.append(line)
-    return result.returncode
+    if still_running:
+        raise Refusal("a program the step started was still running and could not be ended, so nothing was put "
+                      "together for you to look through, and nothing was moved. Restart this computer before you "
+                      "double-click again, and tell your assistant the script needs looking at")
+    made = sysv_objects() - before
+    if made:
+        for kind, number in made:
+            subprocess.run(["ipcrm", "-" + kind, number], capture_output=True)
+        raise Refusal(f"the step made {len(made)} shared system objects another program could read; they were "
+                      "removed, nothing was put together for you to look through, and nothing was moved. Tell your "
+                      "assistant the script needs looking at")
+    return process.returncode
 
 
 def write_what_it_said(path, said, teacher_only):
@@ -1097,6 +1250,7 @@ def box(marking, ask, say):
     say(f"Box the papers: {assessment}.")
     show_the_privacy_points(marking / assessment, ask, say)
     teacher_only = ask_for_the_teacher_only_folder(marking, ask, say)
+    sweep_the_scratch(teacher_only)
     if inside(blank, teacher_only):
         raise Refusal(f"the blank test must not be in {THE_FOLDER}; ask your assistant. Nothing was done")
     originals = teacher_only / assessment / ORIGINALS
@@ -1222,6 +1376,7 @@ def names(marking, ask, say):
     if request.get("do") in ("comment-facts", "comments"):
         show_the_privacy_points(marking / f"{request['term']} Comments", ask, say, points=COMMENT_POINTS)
     teacher_only = ask_for_the_teacher_only_folder(marking, ask, say)
+    sweep_the_scratch(teacher_only)
     what, writes_names, steps = names_steps(request, marking, teacher_only)
     if writes_names:
         while True:
@@ -1240,13 +1395,16 @@ def names(marking, ask, say):
         # Walled as the boxing is (the re-check: an adapted script run with the table open could write anywhere):
         # it may write only into the folder it writes named copies to, and its own scratch, both on the teacher's side.
         writable = [Path(arguments[arguments.index("--out") + 1])] if "--out" in arguments else []
-        scratch, environment = a_step_scratch(teacher_only)
+        scratch = teacher_only / SCRATCH
         try:
+            scratch, environment = a_step_scratch(teacher_only)
             for folder in writable:
                 folder.mkdir(parents=True, exist_ok=True)
+            first = len(said)
             code = run_and_say(runner_command(teacher_only, marking, walled([sys.executable, "-B", str(script)] + arguments,
                                                                               writable + [scratch])),
                                teacher_only, say, said, environment)
+            the_wall_refused(said[first:], "the names step's script")
         finally:
             empty_the_scratch(scratch)
         worst = max(worst, code)
@@ -1407,7 +1565,28 @@ def tidy(assessment):
 # ---------------------------------------------------------------- the command line
 
 
+class WindowClosed(Exception):
+    """The window was closed (SIGHUP) or the step was told to end (SIGTERM): the step's own clean-up still runs."""
+
+
+def the_window_was_closed(_signal_number, _frame):
+    # A closed window sends SIGHUP more than once (the launcher's group, then the terminal itself): the first one
+    # ends the step, and every later one is ignored, so it cannot break off the step's own clean-up.
+    for ending in ("SIGHUP", "SIGTERM"):
+        if hasattr(signal, ending):
+            signal.signal(getattr(signal, ending), signal.SIG_IGN)
+    raise WindowClosed()
+
+
 def interactive_input(prompt):
+    """The teacher's answer, typed after the question is shown: anything already waiting in the window's input
+    (typed ahead, or put there by anything else) is thrown away first."""
+    try:
+        import termios
+        if sys.stdin.isatty():
+            termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+    except (ImportError, OSError):
+        pass
     try:
         return input(prompt)
     except EOFError:
@@ -1426,6 +1605,9 @@ def main(arguments):
         return 0
     if not sys.stdin.isatty():
         raise Refusal("this step is for the teacher to run by double-clicking it, in its own window. Nothing was done")
+    for ending in ("SIGHUP", "SIGTERM"):
+        if hasattr(signal, ending):
+            signal.signal(getattr(signal, ending), the_window_was_closed)
     step = box if arguments[0] == "box" else names
     title = "Box the papers" if arguments[0] == "box" else "Put names on the sheets"
     stale = Path(arguments[1], title + LAST_STOP)
@@ -1448,7 +1630,7 @@ if __name__ == "__main__":
             except OSError:
                 pass
         sys.exit(1)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, WindowClosed):
         print("\nStopped. Nothing more was done.")
         sys.exit(1)
     except Exception as error:   # never a traceback: it could carry a path holding a name

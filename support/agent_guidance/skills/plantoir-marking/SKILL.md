@@ -290,12 +290,12 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `d0373eba4f687175c9fbc068f0d5f4e1be32a6e19e2c19c1be93572f5b2c8a99`  teacher_only.py
+- `56501c12433616be46ff8492036969ffea6187436dab45c0034dabb6e03db99e`  teacher_only.py
 - `4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819`  render_pages.py
-- `e0402b8d9c0130e765547e8243aeff41562318e42505ed54fe65d215924b94fc`  Box the papers.command
-- `7794ca38e29243dcef2f3f74b6a1df13240f31fedcdd4425957736452465bcec`  Put names on the sheets.command
-- `d178beabf7986e09a96f5e19dca31e65765a1becc804dae717a2f3f3ea5bd1bf`  Box the papers.bat
-- `f0b0d036faf31e621695cce033d5f7fea7175a6f9c60cc68eef187ca3dfd197d`  Put names on the sheets.bat
+- `5de2e0fcca0db4b6a96962eb20eb3f3e40ca7c6052cb5c13ee97428e661e8c24`  Box the papers.command
+- `41872a4ac7cd01bb74693730efb8fe9d23221efb3d6074743ffe631a1105bd49`  Put names on the sheets.command
+- `12d8df5f906ba74cee4062289b9e03f7985e87c0c7e7b0ec18027299d5466d97`  Box the papers.bat
+- `e8e9309b269ab65fac2ffaaf9e978a2ad9f04c0e4d5c7c25512a130227be84c7`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -309,19 +309,30 @@ teacher-only folder is.
 boxing: that the boxing script you adapted does only what it says. Box the papers runs it with
 the teacher-only folder open to it. On a Mac it can write only into that
 assessment's folder on the teacher's side, with a temporary folder of its
-own there that is emptied after every step (never the system's temporary
-folder, which your shell reads), and it can reach no network, no local
-socket, no clipboard and no other program; on every system, anything it
-writes outside the folder it was given, in the marking folder or the
-teacher-only folder, is moved unread to the teacher's Quarantine folder and
-the step stops, saying how many. A write outside both folders is stopped on
-a Mac only; on Windows the step points the temporary folder at its own and
-cannot see a script that ignores that. A boxed paper that carries text, an
-attached file or a word from the table in its details is refused, since the
-teacher's look sees only what a page shows. What it prints reaches you
-through the runner, which withholds a line holding a word from the table
-but cannot see a name written in code. That is why the teacher looks
-through every boxed page, and why the launcher says what it moved.
+own there that is emptied when the step ends, however it ends (never the
+system's temporary folder, which your shell reads). It can reach no
+network, no local socket, no clipboard or other system service, no shared
+memory and no other program; it has no way to type into the teacher's
+window, so the teacher's yes or no is always the teacher's; and everything
+it starts is ended before the next question is asked. On every system,
+anything it writes outside the folder it was given, in the marking folder
+or the teacher-only folder, is moved unread to the teacher's Quarantine
+folder and the step stops, saying what was refused. On Windows the step
+points the temporary folder at its own and can stop nothing else. A boxed
+paper that carries text, an attached file or a word from the table in its
+details is refused, since the teacher's look sees only what a page shows.
+What it prints reaches you through the runner, which withholds a line
+holding a word from the table but cannot see a name written in code, and
+a paper's title holding other words reaches you the same way. That is why
+the teacher looks through every boxed page, and why the launcher says what
+it moved.
+
+**Why the wall matters.** The boxing script is code you adapt, and it runs
+with the original scans open. The sandbox around it is the only thing
+between that code and everything else on the computer. If that wall is
+ever found wanting again, the next step is already decided: only a fixed
+script that Plantoir ships runs with the originals, and you supply its
+settings (the label, the box), never its code.
 
 **Every script that reads the name mapping table is run through
 `run_with_names.py`, never directly.** The launchers do that: you never

@@ -254,7 +254,7 @@ def environment():
     return dict(os.environ, PLANTOIR_MARKING_NO_OPEN="1", PYTHONDONTWRITEBYTECODE="1")
 
 
-def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None, points="yes"):
+def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None, points="yes", kill_signal=signal.SIGKILL):
     """Run argv in a pseudo-terminal with echo off, answering each (prompt, reply) in turn when its prompt has
     been printed. kill_when: when this text is printed, the whole process group is killed. Returns (what was
     printed, exit status, killed)."""
@@ -292,7 +292,7 @@ def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None, points="yes
             printed += data
         text = printed.decode("utf-8", "replace")
         if kill_when is not None and not killed and kill_when in text:
-            os.killpg(pid, signal.SIGKILL)
+            os.killpg(pid, kill_signal)
             killed = True
         if points is not None and not killed and text.count(POINTS_PROMPT) > points_answered:
             points_answered += 1
@@ -1550,6 +1550,174 @@ class CheckWideningTests(unittest.TestCase):
                     found[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(found, teacher_only.SKILL_FILES)
         self.assertEqual(teacher_only.what_was_changed(self.a_class.marking), None, "a fresh class is not stopped")
+
+
+SCRATCH_NAMES = (".step scratch", "Scratch")   # this round's name, and the one before it
+
+
+class SixthRoundTests(unittest.TestCase):
+    """The independent verification of 2026-11-13: a script the step ran put "yes" into the window's input, so the
+    teacher's no became a recorded yes; a child it detached wrote after the step's checks; named semaphores and
+    System V objects carried a value out; the step's temporary folder outlived a closed window."""
+
+    def setUp(self):
+        if MISSING or not CAN_DRIVE:
+            self.skipTest(DRIVE_SKIP)
+        self.root = new_root(self)
+        self.a_class = Class(self.root / "class")
+        self.assessment_side = self.a_class.teacher_only / ASSESSMENT
+
+    def the_teacher_says_no(self):
+        return box_the_papers(self.a_class, the_folder(self.a_class, "no"))
+
+    @unittest.skipUnless(sys.platform == "darwin" or sys.platform.startswith("linux"), "TIOCSTI is a POSIX terminal call")
+    def test_the_step_cannot_answer_the_teachers_question(self):
+        import termios
+        injection = getattr(termios, "TIOCSTI", 0x80017472)
+        adapt_the_boxing(self.a_class, [
+            "import fcntl",
+            "def put(fd):",
+            "    for character in b'yes\\n':",
+            "        try:",
+            "            fcntl.ioctl(fd, " + str(injection) + ", bytes([character]))",
+            "        except OSError:",
+            "            pass",
+            "for fd in (0, 1, 2):",
+            "    put(fd)",
+            "try:",
+            "    put(os.open('/dev/tty', os.O_RDWR))",
+            "except OSError:",
+            "    pass",
+            "if os.fork() == 0:",
+            "    os.setsid()",
+            "    import time",
+            "    time.sleep(4)",
+            "    try:",
+            "        put(os.open('/dev/tty', os.O_RDWR))",
+            "    except OSError:",
+            "        pass",
+            "    os._exit(0)"])
+        printed, _status, _killed = self.the_teacher_says_no()
+        self.assertIn("Nothing was moved", printed)
+        self.assertNotIn("The teacher typed yes", printed)
+        self.assertFalse((self.a_class.marking / ASSESSMENT / "Teacher looked.json").exists(), "the yes was the script's")
+        self.assertFalse((self.a_class.marking / ASSESSMENT / "Redacted").exists())
+
+    def test_a_detached_child_is_ended_with_the_step(self):
+        marker = self.assessment_side / "MARKER-later.txt"
+        adapt_the_boxing(self.a_class, [
+            "if os.fork() == 0:",
+            "    os.setsid()",
+            "    if os.fork() == 0:",
+            "        for fd in (0, 1, 2):",
+            "            os.close(fd)",
+            "        import time",
+            "        time.sleep(10)",
+            "        open(" + repr(str(marker)) + ", 'w').write('plantoir-write-probe')",
+            "        os._exit(0)",
+            "    os._exit(0)"])
+        self.the_teacher_says_no()
+        time.sleep(11)
+        self.assertFalse(marker.exists(), "a child the step started wrote after the step ended")
+
+    def test_no_value_leaves_through_shared_system_objects(self):
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        name = ("/plantoir-probe-" + os.urandom(4).hex()).encode()
+        keys = [0x5A000000 + int.from_bytes(os.urandom(2), "big") * 4 + offset for offset in range(3)]
+
+        def clean():
+            libc.sem_unlink(name)
+            for key, get, remove in ((keys[0], lambda key: libc.shmget(key, 0, 0), lambda number: libc.shmctl(number, 0, None)),
+                                     (keys[1], lambda key: libc.msgget(key, 0), lambda number: libc.msgctl(number, 0, None)),
+                                     (keys[2], lambda key: libc.semget(key, 0, 0), lambda number: libc.semctl(number, 0, 0))):
+                number = get(key)
+                if number >= 0:
+                    remove(number)
+        self.addCleanup(clean)
+        adapt_the_boxing(self.a_class, [
+            "import ctypes",
+            "libc = ctypes.CDLL(None)",
+            "libc.sem_open.restype = ctypes.c_void_p",
+            "libc.sem_open(" + repr(name) + ", 0o1000, 0o600, 5)",
+            "libc.shmget(" + str(keys[0]) + ", 4096, 0o1000 | 0o600)",
+            "libc.msgget(" + str(keys[1]) + ", 0o1000 | 0o600)",
+            "libc.semget(" + str(keys[2]) + ", 1, 0o1000 | 0o600)",
+            "print('notify_post', libc.notify_post(b'ca.plantoir.probe') if hasattr(libc, 'notify_post') else 'none')"])
+        printed, _status, _killed = box_the_papers(self.a_class, the_folder(self.a_class, "yes"))
+        libc.sem_open.restype = ctypes.c_void_p
+        opened = libc.sem_open(name, 0)
+        self.assertIn(opened, (None, ctypes.c_void_p(-1).value), "a named semaphore made under the wall")
+        self.assertLess(libc.shmget(keys[0], 0, 0), 0, "System V shared memory")
+        self.assertLess(libc.msgget(keys[1], 0), 0, "a System V message queue outlived the step")
+        self.assertLess(libc.semget(keys[2], 0, 0), 0, "a System V semaphore set outlived the step")
+        self.assertFalse((self.a_class.marking / ASSESSMENT / "Redacted").exists(), "the step stopped:\n" + printed)
+        if sys.platform == "darwin":
+            self.assertNotIn("notify_post 0", printed, "a notify post was sent")
+
+    def scratch_left(self):
+        found = []
+        for folder in (self.a_class.teacher_only, self.assessment_side):
+            for name in SCRATCH_NAMES:
+                if (folder / name).exists():
+                    found.append(str((folder / name).relative_to(self.a_class.teacher_only)))
+        return found
+
+    def test_the_scratch_goes_when_the_window_is_closed_or_the_step_is_told_to_end(self):
+        adapt_the_boxing(self.a_class, ["import tempfile, time",
+                                        "open(os.path.join(tempfile.gettempdir(), 'MARKER.txt'), 'w').write('x')",
+                                        "print('the stand-in is waiting', flush=True)",
+                                        "time.sleep(20)"])
+        for ending in (signal.SIGHUP, signal.SIGTERM):
+            printed, _status, killed = drive(["/bin/bash", str(self.a_class.marking / "Box the papers.command")],
+                                             the_folder(self.a_class, None), self.a_class.marking,
+                                             kill_when="Boxing the papers", kill_signal=ending)
+            self.assertTrue(killed, printed)
+            time.sleep(1.5)
+            self.assertEqual(self.scratch_left(), [], f"{ending.name}:\n{printed}")
+
+    def test_a_scratch_a_kill_left_is_swept_at_the_next_step(self):
+        for folder in (self.a_class.teacher_only, self.assessment_side):
+            (folder / teacher_only.SCRATCH).mkdir(parents=True, exist_ok=True)
+            (folder / teacher_only.SCRATCH / "MARKER.txt").write_text("x", encoding="utf-8")
+        (self.a_class.marking / "Names request.json").write_text(json.dumps({"do": "check-table"}), encoding="utf-8")
+        teacher_only.names(self.a_class.marking, teacher([str(self.a_class.teacher_only)]), lambda _line: None)
+        self.assertEqual(self.scratch_left(), [])
+
+    def test_an_assessment_called_scratch_is_never_swept(self):
+        kept = self.a_class.teacher_only / "Scratch" / "Originals" / "Section 1"
+        kept.mkdir(parents=True)
+        (kept / "Student A.pdf").write_text("an original", encoding="utf-8")
+        (self.a_class.marking / "Names request.json").write_text(json.dumps({"do": "check-table"}), encoding="utf-8")
+        teacher_only.names(self.a_class.marking, teacher([str(self.a_class.teacher_only)]), lambda _line: None)
+        self.assertTrue((kept / "Student A.pdf").is_file())
+
+    def test_a_refused_write_is_named_in_the_stopped_line(self):
+        adapt_the_boxing(self.a_class, ["open('/tmp/MARKER-refused-' + str(os.getpid()) + '.txt', 'w').write('x')"])
+        printed, _status, _killed = box_the_papers(self.a_class, the_folder(self.a_class, "yes"))
+        if WALLED:
+            self.assertIn("tried to write or reach something outside the folders it was given, and was refused", printed)
+        self.assertFalse((self.a_class.marking / ASSESSMENT / "Redacted").exists())
+
+
+class EveryAllowedWriteHasARowTests(unittest.TestCase):
+
+    def test_every_write_the_profile_allows_is_named_by_a_row(self):
+        command = teacher_only.walled(["true"], [Path("/Users/someone/teacher only/Unit 1 Test")])
+        if command == ["true"]:
+            self.skipTest("no sandbox-exec here; the rows say what Windows owes")
+        profile = command[2]
+        clause = profile.split("(allow file-write*", 1)[1].split(")(", 1)[0]
+        allowed = re.findall(r'\((subpath|literal|regex) (?:#)?"([^"]*)"\)', clause)
+        named = set()
+        for row in teacher_run()["writeRoutes"]:
+            named.update(row.get("allows", []))
+        for kind, value in allowed:
+            key = "subpath:the step's folders" if kind == "subpath" else f"{kind}:{value}"
+            self.assertIn(key, named, f"the profile allows {kind} {value}, and no row says so")
+        for operation in teacher_only.SANDBOX_DENIED:
+            self.assertIn("(deny " + operation + ")", profile)
+        self.assertEqual(sorted(teacher_run()["sandboxDenies"]), sorted(teacher_only.SANDBOX_DENIED))
 
 
 class GreetingTests(unittest.TestCase):

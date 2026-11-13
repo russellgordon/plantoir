@@ -6160,6 +6160,65 @@ it, re-attack, and it ships only if that holds.
   around a step (other programs, the assistant's own among them, write
   there at the same time, and moving their files would break them).
 
+**The verification of the write routes, and what it changed (750d,
+2026-11-13).** An independent check on 8c48042fb with harmless stand-ins
+and marker files found the temporary-folder gap closed, eleven of thirteen
+`writeRoutes` rows true, and two false. The serious one: a script the step
+ran put `yes` into the window's own input with an `ioctl` (TIOCSTI) on
+`/dev/tty`, so the teacher's no became a recorded yes and the papers moved.
+The other: a named semaphore made under the wall, and System V objects,
+carried a value out. Smaller: a child that detached itself wrote six
+seconds after the step's checks; the step's temporary folder outlived a
+closed window or a SIGTERM; the names step's temporary folder was called
+`Scratch`, a legal assessment name, so its sweep could have removed that
+assessment. Russell ruled: fix these too, verify again, then it ships.
+
+- **The step can never answer the teacher's question**, structurally: its
+  standard input is `/dev/null`, its output and errors go to pipes, it runs
+  in a session of its own with no controlling terminal (so `/dev/tty`
+  cannot be opened), the wall refuses every `ioctl` and no longer allows a
+  write to `/dev/tty`, everything it started is ended before the next
+  question, and the window's input is emptied (`tcflush`) before each
+  question is read. The test injects `yes` every way it can, from the step
+  and from a detached child, while the teacher answers no.
+- **Nothing the step started outlives it.** Each step carries a token in
+  its environment and holds a lifeline pipe every child inherits; when it
+  ends, its process group and every process carrying the token are ended
+  and the lifeline must close, or the step stops with a true line. A child
+  that leaves the step's session, scrubs its environment and closes every
+  descriptor escapes all three: that needs a script written to escape, and
+  it is the limit. Such a child is still inside the wall, so it can write
+  only on the teacher's side and cannot type into the window.
+- **Every other channel** the profile allowed is denied and listed in
+  `teacherRun.sandboxDenies`: network, every system service and
+  registering one, POSIX shared memory and named semaphores, System V
+  shared memory, every `ioctl`, IOKit, signals to other programs.
+  Measured on macOS 26.6: System V message queues and semaphore sets
+  cannot be refused by a profile, so the step lists this account's System V
+  objects before and after, removes any it made, and stops. Denying
+  `sysctl-write` was REJECTED: it broke `os.uname()`, and Python with it.
+- **Devices.** Only `/dev/null` and the step's own pipes (`/dev/fd/N`) are
+  writable now. A test fails when the profile allows a write no row names.
+- **The temporary folder** is `.step scratch`, a name no assessment can
+  have (assessment names may not start with a dot). It is made inside the
+  step's `try`, so a window closed at any moment still has it emptied;
+  SIGHUP and SIGTERM end the step through its own clean-up, later signals
+  are ignored so they cannot break it off, and every step sweeps what a
+  SIGKILL left. `--tidy` cannot sweep it: it runs in the marking folder and
+  is never told the teacher-only folder.
+- **A refused write is named in the Stopped line**, not only its result.
+- **Row 6** (the clipboard and other services) says exactly what its
+  evidence is: a notify post fails, and the verification's service lookups
+  were refused; no real clipboard write was made, since it would change the
+  teacher's own Mac.
+- **The design fact these rounds exposed.** The boxing script is code the
+  assistant adapts, and it runs with the original scans open. The sandbox
+  is what stands between that code and everything else, so each round has
+  been a hole in the wall. If the wall is ever found wanting again, the
+  next step is recorded: only a fixed script that Plantoir ships runs with
+  the originals, and the assistant supplies its settings (the label, the
+  box), never its code. The skill says so.
+
 **The greeting names no marking skill (Russell, 2026-11-13, piece G).**
 "Marking and report comment writing should not be advertised when an
 agent opens in Plantoir, only within the appropriate context of a

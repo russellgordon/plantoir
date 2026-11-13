@@ -8,7 +8,7 @@ rem (teacher_only.py and run_with_names.py, in the skill folder named in "Skill 
 setlocal
 set "STEP=box"
 set "TITLE=Box the papers"
-set "TEACHER_ONLY_SHA256=d0373eba4f687175c9fbc068f0d5f4e1be32a6e19e2c19c1be93572f5b2c8a99"
+set "TEACHER_ONLY_SHA256=56501c12433616be46ff8492036969ffea6187436dab45c0034dabb6e03db99e"
 set "RUNNER_SHA256=41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb"
 title %TITLE%
 cd /d "%~dp0"
