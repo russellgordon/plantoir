@@ -1107,6 +1107,19 @@
         "couldNotShowLine": "{course} · the Planning tab showed nothing: Plantoir could not keep the plan's pages off the internet on this Mac",
         "couldNotRefreshTheLookLine": "{course} · the Planning tab could not bring the plan's look up to date: {n} file(s) could not be copied",
         "why": "#708, the 708 implementation review M1: the brief's ruling asked for a line when the Planning tab is opened, and the tab's two failures (no page can be shown; the assets mirror failed) reached only the system log, so a report of 'the Planning tab is blank' found nothing. Once per appearance of the tab (not on every return to the window), and the mirror's failure once per appearance. No title: a plan's title is the teacher's own words (rule 5), and the count is what a report needs."
+      },
+      {
+        "event": "opened a unit plan in the browser",
+        "carries": "the course and which kind of page Open in Browser handed to the default browser (the list of plans, a unit's plan, its correlation page, or another file from a unit's plan); as a further line, that the Mac could not open it - never the page's name, its unit's folder or anything written on it",
+        "line": "{course} · opened {what} in the browser",
+        "what": {
+          "allPlans": "the list of plans",
+          "plan": "a unit's plan",
+          "correlation": "a unit's correlation page",
+          "file": "a file from a unit's plan"
+        },
+        "couldNotOpenLine": "{course} · could not open {what} in the browser",
+        "why": "#803: Open in Browser on the Planning tab (unitPlanning.tab.openInBrowser) sends a plan out of Plantoir, to an app a report cannot see into, so a report of 'my plan looks wrong in Safari' or 'nothing happened' needs a line saying the button was pressed and whether the browser took the page. Written once the browser has answered. A refusal writes nothing: the button is dimmed and says why, and the alert at a click says it again. The kind of page and never its name, because a unit's folder name is made from its title, the teacher's own words (rule 5)."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -35425,7 +35438,7 @@
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
     ],
     "tab": {
-      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward and Reload, and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Sharing a plan is not part of this tab yet (#709).",
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Sharing a plan is not part of this tab yet (#709).",
       "tabCases": {
         "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
         "cases": [
@@ -35480,7 +35493,7 @@
         ]
       },
       "choiceCases": {
-        "rule": "Each case is a course folder read on the day `today`. planningFolder says whether courses/<course>/.internal/planning exists; coursePage whether it holds index.html; each of plans is a unit folder holding plan.json with exactly `file` as its text (unitPlanning.planFile), and index.html when page is true. expect.choices is the unit popup's entries in order: allPlans (the planning folder's own index.html, shown as words.allPlans) when there is a course page, then unit:<folder> for each plan read whose folder has an index.html, in UnitPlans.read's order (dated plans by firstClass, then the undated, a tie by folder name). A plan without a page is not offered, and an unreadable plan.json is left out as planFile says. An empty list is the empty tab. Accepted: the Revise greeting names every plan with a readable plan.json (greetingUnitPlans), so while an assistant is still building, or after a unit's page was deleted, the greeting can name plans that the tab does not yet offer, and the tab shows the empty offer (708 implementation review L3). The plan.json is written with the page, so the gap is short, and naming them only once a page exists would need the greeting to look for pages too. expect.startsOn is the entry the popup starts on: the offered plans in outsideAgents.greetingUnitPlans.order (covering today first, then upcoming soonest first, then past most recent first, then undated; the greeting's own order, one function on each platform, not a second ordering), and the first of them when it has a date; otherwise allPlans when offered, otherwise the first entry; null when there are none. A plan with one of its two dates is read as that one day. Each entry is labelled as greetingUnitPlans.nameForm names a plan, cut at unitNameMaxCharacters.",
+        "rule": "Each case is a course folder read on the day `today`. planningFolder says whether courses/<course>/.internal/planning exists; coursePage whether it holds index.html; each of plans is a unit folder holding plan.json with exactly `file` as its text (unitPlanning.planFile), and index.html when page is true. expect.choices is the unit popup's entries in order: allPlans (the planning folder's own index.html, shown as words.allPlans) when there is a course page, then unit:<folder> for each plan read whose folder has an index.html, in UnitPlans.read's order (dated plans by firstClass, then the undated, a tie by folder name). A plan without a page is not offered, and an unreadable plan.json is left out as planFile says. An empty list is the empty tab. Accepted: the Revise greeting names every plan with a readable plan.json (greetingUnitPlans), so while an assistant is still building, or after a unit's page was deleted, the greeting can name plans that the tab does not yet offer, and the tab shows the empty offer (708 implementation review L3). The plan.json is written with the page, so the gap is short, and naming them only once a page exists would need the greeting to look for pages too. expect.startsOn is the entry the popup starts on (#803): the offered plan that COVERS today, its firstClass on or before today and its lastClass on or after, both days included, the earliest firstClass when two do (a tie by folder name); otherwise allPlans when offered, because a teacher between units, before the first or after the last is better served by the list of every unit than by a guess (#708 started on the next unit to begin, which is rejected); otherwise, with no course page, the offered plans in outsideAgents.greetingUnitPlans.order (covering today first, then upcoming soonest first, then past most recent first, then undated; the greeting's own order, one function on each platform, not a second ordering) and the first of them; null when there are none. A plan with one of its two dates is read as that one day; a plan with neither covers no day. 'Covers' is one function on each platform, used by the greeting's order and by this, so the two cannot disagree about which unit is current. The day is the app's today in the teacher's time zone, handed in, never read from the clock in a test. Each entry is labelled as greetingUnitPlans.nameForm names a plan, cut at unitNameMaxCharacters.",
         "cases": [
           {
             "name": "today inside one plan: that plan",
@@ -35515,8 +35528,8 @@
             }
           },
           {
-            "name": "between two plans: the next to start",
-            "today": "2027-02-13",
+            "name": "the first day of a plan: that plan",
+            "today": "2027-02-15",
             "planningFolder": true,
             "coursePage": true,
             "plans": [
@@ -35547,7 +35560,211 @@
             }
           },
           {
-            "name": "after every plan: the last to end",
+            "name": "the last day of a plan: that plan",
+            "today": "2027-02-26",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "the day after a plan ends, with the next not begun: All Plans",
+            "today": "2027-02-27",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "allPlans"
+            }
+          },
+          {
+            "name": "one plan with no dates: All Plans",
+            "today": "2027-02-17",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1"
+              ],
+              "startsOn": "allPlans"
+            }
+          },
+          {
+            "name": "a plan with only its last class, on that day: that plan, though the popup lists it after the plans with a first class",
+            "today": "2027-02-12",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-2",
+                "unit:unit-1"
+              ],
+              "startsOn": "unit:unit-1"
+            }
+          },
+          {
+            "name": "nothing covers today and there is no course page: the next to start",
+            "today": "2027-02-13",
+            "planningFolder": true,
+            "coursePage": false,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-2"
+            }
+          },
+          {
+            "name": "after every plan and there is no course page: the last to end",
+            "today": "2027-04-01",
+            "planningFolder": true,
+            "coursePage": false,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "unit:unit-3"
+            }
+          },
+          {
+            "name": "between two plans: All Plans, not the next to start",
+            "today": "2027-02-13",
+            "planningFolder": true,
+            "coursePage": true,
+            "plans": [
+              {
+                "folder": "unit-1",
+                "file": "{\"unit\": \"Unit 1\", \"title\": \"Atoms and Elements\", \"firstClass\": \"2027-02-01\", \"lastClass\": \"2027-02-12\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-2",
+                "file": "{\"unit\": \"Unit 2\", \"title\": \"Chemical Reactions\", \"firstClass\": \"2027-02-15\", \"lastClass\": \"2027-02-26\"}",
+                "page": true
+              },
+              {
+                "folder": "unit-3",
+                "file": "{\"unit\": \"Unit 3\", \"title\": \"Acids and Bases\", \"firstClass\": \"2027-03-01\", \"lastClass\": \"2027-03-12\"}",
+                "page": true
+              }
+            ],
+            "expect": {
+              "choices": [
+                "allPlans",
+                "unit:unit-1",
+                "unit:unit-2",
+                "unit:unit-3"
+              ],
+              "startsOn": "allPlans"
+            }
+          },
+          {
+            "name": "after every plan: All Plans",
             "today": "2027-04-01",
             "planningFolder": true,
             "coursePage": true,
@@ -35575,11 +35792,11 @@
                 "unit:unit-2",
                 "unit:unit-3"
               ],
-              "startsOn": "unit:unit-3"
+              "startsOn": "allPlans"
             }
           },
           {
-            "name": "before every plan: the first to start",
+            "name": "before every plan: All Plans",
             "today": "2027-01-04",
             "planningFolder": true,
             "coursePage": true,
@@ -35607,7 +35824,7 @@
                 "unit:unit-2",
                 "unit:unit-3"
               ],
-              "startsOn": "unit:unit-1"
+              "startsOn": "allPlans"
             }
           },
           {
@@ -35688,7 +35905,7 @@
             }
           },
           {
-            "name": "a dated plan that has ended comes before an undated one",
+            "name": "a dated plan that has ended comes before an undated one, and nothing covers today: All Plans",
             "today": "2027-06-01",
             "planningFolder": true,
             "coursePage": true,
@@ -35710,7 +35927,7 @@
                 "unit:unit-2",
                 "unit:unit-1"
               ],
-              "startsOn": "unit:unit-2"
+              "startsOn": "allPlans"
             }
           },
           {
@@ -35765,7 +35982,7 @@
             }
           },
           {
-            "name": "a plan whose folder has no page is not offered",
+            "name": "a plan whose folder has no page is not offered, even on a day it covers: All Plans",
             "today": "2027-02-03",
             "planningFolder": true,
             "coursePage": true,
@@ -35786,7 +36003,7 @@
                 "allPlans",
                 "unit:unit-2"
               ],
-              "startsOn": "unit:unit-2"
+              "startsOn": "allPlans"
             }
           },
           {
@@ -36039,7 +36256,16 @@
         "emptyDescription": "Plan a unit with an assistant: a calendar across your sections, lesson cards, each day's materials, assessment drafts and a curriculum correlation. Once it is built, the plan shows here.",
         "revertOnPlanning": "Revert works on the Settings tab, where the changes are shown.",
         "cannotShowTitle": "Unit Plans Can’t Be Shown",
-        "cannotShowDescription": "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough."
+        "cannotShowDescription": "Plantoir could not get ready to show unit plans on this Mac. Quitting Plantoir and opening it again may be enough.",
+        "openInBrowser": "Open in Browser",
+        "openInBrowserHelp": "Open this page in your web browser",
+        "openInBrowserNothingToOpen": "There is no page to open in your browser yet.",
+        "openInBrowserOutsideThePlan": "Only a page from this course’s unit plans can be opened in your browser.",
+        "openInBrowserPageIsGone": "This page is no longer in the course’s unit plans. Reload to see what is there now.",
+        "openInBrowserCouldNotOpenTitle": "Can’t Open in Your Browser",
+        "openInBrowserCouldNotOpen": "Your Mac could not open this page in your web browser.",
+        "openInBrowserNotAPage": "Only a page of the plan or one of its PDFs can be opened in your browser.",
+        "openInBrowserNoBrowser": "No web browser is set on this Mac, so the page was not opened."
       },
       "wordsWhy": "Plain words for what a teacher sees (rule 1): no word for how it is shown, no folder name, no product the teacher has not installed. emptyDescription names no assistant because the buttons under it name only the installed ones. Nothing here says sharing: #709 adds it.",
       "saveOnPlanning": {
@@ -36063,6 +36289,35 @@
           {"name": "a file at the top that is not the list", "page": "robots.txt", "choices": ["allPlans", "unit:unit-1"], "expect": null}
         ]
       },
+      "openInBrowser": {
+        "rule": "Open in Browser, beside Reload on the Planning tab (#803), hands the page the plan is showing to the teacher's default web browser as a file: address, so a plan can be read, printed or kept open with Plantoir closed; the planning folder is hidden in Finder, so this is how a teacher reaches it. Each case is a planning folder at courses/<course>/.internal/planning, with course_config.json in the course folder beside .internal, each path in `made` made as a file (relative to the planning folder, %-escapes decoded), and each key of `links` a symbolic link pointing at its value, read from the link's own folder, as navigationCases makes them. onScreen is the page the web view is on (the web view's own address, so it follows a link the teacher clicked inside the plan); chosen is the page of the popup's entry, used only while no page has loaded. Each is a path resolved against the planning folder as a browser resolves it, or an address with its own scheme (`{planning}` in it stands for the planning folder's absolute path), or null. The order: no onScreen and no chosen is nothingToOpen; onScreen when there is one, never chosen in its place; an address that is not file:, a file: address naming a host other than localhost (#803 review L4), or a file: address that is not inside the planning folder once .. is taken out and every link on the way is followed, compared folder by folder (PlanNavigation's isInside, the rule navigationCases uses), is outsideThePlan; a file that is not a page or a PDF (extension html, htm or pdf, any case), judged both as written and as it resolves through links, is notAPage, failing closed because the folder is written by an outside assistant (#803 review L3: a script, an app or a web shortcut handed on by a browser or by the Mac would run); inside but not there now is pageIsGone; a folder is nothingToOpen; otherwise it opens, as written without its # and ? parts, at the top of the page (an anchor is not promised: an open-document event was never shown to keep one, #803 review L1). expect.opens is the path opened, written as the case writes it; expect.kind is which kind of page the trail names: allPlans (the planning folder's own index.html), plan (<unit>/index.html), correlation (<unit>/correlation.html), file (anything else). The button is dimmed while a refusal stands, and its help says words.openInBrowserHelp, or the refusal's sentence (words.openInBrowserNothingToOpen, openInBrowserOutsideThePlan, openInBrowserPageIsGone, openInBrowserNotAPage). The rule runs again at the click with the web view's address at that moment; a refusal then, or a Mac that could not open the page, is an alert titled words.openInBrowserCouldNotOpenTitle with the refusal's sentence or words.openInBrowserCouldNotOpen. The DEFAULT BROWSER is asked by name (the app that opens https: links), never whatever app opens the file's type: an .html file can belong to a text editor, a PDF to Preview, and the button says Browser. With no browser set NOTHING is opened and the alert says words.openInBrowserNoBrowser; the Mac's own app for the file's type is never used (#803 review L3). Trail: activityTrail.mustRecord 'opened a unit plan in the browser', once the browser has answered.",
+        "cases": [
+          {"name": "a unit's plan on screen", "made": ["index.html", "unit-1/index.html"], "onScreen": "unit-1/index.html", "chosen": "index.html", "expect": {"opens": "unit-1/index.html", "kind": "plan"}},
+          {"name": "the correlation page reached by a link: the page, at its top", "made": ["unit-1/index.html", "unit-1/correlation.html"], "onScreen": "unit-1/correlation.html#a2-1", "chosen": "unit-1/index.html", "expect": {"opens": "unit-1/correlation.html", "kind": "correlation"}},
+          {"name": "All Plans", "made": ["index.html"], "onScreen": "index.html", "chosen": "index.html", "expect": {"opens": "index.html", "kind": "allPlans"}},
+          {"name": "a PDF opened inside the tab", "made": ["unit-1/index.html", "unit-1/pdfs/Day 1 - Warm-up.pdf"], "onScreen": "unit-1/pdfs/Day%201%20-%20Warm-up.pdf", "chosen": "unit-1/index.html", "expect": {"opens": "unit-1/pdfs/Day%201%20-%20Warm-up.pdf", "kind": "file"}},
+          {"name": "a stylesheet is not a page", "made": ["assets/plan.css"], "onScreen": "assets/plan.css", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "nothing loaded yet: the page chosen in the popup", "made": ["unit-1/index.html"], "onScreen": null, "chosen": "unit-1/index.html", "expect": {"opens": "unit-1/index.html", "kind": "plan"}},
+          {"name": "nothing on screen and nothing chosen", "made": [], "onScreen": null, "chosen": null, "expect": {"opens": null, "refusal": "nothingToOpen"}},
+          {"name": "the page on screen has been deleted: not the chosen page instead", "made": ["index.html"], "onScreen": "unit-1/index.html", "chosen": "index.html", "expect": {"opens": null, "refusal": "pageIsGone"}},
+          {"name": "the planning folder itself", "made": ["index.html"], "onScreen": ".", "chosen": "index.html", "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "the course's settings beside the planning folder", "made": [], "onScreen": "../../course_config.json", "chosen": null, "expect": {"opens": null, "refusal": "outsideThePlan"}},
+          {"name": "a folder whose name begins with the planning folder's", "made": ["../planning-old/index.html"], "onScreen": "../planning-old/index.html", "chosen": null, "expect": {"opens": null, "refusal": "outsideThePlan"}},
+          {"name": "a shortcut inside the plan that leads out of it", "made": [], "links": {"unit-1/notes.html": "../../../course_config.json"}, "onScreen": "unit-1/notes.html", "chosen": null, "expect": {"opens": null, "refusal": "outsideThePlan"}},
+          {"name": "a shortcut inside the plan that stays in it", "made": ["index.html"], "links": {"unit-1/home.html": "../index.html"}, "onScreen": "unit-1/home.html", "chosen": null, "expect": {"opens": "unit-1/home.html", "kind": "allPlans"}},
+          {"name": "a web address", "made": [], "onScreen": "https://example.com/", "chosen": null, "expect": {"opens": null, "refusal": "outsideThePlan"}},
+          {"name": "a PDF named in capitals", "made": ["unit-1/pdfs/QUIZ.PDF"], "onScreen": "unit-1/pdfs/QUIZ.PDF", "chosen": null, "expect": {"opens": "unit-1/pdfs/QUIZ.PDF", "kind": "file"}},
+          {"name": "a Terminal script", "made": ["unit-1/run.command"], "onScreen": "unit-1/run.command", "chosen": "unit-1/index.html", "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "an app", "made": ["unit-1/Tool.app/Contents/Info.plist"], "onScreen": "unit-1/Tool.app", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "a shell script", "made": ["unit-1/tidy.sh"], "onScreen": "unit-1/tidy.sh", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "a web shortcut", "made": ["unit-1/Lesson.webloc"], "onScreen": "unit-1/Lesson.webloc", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "a file with no extension", "made": ["unit-1/notes"], "onScreen": "unit-1/notes", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "a link named like a page that leads to a script", "made": ["unit-1/run.command"], "links": {"unit-1/look.html": "run.command"}, "onScreen": "unit-1/look.html", "chosen": null, "expect": {"opens": null, "refusal": "notAPage"}},
+          {"name": "a file address naming another machine", "made": ["index.html"], "onScreen": "file://evil.example{planning}/index.html", "chosen": null, "expect": {"opens": null, "refusal": "outsideThePlan"}},
+          {"name": "a file address naming this Mac as localhost", "made": ["index.html"], "onScreen": "file://localhost{planning}/index.html", "chosen": null, "expect": {"opens": "file://localhost{planning}/index.html", "kind": "allPlans"}}
+        ],
+        "measured": "2026-11-12, #803: a plan made from the shipped template (template/ copied whole, the unit's Files row written as the template's PATTERN comment shows, its two PDFs made) opened from file: addresses with no web server, in headless Chromium 153.0.8010.12, WebKit 26.6 and Firefox 155.0 (playwright-core 1.63, macOS arm64): on each of All Plans, the unit's plan and its correlation page the stylesheet applied, all 19 @font-face faces loaded when each was asked to load, the body set in IBM Plex Sans and the title in IBM Plex Serif, every request a file: one (Chromium and WebKit report them; Firefox reports none for file:), and every link between pages followed by a real click arrived with its stylesheet applied. Each PDF link resolved to its file: WebKit opened it in a new page, and headless Chromium and Firefox, which have no PDF viewer, downloaded it under its real name. Nothing in the template or the app needed changing. Not measured: Safari itself (Playwright's WebKit is the engine, not the sandboxed app), and the PDF viewers of Chrome and Firefox with a window. Russell's hand test checks them: from a course inside ~/Desktop, Open in Browser in Safari on a unit's plan shows its fonts and stylesheet, and its links to the correlation page and a PDF work."
+      },
       "whenItLooksAgain": "When the tab appears, when the window becomes key (the teacher comes back from the terminal where the assistant was building), when a unit is chosen, and on Reload: each time it reads the planning folder again and shows the chosen unit, reloaded from the disk. No file watcher and no timer.",
       "assetsMirror": {
         "rule": "Each time the tab looks again, before the page loads, <planning folder>/assets is made the same as the template's assets in the app's own copy of support/agent_guidance (skills/plantoir-unit-planning/template/assets): changed files copied, missing ones added, extra ones removed. Only when the planning folder already exists: opening the tab never makes one. Never when the planning folder, or its assets, is a symbolic link: the mirror removes extra files, and through a link it would remove them from a folder that is not the plan's (708 implementation review L2, measured). A failure is logged, written on the trail (trail) and changes nothing on screen.",
@@ -36072,7 +36327,7 @@
         "rule": "A plan is written by an outside assistant, so its pages are content the app did not write. The tab shows LOCAL files only. Three guards: (1) the page process may read the planning folder alone, never the course (the mac's loadFileURL allowingReadAccessTo: the planning folder), so a picture, a stylesheet or a frame pointing outside it loads nothing; (2) navigationCases, on every navigation in every frame; (3) no JavaScript (the template has none), no website data kept between views, and every load that is not a file one blocked (the mac's WKContentRuleList), so nothing on the page reaches the network. If the block cannot be put in place no page is shown, and the tab says cannotShowTitle. The 'only on a click' of navigationCases rests on (3): measured (708 implementation review L1), a script's click() on a link reaches the decision as a click, so turning page scripts on would reopen it.",
         "why": "navigationCases covers where a page may GO; a page also LOADS things (pictures, fonts, frames) that no navigation decision sees, so the folder-only read access and the network block are what stop those. Windows owes the same three in its own terms (WebView2: a virtual host mapped onto the planning folder alone, scripts off, and a WebResourceRequested filter that refuses anything else)."
       },
-      "trail": "Each time the tab appears it writes activityTrail.mustRecord 'looked at a course's unit plans' once: the course and how many unit plans it offered, or that it had nothing to show, or, when no plan can be shown, the could-not-show line in place of the count (708 fix review L3) (the 708 implementation review, M1: the brief's ruling asked for a line when the tab is opened). The same event writes a line when no plan can be shown at all (the rule list of whatAPageMayRead could not be made, and the tab says cannotShowTitle) and, once per appearance, when the assets mirror failed, so a report of a blank or odd-looking tab has a line to start from. Plan a Unit's door writes 'asked an assistant to plan a unit'. Choosing a unit, Back, Forward and Reload write nothing: they change nothing. No line ever carries a plan's title or anything in it: it is the teacher's own words, and the count is what a report needs.",
+      "trail": "Each time the tab appears it writes activityTrail.mustRecord 'looked at a course's unit plans' once: the course and how many unit plans it offered, or that it had nothing to show, or, when no plan can be shown, the could-not-show line in place of the count (708 fix review L3) (the 708 implementation review, M1: the brief's ruling asked for a line when the tab is opened). The same event writes a line when no plan can be shown at all (the rule list of whatAPageMayRead could not be made, and the tab says cannotShowTitle) and, once per appearance, when the assets mirror failed, so a report of a blank or odd-looking tab has a line to start from. Plan a Unit's door writes 'asked an assistant to plan a unit'. Open in Browser writes 'opened a unit plan in the browser' (#803): the course and which kind of page, never its name. Choosing a unit, Back, Forward and Reload write nothing: they change nothing. No line ever carries a plan's title or anything in it: it is the teacher's own words, and the count is what a report needs.",
       "rejected": [
         "a TabView: a different control from the section's Website | Problems switch for the same job, and it would decide for itself what each tab keeps; the page decides instead (only the chosen tab drawn, the draft in the model)",
         "Planning drawn over the settings form, mounted or disabled: measured, a focused field, the footer box and a table kept the keyboard under the plan, and a Space or a paste edited the footer out of sight (708 implementation review H1, 708 fix review H1)",
@@ -36083,7 +36338,14 @@
         "a file watcher or a timed refresh: coming back to the window is the moment a teacher expects what changed, and a delay would paper over a race",
         "making the planning folder when the tab opens: an empty folder would then be backed up for nothing",
         "the date range beside each unit in the popup: the plan page shows its dates, and a date written in a menu would need its own rule on both platforms",
-        "JavaScript on: the template needs none, and a plan's page that ran scripts could do more than the three guards can see"
+        "JavaScript on: the template needs none, and a plan's page that ran scripts could do more than the three guards can see",
+        "starting on the next unit to begin when none covers today, as #708 shipped (#803, Russell 2026-11-12): between units, before the first or after the last, the list of every unit is the better place to land than a guess at which one the teacher meant",
+        "Open in Browser opening the page with whatever app opens its file type (#803): an .html file can belong to a text editor on a teacher's Mac, and a PDF to Preview; the default browser is asked by name, and with none set nothing is opened (#803 review L3: the Mac's choice of app would RUN a .command file)",
+        "Open in Browser handing the browser any file in the planning folder (#803 review L3): the folder is written by an outside assistant, and a script, an app or a web shortcut has no place in a plan; only pages and PDFs go",
+        "Open in Browser keeping the page's # anchor (#803 review L1): handed to the browser as an open-document event, an anchor was never shown to survive, so the page opens at its top rather than promising a place it may not reach",
+        "Open in Browser opening the unit chosen in the popup rather than the page on screen (#803): after a link to the correlation page or a PDF, the teacher means what they are looking at",
+        "Open in Browser serving the plan over a local web server (#803): measured, every page, stylesheet, font and PDF resolves from a file: address in Chromium, WebKit and Firefox, and a server would have to be running for the page to open",
+        "the trail naming the unit or the page Open in Browser opened (#803): a unit's folder name is made from its title, the teacher's own words; the kind of page is what a report needs"
       ]
     }
   },

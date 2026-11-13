@@ -307,6 +307,13 @@ nonisolated enum ActivityTrail {
         /// date. Never a plan's title or anything in it. Once per appearance,
         /// so a report of "the Planning tab is blank" has a line to start from.
         case lookedAtUnitPlans = "looked at a course's unit plans"
+        /// Open in Browser on a course's Planning tab handed a page of the
+        /// plan to the default browser (#803, `PlanInTheBrowser`): the course
+        /// and which kind of page (the list of plans, a unit's plan, its
+        /// correlation page, another file), never its name or anything on
+        /// it; or, as a line of the same event, that the Mac could not open
+        /// it. Written once the browser has answered.
+        case openedAUnitPlanInTheBrowser = "opened a unit plan in the browser"
         /// A section's Coverage tab appeared (#793, `CoverageTabTrail`): how
         /// many maps, expectations and not yet addressed, when the map was
         /// made and whether pages changed since; or that there was no map,
