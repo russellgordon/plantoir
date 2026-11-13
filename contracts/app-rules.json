@@ -935,6 +935,22 @@
       {
         "expectRequest" : "",
         "prompt" : "Where do I find this?"
+      },
+      {
+        "expectRequest" : "unitPlanUsername",
+        "prompt" : "Choose a username for these unit plans: "
+      },
+      {
+        "expectRequest" : "unitPlanUsername",
+        "prompt" : "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: "
+      },
+      {
+        "expectRequest" : "unitPlanPassword",
+        "prompt" : "Choose a password for these unit plans (8 to 64 characters): "
+      },
+      {
+        "expectRequest" : "unitPlanPassword",
+        "prompt" : "Please choose a password of 8 to 64 letters, digits, spaces or symbols: "
       }
     ],
     "everyRequest" : [
@@ -972,6 +988,16 @@
         "expectLink" : "",
         "expectSecret" : false,
         "name" : "siteNameConflict"
+      },
+      {
+        "expectLink" : "",
+        "expectSecret" : false,
+        "name" : "unitPlanUsername"
+      },
+      {
+        "expectLink" : "",
+        "expectSecret" : true,
+        "name" : "unitPlanPassword"
       }
     ],
     "everyRequestNote" : "An account ID is not a secret and is shown as it is typed; a token is, and is not. Getting that backwards either puts a live credential on a screen a class can see, or hides a code the teacher needs to check they pasted correctly.",

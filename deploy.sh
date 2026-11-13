@@ -700,6 +700,7 @@ usage() {
   cat <<USAGE
 🧰 Usage:
   ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
+  ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
 
 Examples:
   ${SELF_CMD} ICS3U 1
@@ -726,6 +727,13 @@ Notes:
 - --image REF deploys using a particular already-built image; normally the
   image is built locally from this folder's recipe when missing.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
+- With --plans in place of the section number, the course's unit plans
+  (courses/<COURSE>/.internal/planning) are shared through Cloudflare Pages as
+  a small website of their own for this school year (#709). --protect asks
+  for a username and password before any page opens, and stays on until
+  --remove-password; --change-password chooses a new one; --include-answer-keys
+  keeps answer keys in a share without a password; --stop-sharing deletes the
+  year's site (--year chooses an earlier school year, by the year it began).
 USAGE
 }
 
@@ -752,7 +760,19 @@ fi
 if [[ $# -lt 2 ]]; then usage; exit 1; fi
 
 COURSE_CODE="$1"; shift
-SECTION_NUM="$1"; shift
+# `deploy.sh <CODE> --plans …` shares the course's unit plans (#709) rather
+# than deploying a section: --plans takes the section number's place, and
+# every step below that is about a section's built site is skipped in this
+# mode (PLANS_MODE). Everything else - the reference-course refusal, the
+# Cloudflare token and account, the website builder - is the same code.
+PLANS_MODE="false"
+if [[ "$1" == "--plans" ]]; then
+  PLANS_MODE="true"
+  SECTION_NUM=""
+  shift
+else
+  SECTION_NUM="$1"; shift
+fi
 
 # A course code may not begin with a dot, and the refusal is here rather than
 # in a comment claiming it cannot happen. Plantoir builds a reference course
@@ -939,8 +959,28 @@ TARGET="netlify"
 # destination comes from the course's own settings (#668, below).
 TARGET_WAS_GIVEN="false"
 ACCOUNT_ARG=""
+# Sharing unit plans (#709): every one of these is refused without --plans.
+PLAN_PROTECT="false"
+PLAN_REMOVE_PASSWORD="false"
+PLAN_CHANGE_PASSWORD="false"
+PLAN_ANSWER_KEYS="false"
+PLAN_STOP="false"
+PLAN_YEAR=""
+PLAN_FLAG_SEEN=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --protect) PLAN_PROTECT="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --remove-password) PLAN_REMOVE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --change-password) PLAN_CHANGE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --include-answer-keys) PLAN_ANSWER_KEYS="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --stop-sharing) PLAN_STOP="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --year)
+      if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
+      PLAN_YEAR="$2"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:---year}"; shift ;;
+    --year=*)
+      PLAN_YEAR="${1#*=}"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:---year}" ;;
+    --plans)
+      echo "❌ --plans goes straight after the course code, in place of the section number."; exit 1 ;;
     --target)
       if [[ $# -lt 2 ]]; then echo "❌ Missing value for $1"; echo; usage; exit 1; fi
       TARGET_WAS_GIVEN="true"
@@ -985,6 +1025,45 @@ if [[ "$TARGET" != "netlify" && "$TARGET" != "cloudflare" ]]; then
   echo
   usage
   exit 1
+fi
+
+# ---- Sharing unit plans: what --plans may be given (#709) ----
+# The refusals' sentences are contracts/shared-rules.json ->
+# unitPlanning.share.refusals (netlifyNever, notToAFolder), written here as
+# the contract spells them; scripts/test_deploy_sh_plans.py compares them.
+if [[ "$PLANS_MODE" != "true" && -n "$PLAN_FLAG_SEEN" ]]; then
+  echo "❌ ${PLAN_FLAG_SEEN} is for sharing unit plans: use it with --plans."
+  exit 1
+fi
+if [[ "$PLANS_MODE" == "true" ]]; then
+  if [[ -n "$TO_FOLDER" ]]; then
+    echo "❌ Unit plans are shared through Cloudflare Pages, not to a folder."
+    exit 1
+  fi
+  if [[ "$TARGET_WAS_GIVEN" == "true" && "$TARGET" == "netlify" ]]; then
+    echo "❌ Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password."
+    exit 1
+  fi
+  if [[ "$PLAN_PROTECT" == "true" && "$PLAN_REMOVE_PASSWORD" == "true" ]]; then
+    echo "❌ --protect and --remove-password cannot be given together."
+    exit 1
+  fi
+  if [[ "$PLAN_STOP" == "true" && ( "$PLAN_PROTECT" == "true" || "$PLAN_REMOVE_PASSWORD" == "true" || "$PLAN_CHANGE_PASSWORD" == "true" || "$PLAN_ANSWER_KEYS" == "true" ) ]]; then
+    echo "❌ --stop-sharing cannot be given with a flag that shares."
+    exit 1
+  fi
+  if [[ "$RESET_TOKEN" == "true" || -n "$DIAGNOSE" || -n "$TEAM_SLUG" ]]; then
+    echo "❌ --reset-token, --diagnose and --team are for deploying a section, not for --plans."
+    exit 1
+  fi
+  if [[ -n "$PLAN_YEAR" && ! "$PLAN_YEAR" =~ ^[0-9]{4}$ ]]; then
+    echo "❌ --year takes the year a school year began in, such as 2026."
+    exit 1
+  fi
+  # Unit plans go to Cloudflare Pages and nowhere else (Russell, 2026-11-12),
+  # whatever the course's own settings say, so the saved-destination legs
+  # below (#668) are never read in this mode.
+  TARGET="cloudflare"
 fi
 
 # ---- Where this course deploys, when no destination was typed (#668) ----
@@ -1140,7 +1219,7 @@ the_one_saved_destination() {
 }
 # END saved_destinations
 
-if [[ "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
+if [[ "$PLANS_MODE" != "true" && "$TARGET_WAS_GIVEN" != "true" && -z "$TO_FOLDER" && -f "$_course_config" ]]; then
   if ! _saved_destinations="$(the_saved_destinations "$_course_config" 2>/dev/null)" \
      || [[ -z "$_saved_destinations" ]]; then
     echo ""
@@ -1320,6 +1399,32 @@ refuse_while_this_section_deploys() {
 }
 # <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<
 
+# ---- A course's unit plans being shared are not shared again (#709) ----
+# The same reader as the guard above, asked about the place "<COURSE> --PLANS":
+# a launcher's own words are compared upper-cased, so `deploy.sh C --plans …`
+# is that place, and `deploy.sh C 1` is not (and the other way round, so a
+# share never stops a section's deploy). Its own function, after the guard's
+# block, because that block is kept identical in deploy.sh and preview.sh.
+# The sentence is contracts/shared-rules.json -> unitPlanning.share.refusals
+# .stillSharing; the trail line is the "unit plan share refused" event's.
+refuse_while_these_plans_share() {
+  local course="$1"
+  what_is_deploying_this_section "$course" "--PLANS" >/dev/null || return 0
+  echo ""
+  echo "❌ These unit plans are already being shared, so they cannot be shared again until that has finished."
+  echo "   Nothing was changed."
+  echo ""
+  note_on_the_trail "${course} · unit plans not shared: they were already being shared"
+  exit 1
+}
+
+if [[ "$PLANS_MODE" == "true" ]]; then
+  refuse_while_these_plans_share "$COURSE_CODE"
+fi
+
+# In plans mode the section is empty, which names no place, so this asks
+# nothing of it; the block is kept as it was because
+# scripts/test_deploy_while_its_section_deploys.py reads it whole.
 if [[ "$RESET_TOKEN" != "true" ]]; then
   refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy
 fi
@@ -1505,7 +1610,7 @@ why_this_deploy_builds_first() {
 }
 # END why_this_deploy_builds_first
 _REBUILD_FOR=""
-if [[ "$RESET_TOKEN" != "true" ]]; then
+if [[ "$RESET_TOKEN" != "true" && "$PLANS_MODE" != "true" ]]; then
   _ASKED_COURSE="$(pwd)/courses/${COURSE_CODE}"
   _ASKED_SECTION="${_ASKED_COURSE}/.merged_output/section${SECTION_NUM}"
   _REBUILD_FOR="$(why_this_deploy_builds_first "${_ASKED_COURSE}" "${_ASKED_SECTION}" "$IMAGE")" || _REBUILD_FOR=""
@@ -1513,7 +1618,11 @@ fi
 # Settled before the paths below are read: MERGED_DIR_HOST and everything
 # under it resolve THROUGH the link, and a course still holding a real
 # .merged_output folder has to be moved out before the preflight looks.
-link_course_build_output "$COURSE_CODE"
+# Not for --plans: a share stages a folder of its own inside the website
+# builder and never reads the course's build output.
+if [[ "$PLANS_MODE" != "true" ]]; then
+  link_course_build_output "$COURSE_CODE"
+fi
 
 # Host-side paths (bind-mounted into the container at /teaching/courses)
 COURSE_DIR_HOST="$(pwd)/courses/${COURSE_CODE}"
@@ -1540,7 +1649,7 @@ if [[ ! -d "${COURSE_DIR_HOST}" ]]; then
   exit 1
 fi
 
-if [[ ! -d "${SECTION_DIR_HOST}" ]]; then
+if [[ "$PLANS_MODE" != "true" && ! -d "${SECTION_DIR_HOST}" ]]; then
   echo "❌ Section directory not found on host:"
   echo " ${SECTION_DIR_HOST}"
   echo
@@ -1558,7 +1667,10 @@ if [[ ! -d "${SECTION_DIR_HOST}" ]]; then
 fi
 
 _BUILT_FOUND="false"
+# A share has no built site to wait for (#709).
+if [[ "$PLANS_MODE" == "true" ]]; then _BUILT_FOUND="true"; fi
 for ((_i=0; _i<10; _i++)); do
+  [[ "$_BUILT_FOUND" != "true" ]] || break
   if [[ -d "${PUBLIC_DIR_HOST}" && -n "$(ls -A "${PUBLIC_DIR_HOST}" 2>/dev/null || true)" ]]; then
     _BUILT_FOUND="true"
     break
@@ -2354,6 +2466,96 @@ MSG
   TOKEN="$pasted"
   echo "✅ Saved token to macOS Keychain (service: ${KEYCHAIN_SERVICE})."
 fi
+fi
+
+# -------------------- A unit plan's username and password (#709) --------
+# A protected share asks colleagues for a username and password before any
+# page opens. They are the teacher's choice, kept in the Keychain as one item
+# per course (across school years, so a colleague keeps one password):
+# service containerized-quartz-unit-plan, account <folder id>/<COURSE>, secret
+# username:password. The rules are contracts/shared-rules.json ->
+# unitPlanning.share.credential. They reach the website builder through a
+# pipe into a file only the user can read, which share_plan.py deletes as soon
+# as it has read it; never argv beyond the Keychain store's instant (as the
+# tokens' are), never an environment variable, never printed.
+PLAN_KEYCHAIN_SERVICE="containerized-quartz-unit-plan"
+PLAN_KEYCHAIN_ACCOUNT="${WORKDIR_ID}/${COURSE_CODE}"
+PLAN_CRED=""
+PLAN_SHARE_PROTECTED="false"
+
+get_plan_credential_keychain() {
+  /usr/bin/security find-generic-password -s "$PLAN_KEYCHAIN_SERVICE" -a "$PLAN_KEYCHAIN_ACCOUNT" -w 2>/dev/null || true
+}
+set_plan_credential_keychain() {
+  /usr/bin/security add-generic-password -U -s "$PLAN_KEYCHAIN_SERVICE" -a "$PLAN_KEYCHAIN_ACCOUNT" -w "$1" >/dev/null
+}
+delete_plan_credential_keychain() {
+  /usr/bin/security delete-generic-password -s "$PLAN_KEYCHAIN_SERVICE" -a "$PLAN_KEYCHAIN_ACCOUNT" >/dev/null 2>&1 || true
+}
+
+# The school year a share is for: the year it began, rolling over on
+# 1 August (unitPlanning.share.schoolYear), worked out HERE on the Mac's own
+# clock and handed to share_plan.py, so a share late on 31 July is not given
+# another year by the website builder's clock, which is UTC.
+the_plans_school_year() {
+  local year month
+  year="$(date +%Y)"
+  month="$(date +%m)"
+  if (( 10#$month >= 8 )); then echo "$year"; else echo "$((year - 1))"; fi
+}
+
+# Whether the year's marker last asked for protection: a share with neither
+# --protect nor --remove-password keeps it (modeCases). Plain grep, no JSON
+# reader: share_plan.py writes the marker with json.dumps, one key a line.
+# BEGIN the_plans_were_protected
+the_plans_were_protected() {
+  local marker="$1"
+  [[ -f "$marker" ]] || return 1
+  grep -Eq '"asked"[[:space:]]*:[[:space:]]*"protected"' "$marker" 2>/dev/null && return 0
+  grep -Eq '"protected"[[:space:]]*:[[:space:]]*true' "$marker" 2>/dev/null
+}
+# END the_plans_were_protected
+
+ask_for_the_plan_credential() {
+  local username password
+  assert_can_ask "Choose a username for these unit plans" "Share these unit plans once from Plantoir, where you can choose a username and password. They are saved afterwards."
+  echo ""
+  echo "Colleagues will be asked for this username and password before the plans open."
+  echo "Choose ones made for them, not the password to your own accounts."
+  read -rp "Choose a username for these unit plans: " username
+  while [[ ! "$username" =~ ^[A-Za-z0-9._-]{1,32}$ ]]; do
+    read -rp "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: " username
+  done
+  read -rsp "Choose a password for these unit plans (8 to 64 characters): " password; echo
+  while ! printf '%s' "$password" | LC_ALL=C grep -Eq '^[ -~]{8,64}$'; do
+    read -rsp "Please choose a password of 8 to 64 letters, digits, spaces or symbols: " password; echo
+  done
+  PLAN_CRED="${username}:${password}"
+  set_plan_credential_keychain "$PLAN_CRED"
+  echo "✅ Saved the username and password for these unit plans in the macOS Keychain."
+}
+
+if [[ "$PLANS_MODE" == "true" ]]; then
+  if [[ -z "$PLAN_YEAR" ]]; then PLAN_YEAR="$(the_plans_school_year)"; fi
+  PLAN_MARKER_HOST="courses/${COURSE_CODE}/.cloudflare_sites/plans-${PLAN_YEAR}.json"
+  if [[ "$PLAN_STOP" != "true" ]]; then
+    if [[ "$PLAN_PROTECT" == "true" ]]; then
+      PLAN_SHARE_PROTECTED="true"
+    elif [[ "$PLAN_REMOVE_PASSWORD" != "true" ]] && the_plans_were_protected "$PLAN_MARKER_HOST"; then
+      PLAN_SHARE_PROTECTED="true"
+    fi
+    if [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
+      if [[ "$PLAN_CHANGE_PASSWORD" != "true" ]]; then
+        PLAN_CRED="$(get_plan_credential_keychain)"
+      fi
+      if [[ -z "$PLAN_CRED" ]]; then
+        ask_for_the_plan_credential
+      fi
+    elif [[ "$PLAN_CHANGE_PASSWORD" == "true" ]]; then
+      echo "❌ --change-password is for unit plans shared with a password: add --protect."
+      exit 1
+    fi
+  fi
 fi
 
 # ==================== Container runtime (Colima) ====================
@@ -4463,8 +4665,13 @@ retire_legacy_container() {
   docker rm "$id" >/dev/null 2>&1 || true
 }
 # <<< PREVIEW PORT BLOCK <<<
-# Where the refusal above is filed on the trail: this run's course and section.
-WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"
+# Where the refusal above is filed on the trail: this run's course and section,
+# or the course's unit plans (#709).
+if [[ "$PLANS_MODE" == "true" ]]; then
+  WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/plans"
+else
+  WORKSPACE_TRAIL_PLACE="${COURSE_CODE}/${SECTION_NUM}"
+fi
 
 
 run_container_with_mount() {
@@ -4581,14 +4788,69 @@ else
   run_container_with_mount
 fi
 
-SECTION_DIR_IN_CONTAINER="/teaching/courses/${COURSE_CODE}/.merged_output/section${SECTION_NUM}"
-echo "🚀 Deploying ${COURSE_CODE} S${SECTION_NUM} from: ${SECTION_DIR_IN_CONTAINER}"
+if [[ "$PLANS_MODE" == "true" ]]; then
+  if [[ "$PLAN_STOP" == "true" ]]; then
+    echo "🚀 Stopping sharing ${COURSE_CODE}'s unit plans"
+  else
+    echo "🚀 Sharing ${COURSE_CODE}'s unit plans"
+  fi
+else
+  SECTION_DIR_IN_CONTAINER="/teaching/courses/${COURSE_CODE}/.merged_output/section${SECTION_NUM}"
+  echo "🚀 Deploying ${COURSE_CODE} S${SECTION_NUM} from: ${SECTION_DIR_IN_CONTAINER}"
+fi
 
 # --- Securely inject token into container without exposing on host CLI ---
 if [[ "$TARGET" == "cloudflare" ]]; then
   printf %s "$CF_TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
 else
   printf %s "$TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
+fi
+
+# ---- Sharing unit plans (#709): share_plan.py, then the Keychain ----------
+# The username and password go the way the token does, through a pipe into a
+# file only the user can read; share_plan.py reads it once and deletes it. The
+# Keychain item is deleted only after share_plan.py succeeded: by
+# --remove-password, and by --stop-sharing when no school year of the course
+# is still shared.
+if [[ "$PLANS_MODE" == "true" ]]; then
+  if [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
+    printf %s "$PLAN_CRED" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/plan_cred'  # never shown to a teacher: piped into the website builder, never printed
+  fi
+  PLAN_CRED=""
+  if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
+  _plan_opts=(--year "$PLAN_YEAR")
+  if [[ "$PLAN_STOP" == "true" ]]; then
+    _plan_opts+=(--stop)
+  elif [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
+    _plan_opts+=(--protect)
+  elif [[ "$PLAN_REMOVE_PASSWORD" == "true" ]]; then
+    _plan_opts+=(--remove-password)
+  fi
+  if [[ "$PLAN_ANSWER_KEYS" == "true" && "$PLAN_STOP" != "true" ]]; then _plan_opts+=(--include-answer-keys); fi
+  if [[ "$NON_INTERACTIVE" == "true" ]]; then _plan_opts+=(--non-interactive); fi
+  _share_rc=0
+  docker exec $_EXEC_TTY \
+    -e HOST_TZ_OFFSET="${HOST_TZ_OFFSET}" \
+    -e CF_ACCOUNT="${CF_ACCOUNT}" \
+    -e PLAN_COURSE="${COURSE_CODE}" \
+    "$CONTAINER_NAME" \
+    sh -lc 'tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
+      CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
+        python3 /opt/scripts/share_plan.py --host-os mac --course "$PLAN_COURSE" "$@"' \
+    share_plan "${_plan_opts[@]}" || _share_rc=$?
+  if [[ "$_share_rc" -eq 0 ]]; then
+    if [[ "$PLAN_REMOVE_PASSWORD" == "true" && "$PLAN_STOP" != "true" ]]; then
+      delete_plan_credential_keychain
+    fi
+    if [[ "$PLAN_STOP" == "true" ]]; then
+      _still_shared="false"
+      for _marker in "courses/${COURSE_CODE}/.cloudflare_sites"/plans-*.json; do
+        [[ -e "$_marker" ]] && _still_shared="true"
+      done
+      if [[ "$_still_shared" != "true" ]]; then delete_plan_credential_keychain; fi
+    fi
+  fi
+  exit "$_share_rc"
 fi
 
 # Ask for a terminal only when there is one: `docker exec -t` refuses to start
