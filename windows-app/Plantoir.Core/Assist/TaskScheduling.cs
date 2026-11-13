@@ -632,6 +632,14 @@ public static class TaskScheduling
                 "  } catch { }",
                 "}",
                 "",
+                "# One line on the teacher's activity trail, for this run's own build",
+                "# (#799). deploy.ps1's Write-TrailLine, copied byte for byte and pinned",
+                "# so (BuildBeforeDeployingQuestion.TrailWriterLines).",
+            };
+            lines.AddRange(BuildBeforeDeployingQuestion.TrailWriterLines);
+            lines.AddRange(new[]
+            {
+                "",
                 "# ---- Fingerprint the section BEFORE anything runs -----------------------",
                 "# Matches the mac's launchd path: the fingerprint is taken right before the",
                 "# deploy actually happens, not when the teacher scheduled it, so an edit made",
@@ -660,18 +668,65 @@ public static class TaskScheduling
                 "  }",
                 "} catch { $fingerprint = $null }",
                 "",
-                "# ---- Build first, always -----------------------------------------------",
-                "# A scheduled deploy had NO build step at all: it published whatever",
-                "# happened to be in the builds folder, however old, and if nothing was",
-                "# there it failed. The mac's launchd script has always tested freshness",
-                "# and rebuilt when stale; this side simply never did.",
+                "# ---- Build first, when something asks for it (#799) ----------------------",
+                "# A scheduled deploy had NO build step at all once: it published whatever",
+                "# happened to be in the builds folder, however old. Then it built",
+                "# unconditionally, every night. Since Russell's ruling of 2026-11-13 it",
+                "# follows #768 like every other way of deploying: it asks the shared",
+                "# Python (the reader deploy.ps1 and deploy.py ask, not a third copy in",
+                "# shell) whether anything changed since the build that made the site,",
+                "# in the same order of reasons - a preview's site first, then the",
+                "# toolchain, then the pages and the clock - and builds only when the",
+                "# answer is not a plain 'reuse'. ANY failure of the question builds: a",
+                "# needless build costs a minute overnight, a reused stale one publishes",
+                "# last week's site and says it succeeded. A section with no front page",
+                "# is built without asking. The build writes the trail line 'site built",
+                "# again before deploying' with its reason, once; deploy.ps1 then asks",
+                "# for itself, finds the build current and writes nothing.",
                 "#",
-                "# Unconditionally, rather than repeating the freshness test in shell.",
-                "# This runs while the teacher is asleep, so a minute of rebuilding that",
-                "# was not strictly needed costs nothing, and a freshness test written a",
-                "# THIRD time — after the app's and the launcher's — is a third thing to",
-                "# drift. --build-only also stops any preview still serving this section,",
-                "# so it cannot overwrite what is about to go out.",
+                "# A night that reuses the last build runs no build, so it captures no",
+                "# folder findings: the record an earlier build left still describes",
+                "# the site being deployed, and stays. --build-only, when it runs, also",
+                "# stops any preview still serving this section; a preview's site always",
+                "# answers 'preview', so it is never reused.",
+                $"$sectionDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolder), courseCode, "section" + section))}",
+                "$buildReason = 'toolchain'",
+                "if (-not (Test-Path -LiteralPath (Join-Path $sectionDir 'public\\index.html'))) {",
+                $"  $buildReason = {PsQuote(BuildFreshness.ReasonNeverBuilt)}",
+                "} elseif ($pythonExe -and $scriptsDir -and (Test-Path -LiteralPath $pythonExe)) {",
+                "  $whyCheck = @'",
+            });
+            lines.AddRange(BuildBeforeDeployingQuestion.PythonLines);
+            lines.AddRange(new[]
+            {
+                "'@",
+                // The variables the reader needs to name THIS toolchain exactly
+                // as the launchers do (Enter-NativeRuntime: .toolchain when it
+                // has scripts, else the working folder; the id remembered under
+                // the builds root), set for the question and put back after it.
+                "  $askBase = Split-Path -Parent $scriptsDir",
+                "  $askNames = @('PLANTOIR_SCRIPTS_DIR', 'PLANTOIR_SUPPORT_DIR', 'PLANTOIR_CONTRACTS_DIR', 'PLANTOIR_QUARTZ_DIR', 'PLANTOIR_BUILD_ROOT', 'PYTHONUTF8')",
+                "  $askSaved = @{}",
+                "  foreach ($askName in $askNames) { $askSaved[$askName] = [Environment]::GetEnvironmentVariable($askName) }",
+                "  try {",
+                "    $env:PLANTOIR_SCRIPTS_DIR = $scriptsDir",
+                "    $env:PLANTOIR_SUPPORT_DIR = Join-Path $askBase 'support'",
+                "    $env:PLANTOIR_CONTRACTS_DIR = Join-Path $askBase 'contracts'",
+                "    $env:PLANTOIR_QUARTZ_DIR = Join-Path $nativeRuntime 'quartz'",
+                $"    $env:PLANTOIR_BUILD_ROOT = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolder)))}",
+                "    $env:PYTHONUTF8 = '1'",
+                "    $global:LASTEXITCODE = 1",
+                $"    $whyAnswer = (& $pythonExe -c $whyCheck $scriptsDir {PsQuote(courseDirectory)} $sectionDir) -join ''",
+                "    if ($LASTEXITCODE -eq 0) {",
+                "      $whyAnswer = $whyAnswer.Trim()",
+                "      if ($whyAnswer -ceq 'reuse') { $buildReason = $null }",
+                $"      elseif (@({string.Join(", ", BuildBeforeDeployingQuestion.Reasons.Select(PsQuote))}) -ccontains $whyAnswer) {{ $buildReason = $whyAnswer }}",
+                "    }",
+                "  } catch { $buildReason = 'toolchain' } finally {",
+                "    foreach ($askName in $askNames) { [Environment]::SetEnvironmentVariable($askName, $askSaved[$askName]) }",
+                "  }",
+                "}",
+                "",
                 "#",
                 "# The build's output is CAPTURED, because the folder checks run inside it",
                 "# and print PLANTOIR_HEALTH: lines that nothing would otherwise read: this",
@@ -710,7 +765,13 @@ public static class TaskScheduling
                 "# DIFFERENT files (Start-Process refuses one file for both); the markers",
                 "# are on stdout, and the error file is scanned too rather than assumed",
                 "# empty.",
-                "if ($buildLog) {",
+                "#",
+                "# No build when the question said 'reuse': $buildExit is then 0 and no",
+                "# capture file is made, so the scan below has nothing to read.",
+                "$buildExitFromChild = $null",
+                "if (-not $buildReason) {",
+                "  $buildExitFromChild = 0",
+                "} elseif ($buildLog) {",
                 "  $buildErrLog = $buildLog + '.err'",
                 // Built as a variable rather than continued across lines: a
                 // backtick continuation in generated shell is one stray trailing
@@ -791,6 +852,22 @@ public static class TaskScheduling
                 "  exit 1",
                 "}",
                 "",
+                "# The build went through: one line on the trail, with WHY (#799,",
+                "# activityTrail.mustRecord -> 'site built again before deploying'),",
+                "# written by the code that ran the build. Never for a build that failed",
+                "# or needed an answer (both exited above), and never for a reuse.",
+                "if ($buildReason) {",
+                "  $builtWords = @{",
+                $"    {PsQuote(BuildFreshness.ReasonNeverBuilt)} = {BuildBeforeDeployingQuestion.TrailLineExpression(courseCode, section, BuildFreshness.ReasonNeverBuilt)}",
+            });
+            foreach (string reason in BuildBeforeDeployingQuestion.Reasons)
+                lines.Add($"    {PsQuote(reason)} = {BuildBeforeDeployingQuestion.TrailLineExpression(courseCode, section, reason)}");
+            lines.AddRange(new[]
+            {
+                "  }",
+                "  Write-TrailLine $builtWords[$buildReason]",
+                "}",
+                "",
                 "# ---- Deploy to every destination — un-chained, on purpose ---------------",
                 "$allSucceeded = $true",
                 // Whether anything has already been recorded about this run.
@@ -802,7 +879,7 @@ public static class TaskScheduling
                 // teacher about the last thing that went wrong rather than the
                 // first.
                 "$alreadyRecorded = $false",
-            };
+            });
 
             foreach (var destination in destinations)
             {
