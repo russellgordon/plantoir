@@ -4633,7 +4633,8 @@ to a card (a teaching choice, and the card half means nothing without
 cards), and #715's each-graph-on-its-own-grid and four-graph limit (they
 follow from four empty grids per group at a whiteboard).
 
-A hints sheet is the worksheet with each hint under its question, from the
+(Superseded by #859, below: the hints sheet is now the hints alone.) A
+hints sheet was the worksheet with each hint under its question, from the
 same source: `Handout.tex` gains `\ifhints`, `\showhints` and `\hint{...}`
 (grey, small sans, "Hint:"), its title gains "--- Hints", its question 3
 carries one, and a third two-line wrapper ships as
@@ -4678,6 +4679,221 @@ whole/decimal column is right-aligned "with the same trailing padding", and
 equal widths make aligned numbers "sit at one offset in both" columns. The
 skills follow the 14:19 refinement in both places. That file is his, not
 this repository's, and was left alone.
+
+**Handouts at the owner's own quality (#859 piece B, v2.0.0).** The bar,
+in Russell's words: teachers get handouts "at the quality level that I am
+producing with you on this machine". The plan's audit (30 rules and
+elements of his house style against the shipped skill) found 21 carried, 7
+partly carried, 1 missing (the key's "equivalent forms are fine" line) and
+1 deliberately left out (his "older files move to this format"). The plan
+review compiled the shipped starters and his two reference worksheets and
+found the header, colours, box and typography already matched; what was
+missing was EXAMPLE MATERIAL: the starter was one sparse page with one
+trivial worked example, where his sheets run four pages with substituted
+values in red, side notes beside steps, a table and a graph inside a box,
+and a four-line legend. An assistant imitates what it is shown, so the
+fix is in what it is shown, and in a checker that fails:
+
+- **The starters are finished sheets.** `starters/Handout.tex` is now
+  three pages (two in the key, one hints sheet): three worked examples
+  (`\sv` for a substituted value, `\sidenote` beside a step in an
+  `alignat*`, `\method` for a "Check" heading, a table and its graph side
+  by side inside the box with the label on a peach patch), a grey
+  `groupnote` before a group, a table and a grid side by side with both
+  columns `N` (x from -1 holds a negative too), a context graph
+  (`contextgraph`: a cyclist's distance, stopping at its end points, the
+  distance column 0.0 to 18.0 as `N{$18.0$}`), fill-in blanks, and his
+  graph style (labels on a layer above the curves, axes 0.25 cm past the
+  grid, `lineA` to `lineD`, `answerlegend`). The corners default to an
+  empty `\schoolname` and the Name and Date blanks (the contract's
+  `corners` default); `School Name` is gone, because a placeholder is
+  something an assistant forgets to replace. Two new patterns:
+  `worked_examples.tex` (six ways to set out an example) and `graphs.tex`
+  (an abstract parabola, a line leaving through top and bottom, a vertical
+  line, a context graph, four lines with a legend, a tick label left out
+  where an arrowhead ends, and the same grid in both copies, every
+  domain's working in a comment); `tables.tex` gains pattern E (negative x
+  and y, a mixed column, a horizontal two-row table, a word column). Both
+  new patterns repeat the starter's preamble between markers, and the
+  test compares them.
+- **A `C` cell holding a math minus prints a small red "use N"**, through
+  `collcell` and `\in@` on the detokenised cell, so the fault of the
+  Copilot trial's runs A2 and A3 (a centred column of negatives, against a
+  rule the skill states) shows on the rendered page every assistant is
+  told to look at. Measured: on `tables.tex`, the 80 dpi pages and a
+  600 dpi page are byte-identical with and without the marker. Two limits
+  found by looking: the first version tested for any `-` and fired on
+  `\headstrut`'s `\rule[-1.1em]` (it now looks for `$-` and `$ -` only);
+  and `\qa` is expandable, so the cell is collected after it has chosen a
+  branch, and an answer written only in the key shows the marker in the
+  key's render, not the question copy's. The checker covers both copies
+  from the source.
+- **`tools/check_handout.py`** (stdlib, an aid that is never required):
+  19 failing rules and 2 notes after the two fix rounds below, decided from the source, its wrappers, its PDFs and its folder
+  (the skill's section 8 lists them), one line per problem, exit 1, and
+  at the end of every run the list of what it cannot decide, which the
+  skill sends to the rendered pages. The graph rule evaluates the plotted
+  expression over its domain against `xmin`, `xmax`, `ymin` and `ymax`
+  (the plan review's M1b: a curve leaving through the top before its
+  domain ends is the common miss, not the side edges). `--self-test` has
+  40 cases after the fix rounds. `scripts/test_handout_starters.py` (14 tests, about 32 s on
+  this Mac) runs it, compiles every starter and pattern in every copy, and
+  breaks the starter once per rule (13 breaks) expecting that rule's
+  name. Must-fail: with `origin/dev`'s `Handout.tex` put back, 8 of the 14
+  fail and 1 errors.
+- **The tools are checked before writing** (the trial's A1 found the
+  missing tool only after planning), with a route for each program on a
+  Mac with and without Homebrew and on Windows. Tectonic's own installer
+  puts the program in the folder it is run from, so the skill runs it
+  inside `~/.local/bin` (or `$HOME\tools`), never the working folder or a
+  course. Poppler has no installer of its own outside Homebrew, Scoop or a
+  downloaded build, so the skill says to read the PDF's pages directly
+  where the assistant can, and otherwise to say they were not looked at.
+  Owner's ruling: Plantoir will set both up on the teacher's yes, built
+  with #855. The skill's sentence "where Plantoir has set these programs
+  up, the commands find them" stays true only if #855 puts them on the
+  PATH an assistant's shell sees (or the managed root file names where),
+  which is that issue's to decide. Rendering falls back to a
+  `.handout-check` folder in the handouts folder when the temporary folder
+  is refused (A3).
+- **Hints first, then the answers** (Russell's practice, ruled to ship as
+  a suggestion). The hints sheet is now the hints ALONE: one `\ifhints`
+  block right after `\begin{document}`, `\hint{n}{...}` per question,
+  ending in its own `\end{document}`, so the question copy and the key
+  compile to the same text as without it (the test compiles the starter
+  with the block removed and compares `pdftotext`). This replaces #765's
+  hints-under-each-question sheet, and supersedes that section's REJECTED
+  "a hints-only sheet": the objection was a switch in every question's
+  text, which a separate block does not need. `\hint` keeps its name, so
+  `starterMacros` still holds. Joined `- with Hints` and `- with Answers`
+  files come from `pdfunite`, or without Poppler from `tectonic` and
+  `pdfpages` (measured: a quoted file name with spaces fails to load;
+  unquoted works). The site recipe (a hints page with folded hints, an
+  unpublished "- Answers" twin, and the swap that keeps the address) is
+  written steps through `back_up_course`, `plan_unpublish_pages`,
+  `unpublish_pages`, `plan_publish_pages` and `publish_pages`, with the
+  two renames done as the assistant's own file edits: Plantoir has no
+  page-rename tool, and #753 asks for the swap as one step.
+- **The Print button as a suggestion** in both `plantoir-handouts` and
+  `plantoir-printing`: `printPdf` already makes the button open a PDF, so
+  nothing in the product changed. Ruled: a joined file holding answers may
+  be what the button offers, but only after the assistant says students
+  who press Print will get the answers and the teacher says yes; an answer
+  key alone never is.
+
+**The fix round on #859 B** (Opus implementation review; rulings on the
+issue). Three rules changed:
+
+- A graph only in the answer key is allowed where it serves the topic (owner,
+  2026-11-13: "Allow when it makes sense. Defer to the specific context and
+  topic."). His templates do it when students graph on their own paper. The
+  checker now prints such a graph as a `note:` line, once per graph, and the
+  note never makes it exit 1. The review found each graph reported twice
+  (an `axis` and its `tikzpicture`), and that is fixed too. A table only in
+  the key is still a failure.
+- An exercise page lives outside `section<N>/`, so it is shared by every
+  section, and renaming it changes what every section's link opens at the
+  same moment. The swap therefore happens ONCE, after the LAST section has
+  checked its homework. A section that is ready sooner gets the answers on
+  paper. The earlier text, "they may swap on different days", would have
+  pointed the other section's links at a hidden page.
+- Measured from the build's source: `patches/build.ts` runs `filterContent`
+  before `emitContent`, and `PublishFlag` (`patches/publish.ts`) drops a
+  `publish: false` page in that filter. So an unpublished page's text
+  appears on no page, in no search index and in no link. However,
+  `_ensure_media_symlink` in `build_site.py` mirrors the whole `Media`
+  folder into the site. So `Name - with Answers.pdf` stays in the handouts
+  folder during the hints period, and copying it into `Media` is step 4 of
+  the swap. The checker's new `answers-in-media` rule (with
+  `--course-config`) fails on two things: an answer key in `Media`, and a
+  joined answers file there beside the `- with Hints` file.
+
+The checker also gained:
+- `tabularx` and `tabular*` (the column spec is the second argument, and
+  `X` columns are read);
+- nested tables;
+- horizontal tables decided by shape (labels down the first column AND
+  more columns than rows), so a "Day | Low" table is checked;
+- layout tabulars (no rules, pictures in the cells or `@{}` at both ends)
+  skipped;
+- a firearms list of whole words that only ever mean a firearm. "Bullet"
+  and "gun" were dropped: "bullet points" and "a glue gun" were false
+  alarms.
+
+Run on the owner's two templates, the checker printed 36 lines before the
+fix round. It now prints 10 problems and 10 notes. The 10 problems are
+the key's changed `tasks` column count, which his written rule forbids
+and his templates do.
+
+The starters changed after the reviewer looked at the rendered pages:
+- six practice parts per group, two groups under the first example and six
+  solve parts under the second;
+- a four-line legend question in the starter itself;
+- the subtitle now says to work on your own paper and to write answers 4
+  to 7 on the sheet, so "Show all your work" no longer sits over questions
+  with no room;
+- the box with a table and a graph is shorter, because its table runs
+  across (it is used only to graph).
+
+One measured cause of the empty page feet. The `needspace` package's
+`\needspace` leaves `\penalty-100`, and with `\raggedbottom` every break
+costs only its penalty. TeX therefore ended a page at the last `\q` whose
+needspace came before an overflow, even when that question would have fitted.
+The starters' `\q` now uses `\roomfor`, the same test with a `\penalty0`.
+Pages 1 and 2 of the starter are now full. The owner's templates carry the
+same `\needspace`.
+
+**The last round on #859 B** (the Fable sweep). Measured with
+`build_site.process_frontmatter`, called directly (a Python with
+`frontmatter`, no site build). A copy of a published shared page that
+keeps `publishForSection1: true` and `publishForSection2: true` and adds
+`publish: false` resolves to `publish: True` in both sections, because the
+section's own line wins (`build_site.py`, `process_frontmatter`). With
+every per-section line false it resolves to `False` in both. With one line
+left true it publishes in that section only.
+
+So the recipe now does three things. It hides the answers copy with
+`unpublish_pages`, or by setting EVERY `publishForSection<N>` line false.
+It confirms the copy is hidden with `plan_unpublish_pages` before telling
+the teacher so. And the swap's unpublish step does the same for the hints
+page.
+
+The checker changed with it:
+- Its new rule `answers-copy-published` reads the course's pages. It finds
+  the page whose `printPdf` is the handout's `- with Hints` file, and that
+  page's "- Answers" twin. It fails when the twin would publish in a
+  section where the hints page does. The sections come from
+  `section_numbers` in the course settings and the page's own keys.
+- `answers-in-media` now judges the hints period by whether that hints page
+  is published, so it stays quiet after the swap. The swap now also takes
+  the `- with Hints` file out of `Media` and clears the hints page's
+  `printPdf`.
+- `scripts/test_handout_starters.py` gained `TheAnswersCopyStaysHidden`:
+  the build call, which skips where `frontmatter` is missing, and the
+  checker through a whole hints period and swap.
+- A key whose `tasks` column count differs is now a note (`key-columns`),
+  on the director's direction following the owner's ruling. On his two
+  templates the checker now gives 0 problems and 7 and 13 notes.
+
+The look:
+- question 4's grid now runs to y = 6, so the arrowhead passes the plotted
+  point (-1, 5);
+- the key carries the run and the rise (`slopestep`);
+- `answerlegend` sits 0.9 cm past the grid's right edge, clear of the x
+  label;
+- `worked_examples.tex` gains G, a line drawn from its slope and
+  y-intercept with the run and the rise.
+
+REJECTED: shipping his "outer border drawn last" preamble as the default
+(nicematrix was measured better, #715); "older files move to this format"
+(a teacher's own header is theirs); running Tectonic's installer wherever
+the assistant happens to be (it drops the program there, possibly inside
+`courses/`, which the site copies); comparing the two PDFs to find a key
+whose graph changed size (the checker reads the source, where the key's
+layout is decided); making `\qa` robust so the marker sees both branches
+(it would break `\qa` inside other expansions, such as a title); and
+counting a starter's placeholders as a pass (the test fills in the code
+and the title as a teacher would; the checker names them otherwise).
 
 ### Unit planning (#707): the skill, the plan folder, the reminder
 

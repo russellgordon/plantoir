@@ -162,6 +162,21 @@ that PDF; it wins over `printable: true`. If the file is missing, is not a
 PDF, or is given as a path, Plantoir says so when the site is previewed and
 the page falls back to the generated handout (or to no button).
 
+**A suggestion, when a page and a handout carry the same questions.** When
+a page of the site and a PDF handout made with the `plantoir-handouts`
+skill hold the same or largely the same content, you may offer, once and
+in one sentence, to make the page's Print button hand out the PDF: "This
+page and the handout carry the same questions. Would you like the page's
+Print button to give students the handout's PDF instead of a print of the
+page?" It is one way to start, not the only way, and never done unasked.
+On a yes, follow the handouts skill's section 2 ("On the class website"):
+copy the PDF into `Media`, set `printPdf`, and copy it again after every
+later compile. **Before the Print button hands out a file that holds
+answers** (a joined `Name - with Answers.pdf`), say plainly that students
+who press Print will get the answers, and set it only on the teacher's
+yes. An answer key on its own, `Name - Answers.pdf` or
+`Name - Solutions.pdf`, is never what the button offers.
+
 ## 5. Pictures and diagrams
 
 Images, Mermaid diagrams, maths and code all print. Images and figures are
