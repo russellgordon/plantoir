@@ -4556,12 +4556,13 @@ the trail, because it would be student data.
 - **The privacy points are true, and said first (750 plan review H1 and
   R2).** Four points before any student work is opened: whatever is read
   goes to the AI service (with where to turn model training off, and the
-  school's policy); identifiers only, and the box covers the name box at
-  the top of a page and nothing else, so a name written anywhere else is
-  seen and the teacher skims the blanked papers once, in one file, before
-  any is read; the script stops on any page whose top does not match the
-  blank test, and the name box check file (the top of every page with the
-  box drawn) is looked at FIRST; a name seen is never repeated (the identifier and page only,
+  school's policy); identifiers only; a script boxes the name line of each
+  page whose blank test has a name blank and stops a page that does not
+  line up with it, and the teacher looks at ONE check sheet of every
+  page's top before the assistant reads anything, which the assistant
+  never opens (since Russell's ruling below; before it, a "name box check"
+  and a skim of the blanked papers); a name written anywhere else is not
+  boxed and is seen; a name seen is never repeated (the identifier and page only,
   `NAME VISIBLE page N` in `checks`); the files written stay on the
   computer. REJECTED: v1's "scans are redacted ... what I write stays on
   this computer", which claimed more than the redaction does, and "what I
@@ -4637,7 +4638,8 @@ the trail, because it would be student data.
   (3 pixels of widening alone) those four read 5 to 15 and slipped under,
   because the name's ink over the printed Date counted as the blank's.
   The case "a name written past the box" goes red without the check.
-  **The 750a review's fixes (2026-11-12).** H1: at 80 levels darker than
+  **The 750a review's fixes (2026-11-12; superseded by Russell's ruling
+  below, which made this check a warning).** H1: at 80 levels darker than
   the paper the ring missed a light pencil name (pixel about 178) past the
   box, which was written with 2,124 name pixels visible; at 40 it was
   caught, and at 30 so is the trial fixture's light-pencil name that runs
@@ -4663,11 +4665,60 @@ the trail, because it would be student data.
   names anywhere on a page, which it cannot do (ink on the Date line cannot
   be told from a date). Found while fixing it: on a blank whose Name blank
   is on page 1 only, page 2's "School Name" was taken for the label and a
-  box drawn over the school's name; once a page has a label a writing line
-  follows, a page without one gets no box, and the file's line names it.
+  box drawn over the school's name. (That fix required a writing line after
+  the label, and the fix review, H1, found it left a Name blank drawn as
+  underscores, dots, a table cell or a frame unboxed, with the line saying
+  the page had no name box: since the ruling below, every label is a name
+  blank except one with another word just before it.)
   A limit, said in the skill: a rotation of 1.5 degrees is stopped
   although no ink survived it, since 0.1 in at the box's corners is about
   one degree.
+- **Russell's ruling, 2026-11-12: the teacher's eyes are the proof.**
+  Two rounds of review kept finding names that survived while the script
+  reported success (faint pencil, yellow highlighter, a surname after a
+  gap, a Name blank drawn as underscores), and the fix review measured that
+  an ink check low enough to catch the faint and coloured names stopped 5
+  of 20 clean scans. So coverage is no longer proved by measuring ink:
+  - **The box** is generous, as the teacher's own tool is: on every page of
+    the blank test that has a name blank (the label, whatever the blank
+    after it is drawn as; never a label with another word just before it,
+    such as "School Name"), the whole line, margin to margin (0.3 in from
+    each side), from 0.15 in below the top to 18 pt below the label.
+    MEASURED: the six styles of `scripts/fixtures/marking/blank-name-styles.pdf`
+    (a rule, underscores, dots, a table cell, a frame, underscores at the
+    left margin) are all boxed, and a name written in each is inside; the
+    fix review's four page-2 styles are boxed with no name pixel outside;
+    of its 43 faint and coloured names, 40 are written with no name pixel
+    outside the box and 3 (on a lighting gradient) are stopped.
+  - **Registration is the gate**, as before, by the header row outside the
+    writing area (the school's name) or, where nothing else is printed on
+    it, the band below the box, and the foot; inch-long straight lines are
+    left out of it as well as the left margin. No false CHECK at 0.04 in or
+    0.5 degrees; of the fix review's 20 clean scans one is stopped (a coffee
+    ring through the header band), where three were.
+  - **ONE check sheet**, `Check sheet.pdf` in the teacher-only check folder:
+    the top 1.6 in of every page as it was boxed, captioned by identifier
+    and page; a page with no box or with writing beside the box captioned
+    and outlined in red; a stopped file's pages shown as scanned. The skill
+    makes the teacher's look a STOP: the assistant asks, reads no paper
+    until the teacher says yes, and never opens the sheet (a name the box
+    missed would be on it). MEASURED: 30 papers of 4 pages, 120 pages, 51 s
+    on an M4 Pro, a 20-page sheet of 1.19 MB. REJECTED: a PNG contact sheet
+    (one PDF pages through in Preview), and keeping the skim file (one sheet
+    is what the teacher is asked to look at; the skill says plainly that a
+    name elsewhere on a page is not boxed and would be seen).
+  - **The words**: the run says pages boxed, pages with no name blank,
+    pages with writing beside the box and files stopped, and that the check
+    sheet waits for the teacher's look; never that a name is covered; that a
+    name anywhere else is not boxed; that every page read goes to the
+    assistant's service. A test fails any run line that claims coverage.
+  - **The ink beside the box is a warning**: ink 0.25 in above and below
+    the box, in each pixel's darkest colour channel (so yellow is seen, fix
+    review H2), at 18 levels, adds a line and a red caption and never stops
+    a file. MEASURED: of the fix review's 20 clean scans, 5 warn (lined
+    paper, holes, two folds, a staple with grain), and of the branch's own
+    written cases scaled 99 percent, turned 0.5 degrees and the paper marks
+    warn; a name written under the name line warns, as it must.
 - **A whole class in one scan (review M4).** `--stack` splits it with
   Poppler into `Paper 01.pdf ...` in the teacher-only folder and writes
   `Papers to name.pdf`; the teacher fills a `paper` column in the mapping
@@ -4685,7 +4736,7 @@ the trail, because it would be student data.
   its output captured, withholds any line holding one, and moves any new
   file in the marking folder holding one (its text, a PDF's text, or its
   path) to `Quarantine/`, counting both. Since the 750a review (H3) it
-  never says "checked" of a file it could not read: it reads UTF-16, gzip,
+  tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
   a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
   and XMP; it reports read and clean, moved, and NOT checked by kind, and
   exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
@@ -4696,6 +4747,20 @@ the trail, because it would be student data.
   looks at everything before passing anything on. The skill names its
   SHA-256 and has the assistant check it before use, because it can be
   edited in place until Plantoir next refreshes the working folder (L6).
+  The fix review (H3, M1 to M3, M5) found what still slipped: a link (to
+  the mapping table, or to the teacher-only folder) counted "read and
+  clean" because the path it points to was read; a broken PDF and
+  big-endian UTF-16 with no mark counted clean; short names ("Ho, Ed")
+  withheld honest lines ("finished") and an untouched folder named "June
+  Exam" was moved. Now a link is moved as a link, never followed; a PDF
+  Poppler cannot read (broken or locked) is not checked, and its raw bytes
+  are still searched; UTF-16 is read both ways; every file it could not
+  read is moved to the quarantine unread, so the assistant cannot open it
+  (and the skill says never to); a name part of two or three letters counts
+  only beside another part of the same name, a form shorter than six
+  letters only as a whole word; only a folder the run made or wrote into
+  is moved; and the file is checked out with LF everywhere
+  (`.gitattributes`), so the hash the skill pins holds on a Windows checkout.
   It is a net, not a lock: it cannot
   stop a script run without it or writing elsewhere, or know a name the
   table does not hold, and it says so every run. A name that is also a
