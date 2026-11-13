@@ -737,9 +737,11 @@ final class ReferenceShelfTests: XCTestCase {
     /// Plan review H2: a freed folder name never inherits a group. Through
     /// the real removal and the real restore from Archived.
     func testARecycledFolderNameDoesNotInheritAPlacement() async throws {
-        let block: [String: Any] = try XCTUnwrap(
-            (try ReferenceShelfTests.groupRules()["arrivals"] as? [String: Any])?["recycledFolderNameCase"] as? [String: Any]
+        let cases: [[String: Any]] = try XCTUnwrap(
+            (try ReferenceShelfTests.groupRules()["arrivals"] as? [String: Any])?["recycledFolderNameCases"] as? [[String: Any]]
         )
+        XCTAssertEqual(cases.count, 1, "a case was added or lost; the README census counts them")
+        let block: [String: Any] = cases[0]
         try prepareCoursesFolder()
         try writeReferenceCourse(folder: "ICS3U-2025", code: "ICS3U", year: 2025)
         try writeShelfFile(block["file"])

@@ -19234,7 +19234,7 @@
             "where": "CourseArchiver.archiveAndRemoveCourse"
           }
         ],
-        "recycledFolderNameCase": {
+        "recycledFolderNameCases": [{
           "name": "a recycled folder name does not inherit a placement",
           "file": {
             "version": 1,
@@ -19256,7 +19256,7 @@
             "ICS3U-2025": "2025–26"
           },
           "expectPlacements": {}
-        }
+        }]
       },
       "twoAtOnce": "Every change is read, decided and written under ONE lock on courses/.internal (on the mac an exclusive flock, taken by every window and every process, the MCP server included), and the file is read FRESH inside it, so two windows changing groups at once queue rather than undo each other, and the shelf rule is asked of where every course is at that moment. The file is written atomically: a temporary file renamed over the old one, so a reader never sees half a file. Two machines writing through a synced folder at the same moment: the later write wins, which costs at most one rename or one move. Another window on the same folder redraws its shelf when a change is written.",
       "wording": {

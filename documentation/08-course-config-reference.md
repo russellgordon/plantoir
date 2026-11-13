@@ -190,6 +190,13 @@ never deploys. Two keys carry it, and the rules they obey are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `referenceCourses`, run as cases by both test suites.
 
+`reference_school_year` stays the RECORD of when a course was taught; which
+group it sits in on the shelf is the shelf's, not the course's. A course the
+teacher put in a group of their own is placed there by
+`courses/.internal/reference-shelf.json` (#572's third piece, below), keyed on
+its folder, and its `reference_school_year` is untouched: Set School Year…
+changes the year it shows and leaves it in its group.
+
 **Read STRICTLY: a real JSON `true` and nothing else.** Not through the
 ordinary boolean accessor, and the reason is measured: `JSONSerialization`
 hands back an `NSNumber` for `1`, and `NSNumber` conditionally bridges to
@@ -357,6 +364,7 @@ file — or any file in the working folder.
 | `_backups/<CODE>/<timestamp>.zip` | Full course backups made by the setup wizard before re-runs. It shares this folder with the app's own archives (`<CODE>_<timestamp>.zip`) and backups (`<CODE>_backup_<timestamp>.zip`), which are told apart from it and from each other by NAME alone — `contracts/course-management.json` → `zipNames`. |
 | The `<timestamp>` in all three | `yyyy-MM-dd_HHmmss`, in the **Gregorian** calendar and local time, on every machine whatever calendar it is set to. Python's `strftime` is Gregorian always and Windows pins `CultureInfo.InvariantCulture`; the mac pins `en_US_POSIX` (`ArchiveStamp`) and, since 2026-09-10, also reads the spellings an earlier build wrote on a machine whose calendar was not Gregorian — see [09-mac-app.md](09-mac-app.md#what-an-archive-or-a-backup-is-called-and-the-calendar-it-is-stamped-in). |
 | `.internal/profile.json` | Teacher profile (last name for Netlify site naming). |
+| `.internal/reference-shelf.json` | The Reference Courses shelf's arrangement (#572's third piece): the groups a teacher made, which reference course (by folder) is in which, and what the group for courses with no school year is called. Absent until the teacher makes a group or renames "Other", and then the shelf is the year layout. Read and written by the app only, under a lock on `.internal`, atomically, and never written over when it cannot be read or was written by a newer version. Not carried by a course's backup or archive. `contracts/file-formats.json` → `referenceShelf`; the rules are `shared-rules.json` → `referenceCourses.groups`, and the why is [09-mac-app.md](09-mac-app.md) → "Groups on the reference shelf (#572)". |
 | `.gitignore` | Auto-maintained to exclude `.internal/` and `_backups/`. |
 
 ## Frontmatter conventions recognized in content
