@@ -72,6 +72,17 @@ extension SectionDetailView {
             return
         }
         workspace.sectionVerbRequest = nil
+        // The row's Open in Browser and Stop (#850) are this window's, not
+        // the assistant's functions: the one Open in Browser opens the
+        // preview while one shows, the deployed folder otherwise.
+        if request.item == .openInBrowser {
+            openInBrowserPressed(from: .sidebar)
+            return
+        }
+        if request.item == .stopShowingDeployedFolder {
+            stopShowingTheDeployedFolder()
+            return
+        }
         performVerb(request.item)
     }
 
