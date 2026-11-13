@@ -1254,8 +1254,11 @@ verified, choose another work.
 - **A picture is carried by the payload, BESIDE the page that shows it**, in
   that page's own folder, the way a `.ggb` is (Known traps, below): the
   installer copies anything that is not `.md` as it is, and the build copies
-  a shared folder whole. Show it with `![[File Name.jpg|what it shows]]`, so
-  it has a description. **Not in a `shared/Media` folder**: the installer
+  a shared folder whole. Show it with the description form the shipped
+  `plantoir-page-authoring` skill gives, the path written from the course's
+  top: `![what it shows](Critiques/file-name.jpg)`. Name the file with
+  lower-case letters, digits and hyphens, so the path needs no escaping.
+  **Not in a `shared/Media` folder**: the installer
   drops `Media` from the folders it pours (`setup_course.py`, where the
   manifest's `shared_folders` are read), and both apps' contract tests refuse
   a folder under `shared/` the manifest does not name
