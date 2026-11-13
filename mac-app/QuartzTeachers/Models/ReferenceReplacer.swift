@@ -145,7 +145,7 @@ enum ReferenceReplacer {
         // MARK: - Stored properties
 
         /// Whether the course is busy: previewing, publishing, or held by a
-        /// Claude or Codex session elsewhere, and, when `countingCopies`, a
+        /// Claude, Codex or GitHub Copilot session elsewhere, and, when `countingCopies`, a
         /// copy of it being saved. The act holds a copy record of its own
         /// for its whole length, so it asks the second time without copies.
         var isBusy: @MainActor (_ workingFolderPath: String, _ folderName: String, _ countingCopies: Bool) -> Bool

@@ -57,6 +57,17 @@ Everything here goes into [[Your Career Portfolio]] as your first
 entries, and the inventory gets reused in [[The Application]] — so write
 it once, properly.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] Every skill is attached to a situation a third person could confirm.
+- [ ] My skills come from more than one part of my life.
+- [ ] Part two shows what I learned, not just what happened.
+- [ ] My strategies are ones I have actually used, described specifically.
+- [ ] The supports in part three are real, current, and reachable.
+- [ ] It is organised, plain, and something I would show an adult.
+
 %%curriculum-start%%
 ## Curriculum connection
 

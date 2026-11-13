@@ -174,6 +174,7 @@ final class ClaudeCodeLauncherTests: XCTestCase {
               ],
               "command" : "\\/Applications\\/Plantoir.app\\/Contents\\/MacOS\\/Plantoir",
               "env" : {
+                "PLANTOIR_DOOR_ASSISTANT" : "claude",
                 "PLANTOIR_DOOR_COURSE" : "ICS3U_GOLDEN"
               }
             }

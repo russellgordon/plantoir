@@ -89,6 +89,7 @@ struct CourseMenu: Commands {
                 presence: presence,
                 claude: .courseReviseWithClaude,
                 codex: .courseReviseWithCodex,
+                copilot: .courseReviseWithCopilot,
                 localAssistant: .courseReviseWithLocalAssistant,
                 enabled: enabled,
                 notes: current.row == .course ? (sidebar?.reviseNotes ?? []) : [],
@@ -294,6 +295,7 @@ struct SectionMenu: Commands {
                 presence: presence,
                 claude: .sectionReviseWithClaude,
                 codex: .sectionReviseWithCodex,
+                copilot: .sectionReviseWithCopilot,
                 localAssistant: .sectionReviseWithLocalAssistant,
                 enabled: enabled,
                 notes: current.row == .section ? (sidebar?.reviseNotes ?? []) : [],
@@ -347,8 +349,8 @@ struct SectionMenu: Commands {
     }
 }
 
-/// Revise With ▸ Claude… / Codex… / Local AI Assistant…, in both subject
-/// menus. Each target is DRAWN only when this Mac has it (presence) and
+/// Revise With ▸ Claude… / Codex… / GitHub Copilot… / Local AI Assistant…,
+/// in both subject menus. Each target is DRAWN only when this Mac has it (presence) and
 /// ENABLED by the rule; the submenu itself is left out when there is
 /// nothing to put in it. The reasons an item is greyed (#458) follow it.
 struct ReviseWithMenu: View {
@@ -358,6 +360,7 @@ struct ReviseWithMenu: View {
     var presence: OutsideAssistantPresence
     var claude: SubjectMenuRules.Item
     var codex: SubjectMenuRules.Item
+    var copilot: SubjectMenuRules.Item
     var localAssistant: SubjectMenuRules.Item
     var enabled: Set<SubjectMenuRules.Item>
     var notes: [String]
@@ -383,6 +386,12 @@ struct ReviseWithMenu: View {
                         run(codex)
                     }
                     .disabled(!enabled.contains(codex))
+                }
+                if presence.copilotIsInstalled {
+                    Button(CopilotLauncher.menuItemTitle) {
+                        run(copilot)
+                    }
+                    .disabled(!enabled.contains(copilot))
                 }
                 if presence.localAssistantCanRun {
                     Button(ReviseWithMenu.localAssistantTitle) {
