@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import QuartzTeachers
 
@@ -329,6 +330,57 @@ final class PlanShareTablesTests: XCTestCase {
         XCTAssertEqual(table.sortDescriptors.first?.key, "unit", "by unit, then name, at first")
         table.sortDescriptors = [NSSortDescriptor(key: "kind", ascending: false)]
         XCTAssertEqual(model.sort[.shared], [PlanShareTablesModel.SortKey(column: .kind, ascending: false)])
+    }
+
+    // MARK: - Tests: the sheet's keys
+
+    /// A key pressed in `window`, as AppKit hands it to the watcher.
+    private static func key(_ characters: String, code: UInt16, command: Bool, in window: NSWindow) -> NSEvent? {
+        return NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: command ? [.command] : [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil,
+            characters: characters, charactersIgnoringModifiers: characters,
+            isARepeat: false, keyCode: code
+        )
+    }
+
+    /// Return stays in the search field (review L5), ⌘F goes to it, and ⌘→
+    /// moves the selection when the cursor is not in a text field. In a
+    /// window off the screen, as `QuestionKeysTests` presses its keys.
+    func testTheSheetsKeysReachTheirOwnControls() throws {
+        let window: NSWindow = NSWindow(contentRect: NSRect(x: -7000, y: -7000, width: 400, height: 200),
+                                        styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let field: NSSearchField = NSSearchField(frame: NSRect(x: 10, y: 10, width: 200, height: 24))
+        let other: NSButton = NSButton(frame: NSRect(x: 10, y: 60, width: 100, height: 24))
+        window.contentView?.addSubview(field)
+        window.contentView?.addSubview(other)
+        window.orderFrontRegardless()
+        defer {
+            window.orderOut(nil)
+        }
+        var moves: [Bool] = []
+        var text: String = ""
+        let coordinator: PlanShareSearchField.Coordinator = PlanShareSearchField.Coordinator(
+            text: Binding(get: { return text }, set: { (value: String) in text = value }),
+            onMove: { (toNotShared: Bool) in moves.append(toNotShared) }
+        )
+        coordinator.field = field
+        window.makeFirstResponder(field)
+        XCTAssertTrue(coordinator.isTyping(in: window))
+        let returnKey: NSEvent = try XCTUnwrap(PlanShareTablesTests.key("\r", code: 36, command: false, in: window))
+        XCTAssertNil(coordinator.handle(returnKey), "Return in the search field pressed the sheet's default button")
+        let arrow: String = String(Character(UnicodeScalar(UInt16(NSRightArrowFunctionKey)) ?? " "))
+        let commandRight: NSEvent = try XCTUnwrap(PlanShareTablesTests.key(arrow, code: 124, command: true, in: window))
+        XCTAssertNotNil(coordinator.handle(commandRight), "⌘→ in the field moves the cursor, not the rows")
+        window.makeFirstResponder(other)
+        XCTAssertFalse(coordinator.isTyping(in: window))
+        XCTAssertNotNil(coordinator.handle(returnKey), "Return outside the field is the sheet's own")
+        XCTAssertNil(coordinator.handle(commandRight))
+        XCTAssertEqual(moves, [true])
+        let commandF: NSEvent = try XCTUnwrap(PlanShareTablesTests.key("f", code: 3, command: true, in: window))
+        XCTAssertNil(coordinator.handle(commandF))
+        XCTAssertTrue(coordinator.isTyping(in: window), "⌘F put the cursor in the search field")
     }
 
     // MARK: - Tests: the choices reach the year's marker

@@ -459,12 +459,28 @@ struct PlanShareSearchField: NSViewRepresentable {
             watcher = nil
         }
 
-        /// ⌘F, ⌘→ and ⌘← in this sheet's window; every other key passes.
+        /// Whether the cursor is in this search field.
+        func isTyping(in window: NSWindow) -> Bool {
+            guard let field = field, let editor = window.firstResponder as? NSText else {
+                return false
+            }
+            return editor.delegate === field
+        }
+
+        /// ⌘F, ⌘→ and ⌘← in this sheet's window, and Return while the
+        /// cursor is in the search field, which stays there rather than
+        /// press Cancel, the sheet's default button (review L5: the search
+        /// is made as the teacher types, so Return has nothing left to do).
+        /// Every other key passes.
         func handle(_ event: NSEvent) -> NSEvent? {
             guard let field = field, let window = field.window, event.window === window else {
                 return event
             }
             let modifiers: NSEvent.ModifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            let isReturn: Bool = event.keyCode == 36 || event.keyCode == 76
+            if isReturn && !modifiers.contains(.command) && isTyping(in: window) {
+                return nil
+            }
             guard modifiers.contains(.command), !modifiers.contains(.option), !modifiers.contains(.control) else {
                 return event
             }
