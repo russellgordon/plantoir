@@ -106,9 +106,8 @@ picture cannot show.
    intended tag (step 5 says how), and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
    and the website commit both land on `main` (CLAUDE.md rule 6). **A hotfix
-   cut from `main` is the exception**: `dev` is NOT merged in, and the check
-   is instead that `git log v<last tag>..main` holds only the hotfix (step
-   5's hotfix bullet). After the
+   is the exception**: it is built on `hotfix/<version>` from what shipped,
+   `dev` is NOT merged in, and the check is step 5's hotfix bullet. After the
    website push, merge `main` back into `dev` so the branches do not drift.
 5. Check `MARKETING_VERSION` in `mac-app/project.yml` and `<Version>` in
    the csproj against the tag. **This step CHECKS the number; it does not
@@ -136,13 +135,24 @@ picture cannot show.
      "so the files agree". Nothing reads it to decide what shipped: the
      download cards and `build.py --deploy`'s feed checks read `site.json`
      and the feeds (`build.shipped_version`).
-   - **A hotfix cut from `main` keeps its own number.** `main` carries the
-     number it last shipped (say 1.9.3), and the hotfix raises it there, on
-     `main`, for each platform it ships (1.9.4), while `dev` says 2.0.0. It
-     is cut from `main` without `dev` (step 4's hotfix check). When `main`
-     is merged back into `dev`, git stops on the version line: resolve it to
-     `dev`'s side (2.0.0). If the hotfix takes the very number `dev` is
-     heading for, `dev`'s release moves up with its milestone: ask Russell.
+   - **A hotfix is built from what SHIPPED and keeps its own number**
+     (`RELEASING.md` → "When the number is raised" has the measured history
+     and the whole procedure). `main` is not a hotfix base in general: since
+     #861 every merge of `dev` into `main` between cuts brings `dev`'s raised
+     number and unreleased code with it. Branch `hotfix/<version>` from the
+     tag (or, for a platform that joined the tag later, its catch-up merge),
+     raise that platform's number there only (1.9.3 to 1.9.4; `dev` keeps
+     2.0.0). **Check before building:**
+     `git rev-list --first-parent --merges <base>..hotfix/<version>` prints
+     nothing (on 2026-11-13, `v1.9.3..main` printed 8107d8723 and 5ff48304b,
+     so `main` would rightly fail), and READ
+     `git diff --stat <base> hotfix/<version> -- mac-app windows-app scripts support patches contracts`,
+     which must list only the hotfix's files and the version line. Tag the
+     branch head, merge it into `main` with `--no-ff` (keep the higher number
+     if the version line conflicts), make the website commit, merge `main`
+     back into `dev` resolving the version line to `dev`'s side. If the
+     hotfix takes the number `dev` is heading for, `dev`'s release moves up
+     with its milestone: ask Russell.
 
    **After the cut, each platform's number on `dev` is the next release THAT
    platform will ship.** Once `main` is merged back into `dev` (step 4),
@@ -156,8 +166,8 @@ picture cannot show.
      `<Version>` STAYS at 2.0.0, so the Windows catch-up joins v2.0.0 at the
      tag's number (the catch-up rule below). `<Version>` goes to 2.1.0 after
      that catch-up.
-   - A 1.9.4 hotfix from `main` while `dev` says 2.0.0: nothing is raised
-     on `dev`; the merge back keeps `dev`'s 2.0.0.
+   - A 1.9.4 hotfix while `dev` says 2.0.0: nothing is raised on `dev`;
+     the merge back keeps `dev`'s 2.0.0.
 
    `website/site.json`'s `version` is NOT raised then: it is the released
    version line, and it moves in this cut's website step.
@@ -264,7 +274,7 @@ gh release edit v<version> --draft=false -R <owner/repo>
    --check` verifies both signatures, and `--deploy` refuses unless the
    newest item is the release `site.json` says Windows shipped in (its
    card's pin, else the version line, `build.shipped_version`) and
-   `<Version>` is not below it (#861); confirm too that it carries this installer's
+   `<Version>` is not below the feed's newest item (#861); confirm too that it carries this installer's
    length; if it does not, stop — a Windows release with a
    stale feed is offered to nobody. Never print the private key, and never let
    the feed's line endings change (`.gitattributes` keeps them).

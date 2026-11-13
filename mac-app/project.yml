@@ -245,7 +245,7 @@ targets:
         # The release being BUILT, not the last one shipped (#861): raised on
         # `dev` when work on a release starts, right after the previous cut's
         # merge back into `dev`, and CHECKED at the cut (RELEASING.md,
-        # "When the number is raised"). A hotfix cut from `main` keeps its own.
+        # "When the number is raised"). A hotfix branch keeps its own.
         MARKETING_VERSION: "2.0.0"
         # A PLACEHOLDER for local builds only. A bundle that leaves this Mac
         # is built by publish.sh, which overrides this with

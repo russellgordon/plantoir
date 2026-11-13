@@ -136,7 +136,10 @@ release starts, and the cut CHECKS it rather than raising it.**
   milestone number, in a commit of its own, then re-run `xcodegen generate`
   for the mac. A platform that shipped nothing keeps its number until its own
   cut: its next release is the catch-up that joins the tag just cut, at that
-  tag's number. It is raised after that catch-up, the same way. Three cases,
+  tag's number, or, if it will skip that tag, the release its next run works
+  toward (Windows sat at 1.9.0 through the mac-only 1.9.1 and 1.9.2 and
+  joined v1.9.3 directly; the `direct-release` skill's "Opening a run"
+  raises it then). It is raised after that catch-up, the same way. Three cases,
   walked through:
   - *Both platforms ship 2.0.0.* Both files read 2.0.0 at the cut. After the
     merge back, both go to the next milestone's number (say 2.1.0).
@@ -146,18 +149,43 @@ release starts, and the cut CHECKS it rather than raising it.**
     `<Version>` stays at 2.0.0. The Windows catch-up joins v2.0.0 with
     `<Version>` 2.0.0, which matches the tag, and only after it does
     `<Version>` go to 2.1.0.
-  - *A 1.9.4 hotfix from `main` while `dev` says 2.0.0.* See the next bullet.
-- **A hotfix cut from `main` keeps its own number.** `main` carries the
-  number it last shipped (1.9.3); the hotfix raises it there, on `main`, for
-  each platform the hotfix ships (1.9.4), and the cut is made from `main`
-  without `dev` merged in. Checklist step 4's "`git log main..dev` is empty"
-  is therefore NOT a hotfix check: a hotfix confirms instead that
-  `git log v<last tag>..main` holds only the hotfix. When `main` is merged
-  back into `dev`, both sides have changed the version line from 1.9.3, so
-  git stops on a conflict: resolve it to `dev`'s side (2.0.0), which is
-  still higher. If the hotfix takes the very number `dev` is heading for
-  (`dev` at 1.9.4 and a 1.9.4 hotfix), `dev`'s release has to move up: that
-  is a question for Russell, since its milestone moves with it.
+  - *A 1.9.4 hotfix while `dev` says 2.0.0.* See the next bullet.
+- **A hotfix is built from what SHIPPED, on a branch of its own, and keeps
+  its own number.** A hotfix here means a patch release that must not carry
+  `dev`'s unreleased work. None has been cut this way yet: measured on
+  2026-11-13, every release from v1.9.0 to v1.9.3, patches included, was a
+  merge of `dev` into `main` (`git log --first-parent v1.9.0..main`). Between
+  cuts `main` also takes website commits, feed corrections and merges of
+  `dev` (8107d8723, the Windows catch-up to v1.9.3; 5ff48304b, a website
+  correction). Since #861 each such merge brings `dev`'s raised number and
+  `dev`'s unreleased code onto `main`, so `main` is NOT a hotfix base in
+  general. The procedure:
+  1. Branch `hotfix/<version>` from the commit the platform's shipped bundle
+     was built from: the tag for a platform that shipped in that cut, the
+     catch-up merge for one that joined it later (8107d8723 for Windows
+     1.9.3). Raise that platform's number there, and only there (1.9.3 to
+     1.9.4); `dev` keeps its own (2.0.0).
+  2. **The check, before the bundle is built.** Mechanical:
+     `git rev-list --first-parent --merges <base>..hotfix/<version>` prints
+     nothing, so no merge has come onto the branch since what shipped. Run
+     against `main` on 2026-11-13 it printed two (8107d8723 and 5ff48304b),
+     the right refusal; on a branch made from v1.9.3 with one commit it
+     printed nothing. Then read
+     `git diff --stat <base> hotfix/<version> -- mac-app windows-app scripts support patches contracts`:
+     it must list only the hotfix's own files and the version line. Which
+     files those are is a judgement, so this half is read, not computed.
+     When `git rev-list --first-parent --merges v<last tag>..main` prints
+     nothing, no merge has reached `main` since the tag and the branch may
+     be made from `main`'s head.
+  3. Tag the hotfix branch's head, merge the branch into `main` with
+     `--no-ff` (the tag is then reachable from `main`), and make the website
+     commit on `main`. If a merge of `dev` brought a higher number to `main`,
+     git stops on the version line: keep the higher number. Then merge
+     `main` back into `dev` and resolve the version line to `dev`'s side
+     (2.0.0), and delete the hotfix branch.
+  If the hotfix takes the very number `dev` is heading for (`dev` at 1.9.4
+  and a 1.9.4 hotfix), `dev`'s release has to move up: that is a question
+  for Russell, since its milestone moves with it.
 - **`website/site.json`'s `version` does not move early.** It is the
   RELEASED version line plantoir.app prints, and it moves at the cut, when
   the release is public.

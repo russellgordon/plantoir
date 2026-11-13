@@ -282,7 +282,9 @@ def version_refusal(feed: Path, shipped: str | None | object = _FROM_THE_SITE, c
     not compared for equality, because since #861 it names the release being
     built and is raised on ``dev`` when work on a release starts; it is still
     refused when it is BELOW the feed, which only a number moved backwards
-    can cause. Left out, ``shipped`` is read from the committed site.json."""
+    can cause. Left out, ``shipped`` is read from the committed site.json:
+    the deploy passes it explicitly, and the default is the seam that lets
+    #861's must-fail tests call this with the arguments the old check took."""
     if not feed.is_file():
         return None
     if shipped is _FROM_THE_SITE:

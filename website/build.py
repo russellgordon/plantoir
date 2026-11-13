@@ -1181,7 +1181,9 @@ def feed_version_refusal(feed: Path, project_yml: Path, site: dict | None = None
     equality, because since #861 it names the release being built and runs
     ahead of the feed between cuts. It is still refused when it is BELOW the
     feed, which only a number moved backwards can cause. ``site`` defaults to
-    the committed ``website/site.json``.
+    the committed ``website/site.json``: the deploy passes it explicitly, and
+    the default is the seam that lets #861's must-fail tests call this with
+    the arguments the old check took.
     """
     if not feed.is_file():
         return None
