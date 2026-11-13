@@ -733,7 +733,7 @@ final class CoverageTabTests: XCTestCase {
         XCTAssertFalse(opened.hasPrefix("opened"), "a click cannot confirm Obsidian opened: \(opened)")
         let noObsidian: String = CoverageTabTrail.didNotOpenText(code: "A1.1", why: CoverageTabTrail.whyNoObsidian)
         XCTAssertFalse(noObsidian.contains("{machine}"), noObsidian)
-        XCTAssertTrue(noObsidian.hasSuffix("on this Mac"), noObsidian)
+        XCTAssertTrue(noObsidian.hasSuffix(CoverageTabTrail.whyNoObsidian), noObsidian)
         XCTAssertFalse(CoverageTabTrail.lookedText(
             reading: CoverageTab.Reading(kind: .noRecord, record: nil, page: nil, folder: rootURL),
             changed: .none, rulesCompiled: false

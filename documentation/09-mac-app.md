@@ -1345,8 +1345,10 @@ and once more when it settles; a click writes "page opened in Obsidian", the
 event every section press writes, with the code and the page's place, or why
 nothing opened. A click that goes ahead says Obsidian was ASKED to open the
 page, not that it opened: the route cannot confirm it (#721), and the tab adds
-no silent success of its own. The trail words that name the computer carry
-`{machine}`, so Windows says its own word. Never an expectation's words or a page's words
+no silent success of its own. No trail word names the computer, so both apps
+write the same line; the two sentences on the tab that do (`noObsidian`,
+`cannotShowDescription`) carry `{machine}` and are recorded in
+`specialNames.platformWording.machine.usedIn`. Never an expectation's words or a page's words
 (`coverageTab.tab.trailWords`).
 
 **Not done.** The tab has no Print (not asked for; with the focused preview nil

@@ -917,7 +917,7 @@ nonisolated enum CoverageTabTrail {
     static let noMapYet: String = "no map made yet"
     static let otherVersion: String = "the map was made by another version of Plantoir"
     static let noCurriculum: String = "the last build found no curriculum to map"
-    static let couldNotShow: String = "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this {machine}"
+    static let couldNotShow: String = "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet"
     static let asked: String = "asked to make the coverage map again from the Coverage tab"
     static let madeAgain: String = "the coverage map was made again"
     static let didNotFinish: String = "the coverage map could not be made again: the build ended before it was made"
@@ -929,7 +929,7 @@ nonisolated enum CoverageTabTrail {
     static let whyOutside: String = "its page is not inside the course folder"
     static let whyOlder: String = "the map on screen was older than its record"
     static let whyNotListed: String = "the map names no page for it"
-    static let whyNoObsidian: String = "Obsidian is not on this {machine}"
+    static let whyNoObsidian: String = "Obsidian is not installed"
 
     // MARK: - Functions
 

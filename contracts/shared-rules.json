@@ -5252,7 +5252,7 @@
     "reusedBuild": "A deploy that reuses the last build (#768) runs no Python, so the map stays exactly as that build left it, with its own startedNs. That is true: the build was reused because nothing in the course changed since it started. A deploy that builds writes a new map like a preview. Nothing ever re-dates an old map.",
     "trail": "793a writes no trail line: the build records itself. The tab's lines are tab.trail's (793b).",
     "tab": {
-      "note": "793b, the app half of #793: the Coverage tab on a section's page, which shows the map 793a's build writes (file-formats.json -> coverageTabMap). Every rule below is a case both apps run, and every sentence the tab shows is in words, pinned by name (mac: CoverageTabTests). A test names a sentence by its key, never by quoting it. {when} is the map's startedNs in the app's own date and time style, {code} a code from the click, {reason} the sentence the preview's own refusal says, {machine} the platform's word (MachineWord).",
+      "note": "793b, the app half of #793: the Coverage tab on a section's page, which shows the map 793a's build writes (file-formats.json -> coverageTabMap). Every rule below is a case both apps run, and every sentence the tab shows is in words, pinned by name (mac: CoverageTabTests). A test names a sentence by its key, never by quoting it. {when} is the map's startedNs in the app's own date and time style, {code} a code from the click, {reason} the sentence the preview's own refusal says; the two words that name the computer carry specialNames.platformWording.machine's placeholder, recorded in its usedIn.",
       "notLayered": "Only the chosen tab's content is in the window: the section's Website content (the console or placeholder and the preview over it), the Coverage tab, or the Problems tab, never one over another (the plan review's H1, the shape the course page ended with in #708). While Coverage or Problems shows, the preview's web view is not in the window, so no key, Space or paste reaches it, and the browser commands (Back, Forward, Reload Page) are not offered to it: the focused preview is nil and the toolbar's Back, Forward and Reload are disabled. The preview's web view is owned by its controller, so a switch back finds the same web view with its page and scroll (mac: SectionDetailStructureTests). State that must survive a switch lives in a model (mac: SectionCoverage, keyed per section): the map's web view, the record read last, and a refresh under way.",
       "tabCases": [
         {
@@ -6895,7 +6895,7 @@
         "noMapYet": "no map made yet",
         "otherVersion": "the map was made by another version of Plantoir",
         "noCurriculum": "the last build found no curriculum to map",
-        "couldNotShow": "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this {machine}",
+        "couldNotShow": "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet",
         "asked": "asked to make the coverage map again from the Coverage tab",
         "madeAgain": "the coverage map was made again",
         "didNotFinish": "the coverage map could not be made again: the build ended before it was made",
@@ -6907,7 +6907,7 @@
         "whyOutside": "its page is not inside the course folder",
         "whyOlder": "the map on screen was older than its record",
         "whyNotListed": "the map names no page for it",
-        "whyNoObsidian": "Obsidian is not on this {machine}"
+        "whyNoObsidian": "Obsidian is not installed"
       },
       "trail": "activityTrail.mustRecord: 'looked at a section's curriculum coverage' once each time the tab appears (looked, with counts across every map: how many maps, expectations and not yet addressed, and the map's start as yyyy-MM-dd HH:mm in the Mac's time zone, plus changedSince when the walk had already said so and notThisBuild when the map is another build's; or noMapYet, otherVersion, noCurriculum), and once when the map cannot be shown (couldNotShow). 'asked to make a section's coverage map again' when Make the Map (Again) is pressed (asked), and once more when it settles (madeAgain, didNotFinish or refused). A click writes 'page opened in Obsidian' (opened, with the page's place in the course folder without .md and the code; or didNotOpen with one of whyGone, whyOutside, whyOlder, whyNotListed, whyNoObsidian). Never an expectation's words or a page's words.",
       "rejected": [
@@ -12562,7 +12562,9 @@
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
-          "shared-rules.json:appUpdates.wording.elsewhereWork"
+          "shared-rules.json:appUpdates.wording.elsewhereWork",
+          "shared-rules.json:coverageTab.tab.words.cannotShowDescription",
+          "shared-rules.json:coverageTab.tab.words.noObsidian"
         ],
         "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",
         "why": "GitHub #418 (DO 1) and #410 (DO 1, DO 2), decided by Russell 2026-10-03. Before it, Windows carried its own copy of each such sentence (appUpdates.windowsWording.elsewhereWorkOnWindows; previewPorts.whenNoBlockIsFree.sentenceOnWindows) or compared with a substitution of its own (#233's 'your PC'), and a reworded sentence on one side would leave the other copy standing. REJECTED: a separate Windows key per sentence (two copies of every sentence, which is the drift this replaces); 'this Mac'/'this PC' as the placeholder's value (the sentences say 'your Mac' as well as 'this Mac', and changing either to fit would reword a sentence teachers already read); reusing the keys list above, whose substitution is 'on your Mac' -> 'on this PC' and changes the determiner as well as the noun."
