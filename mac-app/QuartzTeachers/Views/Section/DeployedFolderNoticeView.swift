@@ -42,7 +42,7 @@ struct DeployedFolderNoticeView: View {
                     .accessibilityHint(DeployedFolderWording.stopHint)
                     .accessibilityIdentifier("deployedFolderStopButton")
                 } else {
-                    Button("Dismiss") {
+                    Button(DeployedFolderWording.dismissButton) {
                         press()
                     }
                     .accessibilityIdentifier("deployedFolderGoneDismissButton")

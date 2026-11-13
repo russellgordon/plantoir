@@ -6932,7 +6932,9 @@ fi
 # answers every link every page writes. The app is named, never found: a
 # DerivedData bundle may be another checkout's (rule 10), so the gate passes
 # PLANTOIR_APP=<Plantoir.app>, and a named bundle that cannot serve FAILS.
-# Unnamed, it is skipped and says so. The must-fail is the same crawl
+# Unnamed, it is skipped and says plainly that nothing ran. The crawl starts
+# the bundle with --serve-deployed-folder, which is decided before any
+# application exists (PlantoirMain), so it takes no focus from the teacher. The must-fail is the same crawl
 # against python3 -m http.server, which adds no .html.
 if [[ -n "${PLANTOIR_APP:-}" ]]; then
   if python3 -I browser-checks/crawl_deployed_folder.py --app "$PLANTOIR_APP" "$TC_OUT/section1" \
@@ -6949,7 +6951,7 @@ if [[ -n "${PLANTOIR_APP:-}" ]]; then
     pass "and the crawl's must-fail failed as it should: $(head -1 /tmp/verify_deployed_folder_plain.log) from a server that adds no .html (#850)"
   fi
 else
-  skip "the deployed folder crawl through the app: PLANTOIR_APP names no Plantoir.app (#850)"
+  skip "SKIPPED, NOT A PASS: the deployed folder crawl through the app did not run, because PLANTOIR_APP is not set. Run again with PLANTOIR_APP=<the Plantoir.app built from this tree> (#850)"
 fi
 TC_STAMP="$(tr -d '[:space:]' < "$TC_SECTION/.built-with-toolchain" 2>/dev/null || true)"
 if [[ "$TC_STAMP" == "$DEV_TEST_IMAGE" ]]; then

@@ -1,6 +1,7 @@
 import SwiftUI
 
-@main
+/// The app itself. Its entry point is `PlantoirMain`, which hands over to
+/// this only when the process is to be an application at all (#850).
 struct QuartzTeachersApp: App {
 
     // MARK: - Stored properties
@@ -41,12 +42,6 @@ struct QuartzTeachersApp: App {
         // was, because it IS the app.
         if let folder = AssistMCPServer.requestedWorkingFolder(from: CommandLine.arguments) {
             AssistMCPServer.serve(workingFolder: folder)
-        }
-
-        // A deployed folder served with no window, for checks run from the
-        // command line (#850). Never returns.
-        if let folder = DeployedFolderCommandLine.requestedFolder(from: CommandLine.arguments) {
-            DeployedFolderCommandLine.serve(folder: folder)
         }
 
         // A scheduled deploy, fired by launchd. Checked before anything that

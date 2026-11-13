@@ -264,6 +264,7 @@ final class DeployedFolderResolutionTests: XCTestCase {
         XCTAssertEqual(limits["maximumHeaderBytes"] as? Int, DeployedFolderServer.maximumHeaderBytes)
         XCTAssertEqual(limits["secondsToSendTheHeaders"] as? Int, DeployedFolderServer.secondsToSendTheHeaders)
         XCTAssertEqual(limits["secondsIdleBetweenRequests"] as? Int, DeployedFolderServer.secondsIdleBetweenRequests)
+        XCTAssertEqual(limits["secondsToTakeAPiece"] as? Int, DeployedFolderServer.secondsToTakeAPiece)
     }
 
     func testEveryConnectionCase() async throws {
@@ -274,8 +275,9 @@ final class DeployedFolderResolutionTests: XCTestCase {
             kinds.append(try XCTUnwrap(testCase["kind"] as? String))
         }
         XCTAssertEqual(kinds.sorted(), [
-            "headersNotSentInTime", "headersTooLarge", "oneConnectionTooMany",
-            "requestLineTooLong", "theNetworkAddressIsRefused", "twoRequestsOnOneConnection",
+            "aConnectionPastTheMaximumMakesRoom", "headersNotSentInTime", "headersTooLarge",
+            "readersThatStopReading", "requestLineTooLong", "theNetworkAddressIsRefused",
+            "twoRequestsOnOneConnection",
         ], "a connection case this test does not know")
 
         let fixture: (root: URL, outside: URL, top: URL) = try DeployedFolderResolutionTests.makeFixture(files: ["index.html": "home"])
@@ -325,32 +327,72 @@ final class DeployedFolderResolutionTests: XCTestCase {
             close(slow)
         }
 
-        // oneConnectionTooMany
+        // aConnectionPastTheMaximumMakesRoom
         var silent: [Int32] = []
         var index: Int = 0
-        while index <= DeployedFolderServer.maximumConnections {
+        while index < DeployedFolderServer.maximumConnections {
             if let socket = RawHTTP.connect(port: port) {
                 silent.append(socket)
             }
             index += 1
         }
-        XCTAssertEqual(silent.count, DeployedFolderServer.maximumConnections + 1)
+        XCTAssertEqual(silent.count, DeployedFolderServer.maximumConnections)
+        let newcomer: RawHTTP.Answer? = RawHTTP.exchange(port: port, raw: Data("GET / HTTP/1.1\r\n\(host)Connection: close\r\n\r\n".utf8))
+        XCTAssertEqual(newcomer?.status, 200, "with every place taken by silent connections, a newcomer was not answered")
         var closed: Int = 0
         for socket in silent {
             if RawHTTP.closesWithin(socket, seconds: 0.2) {
                 closed += 1
             }
         }
-        if closed == 0 {
-            for socket in silent {
-                if RawHTTP.closesWithin(socket, seconds: 2) {
-                    closed += 1
-                    break
-                }
+        XCTAssertGreaterThanOrEqual(closed, 1, "no quiet connection was closed to make room")
+        for socket in silent {
+            close(socket)
+        }
+        await started.server.stop()
+    }
+
+    /// The implementation review's M2, measured there: 64 readers that ask
+    /// for a large file and never read held every place, and a normal
+    /// request was refused at 2 s and at 47 s.
+    func testReadersThatStopReadingDoNotShutTheSiteOut() async throws {
+        let fixture: (root: URL, outside: URL, top: URL) = try DeployedFolderResolutionTests.makeFixture(files: ["index.html": "home"])
+        defer {
+            try? FileManager.default.removeItem(at: fixture.top)
+        }
+        // Larger than any buffer between the two ends.
+        let big: Data = Data(count: 16 * 1024 * 1024)
+        try big.write(to: fixture.root.appendingPathComponent("big.mp4"))
+        let started: (server: DeployedFolderServer, firstWasTaken: Bool) = try await DeployedFolderServer.start(
+            root: fixture.root, candidates: DeployedFolderResolutionTests.testPorts(), onFolderGone: {}
+        )
+        let port: Int = started.server.port
+        var readers: [Int32] = []
+        var index: Int = 0
+        while index < DeployedFolderServer.maximumConnections {
+            if let socket = RawHTTP.connect(port: port, receiveBuffer: 4096) {
+                RawHTTP.send(socket, Data("GET /big.mp4 HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\n\r\n".utf8))
+                readers.append(socket)
+            }
+            index += 1
+        }
+        XCTAssertEqual(readers.count, DeployedFolderServer.maximumConnections)
+        let normal: RawHTTP.Answer? = RawHTTP.exchange(
+            port: port, raw: Data("GET / HTTP/1.1\r\nHost: 127.0.0.1:\(port)\r\nConnection: close\r\n\r\n".utf8)
+        )
+        XCTAssertEqual(normal?.status, 200, "64 readers that stopped reading shut a normal request out")
+        // One stalled reader the newcomer did not displace is closed once a
+        // piece has gone untaken for long enough.
+        let limit: Double = Double(DeployedFolderServer.secondsToTakeAPiece + 10)
+        var closedOne: Bool = false
+        for socket in readers.reversed() {
+            if RawHTTP.closedEvenAfterData(socket, seconds: limit) {
+                closedOne = true
+                break
             }
         }
-        XCTAssertGreaterThanOrEqual(closed, 1, "one connection past the maximum was kept open")
-        for socket in silent {
+        XCTAssertTrue(closedOne, "a reader that stopped reading was never closed")
+        for socket in readers {
             close(socket)
         }
         await started.server.stop()
@@ -392,10 +434,13 @@ nonisolated enum RawHTTP {
 
     // MARK: - Functions
 
-    static func connect(port: Int, address: String = "127.0.0.1") -> Int32? {
+    static func connect(port: Int, address: String = "127.0.0.1", receiveBuffer: Int32? = nil) -> Int32? {
         let socketHandle: Int32 = socket(AF_INET, SOCK_STREAM, 0)
         if socketHandle < 0 {
             return nil
+        }
+        if var size = receiveBuffer {
+            setsockopt(socketHandle, SOL_SOCKET, SO_RCVBUF, &size, socklen_t(MemoryLayout<Int32>.size))
         }
         var where_: sockaddr_in = sockaddr_in()
         where_.sin_family = sa_family_t(AF_INET)
@@ -505,6 +550,35 @@ nonisolated enum RawHTTP {
         var byte: UInt8 = 0
         let count: Int = recv(socketHandle, &byte, 1, MSG_PEEK | MSG_DONTWAIT)
         return count <= 0
+    }
+
+    /// Whether the peer closes within `seconds`, reading nothing of what it
+    /// sent: the bytes already waiting are left where they are, and the
+    /// close is seen as an error or an end on a peek past them.
+    static func closedEvenAfterData(_ socketHandle: Int32, seconds: Double) -> Bool {
+        let deadline: Date = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            var error: Int32 = 0
+            var length: socklen_t = socklen_t(MemoryLayout<Int32>.size)
+            getsockopt(socketHandle, SOL_SOCKET, SO_ERROR, &error, &length)
+            if error != 0 {
+                return true
+            }
+            var info: tcp_connection_info = tcp_connection_info()
+            var infoLength: socklen_t = socklen_t(MemoryLayout<tcp_connection_info>.size)
+            if getsockopt(socketHandle, IPPROTO_TCP, TCP_CONNECTION_INFO, &info, &infoLength) == 0 {
+                // TCPS_CLOSE_WAIT (5) and later: the server has closed its end.
+                if info.tcpi_state >= 5 {
+                    return true
+                }
+            }
+            var waiting: pollfd = pollfd(fd: socketHandle, events: Int16(POLLHUP), revents: 0)
+            _ = poll(&waiting, 1, 500)
+            if (waiting.revents & Int16(POLLHUP)) != 0 {
+                return true
+            }
+        }
+        return false
     }
 
     /// Sends one request as the case writes it, with Connection: close

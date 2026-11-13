@@ -45,12 +45,17 @@ nonisolated enum DeployedFolderWording {
     static let notDeployedYet: String = "Nothing has been deployed to this section’s folder yet. Deploy it first."
     static let folderNotFound: String = "Plantoir can’t find this section’s deploy folder. If it’s on a drive, connect the drive, or deploy again."
 
+    /// The button on the line that says the folder went away, which takes
+    /// the line down (the implementation review's L3).
+    static let dismissButton: String = "Dismiss"
+
     /// Said in the notice's place when the folder went away while shown.
     static let stoppedFolderGone: String = "Your deployed folder is no longer where it was, so Plantoir stopped showing it."
 
     /// The alert when it could not be opened.
     static let couldNotOpenTitle: String = "Your Deployed Folder Could Not Be Opened"
     static let couldNotOpen: String = "Plantoir could not show this folder in your web browser. Try again, or restart your computer if it happens again."
+    static let couldNotOpenButton: String = "OK"
 
     /// Under a finished deploy to a folder, in place of the note that said
     /// the pages would only look right on a web host.
@@ -80,6 +85,8 @@ nonisolated enum DeployedFolderWording {
             "couldNotOpenTitle": couldNotOpenTitle,
             "couldNotOpen": couldNotOpen,
             "renderNote": renderNote,
+            "dismissButton": dismissButton,
+            "couldNotOpenButton": couldNotOpenButton,
         ]
     }
 }

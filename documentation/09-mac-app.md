@@ -16185,7 +16185,15 @@ behave (the review's H1).
 **Limits** (the review's M1: a server with none held 300 of 300 half-sent
 requests open after 12 seconds): 64 connections, a request line of 8 KiB
 (414), headers of 16 KiB (431), 10 s to send the headers, 30 s idle between
-requests, and a GET that says it has a body is answered 400 and closed.
+requests, 30 s for a reader to take each piece of an answer, and a GET that
+says it has a body is answered 400 and closed. **When all 64 places are
+taken, the connection that has been quiet longest is closed to make room**,
+so a newcomer always gets in. Both came from the implementation review's
+M2: 64 readers that asked for a 200 MB file and never read held every
+place, and a normal request was refused at 2 s and again at 47 s. Refusing
+the newcomer, which the first version did, is what let a paused video or a
+reader that stopped shut the teacher's own browser out; a reserve of places
+was rejected because the readers could take those too.
 
 ### The address
 
@@ -16217,9 +16225,18 @@ preview's, and a one-time key cookie was offered and declined.
 - The limits against the built app: a 8,300-byte request line 414 and
   closed; 16,500 bytes of headers 431; two pipelined requests both
   answered; a connection that sent only its request line closed after
-  10.5 s; of 65 silent connections, 1 closed; a connection to this Mac's
+  10.5 s; of 65 silent connections, 1 closed (the first version, which
+  refused the newcomer; it now closes the quietest and answers the
+  newcomer, to be measured, below); a connection to this Mac's
   network address (192.168.1.x) refused; `Host: 127.0.0.1.evil.example`
   400.
+- **Owed, with the screen free** (the fix round ran with the teacher at the
+  keyboard, so nothing that starts the app ran): `browser-checks/
+  check_headless_modes.py --app <bundle>` (is the headless child an
+  application, did the front application change, how fast does it leave)
+  on faac3da1b and on the fix; `DeployedFolderHeadlessTests`,
+  `testReadersThatStopReadingDoNotShutTheSiteOut` and the two quick-press
+  tests, with their numbers.
 - Not measured: a firewall prompt (this Mac's firewall is off; none is
   expected for a loopback-only listener, as `llama-server` already binds
   127.0.0.1 from this app), and Safari playing a video through it.
@@ -16227,9 +16244,51 @@ preview's, and a one-time key cookie was offered and declined.
 ### `--serve-deployed-folder`
 
 `Plantoir --serve-deployed-folder <folder>` serves a folder with no window,
-prints `DEPLOYED_FOLDER_ADDRESS=http://127.0.0.1:<port>/`, and exits when its
-standard input closes. It is for checks run from the command line, like
-`--mcp-stdio`; it remembers no address and writes no trail line.
+prints one line, `DEPLOYED_FOLDER_ADDRESS=http://127.0.0.1:<port>/` or
+`DEPLOYED_FOLDER_FAILED=<why>`, and exits when its standard input closes or
+on TERM. It remembers no address and writes no trail line.
+
+**It must never become an application** (the implementation review's
+HIGH). It runs from `verify.sh` and other checks while the teacher works,
+and at about 12:17 on 2026-11-13 the teacher's key window was taken while
+the reviewer started three of these; one printed nothing and two outlived
+their input. Not proven to be the cause, and the measurement is owed
+(above), but the code made it possible: the flag was read in
+`QuartzTeachersApp.init`, inside SwiftUI's `App.main`, after an
+`NSApplication` existed. It is now decided in `PlantoirMain`, the
+process's `@main`, before `QuartzTeachersApp.main()` is called, so the
+headless process never has an `NSApplication` at all and imports nothing
+that would make one. Its input is read on a thread of its own whose end
+calls `exit`, so nothing on the concurrency pool can keep it alive, and a
+watchdog prints the failed line and leaves if starting takes more than
+10 s, so a check never waits on silence. Rejected: setting the activation
+policy to prohibited after start-up (an application has already been made
+by then, and registered, which is the thing to prevent) and `LSUIElement`
+(it would hide the real app's Dock icon too).
+
+`--mcp-stdio` and `--write-contracts` are still decided in
+`QuartzTeachersApp.init`. Whether they are seen as applications is checked
+by the same script and reported, not changed, in #850.
+
+### What was left out, and why
+
+- **The plan's real-browser check** (`browser-checks/served_folder.mjs`:
+  follow a link without a reload, the sidebar, search, a quiz, GeoGebra, a
+  Python block, the styled 404) was not built. Only the href crawl landed,
+  and the crawl never requests what scripts fetch (`static/contentIndex.json`
+  for search, the module worker, Pyodide's files) or runs a page under the
+  new `nosniff` and `Cross-Origin-Resource-Policy` headers. It needs the app
+  started and a browser driven, which the fix round could not do with the
+  teacher at the keyboard. It goes to #597's browser-check gate.
+- **Names a strict host would serve that this refuses** (the review's L1):
+  a name ending in `.` (a page titled "Notes etc." is `Notes-etc..html`) and
+  the stems Windows reserves (`con`, `aux`, `nul`, `com1`…) are refused on the
+  Mac too, so such a page answers 404 here and 200 on Cloudflare. Rare, and
+  the price of the two apps answering alike.
+- **The section row's context menu reads the disk** when it is drawn (the
+  review's L6: the saved settings and the lease folder). Not measured; left
+  as it is, because a menu that offers Open in Browser without knowing the
+  folder is there would offer a press that does nothing.
 
 ### What Windows owes
 

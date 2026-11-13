@@ -1243,8 +1243,8 @@
       },
       {
         "event": "deployed folder no longer shown",
-        "carries": "the course and the section; why it stopped (Stop was pressed, Plantoir quit, the folder was gone); how many requests it answered and how many found nothing. Counts only, never an address: an address is a page name.",
-        "line": "stopped showing the deployed folder in the web browser — {Stop was pressed | Plantoir quit | the folder was gone} ({requests} requests, {missing} not found)",
+        "carries": "the course and the section; why it stopped (Stop was pressed, Plantoir quit, the folder was gone, it stopped on its own); how many requests it answered and how many found nothing. Counts only, never an address: an address is a page name.",
+        "line": "stopped showing the deployed folder in the web browser — {Stop was pressed | Plantoir quit | the folder was gone | it stopped on its own} ({requests} requests, {missing} not found)",
         "why": "#850. The not-found count is what makes 'a page would not open' reportable without asking which page."
       },
       {
@@ -41376,7 +41376,9 @@
       "stoppedFolderGone": "Your deployed folder is no longer where it was, so Plantoir stopped showing it.",
       "couldNotOpenTitle": "Your Deployed Folder Could Not Be Opened",
       "couldNotOpen": "Plantoir could not show this folder in your web browser. Try again, or restart your computer if it happens again.",
-      "renderNote": "Opened straight from the folder, its pages won’t work. Click Open in Browser to see them working."
+      "renderNote": "Opened straight from the folder, its pages won’t work. Click Open in Browser to see them working.",
+      "dismissButton": "Dismiss",
+      "couldNotOpenButton": "OK"
     },
     "wordingWhy": "None of these promises how a web host will behave (the plan review's H1): a folder deploy is the one destination whose host is unknown, and #849 measured a plain host answering 404 for every page link. They say what Plantoir shows. renderNote replaces the note that said the pages only display properly once on a web host. No word for what answers the browser (rule 1).",
     "offeredWhen": "Read on events, never on a clock: when the section shows, when a deploy ends, when a menu opens, when the pointer reaches the button, and when a show starts or stops. The folder is the course's folder destination (its first destination when that is a folder, else the first other one that is; a course has at most one), resolved exactly as folderPublishTarget resolves --to-folder, from the SAVED settings a deploy uses.",
@@ -41408,13 +41410,15 @@
       "maximumHeaderBytes": 16384,
       "secondsToSendTheHeaders": 10,
       "secondsIdleBetweenRequests": 30,
-      "why": "The plan review's M1: a server with no limits held 300 of 300 half-sent requests open after 12 seconds. A request line over the limit is answered 414, headers over theirs 431, and both close; a connection that has not sent its headers in time, or sits idle between requests too long, is closed; a connection past the maximum is closed at once."
+      "secondsToTakeAPiece": 30,
+      "why": "The plan review's M1: a server with no limits held 300 of 300 half-sent requests open after 12 seconds. A request line over the limit is answered 414, headers over theirs 431, and both close; a connection that has not sent its headers in time, or sits idle between requests too long, is closed; when every place is taken, the connection that has been quiet longest is closed to make room, so a newcomer - the teacher's own browser - always gets in; and a piece of an answer left untaken for secondsToTakeAPiece closes its connection. The last two are the implementation review's M2: 64 readers that asked for a 200 MB file and never read held every place, and a normal request was refused at 2 s and at 47 s."
     },
     "connectionCases": [
       {"kind": "requestLineTooLong", "expect": {"status": 414, "closes": true}},
       {"kind": "headersTooLarge", "expect": {"status": 431, "closes": true}},
       {"kind": "headersNotSentInTime", "expect": {"closedWithin": 15}},
-      {"kind": "oneConnectionTooMany", "expect": {"closed": true}, "why": "With maximumConnections open and silent, one more is closed."},
+      {"kind": "aConnectionPastTheMaximumMakesRoom", "expect": {"newcomerAnswered": true, "oneQuietConnectionClosed": true}, "why": "With maximumConnections open and silent, one more is let in and answered, and the quietest is closed to make room."},
+      {"kind": "readersThatStopReading", "expect": {"aNormalRequestAnswered": true, "aStalledReaderClosedWithin": 40}, "why": "maximumConnections readers ask for a large file and never read: a normal request is still answered, and a stalled reader is closed once a piece has gone untaken for secondsToTakeAPiece (the implementation review's M2)."},
       {"kind": "twoRequestsOnOneConnection", "expect": {"bothAnswered": true}},
       {"kind": "theNetworkAddressIsRefused", "expect": {"refused": true}, "why": "Bound to 127.0.0.1 only, as previews since #684: a connection through this computer's own network address is refused."}
     ],
@@ -41551,6 +41555,10 @@
       {"when": "a request finds the folder gone", "then": "stopped; the window says wording.stoppedFolderGone until dismissed"},
       {"when": "the section's window closes", "then": "NOT stopped: the browser tab outlives the window (Russell, 2026-11-13)"},
       {"when": "a deploy to the same folder", "then": "NOT stopped: the next reload shows the new site"},
+      {"when": "two presses of Open in Browser before the first has started showing", "then": "ONE show: the second joins the first, both hand the browser the same address, and Stop ends it (the implementation review's M1)"},
+      {"when": "Stop is pressed while the show is still starting", "then": "it is stopped as soon as it has started; nothing is left listening"},
+      {"when": "Stop on a section with two shows, one started before its deploy folder was changed", "then": "both are stopped (the implementation review's L5)"},
+      {"when": "the listener ends without being asked", "then": "the show is dropped and the trail says it stopped on its own (the implementation review's L4)"},
       {"when": "Open in Browser is pressed again while it runs", "then": "the same address opens again and nothing new starts; the trail says already open"}
     ],
     "rejected": [

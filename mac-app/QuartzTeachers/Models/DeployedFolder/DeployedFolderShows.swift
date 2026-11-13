@@ -50,6 +50,9 @@ final class DeployedFolderShows {
         case stopPressed = "Stop was pressed"
         case plantoirQuit = "Plantoir quit"
         case folderGone = "the folder was gone"
+        /// The listener ended without being asked (the implementation
+        /// review's L4).
+        case endedOnItsOwn = "it stopped on its own"
     }
 
     /// Why opening did not happen, for the trail.
@@ -78,16 +81,21 @@ final class DeployedFolderShows {
     /// folder"), so their window can say so until it is dismissed.
     private(set) var stoppedBecauseTheFolderWentAway: Set<String> = []
 
-    /// Tests only: shows counted as open without a listener, for the quit
-    /// case.
+    /// Starts not yet finished, by canonical folder path: a second press
+    /// joins the first.
+    private var startsUnderWay: [String: Task<Show?, Never>] = [:]
+
+    /// Which section each start under way is for ("course/section/working
+    /// folder"), so Stop on a section reaches its start too.
+    private var startingFor: [String: String] = [:]
+
+    /// Folders whose Stop was pressed while their start was still under way.
+    private var stopsAskedForWhileStarting: Set<String> = []
+
+    /// Tests only: how many shows the quit case says are open. The quit
+    /// rule reads none of this on purpose (a shown folder is never asked
+    /// about); the case holds a later change that counted shows to account.
     var pretendShownForTests: Int = 0
-
-    // MARK: - Computed properties
-
-    /// How many are shown, for the quit rule.
-    var shownCount: Int {
-        return shows.count + pretendShownForTests
-    }
 
     // MARK: - Functions: looking
 
@@ -178,7 +186,20 @@ final class DeployedFolderShows {
         let canonicalRoot: String = FolderIdentity.canonicalPath(sectionFolder.path)
         for show in shows where show.id == canonicalRoot {
             ActivityTrail.note(
-                .deployedFolderOpened, "opened the deployed folder in the web browser (\(from.rawValue), already open)",
+                .deployedFolderOpened, DeployedFolderShows.openedLine(from: from, alreadyOpen: true, moved: false),
+                course: courseCode, section: sectionNumber
+            )
+            return handOver(show, courseCode: courseCode, sectionNumber: sectionNumber, openInBrowser: openInBrowser)
+        }
+        // A second press while the first is still starting joins it, so two
+        // quick presses start ONE show (the implementation review's M1: both
+        // passed the check above, both started, and Stop ended only one).
+        if let starting = startsUnderWay[canonicalRoot] {
+            guard let show = await starting.value else {
+                return false
+            }
+            ActivityTrail.note(
+                .deployedFolderOpened, DeployedFolderShows.openedLine(from: from, alreadyOpen: true, moved: false),
                 course: courseCode, section: sectionNumber
             )
             return handOver(show, courseCode: courseCode, sectionNumber: sectionNumber, openInBrowser: openInBrowser)
@@ -191,19 +212,48 @@ final class DeployedFolderShows {
             noteCouldNotOpen(.nothingDeployed, courseCode: courseCode, sectionNumber: sectionNumber)
             return false
         }
+        let starting: Task<Show?, Never> = Task { @MainActor in
+            return await self.startShowing(
+                canonicalRoot: canonicalRoot, courseCode: courseCode, sectionNumber: sectionNumber,
+                workingFolderPath: workingFolderPath, from: from, defaults: defaults
+            )
+        }
+        startsUnderWay[canonicalRoot] = starting
+        startingFor[canonicalRoot] = DeployedFolderShows.key(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolderPath: workingFolderPath
+        )
+        let started: Show? = await starting.value
+        startsUnderWay.removeValue(forKey: canonicalRoot)
+        startingFor.removeValue(forKey: canonicalRoot)
+        guard let show = started else {
+            return false
+        }
+        return handOver(show, courseCode: courseCode, sectionNumber: sectionNumber, openInBrowser: openInBrowser)
+    }
+
+    /// Starts one show and records it, or nil (and a trail line) when no
+    /// address was free. A Stop pressed while it started ends it at once.
+    private func startShowing(
+        canonicalRoot: String, courseCode: String, sectionNumber: Int, workingFolderPath: String,
+        from: From, defaults: UserDefaults
+    ) async -> Show? {
         let remembered: Int? = DeployedFolderAddress.rememberedPort(forCanonicalPath: canonicalRoot, defaults: defaults)
         let candidates: [Int] = DeployedFolderAddress.candidates(forCanonicalPath: canonicalRoot, remembered: remembered)
         let root: URL = URL(fileURLWithPath: canonicalRoot)
         let started: (server: DeployedFolderServer, firstWasTaken: Bool)
         do {
-            started = try await DeployedFolderServer.start(root: root, candidates: candidates) {
+            started = try await DeployedFolderServer.start(root: root, candidates: candidates, onFolderGone: {
                 Task { @MainActor in
                     DeployedFolderShows.shared.theFolderWentAway(canonicalRoot: canonicalRoot)
                 }
-            }
+            }, onEnded: {
+                Task { @MainActor in
+                    DeployedFolderShows.shared.theListenerEnded(canonicalRoot: canonicalRoot)
+                }
+            })
         } catch {
             noteCouldNotOpen(.noFreeAddress, courseCode: courseCode, sectionNumber: sectionNumber)
-            return false
+            return nil
         }
         DeployedFolderAddress.remember(port: started.server.port, forCanonicalPath: canonicalRoot, defaults: defaults)
         let show: Show = Show(
@@ -211,12 +261,16 @@ final class DeployedFolderShows {
             workingFolderPath: workingFolderPath, root: root, port: started.server.port, server: started.server
         )
         shows.append(show)
-        var what: String = "opened the deployed folder in the web browser (\(from.rawValue))"
-        if started.firstWasTaken {
-            what = "opened the deployed folder in the web browser (\(from.rawValue), at a different address because its usual one was taken, so what the site remembered there is not shown)"
+        ActivityTrail.note(
+            .deployedFolderOpened, DeployedFolderShows.openedLine(from: from, alreadyOpen: false, moved: started.firstWasTaken),
+            course: courseCode, section: sectionNumber
+        )
+        if stopsAskedForWhileStarting.contains(canonicalRoot) {
+            stopsAskedForWhileStarting.remove(canonicalRoot)
+            stop(show, reason: .stopPressed)
+            return nil
         }
-        ActivityTrail.note(.deployedFolderOpened, what, course: courseCode, section: sectionNumber)
-        return handOver(show, courseCode: courseCode, sectionNumber: sectionNumber, openInBrowser: openInBrowser)
+        return show
     }
 
     /// Hands the address to the browser; says so on the trail when it would
@@ -231,9 +285,31 @@ final class DeployedFolderShows {
 
     private func noteCouldNotOpen(_ why: CouldNotOpen, courseCode: String, sectionNumber: Int) {
         ActivityTrail.note(
-            .deployedFolderCouldNotBeOpened, "could not open the deployed folder in the web browser — \(why.rawValue)",
+            .deployedFolderCouldNotBeOpened, DeployedFolderShows.couldNotOpenLine(why),
             course: courseCode, section: sectionNumber
         )
+    }
+
+    // MARK: - Functions: the trail's words
+
+    /// "opened the deployed folder in the web browser (…)", as
+    /// `activityTrail.mustRecord` writes it.
+    static func openedLine(from: From, alreadyOpen: Bool, moved: Bool) -> String {
+        if alreadyOpen {
+            return "opened the deployed folder in the web browser (\(from.rawValue), already open)"
+        }
+        if moved {
+            return "opened the deployed folder in the web browser (\(from.rawValue), at a different address because its usual one was taken, so what the site remembered there is not shown)"
+        }
+        return "opened the deployed folder in the web browser (\(from.rawValue))"
+    }
+
+    static func stoppedLine(_ reason: StopReason, requests: Int, notFound: Int) -> String {
+        return "stopped showing the deployed folder in the web browser — \(reason.rawValue) (\(requests) requests, \(notFound) not found)"
+    }
+
+    static func couldNotOpenLine(_ why: CouldNotOpen) -> String {
+        return "could not open the deployed folder in the web browser — \(why.rawValue)"
     }
 
     /// Stops showing one folder.
@@ -268,9 +344,27 @@ final class DeployedFolderShows {
     }
 
     /// Stop on a section: the notice's button and the menu item.
+    ///
+    /// Every show of the section, not only the first: one started before the
+    /// course's deploy folder was changed is the section's too (the
+    /// implementation review's L5). A start still under way for it is
+    /// stopped as soon as it finishes.
     func stop(courseCode: String, sectionNumber: Int, workingFolderPath: String) {
-        if let show = show(courseCode: courseCode, sectionNumber: sectionNumber, workingFolderPath: workingFolderPath) {
+        var ending: [Show] = []
+        for show in shows {
+            if show.courseCode == courseCode && show.sectionNumber == sectionNumber
+                && FolderIdentity.isSameFolder(show.workingFolderPath, workingFolderPath) {
+                ending.append(show)
+            }
+        }
+        for show in ending {
             stop(show, reason: .stopPressed)
+        }
+        let section: String = DeployedFolderShows.key(
+            courseCode: courseCode, sectionNumber: sectionNumber, workingFolderPath: workingFolderPath
+        )
+        for (root, owner) in startingFor where owner == section {
+            stopsAskedForWhileStarting.insert(root)
         }
     }
 
@@ -287,6 +381,14 @@ final class DeployedFolderShows {
         }
     }
 
+    /// The listener ended without being asked. Our own Stop removes the
+    /// show first, so this finds nothing then.
+    func theListenerEnded(canonicalRoot: String) {
+        for show in shows where show.id == canonicalRoot {
+            stop(show, reason: .endedOnItsOwn)
+        }
+    }
+
     /// The server found its folder gone.
     func theFolderWentAway(canonicalRoot: String) {
         for show in shows where show.id == canonicalRoot {
@@ -297,7 +399,7 @@ final class DeployedFolderShows {
     static func noteStopped(_ reason: StopReason, counts: (requests: Int, notFound: Int), courseCode: String, sectionNumber: Int) {
         ActivityTrail.note(
             .deployedFolderNoLongerShown,
-            "stopped showing the deployed folder in the web browser — \(reason.rawValue) (\(counts.requests) requests, \(counts.notFound) not found)",
+            stoppedLine(reason, requests: counts.requests, notFound: counts.notFound),
             course: courseCode, section: sectionNumber
         )
     }
@@ -309,6 +411,7 @@ final class DeployedFolderShows {
         }
         shows = []
         stoppedBecauseTheFolderWentAway = []
+        stopsAskedForWhileStarting = []
         pretendShownForTests = 0
     }
 }

@@ -176,8 +176,9 @@ final class DeployedFolderOfferTests: XCTestCase {
         XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: show.port), "still answering after Stop")
 
         let trail: String = DeployedFolderOfferTests.trailText(in: trailFolder)
-        XCTAssertTrue(trail.contains(ActivityTrail.Event.deployedFolderOpened.rawValue) || trail.contains("opened the deployed folder"))
-        XCTAssertTrue(trail.contains("already open"), "the second press is on the trail as already open")
+        XCTAssertTrue(trail.contains(DeployedFolderShows.openedLine(from: .result, alreadyOpen: false, moved: false)))
+        XCTAssertTrue(trail.contains(DeployedFolderShows.openedLine(from: .sectionMenu, alreadyOpen: true, moved: false)),
+                      "the second press is on the trail as already open")
         XCTAssertFalse(trail.contains(section.path), "the trail names the folder's path")
         XCTAssertFalse(trail.contains("127.0.0.1"), "the trail names the address")
     }
@@ -207,7 +208,98 @@ final class DeployedFolderOfferTests: XCTestCase {
         XCTAssertFalse(opened)
         XCTAssertEqual(handed, 0)
         XCTAssertTrue(shows.shows.isEmpty)
-        XCTAssertTrue(DeployedFolderOfferTests.trailText(in: trailFolder).contains("could not open the deployed folder"))
+        XCTAssertTrue(DeployedFolderOfferTests.trailText(in: trailFolder).contains(DeployedFolderShows.couldNotOpenLine(.folderNotFound)))
+    }
+
+    /// A made-up deployed section and a scratch trail, for the tests below.
+    func makeASection(named name: String) throws -> (section: URL, top: URL, trail: URL) {
+        let fileManager: FileManager = FileManager.default
+        let top: URL = fileManager.temporaryDirectory
+            .appendingPathComponent("deployed-folder-\(name)-\(UUID().uuidString)")
+            .resolvingSymlinksInPath()
+        let section: URL = top.appendingPathComponent("published").appendingPathComponent("section1")
+        try fileManager.createDirectory(at: section, withIntermediateDirectories: true)
+        try Data("home".utf8).write(to: section.appendingPathComponent("index.html"))
+        let trail: URL = top.appendingPathComponent("trail")
+        try fileManager.createDirectory(at: trail, withIntermediateDirectories: true)
+        return (section: section, top: top, trail: trail)
+    }
+
+    /// The implementation review's M1: two presses before the first has
+    /// started must start ONE show, and Stop must leave nothing listening.
+    /// Fails where the second press passed the "already shown" check while
+    /// the first was still starting.
+    func testTwoQuickPressesStartOneShowAndStopLeavesNothingListening() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "quick")
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        defer {
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let defaults: UserDefaults = TestDefaults.make()
+        let workingFolder: String = made.top.path
+        // Both pressed before either has finished starting: two tasks on the
+        // main actor, the second running while the first waits for its
+        // listener.
+        let section: URL = made.section
+        let first: Task<Bool, Never> = Task { @MainActor in
+            return await shows.open(
+                sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+                from: .toolbar, defaults: defaults, openInBrowser: { _ in true }
+            )
+        }
+        let second: Task<Bool, Never> = Task { @MainActor in
+            return await shows.open(
+                sectionFolder: section, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+                from: .result, defaults: defaults, openInBrowser: { _ in true }
+            )
+        }
+        let answers: [Bool] = [await first.value, await second.value]
+        XCTAssertEqual(answers, [true, true])
+        XCTAssertEqual(shows.shows.count, 1, "two quick presses started two shows")
+        let port: Int = try XCTUnwrap(shows.shows.first).port
+        let neighbour: Int = port + 1
+        let neighbourWasFree: Bool = !RawHTTP.canConnect(address: "127.0.0.1", port: neighbour)
+        shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        XCTAssertTrue(shows.shows.isEmpty)
+        XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: port), "still listening after Stop")
+        if neighbourWasFree {
+            XCTAssertFalse(RawHTTP.canConnect(address: "127.0.0.1", port: neighbour), "a second listener was left behind")
+        }
+    }
+
+    /// Stop on a section ends every show of it (the review's L5): one
+    /// started before its deploy folder was changed included.
+    func testStopEndsEveryShowOfTheSection() async throws {
+        let made: (section: URL, top: URL, trail: URL) = try makeASection(named: "two")
+        let other: URL = made.top.appendingPathComponent("moved").appendingPathComponent("section1")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try Data("home".utf8).write(to: other.appendingPathComponent("index.html"))
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.trail)
+        let shows: DeployedFolderShows = DeployedFolderShows.shared
+        shows.resetForTests()
+        defer {
+            shows.resetForTests()
+            ActivityTrail.store = previousTrail
+            try? FileManager.default.removeItem(at: made.top)
+        }
+        let defaults: UserDefaults = TestDefaults.make()
+        let workingFolder: String = made.top.path
+        for folder in [made.section, other] {
+            let opened: Bool = await shows.open(
+                sectionFolder: folder, courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder,
+                from: .sectionMenu, defaults: defaults, openInBrowser: { _ in true }
+            )
+            XCTAssertTrue(opened)
+        }
+        XCTAssertEqual(shows.shows.count, 2)
+        shows.stop(courseCode: "SCH3U", sectionNumber: 1, workingFolderPath: workingFolder)
+        XCTAssertTrue(shows.shows.isEmpty, "Stop left a show of the section running")
     }
 
     static func trailText(in folder: URL) -> String {

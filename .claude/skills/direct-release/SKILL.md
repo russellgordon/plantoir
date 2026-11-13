@@ -145,7 +145,7 @@ A change to documents alone needs no gate unless a test reads the document
 |---|---|---|
 | Never edit | `windows-app/` | `mac-app/` |
 | The other side's work goes in | a `windows` issue | a `mac` issue |
-| Gates | the mac suite, `verify.sh`, and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
+| Gates | the mac suite, `verify.sh` (with `PLANTOIR_APP` naming the bundle built from the tree under test, or #850's crawl is skipped), and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
 | Not a gate | the UI test target: opt-in, alone on a quiet machine | `run-ui-tests.ps1`: opt-in, needs the screen, closes Plantoir |
 | The image (Dockerfile, baked files) | gated by `verify.sh` | not gated here: a change made on Windows needs a `mac` issue |
 | Generated contract halves | `Plantoir --write-contracts` | cannot regenerate: propose authored cases, open a `mac` issue |

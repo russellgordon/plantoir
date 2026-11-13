@@ -34,7 +34,12 @@ import Synchronization
 ///
 /// **Limits** (the plan review's M1, which held 300 of 300 half-sent
 /// requests open against a server with none): `limits` below, pinned
-/// against `deployedFolderInBrowser.limits` in the contract.
+/// against `deployedFolderInBrowser.limits` in the contract. When all the
+/// places are taken, the connection that has been quiet longest is closed to
+/// make room, and a piece of an answer left untaken for
+/// `secondsToTakeAPiece` closes its connection, so readers that stop reading
+/// cannot shut the teacher's own browser out (the implementation review's
+/// M2).
 actor DeployedFolderServer {
 
     // MARK: - Types
@@ -46,8 +51,17 @@ actor DeployedFolderServer {
         /// Bumped whenever a deadline is set or cleared; a deadline that
         /// fires with an older token is ignored.
         var deadlineToken: Int = 0
-        /// An answer is being sent; no deadline applies while it is.
+        /// An answer is being sent; the header deadline does not apply
+        /// while it is, the send deadline does.
         var isAnswering: Bool = false
+        /// Bumped whenever a piece is handed over or taken; a send deadline
+        /// that fires with an older token is ignored.
+        var sendToken: Int = 0
+        /// When the connection last did anything: bytes arrived, or a piece
+        /// was taken. The least recent makes room when the server is full.
+        var lastActivity: ContinuousClock.Instant = ContinuousClock.now
+        /// The order connections arrived in, to break a tie.
+        var arrival: Int = 0
     }
 
     /// Why starting found no address.
@@ -64,6 +78,11 @@ actor DeployedFolderServer {
     nonisolated static let maximumHeaderBytes: Int = 16 * 1024
     nonisolated static let secondsToSendTheHeaders: Int = 10
     nonisolated static let secondsIdleBetweenRequests: Int = 30
+    /// How long a reader may leave a piece of an answer untaken before the
+    /// connection closes (the implementation review's M2: 64 readers that
+    /// never read held every place, and a normal request was refused at
+    /// 2 s and at 47 s).
+    nonisolated static let secondsToTakeAPiece: Int = 30
     nonisolated static let bytesPerPiece: Int = 256 * 1024
 
     /// The one queue the framework delivers on (see the header).
@@ -101,7 +120,8 @@ actor DeployedFolderServer {
     /// `firstWasTaken` says whether the usual address was held, for the
     /// trail.
     static func start(
-        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable () -> Void
+        root: URL, candidates: [Int], onFolderGone: @escaping @Sendable () -> Void,
+        onEnded: @escaping @Sendable () -> Void = {}
     ) async throws -> (server: DeployedFolderServer, firstWasTaken: Bool) {
         var tried: Int = 0
         for candidate in candidates {
@@ -129,6 +149,17 @@ actor DeployedFolderServer {
             }
             let started: Bool = await DeployedFolderServer.waitUntilListening(listener)
             if started {
+                // Still listening for its state once it is ready, so a
+                // listener that fails later is noticed (the implementation
+                // review's L4).
+                listener.stateUpdateHandler = { state in
+                    switch state {
+                    case .failed, .cancelled:
+                        onEnded()
+                    default:
+                        break
+                    }
+                }
                 return (server: server, firstWasTaken: tried > 0)
             }
             listener.cancel()
@@ -185,13 +216,22 @@ actor DeployedFolderServer {
     // MARK: - Functions: connections
 
     func accept(_ connection: NWConnection) {
-        if isStopped || connections.count >= DeployedFolderServer.maximumConnections {
+        if isStopped {
             connection.cancel()
             return
         }
+        // Full: the connection that has done nothing for longest makes room,
+        // so a new one (the teacher's own browser) always gets in. A paused
+        // video or a reader that stopped reading is the one that goes, not
+        // the newcomer (the implementation review's M2).
+        if connections.count >= DeployedFolderServer.maximumConnections {
+            closeTheLeastRecentlyActive()
+        }
         let identifier: Int = nextConnectionID
         nextConnectionID += 1
-        connections[identifier] = ConnectionState(connection: connection)
+        var fresh: ConnectionState = ConnectionState(connection: connection)
+        fresh.arrival = identifier
+        connections[identifier] = fresh
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed, .cancelled:
@@ -205,6 +245,70 @@ actor DeployedFolderServer {
         connection.start(queue: DeployedFolderServer.deliveryQueue)
         armDeadline(identifier, seconds: DeployedFolderServer.secondsToSendTheHeaders)
         receiveMore(identifier)
+    }
+
+    /// Closes the connection that has been quiet longest.
+    func closeTheLeastRecentlyActive() {
+        var chosen: Int? = nil
+        var chosenState: ConnectionState? = nil
+        for (identifier, state) in connections {
+            if let current = chosenState {
+                if state.lastActivity < current.lastActivity
+                    || (state.lastActivity == current.lastActivity && state.arrival < current.arrival) {
+                    chosen = identifier
+                    chosenState = state
+                }
+            } else {
+                chosen = identifier
+                chosenState = state
+            }
+        }
+        if let chosen {
+            close(chosen)
+        }
+    }
+
+    /// Notes that a connection did something.
+    func noteActivity(_ identifier: Int) {
+        guard var state = connections[identifier] else {
+            return
+        }
+        state.lastActivity = ContinuousClock.now
+        connections[identifier] = state
+    }
+
+    /// A send deadline: the connection closes if this piece has not been
+    /// taken when it passes. A real timeout.
+    func armSendDeadline(_ identifier: Int) {
+        guard var state = connections[identifier] else {
+            return
+        }
+        state.sendToken += 1
+        let token: Int = state.sendToken
+        connections[identifier] = state
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(DeployedFolderServer.secondsToTakeAPiece))
+            await self?.sendDeadlinePassed(identifier, token: token)
+        }
+    }
+
+    func sendDeadlinePassed(_ identifier: Int, token: Int) {
+        guard let state = connections[identifier] else {
+            return
+        }
+        if state.sendToken == token && state.isAnswering {
+            close(identifier)
+        }
+    }
+
+    /// A piece was taken: the send deadline is cleared until the next one.
+    func pieceTaken(_ identifier: Int) {
+        guard var state = connections[identifier] else {
+            return
+        }
+        state.sendToken += 1
+        state.lastActivity = ContinuousClock.now
+        connections[identifier] = state
     }
 
     func forget(_ identifier: Int) {
@@ -240,6 +344,7 @@ actor DeployedFolderServer {
         let wasEmpty: Bool = state.buffer.isEmpty
         if let data {
             state.buffer.append(data)
+            state.lastActivity = ContinuousClock.now
         }
         connections[identifier] = state
         if wasEmpty && !state.buffer.isEmpty {
@@ -419,8 +524,10 @@ actor DeployedFolderServer {
         }
         let closes: Bool = answer.closesTheConnection
         let body: DeployedFolderResolver.Body = answer.body
+        armSendDeadline(identifier)
         state.connection.send(content: head, completion: .contentProcessed { [weak self] error in
             Task {
+                await self?.pieceTaken(identifier)
                 await self?.sentTheHead(identifier, body: body, closes: closes, failed: error != nil)
             }
         })
@@ -467,8 +574,10 @@ actor DeployedFolderServer {
             return
         }
         let sent: UInt64 = UInt64(piece.count)
+        armSendDeadline(identifier)
         state.connection.send(content: piece, completion: .contentProcessed { [weak self] error in
             Task {
+                await self?.pieceTaken(identifier)
                 await self?.sentAPiece(
                     identifier, handle: handle, position: position + sent,
                     remaining: remaining - sent, closes: closes, failed: error != nil

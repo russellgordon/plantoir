@@ -188,7 +188,7 @@ extension SectionDetailView {
                 refreshTheDeployedFolder()
             }
             .alert(DeployedFolderWording.couldNotOpenTitle, isPresented: $deployedFolderCouldNotOpen) {
-                Button("OK") {}
+                Button(DeployedFolderWording.couldNotOpenButton) {}
             } message: {
                 Text(DeployedFolderWording.couldNotOpen)
             }
