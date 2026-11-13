@@ -78,22 +78,29 @@ final class QuitConfirmationTests: XCTestCase {
     }
 
     /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared` (#863): a share
-    /// of unit plans is asked about in the contract's words, which name it
-    /// as sharing and never as deploying. Run through the no-argument forms
-    /// the delegate calls, with the share held the way `PlanShareRunner`
-    /// holds it, so a change to either the words or the record they are
-    /// chosen from fails here.
+    /// of unit plans is asked about in its own words, alone and beside
+    /// deploys, and is never counted as a section being deployed. Run
+    /// through the no-argument forms the delegate calls, with each share held
+    /// the way `PlanShareRunner` holds it, so a change to the words or to the
+    /// record they are chosen from fails here.
     func testSharingUnitPlansIsAskedAboutInTheContractsWords() throws {
         let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
         let block: [String: Any] = try XCTUnwrap(section["whileUnitPlansAreShared"] as? [String: Any])
-        let questionTemplate: String = try XCTUnwrap(block["question"] as? String)
-        let message: String = try XCTUnwrap(block["message"] as? String)
-        let trailTemplate: String = try XCTUnwrap(block["trailLine"] as? String)
+        let words: [String: Any] = try XCTUnwrap(block["words"] as? [String: Any])
+        XCTAssertEqual(words["shareMessage"] as? String, QuitConfirmation.shareMessage)
+        XCTAssertEqual(words["deployAndShareMessage"] as? String, QuitConfirmation.deployAndShareMessage)
+        XCTAssertEqual(words["deployMessage"] as? String, QuitConfirmation.explanation(publishing: true))
+        XCTAssertNil(block["notSettledHere"], "Settled by Russell on 2026-11-13 (#863)")
+        let shareMessage: String = try XCTUnwrap(words["shareMessage"] as? String)
+        XCTAssertFalse(shareMessage.contains("class website"), "A share does not touch the class website")
+
+        let questionTemplate: String = try XCTUnwrap(words["question"] as? String)
+        let trailTemplate: String = try XCTUnwrap(words["trailLine"] as? String)
         let answers: [String: Any] = try XCTUnwrap(block["answers"] as? [String: Any])
         let keptAnswer: String = try XCTUnwrap(answers["keepWorking"] as? String)
         let quitAnswer: String = try XCTUnwrap(answers["quitAnyway"] as? String)
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 3)
+        XCTAssertGreaterThanOrEqual(cases.count, 7)
 
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
@@ -143,7 +150,6 @@ final class QuitConfirmationTests: XCTestCase {
                 continue
             }
             let asked: String = try XCTUnwrap(underWay, name)
-            let course: String = try XCTUnwrap(shares.first, name)
             let expectQuestion: String = try XCTUnwrap(testCase["expectQuestion"] as? String, name)
             let expectMessage: String = try XCTUnwrap(testCase["expectMessage"] as? String, name)
             let expectTrailKept: String = try XCTUnwrap(testCase["expectTrailKept"] as? String, name)
@@ -158,14 +164,15 @@ final class QuitConfirmationTests: XCTestCase {
                 QuitConfirmation.trailLine(workUnderWay: asked, choice: .quitAnyway), expectTrailQuit, name
             )
 
-            // The templates say the same as the case, so a reader building
-            // from the templates gets the case's words.
-            XCTAssertEqual(questionTemplate.replacingOccurrences(of: "{course}", with: course), expectQuestion, name)
-            XCTAssertEqual(message, expectMessage, name)
-            let trailForCourse: String = trailTemplate.replacingOccurrences(of: "{course}", with: course)
-            XCTAssertEqual(trailForCourse.replacingOccurrences(of: "{answer}", with: keptAnswer), expectTrailKept, name)
-            XCTAssertEqual(trailForCourse.replacingOccurrences(of: "{answer}", with: quitAnswer), expectTrailQuit, name)
-            XCTAssertFalse(expectQuestion.lowercased().contains("deploy"), "\(name): a share is never called a deploy")
+            // The templates give the case's words, so a reader building
+            // from the templates says what this app says.
+            XCTAssertEqual(questionTemplate.replacingOccurrences(of: "{underWay}", with: asked), expectQuestion, name)
+            let trailForWork: String = trailTemplate.replacingOccurrences(of: "{underWay}", with: asked)
+            XCTAssertEqual(trailForWork.replacingOccurrences(of: "{answer}", with: keptAnswer), expectTrailKept, name)
+            XCTAssertEqual(trailForWork.replacingOccurrences(of: "{answer}", with: quitAnswer), expectTrailQuit, name)
+            if publishCount == 0 {
+                XCTAssertFalse(expectQuestion.lowercased().contains("deploy"), "\(name): a share is never called a deploy")
+            }
         }
     }
 

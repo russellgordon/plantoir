@@ -374,8 +374,8 @@ final class PlanSharingTests: XCTestCase {
         }
         let explanation: String = try XCTUnwrap(written, "No unitPlanUsername in credentialRequests")
         XCTAssertTrue(explanation.contains(MachineWord.placeholder), explanation)
-        XCTAssertFalse(explanation.contains("this Mac"), explanation)
+        XCTAssertFalse(explanation.contains(MachineWord.onThisPlatform), explanation)
         XCTAssertEqual(MachineWord.filling(explanation), CredentialRequest.unitPlanUsername.explanation)
-        XCTAssertTrue(CredentialRequest.unitPlanUsername.explanation.contains("on this Mac,"))
+        XCTAssertNotEqual(explanation, CredentialRequest.unitPlanUsername.explanation, "the app fills the placeholder")
     }
 }

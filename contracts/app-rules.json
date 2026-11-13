@@ -4019,7 +4019,179 @@
         }
       ],
       "casesHow" : "Each case is the plain greeting of a Revise door for course and courseName, told about referenceCourses (already made as eachCourse says). expectSentence null: the greeting is exactly the one with no reference courses. Otherwise the greeting is the one with no reference courses, then one space, then expectSentence exactly, and nothing else (no unit-plans sentence is asked for in these cases).",
-      "eachCourse" : "'{folder} ({year})': the reference course's folder name, then its school year as the sidebar labels it ('2025–26', with an en dash), or 'Other' when it has none. Same code only: a course kept for reference whose displayed code is this course's, compared without regard to case. Sorted by that text, code point by code point. Never said on a course kept for reference, where no door opens.",
+      "eachCourse" : "'{folder} ({year})': the reference course's folder name, then its school year as the sidebar labels it ('2025–26', with an en dash), or 'Other' when it has none. Same code only: a course kept for reference whose displayed code is this course's, compared without regard to case. Sorted by that text, ordinal (codes are ASCII and the year label is fixed text, so Swift's String sort and an ordinal comparison in C# agree). Never said on a course kept for reference, where no door opens.",
+      "listCases" : [
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+            "ICS3U-2025 (2025–26)"
+          ],
+          "name" : "same code listed, another code left out",
+          "shelf" : [
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-2025",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2025
+            },
+            {
+              "courseCode" : "MCV4U",
+              "folder" : "MCV4U-2025",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2025
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "Same code only: last year's MCV4U is not this session's business."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+            "ics3u-old (2024–25)"
+          ],
+          "name" : "the code is compared without regard to case",
+          "shelf" : [
+            {
+              "courseCode" : "ics3u",
+              "folder" : "ics3u-old",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2024
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "A code typed in lower case on the shelf is still the same course; the folder is listed as it is spelled."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+            "ICS3U-2019 (Other)",
+            "ICS3U-OLD (Other)"
+          ],
+          "name" : "no school year, or one before the floor, is Other",
+          "shelf" : [
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-OLD",
+              "keptForReference" : true,
+              "referenceSchoolYear" : null
+            },
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-2019",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2019
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "The year is the one the sidebar files it under (referenceCourses.schoolYearRead): none, or a year not offered (before the floor), is the Other group."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+            "ICS3U-2023 (2023–24)",
+            "ICS3U-2025 (2025–26)",
+            "ICS3U-A (Other)"
+          ],
+          "name" : "sorted by the listed text",
+          "shelf" : [
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-2025",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2025
+            },
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-A",
+              "keptForReference" : true,
+              "referenceSchoolYear" : null
+            },
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-2023",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2023
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "Ordinal, on the whole listed text."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+
+          ],
+          "name" : "a course you teach is never listed",
+          "shelf" : [
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-S2",
+              "keptForReference" : false,
+              "referenceSchoolYear" : null
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "Only courses kept for reference are listed; a live course's displayed code is its folder anyway."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U-2025",
+            "keptForReference" : true
+          },
+          "expect" : [
+
+          ],
+          "name" : "a course kept for reference is told about none",
+          "shelf" : [
+            {
+              "courseCode" : "ICS3U",
+              "folder" : "ICS3U-2024",
+              "keptForReference" : true,
+              "referenceSchoolYear" : 2024
+            }
+          ],
+          "today" : "2026-09-20",
+          "why" : "No door opens on a course kept for reference, so it is never told about the others."
+        },
+        {
+          "course" : {
+            "courseCode" : "ICS3U",
+            "folder" : "ICS3U",
+            "keptForReference" : false
+          },
+          "expect" : [
+
+          ],
+          "name" : "nothing on the shelf",
+          "shelf" : [
+
+          ],
+          "today" : "2026-09-20",
+          "why" : "The overwhelming majority of courses: an empty list, so no sentence."
+        }
+      ],
+      "listCasesHow" : "How the list the sentence names is made, as eachCourse says, for Windows to run rather than work out. course is the course the door opens on (folder, its course_code and whether it is kept for reference); shelf is every OTHER course in the working folder, each with its folder, course_code, kept_for_reference and reference_school_year (null for none). expect is the list exactly, in order; an empty list means no sentence. today is the day the school years are read on (referenceCourses.schoolYearsOffered).",
       "separator" : ", ",
       "sentence" : "I also keep earlier {course} courses for reference: {courses}. You can read them and build on what is there; they are never deployed, and nothing in them can be changed.",
       "where" : "After the sentence that asks for the plan tool and agreement (it ends 'wait for me to agree.'), with one space before it, and before greetingUnitPlans' sentence when that is said. {course} is the course's code as the greeting names it; {courses} the list joined by separator. The whole greeting's double quotes become apostrophes as greetingCarriesNoDoubleQuotes says.",

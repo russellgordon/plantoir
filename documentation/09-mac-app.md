@@ -4774,7 +4774,11 @@ contract key, so Windows' greeting lacked it and no test noticed. It is now
 it goes, and four cases, run by
 `AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
 `ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
-`referenceCoursesSentence(courseCode:referenceCourses:)`. The mac's greeting
+`referenceCoursesSentence(courseCode:referenceCourses:)`; and seven
+`listCases` (the review's finding), which give a course and its shelf and
+expect the list, run through `referenceCoursesToMention` by
+`testTheReferenceCoursesListIsMadeAsTheContractSays`, so Windows runs how the
+list is made rather than working it out from `eachCourse`. The mac's greeting
 did not move by a byte (the old and new code compiled side by side and compared
 on four inputs), and the greeting is not shown to the local model, whose
 digest is unchanged.
@@ -16073,16 +16077,28 @@ this is the app's half.
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. Since #863 the question, its message and the
-  trail line for both answers are in the contract
-  (`quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`, three cases run by
-  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`),
-  because Windows was telling a teacher a deploy was still going. They are the
-  mac's own words, chosen by Russell; the message is the one a publish gets,
-  since the share is counted as a publish. NOT pinned: a share beside a
-  section's deploy, or two shares, which are two publishes and are asked about
-  as "deploying 2 sections" today; that is raised on #863 rather than written
-  down as the rule. A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a share has its own words on quit**
+  (Russell, 2026-11-13), in the contract so Windows says the same ones:
+  `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words`, with seven
+  cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`.
+  `QuitConfirmation.workUnderWay` splits the publishes by
+  `PlanSharing.leaseSection`: shares are named "sharing the unit plans of
+  <CODE>" or "of N courses", deploys as before, and both together as "deploying
+  … and sharing …". Before the fix two shares, or a share beside a deploy,
+  were "deploying 2 sections". The message under a share
+  (`QuitConfirmation.shareMessage`) says what a share stopped part way leaves,
+  read off `unitPlanning.share.interruptionCases`: its marker stays at
+  `sending`, the Planning tab shows `lastShareUnfinished`, and the address may
+  serve what was sent until Share Again or Stop Sharing; it never names the
+  class website, which a share does not touch. With deploys as well,
+  `deployAndShareMessage` names both. The update banner borrows the same
+  phrase (`UpdateGate.workUnderWay`), so it says sharing too. REJECTED: the
+  deploy's message for a share (the first commit's recording of the mac's old
+  words), which told a teacher the class website was part way updated; and
+  naming a Stop Sharing in flight separately, which the activity record cannot
+  tell from a share (both hold the same lease), and which the message already
+  covers ("until you share them again or stop sharing them"). A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):

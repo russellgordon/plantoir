@@ -116,6 +116,27 @@ enum QuitConfirmation {
         OSType(kAEShutDown)
     ]
 
+    /// The sentence under the question when unit plans are being shared and
+    /// no section is being deployed (#863, Russell 2026-11-13: sharing gets
+    /// its own words). A share stopped part way leaves the plans' marker at
+    /// `sending`, which the Planning tab reads as `lastShareUnfinished`: the
+    /// address may already serve what was sent until the next Share Again
+    /// finishes it or Stop Sharing takes it down
+    /// (`unitPlanning.share.interruptionCases`). It never names the class
+    /// website, which a share does not touch.
+    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.words.shareMessage`.
+    static let shareMessage: String =
+        "Quitting now could leave it unfinished, and anyone with the address could still "
+        + "open the plans until you share them again or stop sharing them."
+
+    /// The sentence when sections are being deployed AND unit plans shared:
+    /// both things a stopped run can leave, in one sentence.
+    /// `...whileUnitPlansAreShared.words.deployAndShareMessage`.
+    static let deployAndShareMessage: String =
+        "Quitting now could leave them unfinished: the class website could be part way "
+        + "updated, and anyone with the address could still open the plans until you share "
+        + "them again or stop sharing them."
+
     static let keepWorkingButton: String = "Keep Working"
     static let quitAnywayButton: String = "Quit Anyway"
 
@@ -169,15 +190,37 @@ enum QuitConfirmation {
         copies: [CourseActivity.CopyRecord] = []
     ) -> String? {
         _ = previews
-        if publishes.count == 1 {
-            let only: CourseActivity.PublishRecord = publishes[0]
-            if only.sectionNumber == PlanSharing.leaseSection {
-                return "sharing the unit plans of \(only.courseCode)"
+        // A share of unit plans is held as a publish under section 0, and is
+        // named as SHARING, never counted as a section being deployed (#863).
+        var deploys: [CourseActivity.PublishRecord] = []
+        var shares: [CourseActivity.PublishRecord] = []
+        for publish in publishes {
+            if publish.sectionNumber == PlanSharing.leaseSection {
+                shares.append(publish)
+            } else {
+                deploys.append(publish)
             }
-            return "deploying Section \(only.sectionNumber) of \(only.courseCode)"
         }
-        if publishes.count > 1 {
-            return "deploying \(publishes.count) sections"
+        var deploying: String?
+        if deploys.count == 1 {
+            deploying = "deploying Section \(deploys[0].sectionNumber) of \(deploys[0].courseCode)"
+        } else if deploys.count > 1 {
+            deploying = "deploying \(deploys.count) sections"
+        }
+        var sharing: String?
+        if shares.count == 1 {
+            sharing = "sharing the unit plans of \(shares[0].courseCode)"
+        } else if shares.count > 1 {
+            sharing = "sharing the unit plans of \(shares.count) courses"
+        }
+        if let deploying, let sharing {
+            return "\(deploying) and \(sharing)"
+        }
+        if let deploying {
+            return deploying
+        }
+        if let sharing {
+            return sharing
         }
         if previewBuilds.count == 1 {
             let only: CourseActivity.PreviewBuildRecord = previewBuilds[0]
@@ -258,7 +301,29 @@ enum QuitConfirmation {
     /// so the question and its explanation are chosen from the same record
     /// at the same moment. A publish wins here exactly as it does there.
     static func explanation() -> String {
-        return explanation(publishing: !CourseActivity.activePublishes.isEmpty)
+        var deploying: Bool = false
+        var sharing: Bool = false
+        for publish in CourseActivity.activePublishes {
+            if publish.sectionNumber == PlanSharing.leaseSection {
+                sharing = true
+            } else {
+                deploying = true
+            }
+        }
+        return explanation(deploying: deploying, sharing: sharing)
+    }
+
+    /// The sentence under the question, told what is being deployed and
+    /// what shared (#863). A share has its own sentence; with neither, the
+    /// preview build's or the copy's sentence.
+    static func explanation(deploying: Bool, sharing: Bool) -> String {
+        if deploying && sharing {
+            return deployAndShareMessage
+        }
+        if sharing {
+            return shareMessage
+        }
+        return explanation(publishing: deploying)
     }
 
     /// The sentence under the question.

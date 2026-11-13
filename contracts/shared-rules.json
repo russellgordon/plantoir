@@ -14708,18 +14708,27 @@
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
     },
     "whileUnitPlansAreShared": {
-      "rule": "Sharing a course's unit plans (#709) is work under way like a publish: the share holds the course under a lease of kind publish, so the app's record of active publishes counts it and quitting while it runs asks first. The question names it as SHARING, never as deploying (unitPlanning.share.theVerbIsShare). Since #863 the words are here, so both apps say the same ones; they are the mac's own, chosen by Russell on 2026-11-13 (question dialog, 'Use the Mac's sentence').",
-      "question": "Plantoir is still sharing the unit plans of {course}.",
-      "message": "Quitting now could leave it unfinished, with the class website part way updated.",
-      "messageIsThePublishes": "The message is the one a section's publish gets, because the share is counted as a publish. A preview build's message ('Nothing on the class website changes') is never shown for a share.",
-      "trailLine": "asked whether to quit while still sharing the unit plans of {course}, and the teacher {answer}",
+      "rule": "Sharing a course's unit plans (#709) is work under way like a publish: the share holds the course under a lease of kind publish, so quitting while it runs asks first. Since #863 (Russell, 2026-11-13: sharing gets its own wording on quit) a share is named as SHARING in the question, never counted as a section being deployed (unitPlanning.share.theVerbIsShare), and the message under it says what a share stopped part way leaves, never the class website, which a share does not touch. When sections are deployed as well, the question names both, the deploys first, and the message names what each can leave.",
+      "words": {
+        "question": "Plantoir is still {underWay}.",
+        "sharingOne": "sharing the unit plans of {course}",
+        "sharingSeveral": "sharing the unit plans of {n} courses",
+        "deployingOne": "deploying Section {section} of {course}",
+        "deployingSeveral": "deploying {n} sections",
+        "deployingAndSharing": "{deploying} and {sharing}",
+        "shareMessage": "Quitting now could leave it unfinished, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+        "deployAndShareMessage": "Quitting now could leave them unfinished: the class website could be part way updated, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+        "deployMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+        "trailLine": "asked whether to quit while still {underWay}, and the teacher {answer}"
+      },
       "answers": {
         "keepWorking": "chose to keep working",
         "quitAnyway": "chose to quit anyway"
       },
       "trailEvent": "quit asked about work under way",
-      "placeholders": "{course} is the course's code as the share names it; {answer} is one of answers. The buttons are the question's usual two, in buttons' order with keepWorking the default.",
-      "casesHow": "given.sharesUnderWay lists the course codes whose unit plans are being shared, one share each; the other given keys mean what they mean in cases. expectAsk is the decision; when it is true, expectQuestion and expectMessage are the alert's two lines, and expectTrailKept and expectTrailQuit the trail line for each answer, exactly.",
+      "placeholders": "{underWay} is what is under way: sharingOne or sharingSeveral alone, deployingOne or deployingSeveral alone, or deployingAndSharing joining one of each. {course} is a course's code; {section} a section's number; {n} how many; {answer} one of answers. deployingOne, deployingSeveral and deployMessage are the words the question already used for deploys alone (cases above), written here so a reader can build every combination from this block. The buttons are the question's usual two, in buttons' order with keepWorking the default.",
+      "whatAStoppedShareLeaves": "Measured from unitPlanning.share.interruptionCases: a share stopped after its upload began leaves its marker at sending, so the Planning tab shows words.lastShareUnfinished, and the address may already serve what was sent until a Share Again finishes it or a Stop Sharing takes it down; a share stopped before anything was sent leaves nothing open. A share is deploy.sh with --plans on the app's terminal, so it can stop when the app goes, as a deploy can; hence 'could', as in the deploy's sentence.",
+      "casesHow": "given.sharesUnderWay lists the course codes whose unit plans are being shared, one share each. given.sectionPublishesUnderWay is how many SECTIONS are being deployed, as sections 1, 2, ... of ADA1O (it is cases' publishesUnderWay with the shares left out, since a share is also a publish). previewsBeingBuilt, copiesBeingSaved and quitReason mean what they mean in cases; previewsOpen is left out because an open preview never counts. expectAsk is the decision; when it is true, expectQuestion and expectMessage are the alert's two lines, and expectTrailKept and expectTrailQuit the trail line for each answer, exactly.",
       "cases": [
         {
           "name": "one course's unit plans are being shared",
@@ -14734,10 +14743,84 @@
           },
           "expectAsk": true,
           "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
-          "expectMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+          "expectMessage": "Quitting now could leave it unfinished, and anyone with the address could still open the plans until you share them again or stop sharing them.",
           "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
           "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
           "why": "The moment #863 is about. Windows said a deploy was still going here, and a share is never called a deploy."
+        },
+        {
+          "name": "two courses' unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave it unfinished, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Two shares are two courses' plans, not two sections: until #863 the mac asked about them as 'deploying 2 sections'."
+        },
+        {
+          "name": "a share beside one section's deploy",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished: the class website could be part way updated, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Both are named, the deploy first, and the message says what each can leave: the class website part way updated, and the plans open at their address."
+        },
+        {
+          "name": "a share beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished: the class website could be part way updated, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The sections are counted without the share."
+        },
+        {
+          "name": "two shares beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave them unfinished: the class website could be part way updated, and anyone with the address could still open the plans until you share them again or stop sharing them.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Each half counts its own kind."
         },
         {
           "name": "a share and a preview being built: the share is named",
@@ -14752,10 +14835,10 @@
           },
           "expectAsk": true,
           "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
-          "expectMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+          "expectMessage": "Quitting now could leave it unfinished, and anyone with the address could still open the plans until you share them again or stop sharing them.",
           "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
           "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
-          "why": "A publish wins over a preview build (whatCountsAsUnderWay), and the share is counted as a publish, so the question and its message are the share's."
+          "why": "A publish wins over a preview build (whatCountsAsUnderWay), and a share is held as a publish, so the question and its message are the share's."
         },
         {
           "name": "the Mac is logging out while a share runs",
@@ -14771,8 +14854,7 @@
           "expectAsk": false,
           "why": "neverAskWhen holds for a share as for a publish: a question here would block the log out."
         }
-      ],
-      "notSettledHere": "A share running beside a section's deploy, or two shares at once, are two publishes, and the mac asks about them today as 'deploying 2 sections', which calls the share deploying. No case pins that wording; it is raised with Russell on #863."
+      ]
     },
     "cases": [
       {

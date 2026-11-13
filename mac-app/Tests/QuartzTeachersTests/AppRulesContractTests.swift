@@ -933,6 +933,38 @@ final class AppRulesContractTests: XCTestCase {
         }
     }
 
+    /// `greetingReferenceCourses.listCases` (#856): which courses the
+    /// sentence names, in what form and order, run through
+    /// `referenceCoursesToMention` with each shelf built as `Course`s.
+    func testTheReferenceCoursesListIsMadeAsTheContractSays() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let block: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["listCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 7)
+        let root: URL = URL(fileURLWithPath: "/pretend/courses", isDirectory: true)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let todayText: String = try XCTUnwrap(testCase["today"] as? String, name)
+            let today: CalendarDay = try XCTUnwrap(CalendarDay(text: todayText), name)
+            let given: [String: Any] = try XCTUnwrap(testCase["course"] as? [String: Any], name)
+            let shelf: [[String: Any]] = try XCTUnwrap(testCase["shelf"] as? [[String: Any]], name)
+            let expect: [String] = try XCTUnwrap(testCase["expect"] as? [String], name)
+
+            let course: Course = try AppRulesContractTests.course(from: given, under: root)
+            var courses: [Course] = [course]
+            for entry in shelf {
+                courses.append(try AppRulesContractTests.course(from: entry, under: root))
+            }
+            XCTAssertEqual(
+                ClaudeCodeLauncher.referenceCoursesToMention(for: course, among: courses, today: today),
+                expect,
+                name
+            )
+        }
+    }
+
     /// Runs `outsideAgents` — the two menu items that hand one course to a
     /// command-line assistant the teacher already has, "Revise with Claude…"
     /// and "Revise with Codex…".
@@ -1241,6 +1273,27 @@ final class AppRulesContractTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    /// One course for a `listCases` row: its folder, `course_code`,
+    /// `kept_for_reference` and `reference_school_year`.
+    private static func course(from entry: [String: Any], under root: URL) throws -> Course {
+        let folder: String = try XCTUnwrap(entry["folder"] as? String)
+        var values: [String: Any] = [
+            "course_code": try XCTUnwrap(entry["courseCode"] as? String),
+            "course_name": "A course",
+        ]
+        if entry["keptForReference"] as? Bool == true {
+            values["kept_for_reference"] = true
+        }
+        if let year = entry["referenceSchoolYear"] as? Int {
+            values["reference_school_year"] = year
+        }
+        return Course(
+            code: folder,
+            directoryURL: root.appendingPathComponent(folder, isDirectory: true),
+            configuration: CourseConfiguration(values: values, lastSavedData: Data())
+        )
     }
 
     private static func readRules() throws -> [String: Any] {
