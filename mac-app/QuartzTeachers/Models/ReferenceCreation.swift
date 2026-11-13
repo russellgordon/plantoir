@@ -271,8 +271,12 @@ enum ReferenceCreation {
             ReferenceStaging.stagingName(for: folderName)
         )
         do {
+            // The code as it is stored everywhere else: trimmed and upper
+            // case, whatever the caller passed.
+            var withTheCode: [String: Any] = configuration
+            withTheCode["course_code"] = code
             let settings: CourseConfiguration = ReferenceCreation.referenceSettings(
-                configuration, schoolYear: schoolYear
+                withTheCode, schoolYear: schoolYear
             )
             try settings.write(to: stagingURL.appendingPathComponent(ReferenceImportSource.configFileName))
         } catch {

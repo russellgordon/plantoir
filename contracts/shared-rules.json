@@ -18187,8 +18187,104 @@
         "checkoutLayoutShortcutToAFile": "{shortcut} is a shortcut to a file, not a folder.",
         "checkoutLayoutRule": "The checkoutLayout* sentences are said only about a class kept in the 2024-25 layout, a whole website folder per class (quartzCheckoutLayout above). {place} is where the pages are read from: ~/... inside the home folder, the whole path otherwise. {shortcut} is a Finder shortcut's own name - 'shortcut' is the one word allowed about how the folders were joined, because the teacher made them in Finder; none says alias, link, vault, checkout or Quartz. checkoutLayoutOnlyTheFirstSection is both a row's reason and the refusal when a later section is chosen on its own, {section} its number. A row reached through a shortcut says checkoutLayoutReadThroughShortcut, any other checkoutLayoutReadFrom. checkoutLayoutOnlyPagesComeAcross is said once under the list and in the summary whenever such a row is there. A loss reuses olderLayoutLeftOut; a link that showed something else is one of its {names} as checkoutLayoutWhatALinkShowed, {name} the link's own name and {place} its own text with './' taken off and a home-folder path written from '~' (never the account name). checkoutLayoutChooseACourseFolderInside is the refusal for a school year's folder whose courses' shortcuts are two levels down (recognition.rule step 5).",
         "olderLayoutRule": "The olderLayout* sentences are said only about a class kept in the older folder-per-class layout (olderLayout above). {names} is the missing names in a stable order joined as 'A, B and C' (in olderLayoutLeftOut, the paths left out, and with {count} 1 the sentence reads '1 of its files or folders was not brought across'); {count} is how many shared folders and pages the class used (in olderLayoutLeftOut, how many were left out); alsoTickedForThatYear is said beside a ticked row whose code and year clash ONLY with a row ticked above it in the same sheet - nothing is kept yet, so codeAlreadyInThatYear ('You already have...') would be false - unless both are older-layout classes named as sections of the course, which get olderLayoutAnotherSectionOfTheSameCourse; {folder} is the row above, {course} the code; olderLayoutLeftOut is added to a summary line after olderLayoutImportedWithSharedMissing, or after 'imported' and a full stop; {code} is the code a chosen folder's name carries. None of them says how the shared folder was reached from the class - a teacher kept folders, and folders are what they are told about - and none says vault, link or add-on settings' contents.",
+        "zipCouldNotBeOpened": "{zip} could not be opened. It may be damaged, or it may not be a zip file.",
+        "zipIsNotSafeToOpen": "{zip} holds files that would be put outside its own folder, or shortcuts to other places, so nothing was taken from it.",
+        "zipHoldsNoCourse": "{zip} does not hold a course. Choose a backup or an archive of a whole course, or a folder.",
         "rule": "{course} is the code a TEACHER reads - ICS4U, never the folder name; {folder} is the folder they chose, by its own name, because 'that folder' means nothing once the chooser has closed. The calm note about the pages being locked (referenceCourses.wording.pagesAreLocked) is shown in this sheet too, where the teacher is deciding rather than after the fact.",
         "machineryCheck": "No sentence here names a symlink, a build output, a script, a container or a flag. Nothing says 'cannot' where 'is not' will do. The size a teacher reads is the size that will be COPIED, with last year's built website already taken out of it."
+      },
+      "zips": {
+        "appliesOn": ["mac", "windows"],
+        "rule": "Import Courses for Reference... also accepts a backup or archive zip, a colleague's included (#572). The zip is opened into a NEW folder of its own OUTSIDE the working folder (the system's temporary folder), is never written to, and is read as the ONE course folder at its root, offered on its own exactly as a lone course folder is (foldersAccepted). Before it is opened its listing is read: an empty listing refuses it with wording.zipHoldsNoCourse, and a name that is absolute, begins with ~, holds a backslash or a .. part, or any entry that is a link, refuses the whole zip with wording.zipIsNotSafeToOpen. After it is opened, anything unpacked that is a link refuses it again and what was unpacked is removed. A zip the system cannot read is refused with wording.zipCouldNotBeOpened; one whose top level (hidden entries and Finder's __MACOSX not counted) is not exactly one folder holding course_config.json is refused with wording.zipHoldsNoCourse. Every refusal writes 'zip could not be read for reference' naming the zip's FILE NAME, and a course that came across is named on the trail by the zip's file name. What was unpacked is removed when the sheet closes. Live codes are never consulted, as for every import (codesInUse): a zip of a course whose code is live lands beside it. Nothing in courses/ is overwritten, renamed or removed: the shelf rule, the proposed folder name, the staging claim and the one rename are the import's own.",
+        "why": "Russell, 2026-11-01 and 2026-11-12 (#572): the import path offers a course for reference whether it is a folder, a backup or an archive, and there is no separate restore-as-reference door. A backup and an archive hold exactly the lone-course shape the import already reads (CourseRestorer.unpack relies on the same shape), so the importer is reused whole (plan review H1). Measured on macOS 26 with /usr/bin/ditto -x -k into a fresh folder: entries named ../escaped.txt and ICS3U/../../escaped2.txt were both written INSIDE that folder and /tmp/x was written as tmp/x inside it, so the unzipper does not let a name escape; but a link entry was made as a real link (ICS3U/link -> /etc). The name check is kept anyway, because a refusal says why where a quietly rewritten path does not, and because the unzipper is not the only thing a later change could put there.",
+        "rejected": "A separate Restore as Reference Course... door on backup and archive rows, with its own sheet, situation key and trail events (the first plan): a second importer, ruled out by Russell on 2026-11-12. Opening the zip inside the working folder: the import refuses a source inside the folder that is open, and a half-opened zip under courses/ would be one more thing the sweep had to know about. A size limit: a teacher's own backup is the ordinary source, and no limit would separate a large course from a hostile zip.",
+        "codesInUse": "A course whose code is live in this working folder is imported beside it, from a folder or a zip: the import checks only the shelf rule, never the live courses. True on both platforms before #572 (mac ReferenceImporter and ImportCoursesForReferenceSheet.troubleByCourse, Windows ReferenceImport.cs) and pinned here so neither side 'fixes' it (plan review L2).",
+        "namesCases": [
+          { "names": ["ICS3U/", "ICS3U/course_config.json", "ICS3U/section1/index.md"], "stayInside": true, "why": "A backup as Plantoir makes one." },
+          { "names": ["ICS3U/", "__MACOSX/ICS3U/._course_config.json"], "stayInside": true, "why": "What Finder's Compress adds; folded back into the files by the unzipper." },
+          { "names": ["../escaped.txt"], "stayInside": false },
+          { "names": ["ICS3U/../../escaped.txt"], "stayInside": false },
+          { "names": ["/tmp/escaped.txt"], "stayInside": false },
+          { "names": ["~/escaped.txt"], "stayInside": false },
+          { "names": ["ICS3U\\..\\escaped.txt"], "stayInside": false, "why": "Another system reads a backslash as a folder." },
+          { "names": ["ICS3U/notes..md"], "stayInside": true, "why": "Two dots inside a name are not a part of their own." },
+          { "names": [], "stayInside": false }
+        ],
+        "listingCases": [
+          { "lines": ["Archive:  ICS3U_backup.zip", "drwxr-xr-x  2.1 unx        0 bx stor 26-Nov-12 23:47 ICS3U/", "-rw-r--r--  2.1 unx        3 bX defN 26-Nov-12 23:47 ICS3U/course_config.json", "2 files, 3 bytes uncompressed, 3 bytes compressed:  0.0%"], "holdsALink": false },
+          { "lines": ["lrwxr-xr-x  2.1 unx        4 b- stor 26-Nov-12 23:47 ICS3U/link"], "holdsALink": true },
+          { "lines": ["Zip file size: 411 bytes, number of entries: 3"], "holdsALink": false, "why": "A header line is not an entry." }
+        ],
+        "cases": [
+          { "name": "a backup of a course whose code is live", "zip": "backupOfALiveCourse", "expect": "offered", "courseCode": "ICS3U", "why": "The point: the course is offered on its own and lands beside the live one, which is untouched, and the zip is unchanged." },
+          { "name": "a zip with a name that climbs out", "zip": "climbsOut", "expect": "refused", "said": "zipIsNotSafeToOpen" },
+          { "name": "a zip holding a link", "zip": "holdsALink", "expect": "refused", "said": "zipIsNotSafeToOpen" },
+          { "name": "a zip holding two folders", "zip": "twoFolders", "expect": "refused", "said": "zipHoldsNoCourse" },
+          { "name": "a zip whose folder has no settings", "zip": "folderWithoutSettings", "expect": "refused", "said": "zipHoldsNoCourse", "why": "A section archive, or any folder that is not a course." },
+          { "name": "a file that is not a zip", "zip": "notAZip", "expect": "refused", "said": "zipCouldNotBeOpened" }
+        ]
+      }
+    },
+    "creating": {
+      "appliesOn": ["mac", "windows"],
+      "note": "Making a NEW course straight onto the Reference Courses shelf from the New Course wizard, even when a live course has its code (#572, first piece). Three doors and one path (Russell, 2026-11-12): the wizard's toggle, the offer under the taken-code refusal, and New Reference Course... on the Reference Courses heading, which opens the same wizard with the toggle on.",
+      "rule": "In order: (1) the shelf rule for the chosen year, again at the act; (2) the folder name is ReferenceCourseRule.proposedFolderName's (CODE-YYYY, or CODE-REF for Other, -2 to -9 on a clash), and a folder of that name already there refuses; (3) the hidden staging folder is CLAIMED (ReferenceStaging.claim, the claim and lease every reference door takes); (4) the wizard's settings are written into it already marked kept_for_reference with reference_school_year, prepopulate_example_content true, use_skeleton false and the destination neutralised (settingsWritten), so the folder is a reference course for the whole of the run; (5) the real setup runs INSIDE it (course-management.json courseCode.setupIntoStaging), with the ordinary answer pump and progress steps; (6) on success, and only when the ready-made pages are there (setup said 'Example content installed' AND a page other than a folder's front page is in the folder), ReferenceCopier.makeIntoAReferenceCourse and one rename to courses/<FOLDER>; (7) otherwise, or on Cancel, the staging folder is removed and nothing is added; (8) the claim is given back last, however it ended. The live course of the same code is never opened, written, backed up or renamed by any step. 'course created' is NOT written for this path; 'course created for reference' or 'course could not be created for reference' is, once. No groups file is written and no replace is offered: those are #572's second and third pieces.",
+      "why": "GitHub #572: a teacher who has last year's ICS3U on the shelf, or this year's live ICS3U, wants the newer ready-made ICS3U beside it to read and copy from. Making it in the staging folder is the same answer every other reference door gives to 'nothing under courses/ is ever a course that is not yet a reference course'. The pages check is plan review H3: an ordinary course without its pages is a nuisance a teacher repairs, a locked reference course without them is worthless, and the trail would have said it was made from them.",
+      "rejected": "Making a live course, keeping a copy and removing the live one: impossible when the code is taken (the point of the issue), and otherwise a deployable course in the sidebar for the length of the run, a 'course created' line for a course that then vanishes, and an archive nobody asked for. Offering the choice for a code with no ready-made pages: the result would be a locked skeleton nobody can read from or add to (the plan review's first question; the director took its recommendation on 2026-11-12). An editable folder name: Import does not offer one either.",
+      "whenOffered": {
+        "rule": "ReferenceChoice.offered on the mac. Nothing for an empty code or a club. For a code WITH ready-made pages: the offer line and its button under the taken-code refusal when a course folder of that code is here and the toggle is off, and the toggle otherwise. For a code WITHOUT them: the noReadyMadePages sentence when the code is taken or the wizard came from New Reference Course..., and nothing otherwise, because the sentence answers a question only once it has been asked. Create makes a reference course only when the toggle is on AND the answer is the toggle.",
+        "cases": [
+          { "code": "", "hasReadyMadePages": false, "isClub": false, "takenByACourseHere": false, "keepsForReference": false, "cameForReference": true, "expect": "notShown" },
+          { "code": "ICS3U", "hasReadyMadePages": true, "isClub": false, "takenByACourseHere": false, "keepsForReference": false, "cameForReference": false, "expect": "toggle" },
+          { "code": "ICS3U", "hasReadyMadePages": true, "isClub": false, "takenByACourseHere": true, "keepsForReference": false, "cameForReference": false, "expect": "offerUnderTheRefusal" },
+          { "code": "ICS3U", "hasReadyMadePages": true, "isClub": false, "takenByACourseHere": true, "keepsForReference": true, "cameForReference": false, "expect": "toggle", "why": "Once the offer is taken, the refusal goes and the toggle with its year shows." },
+          { "code": "ICS3U", "hasReadyMadePages": true, "isClub": true, "takenByACourseHere": false, "keepsForReference": true, "cameForReference": false, "expect": "notShown", "why": "A club takes no ready-made pages." },
+          { "code": "ABC1D", "hasReadyMadePages": false, "isClub": false, "takenByACourseHere": false, "keepsForReference": false, "cameForReference": false, "expect": "notShown" },
+          { "code": "ABC1D", "hasReadyMadePages": false, "isClub": false, "takenByACourseHere": true, "keepsForReference": false, "cameForReference": false, "expect": "noReadyMadePages" },
+          { "code": "ABC1D", "hasReadyMadePages": false, "isClub": false, "takenByACourseHere": false, "keepsForReference": true, "cameForReference": true, "expect": "noReadyMadePages" }
+        ]
+      },
+      "codeCheck": {
+        "rule": "For a course kept for reference the code rule is asked with NO existing codes (characters, length, double spaces and kept names still refuse) and then the shelf rule for the chosen year, with its own sentences; for an ordinary course it is today's check against every course folder here. The live caption and the act ask the same function.",
+        "cases": [
+          { "typed": "ICS3U", "existingFolderNames": ["ICS3U"], "keepsForReference": false, "schoolYear": 2026, "shelved": [], "expect": "alreadyTaken" },
+          { "typed": "ICS3U", "existingFolderNames": ["ICS3U"], "keepsForReference": true, "schoolYear": 2026, "shelved": [], "expect": null, "folderName": "ICS3U-2026" },
+          { "typed": "ICS3U", "existingFolderNames": ["ICS3U", "ICS3U-2026"], "keepsForReference": true, "schoolYear": 2026, "shelved": [{ "displayCode": "ICS3U", "schoolYear": 2026, "folderName": "ICS3U-2026" }], "expect": "codeAlreadyInThatYear" },
+          { "typed": "ICS3U", "existingFolderNames": ["ICS3U-REF"], "keepsForReference": true, "schoolYear": null, "shelved": [{ "displayCode": "ICS3U", "schoolYear": null, "folderName": "ICS3U-REF" }], "expect": "codeAlreadyWithNoYear" },
+          { "typed": "ICS3U", "existingFolderNames": ["ICS3U", "ICS3U-2025"], "keepsForReference": true, "schoolYear": 2026, "shelved": [{ "displayCode": "ICS3U", "schoolYear": 2025, "folderName": "ICS3U-2025" }], "expect": null, "folderName": "ICS3U-2026", "why": "Last year's ICS3U on the shelf and this year's newer one beside it: the issue's own case." },
+          { "typed": "work", "existingFolderNames": [], "keepsForReference": true, "schoolYear": 2026, "shelved": [], "expect": "keptForPlantoir" },
+          { "typed": "ICS 3U!", "existingFolderNames": [], "keepsForReference": true, "schoolYear": 2026, "shelved": [], "expect": "charactersThatAreNotAllowed" }
+        ]
+      },
+      "settingsWritten": {
+        "rule": "What the staging folder's course_config.json carries before setup runs, on top of the wizard's own answers: these keys with these values, and none of the absent keys. The four destination keys are referenceCourses.neutralises.keys, taken from the one function every door uses (neutraliseForReference).",
+        "expectKeys": { "kept_for_reference": true, "reference_school_year": 2026, "prepopulate_example_content": true, "use_skeleton": false, "deploy_target": "local_folder", "deploy_folder_path": "" },
+        "absentKeys": ["additional_deploy_targets", "custom_domains"],
+        "otherYearMeans": "reference_school_year absent, as everywhere else"
+      },
+      "sequence": {
+        "rule": "How the act ends, by how setup ended. In every case nothing is left in the staging folder, the claim is given back, and the live course is unchanged.",
+        "cases": [
+          { "name": "setup finished with the ready-made pages", "setup": "succeeded", "expect": { "onTheShelf": true, "locked": true, "said": null, "trail": "course created for reference" } },
+          { "name": "setup failed", "setup": "failed", "expect": { "onTheShelf": false, "said": "couldNotBeMade", "trail": "course could not be created for reference" } },
+          { "name": "setup finished without the ready-made pages", "setup": "succeededWithoutPages", "expect": { "onTheShelf": false, "said": "pagesDidNotLand", "trail": "course could not be created for reference" }, "why": "Plan review H3, the app's half: an older setup that carried on, or a line printed and nothing written." },
+          { "name": "the teacher pressed Cancel", "setup": "stopped", "expect": { "onTheShelf": false, "said": "stopped", "trail": "course could not be created for reference" } }
+        ]
+      },
+      "wording": {
+        "toggleLabel": "Keep this course for reference",
+        "toggleCaption": "It goes on the Reference Courses shelf with the ready-made pages written for it, to read and copy from. It is never deployed, and its pages are locked.",
+        "noReadyMadePages": "There are no ready-made pages for {code} to keep for reference.",
+        "offerUnderTheRefusal": "To add another {code} to read and copy from, keep this one for reference.",
+        "offerButton": "Keep for Reference",
+        "createButton": "Create Reference Course",
+        "creatingTitle": "Creating your reference course",
+        "couldNotBeMade": "{code} could not be set up for reference, so nothing was added to the Reference Courses shelf.",
+        "pagesDidNotLand": "The ready-made pages for {code} could not be installed, so nothing was added to the Reference Courses shelf.",
+        "stopped": "Stopped. Nothing was added to the Reference Courses shelf.",
+        "newReferenceCourseMenuItem": "New Reference Course…",
+        "rule": "{code} is the code a TEACHER reads, upper case. The offer line is said under the existing taken-code refusal, whose sentence is unchanged (course-management.json courseCode.problems). The menu item ends in a real ellipsis character in both apps.",
+        "machineryCheck": "No 'staging', 'setup', 'script', 'container', 'toolchain' or 'folder name' in any sentence here."
       }
     }
   },
