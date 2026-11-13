@@ -236,13 +236,20 @@ def run_script(script, *arguments):
                           capture_output=True, text=True, encoding="utf-8")
 
 
-def ink_left_outside_the_box(blanked, masks):
-    """How many pixels of the name's ink are visible in a blanked file outside its box."""
+def turned_pages(line):
+    """The pages the script's own line says it turned upright."""
+    match = re.search(r"; pages? ([\d, ]+) turned upright", line)
+    return {int(number) for number in match.group(1).split(", ")} if match else set()
+
+
+def ink_left_outside_the_box(blanked, masks, turned_by_the_script):
+    """How many pixels of the name's ink are visible in a blanked file outside its box. The ink is looked
+    for where the page the SCRIPT wrote puts it: turned half a turn only on the pages it says it turned."""
     left = 0
-    for number, (spots, (width, height), turned) in enumerate(masks, start=1):
+    for number, (spots, (width, height), _scanned_upside_down) in enumerate(masks, start=1):
         out_width, out_height, pixels = render(blanked, number)
         for x, y in spots:
-            if turned:
+            if number in turned_by_the_script:
                 x, y = width - 1 - x, height - 1 - y
             inside = BOX[0] * DPI <= x < BOX[2] * DPI and BOX[1] * DPI <= y < BOX[3] * DPI
             if not inside and 0 <= x < out_width and 0 <= y < out_height and pixels[y * out_width + x] < 128:
@@ -303,7 +310,7 @@ class RedactionTests(unittest.TestCase):
             self.assertNotEqual(case["expect"], "CHECK", f"{case['variant']} must be stopped: {line}")
             self.assertIn("header matches your blank test", line, case["variant"])
             self.assertNotIn(" OK", line, "the line says what was measured, never OK")
-            left = ink_left_outside_the_box(blanked, masks)
+            left = ink_left_outside_the_box(blanked, masks, turned_pages(line))
             report.append(f"{case['variant']}: written, {left} name pixels left")
             self.assertEqual(left, 0, f"{case['variant']}: name ink is visible in a written file")
         print("\n" + "\n".join(report) + f"\n({self.seconds:.1f} s for {2 * len(self.made)} pages)")
@@ -420,7 +427,7 @@ class BoxAndRefusalTests(unittest.TestCase):
                                 "--check-dir", Path(root) / "Check")
             self.assertIn("Section 1/Student A.pdf: 2 pages, box placed on 2; header matches your blank test", result.stdout)
             self.assertEqual(ink_left_outside_the_box(Path(root) / "Redacted" / "Section 1" / "Student A.pdf",
-                                                      made["Student A"][1]), 0)
+                                                      made["Student A"][1], set()), 0)
 
     def test_a_letter_paper_against_a_legal_blank_refuses(self):
         with tempfile.TemporaryDirectory() as root:
