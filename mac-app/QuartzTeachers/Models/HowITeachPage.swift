@@ -4,9 +4,9 @@ import Foundation
 /// The teacher's "How I Teach" page: one per course, `How I Teach.md` at the
 /// top of the course folder, saying how the course is taught (#209).
 ///
-/// The teacher writes it in Obsidian, or an outside assistant (Claude, Codex)
+/// The teacher writes it in Obsidian, or an outside assistant (Claude, Codex, GitHub Copilot)
 /// drafts it from the course's own pages and saves it once the teacher agrees;
-/// both outside doors ask the session to read it. It is NEVER on the website —
+/// every outside door asks the session to read it. It is NEVER on the website —
 /// and that is kept by the BUILD, in shared Python (`scripts/how_i_teach.py`),
 /// by the page's LOCATION rather than by any setting on it, because a later
 /// `publishForSection<N>: true` beats `publish: false`. The whole rule, with

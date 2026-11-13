@@ -17,5 +17,6 @@ these pages are how it is done here without dread.
 
 **Unit 3 — Art and meaning**
 
+- [[A Looking Sheet]]
 - [[Assessing Your Own Work]]
 - [[Looking Twice]]

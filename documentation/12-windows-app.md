@@ -1239,6 +1239,40 @@ which a `'` in a course's name broke out of, and `wt -d "{path}"` split at a
 `;`. `OutsideTerminalTests` pins it for a folder named with `'`, `;`, `&` and a
 trailing `\`.
 
+### A third door, GitHub Copilot (#783, mac first, owed here)
+
+The mac added Revise With ▸ GitHub Copilot…, Fix with GitHub Copilot… and
+Plan a Unit with GitHub Copilot… for v2.0.0, listed after Codex. The design,
+what was measured and what was rejected are in
+`10-local-ai-assistant.md` → "The third door: GitHub Copilot (#783)", and the
+data in `app-rules.json` → `outsideAgents.agents[copilot]`. What this side
+inherits by reading the contract: the arguments, the connection file's shape
+(`connectionFile`, with its 30-minute `timeout`), the titles, the
+`stoppedAtOnce` sentence, the identity rule's npm package name, the
+`fixWith.buttonCases`, `planAUnit.buttons`, `doorCourseHold` and `tabCases`
+entries, and the nine hold sentences in `assist-wording.json`, which since #783
+name the assistant holding the course through one `{assistant}` slot
+(`doorCourseHold.naming`). For that, every Windows door owes
+`PLANTOIR_DOOR_ASSISTANT` (its own key) in its server's environment, and
+`plantoir-mcp` owes the key as its `assist` lease's fifth line
+(`file-formats.json` → `workLease.lines`), writing line 4 first (the start, or
+an empty line): its assist lease has three lines today, and a key appended
+would be read as the start and the hold as gone (`workLease.bodyCases`); until then a Windows hold names
+none and the mac's sentences list all three, which is still true. What it owes, and the windows issue for #783 lists:
+a `CopilotLauncher` that writes `mcp-<CODE>-copilot.json` into Plantoir's data
+folder and starts `copilot.exe` by argument vector, or npm's `copilot.cmd`
+through `OutsideDoor.CmdArguments` (the `@` path's quoting measured per parse,
+and the longest `fixWith.greetingCases` line measured against cmd's 8,191);
+detection on PATH and in WinGet's links folder, `%APPDATA%\npm` and
+`~\.local\bin`, with Windows' own way of telling GitHub's `copilot` from
+another program of the same name; a third presence flag and the three places
+in the window, keyboard reachable with Narrator labels; and never ADDING
+`COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` to the child's
+environment, because Copilot signs in from any of them ahead of the
+teacher's stored sign-in. GitHub's install page says the Windows tool's
+shell needs PowerShell 6 or later; whether a handout can be made on a stock
+PowerShell 5.1 machine is a measurement owed here.
+
 ---
 
 ## Scheduled deploys

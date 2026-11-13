@@ -52,7 +52,8 @@ are ones we study and watch rather than perform, and regalia is not costume.
 [[Does a Dance Belong to a Culture|Does a Dance Belong to a Culture?]] is the seminar where we argue this out
 properly. [[Where a Form Comes From]] traces one form's development in
 depth, and [[Three Forms We Practise]] covers the three we return to all
-year.
+year. [[Four Forms on Film]] has a lesson in each of the four to watch, with
+questions to watch it by.
 
 %%curriculum-start%%
 ## Curriculum connection

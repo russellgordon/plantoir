@@ -57,6 +57,16 @@ Everyone can tell, including you.
 > decision with a named obstacle is worth full marks here. An invented
 > conclusion is worth much less, and is usually obvious.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] My working shows the strategy being applied, not only named.
+- [ ] My criteria include what really matters to me, including the reasons that are not impressive.
+- [ ] I can point to something someone said, and to what it changed.
+- [ ] My goal is specific and dated, and it has a first step.
+- [ ] My review names the strategy's weaknesses as well as its successes.
+
 %%curriculum-start%%
 ## Curriculum connection
 
