@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the class's results from the marks records, identifiers only: one document and one grade table per
-assessment, written into the marking folder. Run it again after any change to a mark or a level: the
+assessment, written into the marking folder. Run it again after any change to a mark: the
 documents do not change by themselves, and each one says when it was built and a fingerprint of everything
 it was built from.
 
@@ -18,26 +18,23 @@ For each --assessment (a folder of the marking folder, as plantoir-marking secti
 
   Marks/Section N/Student A.json    the marks records of a test, each checked with check_kit.py against the
                                     --kit given after it; totals are counted from the points, never read
-  Records/Section N/Student A.json  levels for each category, first and revised, ONLY IF the folder holds any
-                                    ({"identifier": "Student A", "section": 1, "levels": {"K": {"first": "3",
-                                    "revised": "3+"}}}, reference/results.md); no skill writes them yet for a
-                                    coding assignment, so the document says plainly when there are none
   Sheets/Section N/Student A - Marks by Question.tex   if there: the marks line build_test_sheet.py wrote
-  Marking Settings.md               the "- Half marks:", "- Levels scale:" and "- Percentages:" lines
+  Marking Settings.md               the "- Half marks:" and "- Percentages:" lines
 
 and writes into --out (the assessment's own Results/ folder when there is one assessment):
 
   Class Results.tex and .pdf        marks by category for every student, section by section, with the
-                                    section's means; levels first and revised; the students with no revised
-                                    level and the marked students with no level record; when it was built,
-                                    the fingerprint, and which parts had no records
-  Grades - <Assessment>.csv         one row per student: marks, out of and percent by category and the total
-  Levels - <Assessment>.csv         one row per student with a level record: first, revised, the level, percent
-  (every row of both tables ends with "built": the build time and the fingerprint)
+                                    section's means, when it was built and the fingerprint
+  Grades - <Assessment>.csv         one row per student: marks, out of and percent by category
+  (every row ends with "built": the build time and the fingerprint)
 
-A point voided for everyone counts for no one: it is out of both the mark and the "out of", as on the
-sheet, and a category with nothing counted is shown as not counted. The level is read from the percentage
-as printed. A sheet whose marks line no longer gives the record's totals STOPS the build, naming the
+Russell, 2026-11-13, on the numbers a marked test shows: a point voided for the class is a BONUS for a student
+who earned it: it leaves the "out of" for everyone, and a student who earned it keeps the mark, so a category
+can read 2 out of 1, 200%. There is no overall percentage, ever: results are by category only. A test marked
+by points never mentions levels: levels belong to work marked against a rubric or success criteria, which no
+skill marks yet. A category with nothing to count and nothing earned is shown as not counted.
+
+A sheet whose marks line no longer gives the record's totals STOPS the build, naming the
 identifier and both numbers. So does a file that is not named like an identifier's record, a sheet with no
 record, a sheet whose marks line cannot be read, and an assessment with no record. The documents are built
 in a hidden folder and put in place only when every one is built; the last run's are first renamed
@@ -61,22 +58,16 @@ from fractions import Fraction
 from pathlib import Path
 
 # MARK: - What you may change for this teacher
-#   the document's wording, headings, school name and corners, paper size and colours; the file names; how a
-#   level is read from a percentage (LEVEL_FROM_PERCENT: "at or below", the highest level whose percentage is at
-#   or below the mark as printed, or "nearest"); the ways of rounding a percentage the settings may name
-#   (ROUNDINGS); the columns of the grade tables (a report system's own order); weighting categories
-#   differently for an overall mark (the default is the plain sum of points); charts or a test-against-assignment
-#   comparison added to the document (reference/results.md).
+#   the document's wording, headings, school name and corners, paper size and colours; the file names; the ways
+#   of rounding a percentage the settings may name (ROUNDINGS); the order of the grade table's columns (a report
+#   system's own order); charts or a test-against-assignment comparison added to the document
+#   (reference/results.md).
 DOCUMENT = "Class Results"
 GRADES = "Grades - {assessment}.csv"
-LEVELS = "Levels - {assessment}.csv"
 PAPER = "letterpaper"
-LEVEL_FROM_PERCENT = "at or below"
 ROUNDINGS = {"whole numbers, half up": (0, "half up"), "one decimal, half up": (1, "half up"),
              "whole numbers, down": (0, "down")}
 DEFAULT_ROUNDING = "whole numbers, half up"
-NO_REVISION_TITLE = "No revised levels"
-NO_RECORD_TITLE = "No level record"
 NOT_COUNTED = "not counted"
 SECTION = r"^Section (\d+)$"
 SHEET_SUFFIX = " - Marks by Question.tex"
@@ -85,14 +76,14 @@ SHEET_SUFFIX = " - Marks by Question.tex"
 #   never print, log or write outside the teacher-only folder any value read from a name mapping table (this
 #   script reads none, and writes identifiers only); never print a file name that is not an identifier; capture
 #   every program's output and print only counts and identifiers; refuse (exit 1, identifier-only message) when
-#   anything is unexpected; never write inside a Plantoir working folder; a voided point counts for no one; a
-#   level is read from the percentage as printed; a sheet whose totals differ from its record, an unreadable
-#   sheet, a sheet with no record, a file not named like a record, a level off the teacher's scale and a half
-#   mark without the settings' yes each stop the build; every document and every table row carries the build
+#   anything is unexpected; never write inside a Plantoir working folder; a voided point is a bonus (in no
+#   one's out of, kept by a student who earned it); no overall mark or percentage, ever; no level, ever, for a
+#   test; a sheet whose totals differ from its record, an unreadable sheet, a sheet with no record, a file not
+#   named like a record and a half mark without the settings' yes each stop the build; every document and every table row carries the build
 #   time and a fingerprint of everything read, the settings included; documents are put in place only when all
 #   are built, after the last run's are renamed "earlier run, do not use"; no document calls itself correct or
 #   complete; the teacher-decides sentence below, word for word.
-TEACHER_DECIDES = ("Every mark, level and comment here is a suggestion drafted for you. Grading is your "
+TEACHER_DECIDES = ("Every mark and comment here is a suggestion drafted for you. Grading is your "
                    "professional responsibility: please read and decide on each one before anything reaches "
                    "a student. I draft; you decide.")
 EARLIER = " - earlier run, do not use"
@@ -137,29 +128,29 @@ def in_a_working_folder(path):
 
 
 class Settings:
-    """What Marking Settings.md says: half marks, the scale (highest first, or None) and the rounding."""
+    """What Marking Settings.md says for a test: half marks and the rounding. A - Levels scale: line is not read:
+    a test marked by points never mentions levels (Russell, 2026-11-13)."""
 
     def __init__(self, path):
         if path is None or not Path(path).is_file():
-            raise Refusal("give --settings with the course's Marking Settings.md (the half-marks, levels-scale and "
-                          "percentages lines are read from it)")
+            raise Refusal("give --settings with the course's Marking Settings.md (the half-marks and percentages "
+                          "lines are read from it)")
         try:
             self.raw = Path(path).read_bytes()
             text = self.raw.decode("utf-8")
         except (OSError, UnicodeDecodeError):
             raise Refusal("Marking Settings.md could not be read as text")
         self.half_marks = False
-        self.scale = None
         self.rounding = DEFAULT_ROUNDING
         self.rounding_said = False
         seen = set()
         for line in text.splitlines():
-            found = re.match(r"\s*[-*]\s*(Half marks|Levels scale|Percentages):\s*(.*?)\s*$", line, re.IGNORECASE)
+            found = re.match(r"\s*[-*]\s*(Half marks|Percentages):\s*(.*?)\s*$", line, re.IGNORECASE)
             if found is None:
-                near = re.match(r"\s*[-*]\s*(half[ -]?marks?|levels?[ -]?scales?|percentages?)\s*:", line, re.IGNORECASE)
+                near = re.match(r"\s*[-*]\s*(half[ -]?marks?|percentages?)\s*:", line, re.IGNORECASE)
                 if near is not None:
                     raise Refusal("Marking Settings.md has a line that looks like one this script reads but is not written "
-                                  "as - Half marks:, - Levels scale: or - Percentages:; rewrite it so it is not passed over")
+                                  "as - Half marks: or - Percentages:; rewrite it so it is not passed over")
                 continue
             key = found.group(1).casefold()
             value = found.group(2)
@@ -174,8 +165,6 @@ class Settings:
                     raise Refusal("the - Half marks: line in Marking Settings.md says neither yes nor no (the teacher's "
                                   "words and the date may follow in brackets)")
                 self.half_marks = answer.group(1).casefold() == "yes"
-            elif key == "levels scale":
-                self.scale = read_scale(value)
             else:
                 if value.casefold() not in ROUNDINGS:
                     raise Refusal("the - Percentages: line in Marking Settings.md is not one of: "
@@ -183,32 +172,6 @@ class Settings:
                 self.rounding = value.casefold()
                 self.rounding_said = True
         self.places, self.direction = ROUNDINGS[self.rounding]
-
-
-def read_scale(value):
-    if value == "" or value.casefold().startswith("none"):
-        return None
-    entries = []
-    levels = set()
-    percents = set()
-    for item in value.split(","):
-        match = re.match(r"^\s*(\S{1,8})\s+(\d{1,3}(?:\.\d+)?)\s*%?\s*$", item)
-        if match is None:
-            raise Refusal("the levels scale in Marking Settings.md could not be read: write each level, a space and "
-                          "its percent, commas between, highest first (the format only: 4 80, 3 70, 2 60, 1 50)")
-        level, value_text = match.group(1), match.group(2)
-        if level in levels:
-            raise Refusal("the levels scale in Marking Settings.md names a level twice")
-        if Fraction(value_text) in percents:
-            raise Refusal("the levels scale in Marking Settings.md gives two levels the same percent, so one of them "
-                          "can never be reached")
-        if Fraction(value_text) > 100:
-            raise Refusal("the levels scale in Marking Settings.md has a percent over 100, which nobody can reach")
-        levels.add(level)
-        percents.add(Fraction(value_text))
-        entries.append((level, Fraction(value_text)))
-    entries.sort(key=lambda entry: -entry[1])
-    return entries
 
 
 def rounded(settings, earned, out_of):
@@ -230,30 +193,6 @@ def shown(settings, value):
     if settings.places == 0:
         return str(int(value))
     return f"{float(value):.{settings.places}f}"
-
-
-def level_for(settings, value):
-    """The level the percentage AS PRINTED reaches on the teacher's scale, by LEVEL_FROM_PERCENT."""
-    scale = settings.scale
-    if scale is None or value is None:
-        return ""
-    if LEVEL_FROM_PERCENT == "nearest":
-        best = scale[0]
-        for entry in scale:
-            if abs(entry[1] - value) < abs(best[1] - value):
-                best = entry
-        return best[0]
-    for level, at_least in scale:
-        if value >= at_least:
-            return level
-    return "below " + scale[-1][0]
-
-
-def percent_for(scale, level):
-    for entry_level, value in scale:
-        if entry_level == level:
-            return value
-    return None
 
 
 # ---------------------------------------------------------------- reading one assessment
@@ -304,19 +243,19 @@ def check_record(checker, kit_path, record_path, label):
 
 
 def category_marks(kit, record, label):
-    """[(category key, earned, out of)] in the kit's order. A point the kit voids for the whole class counts for no
-    one: it is out of both the mark and the out of, as build_test_sheet.py counts it."""
+    """[(category key, earned, out of)] in the kit's order. A point the kit voids for the whole class is a bonus
+    (Russell, 2026-11-13): it is in no one's out of, and a student who earned it keeps the mark, so a category can
+    read 2 out of 1. build_test_sheet.py counts it the same way."""
     voided = kit.get("voided", {}) or {}
     result = []
     for category in kit["categories"]:
         earned = 0.0
         out_of = 0
         for point in kit["points"]:
-            if point["category"] == category["key"] and point["id"] not in voided:
+            if point["category"] == category["key"]:
                 earned += record["points"][point["id"]]["earned"]
-                out_of += 1
-        if earned > out_of:
-            raise Refusal(f"{label}: {category['key']} gives {number(earned)} out of {out_of}; nothing was put in place")
+                if point["id"] not in voided:
+                    out_of += 1
         result.append((category["key"], earned, out_of))
     return result
 
@@ -345,11 +284,11 @@ def sheet_marks(path):
 
 
 def said_as(key, earned, out_of):
-    return f"{key} {NOT_COUNTED}" if out_of == 0 else f"{key} {number(earned)}/{out_of}"
+    return f"{key} {NOT_COUNTED}" if out_of == 0 and earned == 0 else f"{key} {number(earned)}/{out_of}"
 
 
 def read_marks(entry, checker, settings, identifier, problems, notes, read_paths):
-    """[(section, identifier, [(key, earned, out of)], (earned, out of))] for one assessment's marks records."""
+    """[(section, identifier, [(key, earned, out of)])] for one assessment's marks records."""
     kit = entry["kit"]
     students = []
     records = identifier_files(entry["folder"] / "Marks", identifier, problems, f"{entry['name']}/Marks")
@@ -393,11 +332,6 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
             entry["left out"] += 1
             continue
         categories = category_marks(kit, record, label)
-        total_earned = 0.0
-        total_out_of = 0
-        for _key, earned, out_of in categories:
-            total_earned += earned
-            total_out_of += out_of
         sheet = entry["folder"] / "Sheets" / f"Section {section}" / (name + SHEET_SUFFIX)
         if sheet.is_file():
             read_paths.append(sheet)
@@ -415,8 +349,6 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
                     if printed is None or abs(printed[0] - earned) > 1e-9 or printed[1] != out_of:
                         if printed is None:
                             said.append(f"{key} nothing")
-                        elif printed[1] == 0 and printed[0] != 0:
-                            said.append(f"{key} {number(printed[0])}/0")      # a sheet built before voided points counted for no one
                         else:
                             said.append(said_as(key, printed[0], printed[1]))
                         now.append(said_as(key, earned, out_of))
@@ -431,7 +363,7 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
                     entry["sheets agree"] += 1
         else:
             entry["no sheet"] += 1
-        students.append((section, name, categories, (total_earned, total_out_of)))
+        students.append((section, name, categories))
     sheets = entry["folder"] / "Sheets"
     if sheets.is_dir():
         for section_folder in sorted(sheets.iterdir(), key=lambda found: (len(found.name), found.name)):
@@ -448,52 +380,6 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
                     problems.append(f"Section {match.group(1)}/{name}: a Marks by Question sheet with no marks record "
                                     "beside it (the record was renamed, moved or deleted)")
     return students
-
-
-LEVEL_TEXT = re.compile(r"^[^\s\\{}$&%#_^~]{1,8}$")
-CATEGORY_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,11}$")
-
-
-def read_levels(entry, settings, identifier, problems, read_paths):
-    """([(section, identifier, {key: (first, revised)})], [category keys in order]) for one assessment's Records."""
-    students = []
-    keys = []
-    for section, name, path in identifier_files(entry["folder"] / "Records", identifier, problems,
-                                                f"{entry['name']}/Records"):
-        label = f"Section {section}/{name}"
-        read_paths.append(path)
-        record = read_json(path, f"{label}'s level record")
-        shape = f"{label}: its level record is not in the shape reference/results.md gives; nothing was put in place"
-        if not isinstance(record, dict) or record.get("identifier") != name:
-            raise Refusal(shape)
-        if "section" in record and str(record.get("section")) != str(section):
-            raise Refusal(shape)
-        levels = record.get("levels")
-        if not isinstance(levels, dict) or not levels:
-            raise Refusal(shape)
-        found = {}
-        for key, pair in levels.items():
-            if not CATEGORY_KEY.match(str(key)) or not isinstance(pair, dict):
-                raise Refusal(shape)
-            first = pair.get("first")
-            revised = pair.get("revised")
-            for value in (first, revised):
-                if value is not None and (not isinstance(value, str) or not LEVEL_TEXT.match(value)):
-                    raise Refusal(shape)
-            if first is None:
-                raise Refusal(shape)
-            if settings.scale is not None:
-                for value in (first, revised):
-                    if value is not None and percent_for(settings.scale, value) is None:
-                        problems.append(f"{label}: {key} level {value} is not on the levels scale in Marking Settings.md")
-            if key not in keys:
-                keys.append(key)
-            found[key] = (first, revised)
-        students.append((section, name, found))
-    return students, keys
-
-
-# ---------------------------------------------------------------- LaTeX
 
 
 def esc(text):
@@ -558,13 +444,9 @@ def table_start(columns, header_cells):
 
 def marks_cell(settings, earned, out_of):
     if out_of == 0:
-        return NOT_COUNTED
+        return NOT_COUNTED if earned == 0 else f"{number(earned)}/0 (a bonus; no percentage)"
     value = rounded(settings, earned, out_of)
-    cell = f"{number(earned)}/{out_of} ({shown(settings, value)}\\%)"
-    level = level_for(settings, value)
-    if level:
-        cell += " " + esc(level)
-    return cell
+    return f"{number(earned)}/{out_of} ({shown(settings, value)}\\%)"
 
 
 def marks_part(name, kit, students, settings, notes_for_part):
@@ -573,27 +455,24 @@ def marks_part(name, kit, students, settings, notes_for_part):
     for category in kit["categories"]:
         titles.append(esc(category["key"]) + " " + esc(category["title"]))
     tex += "{\\small " + "; ".join(titles) + ".}\\par\\vspace{4pt}\n"
-    sections = sorted(set(section for section, _identifier, _categories, _total in students))
+    sections = sorted(set(section for section, _identifier, _categories in students))
     for section in sections:
         tex += heading(f"Section {section}", "normalsize")
         header = ["\\textbf{Student}"]
         for category in kit["categories"]:
             header.append("\\textbf{" + esc(category["key"]) + "}")
-        header.append("\\textbf{Total}")
-        tex += table_start(len(kit["categories"]) + 1, header)
+        tex += table_start(len(kit["categories"]), header)
         sums = []
         counts = []
-        for _column in range(len(kit["categories"]) + 1):
+        for _column in range(len(kit["categories"])):
             sums.append(Fraction(0))
             counts.append(0)
-        for row_section, identifier, categories, total in students:
+        for row_section, identifier, categories in students:
             if row_section != section:
                 continue
             cells = [student(section, identifier)]
-            columns = list(categories) + [("total", total[0], total[1])]
-            for index, (_key, earned, out_of) in enumerate(columns):
-                text = marks_cell(settings, earned, out_of)
-                cells.append("\\textbf{" + text + "}" if index == len(columns) - 1 else text)
+            for index, (_key, earned, out_of) in enumerate(categories):
+                cells.append(marks_cell(settings, earned, out_of))
                 if out_of:
                     sums[index] += Fraction(str(earned)) * 100 / out_of
                     counts[index] += 1
@@ -610,87 +489,18 @@ def marks_part(name, kit, students, settings, notes_for_part):
     return tex
 
 
-def levels_part(name, students, keys, settings, marked):
-    """The levels table, the students with no revised level, and the marked students with no level record."""
-    tex = heading(name + ": levels, first and revised")
-    sections = sorted(set(section for section, _identifier, _levels in students))
-    no_revision = []
-    with_record = set()
-    for section in sections:
-        tex += heading(f"Section {section}", "normalsize")
-        header = ["\\textbf{Student}"]
-        for key in keys:
-            header.append("\\textbf{" + esc(key) + "}")
-        tex += table_start(len(keys), header)
-        for row_section, identifier, levels in students:
-            if row_section != section:
-                continue
-            with_record.add((section, identifier))
-            cells = [student(section, identifier)]
-            revised_any = False
-            for key in keys:
-                if key not in levels:
-                    cells.append("")
-                    continue
-                first, revised = levels[key]
-                cell = esc(first) + " $\\rightarrow$ " + (esc(revised) if revised is not None else "none")
-                if revised is not None:
-                    revised_any = True
-                current = revised if revised is not None else first
-                if settings.scale is not None:
-                    cell += f" ({number(float(percent_for(settings.scale, current)))}\\%)"
-                cells.append(cell)
-            if not revised_any:
-                no_revision.append((section, identifier))
-            tex += " & ".join(cells) + "\\\\\n\\hline\n"
-        tex += "\\end{longtable}}\n"
-    tex += heading(NO_REVISION_TITLE, "normalsize")
-    if no_revision:
-        listed = []
-        for section, identifier in no_revision:
-            listed.append(student(section, identifier) + f" (Section {section})")
-        tex += "Students whose level record has no revised level: " + ", ".join(listed) + ".\\par\n"
-    else:
-        tex += (f"Counted: {plural(len(students), 'student')} with a level record here, and every one has at least "
-                "one revised level.\\par\n")
-    no_record = []
-    for key in sorted(marked, key=lambda found: (found[0], len(found[1]), found[1])):
-        if key not in with_record:
-            no_record.append(key)
-    if no_record:
-        tex += heading(NO_RECORD_TITLE, "normalsize")
-        listed = []
-        for section, identifier in no_record:
-            listed.append(student(section, identifier) + f" (Section {section})")
-        tex += ("Students marked in this run who have no level record for " + esc(name) + ": " + ", ".join(listed)
-                + ".\\par\n")
-    return tex, no_revision, no_record
-
-
 def built_from(entries, stamp, fingerprint, settings, assessments_text):
     tex = heading("What this was built from")
     tex += (f"Built on {esc(stamp)} from these records and Marking Settings.md (fingerprint {fingerprint}): "
-            + esc(assessments_text) + " After any change to a mark, a level or the settings, run class\\_results.py "
+            + esc(assessments_text) + " After any change to a mark or the settings, run class\\_results.py "
             "again, and then make the named copies again: this document does not change by itself.\\par\n")
-    for entry in entries:
-        if entry["missing"]:
-            tex += "{\\small " + esc(entry["missing"]) + "}\\par\n"
     tex += ("{\\small Each category's mark is the sum of its points earned, out of its points. A point the teacher "
-            "removed from the count (voided) counts for no one: it is in neither the mark nor the out of, as on the "
-            "feedback sheet, and a category with nothing counted is shown as not counted and left out of the means. "
-            "The total is the sum of the categories. Percentages are rounded to " + esc(settings.rounding)
-            + (" (the - Percentages: line of Marking Settings.md)" if settings.rounding_said else
-               " (the default: Marking Settings.md has no - Percentages: line)")
-            + ", and every level is read from the percentage as printed. ")
-    if settings.scale is None:
-        tex += ("Marking Settings.md gives no levels scale, so no level is worked out from a percentage and no "
-                "percentage from a level.")
-    else:
-        rule = ("the highest level on the scale at or below its percentage" if LEVEL_FROM_PERCENT != "nearest"
-                else "the level on the scale nearest its percentage")
-        tex += ("Levels use the scale in Marking Settings.md (" + ", ".join(
-            esc(level) + " " + number(float(value)) for level, value in settings.scale)
-            + "): a mark's level is " + rule + ", and a level's percent is the scale's.")
+            "voided for the class is a bonus: it is in no one's out of, and a student who earned it keeps the mark, as "
+            "on the feedback sheet, so a category can read more than its out of. A category with nothing to count and "
+            "nothing earned is shown as not counted and left out of the means. There is no overall mark: results are "
+            "by category. Percentages are rounded to " + esc(settings.rounding)
+            + (" (the - Percentages: line of Marking Settings.md)." if settings.rounding_said else
+               " (the default: Marking Settings.md has no - Percentages: line)."))
     tex += "}\\par\\vspace{6pt}\n"
     return tex
 
@@ -734,7 +544,6 @@ def written_names(entries):
     names = [DOCUMENT + ".tex", DOCUMENT + ".pdf"]
     for entry in entries:
         names.append(GRADES.format(assessment=entry["name"]))
-        names.append(LEVELS.format(assessment=entry["name"]))
     return names
 
 
@@ -761,14 +570,13 @@ def remove_earlier_run(out, entries):
 
 def fingerprint_of(paths, settings, identifier):
     """12 hex digits of SHA-256 over every file read (kit, records, sheets), the settings and the identifier
-    pattern, so a document built from other records, another scale or other rounding has another fingerprint."""
+    pattern, so a document built from other records or other rounding has another fingerprint."""
     digest = hashlib.sha256()
     for path in sorted(set(paths), key=str):
         digest.update(str(path.name).encode("utf-8") + b"\x00")
         digest.update(path.read_bytes())
     digest.update(b"settings\x00" + settings.raw)
     digest.update(b"identifiers\x00" + identifier.encode("utf-8"))
-    digest.update(b"levels\x00" + LEVEL_FROM_PERCENT.encode("utf-8"))
     return digest.hexdigest()[:12]
 
 
@@ -784,41 +592,13 @@ def grade_rows(kit, students, settings, built):
     header = ["section", "identifier"]
     for category in kit["categories"]:
         header.extend([f"{category['key']} marks", f"{category['key']} out of", f"{category['key']} %"])
-        if settings.scale is not None:
-            header.append(f"{category['key']} level")
-    header.extend(["total", "total out of", "total %"])
-    if settings.scale is not None:
-        header.append("total level")
     header.append("built")
     rows = [header]
-    for section, identifier, categories, total in sorted(students, key=lambda row: (row[0], len(row[1]), row[1])):
+    for section, identifier, categories in sorted(students, key=lambda row: (row[0], len(row[1]), row[1])):
         row = [str(section), identifier]
-        for _key, earned, out_of in list(categories) + [("total", total[0], total[1])]:
+        for _key, earned, out_of in categories:
             value = rounded(settings, earned, out_of)
             row.extend([number(earned), str(out_of), shown(settings, value)])
-            if settings.scale is not None:
-                row.append(level_for(settings, value))
-        row.append(built)
-        rows.append(row)
-    return rows
-
-
-def level_rows(students, keys, settings, built):
-    header = ["section", "identifier"]
-    for key in keys:
-        header.extend([f"{key} first", f"{key} revised", f"{key} level"])
-        if settings.scale is not None:
-            header.append(f"{key} %")
-    header.append("built")
-    rows = [header]
-    for section, identifier, levels in sorted(students, key=lambda row: (row[0], len(row[1]), row[1])):
-        row = [str(section), identifier]
-        for key in keys:
-            first, revised = levels.get(key, (None, None))
-            current = revised if revised is not None else first
-            row.extend([first or "", revised or "", current or ""])
-            if settings.scale is not None:
-                row.append("" if current is None else number(float(percent_for(settings.scale, current))))
         row.append(built)
         rows.append(row)
     return rows
@@ -866,18 +646,15 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
     notes = []
     said = []
     read_paths = []
-    marked = set()
     for entry in entries:
         entry["folder"] = Path(entry["folder"]).resolve()
-        entry.update({"left out": 0, "no sheet": 0, "sheets agree": 0, "marks": [], "levels": ([], []), "notes": []})
+        entry.update({"left out": 0, "no sheet": 0, "sheets agree": 0, "marks": [], "notes": []})
         if not entry["folder"].is_dir():
             raise Refusal("an --assessment folder was not found")
-        has_marks = (entry["folder"] / "Marks").is_dir()
-        has_records = (entry["folder"] / "Records").is_dir()
-        if not has_marks and not has_records:
-            raise Refusal(f"{entry['name']}: it has no Marks folder and no Records folder, so there is nothing to build "
-                          "from; nothing was put in place")
-        if has_marks:
+        if not (entry["folder"] / "Marks").is_dir():
+            raise Refusal(f"{entry['name']}: it has no Marks folder, so there is nothing to build from; nothing was put "
+                          "in place")
+        if True:
             if entry["kit_path"] is None:
                 raise Refusal(f"{entry['name']}: give --kit after its --assessment (the marks records are counted from "
                               "the kit's points); nothing was put in place")
@@ -887,31 +664,11 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
             entry["marks"] = read_marks(entry, checker, settings, identifier, problems, notes, read_paths)
             entry["notes"] = notes[before:]
             counts = {}
-            for section, name, _categories, _total in entry["marks"]:
+            for section, _name, _categories in entry["marks"]:
                 counts[section] = counts.get(section, 0) + 1
-                marked.add((section, name))
             if counts:
                 said.append(f"{entry['name']}: " + "; ".join(
                     f"Section {section}: {plural(counts[section], 'marks record')} counted" for section in sorted(counts)))
-        if has_records:
-            entry["levels"] = read_levels(entry, settings, identifier, problems, read_paths)
-            counts = {}
-            for section, name, _levels in entry["levels"][0]:
-                counts[section] = counts.get(section, 0) + 1
-                marked.add((section, name))
-            if counts:
-                said.append(f"{entry['name']}: " + "; ".join(
-                    f"Section {section}: {plural(counts[section], 'level record')} counted" for section in sorted(counts)))
-        if not entry["levels"][0]:
-            entry["missing"] = (f"{entry['name']}: there is no level record in a Records folder, so this document has "
-                                "no levels, no revision summary and no list of students with no revised levels for it.")
-        elif not has_marks:
-            entry["missing"] = (f"{entry['name']}: there is no Marks folder, so this document has no marks by category "
-                                "for it.")
-        else:
-            entry["missing"] = ""
-        if entry["missing"]:
-            said.append(entry["missing"].replace("this document has", "the documents have"))
     if problems:
         for problem in problems:
             print(problem)
@@ -931,12 +688,9 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
     pieces = []
     for entry in entries:
         marks_count = len(entry["marks"])
-        levels_count = len(entry["levels"][0])
-        total_records += marks_count + levels_count
+        total_records += marks_count
         if marks_count:
             pieces.append(f"{entry['name']}, {plural(marks_count, 'marks record')}")
-        if levels_count:
-            pieces.append(f"{entry['name']}, {plural(levels_count, 'level record')}")
     assessments_text = "; ".join(pieces) + "."
     names = []
     for entry in entries:
@@ -952,23 +706,12 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
             + esc(stamp) + " $\\cdot$ fingerprint " + fingerprint + "}\\par\\vspace{4pt}\n")
     tex += "{\\small\\itshape " + esc(TEACHER_DECIDES) + "}\\par\\vspace{6pt}\n"
     tex += built_from(entries, stamp, fingerprint, settings, assessments_text)
-    headings = ["What this was built from", NO_REVISION_TITLE, NO_RECORD_TITLE]
+    headings = ["What this was built from"]
     listed = []
     for entry in entries:
         if entry["marks"]:
             tex += marks_part(entry["name"], entry["kit"], entry["marks"], settings, entry["notes"])
             headings.append(entry["name"] + ": marks by category")
-        if entry["levels"][0]:
-            part, no_revision, no_record = levels_part(entry["name"], entry["levels"][0], entry["levels"][1], settings,
-                                                       marked)
-            tex += part
-            headings.append(entry["name"] + ": levels, first and revised")
-            for found, words in ((no_revision, "with no revised levels"), (no_record, "marked with no level record")):
-                if found:
-                    labels = []
-                    for section, name in found:
-                        labels.append(f"Section {section}/{name}")
-                    listed.append(f"{entry['name']}: {plural(len(found), 'student')} {words}: " + ", ".join(labels))
     for section in range(1, 100):
         headings.append(f"Section {section}")
     tex += "\\end{document}\n"
@@ -979,11 +722,6 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
         if entry["marks"]:
             name = GRADES.format(assessment=entry["name"])
             (building / name).write_text(csv_text(grade_rows(entry["kit"], entry["marks"], settings, built)), encoding="utf-8")
-            staged.append(name)
-        if entry["levels"][0]:
-            name = LEVELS.format(assessment=entry["name"])
-            (building / name).write_text(csv_text(level_rows(entry["levels"][0], entry["levels"][1], settings, built)),
-                                         encoding="utf-8")
             staged.append(name)
     pages = None
     if not tex_only:
@@ -1018,7 +756,7 @@ def build_in(entries, checker, settings_path, out, building, title, school, tex_
         else:
             print(f"Wrote {name}")
     print(f"Built {stamp} from {plural(total_records, 'record')} and Marking Settings.md (fingerprint {fingerprint}). "
-          "These hold identifiers only. After any change to a mark, a level or the settings, run this again and make "
+          "These hold identifiers only. After any change to a mark or the settings, run this again and make "
           "the named copies again: they do not change by themselves.")
     return 1 if left_out else 0
 
@@ -1063,7 +801,7 @@ def self_test(checker):
         (assessment / "Marks" / "Section 1" / "Student B.json").write_text(
             json.dumps(record("Student B", [1, 1, 1], voided)), encoding="utf-8")
         settings = marking / "Marking Settings.md"
-        settings.write_text("- Half marks: no\n- Levels scale: 4 83, 3 71, 2 62, 1 51\n", encoding="utf-8")
+        settings.write_text("- Half marks: no\n- Levels scale: 4 83, 3 71, 2 62, 1 51\n", encoding="utf-8")   # never read
         sheet = assessment / "Sheets" / "Section 1" / ("Student A" + SHEET_SUFFIX)
         sheet.write_text("{\\large\\bfseries\\sffamily K 1/1 $\\cdot$ T 2/2}\\par\\vspace{2pt}\n", encoding="utf-8")
 
@@ -1080,14 +818,11 @@ def self_test(checker):
         (assessment / "Marks" / "Section 1" / "Student A.json").write_text(
             json.dumps(record("Student A", [1, 0, 1], voided)), encoding="utf-8")
         stale = run(["--tex-only"])
-        if stale.returncode != 1 or "Section 1/Student A: its sheet says T 2/2, and its marks record now gives T 0/1" not in stale.stdout:
+        if stale.returncode != 1 or "Section 1/Student A: its sheet says T 2/2, and its marks record now gives T 1/1" not in stale.stdout:
             problems.append("a sheet whose totals differ from its record did not stop the build")
         if (assessment / "Results" / (DOCUMENT + ".tex")).exists():
             problems.append("a stopped build put a document in place")
-        sheet.write_text("{\\large\\bfseries\\sffamily K 1/1 $\\cdot$ T 0/1}\\par\\vspace{2pt}\n", encoding="utf-8")
-        (assessment / "Records" / "Section 1").mkdir(parents=True)
-        (assessment / "Records" / "Section 1" / "Student A.json").write_text(json.dumps(
-            {"identifier": "Student A", "section": 1, "levels": {"K": {"first": "2", "revised": "3"}}}), encoding="utf-8")
+        sheet.write_text("{\\large\\bfseries\\sffamily K 1/1 $\\cdot$ T 1/1}\\par\\vspace{2pt}\n", encoding="utf-8")
         good = run(["--tex-only"])
         if good.returncode != 0:
             problems.append("the invented records were not built")
@@ -1096,14 +831,17 @@ def self_test(checker):
                 rows = list(csv.DictReader(handle))
         except OSError:
             rows = []
-        if len(rows) != 2 or rows[0].get("T marks") != "0" or rows[0].get("total %") != "50" or rows[0].get("total level") != "below 1":
-            problems.append("the grade table's totals are not the sum of the points")
-        if len(rows) == 2 and (rows[1].get("T marks") != "1" or rows[1].get("T out of") != "1"):
-            problems.append("a voided point was counted")
+        if len(rows) != 2 or rows[0].get("T marks") != "1" or rows[0].get("T out of") != "1":
+            problems.append("the grade table's marks are not the sum of the points")
+        if len(rows) == 2 and (rows[1].get("T marks") != "2" or rows[1].get("T out of") != "1" or rows[1].get("T %") != "200"):
+            problems.append("a voided point a student earned was not kept as a bonus (2 out of 1, 200%)")
+        if rows and any(("total" in key or "level" in key) for key in rows[0]):
+            problems.append("the grade table has an overall mark or a level")
         if len(rows) == 2 and not re.match(r"^\d{4}-\d\d-\d\d \d\d:\d\d [0-9a-f]{12}$", rows[0].get("built", "")):
             problems.append("a row of the grade table does not say when it was built")
-        if "Unit 1 Test: 1 student marked with no level record: Section 1/Student B" not in good.stdout:
-            problems.append("a marked student with no level record was not listed")
+        tex = (assessment / "Results" / (DOCUMENT + ".tex")).read_text(encoding="utf-8") if (assessment / "Results" / (DOCUMENT + ".tex")).exists() else ""
+        if "Total" in tex or "level" in tex.casefold():
+            problems.append("the document has an overall mark or a level")
         if shutil.which("tectonic") is not None and shutil.which("pdftotext") is not None:
             compiled = run([])
             if compiled.returncode != 0 or not (assessment / "Results" / (DOCUMENT + ".pdf")).exists():
@@ -1116,9 +854,9 @@ def self_test(checker):
         return 1
     compiled_too = shutil.which("tectonic") is not None and shutil.which("pdftotext") is not None
     print("self-test passed: records voiding different points stopped the build, invented records counted point by "
-          "point with a point the kit voids counted for no one, a sheet whose totals differ stopped the build and put "
-          "nothing in place, levels read through an invented scale, a marked student with no level record listed, "
-          "every row stamped. "
+          "point with a point the kit voids kept as a bonus by the student who earned it (2 out of 1, 200%), a sheet "
+          "whose totals differ stopped the build and put nothing in place, no overall mark and no level anywhere "
+          "(a Levels scale line in the settings is not read), every row stamped. "
           + ("The PDF was compiled. " if compiled_too else "The PDF was NOT tested: tectonic or pdftotext is not "
              "installed, and it cannot be made without them. ")
           + "This checks the paths the test knows; it is no guarantee about changes it does not reach.")

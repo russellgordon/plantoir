@@ -27,16 +27,18 @@ place `make_named_copies.py` puts a name, at the end, on the teacher's word.
    that teach it.
 6. Overall comments: one paragraph that names the student's best work again and frames the first focus
    item as within reach.
-7. The marks, last: by question and by category. Never a total on the student's sheet.
+7. The marks, last: by question and by category. Never a total, an overall percentage or a level, on either sheet (Russell, 2026-11-13: a test marked by points never mentions levels).
 
 The marks go last because students read marks first and stop: placed last, the reasons are read first.
 
-## A point voided for everyone
+## A point voided for the class: a bonus
 
-A point the teacher removed from the count (`voided` in a record) counts for no one: it is in neither the
-mark nor the out of, its row on the teacher's sheet shows no mark and says it was not counted for anyone,
-and a question or category with nothing counted reads "not counted". `class_results.py` counts it the same
-way, so the sheet and the class's results agree.
+Russell, 2026-11-13: a point the teacher removed from the count (the kit's `voided`, copied into every
+record) is a bonus for a student who earned it. It leaves the out of for everyone; a student who earned it
+keeps the mark, so a category can read 2 of 1. Its row on the teacher's sheet shows the mark with
+"(bonus)" and the teacher's reason, and a question or category with no point left to count and nothing
+earned reads "not counted". `class_results.py` counts it the same way, so the sheet and the class's
+results agree.
 
 ## What the builder refuses
 
@@ -57,6 +59,6 @@ way, so the sheet and the class's results agree.
 ## What a teacher often changes
 
 The headings and leads (`ISSUES_TITLE` and the others at the top of the script), the school name and
-corners, the paper size, levels in place of marks (add the teacher's scale where `category_marks` is
-printed), and which sections the sheet has. Change them in the copy in `Scripts/`, keep the "What must
+corners, the paper size, and which sections the sheet has. Never levels and never an overall mark on a
+test's sheet: a test marked by points shows marks by category only. Change them in the copy in `Scripts/`, keep the "What must
 not change" block, and run `--self-test`.

@@ -48,9 +48,9 @@ Class results (#750, 750c, for class_results.py's documents), through the runner
 --document fills every \\student{N}{Student A} of an identifier document with the TeX-escaped name and the
 identifier, compiles it in a temporary folder with its output captured and thrown away, checks every name is
 printed in the PDF, and writes only "<out>/<document> (Names).pdf". --grades reads a grade table
-class_results.py wrote (section, identifier, then numbers and levels), refuses the whole run (writing
-nothing) when a cell holds a word from the table or more than a number or a level, or when a student is not
-in the table, and writes "<out>/<table> (Names).csv" with the name first, ordered by section and then by
+class_results.py wrote (section, identifier, then numbers by category), refuses the whole run (writing
+nothing) when a cell holds a word from the table or anything but a number, when a column is a level or an
+overall mark (a test shows neither: Russell, 2026-11-13), or when a student is not in the table, and writes "<out>/<table> (Names).csv" with the name first, ordered by section and then by
 name, for the teacher to copy into the school's report system. Both refuse an --out outside the teacher-only
 folder that holds the mapping table.
 
@@ -84,6 +84,7 @@ DOCUMENT_SLOT = re.compile(r"\\student\{(\d+)\}\{([^{}]*)\}")
 BUILT = re.compile(r"^\d{4}-\d\d-\d\d \d\d:\d\d [0-9a-f]{12}$")
 NAMED_SUFFIX = " (Names)"
 GRADE_CELL_LENGTH = 16
+GRADE_CELL = re.compile(r"^(-?\d+(\.\d+)?)?$")      # a number, or nothing (a category with nothing counted)
 COMMENTS_TABLE = "Report Comments.csv"
 COMMENTS_PAGE = "Report Comments.md"
 DRAFTS_PAGE = "Comments - Drafts.md"
@@ -99,9 +100,9 @@ DRAFTS_PAGE = "Comments - Drafts.md"
 #   pronoun only from the table's pronouns column, never guess one; never say a comment is within the
 #   limit without having counted it.
 #   Results: write the named document and the named grade table only into the teacher-only folder that holds
-#   the mapping table; refuse, writing nothing, a grade table whose cells hold a word from the table or more
-#   than a number or a level, or a student the table does not hold; a named document whose names are not all
-#   printed in its PDF is a failure.
+#   the mapping table; refuse, writing nothing, a grade table whose cells hold a word from the table or
+#   anything but a number, a level or overall column, or a student the table does not hold; a named document
+#   whose names are not all printed in its PDF is a failure.
 PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
 FIRST_NAME_PLACEHOLDER = "first name"
 PRONOUN_PLACEHOLDERS = ("they", "them", "their", "theirs")
@@ -991,13 +992,16 @@ def make_named_grades(table, grades, out):
         if (section, identifier) not in rows:
             problems.append(f"{label}: not in the mapping table")
         for column, cell in enumerate(row[2:-1], start=3):
-            if len(cell) > GRADE_CELL_LENGTH or holds_any_form(cell, everyone):
-                problems.append(f"{label}: column {column} holds a word from your mapping table, or more than a number "
-                                "or a level")
+            if len(cell) > GRADE_CELL_LENGTH or holds_any_form(cell, everyone) or not GRADE_CELL.match(cell):
+                problems.append(f"{label}: column {column} holds a word from your mapping table, or something that is "
+                                "not a number")
                 break
     for column, cell in enumerate(header[2:], start=3):
         if holds_any_form(cell, everyone):
             problems.append(f"the heading of column {column} holds a word from your mapping table")
+        elif "level" in cell.casefold() or cell.casefold().startswith("total"):
+            problems.append(f"the heading of column {column} is a level or an overall mark, which a test's grade table "
+                            "never carries")
     target = out / (Path(grades).stem + NAMED_SUFFIX + ".csv")
     if problems:
         for problem in problems:
@@ -1031,7 +1035,7 @@ def make_named_grades(table, grades, out):
     if students:
         stamp, fingerprint = students[0][2][-1].rsplit(" ", 1)
         print(f"Its rows say they were built {stamp}, fingerprint {fingerprint}, as class_results.py wrote them. After any "
-              "change to a mark, a level or the settings, build the results again and then this again.")
+              "change to a mark or the settings, build the results again and then this again.")
     print(f"{target.name} is in your teacher-only folder. I have not opened it, and I do not open it.")
     return 0
 

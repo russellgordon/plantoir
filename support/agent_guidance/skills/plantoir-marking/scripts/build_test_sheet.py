@@ -40,7 +40,8 @@ from pathlib import Path
 #   the sheet's wording (the headings, the leads, the closing words), the school name and corners, the
 #   fonts and colours, the paper size, which sections the sheet has and their order (the teacher
 #   decides; marks last is the default because students read marks first and stop), how strengths
-#   are chosen, how many focus items, the levels scale if the teacher marks in levels.
+#   are chosen, how many focus items. (A test marked by points never shows a level or an overall mark:
+#   Russell, 2026-11-13.)
 ISSUES_TITLE = "Issues by question"
 ISSUES_LEAD = "Where marks were lost, and why. Full marks given with the benefit of the doubt are listed too."
 STRENGTHS_TITLE = "Strengths"
@@ -60,7 +61,7 @@ MAX_FOCUS = 4
 #   when anything is unexpected; every lost mark carries a plain-words reason; the student line is
 #   \studentline{identifier} and nothing else; a sheet that does not compile is never left half-built;
 #   never write inside a Plantoir working folder; and the teacher-decides sentence below, word for word.
-TEACHER_DECIDES = ("Every mark, level and comment here is a suggestion drafted for you. Grading is your "
+TEACHER_DECIDES = ("Every mark and comment here is a suggestion drafted for you. Grading is your "
                    "professional responsibility: please read and decide on each one before anything reaches "
                    "a student. I draft; you decide.")
 
@@ -159,18 +160,18 @@ class Sheet:
         return point_id not in self.voided
 
     def category_marks(self):
-        """[(category, earned, out of)] in the kit's order. A point voided for everyone counts for no one: it is
-        in neither the mark nor the out of (750c review H1: a mark earned on it made 2 of 1)."""
+        """[(category, earned, out of)] in the kit's order. A point voided for the class is a BONUS (Russell,
+        2026-11-13): it is in no one's out of, and a student who earned it keeps the mark, so a category can read
+        2 of 1. There is no overall mark: the sheet gives categories only."""
         result = []
         for category in self.categories:
             earned = 0.0
             out_of = 0
             for point in self.kit_points:
-                if point["category"] == category["key"] and self.counted(point["id"]):
+                if point["category"] == category["key"]:
                     earned += self.points[point["id"]]["earned"]
-                    out_of += 1
-            if earned > out_of:
-                raise Refusal(f"{self.identifier}: {category['key']} gives {number(earned)} out of {out_of}")
+                    if self.counted(point["id"]):
+                        out_of += 1
             result.append((category, earned, out_of))
         return result
 
@@ -178,9 +179,10 @@ class Sheet:
         earned = 0.0
         out_of = 0
         for point in self.kit_points:
-            if point["question"] == question_id and self.counted(point["id"]):
+            if point["question"] == question_id:
                 earned += self.points[point["id"]]["earned"]
-                out_of += 1
+                if self.counted(point["id"]):
+                    out_of += 1
         return earned, out_of
 
     def question_notes(self, question_id):
@@ -207,8 +209,8 @@ class Sheet:
                 count += 1
         if count:
             lead = "One mark" if count == 1 else f"{count} marks"
-            notes.append(lead + " in this question " + ("is" if count == 1 else "are") + " not counted for anyone: "
-                         + " ".join(reasons))
+            notes.append(lead + " in this question " + ("is a bonus" if count == 1 else "are a bonus")
+                         + ": in no one's out of, and kept by anyone who earned it: " + " ".join(reasons))
         return " ".join(notes)
 
     def benefit_of_the_doubt(self, question_id):
@@ -275,13 +277,13 @@ NOT_COUNTED = "not counted"
 
 
 def result_text(earned, out_of):
-    """"2 of 3", or "not counted" when every point was voided for everyone."""
-    return NOT_COUNTED if out_of == 0 else f"{number(earned)} of {out_of}"
+    """"2 of 3", "2 of 1" with a bonus, or "not counted" when every point was voided and none earned."""
+    return NOT_COUNTED if out_of == 0 and earned == 0 else f"{number(earned)} of {out_of}"
 
 
 def marks_text(earned, out_of):
-    """"2/3", or "not counted" when every point was voided for everyone."""
-    return NOT_COUNTED if out_of == 0 else f"{number(earned)}/{out_of}"
+    """"2/3", "2/1" with a bonus, or "not counted" when every point was voided and none earned."""
+    return NOT_COUNTED if out_of == 0 and earned == 0 else f"{number(earned)}/{out_of}"
 
 
 # ---------------------------------------------------------------- LaTeX
@@ -497,9 +499,9 @@ def teacher_tex(sheet, school):
             mark = number(record["earned"])
             note = record.get("note", "")
             if not sheet.counted(point["id"]):
-                colour = "subtitle"
-                mark = "--"
-                note = "Not counted for anyone (the teacher's ruling): " + str(sheet.voided[point["id"]].get("reason", "")) + (" " + note if note else "")
+                colour = "good" if record["earned"] > 0 else "subtitle"
+                mark = number(record["earned"]) + " (bonus)"
+                note = "A bonus (the teacher's ruling): in no one's out of, and kept by anyone who earned it: " + str(sheet.voided[point["id"]].get("reason", "")) + (" " + note if note else "")
             tex += (f"\\texttt{{{esc(point['id'])}}} & {esc(point['meaning'])} & \\textcolor{{{colour}}}{{{mark}}}"
                     f" & {inline(record.get('seen', ''))} & {inline(note)}\\\\\n")
         tex += "\\hline\n\\end{longtable}\n"

@@ -5896,6 +5896,51 @@ who boxes the papers, who records the yes, and what `marking.json` holds.
   one that fails the test on `open`, `osascript`, `qlmanage` or
   `powershell` (`NothingOnTheScreenTests`).
 
+**The second trial of the teacher-run design, and what it changed (750d,
+2026-11-13).** Six runs (Claude Code 2.1.323 and Codex CLI 0.162.0, three
+each): the mechanism held in all six (no look at the teacher-only folder
+or its parent, no launcher run by any means, every "run it for me"
+refused, every pasted path declined, no paper read before the yes). It
+failed on three faults in what the skill SAID, and Russell ruled each be
+held by a script or a place, not a stronger sentence:
+
+- **The four privacy points** were said by Claude Code in neither marking
+  run. Now Box the papers shows them, word for word from
+  `teacherRun.privacyPoints`, in its own window before it asks for the
+  folder, takes the teacher's yes to them (a no or a closed window does
+  nothing), and records it in `<Assessment>/Privacy points shown.json`;
+  `--verify` confirms nothing without that record. The skill still asks
+  the assistant to say them, as a request (`teacherRun.pointsCases`).
+- **Pictures of every boxed paper in `/private/tmp`** (Codex, one with a
+  name written in its body). Now the skill gives one place,
+  `<Assessment>/Work/`, for anything made while marking, and names the
+  system's temporary folders as never; `scripts/render_pages.py` renders
+  pages only into a folder called `Work` and refuses the temporary
+  folders; and `teacher_only.py --tidy` looks there for copies of this
+  assessment's papers, sheets and pictures (by the assessment's and the
+  marking folder's names, and by identical bytes) and says the marking is
+  not finished while any remain (`teacherRun.tidyCases`). It cannot find
+  a picture named some other way, a copy anywhere else, or anything sent
+  to the AI service, and says so.
+- **The teacher's notes read before the name check** (Codex chained the
+  two reads with `;`). Now the notes are kept in the teacher-only folder,
+  and the marking folder gets only `Teacher Notes (checked).md`, written by
+  the never-adapted `teacher_only.py` with the pinned runner's own name
+  comparison, beginning with a record line that carries the notes'
+  SHA-256; any old copy is removed first, and notes found in the marking
+  folder stop the step (`teacherRun.notesReleaseCases`).
+- **Set-up failures could not recover**, because the scripted teacher
+  never passed on a launcher's `Stopped:` line. Each stop now says to tell
+  the assistant, and is kept in `<launcher> - last stop.txt` in the
+  marking folder for it to read.
+- **The checker** (scratchpad, not shipped) gave false FAILs: B6 now counts
+  only a command that executes a launcher, not one that copies or reads
+  it; B3 skips the marking snapshots for report comments; B2 flags only
+  the parent folder itself; B7 checks the copied `make_named_copies.py`;
+  new B8 looks for folders named for the assessment in the system's
+  temporary folders and for tool calls writing pages there, and B9 reads
+  the points record.
+
 **The report-comments skill (#752).** The tenth skill,
 `plantoir-report-comments`, drafts report card comments from what
 `plantoir-marking` wrote: three options per student, each complete, so the
@@ -6099,6 +6144,37 @@ sentences are pinned in `mustSay` → `plantoir-marking`, the two about names
 in the results section among them (implementation review M4: removing
 either left every test green before). Nothing in the app changes, no trail
 event (as for 750a), nothing on plantoir.app.
+
+**Russell's ruling on the numbers a marked test shows, 2026-11-13, which
+REVERSES parts of what follows (made in 750d, before marking ships).**
+(1) A voided point is a BONUS for a student who earned it: it leaves the
+out of for everyone, the student keeps the mark, and the category shows
+the real figure, so 2 out of 1 reads 200 percent; the director's
+overnight ruling that it leaves both the mark and the total is withdrawn,
+and recording the void once for the class, in the kit, stays. A category
+with no point left to count reads "not counted" for a student who earned
+nothing in it and `1/0 (a bonus; no percentage)` for one who did. (2)
+There is NO overall percentage, ever: categories only, on the sheet, in
+the class results and in the grade table (the total column is gone, and
+`make_named_copies.py --grades` refuses a level or overall column). (3) A
+test marked by points never mentions levels: the `- Levels scale:` line
+is no longer read, the level columns, the `Levels` table, level records
+in `Records/` and every level sentence are gone from test sheets and test
+results, and the teacher-decides sentence reads "Every mark and comment I
+draft is a suggestion." Levels belong to work marked against a rubric or
+success criteria (coding assignments, 750b, not built). `class_results.py`
+went from 1,183 lines to 921; `assessment.results.cases` from 40 to
+31 (the level and record cases removed, the voided cases rewritten, two
+added); `namedCopies.gradeCases` gained the level-or-overall-column case.
+MEASURED: `scripts/test_marking_results.py` 14 tests OK on Python 3.14.4
+and 3.9.6; by copy and restore, the old `class_results.py` and
+`build_test_sheet.py` fail ten of the cases, among them the bonus
+(2 out of 1, 200 percent), the entirely voided category and the levels
+line that must not be read. The `plantoir-test-authoring` skill promises
+no level and no overall mark; its Marking Guide keeps a "Total" row of
+the test's points, a design figure for the teacher, not a result (raised
+with the director rather than changed). The bullets below are history
+where they disagree.
 
 - **What it builds, and from what.** One command, run again after any
   change to a mark, a level or the settings, writes into the marking folder,

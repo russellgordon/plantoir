@@ -24,7 +24,7 @@ it under the title of every document you write for the teacher (the marks
 by question sheets, `Marking Settings.md`, `Marking Rules Applied.md`):
 
 ```text wrap
-Every mark, level and comment I draft is a suggestion. Grading is your professional responsibility: please read and decide on each one before anything reaches a student. I draft; you decide.
+Every mark and comment I draft is a suggestion. Grading is your professional responsibility: please read and decide on each one before anything reaches a student. I draft; you decide.
 ```
 
 ## 2. Privacy first
@@ -169,7 +169,6 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
   <Assessment>/Briefs/                      the marker and reviewer briefs
   <Assessment>/Marking Rules Applied.md     every ruling, numbered
-  <Assessment>/Records/Section N/           level records, only if there are any (section 15)
   <Assessment>/Results/                     the class's results, identifiers only (section 15)
 the teacher-only folder (you never see it):
   Name Mapping Table.csv                    section, identifier, name (and optional columns)
@@ -420,7 +419,7 @@ There are three kinds of rule, and they are applied differently:
 - **The teacher's own.** If `courses/<CODE>/How I Teach.md` exists, read it
   first (with Plantoir's tools connected, `read_how_i_teach` reads it) and
   mark its way. Otherwise ask, once, briefly: the categories and how marks
-  are counted (marks out of a total, or levels and their scale), whether a
+  are counted (marks out of the kit's points, by category), whether a
   half mark may be given, the school name for the sheet's corner (from the
   course's print settings, `print_school_name`, as the `plantoir-handouts`
   skill's section 2 reads it). Record each answer in `Marking
@@ -468,7 +467,7 @@ sheet says goes in:
 - `closing`: one paragraph naming the student's best work again and
   framing the first focus item as within reach.
 
-Never a total: totals are counted from the points. Check each record with
+Never a total in a record: the marks by category are counted from the points. Check each record with
 `check_kit.py --marks` before its sheet is built.
 
 ## 10. Process
@@ -613,27 +612,29 @@ python3 -B "<marking folder>/Scripts/class_results.py" --assessment "<marking fo
 
 It writes `Class Results.pdf` and a grade table per assessment into
 `<Assessment>/Results/`, identifiers only (`--assessment` again, each with
-its own `--kit`, and `--out` for a term's results across assessments). It
-reads level records in `Records/` only if that folder holds any, and the
-document says plainly which parts it had no records for. Every script reads
+its own `--kit`, and `--out` for a term's results across assessments).
+Every script reads
 identifiers one way only, `Student A` to `Student ZZ`, matched in full;
 papers named another way are renamed first (`redact_scans.py
 --name-papers`). Render every page and look, as for the sheets.
 
-- **The scale is the teacher's.** Levels come from the `- Levels scale:`
-  line of `Marking Settings.md`. Never fill in the levels scale yourself:
-  ask the teacher, and record their answer with their words and the date.
-  How a percentage is rounded is the `- Percentages:` line (whole numbers,
-  half up, when there is none); every level is read from the percentage as
-  printed.
+- **The numbers a marked test shows** (Russell, 2026-11-13): marks by
+  category only (K, T, C, A as the kit names them), each out of its
+  points and as a percentage. **There is no overall mark or percentage, ever,** on the sheet, in the results or in the grade table. **A test marked by points never mentions levels:** no level, no scale, no
+  sentence about levels; levels belong to work marked against a rubric or
+  success criteria, which this skill does not mark yet. **A voided point is a bonus:** it leaves the out of for everyone, and a
+  student who earned it keeps the mark, so a category can read 2 out of 1,
+  200%. The void is recorded once for the class, in the kit. How a
+  percentage is rounded is the `- Percentages:` line of `Marking
+  Settings.md` (whole numbers, half up, when there is none).
 - **A sheet whose totals no longer match its marks record stops the
   build**, naming the identifier and both numbers: build that student's
   sheets again, tell the teacher which student was affected, and run it
   again. Never edit the numbers in a document by hand. It stops, too, on a
-  file in `Marks/` or `Records/` not named like a record (a rescan saved
+  file in `Marks/` not named like a record (a rescan saved
   beside one), a sheet with no record, or a sheet it cannot read: say what
   it printed, and ask the teacher which file is the right one.
-- **After any change to a mark or a level, run `class_results.py`
+- **After any change to a mark, run `class_results.py`
   again.** The documents do not change by themselves; each says when it was
   built and the fingerprint of everything it read, the settings included.
   A change to the settings needs a new run too. Report what it printed;

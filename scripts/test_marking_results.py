@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 The plantoir-marking skill's class results (#750, piece 750c): scripts/class_results.py, which builds the
-class's results from the marks records (and from level records, only when a Records folder is there),
-identifiers only, and make_named_copies.py's two modes for them, --grades and --document.
+class's results from the marks records, identifiers only, by category only and with no level (Russell,
+2026-11-13: a voided point is a bonus, no overall percentage ever, no level on a test marked by points), and make_named_copies.py's two modes for them, --grades and --document.
 
 Every case in contracts/shared-rules.json -> assessment -> results -> cases is run as the skill runs it: an
 invented marking folder holding the contract's base kit (kitFormat.base), marks records, Marks by Question
@@ -231,8 +231,7 @@ class ResultsCaseTests(unittest.TestCase):
                 return
             for name, rows in case.get("grades", {}).items():
                 self.assertEqual(table_without_built(self, out / f"Grades - {name}.csv"), rows, label)
-            for name, rows in case.get("levels", {}).items():
-                self.assertEqual(table_without_built(self, out / f"Levels - {name}.csv"), rows, label)
+            self.assertFalse(any(path.name.startswith("Levels - ") for path in out.iterdir()), f"{label}: a levels table")
             self.assertFalse((out / ".building results").exists(), label)
             for path in out.iterdir():
                 self.assertNotIn("earlier run", path.name, f"{label}: a build that put new documents in place left the old")
@@ -242,6 +241,8 @@ class ResultsCaseTests(unittest.TestCase):
             folded = re.sub(r"\s+", " ", tex)
             for text in case.get("document", []):
                 self.assertIn(text, folded, label)
+            for text in case.get("documentNot", []):
+                self.assertNotIn(text, folded, label)
             place = -1
             for text in case.get("documentInOrder", []):
                 self.assertGreater(folded.find(text), place, f"{label}: {text} is out of order")
@@ -273,7 +274,7 @@ class ResultsCaseTests(unittest.TestCase):
 
     def test_every_contract_case(self):
         cases = assessment()["results"]["cases"]
-        self.assertGreaterEqual(len(cases), 36)
+        self.assertGreaterEqual(len(cases), 31)
         for case in cases:
             with self.subTest(case=case["name"]):
                 self.check_case(case)
@@ -281,10 +282,10 @@ class ResultsCaseTests(unittest.TestCase):
     @unittest.skipIf(MISSING, SKIP_REASON)
     def test_a_case_compiles_to_a_pdf(self):
         for case in assessment()["results"]["cases"]:
-            if case["name"].startswith("levels with steps map through an invented scale"):
+            if case["name"].startswith("a voided point a student earned is a bonus"):
                 self.check_case(case, compile_too=True)
                 return
-        self.fail("the levels case is not in the contract")
+        self.fail("the bonus case is not in the contract")
 
     def test_its_own_self_test_passes(self):
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--self-test", "--checker", str(CHECKER)],
@@ -292,13 +293,13 @@ class ResultsCaseTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("self-test passed", result.stdout)
 
-    def test_another_scale_gives_another_fingerprint(self):
-        # 750c review H3: three runs with three scales printed one fingerprint, so a stale copy looked fresh.
+    def test_other_settings_give_another_fingerprint(self):
+        # 750c review H3: three runs with three settings printed one fingerprint, so a stale copy looked fresh.
         case = assessment()["results"]["cases"][0]
         printed = set()
-        for scale in ("none", "4 83, 3 71, 2 62, 1 51", "4 88, 3 74, 2 63, 1 52"):
+        for rounding in ("whole numbers, half up", "one decimal, half up", "whole numbers, down"):
             with tempfile.TemporaryDirectory() as folder:
-                changed = dict(case, settings="- Half marks: no\n- Levels scale: " + scale + "\n")
+                changed = dict(case, settings="- Half marks: no\n- Percentages: " + rounding + "\n")
                 command, out, _kits = set_up(changed, Path(folder))
                 result = subprocess.run(command + ["--tex-only"], capture_output=True, text=True, encoding="utf-8")
                 self.assertEqual(result.returncode, 0, result.stdout)
@@ -477,13 +478,22 @@ class SkillFileTests(unittest.TestCase):
         self.assertIn("--grades", skill)
         self.assertIn("--document", skill)
         reference = (SKILL / results["reference"]).read_text(encoding="utf-8")
-        self.assertIn(results["scaleLine"], reference)
-        self.assertIn(results["noRevisionTitle"], (SKILL / results["script"]).read_text(encoding="utf-8"))
+        self.assertIn(results["roundingLine"], reference)
 
-    def test_the_settings_template_carries_the_scale_line_the_script_reads(self):
+    def test_no_level_and_no_overall_mark_on_a_test(self):
+        # Russell, 2026-11-13: levels only with a rubric or success criteria; no overall percentage, ever.
         results = assessment()["results"]
-        template = (SKILL / "templates" / results["scaleFrom"]).read_text(encoding="utf-8")
-        self.assertIn(results["scaleLine"] + " none", template)
+        template = (SKILL / "templates" / results["settingsFrom"]).read_text(encoding="utf-8")
+        self.assertNotIn("Levels scale", template)
+        self.assertIn(results["roundingLine"] + " " + results["roundings"][0], template)
+        for path in (SCRIPT, SHEET_BUILDER, SKILL / results["reference"], SKILL / "reference" / "test-sheets.md"):
+            text = path.read_text(encoding="utf-8")
+            for word in ("level record", "LEVEL_FROM_PERCENT", "total %", "\\textbf{Total}", "level_for"):
+                self.assertNotIn(word, text, f"{path.name}: {word}")
+
+    def test_the_settings_template_carries_the_rounding_line_the_script_reads(self):
+        results = assessment()["results"]
+        template = (SKILL / "templates" / results["settingsFrom"]).read_text(encoding="utf-8")
         self.assertIn(results["roundingLine"] + " " + results["roundings"][0], template)
         script = (SKILL / results["script"]).read_text(encoding="utf-8")
         for rounding in results["roundings"]:

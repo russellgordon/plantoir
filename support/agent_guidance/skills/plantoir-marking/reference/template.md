@@ -25,11 +25,12 @@ made it gave.
 
 ## The sheet
 
-- **Levels with steps** (`4++`, `4+`, `4`, `4-`, `4--`, down to `1`) on the teacher's percentage scale,
-  where the course reports levels.
+- **Levels with steps** (`4++`, `4+`, `4`, `4-`, `4--`, down to `1`) belong to work marked against a
+  rubric or success criteria, never to a test marked by points: a test's sheet shows marks by category
+  only, and no overall mark (Russell, 2026-11-13).
 - **Colours on a feedback sheet**: green for what was done well, orange for what is still missing or
   not quite right, black for what is noted and did not change the mark ("Noted, but it did not change
-  your level."). An orange item names the gap in a bold one-sentence headline, gives its evidence, and
+  your mark."). An orange item names the gap in a bold one-sentence headline, gives its evidence, and
   ends with one short prompt of about fifteen words, never the fix and never next steps.
 - **Never cite an earlier sheet's item numbers**; say it in words.
 
