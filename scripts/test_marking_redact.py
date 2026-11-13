@@ -403,6 +403,7 @@ class BoxTests(unittest.TestCase):
                 if expected is None:
                     self.assertIn("no name blank on your blank test, so no box", line, case["name"])
                     continue
+                self.assertIn("box in inches ", line, case["name"])
                 values = [float(value) for value in line.split("box in inches ")[1].split(",")]
                 for found, wanted in zip(values, expected):
                     self.assertAlmostEqual(found, wanted, delta=0.02, msg=f"{case['name']}: {line}")
@@ -493,6 +494,32 @@ class BatchAndRecordTests(unittest.TestCase):
         stale = run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check)
         self.assertEqual(stale.returncode, 1, "a new batch needs a new look")
         self.assertIn("Not confirmed", stale.stdout)
+
+    def test_a_stale_record_is_refused(self):
+        # A record left from an earlier batch must not stand for this one: --verify reads the files.
+        self.box()
+        run_script(SCRIPT, "--confirm", self.redacted, "--check-dir", self.check)
+        old_record = (self.check / "Teacher confirmed.json").read_bytes()
+        os.remove(self.originals / "Section 1" / "Student B.pdf")
+        self.box()
+        (self.check / "Teacher confirmed.json").write_bytes(old_record)
+        self.assertEqual(run_script(SCRIPT, "--verify", self.redacted, "--check-dir", self.check).returncode, 1)
+
+    def test_a_failure_while_writing_leaves_nothing_to_read(self):
+        # 750a fix review 2, M2: the combined file failed after the papers were written, and they stayed.
+        self.box()
+        fake = self.root / "bin"
+        fake.mkdir()
+        (fake / "pdfunite").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        (fake / "pdfunite").chmod(stat.S_IRWXU)
+        environment = dict(os.environ, PATH=str(fake) + os.pathsep + os.environ.get("PATH", ""))
+        result = subprocess.run([sys.executable, "-B", str(SCRIPT), str(self.originals), str(self.redacted), "--blank",
+                                 str(BLANK_LETTER), "--check-dir", str(self.check)], capture_output=True, text=True,
+                                env=environment)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("none may be read", result.stdout)
+        self.assertEqual(list(self.redacted.rglob("*.pdf")), [], "no paper is left where the assistant reads")
+        self.assertFalse((self.check / COMBINED).exists(), "no old combined file stands in for this batch")
 
     def test_a_failed_write_leaves_nothing_to_read(self):
         self.box()

@@ -490,7 +490,7 @@ def redact_folder(originals, redacted, blank, check_dir, labels, given_box, iden
                 (check / BATCH).write_text(json.dumps({"written": datetime.datetime.now().isoformat(timespec="seconds"),
                                                        "combined": sha256_of(check / COMBINED),
                                                        "papers": papers_in(redacted)}, indent=1), encoding="utf-8")
-        except OSError:
+        except (OSError, Refusal):
             for path in sorted(redacted.rglob("*.pdf")):
                 os.remove(path)
             raise Refusal("the boxed papers could not all be written; none was left where they are read, and none "
