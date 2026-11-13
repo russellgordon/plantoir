@@ -31,6 +31,13 @@ place `make_named_copies.py` puts a name, at the end, on the teacher's word.
 
 The marks go last because students read marks first and stop: placed last, the reasons are read first.
 
+## A point voided for everyone
+
+A point the teacher removed from the count (`voided` in a record) counts for no one: it is in neither the
+mark nor the out of, its row on the teacher's sheet shows no mark and says it was not counted for anyone,
+and a question or category with nothing counted reads "not counted". `class_results.py` counts it the same
+way, so the sheet and the class's results agree.
+
 ## What the builder refuses
 
 - A kit or marks record that does not pass `check_kit.py`.

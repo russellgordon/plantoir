@@ -96,9 +96,10 @@ def half_marks_allowed(settings_path):
     if settings_path is None or not Path(settings_path).is_file():
         return False
     for line in Path(settings_path).read_text(encoding="utf-8").splitlines():
-        match = re.match(r"\s*[-*]\s*Half marks:\s*(\w+)", line, re.IGNORECASE)
+        match = re.match(r"\s*[-*]\s*Half marks:\s*(.*?)\s*$", line, re.IGNORECASE)
         if match:
-            return match.group(1).casefold() == "yes"
+            # yes or no, then at most the teacher's words and date in brackets: "yes, on part B" is not a yes
+            return re.match(r"^yes\s*(\(.*\))?$", match.group(1), re.IGNORECASE) is not None
     return False
 
 
@@ -143,16 +144,18 @@ class Sheet:
         return point_id not in self.voided
 
     def category_marks(self):
-        """[(category, earned, out of)] in the kit's order."""
+        """[(category, earned, out of)] in the kit's order. A point voided for everyone counts for no one: it is
+        in neither the mark nor the out of (750c review H1: a mark earned on it made 2 of 1)."""
         result = []
         for category in self.categories:
             earned = 0.0
             out_of = 0
             for point in self.kit_points:
-                if point["category"] == category["key"]:
+                if point["category"] == category["key"] and self.counted(point["id"]):
                     earned += self.points[point["id"]]["earned"]
-                    if self.counted(point["id"]):
-                        out_of += 1
+                    out_of += 1
+            if earned > out_of:
+                raise Refusal(f"{self.identifier}: {category['key']} gives {number(earned)} out of {out_of}")
             result.append((category, earned, out_of))
         return result
 
@@ -160,10 +163,9 @@ class Sheet:
         earned = 0.0
         out_of = 0
         for point in self.kit_points:
-            if point["question"] == question_id:
+            if point["question"] == question_id and self.counted(point["id"]):
                 earned += self.points[point["id"]]["earned"]
-                if self.counted(point["id"]):
-                    out_of += 1
+                out_of += 1
         return earned, out_of
 
     def question_notes(self, question_id):
@@ -203,7 +205,7 @@ class Sheet:
                     if point["question"] == question["id"] and not self.counted(point["id"]):
                         voided_here = True
                 if lost or voided_here or self.benefit_of_the_doubt(question["id"]):
-                    rows.append((part, question["id"], question["skill"], f"{number(earned)} of {out_of}",
+                    rows.append((part, question["id"], question["skill"], result_text(earned, out_of),
                                  self.question_notes(question["id"])))
         return rows
 
@@ -243,6 +245,19 @@ def number(value):
     return str(int(value)) if float(value).is_integer() else str(value)
 
 
+NOT_COUNTED = "not counted"
+
+
+def result_text(earned, out_of):
+    """"2 of 3", or "not counted" when every point was voided for everyone."""
+    return NOT_COUNTED if out_of == 0 else f"{number(earned)} of {out_of}"
+
+
+def marks_text(earned, out_of):
+    """"2/3", or "not counted" when every point was voided for everyone."""
+    return NOT_COUNTED if out_of == 0 else f"{number(earned)}/{out_of}"
+
+
 # ---------------------------------------------------------------- LaTeX
 
 
@@ -256,7 +271,8 @@ def esc(text):
     text = text.replace("~", "\\textasciitilde{}").replace("^", "\\textasciicircum{}")
     text = text.replace("<", "\\textless{}").replace(">", "\\textgreater{}")
     for symbol, command in (("≥", "$\\geq$"), ("≤", "$\\leq$"), ("≠", "$\\neq$"), ("←", "$\\leftarrow$"),
-                            ("→", "$\\rightarrow$"), ("–", "--"), ("—", "---"), ("÷", "$\\div$"), ("×", "$\\times$")):
+                            ("→", "$\\rightarrow$"), ("–", "--"), ("—", "---"), ("÷", "$\\div$"), ("×", "$\\times$"),
+                            ("·", "$\\cdot$")):
         text = text.replace(symbol, command)
     for token in (")", "\\{", "\\}", ",", ";"):
         text = text.replace(token, token + "\\allowbreak{}")
@@ -412,16 +428,16 @@ def feedback_tex(sheet, school):
                                if point["question"] == question["id"] and point["category"] == category["key"]]
             if question_points:
                 question_earned, question_out_of = sheet.question_result(question["id"])
-                by_question.append(f"{question['id']}: {number(question_earned)} of {question_out_of}")
+                by_question.append(f"{question['id']}: {result_text(question_earned, question_out_of)}")
         tex += (f"\\rule{{0pt}}{{2.6ex}}{esc(category['title'])} & " + " $\\cdot$ ".join(esc(part) for part in by_question)
-                + f" & {number(earned)}/{out_of}\\\\[2pt]\n")
+                + f" & {marks_text(earned, out_of)}\\\\[2pt]\n")
     tex += "\\hline\n\\end{tabular}\\par\\end{minipage}\n\\end{document}\n"
     return tex
 
 
 def teacher_tex(sheet, school):
     kit = sheet.kit
-    marks_line = " $\\cdot$ ".join(f"{esc(category['key'])} {number(earned)}/{out_of}"
+    marks_line = " $\\cdot$ ".join(f"{esc(category['key'])} {marks_text(earned, out_of)}"
                                    for category, earned, out_of in sheet.category_marks())
     tex = preamble(kit["test"] + " · Marks by question (teacher only)", kit["course"], school)
     tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"]) + " · Marks by question}\\par\\vspace{2pt}\n"
@@ -448,15 +464,17 @@ def teacher_tex(sheet, school):
             continue
         tex += "\\Needspace{8\\baselineskip}\\vspace{4pt}\n\\begin{longtable}" + columns + "\n" + head + "\\endfirsthead\n" + head + "\\endhead\n"
         tex += (f"\\multicolumn{{5}}{{|l|}}{{\\bfseries\\sffamily {esc(category['title'])}: "
-                f"{number(earned)}/{out_of}}}\\\\\n\\hline\n")
+                f"{marks_text(earned, out_of)}}}\\\\\n\\hline\n")
         for point in category_points:
             record = sheet.points[point["id"]]
             colour = "good" if record["earned"] >= 1 else "gap"
+            mark = number(record["earned"])
             note = record.get("note", "")
             if not sheet.counted(point["id"]):
                 colour = "subtitle"
-                note = "Not counted (the teacher's ruling): " + str(sheet.voided[point["id"]].get("reason", "")) + (" " + note if note else "")
-            tex += (f"\\texttt{{{esc(point['id'])}}} & {esc(point['meaning'])} & \\textcolor{{{colour}}}{{{number(record['earned'])}}}"
+                mark = "--"
+                note = "Not counted for anyone (the teacher's ruling): " + str(sheet.voided[point["id"]].get("reason", "")) + (" " + note if note else "")
+            tex += (f"\\texttt{{{esc(point['id'])}}} & {esc(point['meaning'])} & \\textcolor{{{colour}}}{{{mark}}}"
                     f" & {inline(record.get('seen', ''))} & {inline(note)}\\\\\n")
         tex += "\\hline\n\\end{longtable}\n"
     tex += "\\end{document}\n"
@@ -519,7 +537,7 @@ def build(kit_path, marks_path, out, checker, settings, school, site, links_path
         pages = compile_and_check(tex, out / (stem + ".pdf"), sheet.identifier, part_titles)
         (out / (stem + ".tex")).write_text(tex, encoding="utf-8")
         built.append(f"{suffix} {pages} page" + ("s" if pages != 1 else ""))
-    totals = " ".join(f"{category['key']} {number(earned)}/{out_of}" for category, earned, out_of in sheet.category_marks())
+    totals = " ".join(f"{category['key']} {marks_text(earned, out_of)}" for category, earned, out_of in sheet.category_marks())
     print(f"{sheet.identifier}: {totals}; checks {len(marks.get('checks', []))}; " + ", ".join(built))
     return 0
 

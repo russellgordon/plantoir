@@ -5562,88 +5562,109 @@ from invented marks records; it is written up for the director.
 script, `scripts/class_results.py`, and a third reference,
 `reference/results.md`; `make_named_copies.py` gained `--document` and
 `--grades`. The contract is `assessment.results` (its `cases`) and
-`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and five
-sentences are pinned in `mustSay` → `plantoir-marking`. Nothing in the app
-changes, no trail event (as for 750a), nothing on plantoir.app.
+`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and eight
+sentences are pinned in `mustSay` → `plantoir-marking`, the two about names
+in the results section among them (implementation review M4: removing
+either left every test green before). Nothing in the app changes, no trail
+event (as for 750a), nothing on plantoir.app.
 
 - **What it builds, and from what.** One command, run again after any
-  change to a mark or a level, writes into the marking folder, identifiers
-  only: `Class Results.tex` and `.pdf` (marks by category per section with
-  the section's means, levels first and revised, the students with no
-  revised level), `Grades - <Assessment>.csv` and `Levels - <Assessment>.csv`.
-  It reads the marks records 750a writes, each passed through #751's
-  `check_kit.py` first, and level records (`Records/Section N/Student A.json`)
-  ONLY IF that folder is there. 750b, which would write level records for a
-  coding assignment, is not built, so the document says in words, per
-  assessment, which of the two it had none of; a missing part is never
-  shown as a part with nothing in it. Each document says when it was built,
-  from how many records of which assessment, and a 12-character SHA-256
-  fingerprint of those records, so a stale copy can be told from a fresh one.
+  change to a mark, a level or the settings, writes into the marking folder,
+  identifiers only: `Class Results.tex` and `.pdf` (marks by category per
+  section with the section's means, levels first and revised, the students
+  with no revised level, the marked students with no level record),
+  `Grades - <Assessment>.csv` and `Levels - <Assessment>.csv`. It reads the
+  marks records 750a writes, each passed through #751's `check_kit.py`
+  first, and level records (`Records/Section N/Student A.json`) ONLY IF that
+  folder holds any. 750b, which would write level records for a coding
+  assignment, is not built, so the document says in words, per assessment,
+  which of the two it had none of; an empty `Records/` folder is read as none
+  (review M2).
 - **The trim (750 plan review M7).** The plan's version replaced Russell's
-  eleven-script, twelve-compile chain (graphics, the test against the
-  assignment, the grades summary, the revision summary, a hand-kept marking
-  summary, three named versions). REJECTED as toolkit creep: the shipped
-  script builds the totals by category, the grade tables and the
-  no-revision list; charts, the test beside an assignment and a marking
-  summary with the teacher's own notes are words in `reference/results.md`
-  for the assistant to build itself, identifiers only. Russell's
+  eleven-script, twelve-compile chain. REJECTED as toolkit creep: the shipped
+  script builds the totals by category, the grade tables and the two lists;
+  charts, the test beside an assignment and a marking summary with the
+  teacher's own notes are words in `reference/results.md`. His
   `make_graphics.py`, `grades_summary.py`, `grades_tsv.py`,
   `make_revision_summary.py`, `update_marking_summary_rows.py` and
-  `check_headings.py` were the models; none is copied.
-- **A total is the sum of its points, and a sheet that disagrees stops the
-  build.** A category's mark is counted from the points exactly as
-  `build_test_sheet.py` counts it (a `voided` point is left out of the out
-  of, and a mark earned on it still counts); the total is counted over
-  every point on its own and checked against the categories' sum. A Marks
-  by Question sheet beside a record is read by the marks line the sheet
-  builder writes, and a sheet whose totals differ stops the build, naming
-  the identifier and both numbers: the student was told something the
-  record no longer says. That is the check "after any change to a mark,
-  run it" needs, since a record changed after its sheet was built is the
-  case it catches. A half mark without the settings' yes, a level not on
-  the scale, a record whose identifier is not its file's, and a record the
-  kit checker refuses stop it too. On any stop nothing new is written and
-  the last run's files are renamed "earlier run, do not use", as #752's
-  comments are. A record with a point not yet marked is left out and named.
-  No line says a document is correct or complete (`results.neverSays`,
-  checked over every case's output).
-- **The scale is the teacher's.** Read from `Marking Settings.md` (`-
-  Levels scale: none`, or each level and its percent; the template carries
-  the line set to `none`). A mark's level is the highest level at or below
-  its percentage, which a teacher may change to the nearest
-  (`LEVEL_FROM_PERCENT`); a level's percent is the scale's. REJECTED:
-  Russell's scale (4++ 100 to 1-- 50), his reading of a test's level as the
-  nearest step, his weighting (categories even, test and assignment equal)
-  and his school as defaults; the fixtures use an invented scale.
+  `check_headings.py` were the models; none is copied. The review's LOW
+  suggested cutting the level-record reader too; KEPT, because the brief
+  makes reading `Records/` when it is there part of this piece, and the
+  second heading check, because the named copy breaks its pages elsewhere.
+- **A voided point counts for no one, on the sheet and in the results
+  (implementation review H1; this changed 750a's merged
+  `build_test_sheet.py`).** MEASURED by the review: a voided point a student
+  had earned gave `T 2/1`, 200 percent in the grade table for the report
+  system, on the sheet and in the results alike, and a category voided
+  entirely gave a section mean of 0 percent. Russell's own builder kept the
+  earned mark and capped each category at 100 percent; the port dropped the
+  cap. Now the point is in neither the mark nor the out of, the sheet shows
+  no mark for it and says it was not counted for anyone, and a category with
+  nothing counted reads "not counted", in the marks line and the tables, and
+  is left out of the means. Both scripts refuse a mark over its out of.
+  REJECTED: the bonus with a cap as the default; it is one teacher's choice,
+  made in the copy.
+- **One percentage, printed and read (review H2).** MEASURED: 35/44 printed
+  80 percent with the level below an 80 cut while the total's 80 percent got
+  the level above. A percentage is now rounded once, by the settings'
+  `- Percentages:` line (whole numbers, half up when there is none; one
+  decimal, half up; whole numbers, down), with fractions so 82.5 is never
+  rounded down by floating point, and every level is read from that printed
+  value; the document prints the rule it used. Cases sit half a percent below
+  each cut of an invented scale and on 73/88.
+- **What stops the build.** A Marks by Question sheet whose marks line gives
+  other totals than its record (both numbers named), names a category the
+  kit does not have, or cannot be read; a sheet with no record beside it; any
+  file or folder in `Marks/` or `Records/` not named `Section N/<identifier>.json`
+  (counted, never named), which catches a rescan saved beside a record and a
+  class named another way unless `--identifiers` gives its pattern (review
+  M1: each of these gave exit 0 and a document that looked complete); an
+  assessment with no marks record; a half mark without the settings' yes
+  (yes or no, then at most bracketed words: review L2 found `yes-only-on-part-B`
+  read as yes); a level off the scale, and a scale that names a level or a
+  percent twice, a percent over 100, or is written twice. REMOVED: the check
+  of a total against the categories' sum, which could never fail (review M3,
+  measured by replacing it with `if False:`).
+- **Stale named copies (review H3).** MEASURED: three scales gave one
+  fingerprint, and the named grade table, the file copied into a report
+  system, carried no stamp at all. Now the fingerprint covers the kit, the
+  records, the sheets, `Marking Settings.md` and the identifier pattern;
+  every document and every row of both tables carries the build time and
+  fingerprint (the `built` column), and `--grades` refuses a table without
+  it or with rows of two builds, carries it into the named table and prints
+  it. The skill says to make the named copies again after every run. A
+  build is staged in a hidden folder and put in place only when every
+  document is built, after the last run's are renamed "earlier run, do not
+  use"; a test kills a build while it compiles and finds no finished-looking
+  document. REJECTED: marking a set "incomplete" in place, which leaves a
+  half-written folder for someone to misread.
+- **The scale is the teacher's.** Read from `Marking Settings.md`, never
+  filled in by the assistant. REJECTED: Russell's scale, his weighting and
+  his school as defaults, and his scale as a format example (review M5: the
+  refusal message showed its first three steps); every example and fixture
+  scale is invented.
 - **Names, at the end, by the one name step.** The named document and the
   named grade table are made only by `make_named_copies.py` through the
-  never-adapted runner (whose pinned SHA-256 does not move: the runner is
-  unchanged). Every student in the identifier document is
-  `\student{section}{identifier}`, the one place `--document` fills (a
-  section is part of the key, since every section has a Student A); it
-  fails on Missing character, a name missing from the PDF's text, or a
-  heading left alone at a page's foot once the names make rows taller
-  (MEASURED: the first named copy of a two-assessment document left "Unit 1
-  Assignment: levels, first and revised" at the foot of page 1, where the
-  identifier copy had not; the headings now keep 14 and 8 lines of room).
-  `--grades` refuses the whole table, writing nothing, when a cell holds a
-  word of the mapping table by #752's one name comparison or more than 16
-  characters (a grade table holds numbers and levels only), or a student
-  the table does not hold, and writes the name first, ordered by section and
-  then by name. The plan called it `--table`; REJECTED because `--table`
-  already names the mapping table in every mode.
+  never-adapted runner (unchanged, so its pinned SHA-256 does not move).
+  Every student in the identifier document is `\student{section}{identifier}`;
+  `--document` fails on Missing character, on a student whose name and
+  identifier are not on the page as often as students carry them (review L5:
+  two students of one name were satisfied by one printing), or on a heading
+  left alone at a page's foot once the names make rows taller. `--grades`
+  refuses the whole table when a cell holds a word of the mapping table by
+  #752's one name comparison or more than 16 characters, or a student the
+  table does not hold, and writes the name first, ordered by section and then
+  by name. The plan called it `--table`; REJECTED because `--table` already
+  names the mapping table in every mode.
 - **Measured** (Apple M4 Pro, macOS 26.6, tectonic 0.17.0, Python 3.14.4
   and 3.9.6): 60 invented records in two sections build in 1.6 s with the
-  PDF (3 letter pages, 31.8 KB) and 1.4 s without it, most of it the 60 runs
-  of `check_kit.py`. `scripts/test_marking_results.py`: 10 tests, every
-  `results` case (16), `gradeCases` (7) directly and through the runner,
-  `documentCases` (4, skipped without tectonic and pdftotext), one case
-  compiled, both self-tests. Must-fails by copy and restore, each red: the
-  sheet comparison removed (2 cases), the no-revision list dropped, a voided
-  point counted in the out of, the files sorted as text (Student AA before
-  Student B), the grade table's name check dropped, its order by name
-  dropped, and both of `--document`'s font checks dropped (one alone is
-  caught by the other).
+  PDF and 1.4 s without, most of it the 60 runs of `check_kit.py`.
+  `scripts/test_marking_results.py`: 12 tests, every `results` case (36,
+  each `sheetLine` case also through `build_test_sheet.py`), `gradeCases`
+  (9) directly and through the runner, `documentCases` (5, skipped without
+  tectonic and pdftotext), one case compiled, three scales giving three
+  fingerprints, a build killed half way, both self-tests. Must-fails by copy
+  and restore are listed in the closing comment on #750.
 
 NOT MEASURED in this piece: a trial with a real assistant building results
 from invented records; it is written up for the director.

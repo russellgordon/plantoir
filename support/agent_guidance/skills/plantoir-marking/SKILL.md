@@ -488,21 +488,32 @@ python3 -B "<marking folder>/Scripts/class_results.py" --assessment "<marking fo
 It writes `Class Results.pdf` and a grade table per assessment into
 `<Assessment>/Results/`, identifiers only (`--assessment` again, each with
 its own `--kit`, and `--out` for a term's results across assessments). It
-reads level records in `Records/` only if that folder is there, and the
-document says plainly which parts it had no records for. Render every page
-and look, as for the sheets.
+reads level records in `Records/` only if that folder holds any, and the
+document says plainly which parts it had no records for. If the teacher's
+papers are named another way than `Student A`, give the pattern recorded in
+`Marking Settings.md` with `--identifiers`, as for the scans. Render every
+page and look, as for the sheets.
 
 - **The scale is the teacher's.** Levels come from the `- Levels scale:`
   line of `Marking Settings.md`. Never fill in the levels scale yourself:
   ask the teacher, and record their answer with their words and the date.
+  How a percentage is rounded is the `- Percentages:` line (whole numbers,
+  half up, when there is none); every level is read from the percentage as
+  printed.
 - **A sheet whose totals no longer match its marks record stops the
   build**, naming the identifier and both numbers: build that student's
   sheets again, tell the teacher which student was affected, and run it
-  again. Never edit the numbers in a document by hand.
+  again. Never edit the numbers in a document by hand. It stops, too, on a
+  file in `Marks/` or `Records/` not named like a record (a rescan saved
+  beside one), a sheet with no record, or a sheet it cannot read: say what
+  it printed, and ask the teacher which file is the right one.
 - **After any change to a mark or a level, run `class_results.py`
   again.** The documents do not change by themselves; each says when it was
-  built and from which records. Report what it printed; never say the
-  results are correct or complete.
+  built and the fingerprint of everything it read, the settings included.
+  A change to the settings needs a new run too. Report what it printed;
+  never say the results are correct or complete. After each run, make the
+  named copies again before anything is copied into a report system: a
+  named copy keeps the build time and fingerprint of the run it came from.
 
 The named copy of the document, and the named grade table for the school's
 report system, are made only on the teacher's word, through the runner,

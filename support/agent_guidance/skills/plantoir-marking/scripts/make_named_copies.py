@@ -80,7 +80,8 @@ SLOT = re.compile(r"\\studentline\{([^{}]*)\}")
 FIRST_NAME_COLUMN = "first name"
 PRONOUNS_COLUMN = "pronouns"
 OPTIONS_PER_STUDENT = 3
-DOCUMENT_SLOT = re.compile(r"\\student\{(\d+)\}\{(Student [A-Z]{1,2})\}")
+DOCUMENT_SLOT = re.compile(r"\\student\{(\d+)\}\{([^{}]*)\}")
+BUILT = re.compile(r"^\d{4}-\d\d-\d\d \d\d:\d\d [0-9a-f]{12}$")
 NAMED_SUFFIX = " (Names)"
 GRADE_CELL_LENGTH = 16
 COMMENTS_TABLE = "Report Comments.csv"
@@ -851,6 +852,13 @@ def make_named_document(table, document, out):
     slots = DOCUMENT_SLOT.findall(tex)
     if not slots:
         raise Refusal("the document has no \\student{section}{identifier} for a name to go in; nothing was written")
+    strange = 0
+    for _section, identifier in slots:
+        if not re.match(IDENTIFIER, identifier):
+            strange += 1
+    if strange:
+        raise Refusal(f"{plural(strange, 'place')} in the document marked \\student hold something not like an "
+                      "identifier; nothing was written")
     missing = []
     for section, identifier in slots:
         label = f"Section {section}/{identifier}"
@@ -878,11 +886,16 @@ def make_named_document(table, document, out):
         if "Missing character" in said:
             raise Refusal(f"a name could not be set in the font of {stem}; nothing was written")
         printed = printed_text(pdf)
+        # Each student's name AND identifier, as put in, counted on the page: a name printed once does not stand
+        # for two students of that name, and a name inside another name is not this one (750c review, L5).
+        wanted = {}
+        for section, identifier in set(slots):
+            form = comparable(names[(int(section), identifier)] + " (" + identifier + ")")
+            wanted.setdefault(form, []).append(f"Section {section}/{identifier}")
         unset = []
-        for section, identifier in slots:
-            label = f"Section {section}/{identifier}"
-            if comparable(names[(int(section), identifier)]) not in printed and label not in unset:
-                unset.append(label)
+        for form, labels in wanted.items():
+            if printed.count(form) < len(labels):
+                unset.extend(sorted(labels))
         if unset:
             raise Refusal(f"the name of {', '.join(unset)} could not be set in the font of {stem}; nothing was written")
         stranded = heading_left_alone(named, pdf)
@@ -928,13 +941,23 @@ def read_grades(path):
     if not rows or [cell.strip().casefold() for cell in rows[0][:2]] != ["section", "identifier"] or len(rows[0]) < 3:
         raise Refusal("the grade table does not start with the columns section and identifier, as class_results.py "
                       "writes it; nothing was written")
+    if rows[0][-1].strip().casefold() != "built":
+        raise Refusal("the grade table has no built column (when it was built, and its fingerprint), as class_results.py "
+                      "writes it; build it again with class_results.py; nothing was written")
     found = []
+    built = set()
     for row in rows[1:]:
         if not row:
             continue
         if len(row) != len(rows[0]) or not row[0].strip().isdigit() or not re.match(IDENTIFIER, row[1].strip()):
             raise Refusal("a row of the grade table is not like 1, Student A, then its marks; nothing was written")
+        if not BUILT.match(row[-1]):
+            raise Refusal("a row of the grade table has a built cell not as class_results.py writes it; nothing was written")
+        built.add(row[-1])
         found.append((int(row[0].strip()), row[1].strip(), row))
+    if len(built) > 1:
+        raise Refusal("the rows of the grade table were built at different times; build it again with class_results.py; "
+                      "nothing was written")
     return rows[0], found
 
 
@@ -953,7 +976,7 @@ def make_named_grades(table, grades, out):
         seen.add((section, identifier))
         if (section, identifier) not in rows:
             problems.append(f"{label}: not in the mapping table")
-        for column, cell in enumerate(row[2:], start=3):
+        for column, cell in enumerate(row[2:-1], start=3):
             if len(cell) > GRADE_CELL_LENGTH or holds_any_form(cell, everyone):
                 problems.append(f"{label}: column {column} holds a word from your mapping table, or more than a number "
                                 "or a level")
@@ -991,6 +1014,10 @@ def make_named_grades(table, grades, out):
     if left_out:
         print(f"{plural(len(left_out), 'student')} in your mapping table, in the sections here, "
               f"{'has' if len(left_out) == 1 else 'have'} no row in the grade table: " + ", ".join(left_out))
+    if students:
+        stamp, fingerprint = students[0][2][-1].rsplit(" ", 1)
+        print(f"Its rows say they were built {stamp}, fingerprint {fingerprint}, as class_results.py wrote them. After any "
+              "change to a mark, a level or the settings, build the results again and then this again.")
     print(f"{target.name} is in your teacher-only folder. I have not opened it, and I do not open it.")
     return 0
 
@@ -1151,7 +1178,8 @@ def self_test_results(compile_too):
         table.write_text('section,identifier,name\n1,Student A,"Zedfamily, Qoe"\n1,Student B,"Testfamily, Bartholomewina"\n',
                          encoding="utf-8")
         grades = results / "Grades - Unit 1 Test.csv"
-        grades.write_text("section,identifier,K marks,K out of\n1,Student A,3,4\n1,Student B,4,4\n", encoding="utf-8")
+        grades.write_text("section,identifier,K marks,K out of,built\n1,Student A,3,4,2026-11-13 09:00 0123456789ab\n"
+                          "1,Student B,4,4,2026-11-13 09:00 0123456789ab\n", encoding="utf-8")
         out = root_path / "Teacher only" / "Unit 1 Test" / "Named"
         result = subprocess.run([sys.executable, "-B", os.path.abspath(__file__), "--grades", str(grades), "--table",
                                  str(table), "--out", str(out)], capture_output=True, text=True, encoding="utf-8")
@@ -1163,7 +1191,8 @@ def self_test_results(compile_too):
             rows = []
         if [row[:3] for row in rows[1:]] != [["Testfamily, Bartholomewina", "1", "Student B"], ["Zedfamily, Qoe", "1", "Student A"]]:
             problems.append("the named grade table was not written with the names first, ordered by name")
-        grades.write_text("section,identifier,K marks\n1,Student A,Zedfamily\n", encoding="utf-8")
+        grades.write_text("section,identifier,K marks,built\n1,Student A,Zedfamily,2026-11-13 09:00 0123456789ab\n",
+                          encoding="utf-8")
         refused = subprocess.run([sys.executable, "-B", os.path.abspath(__file__), "--grades", str(grades), "--table",
                                   str(table), "--out", str(out / "again")], capture_output=True, text=True, encoding="utf-8")
         if refused.returncode != 1 or (out / "again").exists():

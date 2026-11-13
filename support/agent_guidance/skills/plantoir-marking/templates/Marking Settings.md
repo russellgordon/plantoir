@@ -2,8 +2,8 @@
 
 <!-- A starting point from the plantoir-marking skill. Copy it into the marking folder and fill it in
 with the teacher. Change any wording freely. Keep: the sentence under the title, the "- Half marks:"
-line (build_test_sheet.py and class_results.py read it), the "- Levels scale:" line (class_results.py reads
-it), and no name of any student, anywhere. -->
+line (build_test_sheet.py and class_results.py read it), the "- Levels scale:" and "- Percentages:" lines
+(class_results.py reads them), and no name of any student, anywhere. -->
 
 Every mark, level and comment I draft is a suggestion. Grading is your professional responsibility: please read and decide on each one before anything reaches a student. I draft; you decide.
 
@@ -25,6 +25,10 @@ teacher's own words, and the date. Edit this file to change one; the next markin
   <!-- class_results.py reads this line. "none" when the course reports marks only; otherwise each level
   and the percent it stands for, highest first, commas between, as the teacher gives them (the format
   only: "4 80, 3 70, 2 60, 1 50"). Never fill it in from another teacher's scale or from this example. -->
+- Percentages: whole numbers, half up
+  <!-- class_results.py reads this line: how a percentage is rounded before it is printed and a level
+  is read from it. "whole numbers, half up", "one decimal, half up" or "whole numbers, down", as the
+  teacher says. -->
 - School name for the sheets: (print_school_name from the course's settings)
 - Identifiers: Student A, Student B, ... in a folder per section
 
