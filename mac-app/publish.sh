@@ -190,6 +190,11 @@ cp -a "${APP_SOURCE}" "${STAGE_APP}"
 # bundle, in every mode.
 ./release/check-update-keys.sh "${STAGE_APP}" "${EXPECTED_FEED}"
 
+# Compiled Python in the toolchain gives the same recipe a new image name on
+# every Mac (#747). The build phase removes it; this refuses a bundle where it
+# did not. Asked of the BUILT bundle, in every mode.
+./release/check-no-bytecode.sh "${STAGE_APP}"
+
 # ---- 4. Code Signing ---------------------------------------------------------
 if [[ "${SIGN}" == true ]]; then
   echo ""

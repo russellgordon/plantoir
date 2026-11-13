@@ -297,6 +297,13 @@ else
   cat /tmp/verify_recipe_folders_test.log
 fi
 
+if (cd scripts && python3 test_toolchain_bytecode.py) >/tmp/verify_toolchain_bytecode_test.log 2>&1; then
+  pass "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+else
+  fail "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+  cat /tmp/verify_toolchain_bytecode_test.log
+fi
+
 if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
   pass "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
 else
@@ -1056,25 +1063,32 @@ else
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
-# the runs in THIS script, but `scripts/` is a folder reference in the app's
-# project — whatever sits in it is copied into the bundle, mirrored into every
-# working folder's `.toolchain/`, and hashed into the image tag. A `.pyc` there
-# hands teachers a rebuild for nothing, and `.gitignore` hides it from `git
+# the runs in THIS script, but `patches/`, `scripts/`, `support/` and
+# `contracts/` are folder references in the app's project: whatever sits in them
+# is copied into the bundle, mirrored into every working folder's
+# `.toolchain/`, and (before #747) hashed into the image tag. A `.pyc` there
+# handed teachers a rebuild for nothing, and `.gitignore` hides it from `git
 # status`, so a hand-run test that littered would never be noticed. Ten of them
 # were found in a working folder's `.toolchain/` on 2026-09-09, mirrored from a
 # bundle that had been carrying them for some time. The app's own
 # `copyToolchainFiles` removes extraneous files, so a clean bundle heals a
-# folder on the next touch; this keeps the bundle clean.
-if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
-  pass "no bytecode left in scripts/, which ships inside the app"
+# folder on the next touch. Since #747 the build phase removes bytecode from
+# the bundle (mac-app/BuildScripts/write_toolchain_hashes.py), the launchers'
+# toolchain_hash skips it, and publish.sh refuses a bundle that still has it.
+# This check stays for the checkout: this script's own image is built from the
+# working tree, whose `COPY support/` and `COPY contracts/` would bake a stray
+# cache in, and the line below names the hand run that wrote it.
+_bytecode_found="$(find patches scripts support contracts \( -name '__pycache__' -o -name '*.pyc' -o -name '*.pyo' \) -print 2>/dev/null)"
+if [ -z "$_bytecode_found" ]; then
+  pass "no bytecode left in patches/, scripts/, support/ or contracts/, which ship inside the app"
 else
-  fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
-  find scripts -name '__pycache__' -print
-  echo "   Remove it and run again:  rm -rf scripts/__pycache__"
-  echo "   It gets there from running a test file BY HAND — this script exports"
+  fail "compiled Python is in the folders the app carries (patches/, scripts/, support/, contracts/)"
+  echo "$_bytecode_found"
+  echo "   Remove it and run again:"
+  echo "     find patches scripts support contracts -name __pycache__ -prune -exec rm -rf {} +"
+  echo "   It gets there from running a test file BY HAND. This script exports"
   echo "   PYTHONDONTWRITEBYTECODE, a bare 'python3 scripts/test_x.py' does not,"
   echo "   and importing the module under test is what writes the .pyc."
-
 fi
 
 export PLANTOIR_TRAIL_DIR="$VERIFY_TRAIL_DIR"
