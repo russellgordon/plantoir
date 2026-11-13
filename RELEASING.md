@@ -357,6 +357,20 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    `documentation/02-docker-image.md` → "Known vulnerabilities in the image's
    npm packages" says what each outcome means.
 
+   **Run the cut's `verify.sh` with both browser engines required** (#597):
+   `PLANTOIR_REQUIRE_ENGINES=chromium,webkit script -q /dev/null ./verify.sh`.
+   Its rendered check (6h-r) presses every kind of diagram, sketch, graph,
+   formula, quiz, task box and runnable program in Chrome for Testing and in
+   Safari's engine, then proves each row red on a sabotaged copy. Without the
+   variable a missing engine is only a SKIP; with it, a FAILURE, so a cut
+   never passes having checked one engine. The director's merge gate runs it
+   the same way (the `direct-release` skill's gate line). Without the network,
+   the rows that still need Google's fonts or cdnjs say SKIPPED by name and
+   the summary's last lines count every SKIP; a SKIP is never a pass. The variable covers the engines only, not the network, so run the cut's `verify.sh` with the network and read the summary's SKIP lines. Fetch
+   Safari's engine once per Mac with `./browser-checks/fetch-browsers.sh`
+   (Node 22, npm and the network once; 296 MB, outside the repository).
+   `documentation/06-quartz-customizations.md` → R.
+
    **On Windows, the same audit over the runtime** (#685): run
    `.\windows-app\audit-runtime.ps1` from the repository root, against the
    runtime the installer will carry (`-Runtime <folder>` for another one).
