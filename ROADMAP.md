@@ -51,12 +51,14 @@ ready.
   arrange the shelf in groups you make yourself, and replace a reference
   course with a newer version (with a backup kept first).
   ([#572](https://github.com/russellgordon/plantoir/issues/572))
-- **GitHub Copilot beside Plantoir.** When the Copilot command-line tool is
-  installed, Plantoir offers it wherever it offers Claude Code or Codex:
-  revising a course, fixing a section's problems, planning a unit.
-  GitHub offers Copilot at no cost to verified teachers, which would make
-  this the first free way to work with a capable assistant beside Plantoir.
-  (What GitHub offers can change; check GitHub Education when you sign up.)
+- **GitHub Copilot beside Plantoir.** When GitHub Copilot is installed on
+  your Mac, Plantoir offers it wherever it offers Claude Code or Codex, listed
+  after them: revising a course (Revise With ▸ GitHub Copilot…), fixing a
+  section's problems (Fix with GitHub Copilot…) and planning a unit (Plan a
+  Unit with GitHub Copilot…). It asks you in its own window before it changes
+  anything, as the other two do. GitHub has its own plans and an education
+  programme for teachers; Help will say what they include, with the date it
+  was checked.
   ([#783](https://github.com/russellgordon/plantoir/issues/783))
 - **Help inside the app.** A quick start, and a page for each thing you do,
   with pictures of the app, in the Help menu.

@@ -6895,19 +6895,31 @@ own, bound to one section. These are different. A teacher who already has
 course to it — a real terminal session, with Plantoir's tools already
 connected and an opening message already sent. Nothing is typed by them.
 
-| | Revise With ▸ Claude… | Revise With ▸ Codex… |
-|---|---|---|
-| Tool looked for | `claude` | `codex` |
-| Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) |
-| Written for the connection | `mcp-<CODE>.json` | **nothing** |
-| Script the mac hands to a terminal | `launch-<CODE>.command` | `launch-<CODE>-codex.command` |
-| A teacher's own MCP servers | not loaded (`--strict-mcp-config`) | **loaded beside Plantoir's** |
-| Sandbox / approval flags passed | none | none |
-| Trail line | `started Claude Code for <CODE>` | `started Codex for <CODE>` |
+| | Revise With ▸ Claude… | Revise With ▸ Codex… | Revise With ▸ GitHub Copilot… (#783) |
+|---|---|---|---|
+| Tool looked for | `claude` | `codex` | `copilot`, and only GitHub's (signed by GitHub, or an npm install of `@github/copilot`) |
+| Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) | a configuration file, `--additional-mcp-config @<file>` |
+| Written for the connection | `mcp-<CODE>.json` | **nothing** | `mcp-<CODE>-copilot.json` |
+| Script the mac hands to a terminal | `launch-<CODE>.command` | `launch-<CODE>-codex.command` | `launch-<CODE>-copilot.command` |
+| A teacher's own MCP servers | not loaded (`--strict-mcp-config`) | **loaded beside Plantoir's** | **loaded beside Plantoir's**; GitHub's own servers turned off (`--disable-builtin-mcps`) |
+| Sandbox / approval flags passed | none | none | none |
+| Tool timeout passed | none (Claude Code's own) | 1800 s (`tool_timeout_sec`) | 1,800,000 ms (`timeout` in the file) |
+| Trail line | `started Claude Code for <CODE>` | `started Codex for <CODE>` | `started GitHub Copilot for <CODE>` |
 
-Both doors are described as data in
+All three doors are described as data in
 [`contracts/app-rules.json`](../contracts/app-rules.json) → `outsideAgents`,
-and a mac test walks both. The sentences live there, not in this page: naming
+and a mac test walks all three.
+
+**No door refuses deploying.** None passes an approval flag, `deploy_section`
+is offered over the server like every other tool, and the assistant's own
+prompt asks the teacher before it runs; Plantoir's server then applies its
+usual holds (#433: an outside deploy goes ahead while a preview is open, by
+Russell's ruling). A teacher's or a school's own settings can widen that,
+which Plantoir cannot see: Codex's "Always allow", and in Copilot a saved
+approval, `defaultPermissionMode` allow-all, `COPILOT_ALLOW_ALL`, or an
+organisation's "assisted" mode, whose judge reads each tool's hints
+(`deploy_section`'s `destructiveHint` is false). Changing that hint moves the
+MCP surface, so it is left for the director as a possible follow-up. The sentences live there, not in this page: naming
 them rather than quoting them is what keeps a document from going quietly out
 of date.
 
@@ -6959,7 +6971,7 @@ Three properties matter more than the mechanism:
   surface digest (`scripts/test_tool_surface_digest.py`) was checked
   unchanged in every stage.
 - **The item is hidden when the tool is not installed**, and hidden
-  independently per door. Not greyed out: a menu that teaches teachers to stop
+  independently per door, in the order Claude, Codex, GitHub Copilot. Not greyed out: a menu that teaches teachers to stop
   reading it is worse than a shorter menu.
 - **Plantoir never installs one, and never offers to.** These are developer
   tools with accounts and their own update paths. A teacher who wants one
@@ -6983,8 +6995,11 @@ somebody will simplify away.** An app launched from the Dock inherits launchd's
 minimal PATH, so `onPath` usually finds nothing even on a Mac where the
 teacher's own shell finds the tool at once. PATH is tried first, then
 `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, `~/.npm-global/bin`,
-`~/.bun/bin` and every `~/.nvm/versions/node/*/bin`. The same list serves both
-doors with only the name changed: Codex's own installer script sets
+`~/.bun/bin` and every `~/.nvm/versions/node/*/bin`. The same list serves every
+door with only the name changed (#783 left it unchanged: GitHub's install
+script writes `~/.local/bin`, the Homebrew cask `copilot-cli` Homebrew's
+folder, npm its global folder; Volta's `~/.volta/bin` and pnpm's
+`~/Library/pnpm` are searched for no door, a gap noted rather than fixed): Codex's own installer script sets
 `BIN_DIR="${CODEX_INSTALL_DIR:-$HOME/.local/bin}"`, which is already the first
 place looked.
 
@@ -7494,7 +7509,9 @@ lease that is not wanted, so a hold written beside it would vanish at the first
 reconcile after the session's own preview or deploy ended. It survives the
 `isLeaving` window too, and `releaseEverything()` clears it. The trail gets
 `outside session held a course` ("a Claude or Codex session started from
-Plantoir is holding ICS3U while it is open").
+Plantoir is holding ICS3U while it is open" as written in #458; since #783 it
+names no assistant, like the hold's sentences: "The third door: GitHub
+Copilot (#783)").
 
 **The three protections**, each read from another live process's files, never
 this process's own (`heldElsewhere` skips its own pid and dead owners):
@@ -7511,7 +7528,10 @@ this process's own (`heldElsewhere` skips its own pid and dead owners):
 - **A second session is refused.** All three Revise items grey on a held course
   with "Available once you finish revising with Claude or Codex" once under
   them — the sentence Windows' `BusyReason` has said since #430, with "or
-  Codex" added because the server cannot tell which door started it. The two
+  Codex" added because the server cannot tell which door started it. (Since
+  #783 every one of these sentences names no assistant, by Russell's ruling,
+  so the third door needed no fourth name; see "The third door: GitHub
+  Copilot (#783)".) The two
   doors also grey while the in-app window is open on that course, with the
   sentence that names the window (`AssistActivity.closeTheAssistantFirst`), not
   the session's: two causes, two sentences (`CourseActivity
@@ -7802,6 +7822,163 @@ will eventually ask why the two are not the same.
   were added FIRST, before anything was touched, precisely so the extraction can
   be done later and proved not to have moved anything.
 
+### The third door: GitHub Copilot (#783)
+
+Added 2026-11-13 for v2.0.0, on the evidence of the Copilot trial
+(`~/plantoir/copilot-trial/RESULTS.md`, section 4) and the plan review. It is
+the same shape as the other two (`CopilotLauncher`, beside
+`CodexLauncher`, borrowing `ClaudeCodeLauncher`'s helpers) and appears in the
+same three places: Revise With ▸ in both subject menus and every row's
+context menu, Fix with GitHub Copilot… under a section's Problems table, and
+Plan a Unit with GitHub Copilot… on an empty Planning tab. Its contract is
+`outsideAgents.agents[copilot]`.
+
+**Russell's rulings (2026-11-13, on #783).** The menus say "GitHub Copilot…",
+so it is not taken for Microsoft 365 Copilot, which schools often have; it is
+listed after Codex everywhere; Plantoir passes it no permissions, so it asks
+in its own window before each tool that changes something, before the three
+commands a handout needs (`tectonic`, `pdftoppm`, `mkdir`), and before
+deploying, as the other two do; and **the sentences that say a course is
+busy because an outside session is working on it name no assistant**, so
+they never need rewording when another door is added. Those are the nine
+`assist-wording.json` keys `availableOnceYouFinishRevisingWithClaude`,
+`finishTheClaudeSessionFirst`, `claudeIsRevisingTheCourseRename`,
+`claudeIsRevisingTheCourseRestore`, `claudeIsRevisingTheCourseAddSection`,
+`backupKeptForAClaudeSession`, `backupsKeptForAClaudeSession`,
+`finishTheClaudeSessionToDeleteItsBackup` and
+`finishTheClaudeSessionToDeleteItsBackups`, whose key names are kept so no
+reader goes red for a rename; the server's trail line
+(`outsideSessionHeldACourse`) follows them. Nothing a teacher reads says
+the assistant is free or at no cost: GitHub's pages read that day say every
+plan includes the command-line tool and verified teachers may be eligible
+for Copilot Pro, which is not the same claim, and #839's Help owns the
+dated wording.
+
+**How it is started.** The script is
+
+```text wrap
+cd '<working folder>' || exit 1
+started=$SECONDS
+'<copilot>' --additional-mcp-config '@<absolute path>/mcp-<CODE>-copilot.json' --disable-builtin-mcps -i '<greeting>'
+status=$?
+if [ "$status" -ne 0 ] && [ $((SECONDS - started)) -lt 10 ]; then echo; echo '<stoppedAtOnce sentence>'; fi
+```
+
+and the file is `{"mcpServers":{"plantoir":{"type":"local","command":<Plantoir>,"args":["--mcp-stdio",<folder>],"env":{"PLANTOIR_DOOR_COURSE":<CODE>},"tools":["*"],"timeout":1800000}}}`,
+written with `JSONSerialization`. What each piece is for, and what was
+measured:
+
+- **The timeout (plan review H1).** Copilot's `timeout` on a local server
+  covers tool discovery and every tool call, in milliseconds. With none,
+  1.0.108's `callTool` falls back to `W0=6e4`, 60 seconds (read from
+  `cli-main.js` in the cached package, 2026-11-13). `deploy_section` is
+  awaited, and a first deploy takes minutes, so without the key Copilot would
+  most likely tell the model a deploy had failed while Plantoir was still
+  deploying. Thirty minutes, as Codex's `tool_timeout_sec`. **Not yet
+  measured with a slow tool**: the run that would prove it starts a Copilot
+  session, which this piece's implementer was not allowed to do (the brief's
+  hard rule); the closing comment says what the director ran.
+- **No `-C` (plan review H2).** Any argument the installed Copilot does not
+  know prints `error: unexpected argument '…' found` and exits 1, in 0.07 s
+  (measured, 1.0.108). `-C` arrived in 1.0.42 and `--enable-mcp-server` in
+  1.0.80; `--additional-mcp-config` and `--disable-builtin-mcps` predate the
+  oldest changelog entry (0.0.328). The script's own `cd` does `-C`'s job, so
+  the door's floor is as low as it can be. Because the trail already says the
+  door opened, the script ends with `outsideAgents.agents[copilot].stoppedAtOnce.sentence`
+  when Copilot fails within ten seconds of starting. Claude's and Codex's
+  doors have the same gap and are not changed here.
+- **`--disable-builtin-mcps`** turns off GitHub's repository server, which has
+  no business in a course session and would add choices to every routing
+  decision. Measured with `copilot mcp list`: with the flag
+  `github-mcp-server` is listed disabled and `computer-use`, a local
+  built-in, is still listed.
+- **`copilot mcp list` does not read `--additional-mcp-config`** (measured: it
+  lists only the teacher's and the built-in servers), so the file cannot be
+  proved by listing. It was checked against Copilot's own schema
+  (`schemas/api.schema.json` → `McpServerConfigStdio`: `command` required,
+  no keys beyond the schema's). `"type": "local"` is the measured form;
+  1.0.108's schema calls it a legacy alias of `"stdio"`, which an older
+  Copilot may not know.
+
+**Which `copilot` is GitHub's (plan review H3).** Homebrew's own `copilot`
+formula is Amazon's ECS and Fargate tool (deprecated, installable until
+2027-07-06), and it writes the same `/opt/homebrew/bin/copilot` as GitHub's
+cask `copilot-cli` (measured with `brew info`). So `findCopilot()` walks the
+unchanged search list and takes the first `copilot` that is either an npm
+install of `@github/copilot` (its path, links followed, lies in that
+package) or a program that meets the code requirement `identifier "copilot"
+and anchor apple generic and certificate leaf[subject.OU] = "VEKTX9H2N7"`
+(GitHub's identifier and team, measured with `codesign -dv` on the cask's
+binary). The check reads the signature without hashing the program
+(`kSecCSDoNotValidateExecutable`): **6 to 10 ms** on the 196 MB binary
+against **0.51 to 0.55 s** for a full check, measured on this Mac (Apple
+silicon), so it runs where presence already refreshes (launch and
+activation) with no cache. The menus read `OutsideAssistantPresence.copilotIsInstalled`
+rather than asking while they draw. Not yet measured: the identifier and
+team of the binary GitHub's install script puts in `~/.local/bin`. This is a
+check of which program it is, never of sign-in (`neverProbedForSignIn`
+still holds; Copilot has no status command to probe with), and #855 calls
+the same function after it installs Copilot.
+
+**Folder trust, sign-in, a school's policy.** The first start in a folder
+asks whether to trust it; Plantoir does not answer for the teacher. A
+teacher who is not signed in meets Copilot's own sign-in step in the window.
+A school account whose administrator has not enabled the command-line tool,
+or whose policy blocks servers outside its registry, starts a session with
+no Plantoir tools; the greeting tells the session to use them, so it should
+say they are missing, and Help names the case. Copilot also reads the
+teacher's own instructions and personal skills (`~/.agents/skills`), as
+Claude Code reads `~/.claude`; neither door can stop it. A teacher who once
+ran `/mcp disable plantoir` gets sessions with no Plantoir tools, which
+`--enable-mcp-server` would fix for one run at the cost of the 1.0.80 floor.
+
+**Where a teacher without Copilot is sent.** Russell, 2026-11-13: wherever
+Plantoir offers Copilot to a teacher who does not have it, it links Help's
+`github-education` page (#839). This door is hidden while Copilot is not
+installed, so it offers Copilot to nobody who lacks it; the first such offer
+is #855's set-up item. The anchors are recorded in
+`outsideAgents.agents[copilot].helpAnchors`.
+
+**What #855 builds on.** `CopilotLauncher.findCopilot()` and
+`isGitHubsCopilot(atPath:)`, `OutsideAssistantPresence.copilotIsInstalled`,
+the agent key `copilot`, `FixWithAssistant.Assistant.allCases` as the one
+ordered list of doors (Claude, Codex, GitHub Copilot), and `ReviseWithMenu`
+drawing each item from presence, so "Revise With always shown" is a change to
+`anyReviseTargetExists` and one appended item.
+
+**Not changed, on purpose.** No tool, tool description, schema, greeting,
+server instruction or local-model prompt byte moved
+(`scripts/test_tool_surface_digest.py` green), so no routing re-measurement
+is owed. The launchers' origin words (`previewPorts.whenTheWorkspaceIsInUse.sentences.origins`)
+know `claude` and `codex` only: a build a Copilot session starts is named
+"an assistant", which is true; adding `copilot` there is a launcher change
+for another piece. The trial's worst fault (a session telling a teacher
+students could already see a page nothing had deployed) is in what the model
+reads, shared by every door, and is the director's to open as its own issue.
+
+REJECTED: the inline JSON form of `--additional-mcp-config` (a string full of
+double quotes inside a shell argument here and inside `cmd /k` on Windows);
+sharing Claude's `mcp-<CODE>.json` (two launches seconds apart would rewrite
+the file the other window has not read); `-C` and `--enable-mcp-server`
+(version floors); `--allow-all-mcp-server-instructions` (instructions from
+every server the teacher has); pre-allowing read-only tools or the handout
+commands (Russell: no permissions); a separate `COPILOT_HOME` (it hides the
+teacher's sign-in, so every session would start signed out);
+`--no-custom-instructions` (it also turns off `AGENTS.md`);
+`--secret-env-vars` (it does not stop Copilot's own sign-in reading
+`GH_TOKEN`); changing `deploy_section`'s `destructiveHint` (an MCP-surface
+change); a table of outside assistants driving every menu from contract data
+(a rewrite of working code in 41 files for no teacher-visible gain); and
+accepting any executable called `copilot`.
+
+**On Windows**, the windows issue for #783 says what it inherits and owes: a
+`CopilotLauncher` starting `copilot.exe` by argument vector or npm's
+`copilot.cmd` through `cmd /k`, its own form of the identity check, and never
+adding `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` or `GITHUB_TOKEN` to the child's
+environment, because Copilot signs in from any of them ahead of the teacher's
+stored sign-in. The mac's script runs in the teacher's own Terminal or iTerm,
+so Plantoir's environment never reaches it.
+
 ## #610: Open in Obsidian from the assistant
 
 **What it does.** "Open this in Obsidian", typed in a section's assistant
@@ -7941,10 +8118,10 @@ that throws, and the runner's own `catch`). How the press
 reports early on Windows, where a question is an awaited dialog, is in
 `12-windows-app.md` → "The assistant's Open in Obsidian on Windows (#690, the mac's #610)".
 
-### A third way in: Fix with Claude… / Fix with Codex… (#717, part two)
+### A third way in: Fix with Claude… / Fix with Codex… / Fix with GitHub Copilot… (#717, part two; #783)
 
 The Problems tab of a section (`09-mac-app.md` → "Fix with Claude… and Fix with
-Codex… (#717, part two)") opens these SAME two doors, with one difference: the
+Codex… (#717, part two)") opens these SAME doors (GitHub Copilot's too since #783), with one difference: the
 opening message lists the problems the teacher ticked — each row's own line,
 its page, and the skill for its kind — in place of the plain greeting
 (`ClaudeCodeLauncher.open(…, greeting:)`, `CodexLauncher.open(…, greeting:)`,
@@ -7984,8 +8161,8 @@ plan a unit (every session, until a plan exists: Russell, 2026-11-12); once
 plans exist, an instruction to remind the teacher which units have one and
 that they are on the course's Planning tab, without describing them (since
 #708; until then it named the `.internal/planning` folder). The empty
-Planning tab's Plan a Unit with Claude… and Plan a Unit with Codex… open the
-same doors with a message of their own, `outsideAgents.planAUnit`, which
+Planning tab's Plan a Unit with Claude…, Plan a Unit with Codex… and (since
+#783) Plan a Unit with GitHub Copilot… open the same doors with a message of their own, `outsideAgents.planAUnit`, which
 replaces the greeting as Fix with's does (`documentation/09-mac-app.md` →
 "The course page's Planning tab (#708)"). The words, bounds and cases are
 `app-rules.json` → `outsideAgents.greetingUnitPlans` and

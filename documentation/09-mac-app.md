@@ -1142,12 +1142,13 @@ view raises one alert from the record. Must-fail, by copy-and-restore: no
 `pagesShown` guard, "lacks this id" for "no row of that kind", the marker from
 any record, answers kept in memory only — each fails a named test.
 
-### Fix with Claude… and Fix with Codex… (#717, part two)
+### Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot… (#717, part two; #783)
 
-**What it is.** Two buttons under the Problems table (`ProblemsTableView.
+**What it is.** Buttons under the Problems table (`ProblemsTableView.
 fixButtons`) that hand the ticked problems to an outside assistant the teacher
-already has (rulings 3, 5 and 6 on #717). They open the SAME two doors as
-Revise With ▸ — `ClaudeCodeLauncher` and `CodexLauncher`, at the WORKING
+already has (rulings 3, 5 and 6 on #717). They open the SAME doors as
+Revise With ▸ — `ClaudeCodeLauncher`, `CodexLauncher` and, since #783,
+`CopilotLauncher` (in that order, Russell 2026-11-13), at the WORKING
 folder, where the skills and the guidance are — and the only difference is the
 opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
 in place of the plain greeting. Every word, number and case is
@@ -1164,7 +1165,7 @@ shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
 the page is already right, this section needs only a build, and an assistant
 asked to fix it would find nothing wrong and might change something that is not
 broken while looking. At the click, the refusal Revise With ▸ makes (#458: a
-Claude or Codex session already open on the course, or the course busy) is
+session from an outside door already open on the course, or the course busy) is
 made here in its own words, and nothing opens.
 
 **The message** (`fixWith.fixGreeting`, one line): the course and its name,
@@ -4828,7 +4829,7 @@ page scrolls inside its web view. Measured and rejected shapes: "A blank
 window: when a child claims a size the window cannot give", the sixth and
 seventh cases.
 
-A course's page has two tabs while Claude Code or Codex is installed:
+A course's page has two tabs while Claude Code, Codex or GitHub Copilot (#783) is installed:
 Settings, which is what the page has always shown, and Planning, which shows
 the course's unit plans from `courses/<CODE>/.internal/planning/` on this Mac.
 The contract is `shared-rules.json` → `unitPlanning.tab` (`tabCases`,
@@ -4961,8 +4962,9 @@ ships, and #709 refreshes the same folder from the same bytes.
 
 **The empty tab: Plan a Unit.** When there is nothing to offer, the tab is a
 `ContentUnavailableView` ("No Unit Plans Yet", `words.emptyDescription`,
-which names no assistant) with Plan a Unit with Claude… and Plan a Unit with
-Codex…, each only while its assistant is installed, Claude's first. The
+which names no assistant) with Plan a Unit with Claude…, Plan a Unit with
+Codex… and (since #783) Plan a Unit with GitHub Copilot…, each only while its
+assistant is installed, in that order. The
 click makes Revise With's refusal (`WorkspaceModel.reviseRefusal`) in its own
 alert, then opens the door with `PlanAUnit.openingMessage` in place of the
 greeting, so the reference-courses and unit-planning sentences do not ride
@@ -5078,7 +5080,7 @@ the greeting look for pages too. Said in `choiceCases.rule`.
 the plans are on the course's Planning tab, and the skill tells the
 assistant to send the teacher there (707 plan review M5). That is always
 true on the mac when a greeting is said, since a Revise door and the tab
-both need Claude Code or Codex. Windows does #790 (#707's greeting) and
+both need Claude Code, Codex or GitHub Copilot. Windows does #790 (#707's greeting) and
 #708's tab together, because `greetingUnitPlansCases` now carries these
 sentences and a greeting written with the folder wording fails them.
 
@@ -7740,7 +7742,7 @@ is already recording, and `CourseActivity` and `PreviewLeases` call its
 | `build` | any preview of the course is being built (press → first answer), or any section of it is publishing |
 | `publish` | any section of the course is publishing (the whole deploy, its build included — Windows' shape) |
 | `preview` | any section of the course has a preview up in a window |
-| `assist` | `--mcp-stdio` only: the course the Claude or Codex door named, for the whole conversation (#458) |
+| `assist` | `--mcp-stdio` only: the course the outside door (Claude, Codex or GitHub Copilot) named, for the whole conversation (#458) |
 
 That covers the window, the in-app assistant and the `--mcp-stdio` process
 with no new call site, because every build of theirs already went through

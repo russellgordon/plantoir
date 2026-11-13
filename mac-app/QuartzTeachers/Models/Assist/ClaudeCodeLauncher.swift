@@ -32,8 +32,9 @@ import Foundation
 /// `isAvailable` — a teacher without Claude Code should not be offered a
 /// door that opens onto an error.
 ///
-/// `CodexLauncher` is the same door for `codex`, and borrows the helpers
-/// below rather than copying them.
+/// `CodexLauncher` is the same door for `codex`, and `CopilotLauncher` for
+/// GitHub's `copilot` (#783); both borrow the helpers below rather than
+/// copying them.
 nonisolated enum ClaudeCodeLauncher {
 
     // MARK: - Stored properties
@@ -82,10 +83,11 @@ nonisolated enum ClaudeCodeLauncher {
     /// inherits launchd's minimal PATH, so `onPath` usually finds nothing even
     /// on a Mac where the teacher's own shell finds the tool immediately.
     ///
-    /// The same directories serve both doors — Codex's official installer
-    /// script uses `$HOME/.local/bin`, and Homebrew, npm-global and bun land
-    /// where they always do — so the list is written once with the name as a
-    /// parameter rather than copied with one word changed.
+    /// The same directories serve every door — Codex's official installer
+    /// script and GitHub's install script for Copilot use `$HOME/.local/bin`,
+    /// and Homebrew, npm-global and bun land where they always do — so the
+    /// list is written once with the name as a parameter rather than copied
+    /// with one word changed.
     static func findCommandLineTool(named name: String) -> String? {
         for candidate in commandLineToolCandidates(named: name) {
             if FileManager.default.isExecutableFile(atPath: candidate) {
