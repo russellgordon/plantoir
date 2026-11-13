@@ -135,6 +135,14 @@ final class SectionWindowControllers {
             return .noWindow
         }
 
+        /// Press this window's Make the Map Again, on its Coverage tab
+        /// (#793): the button's own action, so whatever presses it (a test
+        /// of the real page, the 793b fix review's H1) runs the steps the
+        /// teacher's click runs. Defaults to nothing, for a window with no
+        /// Coverage tab.
+        var makeTheCoverageMapAgain: () -> Void = {
+        }
+
         // MARK: - Functions
 
         /// Whether there is a preview to stop — building or showing, both

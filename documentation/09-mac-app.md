@@ -761,11 +761,17 @@ WHOLE, because one section's record decides what another's rows say.
 **The tabs: Website | Problems.** `Views/Section/DetailTabs.swift`, a
 segmented control in a thin bar above the section's content, shown only while
 the section's own record has rows; with none, the section looks as it always
-has, and the tab falls back to Website. The Problems tab (`ProblemsTableView`)
-is drawn OVER the console and the site as a top layer of the existing stack.
-**Rejected: a `TabView`** — the site is a live `WKWebView` scrolled to where the
-teacher left it, and moving it between containers is how that is thrown away
-(the comment on the cover layer). **Rejected: the toolbar's principal slot**
+has, and the tab falls back to Website. Since #793 the bar can also carry
+Coverage (Website | Coverage | Problems, "A section's Coverage tab (#793)"
+below), and the Problems tab (`ProblemsTableView`) is drawn INSTEAD of the
+console and the site, not over them as it was from #717 to #793: only the
+chosen tab's content is in the window (`SectionTabContent`), so the hidden
+preview can take no key and no browser command. **Rejected: a `TabView`**, a
+different control that decides for itself what each tab keeps. Leaving the
+window does not throw the preview's page away: `WebPreviewController` owns the
+web view, and the coverage plan review measured a detached and re-added
+`WKWebView` keeping its scroll and its typed text (`SectionDetailStructureTests`
+proves the same instance comes back with its page). **Rejected: the toolbar's principal slot**
 (the plan's place) — the section's toolbar keeps every item ALWAYS present,
 because inserting one conditionally makes macOS rebuild the toolbar and
 mis-lay-out the title (the comment on `.toolbar`), and the switch exists only
@@ -1045,6 +1051,311 @@ surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
 apostrophe in it, the trail line against the contract's, a source scan of
 the view, and the disabled buttons' hint in both states with both buttons
 carrying it (#776).
+
+## A section's Coverage tab (#793)
+
+Every build of a section writes, beside the built site, its curriculum
+coverage map as it would be if every existing page were published (793a, doc
+05 → "The Coverage tab's map (#793)"). The section's page shows it on a
+Coverage tab, with no browser and no assistant. The rules are
+`contracts/shared-rules.json` → `coverageTab.tab`, every one a case both apps
+run (`CoverageTabTests` here); this section says why they are what they are.
+
+**When the tab is there.** `SectionTabs.shown`: Website, then Coverage, then
+Problems, and no bar when Website would be alone. Coverage is in the bar when
+the course has a curriculum folder holding an expectation page
+(`CurriculumFolderRule.resolvedFolders`, the build's own rule), or when the
+section's last map names at least one map (a curriculum folder inside a
+section folder, which the course root does not show). It is there whatever the
+section's WEBSITE says about its coverage map (Russell, 2026-11-12: that
+setting decides what students see, not the teacher's planning view). A course
+with neither has no Coverage tab and no line about it, which is #708's
+"absent, never disabled". The tab that comes and goes most (Problems) is last,
+so Coverage does not move under the pointer, and a chosen tab that leaves the
+bar falls back to Website, never to a neighbour.
+
+**Only the chosen tab is in the window** (the coverage plan review's H1).
+`SectionTabContent` draws the Website layers, the Coverage tab or the Problems
+tab, never one over another, the shape the course page ended with in #708.
+The reason is the one #708's fix review measured: SwiftUI's `.disabled` does
+not take the keyboard from an `NSView`, so a layered tab left the preview's web
+view first responder under it, and the browser commands reach the preview
+through `.focusedSceneValue(\.previewController, …)` whatever is drawn on top.
+So the focused value is now nil unless Website shows, the toolbar's Back,
+Forward and Reload are disabled off Website (they stay in the toolbar, which
+keeps every item always present), and Section ▸ Preview, Deploy… and Open in
+Browser stay, since they name the section, not the hidden page. The preview's
+web view leaves the window and comes back intact because its controller owns
+it (`WebPreviewView.makeNSView` returns `controller.webView`, and
+`loadIfNeeded` does not reload the same address). `SectionDetailStructureTests`
+draws the real `SectionTabContent` with the real `WebPreviewView` offscreen and
+proves: with Coverage or Problems showing the preview's own `WKWebView` is not
+in the tree and does not keep the keyboard; back on Website the same instance
+is there with its page. Measured on the layered shape (a `ZStack` in
+`SectionTabContent.body`): 5 failures in those tests. State that must survive a
+switch lives in `SectionCoverage` (per section, keyed like `SectionProblems`):
+the map's web view, the record read last and a refresh under way.
+
+**What the tab shows.** `CoverageTabDisplay.display` turns a handful of facts
+into one of three faces (`stateCases`): the map with lines above it, an empty
+state, or "the map can't be shown". The record is read as content this app did
+not write (`CoverageTab.read`, the 793a review's items 1 and 2): no record, an
+unreadable one, a page name that is not a plain file name, or a named page not
+there is no map; a version other than 1 is no map, said in its own words; page
+null is "the last build found no curriculum to map". The map is this build's
+only when `about.json`'s `buildId` equals the section's `.build-id`
+(`coverageTab.mapOfThisBuild`, whose cases `CoverageTabTests` runs as the
+Python does); ids are compared for equality only. The first line is the
+map's own date, said only as far as it is true (the 793b review's M1): "made
+when this section was last built" only when the map IS the latest build's;
+"made by an earlier build … the latest build made no map" when it is
+another build's and nothing is making the map, but only "made by an earlier
+build" while a build is making it, because a build writes `.build-id` as it
+starts and the record reads as another build's until its map is written (the
+fix review's M3); and a form with no date, read from the record's own start
+rather than from the walk (LOW 4), when the record has none, because
+the review measured an empty date rendering as "…last built, .". The last
+line is the click hint, or, with
+Obsidian not installed, the sentence saying a click opens nothing. The hint is
+said by the app above the page, never on the page, because it is false without
+Obsidian and on Windows until its tab is wired (the plan review's L1).
+
+**Never a map that looks current and is not.** "Changed since" is #768's own
+rule, not a second one (the plan review's M1): `BuildFreshness.changedSince`
+was factored out of `whyRebuild`, and the tab asks it of the moment the MAP's
+build started (`startedNs`), off the main actor. That reference differs on
+purpose from the site's (the earlier of `.build-started` and `index.html`):
+the map is written mid-build, so its own start is its reference. `.clock` (the
+start is still later than now) and a null `startedNs` both say the map may be
+out of date. A first build after a class date moves writes dates back into
+pages after it starts, so the map it makes reads "changed since" at once: true,
+and errs safe. A map that is another build's, with nothing building, says it
+could not be made again and shows its own date. A deploy that reuses the last
+build (#768) runs no Python, so the map and its date are left exactly as they
+were, which is true.
+
+**Make the Map (Again)** (Russell's rulings, 2026-11-12; the plan review's H2).
+It runs the section's ordinary preview build in the background, with no
+map-only run: a preview already running is stopped and waited for (a second
+cannot have its port, as a repair's rebuild found), then `startPreview()`, the
+way in every caller but the Preview button uses, so the question about today's
+class is never asked. The teacher stays on the tab: no switch to Website, no
+browser, no focus taken. The refresh is a state in `SectionCoverage`, driven by
+events and never by a clock:
+
+- starting AT the press, with a token, before anything is awaited (the 793b
+  review's H1, below);
+- pending once the old preview has stopped, with the record's build id as it
+  was;
+- made again when a reading finds the record this build's with another id; the
+  map updates in place, before Quartz has finished, because the map is written
+  before the build's `PLANTOIR_PROBLEMS:` line and a reading follows that line;
+- did not finish when this window's own build printed that line and the map is
+  not its own (its map step failed), or when the wait for its site ended (the
+  run ended, was stopped or cancelled) before a map, or when the view went away
+  (a switch of section stops its build, through `stopPreview`, which settles
+  the refresh from what is on disk);
+- refused, with the preview's own sentence, when it could not start.
+
+**Why the refresh stops a serving preview at all** (asked by the 793b fix
+review, measured by reading the shared Python and the launchers on
+2026-11-12). A serving preview does not run the build again when pages
+change: `build_site.py` runs once, then Quartz serves with its own watcher
+over the builder's copy, so the serve never writes a new map. A
+`preview.sh --build-only` beside a serve does not leave it running either:
+`build_site.py` stops the section's serving preview first
+(`stop_preview_serving`, which closed a race that published a preview), so a
+build-only refresh would end the teacher's preview AND leave the window's
+Website tab with nothing to show. So every path that makes the map again stops
+the serve; stopping it and serving again (the ordinary Preview) is the one
+that leaves the teacher a live preview afterwards, at the page they were last
+reading.
+Rejected: a build-only refresh, for that reason; a map-only run, ruled out by
+Russell.
+
+**The press is recorded at once** (the 793b review's H1). The first version
+recorded it only after the old preview had stopped, seconds later: the tab
+said nothing, the button could be pressed again, and a second press ended the
+RUNNING build's wait (#232's record of a build in progress), reported "could
+not be made again" while the map was being made, and raised a false "Cannot
+Preview Yet" later; a switch of section during the stop started a preview from
+a view that had gone, which nothing then stopped, so the section read as
+previewed in another window. Now `SectionCoverage.makeAgain` records
+`starting` with a token before it awaits anything; the tab says the map is
+being made and the button is unavailable from that instant; a second press
+does nothing; the old run's end during the stop settles nothing; and the start
+goes ahead only if the token survives the stop. Leaving the section, the course
+or the window (`onDisappear` → `letTheCoverageTabGo`) and quitting
+(`finishTerminating`, before previews are let go, which covers a quit that
+waits on a set-aside update; and `willTerminateNotification`) clear it. Only
+the pressing view counts: the press carries the view's own id, so another
+window on the same section leaving, or stopping its own preview, settles
+nothing of it (the fix review's LOW 1).
+
+**No reading moves a press out of starting** (the 793b fix review's H1). The
+first version of the token was wiped by the very next reading of the record,
+because `settle` read any state but pending as an older "could not": the old
+run's end during the stop always brings a reading (`isBusy` changes), so in
+the ordinary case, a preview serving, the press flashed "making", stopped the
+preview and started nothing. The hand-picked sequence cases had no reading in
+them. Now `settle` leaves `starting` alone, and
+`coverageTab.tab.sequenceInterleavings` is GENERATED: every combination of
+one event at each of three points (during the stop, after the build's start,
+after its map; readings, readings after a problems line, the run ending,
+another window leaving, a Preview the teacher starts), 80 runs
+(`CoverageTabTests.testEveryInterleaving`). `CoverageRefreshInThePageTests`
+drives the real section page offscreen with a stand-in `preview.sh` whose
+stop takes a second, so the old run's end and the page's own readings land
+inside the stop: the press starts its build and the map is made again in
+place. With the guard removed, that test fails and 32 of the 80 interleavings
+fail: the 32 with a reading during the stop. The other 48 take no reading
+there, so they pass on the old code too (the fix review 2's LOW 6).
+`CoverageRefreshInThePageTests`' stand-in serves the site over HTTP, so the
+press is made with the preview really showing and the button checked enabled
+first.
+
+**The old run's end, waited for.** The stop's own wait ends when the stop
+process does; the old run may end a moment after. `makeAgain` then waits for
+that run's end (`ScriptRunner.waitUntilFinished`, an event) before asking
+whether a build is running, so the old run is never taken for a new one and
+the tab never stays on "Making…" (the fix review 2's LOW 1;
+`sequenceCases` → oldRunEndsLate). And a start whose lease is no longer its
+own after waiting for stops to finish (its view went away, or it was stopped)
+runs nothing (LOW 2): the guard is in `startPreview`, so it covers every way
+in, the refresh's and the toolbar's alike.
+
+**The teacher's place, and what they are told** (the fix review 2's M1). A
+preview that was showing starts again at the page last viewed, the Preview
+button's own rule (`previewStartPage`, `.lastViewed`; it falls back to the
+front page when that page is gone), not at the front page. The tab says
+before the press that making the map again starts the preview again
+(`previewRestarts`), and while it builds that it will (`makingWithThePreview`).
+A browser tab the teacher opened on the preview (Open in Browser, or a link
+the preview handed to the browser) keeps its old page and stops reloading by
+itself, because Quartz's live-reload client does not reconnect; it works again
+after one reload once the build is done. That is something the teacher must
+act on, so the tab says it (`browserReload`), only when this window had handed
+the preview to the browser.
+
+**Another window's build.** While another window's preview of the section
+builds, it has moved `.build-id` before its map, so this window's tab no
+longer says the latest build made no map: the older map is "made by an
+earlier build", with the line that the section is being previewed in another
+window (LOW 4).
+
+**A late refusal that waited on Coverage** goes to the section's next page
+when the teacher leaves the section from Coverage, through `SectionCoverage`,
+and is raised there (LOW 3).
+
+**A Preview pressed during the stop is the build** (the fix review's M1).
+After the stop, `makeAgain` asks whether a build is already running (the
+teacher's own Preview, the assistant's); if so the refresh starts nothing, so
+that build keeps its wait and ⌘Q still knows about it, and its map settles
+the refresh. `CoverageTabTests.testEverySequenceCase`
+runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
+test holds open, no window and no delay. A repair's Preview Again
+(`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
+A preview serving when the refresh is pressed starts again at the page last
+viewed (below).
+
+The wait's end is noticed on `isWaitingForServer` turning false, asked again
+inside the callback, because the stop that a refresh makes first ends the OLD
+wait, and that change can arrive after the refresh's own wait has begun. Quitting
+leaves nothing half-recorded: the state is memory only and the build writes the
+map's files whole. The button is disabled while the map is being made, while
+this window's build runs, while the section deploys, while another program
+builds the course, and while another window holds the section's preview, each
+with its line; and while the folder is being copied or made ready, with that
+reason as its help.
+
+**Builds someone else started.** A deploy of this section says so
+(`deploying`) and shows "being made again" once its build has moved the
+section's `.build-id`. Another program building the course (a scheduled deploy,
+an outside assistant) is read from `WorkLeaseRegistry` on each reading, and the
+app coming to the front reads the record again. A scheduled deploy that
+finishes while Plantoir is already in front shows the older map with its own
+older date until the next reading: stale, but honestly dated (the plan
+review's LOW).
+
+**Nothing pops up over the tab** (Russell, 2026-11-12). While Coverage shows,
+`SectionTabs.alertsWait` holds what a build can raise: the Problems alert stays
+due in its store, the links checklist waits as `pendingLinksChecklist`, and a
+late "the preview did not appear" (`showALateRefusal`, which arrives long
+after any press) is held until the teacher leaves the tab. The refusal of the
+tab's own START is said in the tab instead, and only that: it is taken only
+while the start's own synchronous call runs (`SectionTabs.refusalIsTheTabs`,
+`ownStartRunning`), so a refusal of anybody else's press, in this window or
+another, during the stop or while the build runs, reaches whoever pressed
+(the fix review's M1 and M2). The Problems tab
+still appears in the bar. When the teacher next shows Website or Problems,
+what waited is raised one at a time, the way it would have been
+(`raiseWhatWaitedForCoverage`). The Preview and Deploy buttons themselves are
+untouched: pressing one is the teacher's own act, and its question and
+refusals are its own, shown at once whichever tab is chosen. (The first
+version held every refusal while Coverage showed, so a teacher's own press
+was answered minutes later, or not at all after a switch of section: the
+793b review's M2, where the code was wrong and this paragraph right.)
+
+**Web views.** One map web view per section on screen, kept across a switch
+of tab so the map keeps its scroll, and released when no window shows the
+section (`noteShown` / `noteGone`; the 793b review's LOW 2). A new map's
+"changed since" is not known until its own walk is back, and says nothing
+meanwhile (`notKnownYet`; LOW 1).
+
+**The viewer.** The map comes from course content, so it is shown by the
+Planning tab's web view, parameterised rather than copied
+(`PlanWebController.forCoverage`): the same three guards as "What stops a plan
+page reading other files" (#708, above), with the `.coverage-tab` folder,
+every link on the way followed, as the only folder the page may read; a rule
+list compiled from the same text under its own name
+(`PlantoirCoverageTabLocalFilesOnly`), so neither tab compiles over the
+other's; scripts off; nothing stored. `CoverageWebViewGuardTests` runs it with
+no window: the rules compile, the page reaches nothing on the network, runs no
+script and cannot show the built site's picture beside its folder. Rejected: a
+second web view class, which would let a fix to the network block reach one
+tab and not the other.
+
+**A click on a code** (`navigationCases`, `linkCases`, `itemCases`; the 793a
+review's items 3 and 4). `CoverageNavigation.decide` lets the page load itself
+and files in its folder, hands a CLICK on a link of exactly the
+`plantoir-coverage:open/<buildId>/<map>/<code>` form to the app, and refuses
+everything else, the web and email included (the page has none). Measured: a
+`<meta http-equiv="refresh">` to a code reaches the delegate as a navigation
+that is not a click, and only the click test refuses it (with that test
+removed, `CoverageWebViewGuardTests` sees it handed over). The app reads the
+link exactly (four parts, decoded once, a code of letters, digits, dots and
+hyphens), reads the record AGAIN, and `CoverageItem.resolve` looks the code up
+in it: a build id other than the record's is a click on an older page, so
+nothing opens and the record's page is shown; the path is taken literally
+(never decoded: folders may be NAMED `%2e%2e`), refused with an empty, `.` or
+`..` part or a leading `/`, joined to the course folder, resolved through
+every link, and must be inside the course folder resolved the same way, end
+`.md` and be a plain file. Then it opens through Open in Obsidian's own route,
+`WorkspaceModel.openExpectationInObsidian`, which shares `pressOpenInObsidian`
+with the toolbar, so a reference course's locked-pages note, the add-ons offer
+and registering a course Obsidian has never seen as a vault happen exactly as
+they do for the button. Rejected: calling `obsidianOpening.openPage` from the
+tab, which skips all three. A page gone since the build, or one that is not
+inside the course, is said above the map.
+
+**The trail.** "looked at a section's curriculum coverage" once per appearance
+(counts and the map's date, or why there is none), and once when the map
+cannot be shown; "asked to make a section's coverage map again" at the press
+and once more when it settles; a click writes "page opened in Obsidian", the
+event every section press writes, with the code and the page's place, or why
+nothing opened. A click that goes ahead says Obsidian was ASKED to open the
+page, not that it opened: the route cannot confirm it (#721), and the tab adds
+no silent success of its own. No trail word names the computer, so both apps
+write the same line; the two sentences on the tab that do (`noObsidian`,
+`cannotShowDescription`) carry `{machine}` and are recorded in
+`specialNames.platformWording.machine.usedIn`. Never an expectation's words or a page's words
+(`coverageTab.tab.trailWords`).
+
+**Not done.** The tab has no Print (not asked for; with the focused preview nil
+the preview's own cannot be reached from it). VoiceOver on the map's cells, a
+cell's tooltip, dark mode and a preview rebuilt while Coverage shows appearing
+on return are hand tests at the cut. Windows owes the tab; it inherits the map
+from the shared Python (the `windows` issue for #793).
 
 ## One folder, however it is spelled
 
@@ -4311,6 +4622,14 @@ guards, each with one job (`unitPlanning.tab.whatAPageMayRead`):
    that blocks every load and then lets `file:` loads through, so nothing on
    the page reaches the network. The list is compiled before the first page
    loads; if it cannot be, no page is ever loaded.
+
+Since #793 the same controller also shows a section's Coverage tab map,
+parameterised rather than copied: `PlanWebController.forCoverage` names its
+own rule list identifier, the map's folder and `CoverageNavigation.decide` in
+place of guard 2 ("A section's Coverage tab (#793)" above), and keeps guards 1
+and 3 as they are, so a fix to either reaches both tabs.
+`PlanNavigation.Decision` gained `handToTheApp` for the map's clicks; a plan
+never gets it.
 
 MEASURED, in a standalone harness that compiled `PlanningTab.swift`,
 `UnitPlans.swift` and `CalendarDay.swift` from this branch with four
