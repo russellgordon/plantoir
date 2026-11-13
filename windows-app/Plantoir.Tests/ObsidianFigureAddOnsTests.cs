@@ -383,9 +383,44 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         Assert.False(ObsidianFigureAddOnsOffer.CourseIsOpen(@"C:\w\courses\ICS3U", obsidianRunning: true, marked));
         // Unreadable while running: rewritten in place, so not knowing is not "closed".
         Assert.True(ObsidianFigureAddOnsOffer.CourseIsOpen(course, obsidianRunning: true, "{\"vaults\":"));
-        Assert.True(ObsidianFigureAddOnsOffer.CourseIsOpen(course, obsidianRunning: true, null));
+        // No registry at all is closed (Russell's ruling on #742; #815): until
+        // #815 this was open, so a course with no obsidian.json was told it
+        // was open in Obsidian and got nothing written.
+        Assert.False(ObsidianFigureAddOnsOffer.CourseIsOpen(course, obsidianRunning: true, null));
         Assert.Equal(new[] { course }, ObsidianFigureAddOnsOffer.VaultsOpen(true, marked));
         Assert.Empty(ObsidianFigureAddOnsOffer.VaultsOpen(false, marked));
+    }
+
+    /// <summary>
+    /// <c>openStateCases</c> (#742; Windows #815): open, closed or cannot tell,
+    /// every case but the six marked <c>platform: mac</c>, which spell one
+    /// folder the mac's test makes on disk (a link, other letter case, a
+    /// trailing slash, <c>/private</c> in front) and which Windows'
+    /// <see cref="ObsidianFigureAddOnsOffer.SamePath"/> does not fold the same
+    /// way for a link. Decisions follow <c>CourseIsOpen</c>: cannot tell is open.
+    /// </summary>
+    [Fact]
+    public void EveryOpenStateCase()
+    {
+        var cases = Contract["openStateCases"]!["cases"]!.AsArray();
+        int ran = 0, skipped = 0;
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            if (c["platform"]?.ToString() == "mac") { skipped++; continue; }
+            var state = ObsidianFigureAddOnsOffer.OpenState(
+                c["course"]!.ToString(), c["running"]!.GetValue<bool>(), c["registryText"]?.GetValue<string>());
+            Assert.True(c["expect"]!.ToString() == ContractCase(state.ToString()), $"{name}: {state}");
+            Assert.Equal(state != ObsidianFigureAddOnsOffer.CourseOpenState.Closed,
+                ObsidianFigureAddOnsOffer.CourseIsOpen(c["course"]!.ToString(), c["running"]!.GetValue<bool>(), c["registryText"]?.GetValue<string>()));
+            ran++;
+        }
+        // Eight run and six skipped when this was written (2026-11-13); a new
+        // case without a platform runs here on its own.
+        Assert.True(ran >= 8, $"only {ran} openStateCases ran");
+        Assert.Equal(cases.Count, ran + skipped);
+        Assert.Equal(Enum.GetNames<ObsidianFigureAddOnsOffer.CourseOpenState>().Select(ContractCase).OrderBy(n => n),
+            cases.Select(c => c!["expect"]!.ToString()).Distinct().OrderBy(n => n));
     }
 
     [Fact]
@@ -636,6 +671,9 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
 
     private static readonly string[] WindowsKeys = { "offerMessage", "settingFooter" };
 
+    /// <summary>Keys of <c>wording</c> that are about the words rather than words: the note, and <c>closingRule</c> (#834), which names "vault".</summary>
+    private static readonly string[] NotSentences = { "note", "closingRule" };
+
     [Fact]
     public void TheWordsAreTheContractsWithWindowsOwnTwo()
     {
@@ -644,13 +682,26 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         Assert.Equal(WindowsKeys.OrderBy(k => k), windows.Select(p => p.Key).Where(k => k != "note").OrderBy(k => k));
         foreach (var (key, value) in wording)
         {
-            if (key == "note") continue;
+            if (NotSentences.Contains(key)) continue;
             string expected = (WindowsKeys.Contains(key) ? windows[key] : value)!.ToString();
             Assert.True(expected == OurWords(key), $"wording.{key} differs");
         }
-        Assert.Equal(
-            ObsidianFigureAddOnsWording.Filling(windows["offerMessage"]!.ToString(), "MPM2D") + "\n\n" + ObsidianFigureAddOnsWording.Filling(wording["offerWhileOpen"]!.ToString(), "MPM2D"),
-            ObsidianFigureAddOnsWording.OfferText("MPM2D", courseIsOpen: true));
+
+        // The whole message for each state (#815, #843): either lead, then
+        // the three facts as "Label: value" lines in closingRule's order;
+        // a closed course adds neither.
+        string Words(string key) => ObsidianFigureAddOnsWording.Filling(wording[key]!.ToString(), "MPM2D");
+        string message = ObsidianFigureAddOnsWording.Filling(windows["offerMessage"]!.ToString(), "MPM2D");
+        string facts = string.Join("\n", new[] { ("closesLabel", "closesValue"), ("opensAgainLabel", "opensAgainValue"), ("keptLabel", "keptValue") }
+            .Select(pair => Words(pair.Item1) + ": " + Words(pair.Item2)));
+        Assert.Equal(message + "\n\n" + Words("offerWhileOpen") + "\n" + facts,
+            ObsidianFigureAddOnsWording.OfferText("MPM2D", ObsidianFigureAddOnsOffer.CourseOpenState.Open));
+        Assert.Equal(message + "\n\n" + Words("offerWhileObsidianIsOpen") + "\n" + facts,
+            ObsidianFigureAddOnsWording.OfferText("MPM2D", ObsidianFigureAddOnsOffer.CourseOpenState.CannotTell));
+        Assert.Equal(message, ObsidianFigureAddOnsWording.OfferText("MPM2D", ObsidianFigureAddOnsOffer.CourseOpenState.Closed));
+        // The rule the facts follow is still the one this test reads them by.
+        foreach (string key in new[] { "closesLabel", "closesValue", "opensAgainLabel", "opensAgainValue", "keptLabel", "keptValue" })
+            Assert.Contains(key, wording["closingRule"]!.ToString());
     }
 
     [Fact]
@@ -659,7 +710,7 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         string[] banned = { "plugin", "vault", "json", "folder", "script", "toolchain", "cannot", "docker", "container", "model" };
         foreach (var (key, _) in Contract["wording"]!.AsObject())
         {
-            if (key == "note") continue;
+            if (NotSentences.Contains(key)) continue;
             string outsideQuotes = Regex.Replace(OurWords(key), "“[^”]*”", "");
             foreach (string word in banned)
                 Assert.False(outsideQuotes.Contains(word, StringComparison.OrdinalIgnoreCase), $"wording.{key} says {word}");
@@ -672,6 +723,13 @@ public sealed class ObsidianFigureAddOnsTests : IDisposable
         "offerTitle" => ObsidianFigureAddOnsWording.OfferTitle,
         "offerMessage" => ObsidianFigureAddOnsWording.OfferMessage,
         "offerWhileOpen" => ObsidianFigureAddOnsWording.OfferWhileOpen,
+        "offerWhileObsidianIsOpen" => ObsidianFigureAddOnsWording.OfferWhileObsidianIsOpen,
+        "closesLabel" => ObsidianFigureAddOnsWording.ClosesLabel,
+        "closesValue" => ObsidianFigureAddOnsWording.ClosesValue,
+        "opensAgainLabel" => ObsidianFigureAddOnsWording.OpensAgainLabel,
+        "opensAgainValue" => ObsidianFigureAddOnsWording.OpensAgainValue,
+        "keptLabel" => ObsidianFigureAddOnsWording.KeptLabel,
+        "keptValue" => ObsidianFigureAddOnsWording.KeptValue,
         "offerAdd" => ObsidianFigureAddOnsWording.OfferAdd,
         "offerNotNow" => ObsidianFigureAddOnsWording.OfferNotNow,
         "dontAskAgain" => ObsidianFigureAddOnsWording.DontAskAgain,

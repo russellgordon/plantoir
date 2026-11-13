@@ -42,7 +42,18 @@ public static class ObsidianFigureAddOnsWording
     public const string OfferTitle = "Show diagrams and graphs in Obsidian too?";
     /// <summary><c>windowsWording.offerMessage</c>: Enter, not Return.</summary>
     public const string OfferMessage = "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Enter chooses the other button. Obsidian then opens its settings in a window of its own, showing the add-ons switched on; close that window and carry on.";
-    public const string OfferWhileOpen = "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept.";
+    public const string OfferWhileOpen = "{course} is open in Obsidian now, so adding them closes Obsidian and opens it again.";
+    /// <summary>When Obsidian is running and Plantoir cannot tell whether the course is open in it (#742, Windows #815).</summary>
+    public const string OfferWhileObsidianIsOpen = "Obsidian is open now, so adding them closes it and opens it again.";
+    // The three facts under either lead, each a "Label: value" line of the
+    // message, in closingRule's order (#834, Windows #843): Add Them closes
+    // the whole of Obsidian, other courses included, and opens only this one.
+    public const string ClosesLabel = "Closes";
+    public const string ClosesValue = "Obsidian, with every course open in it, not only {course}";
+    public const string OpensAgainLabel = "Opens again";
+    public const string OpensAgainValue = "{course} only";
+    public const string KeptLabel = "Kept";
+    public const string KeptValue = "Everything you have written";
     public const string OfferAdd = "Add Them";
     public const string OfferNotNow = "Not Now";
     public const string DontAskAgain = "Don't ask again";
@@ -55,13 +66,37 @@ public static class ObsidianFigureAddOnsWording
     /// <summary><c>windowsWording.settingFooter</c>: Enter, not Return.</summary>
     public const string SettingFooter = "Plantoir adds them when you open such a course in Obsidian from Plantoir, and after you preview it. The first time each course opens with them, Obsidian asks whether you trust its author: click “Trust author and enable plugins” — pressing Enter chooses “Browse vault in Restricted Mode”. If a course still shows a drawing's text, open Obsidian's Settings ▸ “Community plugins” and click “Exit Restricted mode”. Turning this off adds nothing new and leaves what was added in place.";
 
-    /// <summary>The offer's whole message: the sentence about closing Obsidian added when the course is open in it now.</summary>
-    public static string OfferText(string course, bool courseIsOpen)
+    /// <summary>
+    /// The offer's whole message (the mac's <c>offerText</c>): when the course
+    /// is open in Obsidian, or Obsidian is running and Plantoir cannot tell,
+    /// a sentence about closing Obsidian and the three facts follow. Only
+    /// <see cref="ObsidianFigureAddOnsOffer.CourseOpenState.Open"/> names the
+    /// course as open; a closed course adds nothing.
+    /// </summary>
+    public static string OfferText(string course, ObsidianFigureAddOnsOffer.CourseOpenState openState)
     {
         string text = Filling(OfferMessage, course);
-        if (courseIsOpen) text += "\n\n" + Filling(OfferWhileOpen, course);
+        string? lead = openState switch
+        {
+            ObsidianFigureAddOnsOffer.CourseOpenState.Open => OfferWhileOpen,
+            ObsidianFigureAddOnsOffer.CourseOpenState.CannotTell => OfferWhileObsidianIsOpen,
+            _ => null,
+        };
+        if (lead is not null) text += "\n\n" + Filling(lead, course) + "\n" + ClosingLines(course);
         return text;
     }
+
+    /// <summary>What closes, what opens again and what is kept, as "Label: value" lines (<c>closingRule</c>).</summary>
+    public static IReadOnlyList<(string Label, string Value)> ClosingRows(string course) => new[]
+    {
+        (ClosesLabel, Filling(ClosesValue, course)),
+        (OpensAgainLabel, Filling(OpensAgainValue, course)),
+        (KeptLabel, Filling(KeptValue, course)),
+    };
+
+    /// <summary>The facts as lines of the dialog's message: the offer is a dialog with a Don't ask again box (#731), which holds no form.</summary>
+    public static string ClosingLines(string course) =>
+        string.Join("\n", ClosingRows(course).Select(row => row.Label + ": " + row.Value));
 
     public static string Filling(string sentence, string course) => sentence.Replace("{course}", course);
 }
@@ -144,20 +179,38 @@ public static class ObsidianFigureAddOnsOffer
     public static List<string> VaultsOpen(bool obsidianRunning, string? registryText) =>
         obsidianRunning ? OpenVaultPaths(registryText) : new List<string>();
 
+    /// <summary>Whether the course is open in Obsidian, as far as Plantoir can tell (<c>openStateCases</c>, #742; Windows #815).</summary>
+    public enum CourseOpenState { Open, Closed, CannotTell }
+
     /// <summary>
-    /// Whether the course counts as open in Obsidian: Obsidian is RUNNING and
-    /// its registry marks the course open — or the registry cannot be read at
-    /// all while it runs (Obsidian rewrites it in place, so a read can land
-    /// mid-write; not knowing is not "closed"). However many windows are on
-    /// screen: a hidden or minimised Obsidian holds the list in memory all the
-    /// same (the mac's implementation review B1, measured).
+    /// Open when Obsidian is RUNNING and its registry marks the course's whole
+    /// folder open; closed when Obsidian is not running, when there is no
+    /// registry at all (<paramref name="registryText"/> null: Obsidian writes
+    /// it when a vault opens, so with none no vault is open — Russell's ruling
+    /// on #742, 2026-11-12), or when the course is not marked open; cannot
+    /// tell when a registry is there but is not JSON, is cut off mid-write or
+    /// holds no <c>vaults</c> object (Obsidian rewrites it in place, so a read
+    /// can land mid-write). However many windows are on screen: a hidden or
+    /// minimised Obsidian holds the list in memory all the same (the mac's
+    /// implementation review B1, measured). Matched on the whole path, never
+    /// a vault's name, through <see cref="SamePath"/> (either separator, any
+    /// case); a junction or link spelling of the folder is NOT folded here,
+    /// as the mac's <c>FolderIdentity.isSameFolder</c> folds it (#815: known).
     /// </summary>
-    public static bool CourseIsOpen(string coursePath, bool obsidianRunning, string? registryText)
+    public static CourseOpenState OpenState(string coursePath, bool obsidianRunning, string? registryText)
     {
-        if (!obsidianRunning) return false;
-        if (Vaults(registryText) is null) return true;
-        return OpenVaultPaths(registryText).Any(path => SamePath(path, coursePath));
+        if (!obsidianRunning || registryText is null) return CourseOpenState.Closed;
+        if (Vaults(registryText) is null) return CourseOpenState.CannotTell;
+        return OpenVaultPaths(registryText).Any(path => SamePath(path, coursePath)) ? CourseOpenState.Open : CourseOpenState.Closed;
     }
+
+    /// <summary>
+    /// Whether the course counts as open for what the app DOES: cannot tell
+    /// counts as open, so nothing is written into the course and Add Them
+    /// goes the reopen way. Only the offer's words tell the two apart.
+    /// </summary>
+    public static bool CourseIsOpen(string coursePath, bool obsidianRunning, string? registryText) =>
+        OpenState(coursePath, obsidianRunning, registryText) != CourseOpenState.Closed;
 
     /// <summary>
     /// The vault Obsidian opens for a path: the LONGEST registered vault that
