@@ -795,6 +795,19 @@ else
   cat /tmp/verify_social_card_fonts_test.log
 fi
 
+# No tracked file stores a credential-shaped literal (GitHub #844): an address
+# with a username and password in it whose host is not a reserved example
+# name, a Basic header whose base64 decodes to a pair, or a prefixed token
+# (Netlify, GitHub, AWS, Slack, a private key) not named by its SHA-256 in the
+# test's allow-list. A secret scanner flagged two invented #709 fixtures on
+# 2026-11-13; this fails first. Pure stdlib.
+if (cd scripts && python3 test_no_stored_credentials.py) >/tmp/verify_no_stored_credentials_test.log 2>&1; then
+  pass "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
+else
+  fail "no tracked file stores a credential-shaped literal (scripts/test_no_stored_credentials.py, #844)"
+  cat /tmp/verify_no_stored_credentials_test.log
+fi
+
 # A course's name is cleaned of control characters where it is read (GitHub
 # #780): every contract case, and the three readers (the landing title, the
 # sharing card, setup_course's saved name). Pure stdlib apart from the card,

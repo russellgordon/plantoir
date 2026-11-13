@@ -3024,6 +3024,10 @@
     "supportEmailWhy": "Taken from here rather than from a screenshot of the mac dialog, and shown as something a teacher can CLICK rather than retype. One constant feeds the dialog and the note inside the report, so the two cannot drift."
   },
   "problemReportRedaction": {
+    "assembledInput": {
+      "rule": "A case with `assembledFrom` holds its credential in pieces, and its `input` is a template the test fills before redacting it: `{user}` and `{password}` are replaced by those two values, and `{basic}` by the base64 (standard alphabet, with padding) of `user` + \":\" + `password` in UTF-8. The filled text is what is redacted and compared with `expect`. A template with no `assembledFrom` beside it is a mistake in the contract, and the test says so.",
+      "why": "#844: on 2026-11-13 GitGuardian reported the #709 Basic header and the address with a username and password in it as a \"Basic Auth String exposed on GitHub\". Both were invented, and nothing real leaked, but a stored pair in either shape is indistinguishable to a scanner from a live one, and an alert nobody can tell apart from a real one teaches people to ignore the next. So no case stores one: the redactor is still run against the assembled string, exactly as strong as before, and the stored pieces are words that say what they are. scripts/test_no_stored_credentials.py fails if a pair in either shape comes back anywhere in the repository. Windows reads the same cases and must fill the template the same way. Measured on the mac's redactor: the template read unfilled still redacts to the same `expect`, and still fails with basicAuthHeader or urlUserinfo taken out, but it proves less. Its braces are not characters the email rule takes, so it no longer shows that urlUserinfo has to run before the email rule (filled, with urlUserinfo taken out, the address comes back as `https://example-user:[removed: email address]/`), and `{basic}` is not base64."
+    },
     "cases": [
       {
         "expect": "Working folder /Users/person/Documents/Teaching/ICS3U",
@@ -3101,14 +3105,22 @@
         "why": "KEPT. A sentence that merely says the word 'token' is not a secret, and turning the product's own error messages into holes would make failures unreadable. The rule needs a value after a separator before it removes anything."
       },
       {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
         "expect": "curl -H 'Authorization: Basic [removed: token] https://plans.example",
-        "input": "curl -H 'Authorization: Basic Y29sbGVhZ3VlOlN1bmZsb3dlci00Mg==' https://plans.example",
-        "why": "#709: a protected unit plan's username and password travel as a Basic Authorization header, base64 and not encrypted. Anchored on the header's own name."
+        "input": "curl -H 'Authorization: Basic {basic}' https://plans.example",
+        "why": "#709: a protected unit plan's username and password travel as a Basic Authorization header, base64 and not encrypted. Anchored on the header's own name. The header is BUILT by the test from assembledFrom (#844, see assembledInput): a stored base64 pair is what a secret scanner reports as a live credential."
       },
       {
-        "expect": "Opening https://[removed: token]@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
-        "input": "Opening https://colleague:Sunflower-42@snc2d-plans-2026-27-gordon-k3x9qa8m.pages.dev/",
-        "why": "#709: a username and password written into an address. Before the email rule, which would otherwise take the password and the host for an address and leave the username behind."
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Opening https://[removed: token]@plans.example/",
+        "input": "Opening https://{user}:{password}@plans.example/",
+        "why": "#709: a username and password written into an address. Before the email rule, which would otherwise take the password and the host for an address and leave the username behind: plans.example is an address to that rule, so the order is still proved. The rule does not read the host, so a reserved example name stands in for a pages.dev one (#844)."
+      },
+      {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Signed in as example-user",
+        "input": "Signed in as {user}",
+        "why": "#844 review M1, a tripwire with no credential in it: only a reader that fills the template passes. Read unfilled, the two cases above still redact to their `expect`, and once both rules exist an unfilled reader stays green even with urlUserinfo moved after the email rule (measured). This one fails it on every platform. A username on its own is not redacted, so the filled line comes back as it went in."
       },
       {
         "expect": "Shared Basic French unit plans and Basic Skills.",

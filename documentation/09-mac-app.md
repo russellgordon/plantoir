@@ -12953,6 +12953,55 @@ never the transcript, and the server writes nothing to stdout but its
 replies. Windows' `plantoir-mcp` relays progress lines and a kept tail,
 which is why it redacts that output too (documentation/12-windows-app.md).
 
+**What a redaction fixture may hold (#844).** On 2026-11-13 GitGuardian
+emailed Russell about a "Basic Auth String exposed on GitHub" in this
+repository. It was two of #709's cases: an `Authorization: Basic` header
+whose base64 decoded to an invented username and password, and an address
+with that pair written into it, on a `pages.dev` host that does not resolve.
+Nothing real leaked and nothing needed rotating. But a scanner cannot tell
+an invented pair from a live one, and an alert nobody can tell apart from a
+real one teaches people to dismiss the next. From then on:
+
+- **No case stores a username and password pair in either shape.** A case
+  that needs one carries `assembledFrom` (`user` and `password`, words that
+  say what they are: `example-user`, `example-password`) and an `input`
+  template; the test fills `{user}`, `{password}` and `{basic}` (the base64
+  of `user:password`) before it redacts
+  (`problemReportRedaction.assembledInput`,
+  `SharedRulesContractTests.assembledRedactionInput`). The redactor is run
+  against exactly the string a browser would send, so the case is as strong
+  as before. Measured with `LogRedactor.swift` compiled on its own: with
+  `basicAuthHeader` taken out the Basic case fails, and with `urlUserinfo`
+  taken out the address comes back as
+  `https://example-user:[removed: email address]/`, which is the ordering
+  against the email rule that the case exists to prove. Read unfilled, the
+  template still fails without either rule but no longer proves that
+  ordering: with `urlUserinfo` moved after the email rule, an unfilled
+  reader stays green (measured by the review). So a third assembled case,
+  `Signed in as {user}` expecting `Signed in as example-user`, holds no
+  credential and fails any reader that does not fill the template.
+- **An address in a fixture uses a reserved example host** (`plans.example`)
+  unless the rule under test reads the host. `urlUserinfo` does not.
+- **A prefixed token** (`nfp_`, `ghp_`, `github_pat_`, `AKIA`, `xox?-`, a
+  private key block) appears only where the rule under test keys on the
+  prefix, made of an obviously invented run (the alphabet), and is named in
+  `scripts/test_no_stored_credentials.py`'s `ALLOWED` by its SHA-256 with
+  where it is and why. That test fails on any other stored pair or prefixed
+  token in a tracked file, and on an `ALLOWED` entry that no longer matches
+  anything. Unprefixed fixtures (the 40-character run `secretLength` needs,
+  `CLOUDFLARE_API_TOKEN=abc123XYZ_super-secret-value`, the JWT-shaped
+  `Bearer` value with `abc.def` for its body) are left as they are: they
+  carry no provider's prefix for a detector to key on, and the rules they
+  prove need that shape.
+
+REJECTED: rewriting history to remove the two old strings. They were never
+secrets, a rewrite gives every commit since #709 a new hash on a repository
+two platforms work from, and the scanner's alert is closed in GitGuardian
+(as a test credential, a false positive) rather than in Git. Also rejected:
+storing the base64 of the example pair, which the issue first suggested. It
+is still a stored pair to a scanner that does not read the words, and the
+test that builds it is four lines.
+
 Beside the task records sits **one breadcrumb trail**, `activity.txt`: a line
 for each thing a teacher would recognise as something they did — the app
 opening (with its version and which copy of it), a working folder opened,
