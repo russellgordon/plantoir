@@ -3556,7 +3556,16 @@ fails there.
   destinations with different addresses** (Netlify AND Cloudflare Pages, say):
   the site is built for one address, and the next destination finds the other
   one baked in and rebuilds for its own. So that one stays reachable whatever
-  happens to #136, and for such a course it is not a first-publish corner. Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
+  happens to #136, and for such a course it is not a first-publish corner.
+  **Measured, and ruled, on #799 (2026-11-13):** each site carries its OWN
+  address (Russell), so such a course builds once per host on every deploy,
+  even with nothing changed: 1, 3 and 5 builds over three unchanged deploys
+  of a Netlify course with a Cloudflare destination too, against 1, 2 and 3
+  before #799, when the Cloudflare leg rebuilt for an address its rebuild
+  never got and the Cloudflare site carried the Netlify address. About 35 s
+  more per deploy on the Lenovo 20QES70500, and accepted. Since #799 a
+  destination is also built for its own custom domain when the course records
+  one (05 → "On Windows (#799)"). Since #746 the same function also rebuilds a site an earlier version of Plantoir built (and `deploy.sh` runs `preview.sh --build-only` for it before any destination), once per section after an update. And both `deploy.py` and `deploy.sh` rebuild a site they
   find carrying the preview's live-reload client — reachable in a scheduled run
   only while the wrapper's is-the-site-stale check is narrower than the
   launchers' (the gap described under "How it is tested" below,

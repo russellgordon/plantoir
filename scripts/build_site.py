@@ -116,6 +116,7 @@ def clean_base_url(val: str | None) -> str:
 # got (measured on Windows, #799). Read only here, and only from the
 # environment of the one build deploy.py runs.
 DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
+DEPLOY_BASE_URL_SHAPE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?")
 
 
 def resolve_section_domain(course_dir: Path, config: dict, section_number: int) -> str:
@@ -132,9 +133,14 @@ def resolve_section_domain(course_dir: Path, config: dict, section_number: int) 
     """
     section_key = f"section{section_number}"
 
-    # 0. A deploy's own rebuild, for the destination it is deploying to.
+    # 0. A deploy's own rebuild, for the destination it is deploying to. It is
+    # the address deploy.py chose for THIS leg: the leg's own custom domain
+    # when the course records one (custom_domains, by destination type), else
+    # the service's host - so it is used as given. Only a host name is taken
+    # (letters, digits, dots, hyphens, an optional port): anything else could
+    # break quartz.config.ts, and is ignored as if unset (#799's third review, L2).
     asked_for = clean_base_url(os.environ.get(DEPLOY_BASE_URL_VARIABLE, ""))
-    if asked_for:
+    if asked_for and DEPLOY_BASE_URL_SHAPE.fullmatch(asked_for):
         return asked_for
 
     # 1. Custom domain from course_config.json — keyed by destination type

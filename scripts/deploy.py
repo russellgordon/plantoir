@@ -265,6 +265,43 @@ PAGES_ALREADY_ASKED_VARIABLE = "PLANTOIR_PAGES_ALREADY_ASKED"
 DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
 
 
+def leg_custom_domain(course_dir: Path, section, leg_type: str) -> str:
+    """The teacher's own domain for THIS destination of the section, or "".
+
+    contracts/file-formats.json -> custom_domains: keyed by destination type
+    (`netlify`, `cloudflare_pages`), a domain meant for one destination never
+    applied to another; the OLDER bare-string shape is the primary
+    destination's (`deploy_target`, Netlify when absent) and no other's.
+    Neither service's own record carries it reliably: Cloudflare's project
+    `subdomain` is always `<project>.pages.dev`, and Netlify's `ssl_url` is the
+    custom domain only once it is attached on Netlify's side, so the address a
+    leg is built for is this one when it is set (#799's third review, H1:
+    otherwise every rebuild baked the service's own host and the sharing
+    cards, sitemap and feed dropped the teacher's domain)."""
+    try:
+        config = json.loads((Path(course_dir) / "course_config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    if not isinstance(config, dict):
+        return ""
+    custom_domains = config.get("custom_domains")
+    if not isinstance(custom_domains, dict):
+        return ""
+    sections = custom_domains.get("sections")
+    if not isinstance(sections, dict):
+        return ""
+    entry = sections.get(f"section{section}")
+    if isinstance(entry, dict):
+        value = entry.get(leg_type)
+    elif isinstance(entry, str) and (config.get("deploy_target") or "netlify") == leg_type:
+        value = entry
+    else:
+        value = None
+    if not isinstance(value, str):
+        return ""
+    return clean_base_url(value)
+
+
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
     If quartz.config.ts in internal build dir has a baseUrl that does not match target_domain,
@@ -961,7 +998,11 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
 
     marker = load_cloudflare_marker(course_dir, section) or {}
     host = marker.get("subdomain") or f"{project_name}.pages.dev"
-    ensure_base_url_and_rebuild(public_dir.parent, host, course_code, str(section), _HOST_OS)
+    # Built for the teacher's own domain for the section's CLOUDFLARE
+    # destination when one is recorded, else the project's pages.dev host,
+    # which is all Cloudflare's record ever names (#799's third review, H1).
+    ensure_base_url_and_rebuild(public_dir.parent, leg_custom_domain(course_dir, section, "cloudflare_pages") or host,
+                                course_code, str(section), _HOST_OS)
 
     # Live input (#583): the pages whose code may ask for input as it runs
     # get the headers that isolate them - after any rebuild above, which
@@ -1615,7 +1656,12 @@ def main():
         print("❌ Could not determine Netlify site ID.")
         sys.exit(1)
 
-    target_domain = clean_base_url(site_url)
+    # The address this site is built for: the teacher's own domain for the
+    # section's NETLIFY destination when one is recorded, else Netlify's own
+    # (whose ssl_url is the custom domain only once it is attached there) -
+    # #799's third review, H1. The same address names the site's own links
+    # on the way up (own_host, below).
+    target_domain = leg_custom_domain(course_dir, args.section, "netlify") or clean_base_url(site_url)
     # Called with no address too (#746): it is also where a site an earlier
     # version of Plantoir built is built again, and that must not depend on
     # Netlify having said where the site lives.

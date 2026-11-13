@@ -126,21 +126,52 @@ class ResolveSectionDomainTests(unittest.TestCase):
             domain = build_site.resolve_section_domain(course_dir, {"deploy_target": "cloudflare_pages"}, 1)
             self.assertEqual(domain, "ics3u-s1-2026-teacher.netlify.app")
 
-    def test_a_deploys_own_rebuild_bakes_the_address_it_was_asked_for(self):
-        """#799: deploy.py's rebuild for a destination's address sets the
-        variable on that build, and it wins over the records and the custom
-        domain, so the rebuild comes out with the address it was started for
-        (a Cloudflare leg of a course whose primary is Netlify included)."""
+    def test_a_deploys_own_rebuild_bakes_the_address_deploy_py_chose_for_its_leg(self):
+        """#799: deploy.py's rebuild for a destination sets the variable to
+        the address it chose for THAT leg: the leg's own custom domain when
+        the course records one (deploy.leg_custom_domain, by destination
+        type), else the service's host. So the variable is used as given, and
+        a build with no variable still follows the primary's custom domain.
+        (The third review's H1: until deploy.py chose the leg's custom domain,
+        the variable carried the pages.dev host and dropped it.)"""
         with tempfile.TemporaryDirectory() as tmp:
             course_dir = Path(tmp)
             self._both_markers(course_dir)
+            # A Cloudflare course with its own domain: no variable, the
+            # preview's build, follows the primary's custom domain...
+            config = {"deploy_target": "cloudflare_pages",
+                      "custom_domains": {"sections": {"section1": {"cloudflare_pages": "cf.school.ca"}}}}
+            self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1), "cf.school.ca")
+            # ...and the deploy's rebuild, asked for that domain, keeps it.
+            with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: "cf.school.ca"}):
+                self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1), "cf.school.ca")
+            # The Cloudflare leg of a Netlify course with only a NETLIFY
+            # domain is built for its own host, never the Netlify domain.
             config = {"deploy_target": "netlify",
                       "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca"}}}}
             with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: "https://ics3u-s1-2026-teacher.pages.dev/"}):
-                domain = build_site.resolve_section_domain(course_dir, config, 1)
-            self.assertEqual(domain, "ics3u-s1-2026-teacher.pages.dev")
+                self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1), "ics3u-s1-2026-teacher.pages.dev")
             with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: "  "}):
                 self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1), "ics3u.school.ca")
+
+    def test_a_variable_that_is_not_a_host_name_is_ignored(self):
+        """#799's third review, L2: the value reaches quartz.config.ts inside
+        quotes, so only a host name (and an optional port) is taken; anything
+        else resolves as if the variable were unset."""
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            self._both_markers(course_dir)
+            config = {"deploy_target": "cloudflare_pages"}
+            for bad in ('a"b.pages.dev', "a\nb.pages.dev", "a b.pages.dev", "a.pages.dev/x", "a.pages.dev:port", "-a.pages.dev", "a.pages.dev';"):
+                with self.subTest(value=bad):
+                    with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: bad}):
+                        self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1),
+                                         "ics3u-s1-2026-teacher.pages.dev")
+            for good in ("cf.school.ca", "localhost:8081", "https://Ics3u-S1.pages.dev/"):
+                with self.subTest(value=good):
+                    with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: good}):
+                        self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1),
+                                         build_site.clean_base_url(good))
 
     def test_deploy_py_sets_the_same_variable(self):
         """Read from deploy.py's text, not imported: this file imports

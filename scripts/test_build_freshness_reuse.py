@@ -592,6 +592,72 @@ class DeployPyLooksInTheWorkFolderAndAsksThePages(unittest.TestCase):
         self.assertNotIn('Path(f"/tmp/quartz-builds/', source)
 
 
+class EachLegIsBuiltForItsOwnCustomDomain(unittest.TestCase):
+    """#799's third review, H1: a section's custom domain, for the leg it is
+    recorded for (contracts/file-formats.json -> custom_domains: by
+    destination type; the older bare string is the primary's), is the
+    address that leg is built for and compared with. Cloudflare's record only
+    ever names <project>.pages.dev, so before this a Cloudflare course with a
+    custom domain was rebuilt with pages.dev and its sharing cards, sitemap
+    and feed dropped the teacher's domain."""
+
+    @classmethod
+    def setUpClass(cls):
+        import deploy
+        cls.deploy = deploy
+
+    def _course(self, config):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / "course_config.json").write_text(json.dumps(config), encoding="utf-8")
+        return tmp
+
+    def test_a_cloudflare_course_with_its_own_domain(self):
+        course = self._course({"deploy_target": "cloudflare_pages",
+                               "custom_domains": {"sections": {"section1": {"cloudflare_pages": "https://CF.school.ca/"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "CF.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 2, "cloudflare_pages"), "")
+
+    def test_a_netlify_course_with_its_own_domain(self):
+        course = self._course({"deploy_target": "netlify",
+                               "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "ics3u.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "")
+
+    def test_two_web_destinations_each_with_its_own_domain(self):
+        course = self._course({"deploy_target": "netlify",
+                               "additional_deploy_targets": [{"type": "cloudflare_pages"}],
+                               "custom_domains": {"sections": {"section1": {
+                                   "netlify": "n.school.ca", "cloudflare_pages": "c.school.ca"}}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "n.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "c.school.ca")
+
+    def test_the_older_bare_string_is_the_primarys_alone(self):
+        course = self._course({"deploy_target": "cloudflare_pages",
+                               "custom_domains": {"sections": {"section1": "old.school.ca"}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "cloudflare_pages"), "old.school.ca")
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "")
+        course = self._course({"custom_domains": {"sections": {"section1": "old.school.ca"}}})
+        self.assertEqual(self.deploy.leg_custom_domain(course, 1, "netlify"), "old.school.ca")
+
+    def test_no_settings_or_a_bad_shape_is_no_domain(self):
+        empty = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, empty, True)
+        self.assertEqual(self.deploy.leg_custom_domain(empty, 1, "netlify"), "")
+        for config in ([], {"custom_domains": []}, {"custom_domains": {"sections": {"section1": {"netlify": 7}}}}):
+            with self.subTest(config=config):
+                self.assertEqual(self.deploy.leg_custom_domain(self._course(config), 1, "netlify"), "")
+
+    def test_both_legs_are_built_for_the_leg_custom_domain_first(self):
+        """By source, since both legs talk to a service: the Cloudflare leg
+        compares with the leg's own domain before the project's host, and the
+        Netlify leg before Netlify's ssl_url."""
+        source = (REPOSITORY_ROOT / "scripts" / "deploy.py").read_text(encoding="utf-8")
+        self.assertIn('leg_custom_domain(course_dir, section, "cloudflare_pages") or host', source)
+        self.assertIn('leg_custom_domain(course_dir, args.section, "netlify") or clean_base_url(site_url)', source)
+
+
 class TheNewLinesCarryNoWindowsAnchor(unittest.TestCase):
     """windows-app's LauncherRulesContractTests.TheRebuildLinesAreDeploySHsWordForWord
     takes every deploy.sh echo holding one of its anchors and requires them to

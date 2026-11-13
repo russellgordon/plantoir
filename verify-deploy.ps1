@@ -1754,26 +1754,44 @@ $failedFirst = Run-Launcher -Script "deploy.bat" -LauncherArgs @($Course, "$Sect
 if ($failedFirst.ExitCode -eq 1) { Ok "a run whose first leg failed ends with that leg's code (1)" } else { No "a run whose first leg failed exited $($failedFirst.ExitCode), not 1" }
 Check-Folder "the leg after a failed one" (Join-Path $folderB "section$Section")
 
+# #799: the site carries ITS OWN address. Until #799 a Cloudflare course that
+# had ever been deployed to Netlify was built with the Netlify address (the
+# Netlify record was read first), so its social cards named the other site,
+# and deploy.py rebuilt it on every Cloudflare deploy for an address the
+# rebuild never gave it. Quartz writes og:image from the build's baseUrl. A
+# custom domain the course records for THIS destination (custom_domains, by
+# type; the older bare string is the primary's) is the site's own address too
+# (#799's third review, L1): deploy.py builds the leg for it, and the service's
+# "Live URL" then differs from it, correctly.
+function Check-BuiltForItsAddress([string]$Name, [string]$Url, [string]$Type) {
+    $own = @(([Uri]$Url).Host)
+    try {
+        $saved = [IO.File]::ReadAllText($config) | ConvertFrom-Json
+        $entry = $saved.custom_domains.sections.("section$Section")
+        $domain = $null
+        if ($entry -is [string]) { if (([string]$saved.deploy_target -eq $Type) -or (-not $saved.deploy_target -and $Type -eq 'netlify')) { $domain = $entry } }
+        elseif ($entry) { $domain = [string]$entry.$Type }
+        if ($domain) { $own += (($domain -replace '^(?i)https?://', '').TrimEnd('/')) }
+    } catch { }
+    try { $html = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 "$($Url.TrimEnd('/'))/").Content } catch { No "$Name's front page could not be fetched to read its address"; return }
+    if ($html -match 'property="og:image" content="https://([^/"]+)/') {
+        $found = $Matches[1]
+        if ($own -ccontains $found) { Ok "$Name's pages carry its own address ($found)" }
+        else { No "$Name's pages carry another site's address ($found, not $($own -join ' or '))" }
+    } else { No "$Name's front page names no address in og:image" }
+}
+
 # #799: the same site deployed again straight after, nothing changed, must
 # build nothing. Before #799 every Netlify and Cloudflare deploy here rebuilt:
 # deploy.py looked for the build in /tmp/quartz-builds, a folder Windows does
 # not use (55 to 66 s on the Lenovo 20QES70500). With -FirstPublish the first
 # deploy makes the course's hidden site records at its top, which changes the
 # course folder's own time, so the next deploy builds ONCE by the contract's
-# knownLimits; that run is measured, not asserted.
-# #799: the site carries ITS OWN address. Until #799 a Cloudflare course that
-# had ever been deployed to Netlify was built with the Netlify address (the
-# Netlify record was read first), so its social cards named the other site,
-# and deploy.py rebuilt it on every Cloudflare deploy for an address the
-# rebuild never gave it. Quartz writes og:image from the build's baseUrl.
-function Check-BuiltForItsAddress([string]$Name, [string]$Url) {
-    $want = ([Uri]$Url).Host
-    try { $html = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 "$($Url.TrimEnd('/'))/").Content } catch { No "$Name's front page could not be fetched to read its address"; return }
-    if ($html -match 'property="og:image" content="https://([^/"]+)/') {
-        if ($Matches[1] -ceq $want) { Ok "$Name's pages carry its own address ($want)" }
-        else { No "$Name's pages carry another site's address ($($Matches[1]), not $want)" }
-    } else { No "$Name's front page names no address in og:image" }
-}
+# knownLimits; that run is measured, not asserted. Only for a course with ONE
+# web destination: a course with two builds once per host on every deploy,
+# even with nothing changed, because each site carries its own address
+# (Russell's ruling on #799, 2026-11-13), so the pairings below assert nothing
+# of the kind.
 function Check-DeployedAgainUnchanged([string]$Name, [string]$Target) {
     $again = Measure-Deploy "$Name, the same site again, nothing changed (#799)" "deploy.bat" @($Course, "$Section", "--target", $Target) (Join-Path $work "deploy-$Target-again.log")
     $built = $again.Log -match $script:BuiltAgainLines
@@ -1796,7 +1814,7 @@ if ($haveNetlify) {
         Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"
         Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/"
         Check-PageLinks "Netlify" "$($netlifyUrl.TrimEnd('/'))/" netlify
-        Check-BuiltForItsAddress "Netlify" $netlifyUrl
+        Check-BuiltForItsAddress "Netlify" $netlifyUrl "netlify"
     } else { No "no Netlify address in the output" }
     Check-DeployedAgainUnchanged "Netlify" "netlify"
 } else { Skipped "Netlify (no credentials)" }
@@ -1822,7 +1840,7 @@ if ($haveCloudflare) {
         if ($cfSnapped) { [void](Wait-CloudflareProduction "Cloudflare Pages" $cloudflareUrl (Join-Path $work "cf-alone")) }
         Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
         Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
-        Check-BuiltForItsAddress "Cloudflare Pages" $cloudflareUrl
+        Check-BuiltForItsAddress "Cloudflare Pages" $cloudflareUrl "cloudflare_pages"
     } else { No "no Cloudflare address in the output" }
     Check-DeployedAgainUnchanged "Cloudflare" "cloudflare"
 } else { Skipped "Cloudflare Pages (no credentials)" }

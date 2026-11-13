@@ -2680,8 +2680,21 @@ from the image on every build.
 - A Netlify or Cloudflare build by `deploy.sh` whose address is not the
   destination's is built again by deploy.py for the address. That happens
   today and is not a stale path; named so a reviewer does not find it again.
-  The same on Windows after `deploy.ps1`'s own build, and for a course with
-  two web destinations, each leg's address.
+  The same on Windows after `deploy.ps1`'s own build.
+- **A course that deploys to TWO web hosts builds once per host on EVERY
+  deploy, even with nothing changed** (Russell's ruling on #799, 2026-11-13:
+  each site carries its OWN address, and the cost is accepted). Each leg is
+  built for its own address, Netlify's or Cloudflare's (or that host's own
+  custom domain), so the next leg finds the other address baked in and builds
+  for its own. Measured by #799's third review (three deploys of a Netlify
+  course with a Cloudflare destination too, nothing changed): 1, 3 and 5
+  builds in all, against 1, 2 and 3 before #799, when the second leg rebuilt
+  every time but for an address it never got, so the Cloudflare site
+  carried the Netlify address. So it is one build more than before per
+  unchanged deploy, about 35 s on the Lenovo 20QES70500 (a section's
+  rebuild here takes 12 to 74 s), scheduled nights included.
+  `verify-deploy.ps1` asserts "a second deploy builds nothing" only for a
+  course with one web destination.
 - **Measured on Windows (#799):** a real native build (`preview.ps1
   --build-only`, a course of 21 pages and a picture, the Lenovo above, 74 s the
   first time and 12 s the second) writes NOTHING inside the course: asked at
@@ -2823,6 +2836,24 @@ see the reason for.
       for an address comes out with that address. That includes a Cloudflare
       leg of a Netlify-primary course; such a course still rebuilds once per
       leg for the address ("Known extra builds").
+    - **The address a leg is built for is its OWN CUSTOM DOMAIN when the
+      course records one** (`deploy.leg_custom_domain`: `custom_domains.
+      sections.section<N>[<leg's type>]`, or the older bare string for the
+      primary alone, as `contracts/file-formats.json` says), else the
+      service's host. #799's third review measured why (H1): Cloudflare's
+      record only ever names `<project>.pages.dev` (a custom domain lives in
+      the project's own `domains`, which nothing here reads), so the first
+      fix rebuilt a Cloudflare course with a custom domain as `pages.dev`
+      and its sharing cards, sitemap and feed dropped the teacher's domain.
+      Netlify's `ssl_url` IS the custom domain once it is attached on
+      Netlify's side (by reading; not measured, no credentials), so a
+      Netlify course was mostly spared, but a recorded domain that differs
+      from Netlify's primary one (apex against `www`) now wins, because it
+      is what Plantoir links to. The same address names the Netlify site's
+      own links on the way up (`own_host`). The variable is used as given
+      because it is already the leg's right address; a value that is not a
+      host name (letters, digits, dots, hyphens, an optional port) is ignored
+      as if unset, so nothing else can reach `quartz.config.ts` (L2).
   - **Measured after the fix,** with the same reproduction: the build sets
     `pages.dev` and `deploy.py` reuses, and a Netlify course still builds
     with, and reuses, its `netlify.app` address.
