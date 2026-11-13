@@ -9602,22 +9602,39 @@ shared `ReplaceReferenceCourseAlert`.
    the old folder's name is what refuses a second replace of the same course
    (`twoAtOnce`).
 1. Refuse anything that is not a reference course directly inside `courses/`,
-   read from DISK (`courseOnTheShelf`), a busy course, and a course Obsidian
-   holds (below). The LIVE course of the same code is refused like anything
+   read from DISK (`courseOnTheShelf`), a busy course (a Copy a Page pass
+   reading from it counts, through `PageCopySourceReads`, implementation
+   review L3; it makes nothing else wait), and a course Obsidian holds
+   (below). An aside folder of that name already there refuses too. The LIVE course of the same code is refused like anything
    else; a test takes the guard out and watches the live course be backed up
    and swapped, which is what it is there for.
 2. Back it up: `CourseArchiver.backUpCourse(madeBy: .teacher)`. From here to
    the end the course counts as being copied (`CourseActivity.beginCopy`), so
    no removal, restore, backup or preview starts on it.
-3. Check the backup (plan review M3, `backupCheck`): `zipinfo -1` must list
-   every file of the course on disk, compared in NFC. Only `.merged_output`,
-   `.DS_Store` and Plantoir's own Obsidian add-on folders may be missing.
+3. Check the backup (plan review M3, `backupCheck`): its listing must name
+   every file of the course on disk, compared in NFC. Only `.DS_Store`, the
+   top-level `.merged_output` (a teacher's own one deeper down counts) and
+   Plantoir's own Obsidian add-on folders may be missing. **The listing takes
+   two tools** (implementation review H1, measured): macOS's `zipinfo` 3.00
+   prints every byte outside ASCII as `?` under every locale, so the first
+   version refused every course with `Thème`, `Canada’s` or `y = x²` in a
+   page's name (7 names in 6 of the 39 payloads, MPM2D among them); `tar -tf`
+   under `LC_ALL=en_US.UTF-8` spells the names as stored but listed a zip cut
+   to 300 bytes as whole. So `zipinfo -1` must exit 0, the names are `tar`'s,
+   and the two counts must agree. Proved with real backups of pages carrying
+   the contract's `realNames`, and with an empty and a cut zip.
    Every other name the archiver leaves out (`build`, `out`, `dist`,
    `node_modules`…) fails the check, because a course an older Plantoir or
    Windows made can hold a teacher's own folder of that name. Measured: a
-   reference course with `build/Notes.md` backs up without it and is refused
-   with `couldNotBackUp`; the failed backup is kept and the trail names it
-   and the missing file.
+   reference course with `build/Notes.md` backs up without it and is refused.
+   That backup is KEPT and SAID: `wording.backupIsIncomplete` tells the
+   teacher the course is as it was, that the backup is in Backups under the
+   folder's name without those files, and what they can do (implementation
+   review M1). Removing it was rejected: it holds most of the course, and it
+   would be a delete on a failure path. The trail gives the backup's file
+   name and a COUNT of the files it lacks, never their names, which are page
+   titles (L6). A zip that fails gives only its exit code, for the same
+   reason.
 4. Ask (1) again: the backup takes time (9.7 s for a 467 MB course, measured
    for #351).
 5. Rename the old course aside to `.plantoir-replacing-ICS3U-2025`.
@@ -9651,7 +9668,11 @@ the course (the whole `courses` folder) is not affected. `obsidianCases`.
 runs at the top of `reloadCourses`, BEFORE the folder is listed, so a course
 put back is in that reading's list. For each `.plantoir-replacing-<OLD>`
 nobody is still replacing: `<OLD>` free → renamed BACK; `<OLD>` a course and
-a backup in `_backups/<OLD>/` → removed; no backup → left alone. Only the
+a backup in `_backups/<OLD>/` that is OPENED and found to hold every file of
+the old copy → removed; otherwise → left alone. A file merely named like a
+backup is not trusted (implementation review L1). The check runs `zipinfo`
+and `tar` on the main actor, for a leftover only, so an ordinary reading of a
+folder runs neither. Only the
 whole prefix, dash included, is touched (`sweepCases`, with three look-alike
 teacher folders). The staged new course is the staging sweep's, as before.
 Windows' discovery skips dot-folders, so a leftover from a mac crash is
@@ -9659,7 +9680,15 @@ hidden there until a mac of this version opens the folder.
 
 **Every whole-course restore now leaves a line**, "course restored from a
 backup" (`WorkspaceModel.restoredTrailLine`), live or reference, after the
-restore has happened. Until #572 only a section's restore did.
+restore has happened, and so does a whole course put back from Archived
+(`restoredFromArchivedTrailLine`, implementation review L5), which is how
+the replacement a restore archived comes back. Until #572 only a section's
+restore did.
+
+**Keep a Copy asks the shelf rule again when Replace is pressed**, as the
+wizard and the import already did (L4): if another window re-filed the old
+course meanwhile, `wording.notTheCourseInTheWay` is said and nothing is
+made or backed up.
 
 Trail: "reference course replaced", "reference course could not be
 replaced", "unfinished replace of a reference course put right", "course

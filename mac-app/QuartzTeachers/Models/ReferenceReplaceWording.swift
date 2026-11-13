@@ -91,6 +91,23 @@ nonisolated enum ReferenceReplaceWording {
         return "\(course) could not be backed up, so it was not replaced."
     }
 
+    /// A backup was made and did not hold every file of the course: the
+    /// course is left exactly as it was, the backup is kept and said by the
+    /// name its row has in Backups, and the teacher is told what they can
+    /// do (implementation review M1).
+    static func backupIsIncomplete(course: String, folder: String) -> String {
+        return "\(course) was not replaced, and it is exactly as it was: some of its files could not go into "
+             + "a backup. The backup that was made is in Backups in the sidebar as \(folder), without those "
+             + "files. Keep \(course) and choose another school year for the new one, or delete that backup "
+             + "if you do not need it."
+    }
+
+    /// Replace was pressed for a course that has since moved to another
+    /// school year or gone, so nothing was replaced.
+    static func notTheCourseInTheWay(folder: String) -> String {
+        return "\(folder) is no longer in the way in that school year, so nothing was replaced. Look at the choices again."
+    }
+
     /// Something after the backup failed, and the course was put back.
     static func couldNotReplace(course: String) -> String {
         return "\(course) could not be replaced. It is as it was."

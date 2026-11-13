@@ -43,6 +43,9 @@ enum ReferenceCopier {
         case folderAlreadyExists(String)
         case alreadyBeingMade(String)
         case couldNotCopy(String)
+        /// Replace was pressed for a course that is no longer the one in the
+        /// way: it was moved to another school year, or removed.
+        case notTheCourseInTheWay(String)
 
         // MARK: - Computed properties
 
@@ -54,6 +57,8 @@ enum ReferenceCopier {
                 return ReferenceWording.copyAlreadyBeingMade(folder: folderName)
             case .couldNotCopy(let reason):
                 return "The copy could not be made: \(reason)"
+            case .notTheCourseInTheWay(let folderName):
+                return ReferenceReplaceWording.notTheCourseInTheWay(folder: folderName)
             }
         }
     }
@@ -143,10 +148,21 @@ enum ReferenceCopier {
         replacing folderName: String,
         schoolYear: Int?,
         coursesDirectoryURL: URL,
+        shelved: [ReferenceCourseRule.Shelved],
         world: ReferenceReplacer.World = ReferenceReplacer.World(),
         at moment: Date = Date()
     ) async throws -> Made {
         do {
+            // The shelf rule again, at the act, as the wizard and the import
+            // ask it (implementation review L4): the course in the way must
+            // still be the one the teacher was warned about. Another window
+            // can re-file it between the warning and Replace.
+            let inTheWay: ReferenceCourseRule.Shelved? = ReferenceCourseRule.courseInTheWay(
+                placing: course.displayCode, inYear: schoolYear, among: shelved
+            )
+            if inTheWay?.folderName != folderName {
+                throw Problem.notTheCourseInTheWay(folderName)
+            }
             switch ReferenceStaging.claim(folderName, inCoursesDirectory: coursesDirectoryURL) {
             case .claimed:
                 break

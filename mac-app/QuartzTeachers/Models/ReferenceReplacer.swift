@@ -73,6 +73,10 @@ enum ReferenceReplacer {
         case busy(course: String)
         case openInObsidian(course: String)
         case couldNotBackUp(course: String)
+        /// A backup was made and did not hold the whole course (plan review
+        /// M3; implementation review M1). The backup is KEPT and said, by the
+        /// name its row has in Backups.
+        case backupIsIncomplete(course: String, folder: String)
         case couldNotReplace(course: String)
         case couldNotPutBackYet(course: String)
 
@@ -88,6 +92,8 @@ enum ReferenceReplacer {
                 return ReferenceReplaceWording.openInObsidian(course: course)
             case .couldNotBackUp(let course):
                 return ReferenceReplaceWording.couldNotBackUp(course: course)
+            case .backupIsIncomplete(let course, let folder):
+                return ReferenceReplaceWording.backupIsIncomplete(course: course, folder: folder)
             case .couldNotReplace(let course):
                 return ReferenceReplaceWording.couldNotReplace(course: course)
             case .couldNotPutBackYet(let course):
@@ -107,6 +113,8 @@ enum ReferenceReplacer {
                 return "openInObsidian"
             case .couldNotBackUp:
                 return "couldNotBackUp"
+            case .backupIsIncomplete:
+                return "backupIsIncomplete"
             case .couldNotReplace:
                 return "couldNotReplace"
             case .couldNotPutBackYet:
@@ -120,9 +128,10 @@ enum ReferenceReplacer {
         /// Every file the course holds is in the backup. Carries what the
         /// course held, for the trail.
         case holdsTheCourse(files: Int, pages: Int, bytes: Int64)
-        /// These files of the course are not in it, by their place inside
-        /// the course; the first few only.
-        case isMissing([String])
+        /// This many files of the course are not in it. A COUNT, never a
+        /// name: a page's file name is its title, which the trail never
+        /// carries.
+        case isMissing(count: Int)
         /// The backup's listing, or a folder of the course, could not be
         /// read, so nothing can be said about it.
         case couldNotBeRead
@@ -256,6 +265,10 @@ enum ReferenceReplacer {
 
         let kind: Kind
         let folderName: String
+
+        /// The backup the old copy was checked against before it was
+        /// removed, by its file name, for `tidiedAway`.
+        var backupFileName: String? = nil
     }
 
     // MARK: - Stored properties
@@ -271,9 +284,6 @@ enum ReferenceReplacer {
     /// entry beginning with `.`).
     static let asidePrefix: String = ".plantoir-replacing-"
 
-    /// How many missing files the trail names when a backup does not hold
-    /// the course.
-    nonisolated static let missingNamedOnTheTrail: Int = 3
 
     // MARK: - Functions
 
@@ -469,18 +479,24 @@ enum ReferenceReplacer {
         do {
             backupURL = try await world.backUp(old, coursesDirectoryURL)
         } catch {
+            // The code `zip` stopped with, never its own words: they name
+            // the file it could not read, and a page's file name is its title.
+            let code: Int = (error as NSError).code
             throw ReferenceReplacer.givingUp(
                 .couldNotBackUp(course: course), asked: asked, group: group, stagingURL: stagingURL,
-                world: world, detail: error.localizedDescription
+                world: world, detail: "the backup could not be written (code \(code))"
             )
         }
 
-        // 3. The backup, checked.
+        // 3. The backup, checked. One that does not hold the course is
+        // KEPT, and said: it is most of the course, and removing it would be
+        // a delete on a failure path. The teacher reads where it is.
         let check: BackupCheck = await world.checkTheBackUp(backupURL, oldURL)
         guard case .holdsTheCourse(let files, let pages, let bytes) = check else {
             throw ReferenceReplacer.givingUp(
-                .couldNotBackUp(course: course), asked: asked, group: group, stagingURL: stagingURL,
-                world: world, detail: ReferenceReplacer.describe(check, backupFileName: backupURL.lastPathComponent)
+                .backupIsIncomplete(course: course, folder: folderName), asked: asked, group: group,
+                stagingURL: stagingURL, world: world,
+                detail: ReferenceReplacer.describe(check, backupFileName: backupURL.lastPathComponent)
             )
         }
 
@@ -637,6 +653,12 @@ enum ReferenceReplacer {
         if CourseActivity.coursePublishIsRunning(folderPath: workingFolderPath, courseCode: folderName) {
             return true
         }
+        // A Copy a Page pass reading from it (implementation review L3).
+        let courseURL: URL = URL(fileURLWithPath: workingFolderPath)
+            .appendingPathComponent("courses").appendingPathComponent(folderName)
+        if PageCopySourceReads.isReading(courseURL) {
+            return true
+        }
         return CourseActivity.isRevisedElsewhere(folderPath: workingFolderPath, courseCode: folderName)
     }
 
@@ -664,7 +686,13 @@ enum ReferenceReplacer {
     /// `CourseArchiver.excludedFromArchives` is accepted, because those names
     /// (`build`, `out`, `dist`…) can be a teacher's own folders in a course
     /// an older Plantoir or Windows made.
-    nonisolated static let mayAlwaysBeMissing: [String] = [".merged_output", ".DS_Store"]
+    nonisolated static let mayAlwaysBeMissing: [String] = [".DS_Store"]
+
+    /// The one name accepted missing only at the TOP of the course: the link
+    /// to the built website lives there and nowhere else, and a teacher's
+    /// own `section1/.merged_output/` deeper down is a folder of theirs
+    /// (implementation review L7).
+    nonisolated static let mayBeMissingAtTheTop: [String] = [".merged_output"]
 
     /// The listing and the walk, off the main actor (`@concurrent`, for the
     /// reason `CourseArchiver.zipping` gives).
@@ -684,12 +712,46 @@ enum ReferenceReplacer {
         )
     }
 
-    /// Every name in a zip, from `zipinfo -1`, or nil when it could not be
-    /// listed.
+    /// Every name in a zip, or nil when it could not be listed.
+    ///
+    /// **Two tools, because neither is enough alone** (implementation review
+    /// H1, measured). `zipinfo -1` reads the central directory, so it refuses
+    /// a truncated zip; but macOS's ZipInfo 3.00 prints every byte outside
+    /// ASCII as `?` under every locale, so `Thème.md` came back as
+    /// `The??me.md` and every course with an accent, a curly apostrophe or an
+    /// en dash in a page's name was refused. `tar -tf` (bsdtar) under a UTF-8
+    /// locale spells the names as stored, but it streams the local headers
+    /// and listed a zip cut to 300 bytes as if it were whole. So: `zipinfo`
+    /// must exit 0, the names are `tar`'s, and the two counts must agree.
     nonisolated static func zipListing(atPath zipPath: String) -> [String]? {
+        guard let central = ReferenceReplacer.listing(
+            "/usr/bin/zipinfo", ["-1", zipPath], environment: nil
+        ) else {
+            return nil
+        }
+        guard let names = ReferenceReplacer.listing(
+            "/usr/bin/tar", ["-tf", zipPath], environment: ["LC_ALL": "en_US.UTF-8"]
+        ) else {
+            return nil
+        }
+        if names.count != central.count {
+            return nil
+        }
+        return names
+    }
+
+    /// One tool's listing, a line per name, or nil when it did not exit 0.
+    nonisolated static func listing(
+        _ executable: String,
+        _ arguments: [String],
+        environment: [String: String]?
+    ) -> [String]? {
         let lister: Process = Process()
-        lister.executableURL = URL(fileURLWithPath: "/usr/bin/zipinfo")
-        lister.arguments = ["-1", zipPath]
+        lister.executableURL = URL(fileURLWithPath: executable)
+        lister.arguments = arguments
+        if let environment {
+            lister.environment = environment
+        }
         let output: Pipe = Pipe()
         lister.standardOutput = output
         lister.standardError = Pipe()
@@ -728,10 +790,15 @@ enum ReferenceReplacer {
     ///
     /// `zipNames` nil counts the course without comparing it with anything,
     /// for the warning's numbers.
+    ///
+    /// `inTheZipAs` is the folder name the zip's entries begin with, when it
+    /// is not the course folder's own: the sweep checks an aside folder
+    /// against a backup made under the course's real name.
     nonisolated static func compare(
         zipNames: [String]?,
         courseDirectoryURL: URL,
-        mayBeMissing: [String]
+        mayBeMissing: [String],
+        inTheZipAs zipFolderName: String? = nil
     ) -> BackupCheck {
         var inTheZip: Set<String> = []
         for name in zipNames ?? [] {
@@ -743,7 +810,7 @@ enum ReferenceReplacer {
         }
 
         let fileManager: FileManager = FileManager.default
-        let folderName: String = courseDirectoryURL.lastPathComponent
+        let folderName: String = zipFolderName ?? courseDirectoryURL.lastPathComponent
         // Asked of the folder's resolved path, because the walk hands back
         // `/private/var/…` for a folder named `/var/…`, and a count of path
         // components taken from one spelling is wrong for the other.
@@ -765,7 +832,7 @@ enum ReferenceReplacer {
         var files: Int = 0
         var pages: Int = 0
         var bytes: Int64 = 0
-        var missing: [String] = []
+        var missing: Int = 0
         for case let entryURL as URL in walker {
             // The entry's own name is never resolved: a link stays a link.
             let parentPath: String = entryURL.deletingLastPathComponent().resolvingSymlinksInPath().path
@@ -782,6 +849,7 @@ enum ReferenceReplacer {
             let isFolder: Bool = (values?.isDirectory ?? false) && !isLink
 
             if ReferenceReplacer.mayAlwaysBeMissing.contains(entryURL.lastPathComponent)
+                || ReferenceReplacer.mayBeMissingAtTheTop.contains(relative)
                 || ReferenceReplacer.isUnder(relative, anyOf: mayBeMissing) {
                 if isFolder {
                     walker.skipDescendants()
@@ -801,22 +869,14 @@ enum ReferenceReplacer {
             }
             let zipName: String = (folderName + "/" + relative).precomposedStringWithCanonicalMapping
             if !inTheZip.contains(zipName) {
-                missing.append(relative)
+                missing += 1
             }
         }
         if couldNotRead {
             return .couldNotBeRead
         }
-        if !missing.isEmpty {
-            missing.sort()
-            var named: [String] = []
-            for name in missing where named.count < ReferenceReplacer.missingNamedOnTheTrail {
-                named.append(name)
-            }
-            if missing.count > named.count {
-                named.append("and \(missing.count - named.count) more")
-            }
-            return .isMissing(named)
+        if missing > 0 {
+            return .isMissing(count: missing)
         }
         return .holdsTheCourse(files: files, pages: pages, bytes: bytes)
     }
@@ -833,12 +893,17 @@ enum ReferenceReplacer {
     ///   a live lease from another copy of Plantoir): left alone.
     /// * The old folder name is FREE: the replace stopped before the new
     ///   course was in, so the old course is renamed back. Never removed.
-    /// * The old name holds a course AND a backup of that folder is on disk:
-    ///   the new course was in place, and the old one is in the backup, so
-    ///   the aside folder is removed, unlocked first.
-    /// * The old name holds a course and there is NO backup (somebody
-    ///   deleted it by hand): left alone, hidden, rather than removed with
-    ///   no copy anywhere.
+    /// * The old name holds a course AND a backup in `_backups/<OLD>/` is
+    ///   OPENED and found to hold every file of the old copy (the same check
+    ///   the replace made; implementation review L1): the aside folder is
+    ///   removed, unlocked first. A file merely NAMED like a backup is not
+    ///   trusted.
+    /// * Otherwise (no backup, or none that holds it): left alone, hidden,
+    ///   rather than removed with no copy anywhere.
+    ///
+    /// The check runs `zipinfo` and `tar` here, on the main actor, for each
+    /// leftover only. A folder holds one only after a crash part way through
+    /// a replace, so an ordinary reading of a folder runs neither.
     @discardableResult
     static func sweepLeftovers(inCoursesDirectory coursesDirectoryURL: URL) -> [SweepOutcome] {
         let fileManager: FileManager = FileManager.default
@@ -875,11 +940,13 @@ enum ReferenceReplacer {
                 }
                 continue
             }
-            if !ReferenceReplacer.hasABackup(folderName: folderName, coursesDirectoryURL: coursesDirectoryURL) {
+            guard let backupFileName = ReferenceReplacer.backupThatHolds(
+                child, folderName: folderName, coursesDirectoryURL: coursesDirectoryURL
+            ) else {
                 continue
             }
             if ReferenceStaging.remove(at: child) {
-                outcomes.append(SweepOutcome(kind: .tidiedAway, folderName: folderName))
+                outcomes.append(SweepOutcome(kind: .tidiedAway, folderName: folderName, backupFileName: backupFileName))
             }
         }
         return outcomes
@@ -891,8 +958,8 @@ enum ReferenceReplacer {
         case .putBack:
             return "put \(outcome.folderName) back on the reference shelf — a replace of it did not finish"
         case .tidiedAway:
-            return "tidied away the old copy of \(outcome.folderName) left by a replace that finished — "
-                 + "it is in that folder's backups"
+            return "tidied away the old copy of \(outcome.folderName) left by a replace — "
+                 + "the backup \(outcome.backupFileName ?? "?") was opened and holds it"
         case .couldNotPutBack:
             return "could not put \(outcome.folderName) back on the reference shelf after a replace that "
                  + "did not finish — it is tried again the next time this working folder is opened"
@@ -917,6 +984,8 @@ enum ReferenceReplacer {
         case .notOnTheShelf(let named), .busy(let named), .openInObsidian(let named),
              .couldNotBackUp(let named), .couldNotReplace(let named), .couldNotPutBackYet(let named):
             course = named
+        case .backupIsIncomplete(let named, _):
+            course = named
         }
         ActivityTrail.note(
             .referenceCourseCouldNotBeReplaced,
@@ -937,8 +1006,9 @@ enum ReferenceReplacer {
         switch check {
         case .holdsTheCourse:
             return ""
-        case .isMissing(let names):
-            return "the backup \(backupFileName) does not hold " + names.joined(separator: ", ")
+        case .isMissing(let count):
+            let files: String = count == 1 ? "1 file" : "\(count) files"
+            return "the backup \(backupFileName) is kept, and does not hold \(files) of the course"
         case .couldNotBeRead:
             return "the backup \(backupFileName) could not be checked"
         }
@@ -954,20 +1024,43 @@ enum ReferenceReplacer {
         return false
     }
 
-    /// Whether `courses/_backups/<FOLDER>/` holds a backup of the folder.
-    private static func hasABackup(folderName: String, coursesDirectoryURL: URL) -> Bool {
+    /// The newest backup in `courses/_backups/<FOLDER>/` that holds every
+    /// file of `asideURL`, by its file name, or nil when none does.
+    private static func backupThatHolds(_ asideURL: URL, folderName: String, coursesDirectoryURL: URL) -> String? {
         let folderURL: URL = coursesDirectoryURL
             .appendingPathComponent("_backups").appendingPathComponent(folderName)
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: folderURL, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
         ) else {
-            return false
+            return nil
         }
+        var backups: [BackupItem] = []
         for fileURL in contents {
-            if BackupItem.from(fileURL: fileURL, courseCode: folderName) != nil {
-                return true
+            if let backup = BackupItem.from(fileURL: fileURL, courseCode: folderName) {
+                backups.append(backup)
             }
         }
-        return false
+        backups.sort { first, second in
+            return first.backedUpAt > second.backedUpAt
+        }
+        var mayBeMissing: [String] = []
+        let pluginsURL: URL = asideURL
+            .appendingPathComponent(ObsidianAddOns.settingsFolderName)
+            .appendingPathComponent("plugins")
+        for name in ObsidianFigureAddOns.plantoirAddOnFolders(inPluginsAt: pluginsURL) {
+            mayBeMissing.append(ObsidianAddOns.settingsFolderName + "/plugins/" + name)
+        }
+        for backup in backups {
+            guard let names = ReferenceReplacer.zipListing(atPath: backup.fileURL.path) else {
+                continue
+            }
+            let check: BackupCheck = ReferenceReplacer.compare(
+                zipNames: names, courseDirectoryURL: asideURL, mayBeMissing: mayBeMissing, inTheZipAs: folderName
+            )
+            if case .holdsTheCourse = check {
+                return backup.fileURL.lastPathComponent
+            }
+        }
+        return nil
     }
 }

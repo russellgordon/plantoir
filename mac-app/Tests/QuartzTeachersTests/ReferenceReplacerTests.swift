@@ -172,6 +172,13 @@ final class ReferenceReplacerTests: XCTestCase {
         XCTAssertEqual(ReferenceReplaceWording.couldNotBackUp(course: "{course}"), wording["couldNotBackUp"] as? String)
         XCTAssertEqual(ReferenceReplaceWording.couldNotReplace(course: "{course}"), wording["couldNotReplace"] as? String)
         XCTAssertEqual(
+            ReferenceReplaceWording.backupIsIncomplete(course: "{course}", folder: "{folder}"),
+            wording["backupIsIncomplete"] as? String
+        )
+        XCTAssertEqual(
+            ReferenceReplaceWording.notTheCourseInTheWay(folder: "{folder}"), wording["notTheCourseInTheWay"] as? String
+        )
+        XCTAssertEqual(
             ReferenceReplaceWording.couldNotPutBackYet(course: "{course}"), wording["couldNotPutBackYet"] as? String
         )
         XCTAssertEqual(
@@ -330,7 +337,104 @@ final class ReferenceReplacerTests: XCTestCase {
         try Data("A teacher's notes.\n".utf8).write(to: build.appendingPathComponent("Notes.md"))
         let second: URL = try await CourseArchiver.backUpCourse(old, coursesDirectoryURL: coursesDirectoryURL)
         let check: ReferenceReplacer.BackupCheck = await ReferenceReplacer.checkTheBackUp(second, against: oldURL)
-        XCTAssertEqual(check, .isMissing(["build/Notes.md"]))
+        XCTAssertEqual(check, .isMissing(count: 1))
+    }
+
+    /// Through the REAL archiver and the DEFAULT check (`World()`'s wiring,
+    /// implementation review L2): a course whose pages carry each of the
+    /// contract's `realNames` is held by its backup. MUST FAIL with the
+    /// listing read from `zipinfo` alone, which prints every byte outside
+    /// ASCII as `?` (implementation review H1).
+    func testRealNamesOutsideASCIIAreHeldByTheRealBackup() async throws {
+        try prepareWorkingFolder()
+        let rules: [String: Any] = try XCTUnwrap(
+            try ReferenceReplacerTests.replacingRules()["backupCheck"] as? [String: Any]
+        )
+        let names: [String] = try XCTUnwrap(rules["realNames"] as? [String])
+        XCTAssertGreaterThanOrEqual(names.count, 6, "The contract's names did not load.")
+        ReferenceLock.clearLock(at: oldURL)
+        let old: Course = try XCTUnwrap(
+            ReferenceReplacer.courseOnTheShelf(folderName: "ICS3U-2025", coursesDirectoryURL: coursesDirectoryURL)
+        )
+        for name in names {
+            let pageURL: URL = oldURL.appendingPathComponent("Lessons").appendingPathComponent(name)
+            try Data("A page.\n".utf8).write(to: pageURL)
+            let backupURL: URL = try await CourseArchiver.backUpCourse(old, coursesDirectoryURL: coursesDirectoryURL)
+            let check: ReferenceReplacer.BackupCheck = await ReferenceReplacer.World().checkTheBackUp(backupURL, oldURL)
+            guard case .holdsTheCourse = check else {
+                XCTFail("\(name): its real backup was not taken as holding the course: \(check)")
+                continue
+            }
+            try FileManager.default.removeItem(at: pageURL)
+        }
+    }
+
+    /// An empty file and a real backup cut short are never taken as a
+    /// backup (`unreadableZips`); `tar` alone listed the cut one as whole.
+    func testAnUnreadableZipIsNeverABackup() async throws {
+        try prepareWorkingFolder()
+        let rules: [String: Any] = try XCTUnwrap(
+            try ReferenceReplacerTests.replacingRules()["backupCheck"] as? [String: Any]
+        )
+        let cases: [[String: Any]] = try XCTUnwrap(rules["unreadableZips"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 2, "The contract's cases did not load.")
+        ReferenceLock.clearLock(at: oldURL)
+        let old: Course = try XCTUnwrap(
+            ReferenceReplacer.courseOnTheShelf(folderName: "ICS3U-2025", coursesDirectoryURL: coursesDirectoryURL)
+        )
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let backupURL: URL = try await CourseArchiver.backUpCourse(old, coursesDirectoryURL: coursesDirectoryURL)
+            let whole: Data = try Data(contentsOf: backupURL)
+            var kept: Data = Data()
+            if let cutTo = testCase["cutTo"] as? Int {
+                kept = whole.prefix(cutTo)
+            }
+            try kept.write(to: backupURL)
+            let check: ReferenceReplacer.BackupCheck = await ReferenceReplacer.World().checkTheBackUp(backupURL, oldURL)
+            XCTAssertEqual(check, .couldNotBeRead, name)
+        }
+    }
+
+    /// A Copy a Page pass reading from the course makes it busy to a
+    /// replace, and to nothing else (implementation review L3).
+    func testACopyAPagePassReadingFromItIsBusy() throws {
+        try prepareWorkingFolder()
+        let folder: String = workingFolderURL.path
+        XCTAssertFalse(ReferenceReplacer.courseIsBusy(workingFolderPath: folder, folderName: "ICS3U-2025", countingCopies: true))
+        PageCopySourceReads.begin(oldURL)
+        XCTAssertTrue(ReferenceReplacer.courseIsBusy(workingFolderPath: folder, folderName: "ICS3U-2025", countingCopies: true))
+        XCTAssertTrue(ReferenceReplacer.courseIsBusy(workingFolderPath: folder, folderName: "ICS3U-2025", countingCopies: false))
+        XCTAssertFalse(CourseActivity.courseIsBusy(folderPath: folder, courseCode: "ICS3U-2025"), "It made a preview wait.")
+        PageCopySourceReads.end(oldURL)
+        XCTAssertFalse(ReferenceReplacer.courseIsBusy(workingFolderPath: folder, folderName: "ICS3U-2025", countingCopies: true))
+    }
+
+    /// Keep a Copy asks the shelf rule again at Replace (implementation
+    /// review L4): a course no longer in the way is not replaced.
+    func testKeepACopyRefusesACourseNoLongerInTheWay() async throws {
+        try prepareWorkingFolder()
+        let live: Course = Course(
+            code: "ICS3U", directoryURL: liveURL,
+            configuration: try CourseConfiguration(contentsOf: liveURL.appendingPathComponent("course_config.json"))
+        )
+        let movedAway: [ReferenceCourseRule.Shelved] = [
+            ReferenceCourseRule.Shelved(displayCode: "ICS3U", schoolYear: 2024, folderName: "ICS3U-2025"),
+        ]
+        do {
+            _ = try await ReferenceCopier.keepACopy(
+                of: live, replacing: "ICS3U-2025", schoolYear: 2025, coursesDirectoryURL: coursesDirectoryURL,
+                shelved: movedAway, world: ReferenceReplacerTests.quietWorld()
+            )
+            XCTFail("A course no longer in the way was replaced.")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, ReferenceReplaceWording.notTheCourseInTheWay(folder: "ICS3U-2025"))
+        }
+        XCTAssertEqual(ReferenceReplacerTests.whatItSays(oldURL), "old")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stagingURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: coursesDirectoryURL.appendingPathComponent("_backups/ICS3U-2025").path
+        ), "A backup was made.")
     }
 
     // MARK: - The order of the act
@@ -354,6 +458,10 @@ final class ReferenceReplacerTests: XCTestCase {
         let busy: String? = testCase["busy"] as? String
         let obsidian: String? = testCase["obsidian"] as? String
         let live: Bool = testCase["live"] as? Bool ?? false
+        let leavesTheShelf: Bool = testCase["leavesTheShelf"] as? String == "afterTheBackUp"
+        if testCase["asideAlreadyThere"] as? Bool ?? false {
+            try FileManager.default.createDirectory(at: asideURL, withIntermediateDirectories: true)
+        }
         let liveBefore: [String: String] = try ReferenceCreationTests.digest(of: liveURL)
 
         try stageTheNewCourse()
@@ -382,12 +490,21 @@ final class ReferenceReplacerTests: XCTestCase {
                 throw NSError(domain: "test", code: 28, userInfo: [NSLocalizedDescriptionKey: "The disk is full."])
             }
             recorder.steps.append("backUp")
-            return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher)
+            let made: URL = try await CourseArchiver.backUpCourse(
+                course, coursesDirectoryURL: coursesDirectoryURL, madeBy: .teacher
+            )
+            if leavesTheShelf {
+                // Its settings, which are never locked, edited to say it is
+                // not kept for reference while the backup was made.
+                try Data("{\"course_code\": \"ICS3U\", \"section_numbers\": [1]}\n".utf8)
+                    .write(to: old.appendingPathComponent("course_config.json"))
+            }
+            return made
         }
         world.checkTheBackUp = { backupURL, courseURL in
             if failAt == "checkTheBackUp" {
                 recorder.steps.append("checkTheBackUp:fails")
-                return .isMissing(["section1/index.md"])
+                return .isMissing(count: 1)
             }
             recorder.steps.append("checkTheBackUp")
             return await ReferenceReplacer.checkTheBackUp(backupURL, against: courseURL)
@@ -446,7 +563,9 @@ final class ReferenceReplacerTests: XCTestCase {
         switch oldIs {
         case "inPlace":
             XCTAssertEqual(ReferenceReplacerTests.whatItSays(oldURL), "old", "\(name): the old course is not in place.")
-            XCTAssertFalse(FileManager.default.fileExists(atPath: asideURL.path), "\(name): an aside folder is left.")
+            if !(testCase["asideAlreadyThere"] as? Bool ?? false) {
+                XCTAssertFalse(FileManager.default.fileExists(atPath: asideURL.path), "\(name): an aside folder is left.")
+            }
         case "aside":
             XCTAssertEqual(ReferenceReplacerTests.whatItSays(asideURL), "old", "\(name): the old course is not aside.")
         default:
@@ -508,7 +627,8 @@ final class ReferenceReplacerTests: XCTestCase {
         do {
             _ = try await ReferenceCopier.keepACopy(
                 of: live, replacing: "ICS3U-2025", schoolYear: 2025,
-                coursesDirectoryURL: coursesDirectoryURL, world: ReferenceReplacerTests.quietWorld()
+                coursesDirectoryURL: coursesDirectoryURL, shelved: ReferenceReplacerTests.shelf,
+                world: ReferenceReplacerTests.quietWorld()
             )
             XCTFail("A second replace of the same course went ahead.")
         } catch {
@@ -533,7 +653,8 @@ final class ReferenceReplacerTests: XCTestCase {
         )
         let made: ReferenceCopier.Made = try await ReferenceCopier.keepACopy(
             of: live, replacing: "ICS3U-2025", schoolYear: 2025,
-            coursesDirectoryURL: coursesDirectoryURL, world: ReferenceReplacerTests.quietWorld()
+            coursesDirectoryURL: coursesDirectoryURL, shelved: ReferenceReplacerTests.shelf,
+            world: ReferenceReplacerTests.quietWorld()
         )
         XCTAssertEqual(made.folderName, "ICS3U-2025")
         XCTAssertEqual(ReferenceReplacerTests.whatItSays(oldURL), "live", "The copy is not in the old course's place.")
@@ -680,15 +801,36 @@ final class ReferenceReplacerTests: XCTestCase {
             try ReferenceReplacerTests.writeCourse(
                 at: coursesDirectoryURL.appendingPathComponent(entry), reference: true, says: says
             )
+        }
+        // A REAL backup: of the old copy, under the course's own name, or
+        // of something else under a backup's name (implementation review L1).
+        let backupKind: String = try XCTUnwrap(testCase["backup"] as? String)
+        if backupKind != "none" {
+            let backups: URL = coursesDirectoryURL.appendingPathComponent("_backups").appendingPathComponent("ICS3U-2025")
+            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+            let source: URL = rootURL.appendingPathComponent("zip-source").appendingPathComponent("ICS3U-2025")
+            if backupKind == "holdsIt" {
+                try FileManager.default.createDirectory(
+                    at: source.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                try FileManager.default.copyItem(at: asideURL, to: source)
+            } else {
+                try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+                try Data("Something else.\n".utf8).write(to: source.appendingPathComponent("README.md"))
+            }
+            let zipper: Process = Process()
+            zipper.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            zipper.arguments = ["-r", "-q", "-X", backups.appendingPathComponent("ICS3U-2025_backup_2026-11-13_010000.zip").path, "ICS3U-2025"]
+            zipper.currentDirectoryURL = source.deletingLastPathComponent()
+            try zipper.run()
+            zipper.waitUntilExit()
+            XCTAssertEqual(zipper.terminationStatus, 0, name)
+        }
+        for entry in try XCTUnwrap(testCase["before"] as? [String]) {
             ReferenceLock.lock(courseDirectory: coursesDirectoryURL.appendingPathComponent(entry))
         }
         try FileManager.default.createDirectory(at: coursesDirectoryURL, withIntermediateDirectories: true)
         try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("preview.sh"))
-        if try XCTUnwrap(testCase["backup"] as? Bool) {
-            let backups: URL = coursesDirectoryURL.appendingPathComponent("_backups").appendingPathComponent("ICS3U-2025")
-            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
-            try Data("zip".utf8).write(to: backups.appendingPathComponent("ICS3U-2025_backup_2026-11-13_010000.zip"))
-        }
         if try XCTUnwrap(testCase["someoneIsReplacingIt"] as? Bool) {
             ReferenceStaging.claimedStagingKeys.insert(
                 ReferenceStaging.claimKey(for: "ICS3U-2025", inCoursesDirectory: coursesDirectoryURL)
@@ -728,7 +870,7 @@ final class ReferenceReplacerTests: XCTestCase {
         let text: String = ActivityTrail.store.activityText(includingPrompts: true)
         let events: [String] = try XCTUnwrap(expect["trail"] as? [String])
         let putRight: Bool = text.contains("back on the reference shelf — a replace of it did not finish")
-            || text.contains("tidied away the old copy of ICS3U-2025")
+            || text.contains("tidied away the old copy of ICS3U-2025 left by a replace — the backup ICS3U-2025_backup_2026-11-13_010000.zip was opened and holds it")
         XCTAssertEqual(
             putRight, events.contains(ActivityTrail.Event.unfinishedReplaceOfAReferenceCoursePutRight.rawValue),
             "\(name): \(text)"
@@ -776,9 +918,31 @@ final class ReferenceReplacerTests: XCTestCase {
         let lines: [String] = ReferenceReplacerTests.lines(in: trail, containing: "restored ICS3U (ICS3U) from \(backupURL.lastPathComponent)")
         XCTAssertEqual(lines.count, 1, trail)
         XCTAssertTrue(lines.first?.hasSuffix("; a course you teach") ?? false, trail)
+
+        // A whole course put back from Archived leaves the line too
+        // (implementation review L5). MUST FAIL without it in `restore`.
+        try FileManager.default.removeItem(at: liveURL)
+        workspace.reloadCourses()
+        var archived: ArchivedItem?
+        for candidate in workspace.archivedItems where candidate.courseCode == "ICS3U" && candidate.sectionNumber == nil {
+            archived = candidate
+        }
+        let archive: ArchivedItem = try XCTUnwrap(archived, "The restore made no archive.")
+        workspace.restore(archive)
+        XCTAssertNil(workspace.restoreProblem)
+        XCTAssertEqual(ReferenceReplacerTests.whatItSays(liveURL), "live")
+        let fromArchived: [String] = ReferenceReplacerTests.lines(
+            in: trail, containing: "restored ICS3U (ICS3U) from Archived, \(archive.fileURL.lastPathComponent)"
+        )
+        XCTAssertEqual(fromArchived.count, 1, trail)
     }
 
     // MARK: - Helpers
+
+    /// The shelf as the fixture has it: ICS3U-2025 in 2025–26.
+    static let shelf: [ReferenceCourseRule.Shelved] = [
+        ReferenceCourseRule.Shelved(displayCode: "ICS3U", schoolYear: 2025, folderName: "ICS3U-2025"),
+    ]
 
     static func lines(in text: String, containing fragment: String) -> [String] {
         var found: [String] = []

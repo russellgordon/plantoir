@@ -5592,8 +5592,10 @@ issue for #572's second piece lists the work.
   the DENY entries first), and four trail events, one of them "course
   restored from a backup" on EVERY whole-course restore (check whether
   `CourseRestorer.cs` writes one today).
-- **To measure on Windows rather than copy:** whether `Directory.Move` of a
-  folder whose files carry the DENY entries succeeds, as a rename of a locked
+- **To measure on Windows rather than copy:** what the zip reader there
+  gives for a name outside ASCII (the mac's `zipinfo` prints `?`, which is
+  why the mac reads names with `tar`; `backupCheck.realNames`), and whether
+  `Directory.Move` of a folder whose files carry the DENY entries succeeds, as a rename of a locked
   tree does on APFS; the order depends on it.
 
 ## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)

@@ -249,6 +249,7 @@ struct KeepACopyForReferenceSheet: View {
                     replacing: folderName,
                     schoolYear: schoolYear,
                     coursesDirectoryURL: coursesDirectoryURL,
+                    shelved: workspace.shelvedReferenceCourses(on: today),
                     world: world
                 )
                 dismiss()

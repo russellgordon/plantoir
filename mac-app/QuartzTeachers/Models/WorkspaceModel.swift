@@ -2178,6 +2178,15 @@ class WorkspaceModel {
             restoreProblem = error.localizedDescription
             return
         }
+        // A whole course from Archived leaves the same line a backup's
+        // restore does (#572 implementation review L5): it is how the
+        // replacement a reference course's restore archived comes back.
+        if item.sectionNumber == nil {
+            ActivityTrail.note(
+                .courseRestoredFromABackup,
+                WorkspaceModel.restoredFromArchivedTrailLine(item: item, coursesDirectoryURL: coursesDirectoryURL)
+            )
+        }
         selection = nil
         reloadCourses()
         if let sectionNumber = item.sectionNumber {
@@ -2679,6 +2688,28 @@ class WorkspaceModel {
         }
         line += kept ? "; kept for reference" : "; a course you teach"
         return line
+    }
+
+    /// The line a whole course put back from Archived leaves: the code it
+    /// shows, its folder, the archive's file name (which is used up), and
+    /// whether it is kept for reference.
+    static func restoredFromArchivedTrailLine(item: ArchivedItem, coursesDirectoryURL: URL) -> String {
+        let folderName: String = item.courseCode
+        let restored: CourseConfiguration? = try? CourseConfiguration(
+            contentsOf: coursesDirectoryURL.appendingPathComponent(folderName)
+                .appendingPathComponent("course_config.json")
+        )
+        var shown: String = folderName
+        var kept: Bool = false
+        if let restored {
+            kept = restored.keptForReference
+            let recorded: String = restored.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            if kept && !recorded.isEmpty {
+                shown = recorded
+            }
+        }
+        return "restored \(shown) (\(folderName)) from Archived, \(item.fileURL.lastPathComponent) — "
+             + "that archive is used up" + (kept ? "; kept for reference" : "; a course you teach")
     }
 
     /// Deletes a backup for good — no archive behind it, which is why
