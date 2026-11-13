@@ -117,6 +117,8 @@ def check_page_fields(source: HelpSource) -> None:
                 problems.fail(file, 1, "`" + date_field + ":` is a date written YYYY-MM-DD")
         if "authority" in page.fields and not str(page.fields["authority"]).startswith("https://"):
             problems.fail(file, 1, "`authority:` is an https:// address")
+        if "authority" in page.fields and "factsChecked" not in page.fields:
+            problems.fail(file, 1, "`authority:` is printed with the date its facts were checked: add `factsChecked:`")
 
 
 def check_withheld_file(source: HelpSource) -> None:

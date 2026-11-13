@@ -125,6 +125,10 @@ class RefusedThroughTheBuild(unittest.TestCase):
         self.refused("Select **a section.\n", "a ` or ** is never closed")
         self.refused("Type `here.\n", "a ` or ** is never closed")
 
+    def test_quotation_marks_around_a_say_token_are_refused(self) -> None:
+        self.refused('It says "{{say:shared-rules#fixtureNotice.wording.finished}}"\n', "a {{say:}} sentence is quoted by Help itself")
+        self.refused("It says \u201c{{say:shared-rules#fixtureNotice.wording.finished}}\u201d\n", "a {{say:}} sentence is quoted by Help itself")
+
     def test_steps_must_count_up_by_one(self) -> None:
         self.refused("1. One\n3. Three\n", "step 3 follows step 1")
         self.refused("2. Two\n", "numbered steps start at 1")

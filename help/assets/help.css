@@ -111,6 +111,13 @@ div.being-written {
  * platform (question 2 on #839). */
 [data-platform="windows"] { display: none; }
 
+/* A sentence the app shows ({{say:}}): set in quotation marks by Help, so
+ * writers never type them and every page quotes the same way. */
+span.say::before { content: "\201C"; }
+span.say::after { content: "\201D"; }
+
+p.facts-checked { margin-top: 28px; color: var(--ink-soft); font-size: 14px; }
+
 #help-results ol { padding-left: 1.4em; }
 #help-results p { margin: 2px 0 10px; color: var(--ink-soft); }
 

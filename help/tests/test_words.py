@@ -50,7 +50,7 @@ class RuleTests(unittest.TestCase):
             with self.subTest(sentence=sentence):
                 self.assertEqual(publish_deploy_problems(sentence), [])
 
-    def test_each_misuse_of_publish_and_deploy_is_refused(self) -> None:
+    def test_each_misuse_of_publish_and_deploy_is_flagged_for_the_reviewer(self) -> None:
         for sentence in self.MISUSE:
             with self.subTest(sentence=sentence):
                 self.assertGreater(len(publish_deploy_problems(sentence)), 0)

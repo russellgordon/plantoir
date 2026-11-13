@@ -66,6 +66,7 @@ def search_index(source: HelpSource, renderer: PageRenderer, included: Set[str])
     words: Dict[str, str] = {
         "resultsHeading": source.interface["searchResultsHeading"],
         "noMatch": source.interface["searchNoMatch"],
+        "moreOne": source.interface["searchMoreOne"],
         "more": source.interface["searchMore"],
     }
     return (

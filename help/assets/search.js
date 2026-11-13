@@ -257,7 +257,9 @@
       box.appendChild(list);
       if (results.length > shown) {
         var more = document.createElement("p");
-        more.textContent = String(helpWords.more || "").split("{count}").join(String(results.length - shown));
+        var rest = results.length - shown;
+        var sentence = rest === 1 ? helpWords.moreOne : helpWords.more;
+        more.textContent = String(sentence || "").split("{count}").join(String(rest));
         box.appendChild(more);
       }
     }

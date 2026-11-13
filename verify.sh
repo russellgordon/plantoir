@@ -306,9 +306,9 @@ else
   cat /tmp/verify_help_test_checks.log
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_words.py >/tmp/verify_help_test_words.log 2>&1; then
-  pass "Help: no machinery, no selling, publish never for deploy, no typed counts, quoted runs or contract sentences typed by hand (help/tests/test_words.py, #839)"
+  pass "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
 else
-  fail "Help: no machinery, no selling, publish never for deploy, no typed counts, quoted runs or contract sentences typed by hand (help/tests/test_words.py, #839)"
+  fail "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
   cat /tmp/verify_help_test_words.log
 fi
 if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_macbook.py >/tmp/verify_help_test_macbook.log 2>&1; then

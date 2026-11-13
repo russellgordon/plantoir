@@ -48,8 +48,13 @@ every page, caption and alt text is written by Fable from a fact sheet
    under "For the page's reviewer: publish and deploy", with file and line,
    and counts them in its summary line. The reviewer reads each one.
 5. **Counts.** A digit within four words of "course" or "code" is refused as
-   a typed count, including "a Grade 9 course" and "Section 2 of the course".
-   Write a count as `{{count:ready_made_ontario}}`; rephrase anything else.
+   a typed count, including grade and unit numbers: "a Grade 9 course",
+   "Section 2 of the course", "Unit 1, Day 1 belongs to the course", "the
+   course code MPM2D for Grade 10". The advice the build prints (use
+   `{{count:}}`) fits only a real count; for anything else rephrase so the
+   digit is more than four words from "course" and "code", or ask for a
+   `tone.json` exemption of the exact phrase on that page (`class-pages` and
+   the twelve subject pages will want one). Step numbers are not counted.
 6. **Machinery words in their teaching sense** are refused too: "model",
    "script", "feed", "worker", "container", "Python". A page that needs one
    (Drama's script, a Science model) gets a `tone.json` exemption for that
@@ -89,6 +94,37 @@ every page, caption and alt text is written by Fable from a fact sheet
 14. **"Coverage" and "assistant" in any sense** ("curriculum coverage", "an
     assistant principal") are refused on the web copy outside an
     `{{assistant}}` run. Choose other words, or use the run.
+15. **Front matter** is `id`, `checked: 2.0.0`, `covers`, `keywords` and
+    `description`, plus `indexed`, `factsChecked` and `authority` where they
+    apply. Never `title`, `question`, `anchor`, `section` or `assistant`:
+    the outline owns them and the build refuses them. `pages/index.md` (the
+    introduction above the contents) needs front matter holding only
+    `id: index`; its body is the introduction.
+16. **Run `--web` as well as `--check`** before handing a page over: a
+    mention the web copy may not carry is only a warning under `--check`.
+17. **A written page shows its title and not its question.** Only a stub
+    prints the outline's question, so a page's first sentence must stand
+    without it.
+18. **`{{say:}}` in quotation marks.** Never type quotation marks around a
+    `{{say:}}` token: Help sets every sentence the app shows in its own
+    curly quotation marks, the same on every page.
+19. **Dated facts.** A page whose facts come from someone else's
+    documentation (GitHub's education benefits, a vendor's plans) carries
+    `factsChecked: YYYY-MM-DD` and `authority: https://…`. The build prints
+    them at the foot of the page, in both the Mac book and the web copy
+    (`interface-words.json` → `factsChecked`, `factsCheckedAgainst`), so do
+    not also write the date or the link in prose. `authority` without
+    `factsChecked` is refused.
+20. **Keywords: give both forms** of a word a teacher might type either way,
+    and always where a word doubles its consonant ("quiz", "quizzes").
+21. **A heading inside an `{{assistant}}` run**: keep everything under that
+    heading inside the same run, up to the next heading, so the web copy
+    never shows a section without its heading or a heading with nothing
+    under it.
+22. **Scene entries come first.** `{{picture:}}` fails until the batch's
+    integrator has committed that page's scenes to `help/scenes.json`. Pages
+    whose outline lists scene ids without picture descriptions take `shows`
+    and labels from the fact sheet.
 
 ## What is here
 

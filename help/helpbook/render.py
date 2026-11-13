@@ -86,7 +86,7 @@ class HelpSource:
         self.registries = Registries(repo, help_dir, self.today)
         self.words = WordRules.load(repo, help_dir)
         self.interface: Dict[str, str] = read_json(help_dir / "interface-words.json").get("words", {})
-        for key in ("stubSentence", "placeholderHeading", "searchLabel", "searchButton", "searchResultsHeading", "searchNoMatch", "searchMore"):
+        for key in ("stubSentence", "placeholderHeading", "searchLabel", "searchButton", "searchResultsHeading", "searchNoMatch", "searchMoreOne", "searchMore", "factsChecked", "factsCheckedAgainst"):
             if not isinstance(self.interface.get(key), str) or self.interface[key].strip() == "":
                 raise HelpError("help/interface-words.json -> words needs `" + key + "`")
         withheld = read_json(help_dir / "withheld-on-the-web.json").get("terms", [])
@@ -523,6 +523,24 @@ class PageRenderer:
                 return True
         return False
 
+    def facts_checked_html(self, page: Page) -> str:
+        """The date a page's facts were checked, and the page they were checked
+        against, printed at the foot of the page (ruled on #839 for the GitHub
+        education page: "with the date checked printed on the page", linking
+        GitHub's page as the authority). The words are interface-words.json's."""
+        date: str = str(page.fields.get("factsChecked", "")).strip()
+        if date == "":
+            return ""
+        authority: str = str(page.fields.get("authority", "")).strip()
+        date_html: str = '<time datetime="' + html.escape(date) + '">' + html.escape(date) + "</time>"
+        if authority == "":
+            sentence: str = html.escape(self.source.interface["factsChecked"]).replace("{date}", date_html)
+        else:
+            shown: str = re.sub(r"^https://", "", authority).rstrip("/")
+            link: str = '<a href="' + html.escape(authority) + '">' + html.escape(shown) + "</a>"
+            sentence = html.escape(self.source.interface["factsCheckedAgainst"]).replace("{date}", date_html).replace("{authority}", link)
+        return '<p class="facts-checked">' + sentence + "</p>"
+
     def render_page(self, page: Page) -> str:
         self.scan_web(self.head(page.title, page.keywords, page.description, page.indexed), page, 1)
         if page.is_stub:
@@ -540,6 +558,10 @@ class PageRenderer:
             parts.append('<div class="being-written" role="note"><p>' + html.escape(self.source.interface["stubSentence"]) + "</p></div>")
         else:
             parts.append(self.blocks(page.blocks, page, "mac", self.page_has_windows(page)))
+            facts_line: str = self.facts_checked_html(page)
+            if facts_line != "":
+                self.scan_web(facts_line, page, 1)
+                parts.append(facts_line)
         parts.append("</main>")
         return "\n".join(parts) + "\n" + self.tail()
 

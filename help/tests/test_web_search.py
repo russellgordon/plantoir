@@ -183,6 +183,51 @@ class WebTests(unittest.TestCase):
         self.assertIsNone(shown["threw"], shown)
         self.assertTrue(shown["hidden"])
 
+    def test_the_more_line_agrees_with_its_number(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the page's search was not run")
+        self.build()
+        words = self.read("assets/search-index.js").split("\n", 1)[0]
+        for pages, expected in ((11, "1 more page matches."), (12, "2 more pages match.")):
+            with self.subTest(pages=pages):
+                folder = self.fixture.out / ("synthetic-" + str(pages))
+                (folder / "assets").mkdir(parents=True)
+                entries = []
+                for number in range(pages):
+                    entries.append({"id": "p" + str(number), "title": "Page " + str(number), "description": "", "keywords": [], "text": "lantern"})
+                (folder / "assets" / "search-index.js").write_text(
+                    words + "\nwindow.PLANTOIR_HELP_INDEX = " + json.dumps(entries) + ";\n", encoding="utf-8"
+                )
+                shown = run_page_search(NODE, folder, "lantern", search_js=self.web / "assets" / "search.js")
+                self.assertIsNone(shown["threw"], shown)
+                self.assertEqual(len(shown["items"]), 10)
+                self.assertEqual(shown["paragraphs"], [expected])
+
+    def test_the_date_facts_were_checked_is_printed_with_its_authority(self) -> None:
+        self.fixture.replace(
+            "help/pages/helper-page.md", "description: What the helper does.\n",
+            "description: What the helper does.\nfactsChecked: 2026-11-13\nauthority: https://docs.example.com/benefits/\n",
+        )
+        self.fixture.replace("help/pages/python-page.md", "description: Students run Python code on a page.\n", "description: Students run Python code on a page.\nfactsChecked: 2026-11-01\n")
+        self.fixture.replace("help/facts.json", '"assistantOnTheWeb": false', '"assistantOnTheWeb": true')
+        self.build()
+        expected = ('<p class="facts-checked">Facts checked on <time datetime="2026-11-13">2026-11-13</time> against '
+                    '<a href="https://docs.example.com/benefits/">docs.example.com/benefits</a>.</p>')
+        self.assertIn(expected, self.read("helper-page.html"))
+        self.assertIn('<p class="facts-checked">Facts checked on <time datetime="2026-11-01">2026-11-01</time>.</p>', self.read("python-page.html"))
+        self.assertNotIn("facts-checked", self.read("send-section.html"))
+        if shutil.which("hiutil") is not None:
+            book = self.fixture.out / "Plantoir.help"
+            code, output = self.fixture.run("--mac", str(book))
+            self.assertEqual(code, 0, output)
+            mac = (book / "Contents" / "Resources" / "en.lproj" / "helper-page.html").read_text(encoding="utf-8")
+            self.assertIn(expected, mac)
+        # An authority without the date it was checked against is refused.
+        self.fixture.replace("help/pages/helper-page.md", "factsChecked: 2026-11-13\n", "")
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("add `factsChecked:`", output)
+
     def test_the_assistant_pages_are_found_once_the_switch_is_on(self) -> None:
         if NODE is None:
             self.skipTest("node is not installed; the search index was not run")

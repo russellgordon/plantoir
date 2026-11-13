@@ -7,6 +7,9 @@
   "searchButton": "Search",
   "searchResultsHeading": "Search results",
   "searchNoMatch": "No page matches.",
-  "searchMore": "{count} more pages match."
+  "searchMoreOne": "{count} more page matches.",
+  "searchMore": "{count} more pages match.",
+  "factsChecked": "Facts checked on {date}.",
+  "factsCheckedAgainst": "Facts checked on {date} against {authority}."
  }
 }

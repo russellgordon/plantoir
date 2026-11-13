@@ -80,6 +80,8 @@ def check_inline_syntax(file: str, line: int, text: str, problems: Problems) -> 
     unmatched: str = re.sub(r"\{\{[^{}\n]*\}\}", "", outside_code)
     if "{{" in unmatched or "}}" in unmatched:
         problems.fail(file, line, "a token is not closed with }}")
+    if re.search(r"[\"\u201c\u2018']\{\{say:[^{}]*\}\}|\{\{say:[^{}]*\}\}[\"\u201d\u2019']", outside_code) is not None:
+        problems.fail(file, line, "a {{say:}} sentence is quoted by Help itself: take away the quotation marks around it")
     if re.search(r"&(?:[A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);", outside_code) is not None:
         problems.fail(file, line, "an HTML entity is printed as typed: write the character itself")
     for kind, value in split_inline(text):
