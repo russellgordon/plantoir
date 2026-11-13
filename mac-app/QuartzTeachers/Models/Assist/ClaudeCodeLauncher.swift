@@ -312,8 +312,8 @@ nonisolated enum ClaudeCodeLauncher {
     /// the sentence that holds every change until the teacher agrees. The same
     /// in every session, because the `plantoir-handouts` guide is always
     /// written into the working folder, so nothing is read from the disk at
-    /// the click. It names neither marking nor report comments, which are
-    /// never advertised in a greeting.
+    /// the click. It names none of the held skills (`held.skills` in the
+    /// contract), which are never advertised in a greeting.
     static let handoutsGreetingSentence: String =
         "In your first reply, also tell me in one sentence that you can make printed handouts, "
         + "worksheets and quizzes for this course, each with its answer key, as good-looking PDFs "
