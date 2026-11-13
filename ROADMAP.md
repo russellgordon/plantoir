@@ -102,7 +102,7 @@ Small fixes and conveniences. Mac first where it says so.
   ([#722](https://github.com/russellgordon/plantoir/issues/722)), and a handful of checks that the Mac and Windows apps behave
   the same way.
 
-## Version 2.0
+## Version 2.1
 
 - **PhET science simulations on your pages**, from the University of
   Colorado's collection — projectile motion, gas laws, circuits, natural
@@ -128,7 +128,7 @@ Small fixes and conveniences. Mac first where it says so.
 
 ---
 
-## Version 2.1
+## Version 2.2
 
 - **A live circuit simulator** with real schematic symbols, for physics and
   Technological Education. Lower priority than the rest.
@@ -140,7 +140,7 @@ Small fixes and conveniences. Mac first where it says so.
 - Behind the scenes: fixes to how plantoir.app's pictures are made.
 
 ---
-## Version 2.2
+## Version 2.3
 
 - **"Revise with…" in more places.** Use the Claude and Codex desktop apps,
   not just their command-line versions
@@ -148,7 +148,7 @@ Small fixes and conveniences. Mac first where it says so.
   the same with GitHub Copilot's desktop app
   ([#784](https://github.com/russellgordon/plantoir/issues/784)).
 - **The rest of self-check quizzes**, building on what arrives in 1.8: an
-  answer key when you print, and questions that use PhET (2.0). Questions
+  answer key when you print, and questions that use PhET (2.1). Questions
   with a GeoGebra sketch arrived with GeoGebra itself, in 1.9.
   ([#511](https://github.com/russellgordon/plantoir/issues/511))
 - **Students choose their own colour scheme** on a published site
@@ -159,14 +159,14 @@ Small fixes and conveniences. Mac first where it says so.
 
 ---
 
-## Version 2.3
+## Version 2.4
 
 - **Music notation on your pages**, written as text, with playback.
   ([#679](https://github.com/russellgordon/plantoir/issues/679))
 
 ---
 
-## Version 2.4
+## Version 2.5
 
 - **More assistants for "Revise with…":** Google Gemini and Antigravity.
   Held for later, with no date.

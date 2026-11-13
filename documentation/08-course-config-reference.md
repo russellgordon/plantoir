@@ -95,7 +95,7 @@ A representative example:
 
 ### Control characters in `course_name` (#780)
 
-Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780),
+Since v2.0.0 ([#780](https://github.com/russellgordon/plantoir/issues/780),
 ruled by Russell on 2026-11-12: no control character is legitimate in a
 course's name). `course_name` is a JSON string, and JSON can carry any code
 point as an escape, so a script, a hand edit or another tool can put a NUL, a

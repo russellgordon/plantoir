@@ -153,7 +153,7 @@ own view, `UnsavedSettingsNoticeView`, with no `fixedSize`, and
 from the source, since `SectionDetailView` cannot be mounted in a unit test —
 that nothing in `SectionDetailView.swift` is `.fixedSize(` at all.
 
-**A sixth and a seventh shipped to `dev` in v1.10.0, and were caught in the
+**A sixth and a seventh shipped to `dev` in v2.0.0, and were caught in the
 real window before the cut** (#831, #832, 2026-11-13). On a section whose last
 build made a coverage map, the Coverage tab's column was laid out **2,194**
 points tall inside a 700-point content area; on a course whose class sites go
@@ -1280,7 +1280,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 | the buttons | Return | Escape |
 |---|---|---|
-| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v1.10.0 used for "Cancel is the default") | Cancel | **nothing** |
+| an action, then Cancel `role: .cancel` + `.keyboardShortcut(.defaultAction)` (the shape v2.0.0 first used for "Cancel is the default") | Cancel | **nothing** |
 | a plain action, then Cancel `role: .cancel` | the action | Cancel |
 | Cancel listed first, then a plain action | the action | Cancel |
 | an action `role: .destructive`, then Cancel `role: .cancel` | nothing | Cancel |
@@ -1288,7 +1288,7 @@ window by reading each `NSButton`'s key equivalent and sending the keys:
 
 A raw `NSAlert` behaves the same way: a button titled Cancel takes Escape, and
 a Return given to it later is dropped. So "Cancel is the default" and "Escape
-closes the question" cannot both hold in an alert, and the v1.10.0 shape had
+closes the question" cannot both hold in an alert, and the first v2.0.0 shape had
 kept the first and lost the second without anybody noticing: the structure
 test pinned the modifier, not the key. The questions now use the destructive
 row of the table: **Escape is Cancel, and Return presses neither button**, so
@@ -4527,7 +4527,7 @@ comments 12:58-14:22 UTC), landed on `issue/715-graph-and-key-rules`:
   more room than that. Known, not fixed (#737 review): a guard that asks
   `ps -p` still counts a zombie process in the instant before it is reaped.
 
-**Lettered parts hang, and questions are worded plainly (#754, v1.10.0).**
+**Lettered parts hang, and questions are worded plainly (#754, v2.0.0).**
 Ruled 2026-11-09, written into the skill on 2026-11-12. On a quiz or test a part a), b),
 c) that runs to more than one line hangs under its first word, as a
 numbered question does. `starters/Quiz.tex` gains four macros:
@@ -4565,7 +4565,7 @@ which is not in the repository and, if it was in a working folder's
 `.claude/skills/`, is overwritten whenever Plantoir mirrors the skill
 (`WorkspaceModel.syncDirectory`), so the planner's measured prototype ships.
 
-**Lesson materials, and whose way of teaching (#765, v1.10.0).** Rules
+**Lesson materials, and whose way of teaching (#765, v2.0.0).** Rules
 settled on 2026-11-10 while building a day's resources (a warmup, task
 cards, a summary, an exercise). The handouts skill gains section 13,
 "Lesson materials", and section 14, "Wording and contexts"; the
@@ -4723,7 +4723,7 @@ still starts with its fixture (`scripts/fixtures/unit_plan/`, CSS only,
 extracted once from the example with Russell's leave), that the tokens and
 dark blocks are identical across the two sheets, and that every class a
 shipped release defined still has a rule (`classes-shipped.json`, whose
-first entry is 1.10.0). A later release adds rules at the end of a sheet and
+first entry is 2.0.0). A later release adds rules at the end of a sheet and
 never removes or renames one, because a plan written today must keep its look.
 REJECTED: one merged sheet (it cannot equal both blocks); one sheet scoped by
 a body class (every selector rewritten and one class more specific, so the
@@ -13153,7 +13153,7 @@ file, which is exactly how the mac lost lines.
 
 ### One line per entry: the trail is cleaned and redacted (#780)
 
-Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+Since v2.0.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
 `ProblemReportStore.appendActivityLine` passes every line through
 `ProblemReportStore.safeTrailLine` before the append described above, which
 cleans it with `OneLineText.cleaned` (the course name's rule,

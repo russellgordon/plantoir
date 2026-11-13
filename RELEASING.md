@@ -237,7 +237,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    public — checklist step 4a says what that would leave behind.
    **Before step 5, when the release changes what a teacher sees:** build the UI/UX
    review page and take Russell through it (the `ui-review` skill,
-   `.claude/skills/ui-review/SKILL.md`). Standing practice since v1.10.0: it found two
+   `.claude/skills/ui-review/SKILL.md`). Standing practice since v2.0.0: it found two
    layout faults every test had passed, and it replaces most of the smoke test.
 
 5. **Tell Claude "cut the release."** It drafts teacher-friendly notes, adds the
