@@ -1,6 +1,6 @@
 ---
 name: plantoir-marking
-description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and never asks where the teacher-only folder is; the teacher double-clicks a file that boxes the name line on every scanned page whose blank test has a name blank, looks through the boxed papers, and types yes before any paper reaches the assistant; drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, and builds feedback sheets that show why each mark was lost. Names go onto the sheets only at the end, by a second file the teacher double-clicks.
+description: Use when a teacher asks for help marking or grading a test or quiz written on paper and scanned, or for feedback sheets for one, in any course. Works with identifiers only and never asks where the teacher-only folder is; the teacher double-clicks a file that boxes the name line on every scanned page whose blank test has a name blank, looks through the boxed papers, and types yes before any paper reaches the assistant; drafts every mark and comment for the teacher to decide, records the teacher's rulings and applies them to every paper, builds feedback sheets that show why each mark was lost, and builds the class's results from the marks records. Names go onto the sheets and results only at the end, by a second file the teacher double-clicks.
 ---
 
 # Marking a test from scanned papers, with students' names kept on this computer
@@ -12,7 +12,8 @@ file is managed by Plantoir and is replaced when Plantoir updates; do not
 edit it, and never write anything inside this skill's folder (it is
 replaced whole, and a file written here is lost). Copy from it instead.
 
-This skill marks tests and quizzes written on paper. It does not describe
+This skill marks tests and quizzes written on paper, and builds the
+class's results from those marks (section 15). It does not describe
 marking anything else yet: if the teacher asks for that, say so plainly,
 and do not do it from this skill.
 
@@ -152,12 +153,14 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
   <Assessment>/Briefs/                      the marker and reviewer briefs
   <Assessment>/Marking Rules Applied.md     every ruling, numbered
+  <Assessment>/Records/Section N/           level records, only if there are any (section 15)
+  <Assessment>/Results/                     the class's results, identifiers only (section 15)
 the teacher-only folder (you never see it):
   Name Mapping Table.csv                    section, identifier, name (and optional columns)
   <Assessment>/Originals/Section N/         the scans, Student A.pdf
   <Assessment>/Holding/                     the boxed papers until the teacher's yes
   <Assessment>/Check/                       the one file of boxed papers to look through
-  <Assessment>/Named/                       the named copies
+  <Assessment>/Named/                       the named copies, the named results included
   Quarantine/                               anything the runner caught
 ```
 
@@ -226,11 +229,11 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `5815a0236452c3fb38edee10999d886a66ec99db64a9cef53dedbd84fc2c537d`  teacher_only.py
-- `eb0fb287cfb59fb64adaa947524d438db3cebea98b09bb9206e909fbca8cb970`  Box the papers.command
-- `8f7648223f4d37404f23e1b9852261a85352515cb2fa2bd92cb4f7424785be1f`  Put names on the sheets.command
-- `e9d65fd7776842abf8f9ce85d7aee308fa1333dcfe1b65d63fae235a766af32a`  Box the papers.bat
-- `ea63a540a06862e55ebf926dba8f2f9845365d1757dd077cd50252791a6c77ca`  Put names on the sheets.bat
+- `5be7e47615d1d2e5a8fa84cf4b2ec4aa992aae0e3b7b379a0aeebe512ff7de28`  teacher_only.py
+- `397cce4b157cbd784a96e2b98cec675d68643972ca98caea6d9010887fb84fea`  Box the papers.command
+- `d6baba282ccb7a492aaa3adc5ae8f6fd4ea1f7a6ae1ac3af29386503c42caf43`  Put names on the sheets.command
+- `e51f3ba250d251a558194b952e9bde15906fc1530806d69cad812e20671542b9`  Box the papers.bat
+- `10b05d259082beb3c794c87f64db953106fba313ca41fc5e8cd950f18a0db13e`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -318,7 +321,7 @@ where you read.
    the copies' SHA-256 (section 6).
 3. **Write `<marking folder>/<Assessment>/Box request.json`**, with the
    blank test, your adapted script and the options `--box-from` settled
-   (only `--label`, `--box`, `--dpi` and `--identifiers`):
+   (only `--label`, `--box` and `--dpi`):
 
    ```json
    {"blank": "/Users/name/Teaching/SNC2D/Unit 2 Test/Version A.pdf", "script": "Scripts/redact_scans.py", "options": ["--label", "Student Name"]}
@@ -465,6 +468,12 @@ Never a total: totals are counted from the points. Check each record with
   find before anything is handed over.
 - **After every ruling**, apply it to every paper already marked, then
   write a short check over `Marks/*/*.json` that proves it was, and run it.
+- **A point voided for the whole class** (a question that did not work,
+  on the teacher's yes) is recorded once, in the kit's `voided`, and the
+  same entry is copied into every marks record of the test: a point is
+  voided for everyone or for no one, and `check_kit.py --marks` refuses a
+  record that does not match. Then build every sheet again, and the class
+  results.
 - If you cannot start separate agents, mark one paper at a time yourself,
   and say plainly that the sheets had no independent check.
 - **Reporting**: one short line per paper as it lands (`Section 1/Student
@@ -546,3 +555,66 @@ nothing about report comments.
 
 If the teacher asks what you can help with, answer plainly from what this
 skill describes, and claim nothing it does not.
+
+## 15. Class results
+
+When the marks are final, or the teacher asks how the class did, build the
+class's results with `scripts/class_results.py`, copied into `Scripts/`
+and self-tested like the others (section 6). It reads no mapping table, so
+it runs directly, not through the runner. `reference/results.md` beside
+this file says what it reads, what it writes and how the numbers are made.
+
+```text wrap
+python3 -B "<marking folder>/Scripts/class_results.py" --assessment "<marking folder>/<Assessment>" --kit "<kit>/answers.json" --checker "<this working folder>/.claude/skills/plantoir-test-authoring/scripts/check_kit.py" --settings "<marking folder>/Marking Settings.md"
+```
+
+It writes `Class Results.pdf` and a grade table per assessment into
+`<Assessment>/Results/`, identifiers only (`--assessment` again, each with
+its own `--kit`, and `--out` for a term's results across assessments). It
+reads level records in `Records/` only if that folder holds any, and the
+document says plainly which parts it had no records for. Every script reads
+identifiers one way only, `Student A` to `Student ZZ`, matched in full;
+papers named another way are renamed first (`redact_scans.py
+--name-papers`). Render every page and look, as for the sheets.
+
+- **The scale is the teacher's.** Levels come from the `- Levels scale:`
+  line of `Marking Settings.md`. Never fill in the levels scale yourself:
+  ask the teacher, and record their answer with their words and the date.
+  How a percentage is rounded is the `- Percentages:` line (whole numbers,
+  half up, when there is none); every level is read from the percentage as
+  printed.
+- **A sheet whose totals no longer match its marks record stops the
+  build**, naming the identifier and both numbers: build that student's
+  sheets again, tell the teacher which student was affected, and run it
+  again. Never edit the numbers in a document by hand. It stops, too, on a
+  file in `Marks/` or `Records/` not named like a record (a rescan saved
+  beside one), a sheet with no record, or a sheet it cannot read: say what
+  it printed, and ask the teacher which file is the right one.
+- **After any change to a mark or a level, run `class_results.py`
+  again.** The documents do not change by themselves; each says when it was
+  built and the fingerprint of everything it read, the settings included.
+  A change to the settings needs a new run too. Report what it printed;
+  never say the results are correct or complete. After each run, make the
+  named copies again before anything is copied into a report system: a
+  named copy keeps the build time and fingerprint of the run it came from.
+
+The named copy of the document, and the named grade table for the school's
+report system, are made only on the teacher's word, through the runner,
+into the teacher-only folder, and you never open them. As for the named
+sheets (section 12), write `<marking folder>/Names request.json` and ask the teacher to
+double-click "Put names on the sheets", which runs
+`make_named_copies.py --document` or `--grades` through the runner:
+
+```json
+{"do": "document", "assessment": "Unit 2 Test", "file": "Results/Class Results.tex"}
+```
+
+```json
+{"do": "grades", "assessment": "Unit 2 Test", "file": "Results/Grades - Unit 2 Test.csv"}
+```
+
+Read what it printed in `Put names on the sheets - what it said.txt`.
+
+Charts, a test beside an assignment, and a marking summary with the
+teacher's own notes are not built by the script: `reference/results.md`
+says how to make them yourself, identifiers only.

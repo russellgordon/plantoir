@@ -5029,7 +5029,8 @@ unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 Three skills help a teacher with assessment: `plantoir-test-authoring`
 (#751) writes a unit test and the kit to mark it from, `plantoir-marking`
-(#750) marks papers onto feedback sheets, and `plantoir-report-comments`
+(#750) marks papers onto feedback sheets and builds the class's results
+from them, and `plantoir-report-comments`
 (#752) drafts report card comments from the marking. Neither app reads or
 writes any file they make. Each
 reaches a working folder as every skill does, and the contract is
@@ -5177,8 +5178,9 @@ deferred to the director.
 **The marking skill (#750, piece 750a: a test from scanned papers).** The
 ninth skill, `plantoir-marking`. It marks a test or quiz written on paper
 and scanned, onto a feedback sheet per student, from the kit #751 writes.
-Coding assignments (750b) and results documents (750c) are later pieces;
-until they land the skill says it does not describe marking anything else.
+Coding assignments (750b) are a later piece, held for a ruling; until it
+lands the skill says it does not describe marking anything else. The
+class's results (750c) are below, after the report-comments skill.
 The contract is `assessment.agentGuidance.markingSkill`, `folders`,
 `identifiers`, `scriptPrivacy`, `redaction` and `namedCopies`, and its
 sentences are pinned in `mustSay`. The app does nothing new and records no
@@ -5575,13 +5577,16 @@ who boxes the papers, who records the yes, and what `marking.json` holds.
   `Skill folder.txt`, adapts `redact_scans.py` and runs only its
   `--self-test` and `--box-from` on the BLANK test, and writes `Box
   request.json` (the blank, the adapted script, the options `--label`,
-  `--box`, `--dpi`, `--identifiers` and nothing else). It tells the teacher
+  `--box`, `--dpi` and nothing else; 750c removed `--identifiers`). It tells the teacher
   to double-click and waits. Its commands never contain the teacher-only
   folder (a test fails on `<teacher-only>` in either skill or any template).
 - **What the teacher's window does.** The launcher checks the SHA-256 of
   `teacher_only.py` and `run_with_names.py` in the skill folder before
-  anything else, refuses to run without a terminal (an assistant's command
-  has none), and runs the pinned, never-adapted `teacher_only.py`. That
+  anything else, stops when its input is not a terminal (that catches an
+  accidental pipe and NOTHING more: the implementation review ran Box the
+  papers through a pseudo-terminal and typed the yes itself, twice, and
+  this piece's own test harness does the same), and runs the pinned,
+  never-adapted `teacher_only.py`. That
   asks for the teacher-only folder (dragged into the window, which the
   Mac's Terminal writes with each space as a backslash and a space; or
   Return for the system's own folder chooser, `osascript choose folder`),
@@ -5636,17 +5641,62 @@ who boxes the papers, who records the yes, and what `marking.json` holds.
   non-ASCII letters, and the PowerShell folder chooser are unmeasured on
   Windows. The re-trial with outside assistants is written up for the
   director (`750d-trials.md` in the director's notes).
-- **THE LIMIT, said in the skill.** A pin finds a well-meant change, such
+- **WHAT HOLDS, said in the skill (implementation review H1).** Nothing
+  in a launcher can stop a determined assistant from running it and typing
+  the yes. The design holds because the assistant is never told where the
+  teacher-only folder is, is told never to run either launcher by any
+  means, even when the teacher asks ("run it for me": it says why and
+  names the file to double-click; both skills pin it), and waits; and
+  because the teacher starts the steps. An assistant that ran one would be
+  doing what the skill forbids, and the re-trial's B6 is a blocking check
+  for it. REJECTED: a check of the launcher's ancestry, which an assistant
+  running inside Terminal would pass too.
+- **WHAT THE TEACHER TRUSTS (review M1, M4).** That the boxing script the
+  assistant adapted does only what it says: Box the papers runs it with
+  the teacher-only folder open to it. MEASURED by the review: a one-line
+  adaptation logged the teacher-only path into the marking folder, and
+  another copied two unboxed scans there, counted "read" by the runner
+  (an image has no text), while the teacher looked at a correct combined
+  file. Now, on a Mac, each boxing step runs under `sandbox-exec` with a
+  profile that denies every write except that assessment's folder on the
+  teacher's side and the temporary folder (measured: a write into the
+  marking folder or into a folder outside both is refused); and on every
+  system the launcher takes a listing of both folders before and after the
+  step, moves anything new or changed outside the folder the step was given
+  into the teacher-only `Quarantine/` (never deleting it), and stops before
+  the look, saying how many (`teacherRun.strayWriteCases`, each run with
+  and without the wall, each red on the code before this round). A write
+  outside both folders is stopped on a Mac only; on Windows it cannot be
+  seen. The launcher in the marking folder is checked only by the assistant
+  that copied it, and `Skill folder.txt` is the assistant's (a pointer to a
+  copy must still hash right). So the teacher is trusting the assistant's
+  copying and adapting, plus their own look, and the skill says so.
+- **Every spelling of the path (review M2).** A relative path and a
+  `file://` address of the teacher-only folder passed the old replacement;
+  the folder's name and its `%20` form are now put back too
+  (`teacherRun.hidePathCases`), and a relative path at the folder question
+  is refused (only an assistant needs one).
+- **THE LIMIT.** A pin finds a well-meant change, such
   as an adapted copy; it would not catch an assistant that changed a file
   and every pin together, and an assistant that set out to find the
-  teacher-only folder could look for it. The protection is that the
-  teacher starts these steps and the assistant is never told the path.
+  teacher-only folder could look for it.
   **The residual risk** (Russell's ruling puts the teacher-only folder
   beside the marking folder): a listing of the marking folder's parent
   folder shows the names of the files in it. Scans are named by
   identifier, so only a misnamed scan would show a name that way; the
-  skill tells the assistant never to list that folder, and nothing else is
-  built against it.
+  skill tells the assistant never to list or search that folder or any
+  above it. Since the implementation review (H2) the skill no longer
+  suggests a name or a place for the teacher-only folder (an example name
+  beside a known marking folder told the assistant the path); only the
+  launcher's own window tells the teacher where to keep it.
+- **Tests never reach the screen.** In this round a test that called
+  `teacher_only.box()` inside the test process opened the combined file
+  on the screen, because the no-open switch was set only for the
+  subprocesses. Now the opener and the folder chooser both read
+  `PLANTOIR_MARKING_NO_OPEN` first, the test file sets it in its own
+  process before anything runs, and the module's subprocess is replaced by
+  one that fails the test on `open`, `osascript`, `qlmanage` or
+  `powershell` (`NothingOnTheScreenTests`).
 
 **The report-comments skill (#752).** The tenth skill,
 `plantoir-report-comments`, drafts report card comments from what
@@ -5841,6 +5891,157 @@ script, because two copies of the name step drift.
 
 NOT MEASURED in this piece: a trial with a real assistant drafting comments
 from invented marks records; it is written up for the director.
+
+**Class results (#750, piece 750c).** `plantoir-marking` gained a fifth
+script, `scripts/class_results.py`, and a third reference,
+`reference/results.md`; `make_named_copies.py` gained `--document` and
+`--grades`. The contract is `assessment.results` (its `cases`) and
+`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and nine
+sentences are pinned in `mustSay` → `plantoir-marking`, the two about names
+in the results section among them (implementation review M4: removing
+either left every test green before). Nothing in the app changes, no trail
+event (as for 750a), nothing on plantoir.app.
+
+- **What it builds, and from what.** One command, run again after any
+  change to a mark, a level or the settings, writes into the marking folder,
+  identifiers only: `Class Results.tex` and `.pdf` (marks by category per
+  section with the section's means, levels first and revised, the students
+  with no revised level, the marked students with no level record),
+  `Grades - <Assessment>.csv` and `Levels - <Assessment>.csv`. It reads the
+  marks records 750a writes, each passed through #751's `check_kit.py`
+  first, and level records (`Records/Section N/Student A.json`) ONLY IF that
+  folder holds any. 750b, which would write level records for a coding
+  assignment, is not built, so the document says in words, per assessment,
+  which of the two it had none of; an empty `Records/` folder is read as none
+  (review M2).
+- **The trim (750 plan review M7).** The plan's version replaced Russell's
+  eleven-script, twelve-compile chain. REJECTED as toolkit creep: the shipped
+  script builds the totals by category, the grade tables and the two lists;
+  charts, the test beside an assignment and a marking summary with the
+  teacher's own notes are words in `reference/results.md`. His
+  `make_graphics.py`, `grades_summary.py`, `grades_tsv.py`,
+  `make_revision_summary.py`, `update_marking_summary_rows.py` and
+  `check_headings.py` were the models; none is copied. The review's LOW
+  suggested cutting the level-record reader too; KEPT, because the brief
+  makes reading `Records/` when it is there part of this piece, and the
+  second heading check, because the named copy breaks its pages elsewhere.
+- **A voided point counts for no one, on the sheet and in the results
+  (implementation review H1; this changed 750a's merged
+  `build_test_sheet.py`).** MEASURED by the review: a voided point a student
+  had earned gave `T 2/1`, 200 percent in the grade table for the report
+  system, on the sheet and in the results alike, and a category voided
+  entirely gave a section mean of 0 percent. Russell's own builder kept the
+  earned mark and capped each category at 100 percent; the port dropped the
+  cap. Now the point is in neither the mark nor the out of, the sheet shows
+  no mark for it and says it was not counted for anyone, and a category with
+  nothing counted reads "not counted", in the marks line and the tables, and
+  is left out of the means. Both scripts refuse a mark over its out of.
+  REJECTED: the bonus with a cap as the default; it is one teacher's choice,
+  made in the copy.
+- **One percentage, printed and read (review H2).** MEASURED: 35/44 printed
+  80 percent with the level below an 80 cut while the total's 80 percent got
+  the level above. A percentage is now rounded once, by the settings'
+  `- Percentages:` line (whole numbers, half up when there is none; one
+  decimal, half up; whole numbers, down), with fractions so 82.5 is never
+  rounded down by floating point, and every level is read from that printed
+  value; the document prints the rule it used. Cases sit half a percent below
+  each cut of an invented scale and on 73/88.
+- **What stops the build.** A Marks by Question sheet whose marks line gives
+  other totals than its record (both numbers named), names a category the
+  kit does not have, or cannot be read; a sheet with no record beside it; any
+  file or folder in `Marks/` or `Records/` not named `Section N/<identifier>.json`
+  (counted, never named), which catches a rescan saved beside a record, a
+  record named like a person and a class named another way (review M1: each
+  of these gave exit 0 and a document that looked complete); a record that
+  voids other points than the kit (below); a settings line written nearly as
+  one it reads (`- Percentage:`), which was passed over; an
+  assessment with no marks record; a half mark without the settings' yes
+  (yes or no, then at most bracketed words: review L2 found `yes-only-on-part-B`
+  read as yes); a level off the scale, and a scale that names a level or a
+  percent twice, a percent over 100, or is written twice. REMOVED: the check
+  of a total against the categories' sum, which could never fail (review M3,
+  measured by replacing it with `if False:`).
+- **Stale named copies (review H3).** MEASURED: three scales gave one
+  fingerprint, and the named grade table, the file copied into a report
+  system, carried no stamp at all. Now the fingerprint covers the kit, the
+  records, the sheets, `Marking Settings.md` and the identifier pattern;
+  every document and every row of both tables carries the build time and
+  fingerprint (the `built` column), and `--grades` refuses a table without
+  it or with rows of two builds, carries it into the named table and prints
+  it. The skill says to make the named copies again after every run. A
+  build is staged in a hidden folder and put in place only when every
+  document is built, after the last run's are renamed "earlier run, do not
+  use"; a test kills a build while it compiles and finds no finished-looking
+  document. REJECTED: marking a set "incomplete" in place, which leaves a
+  half-written folder for someone to misread.
+- **A point is voided for the whole class, recorded once, in the kit (fix
+  review H1; this changed #751's merged `check_kit.py` and `FORMAT.md`, and
+  750a's `build_test_sheet.py` again).** MEASURED by the fix review: with
+  the ruling held in each record, a ruling reaching only the records marked
+  after it gave two students with the same answers two out-ofs and two
+  levels, with exit 0, while every sheet said "not counted for anyone". The
+  kit now carries an optional `voided` ({point: {reason, intended}}), and
+  `check_kit.py --marks` refuses a record that voids other points
+  (`marks-voided`); the sheet builder takes the list and its reasons from the
+  kit, so its sentence is true of the class; `class_results.py` checks every
+  record against the kit first and stops naming the identifier and the
+  points. A void applies to every version (point IDs are shared). REJECTED:
+  the reviewer's class-wide comparison in `class_results.py` alone, because
+  the sheet builder sees one record and would still print the sentence on
+  one record's word; and the settings file as the one place, because a void
+  is about one test, and the settings are the course's.
+- **One identifier rule (fix review M1).** MEASURED: `--identifiers '.*'`
+  built results from a record named with a full name and printed it in the
+  `.tex`, and a non-default pattern built results the named step then
+  refused. Every script that reads an identifier now carries one block,
+  byte for byte, matched with `fullmatch` (`Student A` to `Student ZZ`); the
+  option is gone from `class_results.py` and from 750a's `redact_scans.py`,
+  and a test fails if the copies differ or the contract's pattern is
+  another. Papers named another way are renamed with `--name-papers`.
+- **What was left, and why (fix review LOWs).** The staging leaves windows
+  of microseconds between the final renames in which a kill leaves some new
+  documents in place beside a hidden PDF; each is the consistent output of
+  one build, so no wrong number results, and it is written here rather
+  than closed with a marker file. A record not fully marked still puts the
+  documents in place with exit 1, the identifier printed and listed in the
+  document; the named grade table names the student with no row. A test
+  with every point voided builds, "not counted" throughout, which is the
+  ruling as given. `build_test_sheet.py --self-test` fails without tectonic,
+  which is the true answer for a script that cannot run without it. Fixed:
+  a near-miss settings line stops the build; a pre-fix sheet's `K 1/0` is
+  named with its own numbers; the feedback sheet says "2 marks in this
+  question are not counted for anyone" once; `class_results.py --self-test`
+  says when the PDF was not tested.
+- **The scale is the teacher's.** Read from `Marking Settings.md`, never
+  filled in by the assistant. REJECTED: Russell's scale, his weighting and
+  his school as defaults, and his scale as a format example (review M5: the
+  refusal message showed its first three steps); every example and fixture
+  scale is invented.
+- **Names, at the end, by the one name step.** The named document and the
+  named grade table are made only by `make_named_copies.py` through the
+  never-adapted runner (unchanged, so its pinned SHA-256 does not move).
+  Every student in the identifier document is `\student{section}{identifier}`;
+  `--document` fails on Missing character, on a student whose name and
+  identifier are not on the page as often as students carry them (review L5:
+  two students of one name were satisfied by one printing), or on a heading
+  left alone at a page's foot once the names make rows taller. `--grades`
+  refuses the whole table when a cell holds a word of the mapping table by
+  #752's one name comparison or more than 16 characters, or a student the
+  table does not hold, and writes the name first, ordered by section and then
+  by name. The plan called it `--table`; REJECTED because `--table` already
+  names the mapping table in every mode.
+- **Measured** (Apple M4 Pro, macOS 26.6, tectonic 0.17.0, Python 3.14.4
+  and 3.9.6): 60 invented records in two sections build in 1.6 s with the
+  PDF and 1.4 s without, most of it the 60 runs of `check_kit.py`.
+  `scripts/test_marking_results.py`: 13 tests, every `results` case (40,
+  each `sheetLine` case also through `build_test_sheet.py`), `gradeCases`
+  (9) directly and through the runner, `documentCases` (5, skipped without
+  tectonic and pdftotext), one case compiled, three scales giving three
+  fingerprints, a build killed half way, both self-tests. Must-fails by copy
+  and restore are listed in the closing comment on #750.
+
+NOT MEASURED in this piece: a trial with a real assistant building results
+from invented records; it is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

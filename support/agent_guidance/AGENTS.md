@@ -35,7 +35,8 @@ that matches the task before writing:
   `.agents/skills/plantoir-test-authoring/SKILL.md` (the same file is at
   `.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
   `plantoir-handouts` house style for the paper.
-- **Marking a test or quiz from scanned papers, and its feedback sheets**:
+- **Marking a test or quiz from scanned papers, its feedback sheets, and the
+  class's results**:
   read `.agents/skills/plantoir-marking/SKILL.md` (the same file is at
   `.claude/skills/plantoir-marking/SKILL.md`) before opening any student
   work: it keeps students' names on this computer. Never ask where the

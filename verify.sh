@@ -702,16 +702,18 @@ fi
 # the plan review measured and three everyday ones, each stopped with CHECK
 # or blanked with no name ink left, against the committed blank tests.
 # Report comments (#752): every commentNames case, directly and through the
-# runner, and the plantoir-report-comments skill's files. The teacher's own
+# runner, and the plantoir-report-comments skill's files. Class results
+# (#750, 750c): every results case through class_results.py, and the named
+# grade tables and documents (gradeCases, documentCases). The teacher's own
 # steps (750d): both launchers run in a pseudo-terminal with their questions
 # answered, killed at every step, with invented canary names and a marker in
 # the teacher-only folder's path that must reach nothing the assistant reads.
 # Stdlib only.
-for marking_test in redact names guard sheets comments teacher_run; do
+for marking_test in redact names guard sheets comments results teacher_run; do
   if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
-    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a; comments #752; teacher_run 750d)"
+    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a, 750c and 750d; comments #752)"
   else
-    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a; comments #752; teacher_run 750d)"
+    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a, 750c and 750d; comments #752)"
     cat "/tmp/verify_marking_${marking_test}_test.log"
   fi
 done

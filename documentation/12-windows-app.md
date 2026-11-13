@@ -2738,17 +2738,18 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
   09 → "Tests, marking and report comments"), `plantoir-marking` (#750
-  piece 750a, four Python scripts in `scripts/` that an assistant runs
-  against a teacher's scans and the app never does, four templates and two
-  references; `assessment.agentGuidance.markingSkill`, 09 → "Tests,
-  marking and report comments") and `plantoir-report-comments` (#752, a
+  pieces 750a and 750c, five Python scripts in `scripts/` that an assistant
+  runs against a teacher's scans and marks records and the app never does,
+  four templates and three references; `assessment.agentGuidance.markingSkill`
+  and `assessment.results`, 09 → "Tests, marking and report comments") and `plantoir-report-comments` (#752, a
   `SKILL.md` and one reference, no scripts of its own: it uses
   `plantoir-marking`'s `make_named_copies.py --comments` through the
   runner, which needs Python only, neither Poppler nor tectonic;
   `assessment.agentGuidance.reportCommentsSkill`, 09 → the same
   section). A Windows teacher marking scans needs
   Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
-  `pdfseparate`) and tectonic on PATH; which installs work, and how a
+  `pdfseparate`) and tectonic on PATH (the class results need Python only
+  for their tables, and tectonic and `pdftotext` for their PDF); which installs work, and how a
   teacher gets them, is NOT MEASURED here yet and is the `windows` issue
   for 750a's to measure and write down in this section. Since 750d (09 →
   "The teacher runs the steps that touch names") the skill also carries
@@ -2758,7 +2759,14 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   skill folder from `Skill folder.txt` with `set /p`, checks the SHA-256
   of `teacher_only.py` and `run_with_names.py` with the same Python line the
   Mac's `.command` uses, and runs `teacher_only.py`, which offers the
-  PowerShell `FolderBrowserDialog` on Return. They are checked out with
+  PowerShell `FolderBrowserDialog` on Return. The `.bat` has no input check
+  of its own; `teacher_only.py` stops when its input is not a terminal,
+  which catches an accidental pipe and nothing more (what holds is that the
+  assistant is never told the folder and never runs a launcher: 09 → "WHAT
+  HOLDS"). There is no `sandbox-exec` on Windows, so a boxing script that
+  writes outside both folders cannot be seen there; anything it writes into
+  either folder outside the one it was given is still moved to the
+  teacher's Quarantine and the step stops (09 → "WHAT THE TEACHER TRUSTS"). They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft

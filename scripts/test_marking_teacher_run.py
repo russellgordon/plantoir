@@ -61,9 +61,31 @@ CANARIES = ("Plimbertonix", "Quarvelloshade", "Zentrovialdine", "Brumhollowick",
 MARKER = "Tomarkerqzxvpathk"
 ASSESSMENT = "Unit 1 Test"
 
+# Nothing a test runs may open a file or show a chooser on the screen (750d: tests that called box() in this
+# process opened the combined file, because the switch was set only for subprocesses). The switch goes into
+# THIS process's environment before anything is imported or run, so every subprocess inherits it too, and the
+# module's subprocess is guarded so a real opener fails the test instead of reaching the screen.
+os.environ["PLANTOIR_MARKING_NO_OPEN"] = "1"
+SCREEN_PROGRAMS = ("open", "osascript", "qlmanage", "powershell", "explorer", "xdg-open")
 sys.path.insert(0, str(SCRIPTS))
 import teacher_only  # noqa: E402  (the file under test, imported for its pure functions)
 sys.path.pop(0)
+
+
+class GuardedSubprocess:
+    """teacher_only's subprocess, refusing any program that would put something on the screen."""
+
+    def __getattr__(self, name):
+        return getattr(subprocess, name)
+
+    def run(self, command, *arguments, **options):
+        program = os.path.basename(str(command[0])) if isinstance(command, (list, tuple)) and command else ""
+        if program in SCREEN_PROGRAMS:
+            raise AssertionError("a test reached a real " + program + ": nothing may open on the screen")
+        return subprocess.run(command, *arguments, **options)
+
+
+teacher_only.subprocess = GuardedSubprocess()
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_marking_redact as redact_tests  # noqa: E402  (its invented scans)
 sys.path.pop(0)
@@ -612,6 +634,29 @@ class VerifyTests(unittest.TestCase):
             os.symlink(BLANK, holding / "Student D.pdf")
             with self.assertRaises(teacher_only.Refusal):
                 teacher_only.prepare(Path(root) / "Holding", Path(root) / "Check", ASSESSMENT)
+
+
+class NothingOnTheScreenTests(unittest.TestCase):
+
+    def test_no_test_can_reach_a_real_opener_or_chooser(self):
+        self.assertEqual(os.environ.get(teacher_only.NO_OPEN), "1", "the switch is set for this process")
+        self.assertEqual(environment().get(teacher_only.NO_OPEN), "1", "and for every subprocess")
+        self.assertIsNone(teacher_only.open_for_the_teacher(TEACHER_ONLY))
+        self.assertIsNone(teacher_only.chosen_in_a_window())
+        with self.assertRaises(AssertionError):
+            teacher_only.subprocess.run(["open", str(TEACHER_ONLY)])
+
+    def test_every_opener_is_behind_the_switch(self):
+        # Each place teacher_only.py could put something on the screen reads the switch first.
+        source = TEACHER_ONLY.read_text(encoding="utf-8")
+        for function in ("def open_for_the_teacher", "def chosen_in_a_window"):
+            body = source[source.index(function):].split("\ndef ", 1)[0]
+            self.assertIn("os.environ.get(NO_OPEN)", body.split("try:", 1)[0], function)
+        for program in ('"open"', '"osascript"', "startfile", '"powershell"'):
+            for line_number, line in enumerate(source.splitlines(), start=1):
+                if program in line and not line.lstrip().startswith("#"):
+                    enclosing = source[:source.index(line)].rsplit("\ndef ", 1)[1].split("(")[0]
+                    self.assertIn(enclosing, ("open_for_the_teacher", "chosen_in_a_window"), f"line {line_number}")
 
 
 class PinTests(unittest.TestCase):

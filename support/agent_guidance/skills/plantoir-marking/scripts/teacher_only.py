@@ -81,9 +81,9 @@ COMBINED = "Redacted papers to look through.pdf"
 RECORD = "Teacher looked.json"
 IDENTIFIER = re.compile(r"^Student [A-Z]{1,2}$")
 SECTION = re.compile(r"^Section \d+$")
-NO_OPEN = "PLANTOIR_MARKING_NO_OPEN"     # set only by the repository's tests, so a test run opens no window
+NO_OPEN = "PLANTOIR_MARKING_NO_OPEN"     # set by every test and harness: nothing is opened and no chooser is shown
 THE_FOLDER = "your teacher-only folder"
-BOX_OPTIONS = ("--label", "--box", "--dpi", "--identifiers")
+BOX_OPTIONS = ("--label", "--box", "--dpi")
 
 # The four privacy points, word for word as the skill says them and as contracts/shared-rules.json ->
 # assessment -> teacherRun -> privacyPoints holds them; the cover of the combined file carries them.
@@ -165,7 +165,9 @@ def typed_path(typed, windows=None):
 
 def chosen_in_a_window():
     """The system's own folder chooser, shown by this window, never by the assistant. None if it cannot be shown
-    or the teacher closed it."""
+    or the teacher closed it, and None, showing nothing, when PLANTOIR_MARKING_NO_OPEN is set (every test)."""
+    if os.environ.get(NO_OPEN):
+        return None
     try:
         if sys.platform == "darwin":
             result = subprocess.run(["osascript", "-e", 'POSIX path of (choose folder with prompt '
@@ -511,7 +513,7 @@ def inside_one_folder(relative):
 
 
 def box_options(options):
-    """The extra options for the boxing script, from the request: only --label, --box, --dpi, --identifiers."""
+    """The extra options for the boxing script, from the request: only --label, --box and --dpi."""
     if options is None:
         return []
     if not isinstance(options, list) or len(options) % 2 != 0:
