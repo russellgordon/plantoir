@@ -17,9 +17,11 @@ called shared until the address has been fetched and answered as promised
 keeps an address of its own that served an open copy after a protected
 share (measured 2026-11-12, `oldDeployments`).
 
-The username and password reach this program in one file, /tmp/plan_cred,
-written by the launcher through a pipe; it is read once and deleted at once,
-and neither is ever printed, written to the marker, or passed on. Only a
+The username and password reach this program in one file the launcher makes
+for each share (a fresh 0600 file in its own 0700 folder) and names with
+--credential-file; it is read first, deleted at once, and deleted again on
+every way out, a SIGTERM or SIGHUP included. Neither is ever printed, written
+to the marker, or passed on. Only a
 salted hash goes into the worker. The Cloudflare token arrives in the
 environment, as deploy.py's does.
 
@@ -35,7 +37,10 @@ import datetime as dt
 import json
 import os
 import secrets
+import re
 import shutil
+import signal
+import socket
 import sys
 import tempfile
 import time
@@ -62,6 +67,20 @@ CRED_FILE: Path | None = None
 SHARED_MARKER = "PLANTOIR_PLAN_SHARED:"
 REFUSED_MARKER = "PLANTOIR_PLAN_REFUSED:"
 STOPPED_MARKER = "PLANTOIR_PLAN_STOPPED:"
+
+# What fetch_address puts in its headers when the name did not resolve.
+GONE_KEY = "x-plantoir-gone"
+
+# The statuses Cloudflare answers for a Pages project that no longer exists
+# (measured 2026-11-12: 522 and 530, "error code: 1016").
+GONE_STATUSES = (522, 530)
+
+# A credential folder left by a share that was killed outright: the
+# launcher's own name for one (mktemp -d /tmp/plan_cred.XXXXXX) and the age
+# past which no share can still be reading it.
+STALE_CREDENTIAL_FOLDER = re.compile(r"^plan_cred\.[A-Za-z0-9]{6}$")
+STALE_SECONDS = 600
+CREDENTIAL_ROOT = Path("/tmp")
 
 PROOF_SECONDS = 60
 STOP_SECONDS = 30
@@ -101,6 +120,13 @@ def fetch_address(url: str, credential: str | None = None):
             return answer.status, _lower(answer.headers)
     except urllib.error.HTTPError as error:
         return error.code, _lower(error.headers)
+    except urllib.error.URLError as error:
+        # The one failure that is evidence: the name no longer resolves,
+        # which is how a deleted Pages project ends (measured, after about
+        # 100 s). Every other failure says nothing either way.
+        if isinstance(error.reason, socket.gaierror):
+            return None, {GONE_KEY: "nameNotFound"}
+        return None, {}
     except Exception:
         return None, {}
 
@@ -181,6 +207,38 @@ def read_credential() -> str | None:
     if not username or not password:
         return None
     return unit_plan_site.credential_b64(username, password)
+
+
+PRE_READ_CREDENTIAL: str | None = None
+
+
+def _leave_on_signal(number, frame):
+    raise SystemExit(128 + number)
+
+
+def clear_away_stale_credential_folders() -> None:
+    """A share killed outright (SIGKILL) leaves its credential folder behind.
+    Removed by the NEXT share: only folders named the way the launcher names
+    them (plan_cred. and six letters or digits), only ones older than
+    STALE_SECONDS, which no share can still be reading, and never this
+    share's own."""
+    try:
+        entries = list(os.scandir(CREDENTIAL_ROOT))
+    except OSError:
+        return
+    for entry in entries:
+        if not STALE_CREDENTIAL_FOLDER.match(entry.name):
+            continue
+        if CRED_FILE is not None and Path(entry.path) == CRED_FILE.parent:
+            continue
+        try:
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            if time.time() - entry.stat(follow_symlinks=False).st_mtime < STALE_SECONDS:
+                continue
+            shutil.rmtree(entry.path, ignore_errors=True)
+        except OSError:
+            continue
 
 
 def forget_credential() -> None:
@@ -364,24 +422,37 @@ def older_deployment_count(token: str, account: str, name: str) -> int:
     return count
 
 
+def one_line(text: str) -> str:
+    return text.replace("\r", " ").replace("\n", " ")
+
+
 def confirm_the_open_share(course: str, staged) -> bool:
     """unitPlanning.share.openShareLists: before an open share goes out, the
     PDFs it will share and every file it leaves out, by name, and the share
     goes only on a yes (under --non-interactive, the rule decides and the
     lists are printed)."""
     words = share_words()["openShareLists"]
-    shared_pdfs, left_out = unit_plan_site.open_share_lists(staged)
+    marks = words["markers"]
+    shared_files, left_out = unit_plan_site.open_share_lists(staged)
+    # Each list twice: the lines a person reads at a terminal, and one
+    # marker line per file the app reads (and keeps out of the console) to
+    # fill the sheet the teacher answers in, so the app never guesses at
+    # the console's own lines.
+    print(marks["begin"])
     print(words["sharedHeading"])
-    if not shared_pdfs:
+    if not shared_files:
         print("   " + words["none"])
-    for place in shared_pdfs:
+    for place in shared_files:
         print(f"   • {place}")
+        print(f"{marks['shared']} {one_line(place)}")
     print(words["leftOutHeading"])
     if not left_out:
         print("   " + words["none"])
     for place in left_out:
         print(f"   • {place}")
-    print(words["byName"], flush=True)
+        print(f"{marks['leftOut']} {one_line(place)}")
+    print(words["byName"])
+    print(marks["end"], flush=True)
     if deploy.NON_INTERACTIVE:
         print(words["nonInteractive"], flush=True)
         return True
@@ -399,7 +470,7 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
     protected = decide_protected(marker, protect, remove_password)
     credential = None
     if protected:
-        credential = read_credential()
+        credential = PRE_READ_CREDENTIAL
         if credential is None:
             say_refused(course, "noPassword")
             return 1
@@ -466,7 +537,9 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
             "protected": False,
             "failClosed": bool(before.get("failClosed", False)),
             "answerKeys": "in" if (keys_in or before.get("answerKeys") == "in") else "out",
-            "answerKeysLeftOut": staged.answer_keys_left_out,
+            # 0 while the address may still serve a key the last share carried
+            # (fix review M1): the bar never says keys are left out then.
+            "answerKeysLeftOut": 0 if (keys_in or before.get("answerKeys") == "in") else staged.answer_keys_left_out,
             "lastShared": before.get("lastShared") or utc_now_text(),
             "units": staged.units,
             "oldCopies": max(int(before.get("oldCopies") or 0), 1 if before.get("address") else 0),
@@ -509,7 +582,8 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
         "protected": shown_protected,
         "failClosed": fail_closed,
         "answerKeys": "in" if (keys_in or not proven and (marker or {}).get("answerKeys") == "in") else "out",
-        "answerKeysLeftOut": staged.answer_keys_left_out,
+        "answerKeysLeftOut": (0 if (keys_in or not proven and (marker or {}).get("answerKeys") == "in")
+                              else staged.answer_keys_left_out),
         "lastShared": utc_now_text(),
         "units": staged.units,
         # Counted before the deletes, so a Cancel during them leaves the bar
@@ -537,13 +611,18 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
 
 # --------------------------------------------------------------------- stop
 
-def still_answering_with_the_plans(address: str) -> bool:
-    """Whether the address still answers as a plan site does: 200 or 401, or
-    any answer carrying the worker's share header."""
+def what_the_address_says(address: str) -> str:
+    """unitPlanning.share.stopCases: "plans" while it answers as a plan site
+    (200, 401, or anything carrying the worker's share header), "gone" only
+    on an answer that proves the site is gone (522 or 530, or the name no
+    longer resolving), and "unknown" for anything else: no answer at all, a
+    school filter's 403, a 5xx, a 404."""
     status, headers = fetch_address(address)
-    if headers.get("x-plantoir-share"):
-        return True
-    return status in (200, 401)
+    if headers.get("x-plantoir-share") or status in (200, 401):
+        return "plans"
+    if status in GONE_STATUSES or headers.get(GONE_KEY):
+        return "gone"
+    return "unknown"
 
 
 def stop(course: str, course_dir: Path, year: int, token: str, account: str) -> int:
@@ -580,8 +659,10 @@ def stop(course: str, course_dir: Path, year: int, token: str, account: str) -> 
         print("❌ " + share_words()["words"]["stopFailed"])
         print(f"{STOPPED_MARKER} {code_word(course)} {year} {address} failed", flush=True)
         return 1
+    # Stopped only on an answer that proves it (fix review M2): a share
+    # that cannot tell keeps the marker, the row and the saved password.
     start = now()
-    while still_answering_with_the_plans(address):
+    while what_the_address_says(address) != "gone":
         if now() - start >= STOP_SECONDS:
             print("❌ " + share_words()["words"]["stopUnconfirmed"])
             print(f"{STOPPED_MARKER} {code_word(course)} {year} {address} unconfirmed", flush=True)
@@ -627,6 +708,18 @@ def main(argv=None) -> int:
     deploy.NON_INTERACTIVE = bool(args.non_interactive)
     global CRED_FILE
     CRED_FILE = Path(args.credential_file) if args.credential_file else None
+    # The app's Cancel ends a share with SIGTERM; a closed terminal sends
+    # SIGHUP. Both leave through the same finally as ^C does, so the
+    # credential file and its folder go (fix review LOW).
+    for number in (signal.SIGTERM, signal.SIGHUP):
+        try:
+            signal.signal(number, _leave_on_signal)
+        except (ValueError, OSError, AttributeError):
+            pass
+    clear_away_stale_credential_folders()
+    # Read FIRST, before anything that could wait on the network.
+    global PRE_READ_CREDENTIAL
+    PRE_READ_CREDENTIAL = read_credential() if CRED_FILE is not None else None
 
     course = args.course
     course_dir = toolchain_paths.COURSES_DIR / course
@@ -661,6 +754,7 @@ def main(argv=None) -> int:
         return 1
     finally:
         forget_credential()
+        PRE_READ_CREDENTIAL = None
 
 
 if __name__ == "__main__":

@@ -332,6 +332,53 @@ nonisolated enum PlanSharing {
     }
 }
 
+/// The two lists an open share prints before it asks (unitPlanning.share
+/// .openShareLists): every file it will share and every file it leaves out,
+/// read ONLY from the launcher's marker lines, never from the console's own.
+nonisolated struct PlanShareLists: Equatable {
+
+    // MARK: - Stored properties
+
+    static let beginMarker: String = "PLANTOIR_PLAN_LISTS_BEGIN:"
+    static let sharedMarker: String = "PLANTOIR_PLAN_LISTS_SHARED:"
+    static let leftOutMarker: String = "PLANTOIR_PLAN_LISTS_LEFT_OUT:"
+    static let endMarker: String = "PLANTOIR_PLAN_LISTS_END:"
+
+    /// The question the lists come before, without its [y/N] (the console's
+    /// question reader takes that off).
+    static let question: String = "Share these files with anyone who has the address?"
+
+    var shared: [String] = []
+    var leftOut: [String] = []
+    /// True once the end marker arrived.
+    var isComplete: Bool = false
+
+    // MARK: - Functions
+
+    /// Reads marker lines in order into `lists`, starting afresh at a begin
+    /// marker. Lines that are not one of the four are passed over.
+    static func read(_ lines: [String], into lists: inout PlanShareLists?) {
+        for line in lines {
+            let trimmed: String = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == beginMarker {
+                lists = PlanShareLists()
+            } else if trimmed == endMarker {
+                lists?.isComplete = true
+            } else if trimmed.hasPrefix(sharedMarker + " ") {
+                lists?.shared.append(String(trimmed.dropFirst(sharedMarker.count + 1)))
+            } else if trimmed.hasPrefix(leftOutMarker + " ") {
+                lists?.leftOut.append(String(trimmed.dropFirst(leftOutMarker.count + 1)))
+            }
+        }
+    }
+
+    /// Whether a question the console asks is the open share's question,
+    /// which is answered only in the lists' own sheet (fix review H1).
+    static func isTheListsQuestion(_ question: String) -> Bool {
+        return question.trimmingCharacters(in: .whitespaces).hasPrefix(PlanShareLists.question)
+    }
+}
+
 /// The share bar's words (contracts/shared-rules.json → unitPlanning.share
 /// .words). Named by key in every test; `PlanSharingTests` compares each with
 /// the contract, so a sentence is changed in both places or the suite fails.
@@ -370,6 +417,12 @@ nonisolated enum PlanSharingWording {
     /// unitPlanning.share.refusals.oldCopyStillThere, shown on the bar while
     /// the marker's oldCopies is above 0 (review M2).
     static let oldCopyStillThere: String = "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more."
+    static let listsSheetTitle: String = "Share these files?"
+    static let listsSharedHeading: String = "These files will be shared with anyone who has the address:"
+    static let listsLeftOutHeading: String = "These files are left out:"
+    static let listsNone: String = "(none)"
+    static let listsByName: String = "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it."
+    static let listsShareButton: String = "Share"
     static let courseBusy: String = "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished."
     static let changePasswordNote: String = "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with."
 

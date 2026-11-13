@@ -271,7 +271,70 @@ final class PlanSharingTests: XCTestCase {
         }
     }
 
+    // MARK: - Tests: the open share's lists (fix review H1)
+
+    func testTheListsSheetsWordsAndMarkersAreTheContracts() throws {
+        let section: [String: Any] = try XCTUnwrap(try PlanSharingTests.share()["openShareLists"] as? [String: Any])
+        XCTAssertEqual(section["sheetTitle"] as? String, PlanSharingWording.listsSheetTitle)
+        XCTAssertEqual(section["sharedHeading"] as? String, PlanSharingWording.listsSharedHeading)
+        XCTAssertEqual(section["leftOutHeading"] as? String, PlanSharingWording.listsLeftOutHeading)
+        XCTAssertEqual(section["none"] as? String, PlanSharingWording.listsNone)
+        XCTAssertEqual(section["byName"] as? String, PlanSharingWording.listsByName)
+        XCTAssertEqual(section["shareButton"] as? String, PlanSharingWording.listsShareButton)
+        let question: String = try XCTUnwrap(section["question"] as? String)
+        XCTAssertTrue(PlanShareLists.isTheListsQuestion(
+            ScriptRunner.separateDefaultAnswer(from: question.trimmingCharacters(in: .whitespaces)).question
+        ))
+        let markers: [String: Any] = try XCTUnwrap(section["markers"] as? [String: Any])
+        XCTAssertEqual(markers["begin"] as? String, PlanShareLists.beginMarker)
+        XCTAssertEqual(markers["shared"] as? String, PlanShareLists.sharedMarker)
+        XCTAssertEqual(markers["leftOut"] as? String, PlanShareLists.leftOutMarker)
+        XCTAssertEqual(markers["end"] as? String, PlanShareLists.endMarker)
+    }
+
+    /// The sheet shows what the launcher printed: its marker lines, read
+    /// through the real runner, and none of it reaches the console.
+    func testTheSheetsListsAreTheLaunchersMarkerLines() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("PLANTOIR_PLAN_LISTS_BEGIN:\r\nThese files will be shared with anyone who has the address:\r\n")
+        runner.receiveOutput("   • index.html\r\nPLANTOIR_PLAN_LISTS_SHARED: index.html\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_LISTS_SHARED: unit/pdfs/Quiz 1, Part A.pdf\r\n")
+        runner.receiveOutput("These files are left out:\r\nPLANTOIR_PLAN_LISTS_LEFT_OUT: unit/pdfs/Quiz 1 - Solutions.pdf\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_LISTS_END:\r\nShare these files with anyone who has the address? [y/N]: ")
+        XCTAssertEqual(runner.planShareLists, PlanShareLists(
+            shared: ["index.html", "unit/pdfs/Quiz 1, Part A.pdf"],
+            leftOut: ["unit/pdfs/Quiz 1 - Solutions.pdf"],
+            isComplete: true
+        ))
+        XCTAssertFalse(runner.transcript.displayText.contains("PLANTOIR_PLAN_LISTS"))
+    }
+
+    /// The open share's question is answered only in the lists' sheet: the
+    /// plain question alert and the credential sheet never take it.
+    func testTheListsQuestionCanOnlyBeAnsweredInTheListsSheet() {
+        let asked = ScriptRunner.separateDefaultAnswer(from: "Share these files with anyone who has the address? [y/N]:")
+        XCTAssertTrue(PlanShareLists.isTheListsQuestion(asked.question))
+        XCTAssertNil(CredentialRequest.matching(asked.question))
+        let runner: ScriptRunner = ScriptRunner()
+        runner.isAwaitingInput = true
+        runner.isAskingAboutPlanShareLists = true
+        XCTAssertEqual(TaskProgressView.questionSurface(for: runner), .planShareLists)
+        runner.pendingCredentialRequest = CredentialRequest.unitPlanPassword
+        XCTAssertEqual(TaskProgressView.questionSurface(for: runner), .planShareLists)
+        runner.isAskingAboutPlanShareLists = false
+        runner.pendingCredentialRequest = nil
+        XCTAssertEqual(TaskProgressView.questionSurface(for: runner), .plainQuestion)
+        XCTAssertFalse(PlanShareLists.isTheListsQuestion("Fix course code to 'ICS3O'?"))
+    }
+
     // MARK: - Tests: the credential requests
+
+    func testTheAppSendsAPlansPasswordExactlyAsTyped() {
+        XCTAssertEqual(CredentialRequestSheet.answerToSend("  spaced password  ", for: CredentialRequest.unitPlanPassword),
+                       "  spaced password  ")
+        XCTAssertEqual(CredentialRequestSheet.answerToSend("  abc  ", for: CredentialRequest.cloudflareToken), "abc")
+        XCTAssertEqual(CredentialRequestSheet.answerToSend(" science ", for: CredentialRequest.unitPlanUsername), "science")
+    }
 
     func testThePlansQuestionsAreTheirOwnRequests() {
         XCTAssertEqual(CredentialRequest.matching("Choose a username for these unit plans: ")?.name, "unitPlanUsername")

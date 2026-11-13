@@ -36685,7 +36685,7 @@
         "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
       },
       "answerKeys": {
-        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
+        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, with its accents folded (Corrigé reads as corrige), in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
         "appliesTo": [
           ".pdf",
           ".png",
@@ -36698,13 +36698,19 @@
           "answer",
           "solution",
           "markingguide",
-          "markingscheme"
+          "markingscheme",
+          "markscheme",
+          "corrige",
+          "reponse"
         ],
         "wholeWords": [
           "key",
-          "keys"
+          "keys",
+          "soln",
+          "solns",
+          "ans"
         ],
-        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists).",
+        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists). Widened again on the fix review: Mark Scheme and Markscheme, Soln and Solns, Ans, and the French Corrigé and Réponses (Ontario's French-language courses), with accents folded before the letters are read.",
         "cases": [
           {
             "name": "Quiz 1 - Solutions.pdf",
@@ -36849,21 +36855,86 @@
           {
             "name": "Key Concepts.woff2",
             "answerKey": false
+          },
+          {
+            "name": "Quiz 1 Mark Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Markscheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 2 Soln.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test Solns.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 3 Ans.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Corrigé.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Corrige - Test 2.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Réponses du test.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "reponses.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 CORRIGÉ.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Hockey Drills.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keystone Species.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answering Questions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Key Terms.pdf",
+            "answerKey": true
           }
         ]
       },
       "openShareLists": {
-        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints the PDFs it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question arrives in the share sheet as an ordinary question. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
-        "sharedHeading": "These PDFs will be shared with anyone who has the address:",
+        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "sharedHeading": "These files will be shared with anyone who has the address:",
         "leftOutHeading": "These files are left out:",
         "none": "(none)",
         "byName": "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it.",
         "question": "Share these files with anyone who has the address? [y/N]: ",
-        "nonInteractive": "Shared as the lists say, because nobody is here to look at them.",
-        "declined": "Nothing was shared."
+        "nonInteractive": "Sharing as the lists say, because nobody is here to look at them.",
+        "declined": "Nothing was shared.",
+        "markers": {
+          "begin": "PLANTOIR_PLAN_LISTS_BEGIN:",
+          "shared": "PLANTOIR_PLAN_LISTS_SHARED:",
+          "leftOut": "PLANTOIR_PLAN_LISTS_LEFT_OUT:",
+          "end": "PLANTOIR_PLAN_LISTS_END:",
+          "rule": "Each file is printed twice: once in the lists a person reads at a terminal, and once as a marker line, `shared` or `leftOut` followed by one space and the file's place in the plan site (a line break in a name written as a space), between `begin` and `end` (each ending in a colon, so every reader's one rule for a machine line, PLANTOIR_ and capitals then a colon, keeps all four out of the console). The app reads only the marker lines, keeps them out of the console, and shows them in the open share's own sheet; it never reads the console's own lines for the lists."
+        },
+        "sheetTitle": "Share these files?",
+        "shareButton": "Share"
       },
       "interruptionCases": {
-        "rule": "A share or a Stop Sharing that stops part way (the console's Cancel, Quit, a crash) leaves a marker that says no MORE than the site does (review H1): the bar never shows protected, and never not shared, while the address may answer with the plans. share_plan.py writes the marker before the upload with `state` sending, the address, `protected` false, and the answer keys in when this share or the one before carried them; after the proof with `state` shared and `oldCopies` counted before the deletes; and before a Stop Sharing with `state` stopping. Each case interrupts at `point`, after the share before it (`before`: none, open or protected), and expects the marker's state, protected and address, what the bar shows (barCases), and what the next share does.",
+        "rule": "A share or a Stop Sharing that stops part way (the console's Cancel, Quit, a crash) leaves a marker that says no MORE than the site does (review H1): the bar never shows protected, and never not shared, while the address may answer with the plans. share_plan.py writes the marker before the upload with `state` sending, the address, `protected` false, and the answer keys in when this share or the one before carried them; after the proof with `state` shared and `oldCopies` counted before the deletes; and before a Stop Sharing with `state` stopping. Each case interrupts at `point`, after the share before it (`before`: none, open or protected), and expects the marker's state, protected and address, what the bar shows (barCases), and what the next share does. `keysLeftOutLine` is whether the bar would say answer keys were left out (answerKeysLeftOut above 0 on an open marker): never while the address may still serve one (fix review M1).",
         "cases": [
           {
             "name": "a first share stopped after its project was made",
@@ -36969,6 +37040,34 @@
             },
             "bar": "stopping",
             "nextShare": "Stop Sharing again"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during its proof",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true,
+              "keysLeftOutLine": false
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share without the keys, which deletes the copy that held them"
+          },
+          {
+            "name": "an open re-share that drops the answer keys, stopped during the deletes",
+            "before": "openWithKeys",
+            "choice": "shareOpen",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": false,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "open",
+            "nextShare": "deletes the older copy that still holds the keys; until then the bar shows oldCopyStillThere"
           }
         ]
       },
@@ -37053,6 +37152,92 @@
             },
             "bar": "protected",
             "oldCopiesLine": false
+          }
+        ]
+      },
+      "stopCases": {
+        "rule": "What Stop Sharing says, from what the address answers after the delete (fix review M2). It says stopped only on an answer that PROVES the site is gone: 522 or 530 (measured after a delete), or the name no longer resolving. Anything else is unknown (no answer at all, a timeout, a school filter's 403, a 5xx, a 404) and is fetched again every 2 s for up to 30 s; 200, 401 or any answer carrying X-Plantoir-Share is the plans still answering. Not proven by 30 s: words.stopUnconfirmed, the outcome unconfirmed, exit 1, the marker kept as stopping, the row kept with Stop Sharing, and the saved username and password kept (deploy.sh deletes them only after a Stop Sharing that exited 0). `delete` is what Cloudflare answered to the delete; `answers` is what the address says, in order, the last repeated.",
+        "cases": [
+          {
+            "name": "530 straight after the delete",
+            "delete": "deleted",
+            "answers": [
+              "530"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the plans for a moment, then 522",
+            "delete": "deleted",
+            "answers": [
+              "200",
+              "522"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "the name no longer resolves",
+            "delete": "deleted",
+            "answers": [
+              "nameNotFound"
+            ],
+            "outcome": "deleted"
+          },
+          {
+            "name": "no answer at all: offline",
+            "delete": "deleted",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a school filter's 403",
+            "delete": "deleted",
+            "answers": [
+              "403"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 502",
+            "delete": "deleted",
+            "answers": [
+              "502"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "a 404",
+            "delete": "deleted",
+            "answers": [
+              "404"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the plans still answer: another account",
+            "delete": "alreadyGone",
+            "answers": [
+              "200"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address is offline",
+            "delete": "alreadyGone",
+            "answers": [
+              "noAnswer"
+            ],
+            "outcome": "unconfirmed"
+          },
+          {
+            "name": "the delete says 404 and the address answers 530",
+            "delete": "alreadyGone",
+            "answers": [
+              "530"
+            ],
+            "outcome": "alreadyGone"
           }
         ]
       },

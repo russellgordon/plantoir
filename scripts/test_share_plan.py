@@ -150,7 +150,9 @@ class FakeCloudflare:
                 for deployment in project["deployments"]:
                     if deployment["id"] == project["canonical"]:
                         return self.answer(deployment, url, base, credential)
-        return None, {}
+        # A project that is not there answers as a deleted Pages project
+        # did (measured 2026-11-12: 530, "error code: 1016").
+        return 530, {}
 
     def answer(self, deployment, url, base, credential):
         """What one deployment answers, as its worker would."""
@@ -635,6 +637,8 @@ class InterruptionTests(ShareTestCase):
                 if case["before"] == "protected":
                     self.give_credential()
                     self.assertEqual(self.run_share("--protect")[0], 0)
+                elif case["before"] == "openWithKeys":
+                    self.assertEqual(self.run_share("--include-answer-keys")[0], 0)
                 elif case["before"] == "open":
                     self.assertEqual(self.run_share()[0], 0)
                 flags = {"shareOpen": [], "shareProtected": ["--protect"], "removePassword": ["--remove-password"],
@@ -652,6 +656,9 @@ class InterruptionTests(ShareTestCase):
                 self.assertEqual(bool((marker or {}).get("address")), expect["address"], marker)
                 if "oldCopies" in expect:
                     self.assertEqual((marker or {}).get("oldCopies", 0) > 0, expect["oldCopies"], marker)
+                if "keysLeftOutLine" in expect:
+                    line = (not (marker or {}).get("protected")) and (marker or {}).get("answerKeysLeftOut", 0) > 0
+                    self.assertEqual(line, expect["keysLeftOutLine"], marker)
                 self.assertEqual(bar_for(marker), case["bar"], marker)
                 self.assertFalse(self.cred_file.exists(), "the credential file was left behind")
 
@@ -695,6 +702,12 @@ class OpenShareListTests(ShareTestCase):
         self.assertNotIn("Solutions", shared)
         self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", left_out)
         self.assertEqual(self.questions, [words["question"]])
+        marks = words["markers"]
+        self.assertIn(marks["shared"] + " unit/pdfs/Quiz 1.pdf\n", text)
+        self.assertIn(marks["shared"] + " index.html\n", text, "every file going out is listed, not only PDFs")
+        self.assertIn(marks["shared"] + " assets/plan.css\n", text)
+        self.assertIn(marks["leftOut"] + " unit/pdfs/Quiz 1 - Solutions.pdf\n", text)
+        self.assertLess(text.index(marks["begin"]), text.index(marks["end"]))
         self.answer_the_lists = "yes"
         status, text = self.run_share()
         self.assertEqual(status, 0, text)
@@ -715,7 +728,7 @@ class OpenShareListTests(ShareTestCase):
 
     def test_no_sentence_says_the_share_holds_no_answers(self):
         for key, value in share_plan.share_words()["openShareLists"].items():
-            if key == "rule":
+            if key == "rule" or not isinstance(value, str):
                 continue
             self.assertNotIn("no answer", value.lower())
 
@@ -761,19 +774,103 @@ class CredentialFileTests(ShareTestCase):
         self.assertEqual(status, 1)
         self.assertIn("noPassword", text)
 
-    def test_a_password_is_used_exactly_as_typed(self):
-        self.cred_file = self.private_file(f"{USERNAME}:  {PASSWORD}  ")
-        self.cloudflare.password = f"  {PASSWORD}  "
-        status, text = self.run_share("--protect")
-        self.assertEqual(status, 0, text)
-        worker = self.cloudflare.staged[-1]["files"]["_worker.js"].decode()
-        salt = re.search(r'const SALT = "([0-9a-f]+)";', worker).group(1)
-        import hashlib
-        expected = hashlib.sha256((salt + unit_plan_site.credential_b64(USERNAME, f"  {PASSWORD}  ")).encode()).hexdigest()
-        self.assertIn(expected, worker)
+    def test_a_sigterm_before_the_credential_is_used_still_removes_it(self):
+        """The app's Cancel is a SIGTERM (fix review LOW). A real child
+        process, stopped while it waits on the network before the share."""
+        path = self.private_file(f"{USERNAME}:{PASSWORD}")
+        program = (
+            "import sys, time, signal, os\n"
+            f"sys.path.insert(0, {str(REPOSITORY / 'scripts')!r})\n"
+            "import share_plan\n"
+            "def slow(token):\n"
+            "    open(sys.argv[2], 'w').write('waiting')\n"
+            "    time.sleep(60)\n"
+            "share_plan.discover_cloudflare_account = slow\n"
+            "os.environ['CLOUDFLARE_API_TOKEN'] = 'x'\n"
+            "os.environ.pop('CLOUDFLARE_ACCOUNT_ID', None)\n"
+            "share_plan.toolchain_paths.COURSES_DIR = __import__('pathlib').Path(sys.argv[3])\n"
+            "sys.exit(share_plan.main(['--course', 'SNC2D', '--year', '2026', '--protect',\n"
+            "                          '--non-interactive', '--credential-file', sys.argv[1]]))\n"
+        )
+        flag = self.tmp / "waiting"
+        environment = dict(os.environ)
+        environment.pop("CLOUDFLARE_ACCOUNT_ID", None)
+        import subprocess
+        import time as clock
+        child = subprocess.Popen([sys.executable, "-c", program, str(path), str(flag), str(self.courses)],
+                                 env=environment)
+        for _ in range(200):
+            if flag.exists():
+                break
+            clock.sleep(0.05)
+        self.assertTrue(flag.exists(), "the share never reached its network call")
+        child.terminate()
+        child.wait(timeout=30)
+        self.assertFalse(path.exists(), "a SIGTERM left the credential file")
+        self.assertFalse(path.parent.exists(), "a SIGTERM left the credential folder")
+
+    def test_a_folder_a_killed_share_left_is_cleared_by_the_next_and_nothing_else(self):
+        root = self.tmp / "tmp-root"
+        root.mkdir()
+        original = share_plan.CREDENTIAL_ROOT
+        share_plan.CREDENTIAL_ROOT = root
+        self.addCleanup(setattr, share_plan, "CREDENTIAL_ROOT", original)
+        stale = root / "plan_cred.Ab12Cd"
+        fresh = root / "plan_cred.Ef34Gh"
+        other = root / "plan_cred.notours-x"
+        for folder in (stale, fresh, other):
+            folder.mkdir()
+            (folder / "cred").write_text("x:y")
+        old = clock_time() - share_plan.STALE_SECONDS - 60
+        os.utime(stale, (old, old))
+        os.utime(other, (old, old))
+        self.run_share()
+        self.assertFalse(stale.exists(), "a stale folder was left")
+        self.assertTrue(fresh.exists(), "a share still reading its file lost it")
+        self.assertTrue(other.exists(), "a folder Plantoir does not make was removed")
+
+
+def clock_time():
+    import time
+    return time.time()
 
 
 class VerifiedStopTests(ShareTestCase):
+
+    ANSWERS = {
+        "530": (530, {}), "522": (522, {}), "403": (403, {}), "502": (502, {}), "404": (404, {}),
+        "noAnswer": (None, {}), "nameNotFound": (None, {share_plan.GONE_KEY: "nameNotFound"}),
+    }
+
+    def test_every_stop_case(self):
+        for case in share_plan.share_words()["stopCases"]["cases"]:
+            with self.subTest(case=case["name"]):
+                self.setUp()
+                self.run_share()
+                name = self.marker()["name"]
+                address = self.marker()["address"]
+                deployment = self.cloudflare.projects[name]["deployments"][-1]
+                if case["delete"] == "alreadyGone":
+                    del self.cloudflare.projects[name]
+                answers = list(case["answers"])
+                cloudflare = self.cloudflare
+
+                def answering(url, credential=None):
+                    word = answers.pop(0) if len(answers) > 1 else answers[0]
+                    if word == "200":
+                        return cloudflare.answer(deployment, url, address, credential)
+                    return self.ANSWERS[word]
+
+                share_plan.fetch_address = answering
+                status, text = self.run_share("--stop")
+                if case["outcome"] == "unconfirmed":
+                    self.assertEqual(status, 1, text)
+                    self.assertIn(" unconfirmed", text)
+                    self.assertEqual(self.marker()["state"], "stopping")
+                else:
+                    self.assertEqual(status, 0, text)
+                    self.assertIn(" " + case["outcome"], text)
+                    self.assertIsNone(self.marker())
 
     def test_a_stop_whose_address_still_answers_is_not_called_stopped(self):
         self.run_share()

@@ -33,6 +33,7 @@ import json
 import re
 import secrets
 import shutil
+import unicodedata
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -92,6 +93,14 @@ def is_answer_key(file_name: str) -> bool:
     if suffix not in rule["appliesTo"]:
         return False
     stem = name[: len(name) - len(suffix)]
+    # Accents folded first, so Corrigé and Réponses read as corrige and
+    # reponses rather than losing their letters.
+    folded = unicodedata.normalize("NFKD", stem)
+    plain = ""
+    for character in folded:
+        if not unicodedata.combining(character):
+            plain += character
+    stem = plain
     letters = re.sub(r"[^a-z]", "", stem.lower())
     for part in rule["anywhere"]:
         if part in letters:
@@ -408,13 +417,13 @@ class Staged:
 
 def open_share_lists(staged: Staged) -> tuple[list[str], list[str]]:
     """What an open share shows the teacher before it goes out
-    (unitPlanning.share.openShareLists): the PDFs it will share, and every
-    file it leaves out, answer keys and files of other kinds alike, by name
-    and sorted. By name only: nothing here reads a file."""
+    (unitPlanning.share.openShareLists): EVERY file it will share, pages,
+    images and the stylesheets and fonts included, and every file it leaves
+    out, answer keys and files of other kinds alike, by name and sorted. By
+    name only: nothing here reads a file."""
     shared_pdfs: list[str] = []
     for place in staged.files:
-        if place.lower().endswith(".pdf"):
-            shared_pdfs.append(place)
+        shared_pdfs.append(place)
     left_out: list[str] = []
     for place in staged.answer_keys_left_out_names:
         left_out.append(place)

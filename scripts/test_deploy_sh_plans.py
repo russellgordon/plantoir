@@ -313,6 +313,14 @@ class PlansModeTests(unittest.TestCase):
             self.assertEqual(status, 0, out)
             self.assertTrue((folder / "stub" / "plan_item_deleted").exists())
 
+    def test_a_stop_that_cannot_be_confirmed_keeps_the_saved_password(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            status, out = run(folder, ["--stop-sharing", "--year", "2026", "--non-interactive"],
+                              extra_env={"DOCKER_RC": "1"})
+            self.assertEqual(status, 1, out)
+            self.assertFalse((folder / "stub" / "plan_item_deleted").exists())
+
     def test_include_answer_keys_reaches_share_plan(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = a_folder(tmp)
