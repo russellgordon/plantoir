@@ -382,9 +382,10 @@ function Get-SavedDestinations([string]$Text, [string]$Course) {
     }
   }
   foreach ($pair in $pairs) {
-    $kind = [string]$pair[0]
-    # One line per leg, as deploy.sh carries a tab-separated line: a tab or a
-    # line break in a path becomes a space there, and here too.
+    # One line per leg, as deploy.sh carries a tab-separated line: a tab, a
+    # carriage return or a line break in a kind or a path becomes a space
+    # there, and here too (#788: the kind kept them until 1.9.3).
+    $kind = ([string]$pair[0]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
     $path = ([string]$pair[1]).Replace("`t", ' ').Replace("`r", ' ').Replace("`n", ' ')
     $words = 'Netlify'
     if ($kind -ceq 'cloudflare_pages') { $words = 'Cloudflare Pages' }

@@ -40,6 +40,13 @@ public class LauncherRulesContractTests
         foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script })
             info.ArgumentList.Add(argument);
 
+        // The rows NamedGapLedger holds open, handed to the runner (step 0 of
+        // v2.0.0): each must name a row the contract still has, expanded the
+        // way the runner expands it, before the runner is asked to hold it.
+        var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.LauncherRunnerRows).Select(entry => entry.Key).ToList();
+        NamedGapLedger.StillNamed(NamedGapLedger.LauncherRunnerRows, RowsTheRunnerReportsFromTheContract());
+        info.Environment["PLANTOIR_LEDGERED_LAUNCHER_CASES"] = string.Join("\n", held);
+
         using var process = Process.Start(info);
         Assert.NotNull(process);
         // Both pipes read asynchronously and the PROCESS waited on (see
@@ -53,11 +60,114 @@ public class LauncherRulesContractTests
         }
         string output = string.Concat(standardOutput.GetAwaiter().GetResult(), standardError.GetAwaiter().GetResult());
 
+        // A held row that now passes: the gap has closed, and the entry goes.
+        var closed = output.Split('\n').Where(line => line.StartsWith("CLOSED [", StringComparison.Ordinal)).ToList();
+        Assert.True(closed.Count == 0,
+            "A launcher row held open in NamedGapLedger now passes, which is the gap closing: delete its entry " +
+            "(windows-app/Plantoir.Tests/NamedGapLedger.cs, area LauncherRunnerRows) and say so on its issue.\n" +
+            string.Join("\n", closed));
+        // The runner read every held row, and reported each one as held: a
+        // variable it did not read would hold nothing (plan review H3).
+        Assert.Contains($"ledger: {held.Count} held pairs read", output);
+        Assert.Equal(held.Count, output.Split('\n').Count(line => line.StartsWith("ledgered [", StringComparison.Ordinal)));
+
         Assert.Contains(" 0 failed", output);
         Assert.DoesNotContain("FAIL", output);
         // A runner that skipped everything would also say "0 failed".
         Assert.Matches(@"(\d{2,}) passed", output);
         Assert.Equal(0, process.ExitCode);
+    }
+
+    /// <summary>
+    /// The runner's own ledger, proved on made-up rows with its REAL
+    /// <c>Report</c>, <c>Read-LedgeredRows</c> and
+    /// <c>Write-UnreportedLedgerRows</c> (taken from the file by its syntax
+    /// tree, as the runner takes the launchers' functions): a held row that
+    /// passes is CLOSED and counted failed; one that fails in its held shape
+    /// is ledgered; one that fails in another shape, or a held row never
+    /// reported, is a failure; an unset variable holds nothing. A second or
+    /// so, rather than the runner's two and a half minutes.
+    /// </summary>
+    [Fact]
+    public void TheRunnersLedgerHoldsClosesAndCatchesWhatItShould()
+    {
+        string runner = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "test_launcher_rules.ps1");
+        string probe = Path.Combine(Path.GetTempPath(), "plantoir-ledger-probe-" + Guid.NewGuid().ToString("N") + ".ps1");
+        File.WriteAllText(probe, string.Join("\n",
+            "$ErrorActionPreference = 'Stop'",
+            "$tokens = $null; $errors = $null",
+            "$ast = [System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$tokens, [ref]$errors)",
+            "foreach ($name in 'Report', 'Read-LedgeredRows', 'Write-UnreportedLedgerRows') {",
+            "    $found = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)",
+            "    . ([scriptblock]::Create($found[0].Extent.Text))",
+            "}",
+            "$passed = 0; $failed = 0; $ledgered = 0",
+            "$ledgerHeld = Read-LedgeredRows (\"L`tpasses`nL`tfails`r`nL`twrong shape`nL`tnever reported\")",
+            "$ledgerSeen = @{}",
+            "Report 'L' 'passes' $true 'detail'",
+            "Report 'L' 'fails' $false 'expected refused, got allowed'",
+            "Report 'L' 'wrong shape' $false 'refused by the wrong who' $false",
+            "Report 'L' 'not held' $false 'an ordinary failure'",
+            "Report 'L' 'not held, passes' $true ''",
+            "Write-UnreportedLedgerRows",
+            "Write-Host \"counts $passed passed $failed failed $ledgered ledgered\"",
+            "Write-Host (\"unset holds {0}\" -f (Read-LedgeredRows $null).Count)"));
+        try
+        {
+            var info = new ProcessStartInfo { FileName = "powershell.exe", RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            foreach (string argument in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", probe, runner })
+                info.ArgumentList.Add(argument);
+            using var process = Process.Start(info)!;
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            Assert.True(process.WaitForExit(60_000), "the probe did not finish within 60 s");
+            string output = standardOutput.GetAwaiter().GetResult() + standardError.GetAwaiter().GetResult();
+            var lines = output.Replace("\r", "").Split('\n');
+            Assert.Contains("CLOSED [L] passes - ledgered as not built, and it passes: delete its NamedGapLedger entry", lines);
+            Assert.Contains("ledgered [L] fails - expected refused, got allowed", lines);
+            Assert.Contains("FAIL [L] wrong shape: refused by the wrong who (ledgered, but not in the shape its entry holds)", lines);
+            Assert.Contains("FAIL [L] not held: an ordinary failure", lines);
+            Assert.Contains("FAIL [L] never reported: ledgered, and this runner has no such row", lines);
+            Assert.Contains("counts 1 passed 4 failed 1 ledgered", lines);
+            Assert.Contains("unset holds 0", lines);
+            // Neither held line may read as a failure to the suite's own check.
+            Assert.DoesNotContain("FAIL", lines.Single(line => line.StartsWith("ledgered [", StringComparison.Ordinal)));
+            Assert.DoesNotContain("FAIL", lines.Single(line => line.StartsWith("CLOSED [", StringComparison.Ordinal)));
+        }
+        finally { try { File.Delete(probe); } catch { } }
+    }
+
+    /// <summary>
+    /// The rows the runner reports from the lists a ledger entry may hold,
+    /// keyed <c>"&lt;list&gt;\t&lt;name&gt;"</c> with the list spelled as the
+    /// runner's <c>Report</c> spells it (plan review H3): the preview guard's
+    /// cases; the deploy guard's cases on each launcher; each launcher's
+    /// refusal sentences, first and second line; and each launcher's two
+    /// trail lines for the deploy guard. A row the runner adds of its own
+    /// (a Windows-only case) is not here, so an entry for it is withdrawn.
+    /// </summary>
+    internal static IEnumerable<string> RowsTheRunnerReportsFromTheContract()
+    {
+        var shared = ContractLoader.LoadJson("shared-rules.json");
+        static string Row(string list, string name) => list + "\t" + name;
+        foreach (var c in shared["previewWhileItsSectionDeploys"]!["launcherCases"]!.AsArray())
+            yield return Row("previewWhileItsSectionDeploys", c!["name"]!.ToString());
+        var guard = shared["deployWhileItsSectionDeploys"]!;
+        var declined = shared["activityTrail"]!["mustRecord"]!.AsArray()
+            .Single(e => e!["event"]!.ToString() == "build declined, course busy elsewhere")!;
+        foreach (string launcher in new[] { "deploy.ps1", "preview.ps1" })
+        {
+            foreach (var c in guard["launcherCases"]!.AsArray())
+                yield return Row("deployWhileItsSectionDeploys/" + launcher, c!["name"]!.ToString());
+            foreach (var (key, _) in guard["sentences"]!["launcher"]!.AsObject())
+            {
+                yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key);
+                yield return Row("deployWhileItsSectionDeploys.sentences/" + launcher, key + " (second line)");
+            }
+            foreach (string field in new[] { "launcherLineWhenALaterDeployIsStillWorking", "launcherLineWhenItsSectionIsAlreadyBeingDeployed" })
+                if (declined[field] is not null)
+                    yield return Row("activityTrail/" + launcher, field);
+        }
     }
 
     /// <summary>

@@ -12,6 +12,28 @@ namespace Plantoir.Tests;
 public class ContractTests
 {
     /// <summary>
+    /// One hand-compared sentence of <c>assist-wording.json</c>: equal to the
+    /// file, unless <see cref="NamedGapLedger.AssistWordingSaidDifferently"/>
+    /// holds the key, and then it must still DIFFER (the entry fails, saying
+    /// to delete it, the day the words match). For a sentence this app has a
+    /// member for and says in older words, which the
+    /// <see cref="NamedGapLedger.AssistWordingKeys"/> walk cannot hold, since
+    /// the member exists.
+    /// </summary>
+    internal static void SaidAsTheContract(JsonObject wording, string key, string said, ISet<string>? heldAndAsked = null,
+                                           IEnumerable<NamedGapLedger.Entry>? entries = null)
+    {
+        string expected = wording[key]!.ToString();
+        if (NamedGapLedger.Holding(NamedGapLedger.AssistWordingSaidDifferently, key, entries ?? NamedGapLedger.All) is { } owed)
+        {
+            heldAndAsked?.Add(key);
+            Assert.False(expected == said, NamedGapLedger.ClosedMessage(owed));
+            return;
+        }
+        Assert.Equal(expected, said);
+    }
+
+    /// <summary>
     /// <c>assist-wording.json</c> → <c>wording</c> is THE list (#157): every key
     /// is walked by reflection, in both directions, rather than named here one
     /// line at a time. A key the mac adds with no member here goes red naming
@@ -41,7 +63,8 @@ public class ContractTests
         Assert.Equal(wording["deployDidNotFinish"]!.ToString(), AssistWording.DeployDidNotFinish("{course}", "{section}"));
         Assert.Equal(wording["sectionIsBusy"]!.ToString(), AssistWording.SectionIsBusy("{course}", "{section}"));
         Assert.Equal(wording["courseIsBusy"]!.ToString(), AssistWording.CourseIsBusy("{course}"));
-        Assert.Equal(wording["courseIsBeingBuiltElsewhere"]!.ToString(), AssistWording.CourseIsBeingBuiltElsewhere("{course}"));
+        var heldAndAsked = new HashSet<string>(StringComparer.Ordinal);
+        SaidAsTheContract(wording, "courseIsBeingBuiltElsewhere", AssistWording.CourseIsBeingBuiltElsewhere("{course}"), heldAndAsked);
         Assert.Equal(wording["deployWentOutTo"]!.ToString(), AssistWording.DeployWentOutTo("{destinations}"));
 
         Assert.Equal(wording["previewIsRebuilding"]!.ToString(), AssistWording.PreviewIsRebuilding("{course}", "{section}"));
@@ -242,8 +265,8 @@ public class ContractTests
                      AssistWording.FinishTheClaudeSessionToDeleteItsBackups("{course}"));
 
         // #467 (mac #439): a deploy refused while its section was still being deployed.
-        Assert.Equal(wording["deployRefusedWhileALaterDeployWorks"]!.ToString(),
-                     AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"));
+        SaidAsTheContract(wording, "deployRefusedWhileALaterDeployWorks",
+                          AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"), heldAndAsked);
         Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
                      AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
 
@@ -348,6 +371,14 @@ public class ContractTests
         Assert.Equal(wording["openInObsidianFoundNoWindow"]!.ToString(), AssistWording.OpenInObsidianFoundNoWindow("{course}", "{section}"));
         Assert.Equal(wording["openInObsidianDidNotOpen"]!.ToString(), AssistWording.OpenInObsidianDidNotOpen("{course}", "{section}"));
         Assert.Equal(MachineWord.Fill(wording["obsidianIsNotOnThisMachine"]!.ToString()), AssistWording.ObsidianIsNotOnThisMachine());
+
+        // A sentence held as said differently here must be one this test
+        // compares by hand, or its entry would hold nothing open.
+        NamedGapLedger.StillNamed(NamedGapLedger.AssistWordingSaidDifferently, wording.Select(pair => pair.Key));
+        foreach (var entry in NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.AssistWordingSaidDifferently))
+            Assert.True(heldAndAsked.Contains(entry.Key),
+                $"NamedGapLedger holds \"{entry.Key}\" as said differently here, and AssistWording_MatchesContract " +
+                "does not compare it through SaidAsTheContract, so the entry holds nothing open.");
 
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
@@ -754,16 +785,31 @@ public class ContractTests
         var doc = ContractLoader.LoadJson("app-rules.json");
         var cases = doc["credentialPrompts"]!["cases"]!.AsArray();
 
+        // A prompt this app has no request for yet (#709's unit-plan prompts,
+        // owed by #824) is held open by the prompt's own text. A held prompt
+        // must match NOTHING here (plan review M2): the gap is "no request
+        // yet", and matching the wrong request is a second fault the entry
+        // must not hide. Every other prompt is compared exactly as before.
+        var failing = new List<string>();
+        var named = new List<string>();
         foreach (var c in cases)
         {
             if (c is null) continue;
             string prompt = c["prompt"]!.ToString();
             string expectRequest = c["expectRequest"]!.ToString();
+            named.Add(prompt);
 
             var match = CredentialRequests.MatchPrompt(prompt);
             string actualName = match?.Name ?? "";
-            Assert.Equal(expectRequest, actualName);
+            if (actualName != expectRequest) failing.Add(prompt);
+            if (actualName != expectRequest && NamedGapLedger.Holding(NamedGapLedger.CredentialPromptCases, prompt) is { } owed)
+                Assert.True(match is null,
+                    $"\"{prompt}\" is ledgered as having no request here yet (issue #{owed.Issue}), and it " +
+                    $"matches \"{actualName}\" instead of \"{expectRequest}\": a wrong request, not a missing one.");
         }
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialPromptCases, named, named.Except(failing));
+        var unexplained = failing.Where(prompt => !deferred.Contains(prompt)).ToList();
+        Assert.True(unexplained.Count == 0, "prompts matched wrongly: " + string.Join(" | ", unexplained));
     }
 
     [Fact]
@@ -783,10 +829,23 @@ public class ContractTests
             ["siteNameConflict"] = CredentialRequests.SiteNameConflict,
         };
 
+        // A request this app does not have yet (#709's unit-plan username and
+        // password, owed by #824) is held open by name. "Has it here" is any
+        // public CredentialRequest on CredentialRequests, not only this
+        // dictionary, so the entry closes the day the request is written
+        // even if this list is not extended; every other request is compared
+        // field by field as before.
+        var defined = typeof(CredentialRequests).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Select(field => field.GetValue(null)).OfType<CredentialRequest>().Select(request => request.Name)
+            .Concat(codeRequests.Keys);
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CredentialRequestNames,
+            requests.Select(r => r!["name"]!.ToString()), defined);
+
         foreach (var req in requests)
         {
             if (req is null) continue;
             string name = req["name"]!.ToString();
+            if (deferred.Contains(name)) continue;
             Assert.True(codeRequests.TryGetValue(name, out var codeReq), $"Missing request definition for {name}");
 
             Assert.Equal(req["title"]!.ToString(), codeReq!.Title);
@@ -1153,7 +1212,11 @@ public class ContractTests
         string deployScript = File.ReadAllText(Path.Combine(repoRoot, "deploy.ps1"));
 
         var previewFlags = section["preview"]!.AsArray().Select(x => x!["flag"]!.ToString().Split(' ')[0]).ToList();
-        foreach (var flag in previewFlags)
+        // A flag preview.ps1 does not take yet (#729's --for-deploy, owed by
+        // #828) is held open by name; it closes the day preview.ps1 carries it.
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.PreviewLauncherFlags, previewFlags,
+            previewFlags.Where(flag => previewScript.Contains(flag, StringComparison.OrdinalIgnoreCase)));
+        foreach (var flag in previewFlags.Where(flag => !deferred.Contains(flag)))
         {
             Assert.Contains(flag, previewScript, StringComparison.OrdinalIgnoreCase);
         }

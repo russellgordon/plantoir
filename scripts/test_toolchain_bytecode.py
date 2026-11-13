@@ -42,6 +42,23 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 BUILD_PHASE = REPOSITORY_ROOT / "mac-app" / "BuildScripts" / "write_toolchain_hashes.py"
 LAUNCHERS = ["setup.sh", "preview.sh", "deploy.sh"]
 
+
+def _link_or_skip(test, target, link):
+    """os.symlink, or skips the test where this account may not make one.
+
+    Windows lets an ordinary account make a symbolic link only with Developer
+    Mode on; without it os.symlink raises WinError 1314 (measured on Windows 11
+    Pro 26200, step 0 of v2.0.0). That is the machine's setting, not the build
+    phase's behaviour, and the two link cases still run on the mac. Only that
+    error skips, so an account that may make links runs them here too."""
+    try:
+        os.symlink(target, link)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            test.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                          "Developer Mode off); the case runs on the mac")
+        raise
+
 # toolchain_hash as it was in all three launchers before #747, kept as text so
 # the continuity test can run it beside today's.
 TOOLCHAIN_HASH_BEFORE_747 = r"""toolchain_hash() {
@@ -188,7 +205,7 @@ class TheBuildPhaseStripsBytecode(unittest.TestCase):
         (outside / "__pycache__" / "x.pyc").write_bytes(b"\x00")
         (outside / "y.pyc").write_bytes(b"\x00")
         shutil.rmtree(self.resources / "scripts")
-        os.symlink(outside, self.resources / "scripts")
+        _link_or_skip(self, outside, self.resources / "scripts")
         result = self.run_the_phase()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("is a link", result.stderr)
@@ -200,7 +217,7 @@ class TheBuildPhaseStripsBytecode(unittest.TestCase):
         self.addCleanup(shutil.rmtree, outside, True)
         (outside / "__pycache__").mkdir()
         (outside / "__pycache__" / "x.pyc").write_bytes(b"\x00")
-        os.symlink(outside, self.resources / "support" / "linked")
+        _link_or_skip(self, outside, self.resources / "support" / "linked")
         self.assertEqual(self.run_the_phase().returncode, 0)
         self.assertTrue((outside / "__pycache__" / "x.pyc").exists())
 

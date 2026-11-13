@@ -1744,9 +1744,13 @@ public sealed partial class SidebarPane : UserControl
         {
             // Even a restore has an undo: the current version is archived
             // (and stays in place) before the backup's contents move in.
+            string? archivedFirst = null;
             if (Workspace.Courses.FirstOrDefault(c => c.Code == item.CourseCode) is { } current)
-                CourseArchiver.ArchiveCourseWithoutRemoving(current, Workspace.CoursesDirectory());
+                archivedFirst = CourseArchiver.ArchiveCourseWithoutRemoving(current, Workspace.CoursesDirectory());
             CourseRestorer.RestoreBackup(item, Workspace.CoursesDirectory());
+            // Once it has happened, never for a refused one (step 0 of v2.0.0).
+            ActivityTrail.Note(ActivityTrail.Event.CourseRestoredFromABackup,
+                CourseRestorer.RestoredTrailLine(item, archivedFirst, Workspace.CoursesDirectory()));
             Workspace.Reload();
             Workspace.Selection = new SidebarSelection.CourseItem(item.CourseCode);
             _window.ApplyState();
@@ -1887,6 +1891,11 @@ public sealed partial class SidebarPane : UserControl
         try
         {
             CourseRestorer.Restore(item, Workspace.CoursesDirectory(), Workspace.Courses);
+            // A whole course from Archived leaves the same event a backup's
+            // restore does (the mac's #572 review L5); a section's does not.
+            if (item.SectionNumber is null)
+                ActivityTrail.Note(ActivityTrail.Event.CourseRestoredFromABackup,
+                    CourseRestorer.RestoredFromArchivedTrailLine(item, Workspace.CoursesDirectory()));
             Workspace.Selection = null;
             Workspace.Reload();
             Workspace.Selection = item.SectionNumber is int number

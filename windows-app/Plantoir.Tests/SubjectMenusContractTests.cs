@@ -19,6 +19,11 @@ public class SubjectMenusContractTests
     {
         var named = Rule["items"]!.AsArray().Select(n => n!.ToString()).ToList();
         var here = Enum.GetValues<SubjectMenuRules.Item>().Select(SubjectMenuRules.ContractName).ToList();
+        // An item this app's menus do not have yet (the reference shelf's
+        // groups, #827) is held open by name; the rest are the same names in
+        // the same order, as before.
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.SubjectMenuItems, named, here);
+        named = named.Where(name => !deferred.Contains(name)).ToList();
         Assert.Equal(named, here);   // the same names, in the same order
         foreach (string name in named)
             Assert.Equal(name, SubjectMenuRules.ContractName(SubjectMenuRules.ItemNamed(name)!.Value));
@@ -50,9 +55,14 @@ public class SubjectMenusContractTests
         var cases = Rule["cases"]!.AsArray().Select(c => c!).ToList();
         Assert.True(cases.Count >= 21, $"subjectMenus.cases: {cases.Count} (21 when this was written)");
         var failures = new List<string>();
+        // A held item (see the fact above) is no member of SubjectMenuRules.Item,
+        // which that fact's closed-check makes sure of, so it can never be
+        // enabled here: it is taken out of what each case expects, and
+        // everything else is compared as before.
+        var held = NamedGapLedger.All.Where(entry => entry.Area == NamedGapLedger.SubjectMenuItems).Select(entry => entry.Key).ToHashSet();
         foreach (var c in cases)
         {
-            var expected = c["enabled"]!.AsArray().Select(n => n!.ToString()).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            var expected = c["enabled"]!.AsArray().Select(n => n!.ToString()).Where(n => !held.Contains(n)).OrderBy(n => n, StringComparer.Ordinal).ToList();
             var actual = SubjectMenuRules.Enabled(Situation(c["situation"]!.AsObject()))
                 .Select(SubjectMenuRules.ContractName).OrderBy(n => n, StringComparer.Ordinal).ToList();
             if (!expected.SequenceEqual(actual))

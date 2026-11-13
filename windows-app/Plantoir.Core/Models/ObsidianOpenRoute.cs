@@ -3,8 +3,12 @@ using Plantoir.Core.Scripting;
 namespace Plantoir.Core.Models;
 
 /// <summary>Obsidian's add-ons question, or the reopen question, waiting to be shown before Obsidian opens.</summary>
-/// <remarks><paramref name="Page"/> is the file a section's press opens for the page its preview shows (#681), carried through both questions so it is the page that opens once they are answered; null opens <paramref name="Folder"/> as before.</remarks>
-public sealed record ObsidianAddOnsRequest(Course Course, string Folder, IReadOnlyList<ObsidianFigureAddOn> Needed, bool CourseIsOpen, string? Page = null);
+/// <remarks><paramref name="Page"/> is the file a section's press opens for the page its preview shows (#681), carried through both questions so it is the page that opens once they are answered; null opens <paramref name="Folder"/> as before. <paramref name="OpenState"/> is what the offer's words say (#815); <see cref="CourseIsOpen"/> is what the route does, cannot tell counting as open.</remarks>
+public sealed record ObsidianAddOnsRequest(Course Course, string Folder, IReadOnlyList<ObsidianFigureAddOn> Needed, ObsidianFigureAddOnsOffer.CourseOpenState OpenState, string? Page = null)
+{
+    /// <summary>Open or cannot tell: nothing is written into the course, and Add Them goes the reopen way.</summary>
+    public bool CourseIsOpen => OpenState != ObsidianFigureAddOnsOffer.CourseOpenState.Closed;
+}
 
 /// <summary>
 /// What a press of Open in Obsidian came to, said as soon as it is known
@@ -225,6 +229,7 @@ public sealed class ObsidianOpenRoute
     private async Task OpenAfterTheScanAsync(Pressing press, Course course, string folder, string? page, List<ObsidianFigureAddOn> needed, List<ObsidianFigureAddOn> wouldAdd)
     {
         string coursePath = course.DirectoryPath;
+        var openState = CourseOpenStateInObsidian(coursePath);
         var situation = new ObsidianFigureAddOnsOffer.Situation(
             Reference: ReferenceCourse.IsKeptForReference(course),
             ObsidianInstalled: true,
@@ -232,7 +237,7 @@ public sealed class ObsidianOpenRoute
             SuppressedThisRun: ObsidianFigureAddOnsThisRun.Suppressed,
             WouldAdd: wouldAdd.Count > 0,
             VaultIsTheCourse: ObsidianFigureAddOnsOffer.VaultIsTheCourse(page ?? _world.TargetFor(folder, coursePath), coursePath, _world.RegistryText()),
-            CourseOpenInObsidian: CourseIsOpenInObsidian(coursePath),
+            CourseOpenInObsidian: openState != ObsidianFigureAddOnsOffer.CourseOpenState.Closed,
             ReopenDeclinedThisRun: ObsidianFigureAddOnsThisRun.ReopenDeclined.Contains(coursePath));
         switch (ObsidianFigureAddOnsOffer.Decide(situation))
         {
@@ -242,14 +247,14 @@ public sealed class ObsidianOpenRoute
                 break;
             case ObsidianFigureAddOnsOffer.Decision.Offer:
             case ObsidianFigureAddOnsOffer.Decision.OfferWhileOpen:
-                await OfferAsync(press, new ObsidianAddOnsRequest(course, folder, needed, situation.CourseOpenInObsidian, page));
+                await OfferAsync(press, new ObsidianAddOnsRequest(course, folder, needed, openState, page));
                 break;
             case ObsidianFigureAddOnsOffer.Decision.InstallThenOpen:
                 await AddAsync(course, needed, ObsidianFigureAddOnsTrail.Trigger.OpenInObsidian);
                 await OpenThenReportAsync(press, folder, coursePath, page);
                 break;
             case ObsidianFigureAddOnsOffer.Decision.AskReopen:
-                await AskReopenAsync(press, new ObsidianAddOnsRequest(course, folder, needed, true, page));
+                await AskReopenAsync(press, new ObsidianAddOnsRequest(course, folder, needed, openState, page));
                 break;
             default:
                 await OpenThenReportAsync(press, folder, coursePath, page);
@@ -327,6 +332,9 @@ public sealed class ObsidianOpenRoute
 
     private bool CourseIsOpenInObsidian(string coursePath) =>
         ObsidianFigureAddOnsOffer.CourseIsOpen(coursePath, _world.IsRunning(), _world.RegistryText());
+
+    private ObsidianFigureAddOnsOffer.CourseOpenState CourseOpenStateInObsidian(string coursePath) =>
+        ObsidianFigureAddOnsOffer.OpenState(coursePath, _world.IsRunning(), _world.RegistryText());
 
     /// <summary>One pass, through the queue, and its trail line.</summary>
     private async Task AddAsync(Course course, IReadOnlyList<ObsidianFigureAddOn> needed, ObsidianFigureAddOnsTrail.Trigger trigger)
