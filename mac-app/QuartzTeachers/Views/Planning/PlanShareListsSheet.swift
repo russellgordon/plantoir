@@ -27,9 +27,6 @@ struct PlanShareListsSheet: View {
 
     @State var isShowingWarning: Bool = false
 
-    /// Changed by ⌘F to put the cursor in the search field.
-    @State var searchFocusRequest: Int = 0
-
     // MARK: - Initializer
 
     init(
@@ -111,8 +108,18 @@ struct PlanShareListsSheet: View {
     /// change what both tables SHOW, never what is shared.
     var filters: some View {
         HStack(spacing: 12) {
-            PlanShareSearchField(text: $model.query, focusRequest: searchFocusRequest)
-                .frame(minWidth: 220, maxWidth: 320)
+            // ⌘F puts the cursor here, and ⌘→ and ⌘← move the selected
+            // rows, while this sheet's window has the keys: the search
+            // field's coordinator watches for them, since a shortcut is
+            // never hung on a button in a view (#457).
+            PlanShareSearchField(text: $model.query, onMove: { (toNotShared: Bool) in
+                if toNotShared {
+                    move(from: .shared, to: .notShared)
+                } else {
+                    move(from: .notShared, to: .shared)
+                }
+            })
+            .frame(minWidth: 220, maxWidth: 320)
             Picker(PlanShareTableWording.unitPopup, selection: $model.unit) {
                 Text(PlanShareTableWording.allUnits).tag(String?.none)
                 ForEach(model.units, id: \.self) { (unit: String) in
@@ -125,14 +132,6 @@ struct PlanShareListsSheet: View {
             Toggle(PlanShareTableWording.keysOnly, isOn: $model.keysOnly)
                 .accessibilityIdentifier("planShareKeysOnly")
             Spacer()
-            // ⌘F, the standard key for a search field.
-            Button("") {
-                searchFocusRequest += 1
-            }
-            .keyboardShortcut("f", modifiers: .command)
-            .frame(width: 0, height: 0)
-            .opacity(0)
-            .accessibilityHidden(true)
         }
     }
 
@@ -163,8 +162,7 @@ struct PlanShareListsSheet: View {
             } label: {
                 Image(systemName: "chevron.right")
             }
-            .keyboardShortcut(.rightArrow, modifiers: .command)
-            .help(PlanShareTableWording.moveToNotSharedHelp)
+            .help(PlanShareTableWording.moveToNotSharedHelp + " (⌘→)")
             .accessibilityLabel(PlanShareTableWording.moveToNotShared)
             .accessibilityHint(PlanShareTableWording.moveToNotSharedHelp)
             .disabled(model.visibleSelection(in: .shared).isEmpty)
@@ -174,8 +172,7 @@ struct PlanShareListsSheet: View {
             } label: {
                 Image(systemName: "chevron.left")
             }
-            .keyboardShortcut(.leftArrow, modifiers: .command)
-            .help(PlanShareTableWording.moveToSharedHelp)
+            .help(PlanShareTableWording.moveToSharedHelp + " (⌘←)")
             .accessibilityLabel(PlanShareTableWording.moveToShared)
             .accessibilityHint(PlanShareTableWording.moveToSharedHelp)
             .disabled(model.visibleSelection(in: .notShared).isEmpty)

@@ -322,7 +322,12 @@ struct PlanShareDocumentTable: NSViewRepresentable {
                 return
             }
             let title: String = table == .shared ? PlanShareTableWording.moveToNotShared : PlanShareTableWording.moveToShared
-            let item: NSMenuItem = NSMenuItem(title: title, action: #selector(moveFromTheMenu(_:)), keyEquivalent: "")
+            // The key the sheet answers for the same move, shown on the item
+            // so it can be found (#457: shortcuts are discovered on menus).
+            let arrow: Int = table == .shared ? NSRightArrowFunctionKey : NSLeftArrowFunctionKey
+            let key: String = String(Character(UnicodeScalar(UInt16(arrow)) ?? " "))
+            let item: NSMenuItem = NSMenuItem(title: title, action: #selector(moveFromTheMenu(_:)), keyEquivalent: key)
+            item.keyEquivalentModifierMask = .command
             item.target = self
             menu.addItem(item)
         }
@@ -372,19 +377,22 @@ enum PlanShareAnnouncer {
 }
 
 /// The sheet's search field: the system's own (a magnifying glass and a
-/// clear button), filtering both tables as the teacher types; ⌘F puts the
-/// cursor in it (`focusRequest` changes).
+/// clear button), filtering both tables as the teacher types. While its
+/// window has the keys, ⌘F puts the cursor in it and ⌘→ and ⌘← move the
+/// selected rows (`onMove`, true toward Not shared): a watcher on that
+/// window's key presses, removed with the field, because a shortcut is never
+/// hung on a button in a view (#457) and these are the sheet's own keys.
 struct PlanShareSearchField: NSViewRepresentable {
 
     // MARK: - Stored properties
 
     @Binding var text: String
-    let focusRequest: Int
+    let onMove: (Bool) -> Void
 
     // MARK: - Functions
 
     func makeCoordinator() -> Coordinator {
-        return Coordinator(text: $text)
+        return Coordinator(text: $text, onMove: onMove)
     }
 
     func makeNSView(context: Context) -> NSSearchField {
@@ -394,19 +402,21 @@ struct PlanShareSearchField: NSViewRepresentable {
         field.setAccessibilityIdentifier("planShareSearch")
         field.sendsSearchStringImmediately = true
         field.delegate = context.coordinator
-        context.coordinator.lastFocusRequest = focusRequest
+        context.coordinator.field = field
+        context.coordinator.watchTheKeys()
         return field
     }
 
     func updateNSView(_ field: NSSearchField, context: Context) {
         context.coordinator.text = $text
+        context.coordinator.onMove = onMove
         if field.stringValue != text {
             field.stringValue = text
         }
-        if focusRequest != context.coordinator.lastFocusRequest {
-            context.coordinator.lastFocusRequest = focusRequest
-            field.window?.makeFirstResponder(field)
-        }
+    }
+
+    static func dismantleNSView(_ field: NSSearchField, coordinator: Coordinator) {
+        coordinator.stopWatching()
     }
 
     final class Coordinator: NSObject, NSSearchFieldDelegate {
@@ -414,12 +424,15 @@ struct PlanShareSearchField: NSViewRepresentable {
         // MARK: - Stored properties
 
         var text: Binding<String>
-        var lastFocusRequest: Int = 0
+        var onMove: (Bool) -> Void
+        weak var field: NSSearchField?
+        private var watcher: Any?
 
         // MARK: - Initializer
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, onMove: @escaping (Bool) -> Void) {
             self.text = text
+            self.onMove = onMove
         }
 
         // MARK: - Functions
@@ -428,6 +441,54 @@ struct PlanShareSearchField: NSViewRepresentable {
             if let field = notification.object as? NSSearchField {
                 text.wrappedValue = field.stringValue
             }
+        }
+
+        func watchTheKeys() {
+            watcher = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] (event: NSEvent) -> NSEvent? in
+                guard let self = self else {
+                    return event
+                }
+                return self.handle(event)
+            }
+        }
+
+        func stopWatching() {
+            if let watcher = watcher {
+                NSEvent.removeMonitor(watcher)
+            }
+            watcher = nil
+        }
+
+        /// ⌘F, ⌘→ and ⌘← in this sheet's window; every other key passes.
+        func handle(_ event: NSEvent) -> NSEvent? {
+            guard let field = field, let window = field.window, event.window === window else {
+                return event
+            }
+            let modifiers: NSEvent.ModifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.contains(.command), !modifiers.contains(.option), !modifiers.contains(.control) else {
+                return event
+            }
+            let characters: String = event.charactersIgnoringModifiers ?? ""
+            if characters.lowercased() == "f" && !modifiers.contains(.shift) {
+                window.makeFirstResponder(field)
+                return nil
+            }
+            // In the search field ⌘→ and ⌘← keep their meaning there: the
+            // start and the end of the line.
+            if window.firstResponder is NSText {
+                return event
+            }
+            if let scalar = characters.unicodeScalars.first {
+                if scalar.value == UInt32(NSRightArrowFunctionKey) {
+                    onMove(true)
+                    return nil
+                }
+                if scalar.value == UInt32(NSLeftArrowFunctionKey) {
+                    onMove(false)
+                    return nil
+                }
+            }
+            return event
         }
     }
 }
