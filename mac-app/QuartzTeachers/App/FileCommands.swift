@@ -85,6 +85,8 @@ struct FileCommands: Commands {
                     workspace?.isChoosingFolderToImportFrom = true
                 }
             }
+            // A folder, or a backup or archive zip (#572).
+            .help(ReferenceImportWording.chooserMessage)
             .disabled(!enabled.contains(.importCoursesForReference))
 
             Button("Restore from Archive…") {

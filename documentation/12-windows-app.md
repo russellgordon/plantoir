@@ -5551,6 +5551,34 @@ under "The HIG sweep, screen by screen, on Windows (#491 part B)".)
 Import Courses for Reference… is on the File menu, beside Restore from
 Archive…. The calm note is shown before Obsidian opens, once per course,
 remembered in the state folder.
+### Owed: a course made or imported straight onto the shelf (#572, first piece)
+
+Not yet on Windows. The mac's write-up, with what was measured and rejected, is
+`09-mac-app.md` → "Making a reference course from nothing, or from a backup
+(#572)", and the `windows` issue for #572's first piece lists the work.
+
+- **Inherited free:** `setup_course.py --reference-staging-folder`, which
+  `setup.ps1` already forwards after `--`, and
+  `scripts/test_setup_course_reference_staging.py`, which `PythonToolchainTests`
+  discovers. Its prefix check reads `ReferenceStaging.cs`'s `Prefix` when the
+  file is there.
+- **Owed:** the wizard choice and its year picker (`referenceCourses.creating`:
+  `whenOffered`, `codeCheck`, `settingsWritten`, `sequence`, `wording`), a
+  reference run in `NewCourseCreator.cs` that claims the staging folder,
+  writes the marked settings, runs setup inside it and finishes through
+  `MakeIntoAReferenceCourse`; New Reference Course… on the shelf heading;
+  zips in Import Courses for Reference… (`referenceCourses.importing.zips`,
+  with its new `importing.wording` sentences, the size check and its
+  ceilings, the folders made searchable before the second link check, and
+  Import for Reference… on backup and whole-course archive rows as a pointer
+  to the same sheet); the changed `importing.wording.explanation`; and the
+  three trail events. `makeIntoAReferenceCourse` also releases the markers
+  of sections the settings do not list (`ReferenceCopier.sectionsToRelease`).
+- **To measure on Windows rather than copy:** what the unzipper there does
+  with a `..` name, an absolute name and a link entry. The mac's ditto keeps
+  names inside and makes links as links; the contract's checks refuse all
+  three either way.
+
 ## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
 
 What a Windows implementer needs that the mac's write-up cannot give; the

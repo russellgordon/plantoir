@@ -208,6 +208,14 @@ struct SidebarView: View {
                                         workspace.backupRestoreRequest = item
                                     }
                                     .disabled(workspace.isBeingCopied(item.courseCode))
+                                    // The Import sheet, with this zip already
+                                    // chosen (#572): the same door, not a
+                                    // fourth one.
+                                    Button(ReferenceImportWording.importForReferenceMenuItem, systemImage: "books.vertical") {
+                                        select(SidebarSelection.backup(item.id))
+                                        workspace.referenceImportRequest = ReferenceImportRequest(folderURL: item.fileURL)
+                                    }
+                                    .accessibilityIdentifier("importBackupForReference-\(item.id)")
                                     Button("Show in Finder", systemImage: "finder") {
                                         select(SidebarSelection.backup(item.id))
                                         NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
@@ -256,6 +264,15 @@ struct SidebarView: View {
                                     Button("Restore…", systemImage: "arrow.uturn.backward") {
                                         select(SidebarSelection.archived(item.id))
                                         workspace.restoreRequest = item
+                                    }
+                                    // A whole course only: a section's archive
+                                    // holds no course to read (#572).
+                                    if item.sectionNumber == nil {
+                                        Button(ReferenceImportWording.importForReferenceMenuItem, systemImage: "books.vertical") {
+                                            select(SidebarSelection.archived(item.id))
+                                            workspace.referenceImportRequest = ReferenceImportRequest(folderURL: item.fileURL)
+                                        }
+                                        .accessibilityIdentifier("importArchiveForReference-\(item.id)")
                                     }
                                     Button("Show in Finder", systemImage: "finder") {
                                         select(SidebarSelection.archived(item.id))
@@ -1283,6 +1300,17 @@ struct SidebarView: View {
                 }
             } header: {
                 Text(ReferenceWording.groupTitle)
+                    // The shelf's own door to the New Course wizard (#572),
+                    // opening it with the reference choice already made.
+                    // The shelf is drawn only when it holds a course, so the
+                    // wizard's own toggle is the door for a teacher with none.
+                    .contextMenu {
+                        Button(ReferenceCreationWording.newReferenceCourseMenuItem, systemImage: "plus") {
+                            workspace.newCourseWizardIsForReference = true
+                            workspace.isShowingNewCourseWizard = true
+                        }
+                        .accessibilityIdentifier("newReferenceCourse")
+                    }
             }
         }
     }
