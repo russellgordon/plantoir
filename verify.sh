@@ -791,6 +791,17 @@ else
   cat /tmp/verify_social_card_fonts_test.log
 fi
 
+# A course's name is cleaned of control characters where it is read (GitHub
+# #780): every contract case, and the three readers (the landing title, the
+# sharing card, setup_course's saved name). Pure stdlib apart from the card,
+# which skips without Pillow.
+if (cd scripts && python3 test_course_names.py) >/tmp/verify_course_names_test.log 2>&1; then
+  pass "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
+else
+  fail "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
+  cat /tmp/verify_course_names_test.log
+fi
+
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
 # #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
 # and deploy.sh's own question, and the real deploy.sh and deploy.py.
@@ -1881,6 +1892,7 @@ check_baked scripts/machine_line.py       /opt/scripts/machine_line.py
 check_baked scripts/site_health.py        /opt/scripts/site_health.py
 check_baked scripts/site_said.py          /opt/scripts/site_said.py
 check_baked scripts/section_problems.py   /opt/scripts/section_problems.py
+check_baked scripts/course_names.py       /opt/scripts/course_names.py
 # The contract itself must be IN the image: the container's only bind mount is
 # `courses`, so a rule the scripts read has nowhere else to come from. One file
 # stands for the directory — the Dockerfile copies it wholesale.

@@ -1394,7 +1394,9 @@ nonisolated enum ActivityTrail {
     /// says what happened in words rather than naming a function: "started
     /// building the preview", not "runScript(preview.sh)".
     /// `wholeLine` is for an entry that already carries its own timestamp and
-    /// shape — the assistant's turn record — so it is not stamped twice.
+    /// shape — the assistant's turn record — so it is not stamped twice. It
+    /// is the one entry allowed to keep its line breaks (#780); every other
+    /// `what` is written as one line, whatever it holds.
     static func note(
         _ event: Event,
         _ what: String,
@@ -1402,7 +1404,7 @@ nonisolated enum ActivityTrail {
         wholeLine: Bool = false
     ) {
         if wholeLine {
-            store.appendActivityLine(what)
+            store.appendActivityLine(what, keepingLineBreaks: true)
             return
         }
         store.appendActivityLine(line(what, at: moment))

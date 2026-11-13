@@ -4410,7 +4410,9 @@ past most recent first (`greetingUnitPlans.order`), so a full-year course, or
 one carrying last year's plans, names what matters now (707a review M2).
 Each name is put on one line first (`UnitPlans.oneLine`: a line break or a
 tab is one space), because Windows' `cmd /k` door cannot carry a line break
-(review M1); #780's clean of course names should meet it in one function.
+(review M1). Since #780 it runs the course name's rule first
+(`OneLineText.cleaned`), so a NUL or an override in a plan's name is a space
+or gone before the white space is collapsed; no #707 case changed.
 `UnitPlans.read` never throws: a plan file that is not JSON,
 or breaks `planFile.rules`, is left out and counted. The trail's
 "assistant opened" line gains " · told about unit planning", " · reminded of
@@ -11671,6 +11673,91 @@ sharing violation, as the issue says — a guessed delay that still drops the
 line after its last retry. **To KNOW:** if Windows ever trims, the trim must
 run under this same mutex, because a trim is the one write that replaces the
 file, which is exactly how the mac lost lines.
+
+### One line per entry: the trail is cleaned and redacted (#780)
+
+Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+`ProblemReportStore.appendActivityLine` passes every line through
+`ProblemReportStore.safeTrailLine` before the append described above, which
+cleans it with `OneLineText.cleaned` (the course name's rule,
+`contracts/shared-rules.json` → `courseNameCharacters`) and redacts it with
+`LogRedactor.redacting`. Until then nothing removed a control character, so a
+line break in ANY recorded string (a course name, a page title, a folder
+name) split one entry into two and the second read as a line of its own, and
+an escape sequence was written raw for whoever later read the file with `cat`.
+Cleaning the writer, rather than auditing every caller, is what makes "the
+trail never records one" true without a list of call sites to keep. It is the
+only place in the app that both cleans and redacts: the problem report's
+other files and the console are redacted and not cleaned, so there is no
+second order to keep in step.
+
+**The order: redact, clean, redact again, when the clean changes anything**
+(`trailLines.order`). Each single order leaks a different shape of secret,
+and it took two reviews to see both:
+
+- **Redact, then clean** (the plan's order) misses a secret a control is
+  HIDING: a NUL after `Bearer`, an isolate inside `CLOUDFLARE_API_TOKEN` and
+  an override before the `@` of an email address each keep the redactor's
+  rules from matching, because they look for white space and for words that
+  stay joined. The plan review measured it (H4).
+- **Clean, then redact** (the branch's first order) misses the tail of a
+  secret with a control INSIDE it: `\S+` and the home-folder rule read a NUL,
+  an ESC or a DEL as part of the value, but once cleaned it is a space, the
+  match stops there, and `Bearer abc123` NUL `SECRETTAIL` was written
+  `Bearer [removed: token] SECRETTAIL`. Version 1.9.3, which did not clean,
+  took the whole value, so this was a regression; the implementation review
+  measured it (H1).
+
+Both passes together leak neither for a control the redactor reads as part
+of a value (NUL, ESC, DEL and the other controls that are not white space),
+measured with the real `LogRedactor.swift` and `OneLineText.swift`: `trailLines.cases` holds the three
+hidden secrets and eight with a control inside (`Bearer` with a NUL, an ESC
+and a DEL, a labelled secret with an ESC, a value after a colon with a DEL,
+one wrapped in terminal colour codes, and a Mac and a Windows account name
+with a NUL). A line with nothing to clean is redacted once, as it always was.
+
+Redacting twice needed one change to `LogRedactor`: `labelledSecret` and
+`bearerHeader` no longer take a value that is already a placeholder
+(`(?!\[removed: )`), so a second pass changes nothing
+(`problemReportRedaction.redactedAgainCases`). Without it the second pass
+wrote `[removed: token] token]`, and that had been happening since before
+#780 wherever a caller redacted a line and handed it to the trail writer,
+which redacts again (`ScriptRunner`'s "started …" line). Rejected: taking a
+control OUT of the line for the redaction pass rather than spacing it. It
+would join a value a control had split, but it would also join two words a
+NUL stood between, and the line written would no longer be the line recorded.
+
+**What no order catches** (`trailLines.knownLimits`): a rule that matches a
+run of particular characters, the email address, the `nfp_` token, the three
+account-ID rules and the 40-character run, is cut short by a control in the
+middle of the value in every order, as it was in v1.9.3. So are
+`labelledSecret` and `bearerHeader` when the control inside the value is white
+space to the redactor (a tab, LF, CR, VT, FF, NEL, U+2028 or U+2029): `Bearer
+abc` LF `SECRETTAIL` is written `Bearer [removed: token] SECRETTAIL`, the tail
+v1.9.3 wrote after its own line break. No case pins these.
+
+**The one record that keeps its line breaks** is the assistant's turn
+record, `ActivityTrail.note(… wholeLine: true)`, which passes
+`keepingLineBreaks: true`: U+000A is kept there and every other code point is
+cleaned, a carriage return included. Two things inside it are put on one line
+first, because a line break there would otherwise survive:
+`AssistTurnRecord.askedLines` cleans the teacher's sentence before it goes
+behind `promptMarker`, and `AssistTurnRecord.lines` cleans the whole turn
+line (the argument names come from the model's own JSON). The first was a
+real leak, found while writing this: the assistant's field grows to several
+lines (`axis: .vertical`), so a sentence on two lines put its second line on
+the trail with no marker, and a report sent with the prompts left out still
+carried it. `trailLines.promptCases` pins it.
+
+**Not cleaned:** the launchers' `note_on_the_trail` and the quit script's
+`note` append with `printf` and go around this writer; they carry course
+codes and fixed words. Lines already on disk are not cleaned again when a
+report reads them back (the section below), because cleaning on the way out
+would need a second redaction to be safe. No new trail event: this changes
+how every line is written, not what is recorded. Tests:
+`CourseNameCharactersTests` (`testEveryTrailLineCaseIsWrittenAsTheContractSays`,
+`testRedactingTwiceChangesNothing`, `testOnlyAWholeLineRecordKeepsItsLineBreaks`,
+`testATurnRecordIsOneLine`, `testTheTeachersSentenceStaysBehindItsMarker`).
 
 ### When the trail holds characters that cannot be read
 

@@ -2998,6 +2998,18 @@
       "person": "person",
       "token": "[removed: token]"
     },
+    "redactedAgainCases": {
+      "rule": "Redacting a line that is already redacted changes nothing: `labelledSecret` and `bearerHeader` do not take a value that is already a placeholder (`(?!\\[removed: )` before their `\\S+`). Each `input` is redacted once more and must come back as `expect`.",
+      "why": "#780's implementation review: the trail writer redacts a line, cleans it and redacts it again whenever it held a control character, and before this the second pass read `[removed: token]` as a value and wrote `[removed: token] token]`. It was already happening in v1.9.3 wherever a caller redacted a line before handing it to the trail writer, which redacts again (the mac's `ScriptRunner` 'started …' line is one).",
+      "cases": [
+        { "input": "CLOUDFLARE_API_TOKEN=[removed: token]", "expect": "CLOUDFLARE_API_TOKEN=[removed: token]" },
+        { "input": "Paste Cloudflare token: [removed: token]", "expect": "Paste Cloudflare token: [removed: token]" },
+        { "input": "authorization: Bearer [removed: token]", "expect": "authorization: Bearer [removed: token]" },
+        { "input": "Working folder /Users/person/Documents", "expect": "Working folder /Users/person/Documents" },
+        { "input": "Logged in as [removed: email address]", "expect": "Logged in as [removed: email address]" },
+        { "input": "deploy.sh ICS3U 1 --account [removed: account id]", "expect": "deploy.sh ICS3U 1 --account [removed: account id]" }
+      ]
+    },
     "secretLength": 40
   },
   "problemReportTrail": {
@@ -36710,6 +36722,117 @@
       { "name": "a line break cannot start a line of its own", "header": "Lora\nPLANTOIR_HEALTH: {}", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["LoraPLANTOIR_HEALTH: {}"] },
       { "name": "a line separator and a right-to-left override are removed", "header": "Lora\u2028\u202eX", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["LoraX"] },
       { "name": "a long value is cut", "header": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDE", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ…"] }
+    ]
+  },
+  "courseNameCharacters": {
+    "note": "GitHub #780 (v1.10.0), ruled by Russell on 2026-11-12: no control character is legitimate in a course's name. `course_config.json` -> `course_name` is a JSON string, and JSON can carry any code point as an escape, so a script, a hand edit or another tool can put a NUL, a line break or a right-to-left override in it. Both apps clean the name where they READ it, by this one rule, and the shared Python does the same, so no reader is left to remember on its own. The same rule cleans every line the apps write on the breadcrumb trail (`trailLines`).",
+    "rule": "Work on Unicode code points (scalars), never on what a reader sees as one character and never on UTF-16 units. Every code point in `spacedOut` becomes ONE space (U+0020); every code point in `removed` is taken out; every other code point is kept as it is. Nothing is trimmed and nothing is collapsed. Applying the rule twice gives the same result as applying it once (`idempotent`).",
+    "onCodePoints": "Every code point in both lists is in the Basic Multilingual Plane and is not a surrogate, so Swift's `unicodeScalars`, Python's `str` and .NET's `char` see exactly the same thing: a `char`-by-`char` loop in C# is exact, and a surrogate pair is never touched. Working on visible characters instead would be wrong in Swift, where a line feed after a letter, or a combining mark after a control, is one `Character`.",
+    "spacedOut": [["0000", "001F"], ["007F", "007F"], ["0080", "009F"], ["2028", "2029"]],
+    "spacedOutWhy": "C0 controls (tab, line feed and carriage return included): a NUL cuts a C string and a label short, a line feed or a carriage return splits a trail line and the assistant's `list_courses` reply into two, ESC starts a terminal escape sequence in a log someone reads with `cat`, and a tab in a name is never meant. DEL is a control by every definition, and the Windows doors already treat it so (#736). C1 controls: U+0085 is a line break to several readers and U+009B starts an escape sequence in some terminals; they usually arrive by a bad Latin-1 conversion. U+2028 and U+2029 are line breaks to JavaScript, to Python's `splitlines` and to text views. A space rather than nothing, because a control often stands between two words.",
+    "removed": [["202A", "202E"], ["2066", "2069"]],
+    "removedWhy": "The bidirectional embeddings, overrides and isolates. U+202E RIGHT-TO-LEFT OVERRIDE makes a name read differently from what is stored, and an unbalanced one reorders whatever follows it on the same line, a trail line included. Removed rather than spaced because they take up no place in the text.",
+    "keptOnPurpose": [
+      { "codePoint": "200D", "name": "ZERO WIDTH JOINER", "why": "Holds emoji sequences together: the teacher emoji is a woman, U+200D and a school. Removing it splits the emoji in two." },
+      { "codePoint": "200C", "name": "ZERO WIDTH NON-JOINER", "why": "Persian and several other scripts need it to spell words correctly." },
+      { "codePoint": "200E", "name": "LEFT-TO-RIGHT MARK", "why": "A mark a Hebrew or Arabic name may need beside numbers. It reorders nothing on its own and cannot be left unbalanced." },
+      { "codePoint": "200F", "name": "RIGHT-TO-LEFT MARK", "why": "As U+200E." },
+      { "codePoint": "061C", "name": "ARABIC LETTER MARK", "why": "As U+200E, for Arabic." },
+      { "codePoint": "200B", "name": "ZERO WIDTH SPACE", "why": "Invisible, harms no reader of a course name, and a teacher may have pasted it from a web page. On the trail it is a different matter: a token with a zero-width space pasted into it is not matched by `LogRedactor`'s `nfp_` rule in either order (measured in the #780 plan review, L8). That is a gap in the redactor, not in a course name, and this rule does not try to close it." },
+      { "codePoint": "FEFF", "name": "ZERO WIDTH NO-BREAK SPACE (byte order mark)", "why": "As U+200B." },
+      { "codePoint": "00AD", "name": "SOFT HYPHEN", "why": "Ordinary text that a word processor puts in." },
+      { "codePoint": "202F", "name": "NARROW NO-BREAK SPACE", "why": "French puts it before a question mark. It is one code point after the removed range U+202A to U+202E, so it is the case that catches an off-by-one." }
+    ],
+    "noTrimming": "A control at the end becomes a trailing space and the space is kept. The mac's Course Settings field reads and writes the name through this rule on every keystroke, so a rule that trimmed would eat the space a teacher types before \"11\" one keystroke at a time. A reader that wants the ends trimmed trims AFTER cleaning: `build_site.computed_landing_title` does, and the New Course window does before it decides whether the name is empty.",
+    "whereItIsApplied": {
+      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule.",
+      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780.",
+      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it.",
+      "notHere": "Windows' `OutsideDoor.Clean` (#736) stays as it is: it also cleans the page names and the working folder an outside door carries, which are not course names, and it is the last layer before `cmd`. The file is not rewritten when a bad name is read: the next Save of ANY setting writes the cleaned name (the mac's `CourseConfiguration.write(to:)` cleans the key whatever was edited; a per-key merge would otherwise keep the raw name from the file)."
+    },
+    "idempotent": true,
+    "cases": [
+      { "name": "French with accents", "raw": "Français, 11e année", "expect": "Français, 11e année" },
+      { "name": "an en dash", "raw": "Physics – Grade 11", "expect": "Physics – Grade 11" },
+      { "name": "an em dash and a superscript letter", "raw": "Sciences — 10ᵉ", "expect": "Sciences — 10ᵉ" },
+      { "name": "the teacher emoji, which U+200D ZERO WIDTH JOINER holds together", "raw": "👩\u200d🏫 Teaching", "expect": "👩\u200d🏫 Teaching" },
+      { "name": "Persian with U+200C ZERO WIDTH NON-JOINER", "raw": "می\u200cخواهم", "expect": "می\u200cخواهم" },
+      { "name": "Hebrew with U+200F RIGHT-TO-LEFT MARK", "raw": "עברית\u200f 11", "expect": "עברית\u200f 11" },
+      { "name": "an accent written as a combining mark", "raw": "Phé\u0301sique", "expect": "Phé\u0301sique" },
+      { "name": "a soft hyphen", "raw": "Physics 11\u00ad", "expect": "Physics 11\u00ad" },
+      { "name": "a zero-width space", "raw": "Math\u200b11", "expect": "Math\u200b11" },
+      { "name": "a byte order mark at the start", "raw": "\ufeffPhysics", "expect": "\ufeffPhysics" },
+      { "name": "spaces at both ends are kept: nothing is trimmed", "raw": "  Physics  ", "expect": "  Physics  " },
+      { "name": "an empty name", "raw": "", "expect": "" },
+      { "name": "a NUL at the end becomes a trailing space, which is kept", "raw": "Physics\u0000", "expect": "Physics " },
+      { "name": "a NUL in the middle", "raw": "Phys\u0000ics", "expect": "Phys ics" },
+      { "name": "a line feed", "raw": "Physics\u000aGrade 11", "expect": "Physics Grade 11" },
+      { "name": "a tab", "raw": "Physics\u0009Grade 11", "expect": "Physics Grade 11" },
+      { "name": "a carriage return and a line feed are two spaces: nothing is collapsed", "raw": "Physics\u000d\u000a11", "expect": "Physics  11" },
+      { "name": "an escape sequence loses its ESC", "raw": "\u001b[31mPhysics", "expect": " [31mPhysics" },
+      { "name": "DEL", "raw": "Physics\u007f", "expect": "Physics " },
+      { "name": "U+0085 NEXT LINE, a C1 control", "raw": "Physics\u0085 11", "expect": "Physics  11" },
+      { "name": "U+009F, the last C1 control", "raw": "Physics\u009f11", "expect": "Physics 11" },
+      { "name": "U+2028 LINE SEPARATOR", "raw": "Physics\u2028Grade", "expect": "Physics Grade" },
+      { "name": "U+2029 PARAGRAPH SEPARATOR", "raw": "Physics\u2029Grade", "expect": "Physics Grade" },
+      { "name": "a name that is only a NUL", "raw": "\u0000", "expect": " " },
+      { "name": "U+202E RIGHT-TO-LEFT OVERRIDE is removed", "raw": "abc\u202edcba", "expect": "abcdcba" },
+      { "name": "U+2066 and U+2069, an isolate around the name, are removed", "raw": "\u2066Physics\u2069", "expect": "Physics" },
+      { "name": "French with U+202F NARROW NO-BREAK SPACE before a question mark, one code point after the removed range", "raw": "Pourquoi\u202f?", "expect": "Pourquoi\u202f?" },
+      { "name": "French with a typographic apostrophe and U+00A0 NO-BREAK SPACE, one code point after the C1 range", "raw": "Sciences de l’environnement\u00a0: 11e", "expect": "Sciences de l’environnement\u00a0: 11e" },
+      { "name": "Arabic", "raw": "الفيزياء ١١", "expect": "الفيزياء ١١" },
+      { "name": "Arabic with U+061C ARABIC LETTER MARK", "raw": "الصف\u061c 11", "expect": "الصف\u061c 11" },
+      { "name": "Arabic with its vowel marks", "raw": "ف\u0650يز\u0650ي\u064eاء", "expect": "ف\u0650يز\u0650ي\u064eاء" },
+      { "name": "a family emoji with skin tones, held together by U+200D", "raw": "👨🏽\u200d👩🏽\u200d👧 Family Studies", "expect": "👨🏽\u200d👩🏽\u200d👧 Family Studies" },
+      { "name": "a keycap emoji", "raw": "1\ufe0f\u20e3 Unit", "expect": "1\ufe0f\u20e3 Unit" },
+      { "name": "the flag of England, written with tag characters from plane 14", "raw": "🏴\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f English", "expect": "🏴\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f English" },
+      { "name": "U+2060 WORD JOINER", "raw": "Math\u206011", "expect": "Math\u206011" },
+      { "name": "U+FFF9 INTERLINEAR ANNOTATION ANCHOR", "raw": "A\ufff9B", "expect": "A\ufff9B" },
+      { "name": "U+3164 HANGUL FILLER, a letter that looks blank", "raw": "\u3164", "expect": "\u3164" },
+      { "name": "a variation selector after a CJK character", "raw": "葛\udb40\udd00", "expect": "葛\udb40\udd00" },
+      { "name": "U+206A, one code point after the isolates, is kept", "raw": "\u206aPhysics", "expect": "\u206aPhysics" },
+      { "name": "RECORDED CHANGE: an Arabic name with a Latin course code wrapped in U+2067 RIGHT-TO-LEFT ISOLATE and U+2069 POP DIRECTIONAL ISOLATE loses the isolates; the letters survive, and only spaces, punctuation and numbers beside the code can be placed differently on screen", "raw": "دورة \u2067ICS3U\u2069 للصف 11", "expect": "دورة ICS3U للصف 11" },
+      { "name": "RECORDED CHANGE: the same with U+202B RIGHT-TO-LEFT EMBEDDING and U+202C POP DIRECTIONAL FORMATTING", "raw": "\u202bالفيزياء ICS3U\u202c", "expect": "الفيزياء ICS3U" }
+    ],
+    "trailLines": {
+      "rule": "Every line an APP writes on the breadcrumb trail is cleaned by the same rule and redacted before it is written, in the order `order` gives. A line therefore cannot carry a line break of its own, so a line break inside a course name, a page title or a folder name can no longer start a forged line. The one record that keeps its line breaks is the assistant's turn record (`wholeLine` on the mac): there U+000A is kept and every other code point in the rule is cleaned as usual, a carriage return included. The teacher's own sentence in that record is cleaned to ONE line before it is put behind `activityTrail.promptMarker`, so leaving the prompts out of a report leaves out all of it.",
+      "order": "Redact, clean, then redact again, whenever the clean changes the line; a line with nothing to clean is redacted once, as before. Each single order leaks a different shape of secret, measured with the real `LogRedactor.swift` and `OneLineText.swift` compiled together. CLEAN THEN REDACT (the first implementation's order, after the plan review's H4): a control INSIDE a secret becomes a space, `\\S+` and the home-folder rule stop at it, and the rest is written out (`Bearer abc123` NUL `SECRETTAIL` was written `Bearer [removed: token] SECRETTAIL`; `/Users/ann` NUL `e` became `/Users/person e`): the implementation review's H1, a regression against v1.9.3, which took the whole value. REDACT THEN CLEAN (the plan's order): a control placed BETWEEN a label and its value, or inside the label, hides the secret from every rule (a NUL after `Bearer`, an isolate inside `CLOUDFLARE_API_TOKEN`, an override before an email's `@`): the plan review's H4. Redacting first takes the first shape whole when the control inside is one the redactor reads as part of a value (NUL, ESC, DEL and the other controls that are not white space), and redacting the cleaned result takes the second. A tab, LF, CR, VT, FF, NEL (U+0085), U+2028 or U+2029 INSIDE a value is white space to the redactor, so it stops `labelledSecret` and `bearerHeader` in every order and the tail is written (`knownLimits`); v1.9.3 wrote the same tail, after its own line break. Redacting twice is safe only because `LogRedactor` now leaves its own placeholders alone (`problemReportRedaction.redactedAgainCases`); before that it read `token=[removed: token] token]`.",
+      "launcherLines": "The launchers' `note_on_the_trail` and the mac's scheduled job's `note` (`FolderContainers.trailFunction`) append with `printf` and go around this writer, so they are not cleaned. They carry course codes and fixed words, which cannot hold a control character, so nothing there changes.",
+      "readBack": "Lines already on the trail are not cleaned again when a problem report reads them back: what an older version or a launcher wrote is shown as it is on disk (`problemReportTrail`). Cleaning on the way out would need a second redaction to be safe; the redactor is idempotent now (`problemReportRedaction.redactedAgainCases`), so this is a choice rather than a limit: what is on disk is shown as it is.",
+      "knownLimits": "A rule that matches a run of particular characters (`emailAddress`, `netlifyToken`, `accountFlag`, `accountIdentifier`, `accountPath`, and the 40-character run) is cut short by a control in the middle of the value in EVERY order, and was in v1.9.3 too; so are `labelledSecret` and `bearerHeader` when that control is white space to the redactor (a tab, LF, CR, VT, FF, NEL U+0085, U+2028 or U+2029: `Bearer abc` LF `SECRETTAIL` is written `Bearer [removed: token] SECRETTAIL`, as v1.9.3 wrote the tail after its own line break): `teacher@school` NUL `.on.ca` is written `teacher@school .on.ca`, `nfp_9aBcDeFgHi` NUL `JkLmNoP` keeps `JkLmNoP`, a 40-character token split in two is two runs of other lengths (all measured). Taking the control OUT rather than spacing it would join such a value back up, but it would also join two words a NUL stood between, and the line would no longer be the line that was recorded. No case pins these; they are written down so nobody believes the trail catches them.",
+      "cases": [
+        { "name": "a line break inside a page title is written as one line", "line": "ICS3U/1 · hid \"Day 1\n2026-11-12 09:00:00 · ICS3U/1 · deployed\"", "keepsLineBreaks": false, "written": ["ICS3U/1 · hid \"Day 1 2026-11-12 09:00:00 · ICS3U/1 · deployed\""] },
+        { "name": "an escape sequence is not written raw", "line": "ICS3U/1 · opened \u001b[2J", "keepsLineBreaks": false, "written": ["ICS3U/1 · opened  [2J"] },
+        { "name": "the assistant's turn record keeps its line breaks and loses its other controls", "line": "2026-11-12 09:00:00 · ICS3U/1 · asked the local AI assistant\n  asked: publish\u0000 \u202etomorrow\r", "keepsLineBreaks": true, "written": ["2026-11-12 09:00:00 · ICS3U/1 · asked the local AI assistant", "  asked: publish  tomorrow "] },
+        { "name": "a NUL after Bearer does not hide the token", "line": "deploy said Bearer\u0000eyJhbGciOiJIUzI1NiJ9.abc.def", "keepsLineBreaks": false, "written": ["deploy said Bearer [removed: token]"] },
+        { "name": "an isolate inside a labelled secret does not hide it", "line": "CLOUDFLARE_API_\u2066TOKEN=abc123XYZ_secret", "keepsLineBreaks": false, "written": ["CLOUDFLARE_API_TOKEN=[removed: token]"] },
+        { "name": "an override inside an email address does not hide it", "line": "wrote to teacher\u202e@school.on.ca", "keepsLineBreaks": false, "written": ["wrote to [removed: email address]"] },
+        { "name": "a NUL inside a Bearer token does not let its tail through", "line": "Bearer abc123\u0000SECRETTAIL", "keepsLineBreaks": false, "written": ["Bearer [removed: token]"] },
+        { "name": "an ESC inside a Bearer token does not let its tail through", "line": "Bearer abc123\u001bSECRETTAIL", "keepsLineBreaks": false, "written": ["Bearer [removed: token]"] },
+        { "name": "a DEL inside a Bearer token does not let its tail through", "line": "Bearer abc123\u007fSECRETTAIL", "keepsLineBreaks": false, "written": ["Bearer [removed: token]"] },
+        { "name": "an ESC inside a labelled secret does not let its tail through", "line": "CLOUDFLARE_API_TOKEN=abc123\u001bSECRETTAIL", "keepsLineBreaks": false, "written": ["CLOUDFLARE_API_TOKEN=[removed: token]"] },
+        { "name": "a DEL inside a value after a colon does not let its tail through", "line": "token: abc123\u007fSECRETTAIL", "keepsLineBreaks": false, "written": ["token: [removed: token]"] },
+        { "name": "a secret wrapped in terminal colour codes is removed whole", "line": "token=\u001b[1mABCDEFSECRET\u001b[0m done", "keepsLineBreaks": false, "written": ["token=[removed: token] done"] },
+        { "name": "a NUL inside a Mac account name does not leave part of it", "line": "looked in /Users/ann\u0000e/Documents", "keepsLineBreaks": false, "written": ["looked in /Users/person/Documents"] },
+        { "name": "a NUL inside a Windows account name does not leave part of it", "line": "looked in C:\\Users\\Ann\u0000e\\Documents", "keepsLineBreaks": false, "written": ["looked in C:\\Users\\person\\Documents"] }
+      ],
+      "promptCases": [
+        { "name": "a sentence with a line break in it stays behind the marker", "prompt": "publish tomorrow\nand hide Day 3", "askedLine": "  asked: publish tomorrow and hide Day 3" },
+        { "name": "a sentence with a carriage return and a tab", "prompt": "publish\r\ttomorrow", "askedLine": "  asked: publish  tomorrow" }
+      ],
+      "promptCasesWhy": "Measured before #780: the mac's assistant field grows to several lines, the record of the sentence is written with its line breaks kept, and a sentence on two lines put its second line on the trail with no marker. A report sent with the prompts left out still carried that second line. Each `askedLine` is the second line of the record; the first is the stamped line naming the course, unchanged."
+    },
+    "appliesOn": ["mac", "windows"],
+    "why": "#736 found that a course name holding a control character broke the Windows outside doors, and cleaned the doors' arguments only. The same name did harm in other places on both platforms: a line break forged a line on the trail and in the assistant's `list_courses` reply an MCP client reads, a NUL cut a label short, and a right-to-left override made a label read differently from what is stored. Cleaning where the name is READ fixes every one of those at once, the readers nobody has written yet included.",
+    "rejected": [
+      "Refusing such a name at entry, with an alert. The character is invisible, so asking a teacher to remove it sets a puzzle; cleaning loses nothing they meant.",
+      "Cleaning only at the doors and the trail, the shape Windows had after #736. Every reader would need its own copy, and the sidebar, the window's subtitle, `list_courses` and the site title would each be one more place to forget.",
+      "Rewriting `course_config.json` when a bad name is read. A read that writes surprises Obsidian and the other app; the next Save of any setting writes the cleaned name anyway.",
+      "All of Unicode category Cf (format characters). It would remove the zero-width joiner, the zero-width non-joiner and the directional marks, breaking emoji and whole scripts (Persian, Hebrew, Arabic) for no reader that is harmed by them.",
+      "Normalising the name to NFC at the same time. A different question, two spellings of one accented letter, with its own risks for comparisons (#189 is about folder names).",
+      "Trimming. It would eat the space a teacher types in Course Settings.",
+      "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
+      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
     ]
   }
 }

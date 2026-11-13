@@ -25,6 +25,7 @@ import site_health
 import contracts
 import machine_line
 import class_pages
+import course_names
 import markdown_code
 import how_i_teach
 import page_visibility
@@ -978,7 +979,13 @@ def computed_landing_title(cfg, section_number, show_marker):
     default on), and keeps the grade from doubling when the course name
     already carries one ("Computer Science, Grade 12, U").
     """
-    name = str(cfg.get("course_name") or cfg.get("course_code") or "").strip()
+    # Cleaned before it is trimmed (#780): a NUL, a line break or a
+    # right-to-left override in the name never reaches the site title, the
+    # front page heading or a printed page's footer. A name that is nothing
+    # but such characters, or only spaces, falls back to the course code.
+    name = course_names.cleaned(str(cfg.get("course_name") or "")).strip()
+    if not name:
+        name = str(cfg.get("course_code") or "").strip()
     code = str(cfg.get("course_code") or "")
     # Deliberately literal: the switch alone decides. The app warns when
     # the name already carries the grade; what to do about it — edit the

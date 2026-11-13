@@ -3762,7 +3762,9 @@ the stored names. What the rule itself is: [06 → B1](06-quartz-customizations.
 Two more things happen here, fresh on every build:
 
 - **The landing-page title is computed** (`computed_landing_title`) from
-  the CURRENT settings — `course_name`, the per-section
+  the CURRENT settings — `course_name` (cleaned of control characters first,
+  `scripts/course_names.py`, #780, and the course code when nothing is left;
+  [08 → "Control characters in `course_name`"](08-course-config-reference.md)), the per-section
   `show_grade_in_title` toggle (default on; a legacy course-wide boolean
   is honoured), and the per-section `show_section_marker` setting, which
   governs the `", Section N"` suffix — and written into the MERGED copy of

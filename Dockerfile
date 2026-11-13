@@ -296,6 +296,9 @@ COPY scripts/site_health.py /opt/scripts/site_health.py
 # toolchain change is gated on it: the unit tests were green and the image
 # could not be built at all.
 COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# A course's name, cleaned where it is read (#780): imported by build_site.py,
+# setup_course.py and social_card.py by bare name.
+COPY scripts/course_names.py /opt/scripts/course_names.py
 # Where a page's CODE is, so a link written inside code is not read as one
 # (#313) — imported by build_site.py and setup_course.py; the rule is
 # contracts/shared-rules.json → readingALink.whatIsCode.

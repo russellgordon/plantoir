@@ -190,13 +190,17 @@ nonisolated enum UnitPlans {
     /// line break, a tab, several spaces) becomes one space, and the ends are
     /// trimmed, so the greeting and the trail stay one line on both
     /// platforms (707a review M1; Windows' `cmd /k` door cannot carry a line
-    /// break). This is NOT a general clean of control characters: #780 does
-    /// that for course names in this release, and the two should meet in one
-    /// function when it lands.
+    /// break). The course name's rule (#780, `OneLineText`) runs first, so a
+    /// NUL, an escape or a bidirectional override in a plan's name is a
+    /// space or gone before the white space is collapsed; the two rules meet
+    /// here rather than living side by side. A line break, a tab or a run of
+    /// spaces reads exactly as before, and a control the rule turns into a
+    /// space is collapsed with its neighbours like any other space.
     static func oneLine(_ text: String) -> String {
+        let cleanedText: String = OneLineText.cleaned(text)
         var result: String = ""
         var lastWasSpace: Bool = false
-        for character in text {
+        for character in cleanedText {
             if character.isWhitespace {
                 if !lastWasSpace {
                     result.append(" ")
