@@ -20,7 +20,7 @@ keywords:
 - Netlify
 - Cloudflare
 - file too large
-description: What the sentence after a failed deploy means and what to do about it, and the reasons the Deploy button is greyed.
+description: What the sentence after a failed deploy means and what to do about it, and the reasons the Deploy button is greyed or not there.
 ---
 When a deploy does not finish, the section's window says what went wrong and what to do. This page lists those sentences, and the reasons {{control:deployButton}} can be greyed.
 
@@ -84,8 +84,9 @@ alt: The Deploy button greyed in the toolbar, with the help that says the course
 
 - while the section is already being deployed;
 - while a copy of the course is being saved;
-- while the working folder is being got ready;
-- for a course kept for reference, which is never deployed.
+- while the working folder is being got ready.
+
+A course kept for reference has no {{control:deployButton}} button at all, and {{menu:deploy}} is greyed for it. Such a course is never deployed.
 
 ## A second deploy of the same section
 

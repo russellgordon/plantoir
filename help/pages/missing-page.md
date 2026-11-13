@@ -11,6 +11,7 @@ keywords:
 - page missing
 - missing page
 - page not showing
+- new page
 - not on the site
 - students cannot see
 - students can't see
