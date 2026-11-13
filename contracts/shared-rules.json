@@ -25699,11 +25699,12 @@
       "rule": "Under the policy a Netlify publish sends (scripts/netlify_badge.py: script-src 'self' 'unsafe-eval' <hashes>) the stock engine never loads; the six replacements of geogebra_engine.py make it load with that policy unchanged. Every browser check serves on [::1], never 127.0.0.1 or localhost: GeoGebra's loader runs its main file as inline text on those two hosts (and apps-builds.), which would test a path no class site takes. browser-checks/geogebra_applet.mjs proves it on a clone of a built site with the publish's own _headers: zero refusals by the policy, zero requests off the site."
     },
     "words": {
-      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes.",
+      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes. While a sketch opens, `site.loading` and under it `site.loadingFirstTime` show INSIDE the sketch's own box, where the student tapped, in one polite live region said once (#756); they go when the sketch draws, and on failure `site.couldNotLoad` is said below the box instead. \"Up to a minute\" is the loader's own bound (GIVE_UP_MS, 60 s), after which a student is told it did not open; \"the first time\" because the engine is then kept by the browser and opens quickly.",
       "site": {
         "openSketch": "Open the sketch ({size})",
         "sketchSize": "about {megabytes} MB",
         "loading": "Opening the sketch…",
+        "loadingFirstTime": "The first time, this can take up to a minute.",
         "couldNotLoad": "This sketch couldn't be opened. Check the connection, then try again.",
         "lineCouldNotRun": "Line {line} couldn't run: {said}",
         "commandsSummary": "What this sketch is made from",

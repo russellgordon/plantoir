@@ -4360,6 +4360,72 @@ browser opens no keyboard. A tap that has not opened a sketch in 60 s says
 from the site's own copy in `static/geogebra-sketches/` (05 → item 9), never
 from geogebra.org.
 
+**While it opens (#756).** The tap's words are said inside the sketch's own
+card, where the student tapped: `words.site.loading` ("Opening the sketch…")
+with a small turning ring, and under it `words.site.loadingFirstTime`. Until
+#756 the card kept its picture and a disabled button, `loading` was said on
+the line below it, and the applet's box was laid out UNDER the card while the
+engine arrived: an empty white box one sketch tall, pushing everything below
+the sketch down until it drew. Measured on the fixture page (headless
+Chromium 1243 and WebKit 2359, a real press, the engine's first request held):
+the figure went 435.58 → 829.17 → 433.58 px, a 393.6 px jump and back.
+
+- **How.** The transformer puts an empty `div.pl-geogebra-loading`
+  (`role=status`, `aria-live=polite`) inside each card. On a tap,
+  `showOpening` fills it with the two lines and adds `pl-geogebra-opening` to
+  the figure; `endOpening` empties it and removes the class, in the same task
+  that adds `pl-geogebra-loaded` (drawn) or in `failed()` (then the line below
+  says `couldNotLoad`, as before). The region is in the page from the start
+  and filled once, so a screen reader hears the words once; the line below no
+  longer says `loading`, so they are not said twice.
+- **The box under the card.** While `pl-geogebra-opening` is on, the figure
+  is `position: relative`, the card `z-index: 1`, and the applet's box is
+  `position: absolute` at the card's place (top 0, left and right 0, the same
+  `max-width` and ratio) with `z-index: 0`. GeoGebra still measures the box's
+  real width when it is made. The `z-index: 0` matters: GeoGebra's own white
+  preview inside the box has `z-index: 90` and drew over the card until the
+  box became a stacking context (measured, Chromium).
+- **The card is `box-sizing: border-box`.** Its 1 px border was outside the
+  sketch's shape, so the card was 362 px tall where the box is 360, and the
+  page jumped 2 px when the sketch arrived. Now the figure is 433.58 px
+  before the press, through every change while it opens, and once drawn, in
+  both engines; the resting picture is 2 px shorter than before #756, by
+  design, and the drawn sketch is exactly as before.
+- **Theme and motion.** The words sit on a `var(--light)` panel in
+  `var(--dark)` and `var(--darkgray)`: contrast 12.13 and 7.24 in light,
+  16.27 and 13.28 in dark (read by the check). The ring is still under
+  `prefers-reduced-motion: reduce`; the words carry it.
+- **"Up to a minute"** is `GIVE_UP_MS`; "the first time" because a later
+  open is quick once the browser has the engine.
+- **The check** (`browser-checks/geogebra_applet.mjs` item 13) presses the
+  first sketch with real pointer events, holds the engine's first request
+  (`Fetch.requestPaused`) while it reads the card's words against the
+  contract, the contrast in light and dark, the ring with and without
+  reduced motion, and the figure's height and the page's scroll height on
+  every change and every frame until drawn (within 1 px); then presses a
+  fourth, unopened sketch with its file refused (`Fetch.failRequest`) and
+  reads `couldNotLoad` below it with the button back. On dev's loader it
+  fails nine ways per phase, the 393.6 px jump among them. It takes no
+  screenshot: `Page.captureScreenshot` made Chrome fetch the theme's font
+  again after the tap, which the off-site count reported.
+- **Rejected.** A grid on the figure to stack the card and the box (it stops
+  the vertical margins of the caption, the lines and the attribution from
+  collapsing, so every sketch's resting spacing would move; plan review M5).
+  A wrapper element (the loader, the quiz and the print code find the card,
+  the box and the message as the figure's own children). Keeping the box
+  hidden until the sketch draws (GeoGebra would measure a zero width). A
+  progress bar (GeoGebra's loader reports no progress). A timed wait in the
+  check to see the in-between state (the held request is the dependency).
+- **The words are centred by their margins across the whole card**
+  (`left: 0; right: 0; width: max-content`). A first try with `left: 50%`
+  left them half the card to wrap in: 178 px wide in a 358 px card at a
+  390 px window, four lines tall.
+- **Known limit.** The words are 57 px tall (two lines, measured in both
+  engines). A sketch four times as wide as it is tall, in a 390 px window,
+  has an 89.5 px card, and they fit; a card shorter than 57 px (wider than
+  about six to one on a phone) clips them at the card's edge rather than
+  push the page. Measured headless only, not on a device.
+
 **The fence's commands** (#578 stage 3, `geogebraFences.commands`) run once
 the sketch has opened, one line at a time, and a line GeoGebra refuses is
 shown under the sketch — `lineCouldNotRun`, "Line {line} couldn't run:
