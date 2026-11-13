@@ -149,6 +149,10 @@ targets:
       # with no inputs the sandbox refused to let Python read even this
       # script; with these, folders included, it hashed all 12,912 files and
       # wrote the same manifest byte for byte.
+      # Since #747 the script first removes every __pycache__ and .pyc from
+      # the bundle's four folders. Under YES the sandbox refuses that delete
+      # (measured 2026-11-12, Xcode 27.0, outputs declared or not), and the
+      # phase fails the build with a sentence rather than ship them.
       # documentation/09-mac-app.md → "Comparing without reading (#663)".
       - name: Write the toolchain's fingerprints
         script: |

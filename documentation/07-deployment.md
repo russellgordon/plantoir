@@ -2132,9 +2132,10 @@ a product that was fine. The preflight now mirrors, from the WORKING TREE
 names — read from the contract, never a fifth hand-kept list. Files with
 `cp -p`, folders with `rsync -a --delete --exclude=__pycache__
 --exclude=.DS_Store`, so dates are kept and the app's size-and-date check
-finds nothing to redo. Python's caches are never copied, because
-`toolchain_hash` in `preview.sh` does not prune `__pycache__` and one copied
-cache would be a new image tag; one already in the folder is left alone
+finds nothing to redo. Python's caches are never copied. Until #747
+`toolchain_hash` did not prune `__pycache__`, so one copied cache was a new
+image tag; it skips them since, and the exclude stays so the folder holds
+only what the app would mirror. One already in the folder is left alone
 (measured: macOS's openrsync keeps an excluded destination file under
 `--delete`, and its `-i` prints nothing, so the count comes from
 `diff -rq` before the copy instead). When anything differed, the section is

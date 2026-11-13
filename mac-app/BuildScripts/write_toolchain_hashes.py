@@ -26,10 +26,19 @@ Incremental: a file whose length and time still match the previous manifest's
 line keeps that line's hash without being read, so a build that copied nothing
 new costs a walk and a stat per file. The file is written whole (a temporary
 file, then a rename) and only when it would change.
+
+Bytecode first (#747): before anything is fingerprinted, every `__pycache__`
+folder and every `.pyc` and `.pyo` file is removed from the BUNDLE's copy of the four
+folders. Xcode copies a folder reference whole, so a test run by hand in the
+checkout (which writes `scripts/__pycache__/…`) put compiled Python into the
+app, into every working folder's `.toolchain/`, and into the image tag the
+launchers hash from it. The checkout itself is never touched: refusing the
+build there would break the next build after every hand-run test.
 """
 
 import hashlib
 import os
+import shutil
 import sys
 
 MANIFEST_NAME = "toolchain.hashes"
@@ -76,6 +85,54 @@ def sha256_of(path):
     return digest.hexdigest()
 
 
+def is_bytecode_folder(name):
+    return name == "__pycache__"
+
+
+def is_bytecode_file(name):
+    return name.endswith(".pyc") or name.endswith(".pyo")
+
+
+class LinkedRecipeFolder(Exception):
+    """A recipe folder in the bundle is a link, which the phase never follows."""
+
+
+def remove_bytecode(resources):
+    """Removes compiled Python from the bundle's copy of FOLDERS (#747).
+
+    Returns the number of files removed. A folder or file that cannot be
+    removed raises, so the build fails rather than shipping it.
+
+    Never follows a link: a recipe folder that is itself a link is refused
+    (os.walk would follow it, and the delete would reach whatever it points
+    at, outside the bundle), and os.walk does not descend through a linked
+    folder further down. Xcode copies a folder reference as real folders, so
+    a link here means something other than Xcode made the bundle.
+    """
+    removed = 0
+    for folder in FOLDERS:
+        top = os.path.join(resources, folder)
+        if os.path.islink(top):
+            raise LinkedRecipeFolder(top)
+        for directory, subfolders, names in os.walk(top, followlinks=False):
+            kept_subfolders = []
+            for subfolder in subfolders:
+                full = os.path.join(directory, subfolder)
+                if is_bytecode_folder(subfolder) and not os.path.islink(full):
+                    for _inner, _folders, inner_names in os.walk(full):
+                        removed += len(inner_names)
+                    shutil.rmtree(full)
+                else:
+                    kept_subfolders.append(subfolder)
+            # os.walk descends only into what is left in the list.
+            subfolders[:] = kept_subfolders
+            for name in names:
+                if is_bytecode_file(name) and not os.path.islink(os.path.join(directory, name)):
+                    os.remove(os.path.join(directory, name))
+                    removed += 1
+    return removed
+
+
 def files_to_describe(resources):
     relatives = []
     for name in ROOT_FILES:
@@ -101,6 +158,20 @@ def main():
     if not os.path.isdir(os.path.join(resources, "scripts")):
         print(f"error: {resources} holds no scripts/ folder; the resources were not copied", file=sys.stderr)
         return 1
+    try:
+        removed = remove_bytecode(resources)
+    except LinkedRecipeFolder as error:
+        print(f"error: {error} is a link, not a folder; nothing was removed through it, "
+              "and the bundle is not one Xcode made (#747)", file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"error: compiled Python in the bundle could not be removed ({error}); "
+              "the app would carry it and rename the website builder's image (#747). "
+              "Remove __pycache__ from the checkout's patches/, scripts/, support/ and contracts/ "
+              "and build again.", file=sys.stderr)
+        return 1
+    if removed > 0:
+        print(f"toolchain.hashes: removed {removed} compiled Python files from the bundle's copy")
     manifest = os.path.join(resources, MANIFEST_NAME)
     previous = read_previous(manifest)
     lines = []
