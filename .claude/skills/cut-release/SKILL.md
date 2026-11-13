@@ -10,6 +10,15 @@ only part of the process that needs judgement; everything else is
 mechanical. `RELEASING.md` is the authoritative checklist —
 this skill automates its steps 5–6 and the note-writing.
 
+## Before anything else: has the interface changed?
+
+If this release changes what a teacher sees (a new control, a moved one, a new or
+changed sentence), the UI/UX review page comes BEFORE the cut: run the
+[`ui-review`](../ui-review/SKILL.md) skill, take Russell through the page, and cut
+only when what it found is fixed and his rulings are in. Standing practice since
+v1.10.0 (Russell, 2026-11-13). The smoke test that follows covers only what a
+picture cannot show.
+
 ## Gather
 
 1. Last release: `git describe --tags --abbrev=0` (if no tag exists,
