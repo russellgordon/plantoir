@@ -23,9 +23,12 @@ import Observation
 ///   event) is not the shape here. Measured for #729 (W1 to W12,
 ///   `documentation/09-mac-app.md` → "Deploy waits for another program
 ///   (#729)").
-/// - While the activity folder does not exist yet, the nearest folder above
-///   it that does (`courses/.internal`, then `courses/`) is watched instead,
-///   and the watch moves down when it appears. Nothing is created here.
+/// - Every level of the path to it that exists is watched too (`courses/`,
+///   `courses/.internal`): a change at a level above the activity folder
+///   (one made, removed, renamed or replaced) re-arms every level from the
+///   path as it is now. So the watch follows the folder being made one level
+///   at a time, removed, or renamed away and back (the #729 implementation
+///   review's M-b1). Nothing is created here.
 /// - Each holder's process: one `ProcessEnding.ends(of:)` per distinct process
 ///   id among the blocking leases. This is what un-greys the button when a
 ///   holder is killed or crashes and leaves its lease behind: its lease then
@@ -47,6 +50,18 @@ import Observation
 @MainActor
 @Observable
 final class LeaseWatcher {
+
+    // MARK: - Types
+
+    /// One change at one level of the path to the activity folder; `change`
+    /// is nil when that level's watch could not be opened.
+    struct LevelChange: Sendable {
+
+        // MARK: - Stored properties
+
+        let isTheActivityFolder: Bool
+        let change: ScheduledPublishWatcher.Change?
+    }
 
     // MARK: - Stored properties
 
@@ -223,84 +238,118 @@ final class LeaseWatcher {
         reread()
     }
 
-    /// Arm a watch on the activity folder, or on the nearest folder above it
-    /// that exists while it does not. Leaves the watch deaf when none of them
-    /// exists (no `courses/` at all): the next outside event tries again.
+    /// Arm a watch on EVERY level that exists, from `courses/` down to the
+    /// activity folder: `courses/`, `courses/.internal`, and
+    /// `courses/.internal/activity`. Leaves the watch deaf when not even
+    /// `courses/` exists: the next outside event tries again.
+    ///
+    /// Every level, not only the deepest (the #729 implementation review's
+    /// M-b1, and its renamed case). A watch is on an open folder, not on a
+    /// path, so a watch on the activity folder hears nothing when
+    /// `.internal` above it is made alone, renamed away or replaced, and a
+    /// watch on `courses/` hears nothing that happens inside `.internal`.
+    /// Watching each level means any change to the path is an event: a
+    /// change in the activity folder is a re-read, and a change at a level
+    /// above it re-arms every level from the path as it is now, then
+    /// re-reads.
     private func armTheFolderWatch() {
-        let candidates: [URL] = [
-            activityDirectory,
-            activityDirectory.deletingLastPathComponent(),
-            coursesDirectory
-        ]
-        var watched: URL? = nil
-        for candidate in candidates {
+        var levels: [URL] = []
+        for candidate in [coursesDirectory, activityDirectory.deletingLastPathComponent(), activityDirectory] {
             var isDirectory: ObjCBool = false
-            if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
-               isDirectory.boolValue {
-                watched = candidate
+            if !FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory)
+                || !isDirectory.boolValue {
                 break
             }
+            levels.append(candidate)
         }
-        guard let watched else {
+        if levels.isEmpty {
             return
         }
-        let watchingTheFolderItself: Bool = watched == activityDirectory
-        let changes: AsyncStream<ScheduledPublishWatcher.Change> = ScheduledPublishWatcher.changes(
-            at: watched, watching: [.write, .delete, .rename]
-        )
-        folderTask = Task { [weak self] in
-            await self?.watchTheFolder(changes, watchingTheFolderItself: watchingTheFolderItself)
+        let merged: (stream: AsyncStream<LevelChange>, continuation: AsyncStream<LevelChange>.Continuation) =
+            AsyncStream<LevelChange>.makeStream(bufferingPolicy: .bufferingNewest(16))
+        var forwarders: [Task<Void, Never>] = []
+        for level in levels {
+            // Armed here, before this function returns (`changes` arms in
+            // its stream's build closure); the forwarding task only passes
+            // on what it delivers.
+            let changes: AsyncStream<ScheduledPublishWatcher.Change> = ScheduledPublishWatcher.changes(
+                at: level, watching: [.write, .delete, .rename]
+            )
+            let isTheActivityFolder: Bool = level == activityDirectory
+            let continuation: AsyncStream<LevelChange>.Continuation = merged.continuation
+            forwarders.append(Task {
+                var delivered: Bool = false
+                for await change in changes {
+                    delivered = true
+                    continuation.yield(LevelChange(isTheActivityFolder: isTheActivityFolder, change: change))
+                }
+                // A watch that could not be opened ends at once, having said
+                // nothing: say so, so the watch goes deaf rather than re-arm.
+                if !delivered && !Task.isCancelled {
+                    continuation.yield(LevelChange(isTheActivityFolder: isTheActivityFolder, change: nil))
+                }
+            })
         }
-        // Arm first, look second: a folder above it that is watched because
-        // the activity folder did not exist may have gained it between the
-        // look above and the arm. Moving down now costs one more watch.
-        if !watchingTheFolderItself && activityDirectoryExists() {
+        let changes: AsyncStream<LevelChange> = merged.stream
+        folderTask = Task { [weak self] in
+            await self?.watchTheFolders(changes)
+            for forwarder in forwarders {
+                forwarder.cancel()
+            }
+        }
+        // Arm first, look second: a level made between the look above and
+        // the arm is under a watched level, but its own making may have come
+        // before that watch existed. Re-arm once if the path is deeper now.
+        if levels.last != activityDirectory && deepestLevelThatExists() != levels.last {
             folderTask?.cancel()
             folderTask = nil
             armTheFolderWatch()
         }
     }
 
-    /// Read every change the watch delivers; move the watch when what it is
-    /// on went away, or when the activity folder appears under a folder above
-    /// it.
-    private func watchTheFolder(
-        _ changes: AsyncStream<ScheduledPublishWatcher.Change>,
-        watchingTheFolderItself: Bool
-    ) async {
-        var moveTheWatch: Bool = false
-        for await change in changes {
+    /// Read every change the watches deliver. A change IN the activity
+    /// folder is a re-read; anything at a level above it, or any level going
+    /// away, re-arms every level; a watch that could not be opened leaves the
+    /// whole watch deaf for the next outside event.
+    private func watchTheFolders(_ changes: AsyncStream<LevelChange>) async {
+        var rearm: Bool = false
+        for await event in changes {
             folderEvents += 1
-            if change == .theWatchedThingWentAway {
-                moveTheWatch = true
+            guard let change = event.change else {
                 break
             }
-            if !watchingTheFolderItself && activityDirectoryExists() {
-                moveTheWatch = true
-                break
+            if event.isTheActivityFolder && change == .somethingChanged {
+                reread()
+                continue
             }
-            reread()
+            rearm = true
+            break
         }
         if Task.isCancelled {
             return
         }
         folderTask = nil
-        if moveTheWatch && isStarted {
+        if rearm && isStarted {
             // Caused by an event, so this cannot spin: a watch that could not
-            // be opened ends WITHOUT one, and is left deaf for the next
-            // outside event to re-arm.
+            // be opened ends with no event, and is left deaf.
             armTheFolderWatch()
         }
         reread(rearming: false)
     }
 
-    /// Whether the activity folder is there now.
-    private func activityDirectoryExists() -> Bool {
-        var isDirectory: ObjCBool = false
-        let exists: Bool = FileManager.default.fileExists(
-            atPath: activityDirectory.path, isDirectory: &isDirectory
-        )
-        return exists && isDirectory.boolValue
+    /// The deepest of `courses/`, `courses/.internal` and the activity
+    /// folder that exists now, with every level above it, or nil.
+    private func deepestLevelThatExists() -> URL? {
+        var deepest: URL? = nil
+        for candidate in [coursesDirectory, activityDirectory.deletingLastPathComponent(), activityDirectory] {
+            var isDirectory: ObjCBool = false
+            if !FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory)
+                || !isDirectory.boolValue {
+                break
+            }
+            deepest = candidate
+        }
+        return deepest
     }
 }
 

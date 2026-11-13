@@ -352,8 +352,8 @@ final class SectionRunsTests: XCTestCase {
     /// button, Section ▸ Deploy… and ⇧⌘D all read `deployButtonIsEnabled`,
     /// which asks the folder's `LeaseWatcher`; the help and hint come from
     /// one chooser; the leases are read again when the section appears, when
-    /// the app or its window comes to the front, and when the pointer
-    /// reaches the button; and every window's folder is watched. The cases
+    /// the app or its window comes to the front, when the Mac wakes, and when
+    /// the pointer reaches the button; and every window's folder is watched. The cases
     /// themselves are `LeaseWatcherTests.testEveryHeldElsewhereCase`.
     func testDeployAsksWhetherAnotherProgramHoldsTheCourse() throws {
         let view: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
@@ -363,8 +363,9 @@ final class SectionRunsTests: XCTestCase {
                       "the Section menu and its shortcut read the same predicate")
         XCTAssertTrue(view.contains(".help(SectionDetailView.deployHelp("), "the help comes from the one chooser")
         XCTAssertTrue(view.contains(".accessibilityHint(courseIsHeldElsewhere"), "VoiceOver hears the same sentence")
-        XCTAssertEqual(view.components(separatedBy: "leaseWatcher?.reread()").count - 1, 4,
-                       "appearing, the app and the window coming to the front, and the pointer on the button")
+        XCTAssertEqual(view.components(separatedBy: "leaseWatcher?.reread()").count - 1, 5,
+                       "appearing, the app and the window coming to the front, waking from sleep, and the pointer on the button")
+        XCTAssertTrue(view.contains("NSWorkspace.didWakeNotification"))
         let workspace: String = try readSource("QuartzTeachers/Models/WorkspaceModel.swift")
         XCTAssertEqual(workspace.components(separatedBy: "watchTheLeasesOfTheOpenFolders()").count - 1, 4,
                        "its definition, and a window registering, leaving and pointing at a folder")

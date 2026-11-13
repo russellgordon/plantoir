@@ -778,14 +778,23 @@ relying on it.
   `deployHelp` chooses the help.
 
 **The events. No timer anywhere.**
-- A directory watch on `courses/.internal/activity/`
-  (`ScheduledPublishWatcher.changes`, the permitted GCD use). While that
-  folder does not exist, the watch is on the nearest folder above it that
-  does (`courses/.internal`, then `courses/`), and it moves down when the
-  activity folder appears. The watcher CREATES nothing. Creating
-  `courses/.internal` again after something removed it could make that
-  program's own `mv` of a replacement folder fail, since a rename over a
-  folder that is not empty fails.
+- A directory watch on EVERY level of the path that exists: `courses/`,
+  `courses/.internal` and `courses/.internal/activity/`
+  (`ScheduledPublishWatcher.changes`, the permitted GCD use). A change in
+  the activity folder is a re-read. A change at a level above it (a folder
+  made, removed, renamed or replaced) re-arms every level from the path as
+  it is now, then re-reads. A watch is on an open folder, not on a path, so
+  this is what lets it follow `.internal` being made alone first, removed
+  and made again, or renamed away and back. The first build watched only
+  the deepest level that existed and moved down only when the activity
+  folder itself appeared: the implementation review measured it deaf for
+  the rest of the session when `.internal` was made alone first (0 of 20),
+  and its proposed fix (move to the deepest level whenever a deeper one
+  appears) still missed `.internal` renamed away and replaced, which a
+  watch on the old, renamed folder never hears. The watcher CREATES nothing.
+  Creating `courses/.internal` again after something removed it could make
+  that program's own `mv` of a replacement folder fail, since a rename over
+  a folder that is not empty fails.
 - One `ProcessEnding.ends(of:)` per distinct holder's process id. This is
   what un-greys the button when a holder is killed and leaves its lease
   behind: the lease then reads as stale (`ProcessLiveness`), and no file
@@ -794,6 +803,9 @@ relying on it.
   - when the section appears;
   - when the app becomes active;
   - when a window becomes key;
+  - when the Mac wakes from sleep (`NSWorkspace.didWakeNotification`: an app
+    that was already active does not become active again on wake; the
+    review's L-b2);
   - when the pointer enters the Deploy button.
 
   These are the plan review's M4. A stuck grey is the harmful failure,
@@ -802,7 +814,8 @@ relying on it.
   that went deaf. Re-arming is always caused by an event; the watch's own
   last read does not re-arm, so a folder that cannot be opened cannot spin.
 
-**What was measured.** M4 Pro, 12 cores, macOS 26.6, APFS, 2026-11-13. A
+**What was measured.** M4 Pro, 12 cores, macOS 26.6, APFS, 2026-11-13,
+re-run in full on the watcher as merged (every level watched). A
 standalone harness compiled the REAL `LeaseWatcher.swift`, `WorkLeaseFiles`,
 `ProcessLiveness` and `ProcessEnding`, plus `changes(at:watching:)` copied
 verbatim. It ran 40 trials each, with holders as real child processes writing
@@ -820,11 +833,15 @@ their own leases.
 | W8, a lease written and removed within a few milliseconds | final state clear 40/40 |
 | W9, two holders, one leaves | still held by the other 40/40 |
 | W10, `.internal` removed while watched, then made again by a lease | re-armed and listed 40/40 |
-| W12, switching folders | 40/40 left no descriptor on the old folder (`lsof -p`) and no process watch |
+| W12, switching folders | 40/40 left no descriptor on the old folder (`lsof -p`) and no process watch (3 descriptors while watched, one per level) |
+| W13, `.internal` made alone (a token folder in it), 0.3 s later the first lease | 40/40 (0 of 20 before the fix, the review's R1) |
+| W14, `.internal` removed while watched, made again alone, then a lease | 40/40 (0 of 20 before the fix, the review's R5) |
+| W15, `.internal` renamed away while watched, then a lease into a new one | 40/40 |
 
 W11 (sleep and wake with a holder that ended during sleep) was NOT measured.
 An agent may not sleep the Mac. The process-exit event is queued by the
-kernel and delivered on wake, and the app becoming active re-reads anyway.
+kernel and delivered on wake, and the section re-reads on the wake
+notification.
 
 **Why no fallback.** Every pass bar was met, so the 2 s re-read the plan held
 in reserve was not built.
@@ -864,9 +881,16 @@ in reserve was not built.
   - a killed holder un-greys with no file event;
   - a lease written and removed is seen both ways;
   - the watch moves down when the activity folder appears;
+  - each order the folders can appear in: `.internal` made alone first;
+    both together; `.internal` removed and made again alone; the activity
+    folder removed and made again; `.internal` renamed away and back. On the
+    first build, three of these fail (alone first, removed then alone,
+    renamed); on the review's proposed fix, one does (renamed). "Both
+    together" and "the activity folder removed" passed on the first build
+    too, and are kept so a later change cannot break them;
   - stopping lets go of every watch;
   - the help is the contract's sentence.
-- `SectionRunsTests`: source scans of the button, the menu, the hint, the four
+- `SectionRunsTests`: source scans of the button, the menu, the hint, the five
   re-reads and `WorkspaceModel`'s three calls.
 - Must-fail, by copy-and-restore, each rebuilt and run:
   - no process watches: 4 failures, including the killed-holder test and its
@@ -874,7 +898,11 @@ in reserve was not built.
   - `deployIsAvailable` ignoring `heldElsewhere`: 5 failures, the five cases
     that start greyed.
 - `QuartzTeachersUITests` has no test for this yet. It needs the screen;
-  Russell's hand test covers it.
+  Russell's hand test covers it, and must check two things no test here
+  can: that hovering over a greyed Deploy reaches `.onHover` on a disabled
+  button, with the window key and with it behind another (a breakpoint on
+  `LeaseWatcher.reread` in a Debug build shows it), and that VoiceOver reads the sentence ONCE: it is both the `.help` and the
+  `.accessibilityHint`, and if it is read twice the hint goes.
 
 ## A section's Problems tab, its marker and its alert (#717)
 

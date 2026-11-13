@@ -626,6 +626,12 @@ struct SectionDetailView: View {
                 reloadTheProblems()
                 raiseTheProblemsAlertIfDue()
             }
+            // Waking from sleep (#729 review, L-b2): a holder may have ended
+            // while the Mac slept, and an app that was already active does not
+            // become active again on wake. An event, not a clock.
+            .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in
+                leaseWatcher?.reread()
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
                 refreshEditedMarker()
                 leaseWatcher?.reread()

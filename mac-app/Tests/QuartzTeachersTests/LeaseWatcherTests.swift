@@ -232,6 +232,105 @@ final class LeaseWatcherTests: XCTestCase {
         XCTAssertTrue(held)
     }
 
+    // MARK: - The order the folders appear in (#729 implementation review, M-b1)
+
+    /// `.internal` made ALONE first (a deploy's token record, a rename's
+    /// record), and only later the activity folder, by the first lease. The
+    /// first build of `LeaseWatcher` stayed on `courses/` and heard nothing
+    /// inside `.internal` for the rest of the session (measured 0 of 20).
+    func testInternalMadeAloneFirstThenALease() async throws {
+        let (courses, watcher) = try startedWithNoInternalFolder()
+        defer {
+            watcher.stop()
+        }
+        let before: Int = watcher.folderEvents
+        try FileManager.default.createDirectory(
+            at: courses.appendingPathComponent(".internal/tokens"), withIntermediateDirectories: true
+        )
+        await waitForAFolderEvent(watcher, after: before)
+        try await expectALeaseToBeSeen(in: courses, by: watcher, "`.internal` first, then the activity folder")
+    }
+
+    /// Both made at once by the first lease (W5's shape). Passed before the
+    /// fix too: the activity folder was already there at the event.
+    func testInternalAndTheActivityFolderMadeTogether() async throws {
+        let (courses, watcher) = try startedWithNoInternalFolder()
+        defer {
+            watcher.stop()
+        }
+        try await expectALeaseToBeSeen(in: courses, by: watcher, "both made together")
+    }
+
+    /// `.internal` removed while its activity folder is watched, made again
+    /// alone, then a lease (a course restore, or a tidy of `.internal`). The
+    /// first build stayed on `courses/` here too.
+    func testInternalRemovedThenMadeAgainAloneThenALease() async throws {
+        let folder: URL = try makeWorkingFolder()
+        let courses: URL = folder.appendingPathComponent("courses", isDirectory: true)
+        let watcher: LeaseWatcher = LeaseWatcher(coursesDirectory: courses)
+        watcher.start()
+        defer {
+            watcher.stop()
+        }
+        var before: Int = watcher.folderEvents
+        try FileManager.default.removeItem(at: courses.appendingPathComponent(".internal"))
+        await waitForAFolderEvent(watcher, after: before)
+        before = watcher.folderEvents
+        try FileManager.default.createDirectory(
+            at: courses.appendingPathComponent(".internal"), withIntermediateDirectories: true
+        )
+        await waitForAFolderEvent(watcher, after: before)
+        try await expectALeaseToBeSeen(in: courses, by: watcher, "`.internal` removed, then made again alone")
+    }
+
+    /// Only the activity folder removed and made again by a lease. Passed
+    /// before the fix too: the watch moved to `.internal`, which saw it come
+    /// back.
+    func testTheActivityFolderRemovedThenMadeAgain() async throws {
+        let folder: URL = try makeWorkingFolder()
+        let courses: URL = folder.appendingPathComponent("courses", isDirectory: true)
+        let watcher: LeaseWatcher = LeaseWatcher(coursesDirectory: courses)
+        watcher.start()
+        defer {
+            watcher.stop()
+        }
+        let before: Int = watcher.folderEvents
+        try FileManager.default.removeItem(at: WorkLeaseFiles.activityDirectory(coursesDirectory: courses))
+        await waitForAFolderEvent(watcher, after: before)
+        try await expectALeaseToBeSeen(in: courses, by: watcher, "the activity folder removed and made again")
+    }
+
+    /// `.internal` renamed away while watched, a lease written into a new
+    /// one, then that one removed and the first renamed back with a lease in
+    /// it. A watch is on an open folder, not a path: the first build kept
+    /// watching the renamed folder and heard nothing at the path.
+    func testInternalRenamedAwayAndBack() async throws {
+        let folder: URL = try makeWorkingFolder()
+        let courses: URL = folder.appendingPathComponent("courses", isDirectory: true)
+        let internalFolder: URL = courses.appendingPathComponent(".internal")
+        let away: URL = courses.appendingPathComponent(".internal-away")
+        let watcher: LeaseWatcher = LeaseWatcher(coursesDirectory: courses)
+        watcher.start()
+        defer {
+            watcher.stop()
+        }
+        var before: Int = watcher.folderEvents
+        try FileManager.default.moveItem(at: internalFolder, to: away)
+        await waitForAFolderEvent(watcher, after: before)
+        let lease: URL = try await expectALeaseToBeSeen(in: courses, by: watcher, "a new `.internal` after a rename")
+        try FileManager.default.removeItem(at: lease)
+        _ = await waitUntil(watcher) {
+            watcher.holding(forCourse: "EXC2O") == nil
+        }
+        before = watcher.folderEvents
+        try FileManager.default.removeItem(at: internalFolder)
+        await waitForAFolderEvent(watcher, after: before)
+        before = watcher.folderEvents
+        try FileManager.default.moveItem(at: away, to: internalFolder)
+        await waitForAFolderEvent(watcher, after: before)
+        try await expectALeaseToBeSeen(in: courses, by: watcher, "`.internal` renamed back")
+    }
+
     /// Stopping lets go of the folder watch and every process watch (W12).
     func testStoppingLetsGoOfEveryWatch() async throws {
         let folder: URL = try makeWorkingFolder()
@@ -297,6 +396,40 @@ final class LeaseWatcherTests: XCTestCase {
             _ = await XCTWaiter().fulfillment(of: [moved], timeout: remaining)
         }
         return true
+    }
+
+    /// A working folder with `courses/` but no `.internal`, watched.
+    private func startedWithNoInternalFolder() throws -> (URL, LeaseWatcher) {
+        let folder: URL = try makeWorkingFolder()
+        let courses: URL = folder.appendingPathComponent("courses", isDirectory: true)
+        try FileManager.default.removeItem(at: courses.appendingPathComponent(".internal"))
+        let watcher: LeaseWatcher = LeaseWatcher(coursesDirectory: courses)
+        watcher.start()
+        return (courses, watcher)
+    }
+
+    /// A live holder's lease written into `courses`, and the watcher seeing
+    /// it, or the test fails. Returns the lease.
+    @discardableResult
+    private func expectALeaseToBeSeen(in courses: URL, by watcher: LeaseWatcher, _ label: String) async throws -> URL {
+        let holder: Process = try startAHolder()
+        let lease: URL = try writeLease(kind: "build", course: "EXC2O", for: holder.processIdentifier, into: courses)
+        let held: Bool = await waitUntil(watcher) {
+            watcher.holding(forCourse: "EXC2O")?.pid == holder.processIdentifier
+        }
+        XCTAssertTrue(held, "\(label): the lease must be seen within \(deadline) s, with nothing else happening")
+        return lease
+    }
+
+    /// Lets a folder event that has been caused reach the watcher, so the
+    /// next step happens after it rather than in the same moment. Gives up
+    /// after two seconds without failing: a watch that hears nothing (the
+    /// fault these tests exist for) fails at the next step instead.
+    private func waitForAFolderEvent(_ watcher: LeaseWatcher, after count: Int) async {
+        let giveUpAt: Date = Date().addingTimeInterval(2)
+        while watcher.folderEvents <= count && Date() < giveUpAt {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
     }
 
     /// The contract's sentence for a course.
