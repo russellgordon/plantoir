@@ -34,6 +34,7 @@ import base64
 import datetime as dt
 import json
 import os
+import secrets
 import shutil
 import sys
 import tempfile
@@ -240,21 +241,36 @@ def make_project(token: str, account: str, course: str, year: int) -> dict:
 
 
 def prove(address: str, protected: bool, credential: str | None, token: str, account: str, name: str) -> bool:
-    """unitPlanning.share.proof."""
+    """unitPlanning.share.proof: the address answers as this share promises,
+    a path the share does not hold answers 404 from the worker, and the
+    project says its current deployment runs the worker. Every check is
+    retried together until all hold or PROOF_SECONDS pass, because the main
+    address can go on answering the PREVIOUS deployment for a moment
+    (measured up to 2.2 s): after Change Password the old deployment also
+    answers 401 without a password, and only the new password's 200 tells
+    the two apart."""
     start = now()
     while True:
-        status, headers = fetch_address(address)
-        if protected:
-            challenge = headers.get("www-authenticate", "")
-            if status == 401 and challenge.lower().startswith("basic"):
-                break
-        elif status == 200:
+        if _proven_once(address, protected, credential, token, account, name):
             return True
         if now() - start >= PROOF_SECONDS:
             return False
         sleep(PROOF_EVERY)
-    status, _ = fetch_address(address, credential)
-    if status != 200:
+
+
+def _proven_once(address: str, protected: bool, credential: str | None, token: str, account: str, name: str) -> bool:
+    status, headers = fetch_address(address)
+    if protected:
+        challenge = headers.get("www-authenticate", "")
+        if status != 401 or not challenge.lower().startswith("basic"):
+            return False
+        status, _ = fetch_address(address, credential)
+        if status != 200:
+            return False
+    elif status != 200:
+        return False
+    status, headers = fetch_address(address + "plantoir-not-shared-" + secrets.token_hex(4), credential)
+    if status != 404 or headers.get("cache-control", "") != "no-store":
         return False
     try:
         project = cloudflare_api("GET", project_path(account, name), token)
@@ -353,10 +369,15 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
     try:
         public = staging_root / "public"
         staged = unit_plan_site.stage(planning_dir, public, unit_plan_site.bundled_assets_dir(), keys_in)
-        if protected:
-            (public / "_worker.js").write_text(
-                unit_plan_site.worker_js(credential, unit_plan_site.realm_for(course)), encoding="utf-8")
-        else:
+        # Both kinds of share carry the worker: it answers only the files this
+        # share holds, because Cloudflare's edge cache went on serving a file
+        # a later share left out (measured 2026-11-12, unitPlanning.share
+        # .edgeCache). An open share keeps _headers as well, which is what the
+        # static files would carry if the worker were ever passed by.
+        (public / "_worker.js").write_text(
+            unit_plan_site.worker_js(credential if protected else None,
+                                     unit_plan_site.realm_for(course), staged.files), encoding="utf-8")
+        if not protected:
             (public / "_headers").write_text(unit_plan_site.open_headers(), encoding="utf-8")
         # wrangler uploads a functions/ folder from the folder it runs in,
         # not from the one it is handed, so it runs beside the staged folder.

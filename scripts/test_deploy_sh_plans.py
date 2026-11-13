@@ -254,6 +254,7 @@ class PlansModeTests(unittest.TestCase):
             self.assertIn("--stop", docker_args(folder))
             self.assertFalse((folder / "stub" / "plan_item_deleted").exists())
             (markers / "plans-2025.json").unlink()
+            (markers / "plans-2024.previous-20260901T120000Z.json").write_text("{}")
             status, out = run(folder, ["--stop-sharing", "--year", "2025", "--non-interactive"])
             self.assertEqual(status, 0, out)
             self.assertTrue((folder / "stub" / "plan_item_deleted").exists())

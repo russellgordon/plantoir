@@ -36119,7 +36119,7 @@
           ".svg",
           ".txt"
         ],
-        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). A protected share adds _worker.js and no _headers; an open share adds _headers (X-Robots-Tag) and no _worker.js.",
+        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). Every share adds _worker.js (worker, edgeCache); an open share adds _headers (X-Robots-Tag) as well, which is what the static files would carry if the worker were ever passed by.",
         "why": "An allowlist rather than a list of what to leave out: a teacher's plan.json, a .tex, an .htaccess or .htpasswd, and a _headers, _redirects, _routes.json or _worker.js of their own (which Cloudflare would obey) are never uploaded, and a new kind of file is left out until somebody decides it belongs."
       },
       "stageCases": {
@@ -36276,62 +36276,130 @@
         ]
       },
       "worker": {
-        "rule": "A protected share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged). It keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once. Without the right Authorization it answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\", X-Robots-Tag and Cache-Control: no-store, for every path, robots.txt and a missing path included. With it, /_worker.js answers 404 and everything else is the static file with X-Robots-Tag: noindex, nofollow and Cache-Control: private.",
+        "rule": "EVERY share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged); every request reaches it first. It answers only the files the share staged (a list written into it; a path is shared when it, it plus .html, or it plus /index.html is listed, and a path ending in / when its index.html is), with 404, the staged 404.html and Cache-Control: no-store for anything else, /_worker.js included. A protected share's worker also keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once; and without the right Authorization answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\" for every path, robots.txt and a missing path included. Every answer carries X-Robots-Tag: noindex, nofollow and Cache-Control: no-store (private, no-store when protected).",
         "why": "Salted SHA-256 rather than a slow hash: the worker's source is readable only inside the teacher's Cloudflare account, and the password is one made for colleagues, not the teacher's own (the dialog says so). PBKDF2 at 100,000 iterations measured 16.1 ms against a 10 ms CPU limit; at about 10,000, 2.0 ms, the upgrade if that ever changes. Measured: the static file server answers /_worker.js with 404, not the source, so even a bypassed worker does not hand out the salt and hash."
       },
       "workerCases": {
-        "rule": "Run under node against the worker written for username `colleague` and password `correct horse 7`, with a stand-in ASSETS that answers 200 for every path. `auth` is none, wrong or right.",
+        "rule": "Run under node against the worker written for a share holding index.html, unit/index.html, unit/correlation.html, unit/pdfs/Quiz 1, Solutions.pdf, robots.txt and 404.html, with a stand-in ASSETS that answers 200 for every path. `mode` is protected (username `colleague`, password `correct horse 7`) or open; `auth` is none, wrong or right.",
         "cases": [
           {
+            "mode": "protected",
             "path": "/",
             "auth": "none",
             "status": 401,
-            "basicChallenge": true,
-            "robotsTag": true
+            "basicChallenge": true
           },
           {
+            "mode": "protected",
             "path": "/",
             "auth": "wrong",
             "status": 401,
-            "basicChallenge": true,
-            "robotsTag": true
+            "basicChallenge": true
           },
           {
+            "mode": "protected",
             "path": "/",
             "auth": "right",
             "status": 200,
-            "basicChallenge": false,
-            "robotsTag": true
+            "basicChallenge": false
           },
           {
+            "mode": "protected",
             "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
             "auth": "right",
             "status": 200,
-            "basicChallenge": false,
-            "robotsTag": true
+            "basicChallenge": false
           },
           {
+            "mode": "protected",
+            "path": "/unit/correlation",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
             "path": "/robots.txt",
             "auth": "none",
             "status": 401,
-            "basicChallenge": true,
-            "robotsTag": true
+            "basicChallenge": true
           },
           {
+            "mode": "protected",
             "path": "/_worker.js",
             "auth": "none",
             "status": 401,
-            "basicChallenge": true,
-            "robotsTag": true
+            "basicChallenge": true
           },
           {
+            "mode": "protected",
             "path": "/_worker.js",
             "auth": "right",
             "status": 404,
-            "basicChallenge": false,
-            "robotsTag": true
+            "basicChallenge": false
+          },
+          {
+            "mode": "protected",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "none",
+            "status": 200,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/unit/pdfs/Quiz%201%20-%20Solutions.pdf",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
+          },
+          {
+            "mode": "open",
+            "path": "/%E0%A4%A",
+            "auth": "none",
+            "status": 404,
+            "basicChallenge": false
           }
         ]
+      },
+      "edgeCache": {
+        "rule": "Why every share runs the worker, open ones too: Cloudflare's edge cache answers a file a later share left out from its old address. The worker runs before the cache and answers only the files the current share holds.",
+        "measured": "2026-11-12, the teacher's free account, through share_plan.py: an open share with the answer key included, the key fetched, then an open share without it and with no worker: the key went on answering 200 from the edge (cf-cache-status HIT, Cache-Control public, s-maxage=604800) at every sample for 90 s, while the same address with a query string answered 404. The first full run met it after Remove Password: the key colleagues had opened with the password answered 200 to anyone. With the worker on every share, the same sequence answered 404 at 0.3 s and at every sample to 37 s, and a changed page was served changed at once.",
+        "cost": "Every request to an open plan site now counts against the Workers Free plan's 100,000 a day, which a teacher's colleagues will not reach; at the limit an open site closes (fail closed) rather than opening, so it is unreachable until midnight UTC, not exposed."
       },
       "openHeaders": "/*\n  X-Robots-Tag: noindex, nofollow\n",
       "schoolYear": {
@@ -36585,7 +36653,8 @@
         "stopFailed": "Plantoir could not stop sharing these plans, so the address still works. Try Stop Sharing again in a few minutes.",
         "notSharedHere": "This page is not shared at this address.",
         "earlierYear": "{year}: {address}",
-        "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with."
+        "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with.",
+        "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished."
       },
       "refusals": {
         "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",

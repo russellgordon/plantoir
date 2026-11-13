@@ -466,11 +466,17 @@ def credential_b64(username: str, password: str) -> str:
     return base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
 
 
-WORKER_TEMPLATE = """// Written by Plantoir for a shared unit plan (#709). It asks for the username
-// and password before any page is sent. Only a salted hash is kept here.
+WORKER_TEMPLATE = """// Written by Plantoir for a shared unit plan (#709). Every request comes here
+// first. With a password, it is asked for before any page is sent, and only a
+// salted hash of it is kept here. Either way, only the files this share holds
+// are answered: Cloudflare's edge cache keeps a file a later share left out
+// (an answer key, a deleted page) for up to a week at its old address, and
+// this list is what stops it being served from there.
+const PROTECTED = __PROTECTED__;
 const SALT = "__SALT__";
 const HASH = "__HASH__";
 const REALM = "__REALM__";
+const FILES = new Set(__FILES__);
 let verified = null;
 function hex(buf) {
   const bytes = new Uint8Array(buf);
@@ -485,6 +491,7 @@ function same(a, b) {
   return d === 0;
 }
 async function allowed(header) {
+  if (!PROTECTED) return true;
   if (!header || !header.startsWith("Basic ")) return false;
   const given = header.slice(6).trim();
   if (verified !== null && same(given, verified)) return true;
@@ -493,44 +500,67 @@ async function allowed(header) {
   if (same(digest, HASH)) { verified = given; return true; }
   return false;
 }
+function shared(pathname) {
+  let path;
+  try { path = decodeURIComponent(pathname); } catch (e) { return false; }
+  path = path.replace(/^\/+/, "");
+  if (path === "" || path.endsWith("/")) return FILES.has(path + "index.html");
+  return FILES.has(path) || FILES.has(path + ".html") || FILES.has(path + "/index.html");
+}
+const HEADERS = { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" };
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!(await allowed(request.headers.get("Authorization")))) {
       return new Response("This page needs a username and password.", {
         status: 401,
-        headers: {
-          "WWW-Authenticate": 'Basic realm="' + REALM + '", charset="UTF-8"',
-          "X-Robots-Tag": "noindex, nofollow",
-          "Cache-Control": "no-store"
-        }
+        headers: Object.assign({ "WWW-Authenticate": 'Basic realm="' + REALM + '", charset="UTF-8"' }, HEADERS)
       });
     }
-    if (url.pathname === "/_worker.js") {
-      return new Response("Not found", { status: 404, headers: { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" } });
+    if (!shared(url.pathname)) {
+      const missing = await env.ASSETS.fetch(new Request(new URL("/404.html", url), request));
+      return new Response(missing.body, { status: 404, headers: Object.assign({ "Content-Type": "text/html; charset=utf-8" }, HEADERS) });
     }
     const asset = await env.ASSETS.fetch(request);
     const answer = new Response(asset.body, asset);
     answer.headers.set("X-Robots-Tag", "noindex, nofollow");
-    answer.headers.set("Cache-Control", "private");
+    answer.headers.set("Cache-Control", PROTECTED ? "private, no-store" : "no-store");
     return answer;
   }
 };
 """
 
 
-def worker_js(credential: str, realm: str, salt: str | None = None) -> str:
-    """The protected site's `_worker.js`: SHA-256 of a fresh 16-byte salt
-    followed by the base64 credential, compared in constant time and
-    remembered once verified, so a page and its PDFs are hashed once per
-    isolate. The password itself is never in it. `salt` is for tests."""
+def worker_js(credential: str | None, realm: str, files: list[str], salt: str | None = None) -> str:
+    """The share's `_worker.js`, for an open share and a protected one alike.
+
+    Protected (`credential` given): SHA-256 of a fresh 16-byte salt followed
+    by the base64 credential, compared in constant time and remembered once
+    verified, so a page and its PDFs are hashed once per isolate; the
+    password itself is never in it. Open (`credential` None): no question.
+
+    Both answer only the paths in `files` (the staged files, `_worker.js`
+    never among them), with 404 and the staged 404.html for anything else:
+    measured 2026-11-12, Cloudflare's edge cache went on serving an answer key
+    an open re-share had left out (cf-cache-status HIT, s-maxage=604800), and
+    the worker runs before the cache. `salt` is for tests."""
     if salt is None:
         salt = secrets.token_hex(16)
-    digest = hashlib.sha256((salt + credential).encode("utf-8")).hexdigest()
+    shared_files = []
+    for name in sorted(files):
+        if name != "_worker.js" and name != "_headers":
+            shared_files.append(name)
     safe_realm = re.sub(r'[^A-Za-z0-9 .-]', "", realm)
-    text = WORKER_TEMPLATE.replace("__SALT__", salt)
+    if credential is None:
+        digest = ""
+        salt = ""
+    else:
+        digest = hashlib.sha256((salt + credential).encode("utf-8")).hexdigest()
+    text = WORKER_TEMPLATE.replace("__PROTECTED__", "true" if credential is not None else "false")
+    text = text.replace("__SALT__", salt)
     text = text.replace("__HASH__", digest)
-    return text.replace("__REALM__", safe_realm)
+    text = text.replace("__REALM__", safe_realm)
+    return text.replace("__FILES__", json.dumps(shared_files, ensure_ascii=True))
 
 
 def open_headers() -> str:

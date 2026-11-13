@@ -4844,7 +4844,9 @@ if [[ "$PLANS_MODE" == "true" ]]; then
     fi
     if [[ "$PLAN_STOP" == "true" ]]; then
       _still_shared="false"
-      for _marker in "courses/${COURSE_CODE}/.cloudflare_sites"/plans-*.json; do
+      # Exactly plans-<year>.json: a marker a reference copy moved aside
+      # (plans-<year>.previous-<moment>.json) is not a year still shared.
+      for _marker in "courses/${COURSE_CODE}/.cloudflare_sites"/plans-[0-9][0-9][0-9][0-9].json; do
         [[ -e "$_marker" ]] && _still_shared="true"
       done
       if [[ "$_still_shared" != "true" ]]; then delete_plan_credential_keychain; fi

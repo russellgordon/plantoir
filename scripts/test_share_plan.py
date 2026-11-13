@@ -99,7 +99,7 @@ class FakeCloudflare:
         if len(parts) == 7 and method == "GET":
             listed = []
             for deployment in project["deployments"]:
-                listed.append({"id": deployment["id"], "uses_functions": deployment["protected"]})
+                listed.append({"id": deployment["id"], "uses_functions": deployment["worker"]})
             return listed
         if len(parts) == 8 and method == "DELETE":
             deployment_id = parts[7]
@@ -120,7 +120,7 @@ class FakeCloudflare:
         canonical = None
         for deployment in project["deployments"]:
             if deployment["id"] == project["canonical"]:
-                canonical = {"id": deployment["id"], "uses_functions": deployment["protected"]}
+                canonical = {"id": deployment["id"], "uses_functions": deployment["worker"]}
         return {"name": name, "subdomain": project["subdomain"],
                 "deployment_configs": json.loads(json.dumps(project["deployment_configs"])),
                 "canonical_deployment": canonical}
@@ -134,20 +134,26 @@ class FakeCloudflare:
                 files[path.relative_to(public).as_posix()] = path.read_bytes()
         self.staged.append({"files": files, "cwd": os.getcwd(), "public": str(public)})
         self.counter += 1
-        deployment = {"id": f"dep{self.counter}", "protected": "_worker.js" in files}
+        worker = files.get("_worker.js", b"")
+        deployment = {"id": f"dep{self.counter}", "protected": b"const PROTECTED = true;" in worker,
+                      "worker": bool(worker)}
         self.projects[name]["deployments"].append(deployment)
         self.projects[name]["canonical"] = deployment["id"]
 
     def fetch(self, url, credential=None):
         for project in self.projects.values():
-            if url == f"https://{project['subdomain']}/":
+            base = f"https://{project['subdomain']}/"
+            if url.startswith(base):
                 for deployment in project["deployments"]:
                     if deployment["id"] == project["canonical"]:
                         if deployment["protected"]:
                             right = unit_plan_site.credential_b64(USERNAME, PASSWORD)
-                            if credential == right:
-                                return 200, {}
-                            return 401, {"www-authenticate": 'Basic realm="x"'}
+                            if credential != right:
+                                return 401, {"www-authenticate": 'Basic realm="x"'}
+                        if url != base:
+                            if deployment["worker"]:
+                                return 404, {"cache-control": "no-store"}
+                            return 404, {}
                         return 200, {}
         return None, {}
 
@@ -256,7 +262,9 @@ class OpenShareTests(ShareTestCase):
         self.assertIn("protected:no failClosed:yes answerKeys:out units:1 oldCopies:0", text)
         files = self.cloudflare.staged[-1]["files"]
         self.assertIn("_headers", files)
-        self.assertNotIn("_worker.js", files)
+        self.assertIn(b"const PROTECTED = false;", files["_worker.js"])
+        self.assertNotIn(b'"unit/pdfs/Quiz 1 - Solutions.pdf"', files["_worker.js"])
+        self.assertIn(b'"unit/pdfs/Quiz 1.pdf"', files["_worker.js"])
         self.assertNotIn("unit/pdfs/Quiz 1 - Solutions.pdf", files)
         self.assertIn("unit/pdfs/Quiz 1.pdf", files)
         self.assertIn("404.html", files)
@@ -316,7 +324,7 @@ class ProtectedShareTests(ShareTestCase):
         self.assertTrue(marker["protected"])
         self.assertEqual(marker["answerKeys"], "in")
         files = self.cloudflare.staged[-1]["files"]
-        self.assertIn("_worker.js", files)
+        self.assertIn(b"const PROTECTED = true;", files["_worker.js"])
         self.assertNotIn("_headers", files)
         self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", files)
         self.assertIn("protected:yes", text)
@@ -335,11 +343,11 @@ class ProtectedShareTests(ShareTestCase):
         self.give_credential()
         status, text = self.run_share()
         self.assertEqual(status, 0, text)
-        self.assertIn("_worker.js", self.cloudflare.staged[-1]["files"])
+        self.assertIn(b"const PROTECTED = true;", self.cloudflare.staged[-1]["files"]["_worker.js"])
         self.assertTrue(self.marker()["protected"])
         status, text = self.run_share("--remove-password")
         self.assertEqual(status, 0, text)
-        self.assertNotIn("_worker.js", self.cloudflare.staged[-1]["files"])
+        self.assertIn(b"const PROTECTED = false;", self.cloudflare.staged[-1]["files"]["_worker.js"])
         self.assertFalse(self.marker()["protected"])
         self.assertEqual(self.marker()["subdomain"], self.cloudflare.view(self.marker()["name"])["subdomain"])
         self.assert_no_secret_anywhere()
@@ -366,6 +374,28 @@ class ProtectedShareTests(ShareTestCase):
         self.assertFalse(marker["protected"])
         self.assertEqual(marker["asked"], "protected")
         self.assertGreaterEqual(self.clock.seconds, share_plan.PROOF_SECONDS)
+
+    def test_a_changed_password_is_proved_by_the_new_password_not_the_old_deployments_401(self):
+        self.give_credential()
+        self.run_share("--protect")
+        answers = {"calls": 0}
+        fake_fetch = self.cloudflare.fetch
+
+        def the_old_deployment_for_a_moment(url, credential=None):
+            # The main address still answers the old deployment, which also
+            # says 401 without a password, for the first few fetches.
+            answers["calls"] += 1
+            if answers["calls"] <= 3:
+                if credential is None:
+                    return 401, {"www-authenticate": 'Basic realm="x"'}
+                return 401, {"www-authenticate": 'Basic realm="x"'}
+            return fake_fetch(url, credential)
+
+        share_plan.fetch_address = the_old_deployment_for_a_moment
+        self.give_credential()
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 0, text)
+        self.assertIn("protected:yes", text)
 
     def test_every_older_deployment_is_deleted_and_the_current_one_kept(self):
         self.run_share()
@@ -402,6 +432,19 @@ class ProtectedShareTests(ShareTestCase):
         self.assertFalse(self.cred_file.exists())
         self.assertFalse(Path(seen[0]).exists())
         self.assertNotIn(PASSWORD, text)
+
+
+class EdgeCacheTests(ShareTestCase):
+
+    def test_an_open_share_without_the_worker_in_front_is_not_called_shared(self):
+        def no_worker(url, credential=None):
+            return (200, {}) if url.endswith("/") else (404, {})
+
+        share_plan.fetch_address = no_worker
+        status, text = self.run_share()
+        self.assertEqual(status, 1)
+        self.assertIn("notAnsweringYet", text)
+        self.assertNotIn("PLANTOIR_PLAN_SHARED", text)
 
 
 class FailClosedTests(ShareTestCase):

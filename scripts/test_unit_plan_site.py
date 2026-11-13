@@ -230,14 +230,13 @@ for (const c of cases) {
   const headers = {};
   if (auths[c.auth]) headers["Authorization"] = auths[c.auth];
   const answer = await worker.fetch(new Request("https://plans.example" + c.path, { headers }), env);
-  out.push({ status: answer.status, challenge: answer.headers.get("WWW-Authenticate"), robots: answer.headers.get("X-Robots-Tag"), body: await answer.text() });
+  out.push({ status: answer.status, challenge: answer.headers.get("WWW-Authenticate"), robots: answer.headers.get("X-Robots-Tag"), cache: answer.headers.get("Cache-Control"), body: await answer.text() });
 }
-// Twice with the right password: the second is the remembered value.
-const right = { Authorization: auths.right };
-const again = await worker.fetch(new Request("https://plans.example/", { headers: right }), env);
-out.push({ status: again.status });
 console.log(JSON.stringify(out));
 """
+
+SHARED_FILES = ["index.html", "unit/index.html", "unit/correlation.html", "unit/pdfs/Quiz 1, Solutions.pdf",
+                "robots.txt", "404.html"]
 
 
 @unittest.skipIf(NODE is None, "node is not installed here")
@@ -258,31 +257,47 @@ class WorkerTests(unittest.TestCase):
         return {"none": "", "wrong": "Basic " + wrong, "right": "Basic " + right}
 
     def test_every_worker_case(self):
-        source = unit_plan_site.worker_js(unit_plan_site.credential_b64(WORKER_USER, WORKER_PASSWORD),
-                                          unit_plan_site.realm_for("SNC2D"))
-        cases = share()["workerCases"]["cases"]
-        results = self.run_worker(source, cases, self.auths())
-        for case, result in zip(cases, results):
-            with self.subTest(path=case["path"], auth=case["auth"]):
-                self.assertEqual(result["status"], case["status"])
-                if case["basicChallenge"]:
-                    self.assertEqual(result["challenge"], 'Basic realm="SNC2D unit plans", charset="UTF-8"')
-                else:
-                    self.assertIsNone(result["challenge"])
-                self.assertEqual(result["robots"] == "noindex, nofollow", case["robotsTag"])
-                if case["status"] == 200:
-                    self.assertTrue(result["body"].startswith("asset "))
-        self.assertEqual(results[-1]["status"], 200)
+        credential = unit_plan_site.credential_b64(WORKER_USER, WORKER_PASSWORD)
+        sources = {
+            "protected": unit_plan_site.worker_js(credential, unit_plan_site.realm_for("SNC2D"), SHARED_FILES),
+            "open": unit_plan_site.worker_js(None, unit_plan_site.realm_for("SNC2D"), SHARED_FILES),
+        }
+        for mode, source in sources.items():
+            cases = []
+            for case in share()["workerCases"]["cases"]:
+                if case["mode"] == mode:
+                    cases.append(case)
+            # The right password twice: the second answer is the remembered one.
+            results = self.run_worker(source, cases + cases[2:3], self.auths())
+            for case, result in zip(cases, results):
+                with self.subTest(mode=mode, path=case["path"], auth=case["auth"]):
+                    self.assertEqual(result["status"], case["status"])
+                    if case["basicChallenge"]:
+                        self.assertEqual(result["challenge"], 'Basic realm="SNC2D unit plans", charset="UTF-8"')
+                    else:
+                        self.assertIsNone(result["challenge"])
+                    self.assertEqual(result["robots"], "noindex, nofollow")
+                    self.assertIn("no-store", result["cache"])
+                    if case["status"] == 200:
+                        self.assertTrue(result["body"].startswith("asset "))
+                    if case["status"] == 404:
+                        self.assertEqual(result["body"], "asset /404.html")
+            self.assertEqual(results[-1]["status"], cases[2]["status"])
 
     def test_the_password_is_not_in_the_worker_and_two_shares_have_two_salts(self):
         credential = unit_plan_site.credential_b64(WORKER_USER, WORKER_PASSWORD)
-        first = unit_plan_site.worker_js(credential, "X unit plans")
-        second = unit_plan_site.worker_js(credential, "X unit plans")
+        first = unit_plan_site.worker_js(credential, "X unit plans", SHARED_FILES)
+        second = unit_plan_site.worker_js(credential, "X unit plans", SHARED_FILES)
         for source in (first, second):
             self.assertNotIn(WORKER_PASSWORD, source)
             self.assertNotIn(credential, source)
             self.assertNotIn(WORKER_USER, source)
         self.assertNotEqual(first, second)
+
+    def test_the_worker_never_lists_itself(self):
+        source = unit_plan_site.worker_js(None, "X unit plans", SHARED_FILES + ["_worker.js", "_headers"])
+        self.assertNotIn('"_worker.js"', source)
+        self.assertNotIn('"_headers"', source)
 
     def test_a_realm_cannot_end_the_header(self):
         self.assertEqual(unit_plan_site.realm_for('AB"C\\D'), "ABCD unit plans")
