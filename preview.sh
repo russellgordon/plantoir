@@ -4030,6 +4030,17 @@ else
   _EXEC_TTY="-i";  _PY_UNBUFFERED="-u"
 fi
 
+# A serving run whose address carries a claim left by a preview that is no
+# longer running takes the claim over (#835 review H1; build_site.py ->
+# claim_the_preview_address). Asked here, before the build, only so the
+# trail can say so: the take-over itself is build_site.py's, under its lock.
+if [[ -z "$BUILD_ONLY" ]]; then
+  _left_claim="$(docker exec "$CONTAINER_NAME" python3 -B -c 'import sys; sys.path.insert(0, "/opt/scripts"); import build_site; print(build_site.a_claim_that_proves_nothing(int(sys.argv[1]), sys.argv[2], int(sys.argv[3])) or "")' "$PREVIEW_PORT" "$COURSE" "$SECTION" 2>/dev/null | tail -n 1 || true)"
+  if [[ -n "$_left_claim" ]]; then
+    note_on_the_trail "${COURSE}/${SECTION} · a preview of ${_left_claim} that is no longer running had left its claim on this preview's address, so the claim was taken over"
+  fi
+fi
+
 docker exec $_EXEC_TTY "$CONTAINER_NAME" python3 $_PY_UNBUFFERED /opt/scripts/build_site.py \
   --host-os "$_PREVIEW_HOST_OS" \
   --course="$COURSE" \
@@ -4038,4 +4049,12 @@ docker exec $_EXEC_TTY "$CONTAINER_NAME" python3 $_PY_UNBUFFERED /opt/scripts/bu
   $FORCE_NPM_INSTALL \
   $FULL_REBUILD \
   --port "$PREVIEW_PORT" \
-  $MODE_FLAG
+  $MODE_FLAG || _build_rc=$?
+# 75: build_site.py stopped a serving run before it built anything, because
+# another live preview had claimed the same address (#835;
+# contracts/shared-rules.json -> twoPreviewsOneAddress). It said so in the
+# console; this is the line a report reads (rule 5).
+if [[ "${_build_rc:-0}" -eq 75 ]]; then
+  note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — another preview was using its address"
+fi
+exit "${_build_rc:-0}"
