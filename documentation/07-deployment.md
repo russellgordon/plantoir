@@ -1750,10 +1750,15 @@ and the credential item (the `windows` issue for #709).
    and the two skills that make plans and tests write every key, solutions
    file and marking guide there. The name rule from #709 shrank back to a
    HINT (`answerKeys`): the obvious names only (answer key, answers, marking
-   guide or scheme, the French corrigé and réponses, and solution or key as a
-   name's last word or beside test, quiz, exam, worksheet, homework, review,
+   guide or scheme, the French corrigé and réponses, "solutions to",
+   "solution to" and "solution set", and solution, soln or key as a name's
+   last word or beside test, quiz, exam, worksheet, homework, review,
    practice or assignment), so a plan made before the folder keeps its keys
-   out of an open share until they are moved. The widened rule the #709 fix
+   out of an open share until they are moved. The implementation review (M1)
+   measured the first shrink missing `Solutions to Quiz 3.png`, `Lab 2
+   Solution Set`, `Test Solns` and `Unit 2 Soln`, which #709 caught, and the
+   phrases above were added back; `Solutions to Global Warming.pdf` is the
+   accepted false hit, and "ans" stays out (in French it means years). The widened rule the #709 fix
    review ruled (anything holding "answer", "solution" or "key") is
    REJECTED: it held back `Dissolution Lab.pdf`, `Answering Questions.pdf`,
    `Key Terms.pdf` and `Solutions and Mixtures.pdf`, ordinary handouts, and
@@ -1763,8 +1768,15 @@ and the credential item (the `windows` issue for #709).
    (`advice`). Nothing moves a teacher's file for them.
 5. **Two tables before EVERY share** (#833; protected shares too, which #709
    did not ask). The launcher lists the plan's DOCUMENTS only (`documents`):
-   PDFs, text files, everything in an Answer Keys folder, and a picture
-   whose name the hint matches, all movable; a file of a kind no share takes
+   PDFs, text files, everything in an Answer Keys folder, a picture whose
+   name the hint matches, and **a picture no page of the plan loads**, all
+   movable. The plan's own pictures are told from a teacher's by the pages:
+   a picture a page LOADS (an `<img src>` or srcset, a `<source>`, a
+   `<link>` such as an icon, a style's `url()`, resolved from that page) is
+   the plan's own and always goes; one a page only links (`<a href>`) or
+   never names is one a teacher attached, a handout or a key, and is listed
+   like a PDF (review M1: with pictures never listed, an answer-key picture
+   the hint missed went out in an open share listed nowhere); a file of a kind no share takes
    (a `.docx`, a `.tex`) listed in Not shared and not movable, with
    `wordsForTheTables.noteCannotShare`; pages, pictures, stylesheets and fonts
    never listed (they always go, counted in `ownFilesLine`); `plan.json` and
@@ -1803,7 +1815,20 @@ and the credential item (the `windows` issue for #709).
    by-name sentence is kept: Plantoir reads names and folders, never files,
    so a key written inside a page or a PDF outside the folder is shared with
    it. Under `--non-interactive` the remembered choices and the rule decide
-   and the lists are printed.
+   and the lists are printed, with one exception, the director's ruling on
+   the review (M2, `unattendedKeys`): **with nobody to look, a share with no
+   password sends no answer key** on the strength of a remembered choice or
+   the tick alone. Every key is held back, and
+   `openShareLists.keysHeldBackUnattended` says how many and that
+   `--send-answer-keys-openly` sends them on purpose. Russell ruled the case
+   with a person present (M2): a key the teacher dragged into Shared stays
+   there, marked, even after Remove Password, since the tables still open
+   for the look; and (M3) a hint match starts in Shared in a protected or
+   ticked share, keeping its "may be an answer key" mark. A FIRST share that
+   fails leaves no marker (a marker with no project name names no site) and
+   no Keychain item: `deploy.sh` saves a newly asked password only once the
+   share succeeded or gave the year an address (review L3), and reads a year
+   as still shared only from a marker with an address.
 
    **Sort and filter** (Russell, 2026-11-13): each table sorts on its own
    (by unit in the plan's order, then by name, at first); one search field
