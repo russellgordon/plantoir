@@ -205,7 +205,7 @@ struct CoverageTabView: View {
 
     /// The map could not be shown at all: a line of its own, once.
     func noteCannotShow() {
-        ActivityTrail.note(.lookedAtSectionCoverage, CoverageTabTrail.couldNotShow, course: course.code, section: sectionNumber)
+        ActivityTrail.note(.lookedAtSectionCoverage, CoverageTabTrail.filled(CoverageTabTrail.couldNotShow), course: course.code, section: sectionNumber)
     }
 }
 

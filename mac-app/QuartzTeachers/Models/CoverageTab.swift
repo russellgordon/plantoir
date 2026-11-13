@@ -124,7 +124,7 @@ nonisolated struct CoverageTabRecord: Equatable, Sendable {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
-        guard let version = object["version"] as? Int, version == CoverageTabRecord.version else {
+        if !CoverageTabRecord.isTheVersionNumber(object["version"], CoverageTabRecord.version) {
             return nil
         }
         var startedNs: Int64? = nil
@@ -167,10 +167,25 @@ nonisolated struct CoverageTabRecord: Equatable, Sendable {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return false
         }
-        guard let version = object["version"] as? Int else {
+        guard let number = object["version"] as? NSNumber, !CoverageTabRecord.isABoolean(number) else {
             return false
         }
-        return version != CoverageTabRecord.version
+        return number.intValue != CoverageTabRecord.version
+    }
+
+    /// Whether `value` is the JSON NUMBER `wanted`: `true` bridges to an
+    /// `NSNumber` that reads as 1, and is not version 1 (the 793b review's
+    /// LOW 6).
+    static func isTheVersionNumber(_ value: Any?, _ wanted: Int) -> Bool {
+        guard let number = value as? NSNumber, !CoverageTabRecord.isABoolean(number) else {
+            return false
+        }
+        return number.intValue == wanted && number.doubleValue == Double(wanted)
+    }
+
+    /// Whether an `NSNumber` from `JSONSerialization` was a JSON boolean.
+    static func isABoolean(_ number: NSNumber) -> Bool {
+        return CFGetTypeID(number) == CFBooleanGetTypeID()
     }
 }
 
@@ -520,12 +535,20 @@ nonisolated enum CoverageChange: String, Sendable {
     case clock
     /// The record has no start time, so nobody can tell.
     case unknown
+    /// A new map's walk has not come back yet: no line, and not a claim
+    /// that it is current (the 793b review's LOW 1).
+    case notKnownYet
 }
 
 /// How a "make the map again" from the Coverage tab came out, kept per
 /// section in `SectionCoverage` so it survives a switch of tab or section.
 nonisolated enum CoverageRefresh: Equatable, Sendable {
     case none
+    /// Pressed: a preview still running is being stopped first. Recorded at
+    /// the press, so the tab says the map is being made and the button is
+    /// unavailable from that instant (the 793b review's H1). A run ending
+    /// now is the OLD run's, and settles nothing.
+    case starting
     /// Asked for; the build has not yet written the map, or ended.
     case pending
     /// The build ended, was stopped or never reached the map, or its map
@@ -541,6 +564,8 @@ nonisolated enum CoverageRefresh: Equatable, Sendable {
         switch self {
         case .none:
             return "none"
+        case .starting:
+            return "starting"
         case .pending:
             return "pending"
         case .didNotFinish:
@@ -609,7 +634,7 @@ nonisolated enum CoverageTabDisplay {
         let hasAMap: Bool = facts.record == .thisBuild || facts.record == .anotherBuild
         let anyBuildRunning: Bool = facts.ownBuildRunning || facts.deploying || facts.elsewhere
         var making: Bool = false
-        if facts.refresh == .pending || facts.ownBuildBeforeItsMap {
+        if facts.refresh == .pending || facts.refresh == .starting || facts.ownBuildBeforeItsMap {
             making = true
         }
         if facts.record == .anotherBuild && anyBuildRunning {
@@ -624,7 +649,7 @@ nonisolated enum CoverageTabDisplay {
             case .refused:
                 failed = true
                 refusedReason = true
-            case .none, .pending:
+            case .none, .pending, .starting:
                 break
             }
             if facts.record == .anotherBuild && !anyBuildRunning {
@@ -632,9 +657,15 @@ nonisolated enum CoverageTabDisplay {
             }
         }
 
+        // The first line is the map's own date, said only as far as it is
+        // true (the 793b review's M1): "last built" only when the map IS the
+        // latest build's, and never an empty date.
+        let hasATime: Bool = facts.changed != .unknown
         var lines: [String] = []
-        if hasAMap {
-            lines.append("asOf")
+        if facts.record == .thisBuild {
+            lines.append(hasATime ? "asOf" : "asOfNoTime")
+        } else if facts.record == .anotherBuild {
+            lines.append(hasATime ? "olderMap" : "olderMapNoTime")
         }
         if making {
             lines.append("making")
@@ -651,7 +682,7 @@ nonisolated enum CoverageTabDisplay {
                     lines.append("changedSince")
                 case .clock, .unknown:
                     lines.append("mayBeOutOfDate")
-                case .none:
+                case .none, .notKnownYet:
                     break
                 }
             }
@@ -692,8 +723,11 @@ nonisolated enum CoverageTabWording {
 
     static let tabCoverage: String = "Coverage"
     static let asOf: String = "Made when this section was last built, {when}."
+    static let asOfNoTime: String = "Made when this section was last built."
+    static let olderMap: String = "Made by an earlier build of this section, {when}. The latest build made no map."
+    static let olderMapNoTime: String = "Made by an earlier build of this section. The latest build made no map."
     static let making: String = "Making the map again with a new build of this section…"
-    static let couldNotMakeAgain: String = "The map could not be made again this time. This is the map from {when}."
+    static let couldNotMakeAgain: String = "The map could not be made again this time."
     static let couldNotMake: String = "The map could not be made this time."
     static let changedSince: String = "Pages in the course have changed since then, so the map may be out of date."
     static let mayBeOutOfDate: String = "Plantoir cannot tell whether pages have changed since then, so the map may be out of date."
@@ -728,6 +762,12 @@ nonisolated enum CoverageTabWording {
             text = tabCoverage
         case "asOf":
             text = asOf
+        case "asOfNoTime":
+            text = asOfNoTime
+        case "olderMap":
+            text = olderMap
+        case "olderMapNoTime":
+            text = olderMapNoTime
         case "making":
             text = making
         case "couldNotMakeAgain":
@@ -809,25 +849,30 @@ nonisolated enum CoverageTabTrail {
     static let noMapYet: String = "no map made yet"
     static let otherVersion: String = "the map was made by another version of Plantoir"
     static let noCurriculum: String = "the last build found no curriculum to map"
-    static let couldNotShow: String = "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this Mac"
+    static let couldNotShow: String = "the Coverage tab showed nothing: Plantoir could not keep the map's page off the internet on this {machine}"
     static let asked: String = "asked to make the coverage map again from the Coverage tab"
     static let madeAgain: String = "the coverage map was made again"
     static let didNotFinish: String = "the coverage map could not be made again: the build ended before it was made"
     static let refused: String = "the coverage map could not be made again: the preview could not start"
-    static let opened: String = "opened {place} in Obsidian, curriculum expectation {code} from the Coverage tab"
+    static let opened: String = "asked Obsidian to open {place}, curriculum expectation {code}, from the Coverage tab"
     static let didNotOpen: String = "did not open {code} from the Coverage tab: {why}"
     static let whyGone: String = "its page is no longer there"
     static let whyOutside: String = "its page is not inside the course folder"
     static let whyOlder: String = "the map on screen was older than its record"
     static let whyNotListed: String = "the map names no page for it"
-    static let whyNoObsidian: String = "Obsidian is not on this Mac"
+    static let whyNoObsidian: String = "Obsidian is not on this {machine}"
 
     // MARK: - Functions
 
     /// The line for one look at the tab.
+    /// A trail sentence with this platform's word for the computer.
+    static func filled(_ text: String) -> String {
+        return text.replacingOccurrences(of: MachineWord.placeholder, with: MachineWord.onThisPlatform)
+    }
+
     static func lookedText(reading: CoverageTab.Reading, changed: CoverageChange, rulesCompiled: Bool) -> String {
         if !rulesCompiled {
-            return couldNotShow
+            return filled(couldNotShow)
         }
         var what: String = noMapYet
         switch reading.kind {
@@ -900,6 +945,6 @@ nonisolated enum CoverageTabTrail {
     }
 
     static func didNotOpenText(code: String, why: String) -> String {
-        return didNotOpen.replacingOccurrences(of: "{code}", with: code).replacingOccurrences(of: "{why}", with: why)
+        return filled(didNotOpen.replacingOccurrences(of: "{code}", with: code).replacingOccurrences(of: "{why}", with: why))
     }
 }
