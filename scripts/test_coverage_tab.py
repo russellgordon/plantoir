@@ -335,11 +335,18 @@ class TheTwoPanelsAreOnePanel(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "base.scss"
             path.write_text("body { color: red; }\n", encoding="utf-8")
+            # Hashed with CRLF read as LF: on Windows Python's text mode writes
+            # every "\n" of the stylesheet as "\r\n" (here and in the product,
+            # write_text), which changes the bytes and not the stylesheet
+            # (step 0 of v2.0.0). On the mac and in the container nothing is
+            # translated, so this is the very hash it always was.
+            def lf_hash():
+                return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
             with redirect_stdout(io.StringIO()):
                 build_site.append_coverage_styles(path)
-                first = hashlib.sha256(path.read_bytes()).hexdigest()
+                first = lf_hash()
                 build_site.append_coverage_styles(path)
-                second = hashlib.sha256(path.read_bytes()).hexdigest()
+                second = lf_hash()
             expected = "ec55f70196542ea0d00b1c114e8b465fc538061d25c38119278441b19ba7062b"
             self.assertEqual(first, expected)
             self.assertEqual(second, expected, "an earlier block is replaced, not repeated")
@@ -973,8 +980,15 @@ class ClearedWithTheSite(unittest.TestCase):
     """#789, as merged: when a course's builds folder is cleared, the map goes
     with the built site it describes, and the kept GeoGebra copies stay."""
 
-    @unittest.skipUnless(shutil.which("bash"), "the launchers' clear is bash")
     def test_every_launchers_clear_takes_the_map_and_keeps_the_copies(self):
+        # Not plain "bash": on Windows that is C:\Windows\System32\bash.exe,
+        # the WSL launcher, which fails ("must be updated") or cannot open a
+        # Windows path (step 0 of v2.0.0, measured on Windows 11 Pro 26200).
+        # The shared harness finds Git Bash there, and a real bash elsewhere.
+        import test_deploy_non_interactive as launcher_harness
+        shell = launcher_harness._a_bash_that_can_run_deploy_sh()
+        if shell is None:
+            self.skipTest("no bash on this machine that can run the launchers' clear")
         for launcher in ("setup.sh", "preview.sh", "deploy.sh"):
             with self.subTest(launcher), tempfile.TemporaryDirectory() as temp:
                 target = Path(temp) / "CODE"
@@ -983,7 +997,7 @@ class ClearedWithTheSite(unittest.TestCase):
                 write(target / "section1" / "public" / "index.html", "a site")
                 write(target / ".geogebra-cache" / "k.ggb", "a kept copy")
                 script = a_launchers_clear(launcher) + '\nclear_built_sites_keeping_copies "$1"\n'
-                subprocess.run(["bash", "-c", script, "clear", str(target)], check=True)
+                subprocess.run(shell + ["-c", script, "clear", str(target)], check=True)
                 left = sorted(path.relative_to(target).as_posix() for path in target.rglob("*"))
                 self.assertEqual(left, [".geogebra-cache", ".geogebra-cache/k.ggb"])
 

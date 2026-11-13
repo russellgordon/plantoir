@@ -170,7 +170,15 @@ class StageTests(unittest.TestCase):
             folder = a_planning_folder(Path(tmp))
             secret = Path(tmp) / "elsewhere.txt"
             secret.write_text("not for sharing", encoding="utf-8")
-            os.symlink(secret, folder / "unit" / "linked.txt")
+            try:
+                os.symlink(secret, folder / "unit" / "linked.txt")
+            except OSError as error:
+                # WinError 1314: this Windows account may not make symbolic
+                # links (Developer Mode off; measured on Windows 11 Pro 26200).
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                                  "Developer Mode off); the case runs on the mac and in the container")
+                raise
             out = Path(tmp) / "staged"
             unit_plan_site.stage(folder, out, unit_plan_site.bundled_assets_dir(), False)
             self.assertFalse((out / "unit" / "linked.txt").exists())

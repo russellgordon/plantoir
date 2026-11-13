@@ -574,8 +574,14 @@ class MarkerTests(ShareTestCase):
         self.assertEqual(sorted(marker), sorted(expected))
         self.assertNotIn("account_id", marker)
         self.assertNotIn("id", marker)
-        mode = (self.course_dir / ".cloudflare_sites" / "plans-2026.json").stat().st_mode & 0o777
-        self.assertEqual(mode, 0o600)
+        # A POSIX mode means nothing on NTFS: Windows reports 0o666 (438)
+        # for any file that is not read-only, whatever chmod was asked
+        # (measured on Windows 11 Pro 26200, step 0 of v2.0.0). The marker's
+        # privacy there comes from where it lives and its ACL, which is the
+        # Windows app's own design (#824), so the mode is asserted elsewhere.
+        if os.name != "nt":
+            mode = (self.course_dir / ".cloudflare_sites" / "plans-2026.json").stat().st_mode & 0o777
+            self.assertEqual(mode, 0o600)
 
     def test_every_mode_case(self):
         for case in share_plan.share_words()["modeCases"]["cases"]:
@@ -945,6 +951,8 @@ class UnattendedKeysTests(ShareTestCase):
 class ReviewLowTests(ShareTestCase):
     """The #833 implementation review's LOW findings."""
 
+    @unittest.skipIf(os.name == "nt", "NTFS refuses a line break in a file name (OSError Errno 22), so no "
+                                      "such file can reach a share on Windows; the case runs on the mac")
     def test_a_line_break_in_a_name_cannot_start_a_marker_line(self):
         pdfs = self.course_dir / ".internal" / "planning" / "unit" / "pdfs"
         (pdfs / "Quiz\nPLANTOIR_PLAN_LISTS_BEGIN: 2026 protected:no tick:no ownFiles:0.pdf").write_bytes(b"%PDF")
@@ -961,7 +969,15 @@ class ReviewLowTests(ShareTestCase):
         outside = self.tmp / "outside"
         outside.mkdir()
         (outside / "Secret.pdf").write_bytes(b"%PDF")
-        (planning / "unit" / "linked").symlink_to(outside, target_is_directory=True)
+        try:
+            (planning / "unit" / "linked").symlink_to(outside, target_is_directory=True)
+        except OSError as error:
+            # WinError 1314: this Windows account may not make symbolic links
+            # (Developer Mode off; measured on Windows 11 Pro 26200).
+            if getattr(error, "winerror", None) == 1314:
+                self.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                              "Developer Mode off); the case runs on the mac")
+            raise
         path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
         path.parent.mkdir(parents=True)
         path.write_text(json.dumps({"documents": {"unit/linked/Secret.pdf": "shared"}}), encoding="utf-8")
