@@ -827,6 +827,19 @@ else
   cat /tmp/verify_deploy_token_refusal_test.log
 fi
 
+# Two deploys, two writers, two previews at once (GitHub #835): each deploy's
+# token reaches the website builder through a file of its own; the course's
+# config and its shared pages survive two builds writing them together; and a
+# serving preview never stops another one handed the same address.
+for _two_at_once in test_deploy_token_handoff test_shared_writes_two_at_once test_two_previews_one_address; do
+  if (cd scripts && python3 "${_two_at_once}.py") >"/tmp/verify_${_two_at_once}.log" 2>&1; then
+    pass "two at once: scripts/${_two_at_once}.py (#835)"
+  else
+    fail "two at once: scripts/${_two_at_once}.py (#835)"
+    cat "/tmp/verify_${_two_at_once}.log"
+  fi
+done
+
 if (cd scripts && python3 test_verify_lock.py) >/tmp/verify_lock_test.log 2>&1; then
   pass "verify.sh lets one run at a time hold this Mac, names the holder to a second, and lets go on every exit (scripts/test_verify_lock.py)"
 else

@@ -4855,11 +4855,56 @@ else
   echo "🚀 Deploying ${COURSE_CODE} S${SECTION_NUM} from: ${SECTION_DIR_IN_CONTAINER}"
 fi
 
-# --- Securely inject token into container without exposing on host CLI ---
+# >>> TOKEN HAND-OFF BLOCK >>> The token reaches the website builder through a
+# pipe into a file only this deploy knows the name of (#835 F1). Until #835 it
+# was one fixed path, /tmp/deploy_pat, in the ONE builder a working folder
+# shares, so two deploys started together (two courses today; two sections
+# once #835 narrows the hold) read each other's token or none: 29 and 6 of 60
+# in a stand-in of these two steps, run in a real builder (2026-11-13). Now
+# each deploy makes a fresh 0700 folder with mktemp and a 0600 file in it, the
+# shape the unit-plan credential already has (#709 review M4). Only the file's
+# NAME crosses into the reading step; the reading step deletes the folder
+# before it does anything else, and an exit before that step is reached
+# deletes it from the EXIT trap. The secret is never in an argument list, a
+# `docker exec -e`, the console or the trail. scripts/test_deploy_token_handoff.py
+# runs this block, two deploys at a time.
+DEPLOY_PAT_FILE=""
+
+# The reading half, run inside the builder as the start of each deploy's own
+# `sh -lc`. It refuses any name that is not one this block makes, so the
+# `rm -rf` can only ever remove a hand-off folder.
+TAKE_THE_TOKEN='case "${PAT_FILE:-}" in /tmp/deploy_pat.*/pat) ;; *) echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was changed." >&2; exit 1 ;; esac
+    tok=$(cat "$PAT_FILE"); rm -rf "${PAT_FILE%/pat}";
+'
+
+forget_the_token_file() {
+  if [[ -n "$DEPLOY_PAT_FILE" ]]; then
+    docker exec "$CONTAINER_NAME" sh -c 'case "$1" in /tmp/deploy_pat.*/pat) rm -rf "${1%/pat}" ;; esac' forget "$DEPLOY_PAT_FILE" >/dev/null 2>&1 || true
+    DEPLOY_PAT_FILE=""
+  fi
+}
+
+hand_the_token_to_the_builder() {
+  # $1: the token. printf is a builtin, so it is in no process's arguments.
+  DEPLOY_PAT_FILE="$(printf %s "$1" | docker exec -i "$CONTAINER_NAME" sh -c 'umask 077; d="$(mktemp -d /tmp/deploy_pat.XXXXXX)" && cat > "$d/pat" && printf %s "$d/pat"')" || DEPLOY_PAT_FILE=""  # never shown to a teacher: piped into the website builder, never printed
+  if [[ "$DEPLOY_PAT_FILE" != /tmp/deploy_pat.*/pat ]]; then
+    DEPLOY_PAT_FILE=""
+    if [[ "$PLANS_MODE" == "true" ]]; then
+      echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was shared."
+    else
+      echo "❌ Plantoir could not hand the sign-in to the website builder, so nothing was deployed."
+    fi
+    exit 1
+  fi
+  # Nothing in the trap may fail: under `set -e` a failing command there
+  # becomes the run's exit status.
+  trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi' EXIT
+}
+# <<< TOKEN HAND-OFF BLOCK <<<
 if [[ "$TARGET" == "cloudflare" ]]; then
-  printf %s "$CF_TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
+  hand_the_token_to_the_builder "$CF_TOKEN"
 else
-  printf %s "$TOKEN" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/deploy_pat'  # never shown to a teacher: piped into the website builder, never printed
+  hand_the_token_to_the_builder "$TOKEN"
 fi
 
 # ---- Sharing unit plans (#709): share_plan.py, then the Keychain ----------
@@ -4900,8 +4945,9 @@ if [[ "$PLANS_MODE" == "true" ]]; then
     -e HOST_TZ_OFFSET="${HOST_TZ_OFFSET}" \
     -e CF_ACCOUNT="${CF_ACCOUNT}" \
     -e PLAN_COURSE="${COURSE_CODE}" \
+    -e PAT_FILE="${DEPLOY_PAT_FILE}" \
     "$CONTAINER_NAME" \
-    sh -lc 'tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
+    sh -lc "$TAKE_THE_TOKEN"'
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
         python3 /opt/scripts/share_plan.py --host-os mac --course "$PLAN_COURSE" "$@"' \
     share_plan "${_plan_opts[@]}" || _share_rc=$?
@@ -4938,9 +4984,9 @@ docker exec $_EXEC_TTY \
   -e TARGET="${TARGET}" \
   -e CF_ACCOUNT="${CF_ACCOUNT}" \
   -e PLANTOIR_PAGES_ALREADY_ASKED=1 \
+  -e PAT_FILE="${DEPLOY_PAT_FILE}" \
   "$CONTAINER_NAME" \
-  sh -lc '
-    tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat;
+  sh -lc "$TAKE_THE_TOKEN"'
     opts="";
     [ -n "$DIAGNOSE" ]  && opts="$opts $DIAGNOSE";
     # PARSING the flag is not enough — it has to reach the Python, which is

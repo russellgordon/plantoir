@@ -3322,6 +3322,66 @@ already does, on two platforms. The page is remembered by the app from the
 teacher's navigations in its own pane, so a stop needs to capture nothing: a
 `--stop` still ends what it always ended.
 
+## Two at once in one website builder (#835)
+
+A working folder has ONE website builder, and #835 lets two programs work on
+two sections of one course at the same moment (one copy of Plantoir already
+does). Its measurement (63 real paired runs of EXC2O's two sections, 2026-11-13)
+found two things the launchers share that could collide. Both were reachable
+before #835, between two COURSES of one folder.
+
+**The deploy token (F1).** `deploy.sh` piped the Netlify or Cloudflare token
+into one fixed path inside the builder, `/tmp/deploy_pat`, and the next
+`docker exec` read and removed it. Two deploys started together read each
+other's token or none: in a stand-in of those two steps run in a real builder,
+29 of 60 got the other's and 6 none (the measurer); 26 and 4 when re-run
+against the old two steps by `scripts/test_deploy_token_handoff.py`'s real
+builder class. Now the `TOKEN HAND-OFF BLOCK` in `deploy.sh`:
+
+- pipes the token into a fresh `mktemp -d /tmp/deploy_pat.XXXXXX` folder (0700)
+  and a `pat` file in it (0600), the shape the unit-plan credential already had
+  (#709 review M4), and keeps only the file's NAME, in `DEPLOY_PAT_FILE`;
+- hands the NAME to the reading `docker exec` as `PAT_FILE`; the reading step
+  (`TAKE_THE_TOKEN`, the start of both the deploy's and the plan share's
+  `sh -lc`) refuses any name the block did not make, reads the token, and
+  removes the folder before it does anything else;
+- removes the folder from the EXIT trap when the run ends before the reading
+  step (an error, Stop, SIGTERM, SIGINT, SIGHUP: all measured), and stops in
+  words ("could not hand the sign-in to the website builder") if the hand-off
+  itself fails.
+
+The secret is never in an argument list, a `docker exec -e`, the console or
+the trail; `test_deploy_token_handoff.py` feeds made-up tokens and searches
+all four. Inside the builder the token still reaches `deploy.py` as
+`NETLIFY_AUTH_TOKEN` or `CLOUDFLARE_API_TOKEN` in the environment of that one
+command, as before: wrangler reads it from there. A run killed with SIGKILL
+between the hand-off and the reading step leaves its 0700 folder in the
+builder's `/tmp` until the builder is recreated; nothing sweeps `/tmp/deploy_pat.*`,
+because a sweep could remove a hand-off another deploy is about to read, the
+fault this replaced. Rejected: a lock around the old fixed file (it would have to
+be held from the write in one `docker exec` to the read in the next, across two
+processes; a file of its own needs no lock), and handing the token over as
+`docker exec -e` (it is then in the Mac's process table).
+Measured with stand-ins only: no credential of the teacher's was used. Windows
+deploys natively with the token in its own process's environment and has no
+shared file.
+
+**Two previews on one address.** A serving preview chooses one of the
+builder's four addresses (8081-8084), and each program chooses on its own
+(mac: `PreviewLeases`, one process), so two programs could hand two previews
+the same one, and the second's `kill_existing_quartz` stopped the first (3 of
+3). `build_site.py` now CLAIMS the address at the start of a serving run, under
+one `flock` for the builder, for as long as its build runs; a run whose address
+another live preview claimed exits 75 before it builds anything, with
+`shared-rules.json` → `twoPreviewsOneAddress.sentences.launcher`, and
+`preview.sh` writes `launcherLineWhenItsAddressIsAnotherPreviews` on the trail.
+The same course and section started again takes its claim over, and a claim
+whose process has gone counts for nothing. Rejected: moving the second preview
+to a free address, because `preview.sh` announces the address before the build
+and the app opens that one. #835's per-section leases name each preview's
+address, so the app avoids a taken one and this refusal stays rare.
+`scripts/test_two_previews_one_address.py`.
+
 ## A course kept for reference is refused in the launcher, early
 
 > **deploy.ps1, measured (bundle 6b):** all 26 `markerAgreement` rows pass against the real launcher (`ReferenceMarkerAgreementTests`, about 100 s). deploy.ps1 ends its "cannot tell" headline with an ASCII hyphen where deploy.sh has an em dash — Windows PowerShell 5.1 reads a script without a byte-order mark in the machine's code page — and the app's `FailureExplainer` reads both shapes into the same sentence.

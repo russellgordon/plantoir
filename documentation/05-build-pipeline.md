@@ -3733,6 +3733,46 @@ by build time, which differ between two builds of the SAME image too
 top-level `[!answer]-` callouts), a page of look-alikes and its CR LF twin
 are identical.
 
+## Two builds of one course writing its shared files (#835, F2 and F3)
+
+Two builds of one course can run at the same moment: one copy of Plantoir
+building two sections, and since #835 two programs. Two of the files a build
+may write belong to the whole course, and both were made safe for two writers.
+
+**`course_config.json` (F2).** Preflight writes it back when discovery finds a
+new shared folder or file (`_atomic_write_json_with_backup`). Every write went
+through one fixed temporary, `course_config.json.tmp`, so one writer renamed
+the other's half-written file into place: in a stand-in of two writers, 200
+writes each, 224 and 301 reads met a file that was not JSON, and one trial
+ENDED that way (2026-11-13). Each write now makes its own temporary
+(`tempfile.mkstemp`, `.course_config.<random>.tmp`) and renames it, keeping the
+config's permissions; the backup is copied to a temporary of its own and
+renamed too, so a reader never meets a half-copied backup.
+`scripts/test_shared_writes_two_at_once.py`: dev's code 80 to 122 bad reads of
+the config and about a thousand of the backup in five trials; the new code 0.
+Both apps' own writers already used a unique temporary (`Data.write(options:
+.atomic)` on the mac), so only the Python changed. In real paired builds the
+write landed once in ten trials and never collided; the fault is rare and real.
+
+**The date pass (F3).** Two sections dating one shared page each write their
+own `createdSection<N>` (`_replace_the_page_safely`). Its last look at the page
+and its rename were two steps, so both could see the page unchanged and the
+second rename threw away the first's date while both said "written" (100 of
+300 in the measurer's stand-in; 266 to 281 of 300 in the test's, which starts
+the two on a barrier). The look and the rename now run under one exclusive
+`fcntl.flock` for the course (`_HoldingTheCourseDatingLock`), on
+`.merged_output/.dating.lock`, the course's built-website folder, never among
+the teacher's files; with no built-website folder yet, a file in the temporary
+folder named for the course's path (both builds of a working folder run in its
+one builder, so they share it). Held, the second build sees the first's write
+and declines, and its next build dates the page again: a "changed after the
+build began" rebuild once, which already happens inside one app. 0 lost with
+the lock. Windows has no `fcntl`: there it goes ahead unlocked, as before.
+One lock for the course rather than one per page: it is held for the length
+of one read and one rename, so serialising two different pages costs nothing
+a teacher could notice, and there is one file to look for. Rejected: a lock
+file in the course folder, which is the teacher's vault.
+
 ## Stage 4: Configuration patching
 
 The remaining per-section settings from `course_config.json` are applied to
@@ -4424,7 +4464,10 @@ found by reading `build_site.py` rather than by testing:
 - **`course_config.backup.json` and `course_config.json.tmp`** are written
   by `_atomic_write_json_with_backup` during the build's own preflight,
   whenever discovery finds something new. Same failure, less often, and
-  therefore harder to diagnose.
+  therefore harder to diagnose. (Since #835 the temporaries are
+  `.course_config.<random>.tmp` and `.course_config.backup.<random>.tmp`,
+  hidden and ending `.tmp`, so they are skipped twice over; a
+  `course_config.json.tmp` can still be met, left by an older build.)
 
 `contracts/app-rules.json` → `publishedFreshness.filesCounted` runs all
 sixteen of these as data. Wire that up before anything else here; it is the

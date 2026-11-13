@@ -4038,4 +4038,12 @@ docker exec $_EXEC_TTY "$CONTAINER_NAME" python3 $_PY_UNBUFFERED /opt/scripts/bu
   $FORCE_NPM_INSTALL \
   $FULL_REBUILD \
   --port "$PREVIEW_PORT" \
-  $MODE_FLAG
+  $MODE_FLAG || _build_rc=$?
+# 75: build_site.py stopped a serving run before it built anything, because
+# another live preview had claimed the same address (#835;
+# contracts/shared-rules.json -> twoPreviewsOneAddress). It said so in the
+# console; this is the line a report reads (rule 5).
+if [[ "${_build_rc:-0}" -eq 75 ]]; then
+  note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — another preview was using its address"
+fi
+exit "${_build_rc:-0}"

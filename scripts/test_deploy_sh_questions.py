@@ -491,8 +491,12 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
         start = text.index("docker exec $_EXEC_TTY \\\n  -e HOST_TZ_OFFSET")
         finish = text.index("\n  '", start) + len("\n  '")
         command = text[start:finish]
+        # The token reaches the command through deploy.sh's own hand-off
+        # block (#835 F1): a fresh /tmp/deploy_pat.XXXXXX/pat, named in
+        # PAT_FILE, which the command's reading step removes.
+        block_start = text.index("# >>> TOKEN HAND-OFF BLOCK >>>")
+        block = text[block_start:text.index("# <<< TOKEN HAND-OFF BLOCK <<<", block_start)]
         with tempfile.TemporaryDirectory() as scratch:
-            command = command.replace("/tmp/deploy_pat", scratch + "/deploy_pat")
             bin_folder = Path(scratch) / "bin"
             bin_folder.mkdir()
             (bin_folder / "python3").write_text(
@@ -501,13 +505,19 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
             program = "\n".join([
                 # Stands in for docker: every `-e NAME=value` pair is passed on,
                 # so the script sees TARGET and takes the Cloudflare branch.
-                'docker() { local envs=(); while [ "$1" != "-lc" ]; do '
+                # The hand-off block's own execs say `sh -c`, the command `sh -lc`.
+                'docker() { local envs=(); while [ "$1" != "-lc" ] && [ "$1" != "-c" ]; do '
                 'if [ "$1" = "-e" ]; then envs+=("$2"); shift; fi; shift; done; shift; '
-                'env "${envs[@]}" sh -c "$1"; }',
-                '_EXEC_TTY="-i"; CONTAINER_NAME="teaching-quartz-0000abcd"',
+                'env ${envs[@]+"${envs[@]}"} sh -c "$@"; }',
+                '_EXEC_TTY="-i"; CONTAINER_NAME="teaching-quartz-0000abcd"; PLANS_MODE="false"',
+                'give_back_the_ready_turn() { :; }',
                 'COURSE_CODE="AP CALC"; SECTION_NUM="1"; TARGET="' + target + '"',
                 'NON_INTERACTIVE="false"; DIAGNOSE=""; TEAM_SLUG=""; CF_ACCOUNT=""; HOST_TZ_OFFSET=""',
+                block,
+                'hand_the_token_to_the_builder "made-up-token"',
+                'handed="$DEPLOY_PAT_FILE"',
                 command,
+                'if [ -e "$handed" ]; then echo "the hand-off was not removed" >&2; exit 1; fi',
             ])
             environment = dict(os.environ)
             environment["PATH"] = str(bin_folder) + ":/usr/bin:/bin"
