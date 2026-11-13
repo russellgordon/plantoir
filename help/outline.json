@@ -1,0 +1,3928 @@
+{
+ "title": "Plantoir Help: the outline",
+ "status": "Revision 3 (2026-11-13), from revision 2 as approved 14:04 plus every ruling since; read with 839-help-plan-v3.md. Revision 2's shape stands; pages are added, none removed.",
+ "look": "Type \"Helvetica Neue\", Helvetica, Arial, sans-serif for titles (bold) and text; monospace for code only; no display face, no web font. LIGHT: --paper #FCFDFB, --paper-deep #F1F5EF, --card #FFFFFF, --rule #D9E2D6, --ink #1E2721, --ink-soft #566259, --green #1F7A3A, --green-deep #0F4A27; neutral light shadows. DARK: the site's dark values today except the two greens, which are Fern: --green-deep #7FB069, --green #9CC788. Pictures follow the reader's appearance; annotations red #d0312d in both.",
+ "voice": "Documentation, not marketing: one task a page, steps in order, what you see after each, what to do when it goes wrong. Written by Fable from an Opus fact sheet; reviewed adversarially for accuracy, clarity, simple language and tone.",
+ "anchorRule": "One anchor a page, written <a name=\"<anchor>\"></a> before the title; the file is <anchor>.html; a Help button opens a PAGE, never a place inside one (measured 2026-11-13: every anchor on a page resolves to its first).",
+ "pageCount": 100,
+ "sceneCount": 201,
+ "pictureFilesMac": 402,
+ "readingTimeTotalMinutes": 266,
+ "landingPage": {
+  "indexed": false,
+  "why": "The contents page (index.html) is built from this file and is not indexed (robots: anchors). The director decides which other pages are purely informational and sets their `indexed` to false."
+ },
+ "ownsIdentity": "Each page's title, question, section, assistant flag and scenes come from this file only; a page's front matter may not restate them (help/README.md).",
+ "sections": [
+  {
+   "title": "Start here",
+   "purpose": "From nothing to a class website, and the few words the rest of Help uses.",
+   "pages": [
+    {
+     "anchor": "quick-start",
+     "title": "Quick start: your first class website",
+     "question": "How do I get from nothing to a class website, without any account?",
+     "steps": [
+      "What you need: a Mac with Apple silicon and macOS 15; no account for the first site; an assistant is optional (link github-education)",
+      "Download Plantoir from plantoir.app and drag it into Applications",
+      "Open it and choose an empty folder as your working folder (Choose Folder…, then Set Up This Folder)",
+      "Wait while Plantoir gets this Mac ready (first time only, a few minutes)",
+      "File ▸ New Course…: type the course code and keep the ready-made pages if offered",
+      "In the same sheet's Deploying part, set Deploy to: A folder on this Mac, press Choose… and pick an empty folder (for example Class Sites in Documents); make the course",
+      "Select Section 1 in the sidebar and press Preview; read the site in the window, or Open in Browser",
+      "Press Deploy and answer the checklist; the site is copied into section1 inside your folder",
+      "Press Open in Browser. The site opens in your browser, served from the folder (#850)"
+     ],
+     "pictures": [
+      {
+       "shows": "The working folder chooser on an empty folder",
+       "labels": [
+        "Choose Folder…",
+        "Set Up This Folder"
+       ]
+      },
+      {
+       "shows": "The window while this Mac is got ready, with its progress sentence",
+       "labels": [
+        "What is happening now"
+       ]
+      },
+      {
+       "shows": "New Course or Club with a course code typed and its suggested names",
+       "labels": [
+        "Course code",
+        "Pre-populate course with example content"
+       ]
+      },
+      {
+       "shows": "New Course or Club, Deploying part, set to a folder",
+       "labels": [
+        "Deploy to: A folder on this Mac",
+        "Choose…"
+       ]
+      },
+      {
+       "shows": "Section 1 selected, its preview showing the class site",
+       "labels": [
+        "1. Section 1",
+        "2. Preview",
+        "3. Deploy"
+       ]
+      },
+      {
+       "shows": "The Deploy checklist for a new course's section",
+       "labels": [
+        "Ticked: students see it",
+        "Deploy"
+       ]
+      },
+      {
+       "shows": "The finished deploy to a folder, with Open in Browser",
+       "labels": [
+        "Deployed to a folder",
+        "Open in Browser"
+       ]
+      },
+      {
+       "shows": "The browser showing the folder's site",
+       "labels": [
+        "The site, served from the folder"
+       ]
+      }
+     ],
+     "scenes": 8,
+     "readMinutes": 5,
+     "notes": "Revision 3: ends on Open in Browser for a deployed folder (ruled 2026-11-13 14:27); 'What you need' links github-education (ruled 15:04). The deploy choice can also be made later in Course Settings > Deploying.",
+     "id": "quick-start",
+     "section": "Start here",
+     "status": "amended",
+     "amendment": "Revision 3: a short 'What you need' part first (a Mac with Apple silicon and macOS 15; no account for the first site; optional, an assistant, linking github-education). Step 8 becomes: press Open in Browser; the site opens in the browser, served from the folder (#850). Picture 7 is the finished folder deploy with Open in Browser labelled; picture 8 is the browser showing the folder's site. The CONFLICT note is gone (ruled 2026-11-13 14:27). Last line links cloudflare.",
+     "factSheet": "FS-1",
+     "batch": "W1",
+     "waitsOn": [
+      "#850"
+     ],
+     "opensFrom": [
+      "tip: the first-time tip (#851)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "quick-start-1",
+      "quick-start-2",
+      "quick-start-3",
+      "quick-start-4",
+      "quick-start-5",
+      "quick-start-6",
+      "quick-start-7",
+      "quick-start-8"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "cloudflare",
+     "title": "Put your site online with Cloudflare Pages",
+     "question": "When I am ready for students to open the site, how do I put it online?",
+     "steps": [
+      "Make a free Cloudflare account",
+      "In Cloudflare, create an API token with one permission: Account, Cloudflare Pages, Edit; copy your Account ID",
+      "Plantoir ▸ Settings ▸ Deploying: paste the Cloudflare Account ID (once, for every course)",
+      "Course Settings ▸ Deploying: set Deploy to: Cloudflare Pages (keep the folder as Also deploy to, if you like); Save",
+      "Select the section and Deploy; paste the API token when asked (first deploy only)",
+      "The result says Your website is live with the address; give that address to your class"
+     ],
+     "pictures": [
+      {
+       "shows": "Plantoir ▸ Settings ▸ Deploying with the Account ID field",
+       "labels": [
+        "Cloudflare Account ID",
+        "Where do I find this?"
+       ]
+      },
+      {
+       "shows": "Course Settings ▸ Deploying set to Cloudflare Pages",
+       "labels": [
+        "Deploy to: Cloudflare Pages",
+        "Also deploy to, for redundancy"
+       ]
+      },
+      {
+       "shows": "The sheet asking for the Cloudflare API token",
+       "labels": [
+        "API token"
+       ]
+      },
+      {
+       "shows": "The finished deploy with its live address",
+       "labels": [
+        "Your website is live",
+        "The address to give your class"
+       ]
+      },
+      {
+       "shows": "The class site in a browser at its pages.dev address",
+       "labels": [
+        "pages.dev address"
+       ]
+      }
+     ],
+     "scenes": 5,
+     "readMinutes": 4,
+     "notes": "The default destination for a new course, and the next step after the quick start. Replaces 'Set up Cloudflare Pages', which moved here from 'Where a site goes' (that section links to it). DECIDE: picture Cloudflare's own dashboard or describe it in words only (recommended: words, the permission named exactly). The token sheet is pictured by starting a first deploy and cancelling at the sheet; the live result on a TEST project made with the saved test credentials and deleted afterwards (standing order, no credential read).",
+     "id": "cloudflare",
+     "section": "Start here",
+     "status": "amended",
+     "amendment": "Picture Cloudflare's dashboard in words only unless the fact sheet finds a public page; the permission names come from the app's own sheet.",
+     "factSheet": "FS-6",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: CredentialRequestSheet (cloudflareToken)",
+      "sheet: CredentialRequestSheet (cloudflareAccountID)",
+      "sheet: CredentialRequestSheet (cloudflareAccountIDHelp)",
+      "sheet: DeployingSettingsView's account help (CredentialRequestSheet)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "cloudflare-1",
+      "cloudflare-2",
+      "cloudflare-3",
+      "cloudflare-4",
+      "cloudflare-5"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "organised",
+     "title": "How Plantoir is organised",
+     "question": "What are the working folder, a course and a section?",
+     "steps": [
+      "Your working folder holds one folder per course, and Plantoir shows them in the sidebar",
+      "A course holds the pages you write once; each section is one class you teach it to",
+      "Each section gets its own website and its own address",
+      "You write pages in Obsidian; Plantoir builds, previews and deploys them"
+     ],
+     "pictures": [
+      {
+       "shows": "The main window with two courses, their sections, and a reference course",
+       "labels": [
+        "Working folder",
+        "Course",
+        "Section 1",
+        "Reference Courses"
+       ]
+      },
+      {
+       "shows": "The same working folder in Finder, one folder per course",
+       "labels": [
+        "One folder per course"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "organised",
+     "section": "Start here",
+     "status": "kept",
+     "factSheet": "FS-1",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "organised-1",
+      "organised-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "publish-and-deploy",
+     "title": "Publishing and deploying",
+     "question": "What is the difference between publishing a page and deploying a section?",
+     "steps": [
+      "Publishing marks a page so a section's students may see it; nothing leaves your Mac",
+      "Deploying sends a section's whole website to where students read it",
+      "A page you publish appears for students at the section's next deploy",
+      "Help ▸ Publishing and Deploying… says the same in the app"
+     ],
+     "pictures": [
+      {
+       "shows": "The Publishing and Deploying… dialog from the Help menu",
+       "labels": [
+        "Help ▸ Publishing and Deploying…"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "The dialog's own sentences are quoted from the contract by key (assist-wording publishingAndDeployingExplained), never retyped.",
+     "id": "publish-and-deploy",
+     "section": "Start here",
+     "status": "kept",
+     "factSheet": "FS-1",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [
+      "alert: Help > Publishing and Deploying... (NSAlert, ProblemReportCommands.explain)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "publish-and-deploy-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "example-course",
+     "title": "Look around with the example course",
+     "question": "Is there a finished course I can try things on first?",
+     "steps": [
+      "File ▸ New Course…",
+      "Choose Add Example Course under New to this?",
+      "Preview its sections, change pages, try every menu",
+      "Remove it from the Course menu when you are done"
+     ],
+     "pictures": [
+      {
+       "shows": "The New to this? box at the top of New Course or Club",
+       "labels": [
+        "Add Example Course"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 1,
+     "notes": "",
+     "id": "example-course",
+     "section": "Start here",
+     "status": "kept",
+     "factSheet": "FS-1",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "example-course-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "tips",
+     "title": "Turn tips off, or see them again",
+     "question": "How do I stop the tips, or bring them back?",
+     "steps": [
+      "Plantoir > Settings: the switch that turns every tip off",
+      "Help > Show Tips Again: the only thing that turns them back on, and it resets which have been seen",
+      "Each tip's own close button"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts from #851's contract cases once merged: a switch that stays off across updates and silences tips a later release adds.",
+     "id": "tips",
+     "section": "Start here",
+     "status": "new",
+     "factSheet": "FS-1",
+     "batch": "W7",
+     "waitsOn": [
+      "#851"
+     ],
+     "opensFrom": [
+      "menu: Help > Show Tips Again (#851)",
+      "settings: the tips switch (#851)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "tips-1"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "The shape of a course website",
+   "purpose": "How a course is laid out, shown in the example course.",
+   "pages": [
+    {
+     "anchor": "tour-example-course",
+     "title": "Tour the example course",
+     "question": "What does a finished course look like before I make my own?",
+     "steps": [
+      "Add the example course (File ▸ New Course…, Add Example Course)",
+      "In Plantoir's sidebar, notice one course, EXC2O, with Section 1 and Section 2 under it",
+      "Course ▸ Open in Obsidian; in Obsidian's file list notice the shared folders (Concepts, Exercises, Investigations, Tasks, Tutorials, Setup, Style) and the two folders section1 and section2",
+      "Open Style ▸ How This Site Is Organised: the course explains its own shape to students",
+      "Back in Plantoir, Preview Section 1, then Section 2: two sites from one course",
+      "Keep the example course to try things on; remove it when you no longer need it"
+     ],
+     "pictures": [
+      {
+       "shows": "Obsidian's file list for EXC2O",
+       "labels": [
+        "Shared: every section",
+        "section1: Section 1 only",
+        "section2: Section 2 only"
+       ]
+      },
+      {
+       "shows": "Plantoir's sidebar with EXC2O and its two sections",
+       "labels": [
+        "Course",
+        "Section 1",
+        "Section 2"
+       ]
+      },
+      {
+       "shows": "How This Site Is Organised on the built site, its diagram of class pages linking to one concept page",
+       "labels": [
+        "Class pages",
+        "Reference pages"
+       ]
+      },
+      {
+       "shows": "Section 1's and Section 2's sites side by side",
+       "labels": [
+        "Section 1's site",
+        "Section 2's site"
+       ]
+      }
+     ],
+     "scenes": 4,
+     "readMinutes": 4,
+     "notes": "A guided look, not a task: its steps are 'open this, notice that', each naming what to look at and what it shows. The first page of the section; a teacher can follow it before making a course of their own. The example course is a Grade 9 science course (documentation/04, step 0) of about 350 pages with 87 class pages per section.",
+     "id": "tour-example-course",
+     "section": "The shape of a course website",
+     "status": "kept",
+     "factSheet": "FS-2",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "tour-example-course-1",
+      "tour-example-course-2",
+      "tour-example-course-3",
+      "tour-example-course-4"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "shared-and-section",
+     "title": "Shared pages and section pages",
+     "question": "Which pages does every section get, and which belong to one section?",
+     "steps": [
+      "Every folder at the top of the course is shared: each section's site includes it",
+      "A section's own folder (section1, section2) holds its front page, All Classes, Key Links, Private Notes and Scratch Page",
+      "A shared page can still be published for one section and not another: its settings carry one line per section",
+      "A page in a section's folder with the same name and place as a shared one replaces the shared one on that section's site",
+      "In the example course, open Key Links in section1 and section2: each section keeps its own"
+     ],
+     "pictures": [
+      {
+       "shows": "Obsidian: section1 expanded beside the shared folders",
+       "labels": [
+        "Front page",
+        "All Classes",
+        "Key Links"
+       ]
+      },
+      {
+       "shows": "A shared page's settings with publishForSection1 and publishForSection2",
+       "labels": [
+        "Section 1",
+        "Section 2"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Facts from the example's course_config.json (shared_folders, shared_files, per_section_folders, per_section_files, hidden) and documentation/05 Stage 3 (shared folders copied first, then the section's folder over them: 'section overrides'). The fact sheet finds or makes (in the capture's scratch copy only) one same-named page to picture the replacement; EXC2O ships none.",
+     "id": "shared-and-section",
+     "section": "The shape of a course website",
+     "status": "kept",
+     "factSheet": "FS-2",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "shared-and-section-1",
+      "shared-and-section-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "class-pages",
+     "title": "Class pages: Unit 1, Day 1",
+     "question": "How are class pages named, and where do they live?",
+     "steps": [
+      "Each section's All Classes folder holds one page per class, named Unit 1, Day 1, Unit 1, Day 2 and so on",
+      "The first word is the course's word for a unit, chosen in New Course (What do you call a unit?): Unit, or Module, or Thread",
+      "Each section has its own copy of each class, dated for that section: in the example, Unit 1, Day 13 is 24 September in Section 1 and 25 September in Section 2",
+      "Section ▸ Add Next Class makes the next one, numbered and dated",
+      "The front page shows Most Recent Class: the newest class students can see",
+      "A page named another way (Field Trip, Exam Review) is kept as it is and never renumbered"
+     ],
+     "pictures": [
+      {
+       "shows": "All Classes in Obsidian, in order",
+       "labels": [
+        "Unit 1, Day 13",
+        "All Classes"
+       ]
+      },
+      {
+       "shows": "New Course's field for the unit word, with its example caption",
+       "labels": [
+        "What do you call a unit?"
+       ]
+      },
+      {
+       "shows": "A section's front page on the site with Most Recent Class",
+       "labels": [
+        "Most Recent Class"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Thread x, Day y is the same scheme with the word Thread (the wizard's caption says 'Some teachers say Module or Thread'; class-planning.json pageNaming and renamingTheUnitWord; file-formats.json unit_word). Course Settings can rename the word later; the fact sheet gives that control's real name (UnitWordRenameSheet). A club's one-number scheme (Week 1) is on 'Make a club'.",
+     "id": "class-pages",
+     "section": "The shape of a course website",
+     "status": "kept",
+     "factSheet": "FS-2",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "class-pages-1",
+      "class-pages-2",
+      "class-pages-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "one-lesson",
+     "title": "One lesson, written once",
+     "question": "How does a class page use pages I wrote once for the whole course?",
+     "steps": [
+      "A class page holds the Agenda and Things to do before our next class",
+      "Its agenda links to shared pages: concepts, exercises, tasks, handouts",
+      "Open a linked concept page: its backlinks list every class that used it",
+      "Fix a mistake on the concept page once and every section's site has the fix at its next deploy",
+      "Copy a class page's structure from _DUPLICATE ME pages in each folder"
+     ],
+     "pictures": [
+      {
+       "shows": "A class page in Obsidian beside the concept page it links",
+       "labels": [
+        "Agenda",
+        "Link to a shared page"
+       ]
+      },
+      {
+       "shows": "The concept page on the site with its backlinks",
+       "labels": [
+        "Backlinks: the classes that used it"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "From the example course itself: Unit 1, Day 13's agenda links [[Judging Your Own Work]] and [[First Entry]]; How This Site Is Organised states the same idea to students. The fact sheet confirms backlinks show on concept pages and are hidden on class pages (excludeBacklinks: true in class pages).",
+     "id": "one-lesson",
+     "section": "The shape of a course website",
+     "status": "kept",
+     "factSheet": "FS-2",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "one-lesson-1",
+      "one-lesson-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "two-sections",
+     "title": "Two sections on different days",
+     "question": "What do two sections' sites look like when one class is ahead of the other?",
+     "steps": [
+      "In the example course, Section 2's classes are dated one school day after Section 1's",
+      "Hide the newest class in Section 2 (Section ▸ Hide Pages…)",
+      "Preview Section 1 and Section 2: their front pages show different Most Recent Class pages",
+      "Both sites share every concept, exercise and task page",
+      "Undo Last Change puts it back"
+     ],
+     "pictures": [
+      {
+       "shows": "Section 1's and Section 2's sites side by side, different Most Recent Class",
+       "labels": [
+        "Section 1: Unit 5, Day 17",
+        "Section 2: Unit 5, Day 16"
+       ]
+      },
+      {
+       "shows": "Hide Pages… in Section 2",
+       "labels": [
+        "Hide"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "The capture's scratch copy hides one class in Section 2 so the sites differ; nothing in support/ changes. The fact sheet checks which class Section 2's front page then shows (the front page is repointed when asked: class-planning.json sectionIndexPointer, todaysClassOnTheFrontPage).",
+     "id": "two-sections",
+     "section": "The shape of a course website",
+     "status": "kept",
+     "factSheet": "FS-2",
+     "batch": "W1",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "two-sections-1",
+      "two-sections-2"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Every week",
+   "purpose": "The jobs a teacher does most often, in the order a week brings them.",
+   "pages": [
+    {
+     "anchor": "write-in-obsidian",
+     "title": "Write a class page in Obsidian",
+     "question": "Where do I write the pages for a class, and how do they get onto the site?",
+     "steps": [
+      "Select the section or course and choose Open in Obsidian",
+      "Find the class pages folder for the unit",
+      "Write the page as ordinary notes; save as you go",
+      "Back in Plantoir, Preview the section to see it"
+     ],
+     "pictures": [
+      {
+       "shows": "A section selected with Open in Obsidian in the toolbar",
+       "labels": [
+        "Open in Obsidian"
+       ]
+      },
+      {
+       "shows": "Obsidian open on the course, a class page in its folder",
+       "labels": [
+        "Class pages",
+        "The page's settings at the top"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Obsidian windows are captured with the marketing harness's Obsidian set-up (website/shots), never a teacher's vault.",
+     "id": "write-in-obsidian",
+     "section": "Every week",
+     "status": "kept",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "write-in-obsidian-1",
+      "write-in-obsidian-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "add-next-class",
+     "title": "Add the next class",
+     "question": "How do I make the page for the next class, numbered and dated?",
+     "steps": [
+      "Select the section",
+      "Section ▸ Add Next Class",
+      "Plantoir makes the page, numbered and dated from the class dates",
+      "Open it in Obsidian and write it"
+     ],
+     "pictures": [
+      {
+       "shows": "The Section menu open on Add Next Class",
+       "labels": [
+        "Add Next Class"
+       ]
+      },
+      {
+       "shows": "The new class page in the sidebar of Obsidian, with its number and date",
+       "labels": [
+        "The new page"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "Needs class dates first (link to Give Plantoir your class dates); the fact sheet says what happens without them (class-planning contract).",
+     "id": "add-next-class",
+     "section": "Every week",
+     "status": "kept",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.result after Add Next Class)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "add-next-class-1",
+      "add-next-class-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "publish-pages",
+     "title": "Show or hide pages for a section",
+     "question": "How do I let one class see a page and keep it from another?",
+     "steps": [
+      "Select the section",
+      "Section ▸ Publish Pages… (or Hide Pages…)",
+      "Tick the pages in the list and confirm",
+      "Section ▸ Publish Class for a Date… does a whole class at once",
+      "Section ▸ Undo Last Change puts it back",
+      "Deploy the section so students see the change"
+     ],
+     "pictures": [
+      {
+       "shows": "The Publish Pages… sheet with pages ticked",
+       "labels": [
+        "Pages to publish",
+        "Publish"
+       ]
+      },
+      {
+       "shows": "Publish Class for a Date… with a date chosen",
+       "labels": [
+        "Date",
+        "Publish"
+       ]
+      },
+      {
+       "shows": "The Section menu with Undo Last Change",
+       "labels": [
+        "Undo Last Change"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "publish-pages",
+     "section": "Every week",
+     "status": "amended",
+     "amendment": "Covers Publish Pages..., Hide Pages... and Undo Last Change; Publish Class for a Date... and Publish Pages That Links Lead To... have pages of their own because their sheets do.",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.publishPages)",
+      "sheet: SectionVerbSheet (.hidePages)",
+      "sheet: SectionVerbSheet (.result after Undo Last Change)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "publish-pages-1",
+      "publish-pages-2",
+      "publish-pages-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "publish-class-for-date",
+     "title": "Publish the class for a date",
+     "question": "How do I let students see the class for one day?",
+     "steps": [
+      "Section > Publish Class for a Date...",
+      "Choose the day",
+      "Read the plan, then go ahead",
+      "What students see after the next deploy"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "publish-class-for-date",
+     "section": "Every week",
+     "status": "new",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.publishClass)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "publish-class-for-date-1",
+      "publish-class-for-date-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "links-checklist",
+     "title": "Publish the pages a class page links to",
+     "question": "A class page links to pages students cannot see: how do I publish them?",
+     "steps": [
+      "Section > Publish Pages That Links Lead To... (or the offer at Preview or Deploy)",
+      "Tick the pages to publish; a ticked box always means included",
+      "Publish",
+      "When it is offered by itself and when it is not"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json linksChecklist (when offered, what it says, what Publish writes).",
+     "id": "links-checklist",
+     "section": "Every week",
+     "status": "new",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: LinksChecklistSheet (from the section window)",
+      "sheet: LinksChecklistSheet (from the menu)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "links-checklist-1",
+      "links-checklist-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "preview",
+     "title": "Preview a section",
+     "question": "How do I see the site exactly as students will?",
+     "steps": [
+      "Select the section and press Preview (⇧⌘P)",
+      "Read the site in the window; Back, Forward and Reload work as in a browser",
+      "Open in Browser shows it in your web browser",
+      "After editing, press Preview again or use Section ▸ Rebuild Preview",
+      "Hold Option to open the other start page (front page or last page viewed); Settings ▸ Preview chooses which is normal"
+     ],
+     "pictures": [
+      {
+       "shows": "A section's preview with the toolbar",
+       "labels": [
+        "Preview",
+        "Back",
+        "Reload",
+        "Open in Browser"
+       ]
+      },
+      {
+       "shows": "The progress while a preview is built",
+       "labels": [
+        "What is happening now"
+       ]
+      },
+      {
+       "shows": "Settings ▸ Preview with the start page choice",
+       "labels": [
+        "Where Preview opens"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "preview",
+     "section": "Every week",
+     "status": "amended",
+     "amendment": "Open in Browser is now one command for a preview and for a deployed folder (#850): this page says which it opens while a preview is showing and links open-in-browser.",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [
+      "#850"
+     ],
+     "opensFrom": [
+      "settings: Settings > Preview pane",
+      "sheet: SectionVerbSheet (.result after a refused Rebuild Preview)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "preview-1",
+      "preview-2",
+      "preview-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "open-in-browser",
+     "title": "Open a section's site in your browser",
+     "question": "How do I look at a section's site in a full web browser?",
+     "steps": [
+      "Section > Open in Browser, or the button",
+      "While a preview is showing it opens the preview; otherwise, for a section deployed to a folder, it serves that folder",
+      "The notice in the section window says the folder is open in the browser; Stop ends it (also in the Section menu)",
+      "It keeps running until Stop or quitting Plantoir; the address stays the same each time"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "#850 owes this page. Its sentences come from #850's contract keys, never retyped. The known limit (other accounts on a shared Mac can open the address) is stated plainly, as documentation/03 or 09 records it.",
+     "id": "open-in-browser",
+     "section": "Every week",
+     "status": "new",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [
+      "#850"
+     ],
+     "opensFrom": [
+      "notice: the deployed-folder notice (#850; not a sheet, no Help button owed)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "open-in-browser-1",
+      "open-in-browser-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "deploy",
+     "title": "Deploy a section",
+     "question": "How do I put the latest version of a section's site online?",
+     "steps": [
+      "Select the section and press Deploy (⇧⌘D)",
+      "Read the checklist: ticked classes are deployed, unticked ones stay hidden",
+      "Answer the links question if it is asked",
+      "Wait for the result; the section shows when it last deployed",
+      "Open the site from the address shown"
+     ],
+     "pictures": [
+      {
+       "shows": "The Deploy checklist with later classes listed",
+       "labels": [
+        "Ticked: students see it",
+        "Deploy"
+       ]
+      },
+      {
+       "shows": "The deploy's progress in the section",
+       "labels": [
+        "Progress"
+       ]
+      },
+      {
+       "shows": "A finished deploy with its address",
+       "labels": [
+        "The site's address"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Pictured with a section whose destination is a folder under the scratch state folder: a real deploy that sends nothing anywhere. The address picture uses a test site.",
+     "id": "deploy",
+     "section": "Every week",
+     "status": "kept",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [
+      "#850"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "deploy-1",
+      "deploy-2",
+      "deploy-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "later-classes",
+     "title": "Classes dated after the next class, at Deploy",
+     "question": "Deploy asked about classes dated later: what do the ticks mean?",
+     "steps": [
+      "Why Deploy asks (classes published but dated after the next class)",
+      "Every class starts ticked; a ticked class goes out",
+      "Untick a class to keep it back this time"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json classesDatedLater, class-planning.json (#475, #694).",
+     "id": "later-classes",
+     "section": "Every week",
+     "status": "new",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.laterClassesAtDeploy)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "later-classes-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "schedule-deploy",
+     "title": "Schedule a deploy for later",
+     "question": "Can a section deploy itself tomorrow morning?",
+     "steps": [
+      "Select the section",
+      "Section ▸ Schedule Deploy…",
+      "Choose the day and time, then Schedule",
+      "Leave the Mac on and awake, or let it wake soon after",
+      "A notification says how it went; click it to open the section",
+      "Section ▸ Cancel Deploy at… removes it"
+     ],
+     "pictures": [
+      {
+       "shows": "The Schedule Deploy sheet",
+       "labels": [
+        "Date and time",
+        "Schedule"
+       ]
+      },
+      {
+       "shows": "The section showing its scheduled time",
+       "labels": [
+        "Deploys at 6:30 AM"
+       ]
+      },
+      {
+       "shows": "The notification after a scheduled deploy",
+       "labels": [
+        "Click to open the section"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Course Settings' 'How late a scheduled deploy may still run' is named here. The notification is pictured after a real scheduled deploy to a FOLDER destination (safe); its banner is captured by window id only.",
+     "id": "schedule-deploy",
+     "section": "Every week",
+     "status": "kept",
+     "factSheet": "FS-3",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: ScheduleDeploySheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "schedule-deploy-1",
+      "schedule-deploy-2",
+      "schedule-deploy-3"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Through the term",
+   "purpose": "Class dates, schedule changes and a new school year.",
+   "pages": [
+    {
+     "anchor": "class-dates",
+     "title": "Give Plantoir your class dates",
+     "question": "How does Plantoir know which day each class falls on?",
+     "steps": [
+      "Select the section",
+      "Section ▸ Class Dates…",
+      "Paste the dates, choose a .csv or .ics file, or paste a shared Google Sheet's address",
+      "Say where the dates came from, in your own words",
+      "Answer Day First or Month First if asked",
+      "Remember These Dates"
+     ],
+     "pictures": [
+      {
+       "shows": "Class Dates… with pasted dates",
+       "labels": [
+        "Where the dates are",
+        "Where these came from",
+        "Read the Dates"
+       ]
+      },
+      {
+       "shows": "The Day First / Month First question",
+       "labels": [
+        "Day First",
+        "Month First"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Must say plainly that reading a Google Sheet sends its link to Google (the sheet's own sentence, quoted by key).",
+     "id": "class-dates",
+     "section": "Through the term",
+     "status": "kept",
+     "factSheet": "FS-4",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionScheduleSheet",
+      "sheet: SectionScheduleCourseMissingView",
+      "sheet: SectionVerbSheet (.classDates)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "class-dates-1",
+      "class-dates-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "redate",
+     "title": "Move classes when the schedule changes",
+     "question": "A snow day moved everything: how do I shift the classes that follow?",
+     "steps": [
+      "Select the section",
+      "Section ▸ Re-date Classes… to move dates",
+      "Section ▸ Make Room for Classes… to insert classes",
+      "Check the list of changes before you agree",
+      "Preview, then deploy"
+     ],
+     "pictures": [
+      {
+       "shows": "Re-date Classes… listing the classes that move",
+       "labels": [
+        "Classes that move",
+        "Re-date"
+       ]
+      },
+      {
+       "shows": "Make Room for Classes…",
+       "labels": [
+        "How many classes",
+        "Make Room"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Fact sheet: the exact sheets and their sentences (class-planning.json reDatingASection, insertion).",
+     "id": "redate",
+     "section": "Through the term",
+     "status": "kept",
+     "factSheet": "FS-4",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.reDateClasses)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "redate-1",
+      "redate-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "make-room",
+     "title": "Make room for a class",
+     "question": "How do I put a new class in front of the ones already planned?",
+     "steps": [
+      "Section > Make Room for Classes...",
+      "Choose the class to make room before, and how many",
+      "Read the plan: which pages are renumbered and re-dated",
+      "Go ahead; Undo Last Change takes it back"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "make-room",
+     "section": "Through the term",
+     "status": "new",
+     "factSheet": "FS-4",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SectionVerbSheet (.makeRoom)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "make-room-1",
+      "make-room-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "start-of-year",
+     "title": "Get ready for the start of the year",
+     "question": "How do I take last year's classes out of view before a new class starts?",
+     "steps": [
+      "Course ▸ Set School Year… if the year has changed",
+      "Select the section",
+      "Section ▸ Get Ready for the Start of the Year…",
+      "Read what goes into draft and why; agree",
+      "Undo it from the same menu until you next deploy or publish",
+      "Deploy when it looks right"
+     ],
+     "pictures": [
+      {
+       "shows": "The Get Ready for the Start of the Year sheet with its reasons",
+       "labels": [
+        "Goes into draft",
+        "Why",
+        "Get Ready"
+       ]
+      },
+      {
+       "shows": "Set School Year…",
+       "labels": [
+        "School year"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "start-of-year",
+     "section": "Through the term",
+     "status": "kept",
+     "factSheet": "FS-4",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: StartOfYearSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "start-of-year-1",
+      "start-of-year-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "school-year",
+     "title": "Set a course's school year",
+     "question": "What does the school year do, and how do I change it?",
+     "steps": [
+      "Course > Set School Year...",
+      "Choose the year",
+      "What it changes (where it is shown, what it decides)"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "school-year",
+     "section": "Through the term",
+     "status": "new",
+     "factSheet": "FS-4",
+     "batch": "W2",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SetSchoolYearSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "school-year-1"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Courses and sections",
+   "purpose": "Making, changing and removing courses, clubs and sections.",
+   "pages": [
+    {
+     "anchor": "new-course",
+     "title": "Make a new course",
+     "question": "How do I add a course, and what do the choices in New Course mean?",
+     "steps": [
+      "File ▸ New Course… (⇧⌘N)",
+      "Choose the province and type the course code",
+      "Pick a course name from the suggestions or type your own",
+      "Type the section numbers you teach",
+      "Choose the starting content: ready-made pages, a starting outline, curriculum pages, the coverage map",
+      "Make the course; it appears in the sidebar"
+     ],
+     "pictures": [
+      {
+       "shows": "New Course or Club, Basics filled in",
+       "labels": [
+        "Province",
+        "Course code",
+        "Timetable section numbers"
+       ]
+      },
+      {
+       "shows": "Starting Content for a code with ready-made pages",
+       "labels": [
+        "Pre-populate course with example content",
+        "Include … curriculum pages"
+       ]
+      },
+      {
+       "shows": "Starting Content for a code with an outline only",
+       "labels": [
+        "Starting outline"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 4,
+     "notes": "'Keep this course for reference' in the wizard belongs to Last year's courses and is only linked from here.",
+     "id": "new-course",
+     "section": "Courses and sections",
+     "status": "kept",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: NewCourseWizardView (a new course or club)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "new-course-1",
+      "new-course-2",
+      "new-course-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "club",
+     "title": "Make a club",
+     "question": "How do I make a site for a club instead of a course?",
+     "steps": [
+      "File ▸ New Course…",
+      "Type a short code and turn on This is a club",
+      "Give the front page's heading in your own words",
+      "Meetings are numbered Week 1, Week 2"
+     ],
+     "pictures": [
+      {
+       "shows": "New Course or Club with This is a club on",
+       "labels": [
+        "This is a club"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "club",
+     "section": "Courses and sections",
+     "status": "kept",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "club-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "add-section",
+     "title": "Add a section",
+     "question": "I picked up another class of the same course: how do I add its section?",
+     "steps": [
+      "Select the course",
+      "Course ▸ Add Section… (⌥⌘N)",
+      "Type the section number and Add Section",
+      "Publish pages for it and deploy; it gets its own address"
+     ],
+     "pictures": [
+      {
+       "shows": "Add Section… sheet",
+       "labels": [
+        "Section number",
+        "Add Section"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "add-section",
+     "section": "Courses and sections",
+     "status": "kept",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: AddSectionSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "add-section-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "course-settings",
+     "title": "Change a course's settings",
+     "question": "Where do I change a course's name, colours, fonts, footer or sidebar?",
+     "steps": [
+      "Select the course; its Settings tab opens",
+      "Change what you need: name, colour scheme, fonts, footer, sidebar visibility, the word for a unit",
+      "Course ▸ Save Course Settings (⌘S), or Revert",
+      "Preview Again to see the change"
+     ],
+     "pictures": [
+      {
+       "shows": "Course Settings, top of the form",
+       "labels": [
+        "Course name",
+        "Colour scheme",
+        "Save"
+       ]
+      },
+      {
+       "shows": "The colour scheme picker with its live sample",
+       "labels": [
+        "Sample"
+       ]
+      },
+      {
+       "shows": "Sidebar Visibility table",
+       "labels": [
+        "Shown to students"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 4,
+     "notes": "",
+     "id": "course-settings",
+     "section": "Courses and sections",
+     "status": "amended",
+     "amendment": "#566: a typed-in font is downloaded at build (ruled 2026-11-13); the fact sheet reads the merged wording.",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [
+      "#566"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "course-settings-1",
+      "course-settings-2",
+      "course-settings-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "course-folders",
+     "title": "Shared folders and section folders in Course Settings",
+     "question": "How do I add, rename or remove a folder every section shares?",
+     "steps": [
+      "Course Settings: the shared and per-section lists",
+      "Add a folder",
+      "Rename one (the sheet), and what happens to the pages inside",
+      "Remove one"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "course-folders",
+     "section": "Courses and sections",
+     "status": "new",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: StringListEditorView renameSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "course-folders-1",
+      "course-folders-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "special-folders",
+     "title": "The folders Plantoir treats specially",
+     "question": "Which folder names have a special meaning, and what does each do?",
+     "steps": [
+      "Where the list is shown (Course Settings)",
+      "Each special folder and what the build does with it",
+      "What happens when one is renamed or deleted"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json specialFoldersHelp and specialNames. The sheet is itself an explanation; this page says more, as ruled.",
+     "id": "special-folders",
+     "section": "Courses and sections",
+     "status": "new",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: SpecialFoldersHelpView"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "special-folders-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "unit-word",
+     "title": "Change what units are called",
+     "question": "My school says Thread or Module, not Unit: how do I change it?",
+     "steps": [
+      "Course Settings: the unit word",
+      "The rename sheet: what it renames and what it leaves",
+      "What students see after the next deploy"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: class-planning.json renamingTheUnitWord; file-formats.json unit_word.",
+     "id": "unit-word",
+     "section": "Courses and sections",
+     "status": "new",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: UnitWordRenameSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "unit-word-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "rename-remove",
+     "title": "Rename or remove a course",
+     "question": "How do I rename a course, or remove one I no longer teach?",
+     "steps": [
+      "Course ▸ Rename, type the new name",
+      "To remove: Course ▸ Remove Course… and confirm",
+      "A removed course is kept as an archive; File ▸ Restore from Archive… brings it back",
+      "Section ▸ Remove Section… removes one section"
+     ],
+     "pictures": [
+      {
+       "shows": "A course name being edited in the sidebar",
+       "labels": [
+        "Rename"
+       ]
+      },
+      {
+       "shows": "The Remove Course… question",
+       "labels": [
+        "Remove"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "rename-remove",
+     "section": "Courses and sections",
+     "status": "kept",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "rename-remove-1",
+      "rename-remove-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "working-folder",
+     "title": "Choose or change the working folder",
+     "question": "Where does Plantoir keep my courses, and can I move them?",
+     "steps": [
+      "File > Open Working Folder...",
+      "What a working folder holds",
+      "Which folders work (inside your home folder) and which do not",
+      "Open Recent, and what happens when last time's folder cannot be opened"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json workingFolderSelection, reopeningTheLastWorkingFolder, workingFolderReach (#290, #311).",
+     "id": "working-folder",
+     "section": "Courses and sections",
+     "status": "new",
+     "factSheet": "FS-5",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "working-folder-1",
+      "working-folder-2"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Where a site goes",
+   "purpose": "Choosing a destination and setting each one up.",
+   "pages": [
+    {
+     "anchor": "destinations",
+     "title": "Choose where a section deploys",
+     "question": "Where can a class site go, and how do I choose?",
+     "steps": [
+      "Select the course; in Course Settings find Deploying",
+      "Choose Cloudflare Pages, Netlify or a folder in Deploy to",
+      "Optionally tick Also deploy to, for redundancy",
+      "Save; the next deploy uses it"
+     ],
+     "pictures": [
+      {
+       "shows": "Course Settings ▸ Deploying with Deploy to open",
+       "labels": [
+        "Deploy to",
+        "Also deploy to, for redundancy"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "Facts shared with the website (help/facts.json): Netlify's credit allowance as read on a stated date, the 25 MB Cloudflare file limit (contract publishingDestinations.sentences.cloudflareSizeNote).",
+     "id": "destinations",
+     "section": "Where a site goes",
+     "status": "amended",
+     "amendment": "GitHub Pages joins the list once #669 merges.",
+     "factSheet": "FS-6",
+     "batch": "W3",
+     "waitsOn": [
+      "#669"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "destinations-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "netlify",
+     "title": "Set up Netlify",
+     "question": "How do I deploy to Netlify, and what should I know first?",
+     "steps": [
+      "Choose Netlify in Course Settings ▸ Deploying",
+      "Deploy; give your last name once (it forms the site's address)",
+      "Connect your Netlify account when asked",
+      "Know the monthly credit allowance on new accounts"
+     ],
+     "pictures": [
+      {
+       "shows": "The last-name question at a first Netlify deploy",
+       "labels": [
+        "Last name"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "netlify",
+     "section": "Where a site goes",
+     "status": "kept",
+     "factSheet": "FS-6",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: CredentialRequestSheet (netlifyToken)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "netlify-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "folder-deploy",
+     "title": "Deploy to a folder for your school's web space",
+     "question": "My school gives me web space: how do I use it?",
+     "steps": [
+      "Choose A folder in Course Settings ▸ Deploying and pick the folder",
+      "Deploy; each section lands in its own sectionN folder",
+      "Upload that folder to your school's server the way you normally do"
+     ],
+     "pictures": [
+      {
+       "shows": "Deploying set to a folder",
+       "labels": [
+        "Folder",
+        "Choose…"
+       ]
+      },
+      {
+       "shows": "The folder in Finder after a deploy",
+       "labels": [
+        "section1"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "folder-deploy",
+     "section": "Where a site goes",
+     "status": "amended",
+     "amendment": "Ends on Open in Browser (#850), not on opening the folder's files.",
+     "factSheet": "FS-6",
+     "batch": "W3",
+     "waitsOn": [
+      "#850"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "folder-deploy-1",
+      "folder-deploy-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "site-address",
+     "title": "Your site's address",
+     "question": "What will my site's address be, and what if the name is taken?",
+     "steps": [
+      "The questions a first deploy asks (your surname, the site's name)",
+      "What the address is made from",
+      "When the name is already taken"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "site-address",
+     "section": "Where a site goes",
+     "status": "new",
+     "factSheet": "FS-6",
+     "batch": "W3",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: CredentialRequestSheet (teacherSurname)",
+      "sheet: CredentialRequestSheet (siteName)",
+      "sheet: CredentialRequestSheet (siteNameConflict)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "site-address-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "deploy-tokens",
+     "title": "See, change or remove a deploy token",
+     "question": "How do I change the token Plantoir uses for Netlify or Cloudflare?",
+     "steps": [
+      "Plantoir > Settings > Deploying",
+      "Connected or Not connected",
+      "Change Token...: the same steps a first deploy shows, checked before it is saved",
+      "Remove Token"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "deploy-tokens",
+     "section": "Where a site goes",
+     "status": "new",
+     "factSheet": "FS-6",
+     "batch": "W7",
+     "waitsOn": [
+      "#696"
+     ],
+     "opensFrom": [
+      "settings: Settings > Deploying pane (after #696)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "deploy-tokens-1",
+      "deploy-tokens-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "github-pages",
+     "title": "Deploy to GitHub Pages",
+     "question": "How do I put a section's site on GitHub Pages?",
+     "steps": [
+      "What it needs (a GitHub account; the built site's files are public)",
+      "Choose GitHub Pages as the destination",
+      "The first deploy's questions",
+      "The address it gives"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "github-pages",
+     "section": "Where a site goes",
+     "status": "new",
+     "factSheet": "FS-6",
+     "batch": "W7",
+     "waitsOn": [
+      "#669"
+     ],
+     "opensFrom": [
+      "sheet: its credential sheet (#669)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "github-pages-1",
+      "github-pages-2",
+      "github-pages-3"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "What a page can show",
+   "purpose": "Writing pages: who sees them, and what they can carry.",
+   "pages": [
+    {
+     "anchor": "page-settings",
+     "title": "Which classes see a page",
+     "question": "How does a page decide which sections show it?",
+     "steps": [
+      "Every page has a settings block at the top",
+      "publishForSection1: true lets section 1 see it",
+      "A page with no setting is shown to all",
+      "Use Publish Pages… rather than typing the lines",
+      "A page whose settings cannot be read is left out and named on the Problems tab"
+     ],
+     "pictures": [
+      {
+       "shows": "A page's settings block in Obsidian, the publish lines marked",
+       "labels": [
+        "publishForSection1",
+        "publishForSection2"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "The rules come from contracts/file-formats.json pageVisibility; the page states only the forms a teacher should type.",
+     "id": "page-settings",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "page-settings-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "media",
+     "title": "Pictures, PDFs and the Media folder",
+     "question": "Where do pictures and files go so the site shows them?",
+     "steps": [
+      "Put the file in the course's Media folder",
+      "Link or embed it from the page in Obsidian",
+      "Preview to check",
+      "Keep single files under 25 MB for Cloudflare"
+     ],
+     "pictures": [
+      {
+       "shows": "A page in Obsidian with an embedded picture from Media",
+       "labels": [
+        "Media folder"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "media",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "media-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "videos",
+     "title": "Put a video on a page",
+     "question": "How do I show a YouTube or Vimeo video on a page?",
+     "steps": [
+      "Copy the address from the video's Share button",
+      "Paste it on its own line in the picture form",
+      "What students see (the player's size)",
+      "A pasted Vimeo player still works"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "YouTube's short form works today; Vimeo once #692 merges. The Dance subject page links here.",
+     "id": "videos",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [
+      "#692"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "videos-1",
+      "videos-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "printing",
+     "title": "A handout that prints",
+     "question": "How do I make a worksheet print as a proper handout with an answer key?",
+     "steps": [
+      "Add printable: true to the page's settings",
+      "Write each question under ### Question n",
+      "Fold each answer in an [!answer]- callout",
+      "Set school name and blanks in Course Settings ▸ Printing",
+      "Students press Print on the page"
+     ],
+     "pictures": [
+      {
+       "shows": "Course Settings ▸ Printing with the corner sketch",
+       "labels": [
+        "School name",
+        "Blanks to fill in"
+       ]
+      },
+      {
+       "shows": "The page's Print button and its choices",
+       "labels": [
+        "Print",
+        "Questions only"
+       ]
+      },
+      {
+       "shows": "The printed handout",
+       "labels": [
+        "Answer key"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 4,
+     "notes": "Reuses the website's print-page and print-handout captures where they are current.",
+     "id": "printing",
+     "section": "What a page can show",
+     "status": "amended",
+     "amendment": "If #859's third part changes the Print button (offering a handout's PDF), this page gains that part; never the answer key.",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [
+      "#859"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "printing-1",
+      "printing-2",
+      "printing-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "notation",
+     "title": "Mathematics and chemistry notation",
+     "question": "How do I write equations and chemical formulas on a page?",
+     "steps": [
+      "Mathematics between dollar signs",
+      "Chemistry notation",
+      "How it looks in Obsidian and on the site"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "Fact sheet confirms what the build supports today (LaTeX, mhchem) from support/quartz; the Science carousel shows chemistry notation (#840).",
+     "id": "notation",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "notation-1",
+      "notation-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "figures",
+     "title": "Diagrams and graphs",
+     "question": "How do I put a diagram or a graph students can move on a page?",
+     "steps": [
+      "Type a tikz block for a drawn diagram",
+      "Type a functionplot block for a graph",
+      "Add the alt line for screen readers",
+      "Preview; a block that cannot be drawn is named"
+     ],
+     "pictures": [
+      {
+       "shows": "A tikz block beside the diagram it draws",
+       "labels": [
+        "What you type",
+        "What students see"
+       ]
+      },
+      {
+       "shows": "A graph on the class site",
+       "labels": [
+        "Drag to move"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 4,
+     "notes": "",
+     "id": "figures",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "figures-1",
+      "figures-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "obsidian-addons",
+     "title": "See diagrams and graphs in Obsidian too",
+     "question": "Why do my diagrams show on the site but not in Obsidian?",
+     "steps": [
+      "Plantoir > Settings > Obsidian",
+      "Adding the add-ons to a course",
+      "What they change in Obsidian, and that the site does not need them"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "The offer is a confirmationDialog (MainWindowView ObsidianAddOnsOfferDialog), which cannot carry a Help button: not rebuilt (ruled 2026-11-13 16:54).",
+     "id": "obsidian-addons",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [
+      "settings: Settings > Obsidian pane"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "obsidian-addons-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "geogebra",
+     "title": "GeoGebra sketches",
+     "question": "How do I put a GeoGebra sketch students can drag on a page?",
+     "steps": [
+      "Save a .ggb file beside the page or in Media, or type commands, or name a geogebra.org sketch",
+      "Write a geogebra block with file:, commands or material_id:",
+      "Add alt",
+      "Preview and open the sketch once"
+     ],
+     "pictures": [
+      {
+       "shows": "A geogebra block in Obsidian",
+       "labels": [
+        "file:",
+        "alt:"
+       ]
+      },
+      {
+       "shows": "The sketch on the class site, opened",
+       "labels": [
+        "Open the sketch",
+        "Reset"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 4,
+     "notes": "",
+     "id": "geogebra",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "geogebra-1",
+      "geogebra-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "code",
+     "title": "Code students can run",
+     "question": "How do I let students run Python or Swift on a page?",
+     "steps": [
+      "Add codeRunner: true to the page's settings",
+      "Write ```python run (or ```swift run)",
+      "Preview; the first Swift preview downloads what Swift needs, once",
+      "Students press Run"
+     ],
+     "pictures": [
+      {
+       "shows": "A runnable Python block on the class site",
+       "labels": [
+        "Run",
+        "Stop",
+        "Reset"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "code",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "code-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "quizzes",
+     "title": "Questions students check themselves",
+     "question": "How do I write a self-check question?",
+     "steps": [
+      "Write a [!quiz] callout",
+      "Tick the right choice with [x], or give an [!answer]",
+      "Add an [!explain] callout",
+      "Preview and press Check"
+     ],
+     "pictures": [
+      {
+       "shows": "A quiz in Obsidian beside the checked question on the site",
+       "labels": [
+        "What you type",
+        "Check"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "Answers never leave the student's browser: stated once, plainly.",
+     "id": "quizzes",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "quizzes-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "task-boxes",
+     "title": "Checklists students tick",
+     "question": "How do I give students a checklist they can tick on the site?",
+     "steps": [
+      "Write the list",
+      "What students see, and where their ticks are kept"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json taskBoxes (#519).",
+     "id": "task-boxes",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "task-boxes-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "my-progress",
+     "title": "Let students track their progress",
+     "question": "How do students see which success criteria they have ticked?",
+     "steps": [
+      "Success criteria headings",
+      "Turn the My Progress page on in Course Settings",
+      "What students see"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json myProgress, myProgressBuilt; file-formats.json include_my_progress, success_criteria_headings (#545).",
+     "id": "my-progress",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "my-progress-1",
+      "my-progress-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "music-notation",
+     "title": "Music notation students can hear",
+     "question": "How do I put notation students can see and play on a page?",
+     "steps": [
+      "Write the notation",
+      "What students see and hear",
+      "When it does not build"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "music-notation",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-8",
+     "batch": "W6",
+     "waitsOn": [
+      "#679"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "music-notation-1",
+      "music-notation-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "phet",
+     "title": "Science simulations",
+     "question": "How do I put a PhET simulation on a page?",
+     "steps": [
+      "Name the simulation",
+      "The first build downloads it and keeps it",
+      "A build with no internet stops and says which",
+      "Language and screens"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "phet",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-8",
+     "batch": "W6",
+     "waitsOn": [
+      "#674"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "phet-1",
+      "phet-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "circuits",
+     "title": "Circuits students can change",
+     "question": "How do I put a working circuit on a page?",
+     "steps": [
+      "Write or export the circuit",
+      "What students see",
+      "The editor in the preview"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "circuits",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-8",
+     "batch": "W6",
+     "waitsOn": [
+      "#487"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "circuits-1",
+      "circuits-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "models-3d",
+     "title": "3D models students can turn",
+     "question": "How do I show a 3D model on a page?",
+     "steps": [
+      "Put the model file in the course",
+      "Embed it",
+      "Options (height, colour, download)"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "models-3d",
+     "section": "What a page can show",
+     "status": "new",
+     "factSheet": "FS-8",
+     "batch": "W6",
+     "waitsOn": [
+      "#691"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "models-3d-1",
+      "models-3d-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "coverage",
+     "title": "Curriculum expectations and the coverage map",
+     "question": "How do I see which expectations my pages reach?",
+     "steps": [
+      "Link a lesson to the expectations it addresses in its Curriculum connection",
+      "Preview or deploy: the build draws the course's map",
+      "Open the section's Coverage tab to see the map as it would be if every page were published",
+      "Make the Map Again after changes"
+     ],
+     "pictures": [
+      {
+       "shows": "A section's Coverage tab with its map",
+       "labels": [
+        "Coverage",
+        "Made when",
+        "Make the Map Again"
+       ]
+      },
+      {
+       "shows": "The coverage map page on the class site",
+       "labels": [
+        "Pale: few pages"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 4,
+     "notes": "The Coverage tab works with no assistant; its planning use is in the optional section.",
+     "id": "coverage",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "coverage-1",
+      "coverage-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "second-curriculum",
+     "title": "A second curriculum",
+     "question": "My course also follows AP: can it have a second map?",
+     "steps": [
+      "Make a folder for the framework in the course",
+      "Put one page per expectation in it, each named by its code",
+      "Tick the folder under Curriculum folders in Course Settings",
+      "Preview: a second map appears beside the first"
+     ],
+     "pictures": [
+      {
+       "shows": "Curriculum folders in Course Settings, two ticked",
+       "labels": [
+        "Curriculum folders"
+       ]
+      },
+      {
+       "shows": "Two maps on the class site",
+       "labels": [
+        "Ontario",
+        "AP"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "second-curriculum",
+     "section": "What a page can show",
+     "status": "kept",
+     "factSheet": "FS-7",
+     "batch": "W4",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "second-curriculum-1",
+      "second-curriculum-2"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "For your subject",
+   "purpose": "What each subject can do, shown in that subject's own ready-made course.",
+   "pages": [
+    {
+     "anchor": "subject-mathematics",
+     "title": "Mathematics",
+     "question": "What can Plantoir do for a Mathematics course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: MPM2D, MTH1W, MCR3U, MHF4U, MCV4U, MDM4U. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): GeoGebra, diagrams and graphs, notation, printing with answer keys, self-check questions. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-mathematics",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-mathematics",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-mathematics-1",
+      "subject-mathematics-2",
+      "subject-mathematics-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-english",
+     "title": "English",
+     "question": "What can Plantoir do for a English course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: ENG2D, ENG3U, ENG4U, ENL1W. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): self-check questions, handouts, class pages linking shared readings. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-english",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-english",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-english-1",
+      "subject-english-2",
+      "subject-english-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-science",
+     "title": "Science",
+     "question": "What can Plantoir do for a Science course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: SNC1W, SNC2D, SBI3U, SBI4U, SCH3U, SCH4U, SPH3U, SPH4U. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): chemistry notation, simulations, diagrams and graphs, runnable code where the course has it. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-science",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-science",
+     "batch": "W6",
+     "waitsOn": [
+      "#674"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-science-1",
+      "subject-science-2",
+      "subject-science-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-computer-studies",
+     "title": "Computer studies",
+     "question": "What can Plantoir do for a Computer studies course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: ICD2O, ICS3U, ICS4U. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): runnable Python, code blocks, self-check questions. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-computer-studies",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-computer-studies",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-computer-studies-1",
+      "subject-computer-studies-2",
+      "subject-computer-studies-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-technological-education",
+     "title": "Technological education",
+     "question": "What can Plantoir do for a Technological education course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: TAS2O, TEJ2O, TEJ3M, TEJ4M, TGJ2O, THJ2O. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): circuits, 3D models, runnable code (TEJ courses), handouts. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-technological-education",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-technological-education",
+     "batch": "W6",
+     "waitsOn": [
+      "#487",
+      "#691"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-technological-education-1",
+      "subject-technological-education-2",
+      "subject-technological-education-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-canadian-and-world-studies",
+     "title": "Canadian and world studies",
+     "question": "What can Plantoir do for a Canadian and world studies course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: CGC1W, CGF3M, CHA3U, CHC2D, CHV2O, CIA4U. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): videos, shared pages, coverage. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-canadian-and-world-studies",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-canadian-and-world-studies",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-canadian-and-world-studies-1",
+      "subject-canadian-and-world-studies-2",
+      "subject-canadian-and-world-studies-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-music",
+     "title": "Music",
+     "question": "What can Plantoir do for a Music course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: the ready-made Music course (#852). Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): music notation with playback. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-music",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-music",
+     "batch": "W6",
+     "waitsOn": [
+      "#679",
+      "#852"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-music-1",
+      "subject-music-2",
+      "subject-music-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-visual-art",
+     "title": "Visual Art",
+     "question": "What can Plantoir do for a Visual Art course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: AVI1O. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): pictures and the Media folder, printing. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-visual-art",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-visual-art",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-visual-art-1",
+      "subject-visual-art-2",
+      "subject-visual-art-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-drama",
+     "title": "Drama",
+     "question": "What can Plantoir do for a Drama course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: ADA1O. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): shared pages and section pages, videos. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-drama",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-drama",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-drama-1",
+      "subject-drama-2",
+      "subject-drama-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-dance",
+     "title": "Dance",
+     "question": "What can Plantoir do for a Dance course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: ATC1O. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): embedding video (YouTube, and Vimeo with #692). Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-dance",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-dance",
+     "batch": "W6",
+     "waitsOn": [
+      "#692",
+      "ATC1O video page (content)"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-dance-1",
+      "subject-dance-2",
+      "subject-dance-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-business",
+     "title": "Business",
+     "question": "What can Plantoir do for a Business course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: BOH4M. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): handouts, self-check questions. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-business",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-business",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-business-1",
+      "subject-business-2",
+      "subject-business-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "subject-guidance-and-careers",
+     "title": "Guidance and careers",
+     "question": "What can Plantoir do for a Guidance and careers course?",
+     "steps": [
+      "A list of tasks; each names the page of the subject's own ready-made course that shows it, and links the how-to page"
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "Ready-made courses on origin/dev: GLC2O. Candidate features to show (the fact sheet confirms each against the course itself; a feature the course does not use is not shown): checklists students tick, My Progress. Every example and every picture from this subject's own course, never shared across subjects. No sentence about what students or teachers will gain.",
+     "id": "subject-guidance-and-careers",
+     "section": "For your subject",
+     "status": "new",
+     "factSheet": "FS-S-guidance-and-careers",
+     "batch": "W5S",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "subject-guidance-and-careers-1",
+      "subject-guidance-and-careers-2",
+      "subject-guidance-and-careers-3"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Last year's courses",
+   "purpose": "Keeping old courses to read and borrow from, never deployed.",
+   "pages": [
+    {
+     "anchor": "keep-for-reference",
+     "title": "Keep a copy of a course for reference",
+     "question": "How do I keep this year's course before I change it for next year?",
+     "steps": [
+      "Select the course",
+      "Course ▸ Keep a Copy for Reference…",
+      "Choose the school year it was taught",
+      "The copy appears under Reference Courses, locked"
+     ],
+     "pictures": [
+      {
+       "shows": "Keep a Copy for Reference… sheet",
+       "labels": [
+        "School year",
+        "Keep a Copy"
+       ]
+      },
+      {
+       "shows": "The Reference Courses shelf",
+       "labels": [
+        "Reference Courses"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "keep-for-reference",
+     "section": "Last year's courses",
+     "status": "kept",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: KeepACopyForReferenceSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "keep-for-reference-1",
+      "keep-for-reference-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "import-for-reference",
+     "title": "Bring in last year's courses",
+     "question": "How do I bring in last year's working folder, or a backup, to read?",
+     "steps": [
+      "File ▸ Import Courses for Reference…",
+      "Choose last year's working folder or a backup or archive file",
+      "Pick the courses",
+      "They arrive on the shelf, locked"
+     ],
+     "pictures": [
+      {
+       "shows": "Import Courses for Reference… with courses listed",
+       "labels": [
+        "Courses to import",
+        "Import"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "import-for-reference",
+     "section": "Last year's courses",
+     "status": "kept",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: ImportCoursesForReferenceSheet",
+      "sheet: NewCourseWizardView (started for reference, #572a)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "import-for-reference-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "copy-a-page",
+     "title": "Copy a page from another course",
+     "question": "How do I reuse one page from last year in this year's course?",
+     "steps": [
+      "Select the course you are copying FROM",
+      "Course ▸ Copy a Page from This Course… (⇧⌘C)",
+      "Choose the page and the course it goes to",
+      "Choose which linked pages come too",
+      "It arrives hidden; publish it and deploy"
+     ],
+     "pictures": [
+      {
+       "shows": "Copy a Page with its checklist",
+       "labels": [
+        "Page",
+        "Copy to",
+        "Pages it links to"
+       ]
+      },
+      {
+       "shows": "The result screen",
+       "labels": [
+        "Arrived hidden"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "copy-a-page",
+     "section": "Last year's courses",
+     "status": "kept",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: CopyPageSheet"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "copy-a-page-1",
+      "copy-a-page-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "reference-groups",
+     "title": "Organise the Reference Courses shelf",
+     "question": "How do I group reference courses, or replace one?",
+     "steps": [
+      "Use the shelf heading's menu: New Group",
+      "Course ▸ Move to Group",
+      "Replace It… swaps a reference course for a newer copy after a warning and a backup",
+      "Remove Group asks first"
+     ],
+     "pictures": [
+      {
+       "shows": "The shelf heading's menu",
+       "labels": [
+        "New Reference Course…",
+        "New Group"
+       ]
+      },
+      {
+       "shows": "A group with a course in it",
+       "labels": [
+        "Group"
+       ]
+      },
+      {
+       "shows": "The Replace It… warning",
+       "labels": [
+        "Replace It…"
+       ]
+      }
+     ],
+     "scenes": 3,
+     "readMinutes": 3,
+     "notes": "#834 may reshape the Replace It… and Remove Group dialogs before the cut: capture last.",
+     "id": "reference-groups",
+     "section": "Last year's courses",
+     "status": "amended",
+     "amendment": "#834 merged: the dialogs are one message and labelled facts; capture whenever pictures are taken.",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: ReferenceGroupNameSheet (make)",
+      "sheet: ReferenceGroupNameSheet (rename)",
+      "sheet: FactsQuestionSheet (Remove Group)",
+      "sheet: FactsQuestionSheet (Start the Groups Again)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "reference-groups-1",
+      "reference-groups-2",
+      "reference-groups-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "replace-reference-course",
+     "title": "Replace a reference course",
+     "question": "How do I swap a reference course for a newer copy?",
+     "steps": [
+      "Replace It...",
+      "The warning and its facts",
+      "The backup made first, and how to get the old one back"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "replace-reference-course",
+     "section": "Last year's courses",
+     "status": "new",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: FactsQuestionSheet (Replace It...)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "replace-reference-course-1"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Backups",
+   "purpose": "Getting a course back.",
+   "pages": [
+    {
+     "anchor": "backups",
+     "title": "Back up a course and restore it",
+     "question": "How do I back up a course, and get it back later?",
+     "steps": [
+      "Course ▸ Back Up Now",
+      "Backups are listed under All Backups in the sidebar",
+      "Course ▸ Restore from Backup… and choose one",
+      "Plantoir backs up first on its own before big changes",
+      "Delete Backup… removes old ones"
+     ],
+     "pictures": [
+      {
+       "shows": "All Backups in the sidebar",
+       "labels": [
+        "All Backups",
+        "Restore…"
+       ]
+      },
+      {
+       "shows": "Restore from Backup… question",
+       "labels": [
+        "Restore"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "backups",
+     "section": "Backups",
+     "status": "amended",
+     "amendment": "#785: automatic backups keep each Media file once; the size shown is what deleting frees. Nothing a teacher does changes; the fact sheet reads the merged sentences.",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [
+      "#785"
+     ],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "backups-1",
+      "backups-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "archive",
+     "title": "Bring back a removed course",
+     "question": "I removed a course by mistake: can I get it back?",
+     "steps": [
+      "File ▸ Restore from Archive…",
+      "Choose the archive",
+      "The course returns to the sidebar"
+     ],
+     "pictures": [
+      {
+       "shows": "Archived items in the sidebar",
+       "labels": [
+        "Archived"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 1,
+     "notes": "",
+     "id": "archive",
+     "section": "Backups",
+     "status": "kept",
+     "factSheet": "FS-9",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "archive-1"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "When something goes wrong",
+   "purpose": "What to check, in the order it usually helps.",
+   "pages": [
+    {
+     "anchor": "missing-page",
+     "title": "A page is missing from the site",
+     "question": "Why don't students see a page I wrote?",
+     "steps": [
+      "Check the page is published to that section",
+      "Preview again: the site shows the last build",
+      "Deploy: students see the last deploy",
+      "Look at the section's Problems tab for a page that could not be read"
+     ],
+     "pictures": [
+      {
+       "shows": "A section's Problems tab naming an unreadable page",
+       "labels": [
+        "Problems",
+        "The page"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "missing-page",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "missing-page-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "problems",
+     "title": "The Problems tab",
+     "question": "What does the warning on a section mean, and what do I do about it?",
+     "steps": [
+      "A marker in the sidebar says a section has problems",
+      "Open the Problems tab",
+      "Each row names the page and what is wrong",
+      "Fix it in Obsidian and preview again",
+      "Tick a row you have dealt with"
+     ],
+     "pictures": [
+      {
+       "shows": "The sidebar marker",
+       "labels": [
+        "Problems marker"
+       ]
+      },
+      {
+       "shows": "The Problems tab with rows",
+       "labels": [
+        "Page",
+        "What is wrong"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "problems",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "problems-1",
+      "problems-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "slow-first-build",
+     "title": "The first preview is slow",
+     "question": "Is it stuck?",
+     "steps": [
+      "The first build gets this Mac ready: a few minutes, once",
+      "The progress sentence changes while work is happening",
+      "After an update the first build can take longer again",
+      "A first Swift page downloads what Swift needs, once"
+     ],
+     "pictures": [
+      {
+       "shows": "The progress view while getting ready",
+       "labels": [
+        "What is happening now"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "slow-first-build",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "slow-first-build-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "deploy-failed",
+     "title": "A deploy did not work",
+     "question": "The deploy stopped or Deploy is greyed: what now?",
+     "steps": [
+      "Read the sentence in the section: it says what went wrong",
+      "A refused token: clear it and paste a new one when asked",
+      "Deploy greyed: another program is working on the course; wait for it",
+      "Netlify paused: the monthly credits ran out",
+      "A failed deploy leaves the live site as it was"
+     ],
+     "pictures": [
+      {
+       "shows": "Deploy greyed with its explanation",
+       "labels": [
+        "Deploy (greyed)",
+        "Why"
+       ]
+      },
+      {
+       "shows": "A failed deploy's explanation",
+       "labels": [
+        "What went wrong"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Failure states are labelled as failures. The refused-token sentence is pictured with a deliberately wrong token against Cloudflare (sends only the check), or described without a picture.",
+     "id": "deploy-failed",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "deploy-failed-1",
+      "deploy-failed-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "synced-folder",
+     "title": "A working folder in iCloud Drive or Dropbox",
+     "question": "Can my working folder be in a synced folder?",
+     "steps": [
+      "Plantoir explains what syncing means for a working folder",
+      "Use This Folder Anyway if you accept it",
+      "Keep the folder inside your home folder"
+     ],
+     "pictures": [
+      {
+       "shows": "The synced-folder explanation",
+       "labels": [
+        "Use This Folder Anyway"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "synced-folder",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "synced-folder-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "updates",
+     "title": "Updating Plantoir",
+     "question": "How does Plantoir update, and can I check now?",
+     "steps": [
+      "Plantoir checks once a day and asks before installing",
+      "Plantoir ▸ Check for Updates… checks now",
+      "It waits for a deploy or preview to finish first"
+     ],
+     "pictures": [
+      {
+       "shows": "The update offer with its notes",
+       "labels": [
+        "Install Update"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Only a Release build has an updater; pictured from the dress-rehearsal feed (RELEASING.md) or left as words.",
+     "id": "updates",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "alert: the update held notice (NSAlert, AppUpdates.showHeldNotice)",
+      "alert: needs an administrator (NSAlert, AppUpdates.showNeedsAdministrator)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "updates-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "quitting",
+     "title": "Quitting while something is running",
+     "question": "Plantoir asked before quitting: what happens if I quit anyway?",
+     "steps": [
+      "What Plantoir asks about (a deploy, a build, a share, an assistant being set up)",
+      "Finish first, or quit anyway: what each does",
+      "What never asks (a model download)"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json quittingWhileWorkIsUnderWay, plus the cases #863 (sharing) and #855 (assistant set-up) add.",
+     "id": "quitting",
+     "section": "When something goes wrong",
+     "status": "new",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [
+      "#855",
+      "#863"
+     ],
+     "opensFrom": [
+      "alert: the quit question (NSAlert, AppDelegate)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "quitting-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "report",
+     "title": "Send a problem report",
+     "question": "Something went wrong: how do I tell the developer?",
+     "steps": [
+      "Help ▸ Report a Problem…",
+      "Choose what to include",
+      "Read the saved file",
+      "Email it to support@plantoir.app with what you expected"
+     ],
+     "pictures": [
+      {
+       "shows": "The Report a Problem… dialog",
+       "labels": [
+        "What to include",
+        "Save Report"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "report",
+     "section": "When something goes wrong",
+     "status": "kept",
+     "factSheet": "FS-10",
+     "batch": "W5",
+     "waitsOn": [],
+     "opensFrom": [
+      "alert: what to include (NSAlert, ProblemReportCommands.askWhatToInclude)",
+      "alert: there is nothing to report yet (NSAlert)",
+      "alert: the report could not be saved (NSAlert)"
+     ],
+     "assistant": false,
+     "needsPictures": true,
+     "sceneIds": [
+      "report-1"
+     ],
+     "indexed": true
+    }
+   ]
+  },
+  {
+   "title": "Optional: working with an assistant",
+   "purpose": "Everything above works without an assistant. This section is for teachers who choose to use one.",
+   "pages": [
+    {
+     "anchor": "assistants",
+     "title": "About the assistants (optional)",
+     "question": "Do I need an assistant, and which ones work with Plantoir?",
+     "steps": [
+      "Plantoir works fully without any assistant",
+      "The local assistant runs on this Mac and is switched off until you turn it on",
+      "Claude and Codex are programs you install and sign in to yourself",
+      "What each one reads, and where it goes"
+     ],
+     "pictures": [
+      {
+       "shows": "Course ▸ Revise With submenu",
+       "labels": [
+        "Claude…",
+        "Codex…",
+        "Local AI Assistant…"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "assistants",
+     "section": "Optional: working with an assistant",
+     "status": "amended",
+     "amendment": "Names GitHub Copilot beside Claude Code and Codex, listed after Codex; says first that Plantoir needs none; links github-education and set-up-assistant.",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#783",
+      "#855"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "assistants-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "github-education",
+     "title": "Apply for GitHub's education benefits",
+     "question": "How do I get GitHub Copilot through GitHub's benefits for teachers?",
+     "steps": [
+      "Before you apply: what GitHub asks for",
+      "The application, step by step",
+      "How long approval took when measured, and what to do if it is refused or asks for more",
+      "Turn Copilot on for the approved account",
+      "Set up GitHub Copilot's command-line tool from Plantoir (link set-up-assistant)",
+      "What the benefit includes and what it does not"
+     ],
+     "scenes": 4,
+     "readMinutes": 5,
+     "notes": "Every fact from GitHub's own documentation, fetched and quoted with the date read; front matter factsChecked and authority; the page prints the date and links GitHub's page as the authority. Pictures from GitHub's public pages; a signed-in view only if Russell walks it once (to ask then). Says first that Plantoir needs no assistant.",
+     "id": "github-education",
+     "section": "Optional: working with an assistant",
+     "status": "new",
+     "factSheet": "FS-G",
+     "batch": "W8",
+     "waitsOn": [
+      "#783"
+     ],
+     "opensFrom": [
+      "link: wherever Plantoir offers GitHub Copilot to a teacher who does not have it (#783)",
+      "link: the quick start's What you need"
+     ],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "github-education-1",
+      "github-education-2",
+      "github-education-3",
+      "github-education-4"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "set-up-assistant",
+     "title": "Set up an assistant's command-line tool",
+     "question": "How do I get Claude Code, Codex or GitHub Copilot working with Plantoir?",
+     "steps": [
+      "Where it is offered: Settings, the Help menu, and Revise With > Set Up Another Assistant...",
+      "Choose the assistant; Plantoir runs its maker's installer and checks it",
+      "Sign in, in the browser",
+      "Plantoir confirms it works",
+      "Remove takes away only what Plantoir installed",
+      "When a school's Mac stops the installer"
+     ],
+     "scenes": 3,
+     "readMinutes": 4,
+     "notes": "#855 ruled that the vendors' plans and accounts are facts dated in Help only: they live here, each with its date and the vendor's page as authority (factsChecked).",
+     "id": "set-up-assistant",
+     "section": "Optional: working with an assistant",
+     "status": "new",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#855"
+     ],
+     "opensFrom": [
+      "sheet: the set-up sheet (#855)",
+      "settings: the assistants pane (#855)",
+      "menu: the Help menu item (#855)"
+     ],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "set-up-assistant-1",
+      "set-up-assistant-2",
+      "set-up-assistant-3"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "copilot",
+     "title": "Use GitHub Copilot with Plantoir",
+     "question": "How do I revise a course or plan a unit with GitHub Copilot?",
+     "steps": [
+      "Revise with GitHub Copilot..., Fix with GitHub Copilot..., Plan a Unit with GitHub Copilot...",
+      "It asks in its own window before it makes a PDF or deploys",
+      "If it is not signed in or not yet approved"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "copilot",
+     "section": "Optional: working with an assistant",
+     "status": "new",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#783"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "copilot-1",
+      "copilot-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "local-assistant",
+     "title": "The local assistant",
+     "question": "How do I turn on and use the assistant that runs on this Mac?",
+     "steps": [
+      "Plantoir ▸ Settings ▸ Assistant: choose an assistant and let it download",
+      "Section ▸ Revise With ▸ Local AI Assistant…",
+      "Type what you want in a sentence",
+      "Read what it will do and approve it",
+      "Say undo that to put it back"
+     ],
+     "pictures": [
+      {
+       "shows": "Settings ▸ Assistant",
+       "labels": [
+        "The small assistant",
+        "The larger assistant"
+       ]
+      },
+      {
+       "shows": "The assistant window with a plan to approve",
+       "labels": [
+        "Approve"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "Wording follows rule 1: 'the small assistant', 'the larger assistant', never model names.",
+     "id": "local-assistant",
+     "section": "Optional: working with an assistant",
+     "status": "kept",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [],
+     "opensFrom": [
+      "settings: Settings > Assistant pane"
+     ],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "local-assistant-1",
+      "local-assistant-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "revise-with",
+     "title": "Revise a course with Claude or Codex",
+     "question": "How do I open Claude or Codex on a course, and tell it how I teach?",
+     "steps": [
+      "Course ▸ Revise With ▸ Claude… (or Codex…)",
+      "The session opens in your working folder on that course",
+      "Write a How I Teach page at the top of the course",
+      "Preview what it changed before you deploy"
+     ],
+     "pictures": [
+      {
+       "shows": "Revise With in the Course menu",
+       "labels": [
+        "Revise With ▸ Claude…"
+       ]
+      },
+      {
+       "shows": "How I Teach in Obsidian",
+       "labels": [
+        "How I Teach"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "revise-with",
+     "section": "Optional: working with an assistant",
+     "status": "amended",
+     "amendment": "Revise With is always shown (#855); with no assistant it holds only Set Up Another Assistant...; GitHub Copilot... listed after Codex...",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#783",
+      "#855"
+     ],
+     "opensFrom": [
+      "sheet: AgentGuidanceSheet"
+     ],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "revise-with-1",
+      "revise-with-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "how-i-teach",
+     "title": "The How I Teach page",
+     "question": "How do I tell an assistant how I teach?",
+     "steps": [
+      "Where the page is and what it is called",
+      "What to write on it",
+      "The build never puts it on a website"
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "Facts: shared-rules.json howITeachPage (#209).",
+     "id": "how-i-teach",
+     "section": "Optional: working with an assistant",
+     "status": "new",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "how-i-teach-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "plan-a-unit",
+     "title": "Plan a unit",
+     "question": "How do I plan a unit with an assistant and see the plan in Plantoir?",
+     "steps": [
+      "Ask Claude or Codex to plan the unit",
+      "Select the course and open its Planning tab",
+      "Choose the unit in the Unit popup, or All Plans",
+      "Open in Browser to read or print it",
+      "Use the section's Coverage tab to see what the plan reaches"
+     ],
+     "pictures": [
+      {
+       "shows": "The Planning tab on a unit",
+       "labels": [
+        "Planning",
+        "Unit",
+        "Open in Browser"
+       ]
+      },
+      {
+       "shows": "All Plans",
+       "labels": [
+        "All Plans"
+       ]
+      }
+     ],
+     "scenes": 2,
+     "readMinutes": 4,
+     "notes": "Reuses ui-tour scenes where the interface has not changed.",
+     "id": "plan-a-unit",
+     "section": "Optional: working with an assistant",
+     "status": "kept",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#783"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "plan-a-unit-1",
+      "plan-a-unit-2"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "share-plan",
+     "title": "Share a unit plan with a colleague",
+     "question": "How do I give a colleague my unit plans to read?",
+     "steps": [
+      "Planning tab: the share bar at the foot",
+      "Choose Protect and Include Answer Keys",
+      "Read the warning about a public address, then Share",
+      "Send the address; it is kept out of search engines"
+     ],
+     "pictures": [
+      {
+       "shows": "The share bar, not yet shared",
+       "labels": [
+        "Share",
+        "Protect",
+        "Include Answer Keys"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "#833 and #834 may change this sheet before the cut: capture last. A shared state needs a real share to a TEST Cloudflare project.",
+     "id": "share-plan",
+     "section": "Optional: working with an assistant",
+     "status": "amended",
+     "amendment": "#833 merged: the look before a share is two tables, Shared and Not shared.",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [],
+     "opensFrom": [
+      "sheet: PlanShareConsoleSheet",
+      "sheet: PlanShareListsSheet",
+      "sheet: FactsQuestionSheet (the public-address warning)",
+      "sheet: CredentialRequestSheet (unitPlanUsername)",
+      "sheet: CredentialRequestSheet (unitPlanPassword)"
+     ],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "share-plan-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "test-authoring",
+     "title": "Write a unit test",
+     "question": "How do I get a test, its solutions and a marking guide drafted?",
+     "steps": [
+      "Revise With ▸ Claude… on the course",
+      "Ask for the unit test",
+      "Read every question and answer yourself",
+      "Print it from the page"
+     ],
+     "pictures": [
+      {
+       "shows": "A drafted test page on the class site",
+       "labels": [
+        "Print"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "",
+     "id": "test-authoring",
+     "section": "Optional: working with an assistant",
+     "status": "kept",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "test-authoring-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "marking",
+     "title": "Mark a test or assignment",
+     "question": "How do I use an assistant to help mark, keeping names on my computer?",
+     "steps": [
+      "Scan the papers",
+      "Ask the assistant to mark from the scans",
+      "Review every mark",
+      "Names stay on this computer: how"
+     ],
+     "pictures": [
+      {
+       "shows": "A marking folder in Finder, names redacted",
+       "labels": [
+        "Marks"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 3,
+     "notes": "No student name, real paper or real mark in any picture; invented example only.",
+     "id": "marking",
+     "section": "Optional: working with an assistant",
+     "status": "amended",
+     "amendment": "Marking is never in an assistant's opening greeting (ruled 2026-11-13); it is offered in context.",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#750 (750d)"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "marking-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "report-comments",
+     "title": "Draft report card comments",
+     "question": "Can an assistant draft comments from my marks?",
+     "steps": [
+      "Finish marking first",
+      "Ask for comments",
+      "Choose and edit one of the drafted options for each student"
+     ],
+     "pictures": [],
+     "scenes": 0,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "report-comments",
+     "section": "Optional: working with an assistant",
+     "status": "kept",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": false,
+     "sceneIds": [],
+     "indexed": true
+    },
+    {
+     "anchor": "fix-with",
+     "title": "Fix a problem with Claude or Codex",
+     "question": "Can an assistant fix the problems on the Problems tab?",
+     "steps": [
+      "Open the Problems tab",
+      "Fix with Claude… or Fix with Codex…",
+      "Preview the result"
+     ],
+     "pictures": [
+      {
+       "shows": "The Problems tab's Fix with buttons",
+       "labels": [
+        "Fix with Claude…"
+       ]
+      }
+     ],
+     "scenes": 1,
+     "readMinutes": 2,
+     "notes": "",
+     "id": "fix-with",
+     "section": "Optional: working with an assistant",
+     "status": "kept",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#783"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "fix-with-1"
+     ],
+     "indexed": true
+    },
+    {
+     "anchor": "handouts-with-assistant",
+     "title": "Make a handout with an assistant",
+     "question": "Can an assistant make a printed handout and its answer key?",
+     "steps": [
+      "Ask for a handout, worksheet or quiz",
+      "What comes back: a PDF and its answer key from one source",
+      "What the computer needs to make the PDF",
+      "The Print button offering the PDF, as a suggestion"
+     ],
+     "scenes": 2,
+     "readMinutes": 2,
+     "notes": "#859: the greeting says handouts; the page states only what the merged skill does.",
+     "id": "handouts-with-assistant",
+     "section": "Optional: working with an assistant",
+     "status": "new",
+     "factSheet": "FS-11",
+     "batch": "W8",
+     "waitsOn": [
+      "#859"
+     ],
+     "opensFrom": [],
+     "assistant": true,
+     "needsPictures": true,
+     "sceneIds": [
+      "handouts-with-assistant-1",
+      "handouts-with-assistant-2"
+     ],
+     "indexed": true
+    }
+   ],
+   "assistant": true
+  }
+ ],
+ "alertsNotRebuilt": {
+  "rule": "Ruled 2026-11-13 16:54: every sheet gets a Help button; the 7 NSAlerts get one where a Help page explains them; the other alerts (35 SwiftUI .alert presentations on origin/dev 0253c230e, plus the one confirmationDialog, the Obsidian add-ons offer) are not rebuilt in this release.",
+  "swiftUIAlerts": 35,
+  "confirmationDialogs": 1
+ },
+ "sizeRule": "No cap (ruled 2026-11-13 15:25): the build reports the book's size and refuses nothing for size alone."
+}

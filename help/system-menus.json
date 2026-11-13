@@ -1,0 +1,29 @@
+{
+ "about": "Menu paths in menus the golden (mac-app/Tests/Goldens/menu-bar.txt) does not list, for menu-paths.json entries marked \"system\": true. Each item names the source file that makes it, so a removed item can be found. Keep this list short: every other path must be in the golden.",
+ "paths": [
+  {
+   "path": "Plantoir \u25b8 About Plantoir",
+   "key": null,
+   "source": "mac-app/QuartzTeachers/App/QuartzTeachersApp.swift",
+   "why": "CommandGroup(replacing: .appInfo) puts the app's own About Plantoir item first in the Plantoir menu."
+  },
+  {
+   "path": "Plantoir \u25b8 Settings\u2026",
+   "key": "\u2318,",
+   "source": "mac-app/QuartzTeachers/App/QuartzTeachersApp.swift",
+   "why": "The app's SwiftUI Settings scene; macOS adds Settings\u2026 with Command-comma to the app menu."
+  },
+  {
+   "path": "Plantoir \u25b8 Check for Updates\u2026",
+   "key": null,
+   "source": "mac-app/QuartzTeachers/App/AppUpdates.swift",
+   "why": "Added under About Plantoir in a released build that carries an update feed (#204); a Debug build has none."
+  },
+  {
+   "path": "Plantoir \u25b8 Quit Plantoir",
+   "key": "\u2318Q",
+   "source": "mac-app/QuartzTeachers/App/QuartzTeachersApp.swift",
+   "why": "Supplied by macOS for every SwiftUI app; AppDelegate's quit question (an NSAlert) is asked from it."
+  }
+ ]
+}

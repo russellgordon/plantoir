@@ -1,0 +1,4 @@
+{
+ "about": "Menu paths a page names with {{menu:<id>}}. Each entry: \"mac\" is the path as the menu bar shows it, items joined by \" \u25b8 \", and must be a path in mac-app/Tests/Goldens/menu-bar.txt; an entry for a menu the golden does not list (Plantoir, Edit, Window) carries \"system\": true and is checked against help/system-menus.json instead. \"windows\" is null until the Windows side fills it (P2b); \"windowsKey\" is that platform's shortcut. The Mac shortcut is read from the golden, never typed here. An id no page uses is a warning; F's --release refuses it.",
+ "entries": {}
+}

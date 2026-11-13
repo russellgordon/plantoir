@@ -1,0 +1,5 @@
+{
+ "about": "Control labels a page names with {{control:<id>}}. Each entry: \"label\" as the app shows it; \"mac\" names ONE place the label is checked against: {\"file\": \"<repository path>\"} (a Swift string literal in that file), {\"wording\": \"Type.member\"} (the literal of a static let or var under mac-app/QuartzTeachers), or {\"say\": \"<contract file>#<key path>\"}; \"windows\" is null until the Windows side fills it. \"keys\" holds shortcuts that are not menu items, for {{key:<id>}}: {\"mac\": \"\u21e7\u2318P\", \"windows\": null, \"source\": \"<where it is set>\"}.",
+ "entries": {},
+ "keys": {}
+}
