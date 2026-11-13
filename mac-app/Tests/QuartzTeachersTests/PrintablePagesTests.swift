@@ -821,6 +821,161 @@ final class PrintablePagesTests: XCTestCase {
         }
     }
 
+    /// #750 (750a): the marking skill travels the same way, with every
+    /// script, template and reference `assessment.agentGuidance.markingSkill`
+    /// lists, and both root files name it. Each skill in `mentionedBy` names
+    /// it (the test-authoring skill's one-time offer, and the two lists of
+    /// the places under `.internal` a skill may write), the skill says where
+    /// its pointer file lives and how to run its never-adapted runner, and
+    /// it stays out of the page routing table: marking is not part of a page.
+    func testTheMarkingSkillIsWrittenWithItsScriptsAndBothRootFilesNameIt() throws {
+        let assessment: [String: Any] = try SharedRulesContractTests.section("assessment")
+        let agentGuidance: [String: Any] = try XCTUnwrap(assessment["agentGuidance"] as? [String: Any])
+        let guidance: [String: Any] = try XCTUnwrap(agentGuidance["markingSkill"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        if try isHeld(skillName) {
+            try assertHeldSkillIsNotWritten(skillName)
+            return
+        }
+        let scripts: [String] = try XCTUnwrap(guidance["scripts"] as? [String])
+        let templates: [String] = try XCTUnwrap(guidance["templates"] as? [String])
+        let references: [String] = try XCTUnwrap(guidance["references"] as? [String])
+        let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        let runner: String = try XCTUnwrap(guidance["runner"] as? String)
+        let folders: [String: Any] = try XCTUnwrap(assessment["folders"] as? [String: Any])
+        let pointerFile: [String: Any] = try XCTUnwrap(folders["pointerFile"] as? [String: Any])
+        let pointerPath: String = try XCTUnwrap(pointerFile["path"] as? String)
+        XCTAssertTrue(scripts.contains(runner), "the runner is written with the skill")
+        XCTAssertFalse(scripts.isEmpty)
+        XCTAssertFalse(templates.isEmpty)
+        XCTAssertFalse(references.isEmpty)
+        XCTAssertFalse(mentionedBy.isEmpty)
+        let pageAuthoring: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["pageAuthoringSkill"] as? [String: Any])
+        let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
+        XCTAssertFalse(routesTo.contains(skillName), "marking is not part of a page")
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        let pointerInSkill: String = pointerPath.replacingOccurrences(of: "courses/<CODE>/", with: "")
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            let skill: String = try String(
+                contentsOf: skillFolder.appendingPathComponent("SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("This working folder holds courses for Plantoir"), home)
+            XCTAssertTrue(skill.contains("read_how_i_teach"), home)
+            XCTAssertTrue(skill.contains(pointerInSkill), "\(home): the skill must say where its pointer file lives")
+            XCTAssertTrue(skill.contains(runner), "\(home): the skill must say how to run \(runner)")
+            var files: [String] = scripts
+            files.append(contentsOf: templates)
+            files.append(contentsOf: references)
+            for file in files {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: skillFolder.appendingPathComponent(file).path),
+                              "\(home): \(file) must be written beside the skill")
+            }
+            for mentioning in mentionedBy {
+                let other: String = try String(
+                    contentsOf: folder.appendingPathComponent("\(home)/skills/\(mentioning)/SKILL.md"), encoding: .utf8)
+                XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+        }
+    }
+
+    /// #752: the report-comments skill travels the same way, with its
+    /// reference, and both root files name it. Every script it `uses` is
+    /// written in the marking skill's folder beside it (it has no scripts of
+    /// its own: the names go in through `plantoir-marking`'s one name step),
+    /// each skill in `mentionedBy` names it, and it stays out of the page
+    /// routing table: report comments are not part of a page.
+    func testTheReportCommentsSkillIsWrittenAndBothRootFilesNameIt() throws {
+        let assessment: [String: Any] = try SharedRulesContractTests.section("assessment")
+        let agentGuidance: [String: Any] = try XCTUnwrap(assessment["agentGuidance"] as? [String: Any])
+        let guidance: [String: Any] = try XCTUnwrap(agentGuidance["reportCommentsSkill"] as? [String: Any])
+        let skillName: String = try XCTUnwrap(guidance["skill"] as? String)
+        if try isHeld(skillName) {
+            try assertHeldSkillIsNotWritten(skillName)
+            return
+        }
+        let references: [String] = try XCTUnwrap(guidance["references"] as? [String])
+        let uses: [String] = try XCTUnwrap(guidance["uses"] as? [String])
+        let mentionedBy: [String] = try XCTUnwrap(guidance["mentionedBy"] as? [String])
+        XCTAssertFalse(references.isEmpty)
+        XCTAssertFalse(uses.isEmpty)
+        XCTAssertFalse(mentionedBy.isEmpty)
+        let pageAuthoring: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["pageAuthoringSkill"] as? [String: Any])
+        let routesTo: [String] = try XCTUnwrap(pageAuthoring["routesTo"] as? [String])
+        XCTAssertFalse(routesTo.contains(skillName), "report comments are not part of a page")
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillsFolder: URL = folder.appendingPathComponent("\(home)/skills")
+            let skillFolder: URL = skillsFolder.appendingPathComponent(skillName)
+            let skill: String = try String(
+                contentsOf: skillFolder.appendingPathComponent("SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: \(skillName)"), home)
+            XCTAssertTrue(skill.contains("This working folder holds courses for Plantoir"), home)
+            XCTAssertTrue(skill.contains("read_how_i_teach"), home)
+            for file in references {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: skillFolder.appendingPathComponent(file).path),
+                              "\(home): \(file) must be written beside the skill")
+            }
+            for used in uses {
+                XCTAssertTrue(FileManager.default.fileExists(atPath: skillsFolder.appendingPathComponent(used).path),
+                              "\(home): \(used) must be written with the skill it belongs to")
+                let fileName: String = URL(fileURLWithPath: used).lastPathComponent
+                XCTAssertTrue(skill.contains(fileName), "\(home): the skill must say how to run \(fileName)")
+            }
+            for mentioning in mentionedBy {
+                let other: String = try String(
+                    contentsOf: skillsFolder.appendingPathComponent("\(mentioning)/SKILL.md"), encoding: .utf8)
+                XCTAssertTrue(other.contains("`\(skillName)`"), "\(home): \(mentioning) must name \(skillName)")
+            }
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertTrue(text.contains(skillName), "\(name) must name the \(skillName) skill")
+        }
+    }
+
+    /// #750 hold (review M3): the two tests above were the ones that proved
+    /// the marking and report-comments skills are written, named by the root
+    /// files and by every skill in `mentionedBy`. While a skill is in
+    /// `printablePages.agentGuidance.held.skills` each asserts the opposite
+    /// (the skill is in neither home and neither root file names it) and
+    /// stops; when the release that brings it back shortens that list, each
+    /// asserts again that it IS written, so nothing it needs (the root
+    /// bullets, the `.internal/marking` lines `mentionedBy` names) can stay
+    /// missing silently.
+    private func isHeld(_ skillName: String) throws -> Bool {
+        let guidance: [String: Any] = try agentGuidanceContract()
+        guard let held: [String: Any] = guidance["held"] as? [String: Any] else {
+            return false
+        }
+        guard let skills: [String: Any] = held["skills"] as? [String: Any] else {
+            return false
+        }
+        return skills[skillName] != nil
+    }
+
+    private func assertHeldSkillIsNotWritten(_ skillName: String) throws {
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        for home in [".claude", ".agents"] {
+            let skillFolder: URL = folder.appendingPathComponent("\(home)/skills/\(skillName)")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: skillFolder.path), "\(home): \(skillName) is held, and must not be written")
+        }
+        for name in AgentGuidance.rootFiles {
+            let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            XCTAssertFalse(text.contains(skillName), "\(name) must not name the held \(skillName) skill")
+        }
+    }
+
     /// #750 (2026-11-13): the marking and report-comments skills are HELD
     /// from this release (`printablePages.agentGuidance.held`). A freshly
     /// prepared working folder holds neither skill in either home, neither

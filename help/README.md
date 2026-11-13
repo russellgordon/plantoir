@@ -395,7 +395,7 @@ page never lingers and pictures are not rewritten.
 - Index bytes differ between two runs over identical pages, so they are never
   compared across builds.
 - A `robots: anchors` page is listed with no title or description.
-- The real 104 stubs (outline revision 4) build into a 142 KB book.
+- The real 104 stubs (outline revision 4) build into a 142 KB book. (102 since #750's hold took out the marking and report-comments pages, 2026-11-13; not re-measured.)
 - `/usr/bin/python3` is 3.9.6, the Python an Xcode build phase gets. `-I`
   takes the script's own folder off `sys.path`, so `build_help.py` inserts it
   explicitly, and it finds the repository as its own folder's parent, never

@@ -8,22 +8,26 @@ support/agent_guidance/skills, and nothing else, into .claude/skills and .agents
 Copilot door reads those same two homes). So the source folder IS what a working folder receives, on every
 platform and for every outside assistant, and this test reads it rather than an app.
 
-The held list is ONE key, `held.skills`; `held.words` carries, per held skill, the words that would offer
-it. The release that brings a skill back moves its folder from `place` to support/agent_guidance/skills,
-puts back the root files' bullet, and deletes its entries under `held`; this test then checks nothing for
-it, and fails if the folder moved without the contract or the contract without the folder.
+The held list is ONE key, `held.skills`. `held.words.bySkill` carries, per held skill, the regular
+expressions that would offer it, `held.words.allowed` the sentences that may say them (the one the
+test-authoring skill gives when asked to mark), and `mustTrip` and `mustPass` the cases that prove the
+expressions catch the ways a teacher or an assistant would say either feature and leave ordinary uses of
+"marks" and "marking" alone. Bringing a skill back is `held.whenTheyReturn.steps`; this test then checks
+nothing for it, and fails if the folder moved without the contract or the contract without the folder.
 
 While a skill is held this checks:
   - its folder is in `place`, whole (a SKILL.md), and NOT in support/agent_guidance/skills;
   - neither root file (CLAUDE.md, AGENTS.md), and no file of any written skill except a skill named in
     `held.mayStillName`, names it or says one of its words;
   - no greeting or sentence in contracts/app-rules.json or contracts/assist-wording.json, nothing in either
-    app's sources, and nothing in plantoir.app's page sources, names it or says one of its words.
+    app's sources, nothing in Help (help/*.json, the outline's titles, questions and steps included, and
+    help/pages) and nothing in plantoir.app's page sources names it or says one of its words.
 
 Stdlib only; runs on the mac (verify.sh) and on Windows (PythonToolchainTests) alike.
 """
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -33,9 +37,10 @@ GUIDANCE = REPOSITORY / "support" / "agent_guidance"
 WRITTEN_SKILLS = GUIDANCE / "skills"
 ROOT_FILES = [GUIDANCE / "CLAUDE.md", GUIDANCE / "AGENTS.md"]
 WORDING_CONTRACTS = [REPOSITORY / "contracts" / "app-rules.json", REPOSITORY / "contracts" / "assist-wording.json"]
+HELP = REPOSITORY / "help"
 
-# Where each app's own words live. A folder that is not in this checkout (a partial clone) is skipped,
-# and the test says which.
+# Where each app's own words live, Help's included. A folder that is not in this checkout (a partial
+# clone) is skipped, and the test says which.
 APP_SOURCES = [
     (REPOSITORY / "mac-app" / "QuartzTeachers", [".swift", ".strings", ".json", ".md", ".html"]),
     (REPOSITORY / "windows-app" / "Plantoir", [".cs", ".xaml", ".json", ".md", ".html"]),
@@ -43,6 +48,7 @@ APP_SOURCES = [
     (REPOSITORY / "windows-app" / "Plantoir.Mcp", [".cs", ".json", ".md"]),
     (REPOSITORY / "website" / "pages", [".html", ".md", ".json"]),
     (REPOSITORY / "website" / "layout", [".html", ".md", ".json"]),
+    (HELP / "pages", [".md", ".html", ".json"]),
 ]
 BUILD_FOLDERS = {"bin", "obj", "__pycache__", ".build"}
 
@@ -65,12 +71,41 @@ def held_skills():
     return held_block().get("skills", {})
 
 
-def words_for(skill_name):
-    words = held_block().get("words", {})
-    result = [skill_name]
-    for word in words.get(skill_name, []):
-        result.append(word)
+def held_words():
+    return held_block().get("words", {})
+
+
+def folded(text):
+    """Every run of white space as one space, so a phrase wrapped across lines is still one phrase."""
+    return " ".join(text.split())
+
+
+def expressions_for(skill_name):
+    result = []
+    for pattern in held_words().get("bySkill", {}).get(skill_name, []):
+        result.append(re.compile(pattern, re.IGNORECASE))
     return result
+
+
+def first_word_said(text, skill_name):
+    """The first passage of `text` that offers the held skill, or None. The `allowed` sentences are
+    taken out first: they are what an assistant says when asked, and they offer nothing."""
+    text = folded(text)
+    for allowed in held_words().get("allowed", []):
+        text = text.replace(folded(allowed), " ")
+    for expression in expressions_for(skill_name):
+        match = expression.search(text)
+        if match is not None:
+            return match.group(0)
+    return None
+
+
+def first_skill_offered(text):
+    for skill_name in held_words().get("bySkill", {}):
+        word = first_word_said(text, skill_name)
+        if word is not None:
+            return skill_name, word
+    return None
 
 
 def readable_text(path):
@@ -115,32 +150,37 @@ def strings_in(node):
     return found
 
 
-def first_word_said(text, skill_name):
-    """The first of the held skill's name and words that `text` says, ignoring case, or None."""
-    lowered = text.lower()
-    for word in words_for(skill_name):
-        if word.lower() in lowered:
-            return word
-    return None
+class HeldWordTests(unittest.TestCase):
 
+    def test_every_must_trip_sentence_is_caught(self):
+        if not held_skills():
+            self.skipTest("no skill is held in this release")
+        sentences = held_words().get("mustTrip", [])
+        self.assertGreaterEqual(len(sentences), 10)
+        for sentence in sentences:
+            self.assertIsNotNone(first_skill_offered(sentence), "not caught: " + sentence)
 
-class HeldSkillTests(unittest.TestCase):
+    def test_every_must_pass_sentence_is_left_alone(self):
+        sentences = held_words().get("mustPass", [])
+        for sentence in sentences:
+            self.assertIsNone(first_skill_offered(sentence), "caught, but it offers nothing: " + sentence)
 
     def test_the_held_list_and_its_words_agree(self):
-        block = held_block()
         skills = held_skills()
         if not skills:
             self.skipTest("no skill is held in this release")
-        words = block.get("words", {})
+        by_skill = held_words().get("bySkill", {})
         for skill_name in skills:
-            self.assertIn(skill_name, words, f"held.words has no entry for the held {skill_name}")
-        for skill_name in words:
-            if skill_name == "rule":
-                continue
-            self.assertIn(skill_name, skills, f"held.words names {skill_name}, which is not held")
+            self.assertIn(skill_name, by_skill, f"held.words.bySkill has no entry for the held {skill_name}")
+            self.assertTrue(by_skill[skill_name], f"held.words.bySkill has no words for {skill_name}")
+        for skill_name in by_skill:
+            self.assertIn(skill_name, skills, f"held.words.bySkill names {skill_name}, which is not held")
         assessment_held = shared_rules()["assessment"].get("held", {})
         for skill_name in assessment_held.get("skills", []):
             self.assertIn(skill_name, skills, f"assessment.held names {skill_name}, which is not held")
+
+
+class HeldSkillTests(unittest.TestCase):
 
     def test_a_held_skill_is_kept_whole_and_not_where_the_apps_copy_from(self):
         block = held_block()
@@ -172,18 +212,24 @@ class HeldSkillTests(unittest.TestCase):
                 word = first_word_said(text, skill_name)
                 self.assertIsNone(word, f"{path.relative_to(REPOSITORY)} says '{word}', offering the held {skill_name}")
 
-    def test_no_greeting_or_sentence_names_a_held_skill(self):
-        sentences = []
+    def test_no_greeting_sentence_or_help_entry_names_a_held_skill(self):
+        documents = []
         for contract in WORDING_CONTRACTS:
-            document = json.loads(contract.read_text(encoding="utf-8"))
+            documents.append(contract)
+        if HELP.is_dir():
+            for path in sorted(HELP.glob("*.json")):
+                documents.append(path)
+        sentences = []
+        for document_path in documents:
+            document = json.loads(document_path.read_text(encoding="utf-8"))
             for text in strings_in(document):
-                sentences.append((contract.name, text))
+                sentences.append((document_path.relative_to(REPOSITORY).as_posix(), text))
         for skill_name in held_skills():
-            for contract_name, text in sentences:
+            for place, text in sentences:
                 word = first_word_said(text, skill_name)
-                self.assertIsNone(word, f"{contract_name} says '{word}', offering the held {skill_name}: {text[:120]}")
+                self.assertIsNone(word, f"{place} says '{word}', offering the held {skill_name}: {text[:120]}")
 
-    def test_neither_app_nor_the_website_names_a_held_skill(self):
+    def test_neither_app_nor_help_nor_the_website_names_a_held_skill(self):
         skipped = []
         places = []
         for folder, endings in APP_SOURCES:

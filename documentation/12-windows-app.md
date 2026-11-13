@@ -2927,7 +2927,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   `scripts/test_held_skills.py` (#750) checks that neither is in
   `support/agent_guidance/skills` and that no root file, written skill,
   greeting, app source (this app's `Plantoir`, `Plantoir.Core` and
-  `Plantoir.Mcp` included) or plantoir.app page names them
+  `Plantoir.Mcp` included), Help file or plantoir.app page names or offers
+  them (`held.words`); the test-authoring skill (#751), asked to mark,
+  says `held.saysWhenAsked.sentence`
   (`printablePages.agentGuidance.held`, 09 → "Held from v2.0.0"). Not
   measured on Windows: `support\**` is copied with `PreserveNewest`, which
   does not delete a file from `bin\` when it leaves the source, so an
