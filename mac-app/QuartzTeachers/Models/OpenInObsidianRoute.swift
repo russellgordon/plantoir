@@ -43,8 +43,6 @@ struct ObsidianAddOnsRequest: Identifiable {
         return openState != .closed
     }
 
-    // MARK: - Computed properties
-
     var id: String {
         return course.code + "|" + folder.path
     }

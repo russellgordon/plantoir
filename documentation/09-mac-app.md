@@ -5575,16 +5575,28 @@ that Obsidian is open and closes; `.closed` adds neither.
   and empty data reads as `.cannotTell`. This was ruled rather than measured;
   the measurement it rests on (does Obsidian write the file before its first
   vault window is up?) needs Obsidian on the screen.
-- **Cannot tell is a list that is there but is not JSON, is cut off, or has no
-  `vaults` object**: a read that landed while Obsidian rewrote the file.
+- **Cannot tell is a list that is there but is not JSON or is cut off** (a
+  read that landed while Obsidian rewrote the file), **or a complete list
+  with no `vaults` object**, which is not trusted either way. Whether
+  Obsidian ever writes such a file before its first vault is not measured;
+  reading it as cannot tell costs at most a needless reopen.
+- **Another spelling of the same folder is the same course** (#742
+  implementation review M2). Measured before the fix: an open-marked path
+  through a link, in other letter case, with a trailing `/`, or as
+  `/private/tmp/x` for `/tmp/x` read as CLOSED, so an open course was
+  written into. After the exact compare misses, each path the registry marks
+  OPEN is asked through `FolderIdentity.isSameFolder`; only those (one to
+  four on a teacher's Mac, not every registered vault) are opened, and the
+  answer can only move closed to open. `vaultThatOpens` keeps its plain
+  string-prefix compare, because it imitates Obsidian's own match. The
+  spellings are `openStateCases` with `platform: mac`, made in a temporary
+  folder by the test.
 - **Rejected:** the hedge "If {course} is open in Obsidian now, Obsidian
   closes…" (the plan's first wording), because Add Them closes Obsidian
-  whether or not the course is open in it (plan review H2). Comparing paths
-  through `FolderIdentity.canonicalPath` (no case needed it, it would make
-  `vaultThatOpens` disagree with Obsidian's own string-prefix match, and it
-  opens a file per registered vault on every press). Re-reading the registry
-  to settle `.cannotTell` (a second read can land in the same write, and a
-  timed wait is a guess).
+  whether or not the course is open in it (plan review H2). A canonical
+  compare in `vaultThatOpens` (it would disagree with Obsidian's own
+  string-prefix match). Re-reading the registry to settle `.cannotTell` (a
+  second read can land in the same write, and a timed wait is a guess).
 - **Known limits** (`knownLimits`): a stale open mark still reads as open, since
   Obsidian does not always clear it; and when Plantoir cannot tell, the list of
   vaults to reopen could not be read either, so Add Them reopens only this

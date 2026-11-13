@@ -31047,7 +31047,7 @@
       "Re-reading the registry to settle cannotTell (#742): a second read with no wait can land in the same write, and a timed wait to let it settle is a guess."
     ],
     "openStateCases": {
-      "note": "Whether the course is open in Obsidian, as far as Plantoir can tell (#742). `running` is whether Obsidian is running; `registryText` is the whole text of Obsidian's list of vaults (obsidian.json), or null when there is no such file; `course` is the course folder's path. `expect` is open, closed or cannotTell. The match is on the WHOLE folder path, exactly as the registry writes it, never on the course's code or a vault's name. What the app does treats cannotTell as open (no write into the course; Add Them goes the reopen way); only the words differ: open adds wording.offerWhileOpen to the offer, cannotTell adds wording.offerWhileObsidianIsOpen, closed adds neither. No list at all is closed by Russell's ruling on #742 (2026-11-12): Obsidian writes the list when a vault opens, so with no list none is open. A list that is there but is not JSON, is cut off, or has no vaults object is a read that landed mid-write, which is cannotTell.",
+      "note": "Whether the course is open in Obsidian, as far as Plantoir can tell (#742). `running` is whether Obsidian is running; `registryText` is the whole text of Obsidian's list of vaults (obsidian.json), or null when there is no such file; `course` is the course folder's path. `expect` is open, closed or cannotTell. The match is on the WHOLE folder path, exactly as the registry writes it, never on the course's code or a vault's name. What the app does treats cannotTell as open (no write into the course; Add Them goes the reopen way); only the words differ: open adds wording.offerWhileOpen to the offer, cannotTell adds wording.offerWhileObsidianIsOpen, closed adds neither. No list at all is closed by Russell's ruling on #742 (2026-11-12): Obsidian writes the list when a vault opens, so with no list none is open. A list that is there but is not JSON or is cut off is a read that landed mid-write, and a complete list that holds no vaults object is not trusted either way; both are cannotTell. An open-marked path that is ANOTHER SPELLING of the course's folder (a link, other letter case, a trailing slash, /private/tmp for /tmp) is open too (#742 review M2): it is asked only of the vaults marked open and only after the exact compare misses, so it can only turn closed into open. Cases with `platform: mac` need real folders: the test makes `folders` and `links` (link: target) inside a temporary folder and puts its path, as Foundation spells it (under /var), for {temp}, and the same with /private in front for {privateTemp}; Windows' own SamePath already folds case and separators, and these cases are skipped there.",
       "cases": [
         {
           "name": "Obsidian is not running, whatever its list says",
@@ -31103,6 +31103,62 @@
           "running": true,
           "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/elsewhere/Teaching/ADA1O\",\"ts\":1,\"open\":true},\"a2\":{\"path\":\"/w/courses/ADA1O\",\"ts\":2}}}",
           "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "The course's folder is marked open with a trailing slash",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O/\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open in other letter case",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/courses/ada1o\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open through a link to it",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "links": {"Shortcut": "Courses/ADA1O"},
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Shortcut\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course is given through a link, its real folder marked open",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "links": {"Shortcut": "Courses/ADA1O"},
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Shortcut",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open with /private in front",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{privateTemp}/Courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "Another real folder whose name starts the same is marked open",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O", "Courses/ADA1O-old"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O-old\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
           "expect": "closed"
         }
       ]

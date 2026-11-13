@@ -251,9 +251,14 @@ nonisolated enum ObsidianFigureAddOnsOffer {
     /// - A registry that is there but cannot be read, or has no `vaults`
     ///   object: `.cannotTell` (fixes review N1: Obsidian rewrites it in
     ///   place, so a read can land mid-write; not knowing is not "closed").
-    /// - Otherwise `.open` exactly when the registry marks THIS folder's path
-    ///   open. The compare is on the whole path, never on the course's code
-    ///   or the vault's name, so a same-named vault elsewhere is not it.
+    /// - Otherwise `.open` when the registry marks THIS folder open: its
+    ///   whole path, never the course's code or the vault's name, so a
+    ///   same-named vault elsewhere is not it. An open-marked path that is
+    ///   another spelling of the same folder (a link, other letter case, a
+    ///   trailing `/`, `/private/tmp` for `/tmp`) counts too, asked through
+    ///   `FolderIdentity.isSameFolder` (#742 review M2). Only the vaults
+    ///   marked open are asked, and only after the exact compare misses, so
+    ///   this can only ever turn closed into open, the safe direction.
     static func courseOpenState(coursePath: String, obsidianRunning: Bool, registryData: Data?) -> CourseOpenState {
         if !obsidianRunning {
             return .closed
@@ -265,8 +270,14 @@ nonisolated enum ObsidianFigureAddOnsOffer {
               registry["vaults"] is [String: Any] else {
             return .cannotTell
         }
-        if FolderActions.openVaultPaths(registryData: registryData).contains(coursePath) {
+        let openPaths: [String] = FolderActions.openVaultPaths(registryData: registryData)
+        if openPaths.contains(coursePath) {
             return .open
+        }
+        for openPath in openPaths {
+            if FolderIdentity.isSameFolder(openPath, coursePath) {
+                return .open
+            }
         }
         return .closed
     }

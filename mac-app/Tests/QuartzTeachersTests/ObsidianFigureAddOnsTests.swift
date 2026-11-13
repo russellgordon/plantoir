@@ -590,15 +590,37 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     func testEveryOpenStateCase() throws {
         let rules: [String: Any] = try XCTUnwrap(try ObsidianFigureAddOnsTests.rules()["openStateCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(rules["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        XCTAssertGreaterThanOrEqual(cases.count, 14)
+        // The folder the `platform: mac` cases make their folders in, as
+        // Foundation spells it (under /var, which is a link to /private/var).
+        let temp: String = rootURL.path
+        XCTAssertTrue(temp.hasPrefix("/var/"), "the /private case needs a temporary folder under /var, not \(temp)")
+        var madeFolders: Int = 0
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let running: Bool = try XCTUnwrap(testCase["running"] as? Bool, name)
-            let course: String = try XCTUnwrap(testCase["course"] as? String, name)
             let expect: String = try XCTUnwrap(testCase["expect"] as? String, name)
+            let caseFolder: URL = rootURL.appendingPathComponent("case-\(madeFolders)")
+            madeFolders += 1
+            let folders: [String] = testCase["folders"] as? [String] ?? []
+            for folder in folders {
+                try FileManager.default.createDirectory(at: caseFolder.appendingPathComponent(folder), withIntermediateDirectories: true)
+            }
+            let links: [String: String] = testCase["links"] as? [String: String] ?? [:]
+            for (link, target) in links {
+                try FileManager.default.createSymbolicLink(
+                    at: caseFolder.appendingPathComponent(link), withDestinationURL: caseFolder.appendingPathComponent(target)
+                )
+            }
+            let filled = { (text: String) -> String in
+                return text
+                    .replacingOccurrences(of: "{privateTemp}", with: "/private" + caseFolder.path)
+                    .replacingOccurrences(of: "{temp}", with: caseFolder.path)
+            }
+            let course: String = filled(try XCTUnwrap(testCase["course"] as? String, name))
             var registryData: Data? = nil
             if let registryText = testCase["registryText"] as? String {
-                registryData = Data(registryText.utf8)
+                registryData = Data(filled(registryText).utf8)
             }
             let state: ObsidianFigureAddOnsOffer.CourseOpenState = ObsidianFigureAddOnsOffer.courseOpenState(
                 coursePath: course, obsidianRunning: running, registryData: registryData
