@@ -277,7 +277,7 @@ final class ProblemReportTests: XCTestCase {
         // And it is still droppable by prefix, which is what keeps it out of
         // a report the teacher did not tick the box for.
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
-        store.appendActivityLine(text)
+        store.appendActivityLine(text, keepingLineBreaks: true)
         XCTAssertTrue(store.hasAssistantPrompts)
         XCTAssertFalse(
             store.activityText(includingPrompts: false).contains("What will students see?")
@@ -302,7 +302,8 @@ final class ProblemReportTests: XCTestCase {
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
         store.appendActivityLine(
             "2026-08-06 07:06:40 · ICS3U/1 · chose publish_pages(course, section)\n"
-            + AssistTurnRecord.promptMarker + "publish tomorrow's class"
+            + AssistTurnRecord.promptMarker + "publish tomorrow's class",
+            keepingLineBreaks: true
         )
 
         let withoutPrompts: String = store.activityText(includingPrompts: false)
@@ -668,7 +669,8 @@ final class ProblemReportTests: XCTestCase {
 
         store.appendActivityLine(
             "2026-08-06 07:07:00 · COMP/1 · chose check_section(course)\n"
-            + AssistTurnRecord.promptMarker + "What will students see?"
+            + AssistTurnRecord.promptMarker + "What will students see?",
+            keepingLineBreaks: true
         )
         XCTAssertTrue(store.hasAssistantPrompts)
     }

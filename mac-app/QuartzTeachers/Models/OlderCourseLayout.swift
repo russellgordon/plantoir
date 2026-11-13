@@ -244,7 +244,7 @@ nonisolated enum OlderCourseLayout {
             }
             return [
                 "course_code": courseCode,
-                "course_name": courseName,
+                "course_name": CourseName.cleaned(courseName),
                 "num_sections": 1,
                 "section_numbers": [1],
                 "shared_folders": sharedFolders,

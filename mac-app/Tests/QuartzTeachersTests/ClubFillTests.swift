@@ -105,8 +105,12 @@ final class ClubFillTests: XCTestCase {
         for literal in literals {
             XCTAssertFalse(text.contains(literal), "NewCourseWizardView still says \(literal) whatever is being made (#368)")
         }
-        // Positive control: the panel does ask.
-        XCTAssertGreaterThanOrEqual(text.components(separatedBy: "WizardWording.panelWords(isClub: isClubCourse)").count - 1, 10)
+        // Positive control: the panel does ask. Counted whatever the argument
+        // is called, because a helper the panel calls asks with its own
+        // parameter (`nameToWrite(typed:isClub:)`, #780, passes `isClub`);
+        // what matters is that each word is asked of `panelWords`, not which
+        // variable carries the club switch there.
+        XCTAssertGreaterThanOrEqual(text.components(separatedBy: "WizardWording.panelWords(isClub:").count - 1, 10)
     }
 
     func testTheFillMatchesTheContract() throws {
