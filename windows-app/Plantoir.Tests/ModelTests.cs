@@ -984,12 +984,16 @@ public class BuildFreshnessTests
             string content = Path.Combine(course.DirectoryPath, "section1");
             Directory.CreateDirectory(content);
             File.WriteAllText(Path.Combine(content, "index.md"), "x");
+            // The site built AFTER the content, on the real clock (#799): it
+            // used to be dated five minutes ahead, which the clock guard now
+            // reads as a build dated later than now.
+            Thread.Sleep(FreshnessCases.PauseMilliseconds);
             string index = BuiltIndex(buildsRoot, "ICS3U", 1);
             File.WriteAllText(index, "built");
-            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
             Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
 
-            File.SetLastWriteTimeUtc(Path.Combine(content, "index.md"), DateTime.UtcNow.AddMinutes(10));
+            Thread.Sleep(FreshnessCases.PauseMilliseconds);
+            File.AppendAllText(Path.Combine(content, "index.md"), "\nedited");
             Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
@@ -1003,16 +1007,22 @@ public class BuildFreshnessTests
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
             string buildsRoot = Path.Combine(root, "builds");
-            string index = BuiltIndex(buildsRoot, "ICS3U", 1);
-            File.WriteAllText(index, "built");
-            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
             // Obsidian rewrites its own settings constantly; a teacher opening
-            // the vault is not a content change.
+            // the vault is not a content change. Since #799 this pins EDITING
+            // inside a hidden folder, not creating one: making .obsidian at
+            // the top changes the course folder's own time, which the rule
+            // reads (knownLimits: a hidden entry made at the top builds once).
+            // So the folder is there before the build, and edited after it.
             string obsidian = Path.Combine(course.DirectoryPath, ".obsidian");
             Directory.CreateDirectory(obsidian);
             File.WriteAllText(Path.Combine(obsidian, "workspace.json"), "{}");
-            File.SetLastWriteTimeUtc(Path.Combine(obsidian, "workspace.json"), DateTime.UtcNow.AddMinutes(30));
+            Thread.Sleep(FreshnessCases.PauseMilliseconds);
+            string index = BuiltIndex(buildsRoot, "ICS3U", 1);
+            File.WriteAllText(index, "built");
+            Thread.Sleep(FreshnessCases.PauseMilliseconds);
+            File.AppendAllText(Path.Combine(obsidian, "workspace.json"), " ");
+            File.SetLastWriteTimeUtc(Path.Combine(obsidian, "workspace.json"), DateTime.UtcNow);
 
             Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
@@ -1029,18 +1039,20 @@ public class BuildFreshnessTests
         {
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
             string buildsRoot = Path.Combine(root, "builds");
+            // Built after the course, on the real clock (#799): dated ahead,
+            // the clean page below would now read as a build dated later than
+            // now and rebuild for the clock, not for being a preview's.
+            Thread.Sleep(FreshnessCases.PauseMilliseconds);
             string index = BuiltIndex(buildsRoot, "ICS3U", 1);
             // The client as Quartz writes it (#272): a retyped
             // <script>...new WebSocket(...)</script> is (rightly) not matched.
             File.WriteAllText(index, ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["previewBuild"]!
                 ["signature"]!["asQuartzWritesIt"]!.ToString());
-            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
             Assert.True(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
-            Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
+            Assert.Equal(BuildFreshness.ReasonPreview, BuildFreshness.WhyRebuild(course, 1, buildsRoot));
 
             File.WriteAllText(index, "a clean production page");
-            File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
             Assert.False(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
             Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }

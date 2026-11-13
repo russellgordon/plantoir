@@ -779,6 +779,18 @@ public static class ActivityTrail
         /// did not open writes nothing here.
         /// </summary>
         AskedAnAssistantToFixProblems,
+        /// <summary>
+        /// A deploy BUILT the section's site first (#799, the mac's #768 and
+        /// #748 part 2): the course and section and WHY, one of
+        /// <c>buildFreshness.reuseTheLastBuild.reasons</c>, never a page, a
+        /// path or a command (<see cref="BuiltBeforeDeployingWords"/>). Written
+        /// once per build, by whichever code ran it: the app after its own
+        /// build first (<see cref="MultiDestinationDeployRunner"/>, and the
+        /// windowless deploy in <c>AssistWorkspace</c>), the scheduled wrapper
+        /// after its build, and <c>deploy.ps1</c> after its own. It answers
+        /// "why was this morning's deploy slow?" days later.
+        /// </summary>
+        SiteBuiltAgainBeforeDeploying,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -918,6 +930,7 @@ public static class ActivityTrail
         Event.SwiftCouldNotBeGotReady => "Swift could not be got ready",
         Event.ProblemsChanged => "problems changed",
         Event.AskedAnAssistantToFixProblems => "asked an assistant to fix problems",
+        Event.SiteBuiltAgainBeforeDeploying => "site built again before deploying",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -983,6 +996,33 @@ public static class ActivityTrail
     /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
     public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
         $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
+
+    /// <summary>
+    /// The words of <c>site built again before deploying</c> after the course
+    /// and section, which <see cref="Note(Event, string, string, int, DateTime?)"/>
+    /// puts in front: the contract's <c>line</c> with <c>whyWords</c> for
+    /// <paramref name="reason"/>, or <c>lineWhenItHadNotBeenBuilt</c> for
+    /// <c>neverBuilt</c>. A reason the contract does not name gets the
+    /// toolchain's words, which is what deploy.ps1 says for a check that
+    /// failed, never a sentence of its own. Pinned against the contract by
+    /// <c>BuiltBeforeDeployingTrailTests</c>.
+    /// </summary>
+    public static string BuiltBeforeDeployingWords(string reason) => reason switch
+    {
+        "neverBuilt" => "built the website before deploying it — it had not been built yet",
+        _ => "built the website again before deploying it — " + reason switch
+        {
+            "pages" => "something in the course had changed since it was last built",
+            "preview" => "the last build was made by a preview",
+            "clock" => "its last build was dated later than now, so the computer's clock had changed",
+            "frontPageUnreadable" => "its front page could not be read",
+            _ => "Plantoir had been updated since it was last built",
+        },
+    };
+
+    /// <summary>Writes <c>site built again before deploying</c> for one build.</summary>
+    public static void NoteBuiltBeforeDeploying(string course, int section, string reason) =>
+        Note(Event.SiteBuiltAgainBeforeDeploying, BuiltBeforeDeployingWords(reason), course, section);
 
     public static void NoteLaunch()
     {
