@@ -7413,7 +7413,8 @@ it (#627, 2026-10-23): Obsidian does the same here, on 1.13.7 and 1.14.4, and
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
 SHA-256 and address from `obsidianAddOnsForFigures.addOns` with
-`/usr/bin/plutil` (21 ms on the 1.7 MB contract) and carries no pin of its own
+`/usr/bin/jq` (see "Why the fetch reads the contract with jq (#864)" below)
+and carries no pin of its own
 (`ObsidianFigureAddOnsTests.testTheFetchScriptCarriesNoPinOfItsOwn`); a
 mismatch installs nothing; its cache is outside the repository like
 fetch-helpers.sh's. `project.yml` carries `Vendor/obsidian-addons` as
@@ -7426,6 +7427,50 @@ JavaScript and CSS, so nothing to sign beyond the app's seal. Not in
 `support/`: everything there is hashed into the image tag and mirrored into
 `.toolchain/`. At install time the app hashes the files it is about to write
 against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
+
+**Why the fetch reads the contract with jq (#864).** The script read the
+contract with `/usr/bin/plutil -extract` until 2026-11-13. plutil refuses a
+whole JSON file that holds an escaped NUL anywhere in it ("Unsupported
+escaped (unicode) null"), and #780's cases put eight `\u0000` escapes into
+`shared-rules.json` on 2026-11-12, where they stay because they are what
+those cases test. From then on the script read nothing, said the contract
+had no `obsidianAddOnsForFigures.addOns`, and exited 1. That stopped a fresh
+clone or worktree (no `Vendor/obsidian-addons`, so `xcodegen generate`
+fails) and also every machine that already had the folder, because the
+"already in place" check reads the pins first: `publish.sh` runs the script
+under `set -e` before it generates the project, so a release build stopped
+there too. No suite ran the script, so no suite saw it. Measured on macOS
+26.6: of the ten contract files, `plutil -convert json` refuses only
+`shared-rules.json`. Both plutil and jq refuse a lone surrogate escape
+(`\ud800`), which no contract holds; the test below would catch one.
+
+The reader is now `/usr/bin/jq` (jq-1.7.1-apple, in the system volume),
+which macOS has shipped since macOS 15; the Xcode this project builds with
+(26 or later, `mac-app/README.md`) needs macOS 15.6 or later. It reads the escaped NUL as JSON says, 29 ms a
+read on the contract against plutil's 21 ms; all seven pins in about one
+second. `--print-pins` runs the reading step alone and prints what it read,
+one tab-separated line per file, fetching and installing nothing.
+`scripts/test_fetch_obsidian_addons.py` runs it against the real contract
+and compares every line with Python's own reading of the file, so the next
+character a reader refuses fails a suite rather than a new machine; it
+skips where there is no `/usr/bin/jq`, Windows included. Rejected:
+
+- **`sed 's/\\u0000/\\u0001/g' | plutil … -`** works on any macOS and keeps
+  the JSON valid whatever the escapes stand next to, but it edits the text
+  before reading it, fixes only the one character met so far, and leaves a
+  reader that is not reading the file as written.
+- **`/usr/bin/python3`** is only a stub until the developer tools are
+  installed, and the script's rule is that nothing but macOS is needed.
+- **`perl -MJSON::PP`** is on every Mac and reads the file, but at 0.67 s a
+  read it would take most of a minute across the script's reads.
+- **`osascript -l JavaScript`** was ruled out before measuring: osascript
+  is not run on this machine during unattended work.
+
+Windows' `fetch-obsidian-addons.ps1` reads the same file with
+`ConvertFrom-Json` (PowerShell 7) or `JavaScriptSerializer` (5.1). Neither
+was run here, since this Mac has no PowerShell. Both are documented to
+decode `\u0000` into a character rather than refuse it, so no Windows issue
+was opened; a Windows run of the script on the current contract confirms it.
 
 **The sequence** (`obsidianAddOnsForFigures.sequence`, the route
 `WorkspaceModel.openInObsidian(course:sectionNumber:)` in
