@@ -35921,6 +35921,701 @@
         "the date range beside each unit in the popup: the plan page shows its dates, and a date written in a menu would need its own rule on both platforms",
         "JavaScript on: the template needs none, and a plan's page that ran scripts could do more than the three guards can see"
       ]
+    },
+    "share": {
+      "rule": "Share (#709): the course's unit plans go to Cloudflare Pages as a small website of their own, one per school year, open to anyone with the address or protected by a username and password, from the Planning tab's share bar (mac first). deploy.sh <CODE> --plans runs scripts/share_plan.py, which checks the planning folder (checkKinds), stages it by allowlist (stageCases), creates or reuses the year's project (names), sets fail closed and reads it back (failClosed), deploys, proves the address answers as this share promises before saying it is shared (proof), deletes every older deployment (oldDeployments), and writes the year's marker (markerFile). Stop Sharing deletes the year's project. Nothing about a plan is ever sent to Netlify, and the local assistant has no tool that shares one.",
+      "host": {
+        "value": "cloudflare_pages",
+        "why": "Russell, 2026-11-12: Cloudflare Pages only. Netlify's free plan has no password protection, so a protected plan could not be promised there; a Pages project can run a small program (_worker.js) that asks for the username and password before any file is sent, and the teacher's existing Pages: Edit token makes it.",
+        "rejected": [
+          "Netlify, in any form, including probing a site for password protection and refusing on a free plan (707d, dropped 2026-11-12)",
+          "both hosts at once (Russell, 2026-11-01: one host)",
+          "Cloudflare Access: set up in the dashboard, an email PIN, not makeable with the teacher's token, and its preview-only switch does not cover *.pages.dev"
+        ]
+      },
+      "checkKinds": [
+        "noPlans",
+        "badSlug",
+        "excludedName",
+        "unitNotListed",
+        "brokenLink",
+        "externalUrl",
+        "noNoindex",
+        "wrongSheet",
+        "missingClass",
+        "noRobots",
+        "tooLarge"
+      ],
+      "checkKindsWhy": "Each is a rule the plantoir-unit-planning skill already asks an assistant to keep (its section 10), checked again before anything leaves the Mac, because a broken plan shared is a broken plan a colleague opens. externalUrl is about what a page LOADS (a stylesheet, a script, an image, a frame, a font, an @import or url()): a link a reader clicks to a page on the web is allowed, as the Planning tab's navigationCases allow it.",
+      "checkCases": {
+        "rule": "Each case starts from the skill's template (support/agent_guidance/skills/plantoir-unit-planning/template) copied as a planning folder, applies `change`, and expects exactly the problem kinds `expect`, in checkKinds order (an empty list is a plan that shares).",
+        "cases": [
+          {
+            "name": "the template as it ships",
+            "change": {},
+            "expect": []
+          },
+          {
+            "name": "no unit folder",
+            "change": {
+              "remove": [
+                "unit"
+              ]
+            },
+            "expect": [
+              "noPlans",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a unit folder with a capital letter",
+            "change": {
+              "rename": {
+                "unit": "Unit-1"
+              }
+            },
+            "expect": [
+              "noPlans",
+              "badSlug",
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a folder a backup leaves out",
+            "change": {
+              "write": {
+                "unit/build/note.txt": "x"
+              }
+            },
+            "expect": [
+              "excludedName"
+            ]
+          },
+          {
+            "name": "a second unit the list of plans does not name",
+            "change": {
+              "copy": {
+                "unit": "unit-2"
+              }
+            },
+            "expect": [
+              "unitNotListed"
+            ]
+          },
+          {
+            "name": "a link to a PDF that is not there",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Missing%20Sheet.pdf\">x</a>"
+              }
+            },
+            "expect": [
+              "brokenLink"
+            ]
+          },
+          {
+            "name": "a link to a PDF with a space and a comma that is there",
+            "change": {
+              "write": {
+                "unit/pdfs/Quiz 1, Part A.pdf": "%PDF-1.4"
+              },
+              "append": {
+                "unit/index.html": "<a href=\"pdfs/Quiz%201%2C%20Part%20A.pdf\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a stylesheet from the internet",
+            "change": {
+              "append": {
+                "unit/index.html": "<link rel=\"preload\" href=\"https://fonts.example.org/a.css\">"
+              }
+            },
+            "expect": [
+              "externalUrl"
+            ]
+          },
+          {
+            "name": "a link a reader clicks to a page on the web",
+            "change": {
+              "append": {
+                "unit/index.html": "<a href=\"https://www.example.org/curriculum\">x</a>"
+              }
+            },
+            "expect": []
+          },
+          {
+            "name": "a page with no robots meta",
+            "change": {
+              "replace": {
+                "unit/correlation.html": [
+                  "<meta name=\"robots\" content=\"noindex, nofollow\">",
+                  ""
+                ]
+              }
+            },
+            "expect": [
+              "noNoindex"
+            ]
+          },
+          {
+            "name": "a plan page linking no stylesheet",
+            "change": {
+              "replace": {
+                "unit/index.html": [
+                  "href=\"../assets/plan.css\"",
+                  "href=\"../assets/other.css\""
+                ]
+              }
+            },
+            "expect": [
+              "brokenLink",
+              "wrongSheet"
+            ]
+          },
+          {
+            "name": "a class the sheet has no rule for",
+            "change": {
+              "append": {
+                "unit/index.html": "<p class=\"invented-class-name\">x</p>"
+              }
+            },
+            "expect": [
+              "missingClass"
+            ]
+          },
+          {
+            "name": "robots.txt missing",
+            "change": {
+              "remove": [
+                "robots.txt"
+              ]
+            },
+            "expect": [
+              "noRobots"
+            ]
+          },
+          {
+            "name": "robots.txt with CRLF line endings is still the two lines",
+            "change": {
+              "write": {
+                "robots.txt": "User-agent: *\r\nDisallow: /\r\n"
+              }
+            },
+            "expect": []
+          }
+        ]
+      },
+      "stage": {
+        "allowedSuffixes": [
+          ".html",
+          ".css",
+          ".woff2",
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
+        ],
+        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). A protected share adds _worker.js and no _headers; an open share adds _headers (X-Robots-Tag) and no _worker.js.",
+        "why": "An allowlist rather than a list of what to leave out: a teacher's plan.json, a .tex, an .htaccess or .htpasswd, and a _headers, _redirects, _routes.json or _worker.js of their own (which Cloudflare would obey) are never uploaded, and a new kind of file is left out until somebody decides it belongs."
+      },
+      "stageCases": {
+        "rule": "Each case stages the template with `add` written into it first, with `includeAnswerKeys` as given and the app's assets standing in for the plan's, and expects every path in `copied` to be in the staged folder, every path in `notCopied` not to be, and `answerKeysLeftOut` answer keys counted.",
+        "cases": [
+          {
+            "name": "an open share leaves an answer key out",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf",
+              "unit/pdfs/Quiz 1.pdf"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/pdfs/Quiz 1.pdf",
+              "404.html",
+              "robots.txt",
+              "index.html",
+              "unit/index.html",
+              "unit/correlation.html",
+              "assets/plan.css"
+            ],
+            "notCopied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "answerKeysLeftOut": 1
+          },
+          {
+            "name": "a protected share keeps it",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "includeAnswerKeys": true,
+            "copied": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own host files and notes never go",
+            "add": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "unit/plan.json"
+            ],
+            "notCopied": [
+              "_worker.js",
+              "_headers",
+              "_redirects",
+              ".htaccess",
+              "unit/.htpasswd",
+              "unit/notes.tex",
+              "unit/data.json",
+              "unit/plan.json"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "a folder a backup leaves out is not copied",
+            "add": [
+              "unit/node_modules/a.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [],
+            "notCopied": [
+              "unit/node_modules/a.html"
+            ],
+            "answerKeysLeftOut": 0
+          },
+          {
+            "name": "the teacher's own 404.html is replaced",
+            "add": [
+              "404.html"
+            ],
+            "includeAnswerKeys": false,
+            "copied": [
+              "404.html"
+            ],
+            "notCopied": [],
+            "answerKeysLeftOut": 0
+          }
+        ],
+        "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
+      },
+      "answerKeys": {
+        "rule": "A .pdf is an answer key when its name without .pdf, compared without case, ends in one of `endings` or is one of `wholeNames`. These are the names the plantoir-handouts and plantoir-test-authoring skills give answer keys (Name - Answers.pdf, Version A - Solutions.pdf, Name - with Answers.pdf, Marking Guide.pdf). Nothing else is guessed at, so a teacher can predict the rule.",
+        "endings": [
+          " - Answers",
+          " - Solutions",
+          " - with Answers",
+          " - with Solutions"
+        ],
+        "wholeNames": [
+          "Marking Guide"
+        ],
+        "why": "Russell, 2026-11-12: a share with no password leaves out solutions and answer-key PDFs unless the teacher ticks Include Answer Keys; a protected share includes them.",
+        "cases": [
+          {
+            "name": "Quiz 1 - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit Test - Version A - Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Review - with Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Review - with Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Worksheet 3 - Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "quiz 1 - solutions.PDF",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions Manual Notes.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answers.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Worksheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 - Solutions.tex",
+            "answerKey": false
+          },
+          {
+            "name": "Marking Guide - Draft.pdf",
+            "answerKey": false
+          }
+        ]
+      },
+      "worker": {
+        "rule": "A protected share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged). It keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once. Without the right Authorization it answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\", X-Robots-Tag and Cache-Control: no-store, for every path, robots.txt and a missing path included. With it, /_worker.js answers 404 and everything else is the static file with X-Robots-Tag: noindex, nofollow and Cache-Control: private.",
+        "why": "Salted SHA-256 rather than a slow hash: the worker's source is readable only inside the teacher's Cloudflare account, and the password is one made for colleagues, not the teacher's own (the dialog says so). PBKDF2 at 100,000 iterations measured 16.1 ms against a 10 ms CPU limit; at about 10,000, 2.0 ms, the upgrade if that ever changes. Measured: the static file server answers /_worker.js with 404, not the source, so even a bypassed worker does not hand out the salt and hash."
+      },
+      "workerCases": {
+        "rule": "Run under node against the worker written for username `colleague` and password `correct horse 7`, with a stand-in ASSETS that answers 200 for every path. `auth` is none, wrong or right.",
+        "cases": [
+          {
+            "path": "/",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true,
+            "robotsTag": true
+          },
+          {
+            "path": "/",
+            "auth": "wrong",
+            "status": 401,
+            "basicChallenge": true,
+            "robotsTag": true
+          },
+          {
+            "path": "/",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false,
+            "robotsTag": true
+          },
+          {
+            "path": "/unit/pdfs/Quiz%201%2C%20Solutions.pdf",
+            "auth": "right",
+            "status": 200,
+            "basicChallenge": false,
+            "robotsTag": true
+          },
+          {
+            "path": "/robots.txt",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true,
+            "robotsTag": true
+          },
+          {
+            "path": "/_worker.js",
+            "auth": "none",
+            "status": 401,
+            "basicChallenge": true,
+            "robotsTag": true
+          },
+          {
+            "path": "/_worker.js",
+            "auth": "right",
+            "status": 404,
+            "basicChallenge": false,
+            "robotsTag": true
+          }
+        ]
+      },
+      "openHeaders": "/*\n  X-Robots-Tag: noindex, nofollow\n",
+      "schoolYear": {
+        "rolloverMonth": 8,
+        "rule": "One plan site per school year (Russell, 2026-11-12). The year is the calendar year the school year starts in, rolling over on 1 August, as SchoolYear.startingYear on the mac and Timetable.AcademicYearStarting on Windows; it is written in a name as its label, 2026-27.",
+        "cases": [
+          {
+            "day": "2026-07-31",
+            "year": 2025,
+            "label": "2025-26"
+          },
+          {
+            "day": "2026-08-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2026-12-31",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2027-01-01",
+            "year": 2026,
+            "label": "2026-27"
+          },
+          {
+            "day": "2099-09-01",
+            "year": 2099,
+            "label": "2099-00"
+          }
+        ]
+      },
+      "names": {
+        "maxLength": 58,
+        "suffixLength": 8,
+        "rule": "<code>-plans-<year label>-<surname>-<suffix>, lowercase letters, digits and dashes, at most maxLength characters (Cloudflare refuses 59, a capital and an underscore with code 8000003, measured). The suffix is suffixLength characters from a-z and 0-9, on EVERY plan site, protected or not (Russell, 2026-11-12), so the address never changes when a password is added or removed. The suffix is never cut: the surname is shortened first, then dropped, and only then the code. A name Cloudflare says is taken in this account (409, code 8000002) gets a new suffix, at most three tries. The address is always read from the project's `subdomain`, never built from the name: Cloudflare may add characters to a name taken elsewhere.",
+        "cases": [
+          {
+            "code": "MPM2D",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "k3x9qa8m",
+            "name": "mpm2d-plans-2026-27-gordon-k3x9qa8m"
+          },
+          {
+            "code": "AP CALC",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "abcd1234",
+            "name": "ap-calc-plans-2026-27-gordon-abcd1234"
+          },
+          {
+            "code": "ICS3U",
+            "year": 2027,
+            "surname": null,
+            "suffix": "zz99yy88",
+            "name": "ics3u-plans-2027-28-zz99yy88"
+          },
+          {
+            "code": "SNC2D",
+            "year": 2026,
+            "surname": "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop",
+            "suffix": "a1b2c3d4",
+            "name": "snc2d-plans-2026-27-abcdefghijklmnopqrstuvwxyzabc-a1b2c3d4"
+          },
+          {
+            "code": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP",
+            "year": 2026,
+            "surname": "gordon",
+            "suffix": "q1w2e3r4",
+            "name": "abcdefghijklmnopqrstuvwxyzabcdefghi-plans-2026-27-q1w2e3r4"
+          },
+          {
+            "code": "ENG4U",
+            "year": 2099,
+            "surname": "côté",
+            "suffix": "00000000",
+            "name": "eng4u-plans-2099-00-ct-00000000"
+          }
+        ],
+        "note": "The last case is the name part's own rule (letters and digits only); deploy.py's sanitize_last_name has already folded côté to cote before it is saved, so a real surname never reaches it with an accent."
+      },
+      "modeCases": {
+        "rule": "Whether a share is protected, from the year's marker (`protected`, or absent) and the flag given. Protection is sticky: a share with neither flag keeps what the marker says, and only --remove-password opens a protected site.",
+        "cases": [
+          {
+            "marker": null,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": null,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": false,
+            "flag": null,
+            "protected": false
+          },
+          {
+            "marker": false,
+            "flag": "--protect",
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": null,
+            "protected": true
+          },
+          {
+            "marker": true,
+            "flag": "--remove-password",
+            "protected": false
+          },
+          {
+            "marker": true,
+            "flag": "--protect",
+            "protected": true
+          }
+        ]
+      },
+      "warningCases": {
+        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
+        "cases": [
+          {
+            "marker": null,
+            "choice": "shareOpen",
+            "warn": true
+          },
+          {
+            "marker": null,
+            "choice": "shareProtected",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "shareAgain",
+            "warn": false
+          },
+          {
+            "marker": true,
+            "choice": "removePassword",
+            "warn": true
+          },
+          {
+            "marker": true,
+            "choice": "changePassword",
+            "warn": false
+          },
+          {
+            "marker": false,
+            "choice": "addPassword",
+            "warn": false
+          }
+        ]
+      },
+      "failClosed": {
+        "rule": "On EVERY share, open or protected (the director's ruling, 2026-11-12: it costs one call, and a later protected share never runs with the default), PATCH /accounts/{account}/pages/projects/{name} with {\"deployment_configs\":{\"production\":{\"fail_open\":false},\"preview\":{\"fail_open\":false}}}, then GET the project. failClosed is true only when the GET shows false on BOTH environments. A PATCH or GET that fails records failClosed false and the share goes on: the teacher reads words.floodOpen beside a protected address, and the random suffix is the fallback (Russell, 2026-11-01, refined). A new project is also created with the same deployment_configs in its POST.",
+        "measured": "2026-11-12 on the teacher's free account with the teacher's Pages: Edit token: a new project starts with fail_open true on both; the PATCH answers 200 and a GET shows false on both, nothing else changed; it survives every later deploy; a malformed PATCH answers 400 (8000006) and changes nothing.",
+        "notMeasured": "The flood itself (ruled out by Russell). That the API's deployment_configs.*.fail_open IS the dashboard's Settings > Runtime > Fail open / closed is inferred from its name, its per-environment place, and its default of true; the API reference still describes it as 'Whether to fail open when the deployment config cannot be applied'. words.floodClosed therefore says what Cloudflare's own page says fail closed does, no more.",
+        "documentation": [
+          {
+            "page": "developers.cloudflare.com/pages/functions/routing/",
+            "updated": "2026-09-18",
+            "says": "\"Fail open\" means that static assets will continue to be served, even if Pages Functions would ordinarily have run first. \"Fail closed\" means an error page will be returned, rather than static assets."
+          },
+          {
+            "page": "developers.cloudflare.com/pages/functions/pricing/",
+            "updated": "2026-09-08",
+            "says": "The free plan daily request limit resets at midnight UTC."
+          },
+          {
+            "page": "developers.cloudflare.com/workers/platform/limits/",
+            "updated": "2026-10-29",
+            "says": "Accounts on the Workers Free plan have a daily request limit of 100,000 requests, resetting at midnight UTC."
+          }
+        ]
+      },
+      "proof": {
+        "rule": "Nothing is called shared until the address answers as the share promises. Fetched without a password every 2 s for up to 60 s: a protected share needs 401 with a WWW-Authenticate: Basic header, then 200 with the password, and the project's canonical_deployment.uses_functions true; an open share needs 200. A protected share that fails any of these by 60 s is refusals.notProtectedYet, the marker records protected false, and the address is not shown as protected.",
+        "measured": "The main address answered the new deployment 0.2 to 2.2 s after wrangler returned, every time (2026-11-12); one open re-share still met the old protected deployment for 2.2 s."
+      },
+      "oldDeployments": {
+        "rule": "After the proof, every deployment of the project but the canonical one is deleted (GET .../deployments, then DELETE .../deployments/{id}?force=true). A delete that fails: the plans are shared as asked, refusals.oldCopyStillThere is said, the marker keeps oldCopies, and the next share tries again.",
+        "why": "Measured 2026-11-12 (S3): every deploy is also a deployment with an address of its own, and after an open share was re-shared protected, the OLD open deployment's own address still served the list of plans and a PDF with 200 and no password, while the main address answered 401. After its delete the old address answered 404 within 10 s (S4). The active production deployment cannot be deleted (400, 8000034)."
+      },
+      "markerFile": {
+        "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
+        "keys": [
+          "name",
+          "subdomain",
+          "address",
+          "year",
+          "protected",
+          "failClosed",
+          "answerKeys",
+          "lastShared",
+          "units",
+          "oldCopies"
+        ],
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `answerKeys` is in or out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded."
+      },
+      "credential": {
+        "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a file only the user can read (/tmp/plan_cred), which share_plan.py deletes as soon as it has read it. Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
+        "usernamePattern": "^[A-Za-z0-9._-]{1,32}$",
+        "passwordRule": "8 to 64 printable ASCII characters (space to ~)"
+      },
+      "stopSharing": {
+        "rule": "--plans --stop-sharing [--year YYYY] deletes the year's project (DELETE .../pages/projects/{name}); a 404 is alreadyGone. If the delete is refused, the deployments are deleted one by one and it is tried once more. Success removes the marker; failure keeps it and the teacher reads words.stopFailed.",
+        "measured": "2026-11-12: a project holding 2 deployments deleted with 200 and nothing deleted first; the address answered 530 or 522 within 5 s, stopped resolving after about 100 s, and never answered 200 again in 3 minutes. A deleted project's *.pages.dev name could later be taken by another account; the suffix makes that a matter of chance, not of guessing (not measured: it needs a second account)."
+      },
+      "markers": {
+        "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n>",
+        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>]",
+        "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed>",
+        "rule": "Printed by share_plan.py for the app to read and keep out of the console (app-rules.json -> markerOrigins, origin shared-python). <CODE+> is the course with its one permitted space written +, as every other marker writes it."
+      },
+      "words": {
+        "sharedThroughCloudflare": "Unit plans are shared as a small website of their own on Cloudflare Pages, one for each school year.",
+        "netlifyTeacher": "Your class websites go to Netlify, but unit plans are shared through Cloudflare Pages, because Netlify's free plan cannot ask for a password. The first time, you will be asked for a Cloudflare token.",
+        "protect": "Protect with a Username and Password",
+        "includeAnswerKeys": "Include Answer Keys",
+        "share": "Share Unit Plans",
+        "shareAgain": "Share Again",
+        "changePassword": "Change Password…",
+        "addPassword": "Add a Password…",
+        "removePassword": "Remove Password…",
+        "stopSharing": "Stop Sharing",
+        "copyLink": "Copy Link",
+        "withPassword": "Shared with a username and password.",
+        "openToAnyone": "Open to anyone with the address.",
+        "lastShared": "Last shared {when}.",
+        "answerKeysLeftOut": "{n} answer key(s) left out. Protect the plans with a password, or tick Include Answer Keys, to share them.",
+        "crawlerWarningTitle": "Share without a password?",
+        "crawlerWarning": "Anyone with the address can open these plans{answerKeysClause}. Plantoir asks search engines and AI crawlers not to read or keep them, but they can ignore that, so treat anything here as possibly searchable. To require a password, choose Protect with a Username and Password.",
+        "answerKeysClause": ", including the answer keys you chose to include",
+        "shareAnyway": "Share Without a Password",
+        "floodClosed": "If someone floods this address with requests, Cloudflare closes the plans until midnight UTC rather than opening them.",
+        "floodOpen": "Cloudflare did not accept the setting that keeps the plans closed if this address is flooded with requests. If that happened, anyone with the address could open the plans until midnight UTC. The address ends in random letters, so it is hard to guess.",
+        "stopTitle": "Stop sharing the {year} unit plans?",
+        "stopMessage": "The address {address} stops working within a minute, and anyone you gave it to can no longer open the plans. Your plans stay on this Mac.",
+        "stopFailed": "Plantoir could not stop sharing these plans, so the address still works. Try Stop Sharing again in a few minutes.",
+        "notSharedHere": "This page is not shared at this address.",
+        "earlierYear": "{year}: {address}",
+        "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with."
+      },
+      "refusals": {
+        "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",
+        "tooLarge": "These plans were not shared, because a file in them is larger than the 25 MB Cloudflare Pages takes.",
+        "noPassword": "These plans were not shared, because no username and password were given for them.",
+        "notProtectedYet": "These plans were sent, but Plantoir could not confirm that the address asks for the password, so they are not shown as protected. Share Again in a minute.",
+        "oldCopyStillThere": "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more.",
+        "stillSharing": "These unit plans are already being shared, so they cannot be shared again until that has finished.",
+        "notToAFolder": "Unit plans are shared through Cloudflare Pages, not to a folder.",
+        "netlifyNever": "Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password.",
+        "referenceCourse": "referenceCourses.refusal.sentence, unchanged"
+      },
+      "trail": {
+        "rule": "Three events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."
+      },
+      "rejected": [
+        "one site per course with no year (707c's assumption; Russell, 2026-11-12: one per school year)",
+        "the random suffix only on open sites (Russell, 2026-11-12: on every plan site)",
+        "the address built from the project name: subdomain can differ",
+        "leaving old deployments up: each keeps an address of its own, measured serving an open copy after a protected share",
+        "a share without --protect removing the password: protection is sticky, and only --remove-password drops it, after the warning",
+        "functions/_middleware.js instead of _worker.js: wrangler takes functions/ from the folder it runs in, not the uploaded one",
+        "PBKDF2 at 100,000 iterations: 16.1 ms against a 10 ms CPU limit",
+        "the credential in argv (beyond the Keychain store's instant), an environment variable, a file under courses/, or the marker",
+        "staging under the builds root: a temp folder in the website builder is never backed up and needs no link",
+        "a new work-lease kind for sharing: publish already means sending something somewhere to every reader of a lease",
+        "the account id or project id in the marker: every call is by name",
+        "answer keys guessed from other words in a file name (Solutions Manual Notes.pdf): only the skills' own endings count",
+        "deploy.py --plans: its --section is required and the plans path shares none of its section logic",
+        "a share tool for the local assistant or an MCP client: it would move the tool surface, and sharing is the teacher's act",
+        "a flood test on any account (Russell, 2026-11-12)"
+      ]
     }
   },
   "assessment": {
