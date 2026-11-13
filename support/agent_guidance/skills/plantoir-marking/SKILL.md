@@ -229,11 +229,11 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `5be7e47615d1d2e5a8fa84cf4b2ec4aa992aae0e3b7b379a0aeebe512ff7de28`  teacher_only.py
-- `397cce4b157cbd784a96e2b98cec675d68643972ca98caea6d9010887fb84fea`  Box the papers.command
-- `d6baba282ccb7a492aaa3adc5ae8f6fd4ea1f7a6ae1ac3af29386503c42caf43`  Put names on the sheets.command
-- `e51f3ba250d251a558194b952e9bde15906fc1530806d69cad812e20671542b9`  Box the papers.bat
-- `10b05d259082beb3c794c87f64db953106fba313ca41fc5e8cd950f18a0db13e`  Put names on the sheets.bat
+- `cc5f8cb850cfe07f6445391cac90797ee890772bf2e4d0537af63a6651224ebc`  teacher_only.py
+- `b2ae569d1ce347b3636497e205f7fe9c7446cb82713c61a21526ddd4ea751800`  Box the papers.command
+- `11b1e23c41f89d9118473280008e134afb00a58f043c291022915bc8eea3dcff`  Put names on the sheets.command
+- `e82aa624e48b42a213dfe73fb0d409477ae79a7a936c9d4fe3045e8c25f77d81`  Box the papers.bat
+- `a9099a6c40f8335f3092aed9ffb50b9bd98400a2864de13c1f2bc6b58136a0ee`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do

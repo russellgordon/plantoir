@@ -8,6 +8,15 @@ a .bat on Windows) check its SHA-256 and the runner's before they run it, and th
     python3 -I -B teacher_only.py box MARKING_FOLDER       (run by "Box the papers", in the teacher's window)
     python3 -I -B teacher_only.py names MARKING_FOLDER     (run by "Put names on the sheets")
     python3 -I -B teacher_only.py --verify "<marking folder>/<Assessment>"   (the assistant, before any read)
+    python3 -I -B teacher_only.py --tidy "<marking folder>/<Assessment>" [--look-in FOLDER ...]
+                                                           (the assistant, before it calls marking finished)
+
+Since the second trial (750d, 2026-11-13): Box the papers prints the four privacy points in its own window and
+takes the teacher's yes to them before it asks for the folder, and records that they were shown (an assistant
+did not say them in two runs); the teacher's notes for report comments are kept in the teacher-only folder and
+reach the marking folder only as a checked copy this file writes (an assistant read the notes before the name
+check had run); and --tidy looks in the system's temporary folders for copies of this assessment's papers and
+sheets (an assistant rendered every boxed paper into /tmp).
 
 #750, piece 750d. Russell, 2026-11-12: "script runs, teacher checks the papers, confirms names are redacted,
 then agent based marking begins. Simple." Six trials found an assistant's FIRST command could list the
@@ -79,6 +88,13 @@ QUARANTINE = "Quarantine"
 REDACTED = "Redacted"
 COMBINED = "Redacted papers to look through.pdf"
 RECORD = "Teacher looked.json"
+POINTS_RECORD = "Privacy points shown.json"
+NOTES = "Teacher Notes.md"
+CHECKED_NOTES = "Teacher Notes (checked).md"
+CHECKED_MARK = "<!-- Checked by Put names on the sheets"
+WORK = "Work"
+LAST_STOP = " - last stop.txt"
+ASK_POINTS = "Type yes when you have read these four points, or no to stop: "
 IDENTIFIER = re.compile(r"^Student [A-Z]{1,2}$")
 SECTION = re.compile(r"^Section \d+$")
 NO_OPEN = "PLANTOIR_MARKING_NO_OPEN"     # set by every test and harness: nothing is opened and no chooser is shown
@@ -297,12 +313,46 @@ def papers_of_a_batch(holding):
     return papers
 
 
+def points_text():
+    return PRIVACY_HEADING + "\n" + "\n".join(f"{number}. {point}" for number, point in enumerate(PRIVACY_POINTS, start=1))
+
+
+def show_the_privacy_points(folder, ask, say):
+    """The four points, word for word, in the teacher's own window, and the teacher's yes to them, recorded in
+    the assessment's folder: whichever assistant the teacher uses, the teacher has seen them before any paper
+    reaches it. A no, or a closed window, stops everything."""
+    say("")
+    say("Your assistant is asked to tell you these four things. Here they are, word for word:")
+    say(points_text())
+    say("")
+    while True:
+        answer = ask(ASK_POINTS)
+        if answer is None or answer.strip().casefold() in ("no", "n"):
+            raise Refusal("the four privacy points were not acknowledged, so nothing was done")
+        if answer.strip().casefold() == "yes":
+            break
+        say("Please type yes or no.")
+    Path(folder).mkdir(parents=True, exist_ok=True)
+    Path(folder, POINTS_RECORD).write_text(json.dumps({
+        "shown": datetime.datetime.now().isoformat(timespec="seconds"),
+        "points": hashlib.sha256(points_text().encode("utf-8")).hexdigest()}, indent=1), encoding="utf-8")
+
+
+def points_were_shown(assessment):
+    try:
+        record = json.loads((Path(assessment) / POINTS_RECORD).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return record.get("points") == hashlib.sha256(points_text().encode("utf-8")).hexdigest()
+
+
 def verify(assessment):
-    """Exit 0 only when '<Assessment>/Redacted' holds exactly the papers the teacher typed yes for."""
+    """Exit 0 only when '<Assessment>/Redacted' holds exactly the papers the teacher typed yes for, after the four
+    privacy points were shown in the teacher's window."""
     assessment = Path(assessment)
     record_path = assessment / RECORD
     now = papers_in(assessment / REDACTED)
-    if record_path.is_file() and now:
+    if record_path.is_file() and now and points_were_shown(assessment):
         try:
             record = json.loads(record_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -703,6 +753,7 @@ def box(marking, ask, say):
         raise Refusal("the blank test is not where your assistant said; ask your assistant. Nothing was done")
     options = box_options(request.get("options"))
     say(f"Box the papers: {assessment}.")
+    show_the_privacy_points(marking / assessment, ask, say)
     teacher_only = ask_for_the_teacher_only_folder(marking, ask, say)
     if inside(blank, teacher_only):
         raise Refusal(f"the blank test must not be in {THE_FOLDER}; ask your assistant. Nothing was done")
@@ -790,11 +841,15 @@ def names_steps(request, marking, teacher_only):
             raise Refusal(f"{NAMES_REQUEST} names a term whose comments folder is not in the marking folder; ask your "
                           "assistant. Nothing was done")
         if kind == "comment-facts":
+            if (marking / folder / NOTES).is_file():
+                if (marking / folder / CHECKED_NOTES).is_file():
+                    os.remove(marking / folder / CHECKED_NOTES)
+                raise Refusal(f"your notes are in '{folder}' in the marking folder, where your assistant could read them "
+                              f"before they are checked. Move '{NOTES}' into a '{folder}' folder in {THE_FOLDER}, then "
+                              "double-click again. Nothing was done")
             steps = [["--longest-first-name", "--table", table]]
-            what = "find the length of the longest first name in your table (a number, never the name)"
-            if (marking / folder / "Teacher Notes.md").is_file():
-                steps.append(["--check-file", str(marking / folder / "Teacher Notes.md"), "--table", table])
-                what += ", and check your Teacher Notes for any word from your table (by line number only)"
+            what = ("find the length of the longest first name in your table (a number, never the name), and check "
+                    f"'{folder}/{NOTES}' in {THE_FOLDER}, if you wrote one, before a copy of it is given to your assistant")
             return what, False, steps
         limit = request.get("limit")
         count = request.get("count", "characters")
@@ -841,12 +896,134 @@ def names(marking, ask, say):
         code = run_and_say(runner_command(teacher_only, marking, [sys.executable, "-B", str(script)] + arguments),
                            teacher_only, say, said)
         worst = max(worst, code)
+    if request.get("do") == "comment-facts":
+        worst = max(worst, release_the_notes(teacher_only, marking, f"{request['term']} Comments", say, said))
     line = (f"Done. What it said is in '{NAMES_SAID}' in the marking folder, for your assistant to read. Nothing in "
             f"{THE_FOLDER} is shown to your assistant.")
     say(line)
     said.append("Done.")
     write_what_it_said(marking / NAMES_SAID, said, teacher_only)
     return worst
+
+
+def the_name_comparison():
+    """The runner's own comparison (pinned beside this file, checked by the launcher), so the decision to release
+    the teacher's notes is made by never-adapted code."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("run_with_names_pinned", str(RUNNER))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def release_the_notes(teacher_only, marking, folder, say, said):
+    """The teacher's notes, kept in the teacher-only folder, reach the marking folder only as a checked copy that
+    begins with a record of the check and the SHA-256 of the notes it came from. Any old copy goes first, so a
+    copy that exists is a copy of notes that passed. Returns 0, or 1 when the notes hold a word from the table."""
+    source = teacher_only / folder / NOTES
+    checked = marking / folder / CHECKED_NOTES
+    if checked.exists() or checked.is_symlink():
+        os.remove(checked)
+    if not source.is_file():
+        line = f"No '{NOTES}' in '{folder}' in {THE_FOLDER}, so no notes were given to your assistant."
+        say(line)
+        said.append(line)
+        return 0
+    runner = the_name_comparison()
+    try:
+        text = source.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        raise Refusal(f"your notes could not be read as text; save '{NOTES}' as plain text and double-click again")
+    names = runner.tokens_from(runner.read_rows(teacher_only / TABLE))
+    lines = text.splitlines()
+    held = []
+    for number, line in enumerate(lines, start=1):
+        if runner.holds_any_form(line, names):
+            held.append(number)
+    if held:
+        line = (f"A word from your name table is on {len(held)} line(s) of your notes (line "
+                + ", ".join(str(number) for number in held) + "). It may be a name, or an everyday word that is also a "
+                "name. Change those lines, then double-click again. Your notes were NOT given to your assistant.")
+        say(line)
+        said.append(line)
+        return 1
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    record = (f"{CHECKED_MARK}, {datetime.datetime.now().isoformat(timespec='seconds')}: no line holds a word from the "
+              f"name table. SHA-256 of the notes it came from: {digest}. It cannot see a nickname, initials or a name "
+              "that is not in the table. -->")
+    checked.write_text(record + "\n" + text + ("" if text.endswith("\n") else "\n"), encoding="utf-8")
+    line = (f"Your notes held no word from your name table, so a checked copy is in '{folder}/{CHECKED_NOTES}' in the "
+            "marking folder for your assistant. A nickname, initials or a name that is not in your table cannot be "
+            "seen by the check: read your notes once yourself.")
+    say(line)
+    said.append(line)
+    return 0
+
+
+def temporary_folders():
+    found = []
+    for folder in (tempfile.gettempdir(), os.environ.get("TMPDIR", ""), "/tmp", "/private/tmp", "/var/tmp"):
+        if folder and os.path.isdir(folder) and os.path.realpath(folder) not in found:
+            found.append(os.path.realpath(folder))
+    return found
+
+
+def folded_name(text):
+    return re.sub(r"[\W_]", "", text).casefold()
+
+
+def tidy(assessment, look_in):
+    """Look in the system's temporary folders (or those given) for copies of this assessment's papers, sheets and
+    pictures of them, outside the marking folder: by SHA-256 against every file under Redacted, Sheets, Marks and
+    Work, and by name against the assessment's and the marking folder's own names. Prints counts and the folders
+    found, exit 1 when any are there."""
+    assessment = Path(assessment).resolve()
+    marking = assessment.parent
+    targets = {}
+    for part in (REDACTED, "Sheets", "Marks", WORK):
+        for top, _folders, files in os.walk(assessment / part):
+            for name in files:
+                path = Path(top) / name
+                try:
+                    targets.setdefault(path.stat().st_size, set()).add(sha256_of(path))
+                except OSError:
+                    continue
+    slugs = [slug for slug in (folded_name(assessment.name), folded_name(marking.name)) if len(slug) >= 4]
+    roots = [os.path.realpath(folder) for folder in look_in] if look_in else temporary_folders()
+    found = []
+    for root in roots:
+        for top, folders, files in os.walk(root, followlinks=False):
+            here = Path(top)
+            if inside(here, marking):
+                folders[:] = []
+                continue
+            for name in list(folders):
+                if any(slug in folded_name(name) for slug in slugs):
+                    found.append(here / name)
+                    folders.remove(name)
+            for name in files:
+                path = here / name
+                if any(slug in folded_name(name) for slug in slugs):
+                    found.append(path)
+                    continue
+                try:
+                    size = path.lstat().st_size
+                    if size in targets and not path.is_symlink() and sha256_of(path) in targets[size]:
+                        found.append(path)
+                except OSError:
+                    continue
+    places = sorted({str(path if path.is_dir() else path.parent) for path in found})
+    if found:
+        print(f"Not finished: {len(found)} copies of this assessment's papers, sheets or pictures of them are outside the "
+              f"marking folder, in {len(places)} folders: " + "; ".join(places) + ". Every copy of student work stays "
+              f"in the marking folder ('{assessment.name}/{WORK}' for anything you make). Remove these, or ask the "
+              "teacher to, and run this again before you call the marking finished.")
+        return 1
+    print(f"No copy of this assessment's papers or sheets found in: " + "; ".join(roots) + ". This looks only there, "
+          "only by the assessment's and the marking folder's names and by identical bytes: a picture rendered from a "
+          "page and named some other way, a copy anywhere else, and anything already sent to the AI service cannot "
+          "be found by it.")
+    return 0
 
 
 # ---------------------------------------------------------------- the command line
@@ -862,12 +1039,23 @@ def interactive_input(prompt):
 def main(arguments):
     if len(arguments) == 2 and arguments[0] == "--verify":
         return verify(arguments[1])
+    if len(arguments) >= 2 and arguments[0] == "--tidy":
+        look_in = []
+        rest = arguments[2:]
+        while rest[:1] == ["--look-in"] and len(rest) >= 2:
+            look_in.append(rest[1])
+            rest = rest[2:]
+        return tidy(arguments[1], look_in)
     if len(arguments) != 2 or arguments[0] not in ("box", "names"):
         print(__doc__)
         return 0
     if not sys.stdin.isatty():
         raise Refusal("this step is for the teacher to run by double-clicking it, in its own window. Nothing was done")
     step = box if arguments[0] == "box" else names
+    title = "Box the papers" if arguments[0] == "box" else "Put names on the sheets"
+    stale = Path(arguments[1], title + LAST_STOP)
+    if stale.is_file():
+        os.remove(stale)   # what a last stop said is about that run only
     return step(arguments[1], interactive_input, print)
 
 
@@ -875,7 +1063,15 @@ if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv[1:]))
     except Refusal as refusal:
-        print(f"Stopped: {refusal}.")
+        stop = f"Stopped: {refusal}."
+        print(stop)
+        print("Tell your assistant this Stopped line, word for word: it holds no name, and it says what to put right.")
+        if len(sys.argv) == 3 and sys.argv[1] in ("box", "names") and os.path.isdir(sys.argv[2]):
+            title = "Box the papers" if sys.argv[1] == "box" else "Put names on the sheets"
+            try:
+                Path(sys.argv[2], title + LAST_STOP).write_text(stop + "\n", encoding="utf-8")
+            except OSError:
+                pass
         sys.exit(1)
     except KeyboardInterrupt:
         print("\nStopped. Nothing more was done.")

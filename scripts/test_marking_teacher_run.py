@@ -193,11 +193,21 @@ class Class:
         return found
 
 
+def teacher(answers, points="yes"):
+    """The teacher at a function-level step: yes (or `points`) to the four privacy points whenever they are
+    asked about, and each of `answers` in turn to everything else; None (the window closed) when they run out."""
+    def ask(prompt):
+        if prompt == teacher_only.ASK_POINTS:
+            return points
+        return answers.pop(0) if answers else None
+    return ask
+
+
 def environment():
     return dict(os.environ, PLANTOIR_MARKING_NO_OPEN="1", PYTHONDONTWRITEBYTECODE="1")
 
 
-def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None):
+def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None, points="yes"):
     """Run argv in a pseudo-terminal with echo off, answering each (prompt, reply) in turn when its prompt has
     been printed. kill_when: when this text is printed, the whole process group is killed. Returns (what was
     printed, exit status, killed)."""
@@ -218,6 +228,7 @@ def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None):
     position = 0
     queue = list(answers)
     killed = False
+    points_answered = 0
     started = time.time()
     while True:
         if time.time() - started > timeout:
@@ -236,6 +247,9 @@ def drive(argv, answers, cwd, kill_when=None, timeout=240, env=None):
         if kill_when is not None and not killed and kill_when in text:
             os.killpg(pid, signal.SIGKILL)
             killed = True
+        if points is not None and not killed and text.count(POINTS_PROMPT) > points_answered:
+            points_answered += 1
+            os.write(descriptor, (points + "\n").encode("utf-8"))
         answered = True
         while answered and queue and not killed:
             answered = False
@@ -262,6 +276,7 @@ def put_names(a_class, answers, kill_when=None):
 
 
 FOLDER_PROMPT = "Drag it into this window"
+POINTS_PROMPT = "Type yes when you have read these four points"
 YES_PROMPT = "Type yes when you have looked through every page"
 CLOSE_PROMPT = "Press Return to close this window"
 
@@ -459,19 +474,51 @@ class PutNamesTests(unittest.TestCase):
         printed, _status, _killed = put_names(self.a_class, [(FOLDER_PROMPT, str(self.a_class.teacher_only)), (CLOSE_PROMPT, "")])
         self.assertIn("Asked: check-table", self.said())
         (self.a_class.marking / "Term 1 Comments").mkdir()
-        (self.a_class.marking / "Term 1 Comments" / "Teacher Notes.md").write_text(
-            "Student A: steady work.\nStudent B: " + CANARIES[3] + " led the group.\n", encoding="utf-8")
+        notes = self.a_class.teacher_only / "Term 1 Comments" / "Teacher Notes.md"
+        notes.parent.mkdir()
+        notes.write_text("Student A: steady work.\nStudent B: " + CANARIES[3] + " led the group.\n", encoding="utf-8")
         self.request({"do": "comment-facts", "term": "Term 1"})
         more, _status, _killed = put_names(self.a_class, [(FOLDER_PROMPT, str(self.a_class.teacher_only)), (CLOSE_PROMPT, "")])
         said = self.said()
         self.assertRegex(said, r"\b14\b", "the longest first name, as a number: " + said)
-        self.assertIn("line 2", said)
+        self.assertIn("(line 2)", said)
+        self.assertFalse((self.a_class.marking / "Term 1 Comments" / teacher_only.CHECKED_NOTES).exists(),
+                         "notes holding a word from the table are not given to the assistant")
         for text in (printed, more):
             for token in (MARKER,) + CANARIES:
                 self.assertNotIn(token.casefold(), text.casefold())
-        # The teacher's own notes hold a name on purpose; nothing else in the marking folder may.
-        leaks = [leak for leak in self.a_class.leaks() if leak[1] != "Term 1 Comments/Teacher Notes.md"]
-        self.assertEqual(leaks, [])
+        self.assertEqual(self.a_class.leaks(), [])
+
+    def test_every_notes_release_case(self):
+        # 750d second trial: an assistant read the notes in the same command that looked for the check's result.
+        # Now the notes are kept in the teacher-only folder, and the marking folder gets only a checked copy.
+        (self.a_class.marking / "Term 1 Comments").mkdir()
+        checked = self.a_class.marking / "Term 1 Comments" / teacher_only.CHECKED_NOTES
+        for case in teacher_run()["notesReleaseCases"]:
+            folder = self.a_class.teacher_only / "Term 1 Comments"
+            folder.mkdir(exist_ok=True)
+            source = (self.a_class.marking if case.get("notesIn") == "marking" else self.a_class.teacher_only) / \
+                "Term 1 Comments" / "Teacher Notes.md"
+            for old in (folder / "Teacher Notes.md", self.a_class.marking / "Term 1 Comments" / "Teacher Notes.md"):
+                if old.exists():
+                    os.remove(old)
+            if case.get("notes") is not None:
+                source.write_text(case["notes"].replace("{name}", CANARIES[3]), encoding="utf-8")
+            self.request({"do": "comment-facts", "term": "Term 1"})
+            printed, _status, _killed = put_names(self.a_class, [(FOLDER_PROMPT, str(self.a_class.teacher_only)),
+                                                                 (CLOSE_PROMPT, "")])
+            self.assertEqual(checked.exists(), case["released"], f"{case}:\n{printed}")
+            if case["released"]:
+                first = checked.read_text(encoding="utf-8").splitlines()[0]
+                self.assertTrue(first.startswith(teacher_only.CHECKED_MARK), first)
+                self.assertIn(hashlib.sha256(source.read_bytes()).hexdigest(), first, "the record carries the notes' hash")
+            if case.get("refused"):
+                self.assertIn("Stopped: your notes are in", printed)
+            for line in case.get("lines", []):
+                self.assertIn(f"(line {line})", printed)
+            self.assertNotIn(CANARIES[3].casefold(), printed.casefold())
+            if case.get("notesIn") == "marking":
+                os.remove(source)
 
     @unittest.skipIf(shutil.which("tectonic") is None, "tectonic not found; the named sheets compile")
     def test_the_named_sheets_go_to_the_teacher_only_folder_on_yes_only(self):
@@ -533,8 +580,7 @@ class ContractCaseTests(unittest.TestCase):
                 a_class = Class(root)
                 answers = [str(a_class.teacher_only)] + list(case["answers"])
 
-                def ask(_prompt):
-                    return answers.pop(0) if answers else None
+                ask = teacher(answers)
 
                 printed = []
                 try:
@@ -563,7 +609,7 @@ class VerifyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             a_class = Class(root)
             answers = [str(a_class.teacher_only), "yes"]
-            teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0), lambda _line: None)
+            teacher_only.box(a_class.marking, teacher(answers), lambda _line: None)
             assessment = a_class.marking / ASSESSMENT
 
             def check():
@@ -602,7 +648,7 @@ class VerifyTests(unittest.TestCase):
                                encoding="utf-8")
             said = []
             answers = [str(a_class.teacher_only)]
-            self.assertEqual(teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None,
+            self.assertEqual(teacher_only.box(a_class.marking, teacher(answers),
                                               said.append), 1)
             self.assertIn("Fill in the paper column", "\n".join(said))
             self.assertTrue((a_class.teacher_only / ASSESSMENT / "Check" / "Papers to name.pdf").is_file())
@@ -612,7 +658,7 @@ class VerifyTests(unittest.TestCase):
                              encoding="utf-8")
             said = []
             answers = [str(a_class.teacher_only), "yes"]
-            self.assertEqual(teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None,
+            self.assertEqual(teacher_only.box(a_class.marking, teacher(answers),
                                               said.append), 0, "\n".join(said))
             redacted = a_class.marking / ASSESSMENT / "Redacted" / "Section 1"
             self.assertEqual(sorted(path.name for path in redacted.iterdir()), ["Student A.pdf", "Student B.pdf"])
@@ -751,7 +797,7 @@ class PathAndStrayWriteTests(unittest.TestCase):
                     printed = []
                     answers = [str(a_class.teacher_only), "yes"]
                     try:
-                        teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None, printed.append)
+                        teacher_only.box(a_class.marking, teacher(answers), printed.append)
                         stopped = False
                     except teacher_only.Refusal as refusal:
                         printed.append(str(refusal))
@@ -779,8 +825,93 @@ class PathAndStrayWriteTests(unittest.TestCase):
             a_class = Class(root)
             answers = ["../" + a_class.teacher_only.name]
             with self.assertRaises(teacher_only.Refusal) as raised:
-                teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None, lambda _line: None)
+                teacher_only.box(a_class.marking, teacher(answers), lambda _line: None)
             self.assertIn("full path", str(raised.exception))
+
+
+@unittest.skipIf(MISSING, "Poppler is not installed here; these cases box papers")
+class SecondTrialTests(unittest.TestCase):
+    """What the second trial found, each held by a script or a place rather than by a sentence."""
+
+    def test_every_points_case(self):
+        for case in teacher_run()["pointsCases"]:
+            with tempfile.TemporaryDirectory() as root:
+                a_class = Class(root)
+                answers = [str(a_class.teacher_only), "yes"]
+                printed = []
+                try:
+                    teacher_only.box(a_class.marking, teacher(answers, points=case["answer"]), printed.append)
+                except teacher_only.Refusal as refusal:
+                    printed.append(str(refusal))
+                record = a_class.marking / ASSESSMENT / teacher_run()["pointsRecord"]
+                self.assertEqual(record.is_file(), case["shown"], case)
+                self.assertEqual((a_class.marking / ASSESSMENT / "Redacted").exists(), case["shown"], case)
+                if case["shown"]:
+                    text = folded("\n".join(printed))
+                    for point in teacher_run()["privacyPoints"]:
+                        self.assertIn(folded(point), text, "the window shows every point word for word")
+                    self.assertLess(text.index(folded(teacher_run()["privacyPoints"][3])),
+                                    text.index("Which is your teacher-only folder"), "before the folder is asked for")
+                else:
+                    self.assertNotIn("Which is your teacher-only folder", "\n".join(printed))
+
+    def test_the_check_needs_the_points_record(self):
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            answers = [str(a_class.teacher_only), "yes"]
+            teacher_only.box(a_class.marking, teacher(answers), lambda _line: None)
+            assessment = a_class.marking / ASSESSMENT
+            self.assertEqual(teacher_only.verify(assessment), 0)
+            os.remove(assessment / teacher_run()["pointsRecord"])
+            self.assertEqual(teacher_only.verify(assessment), 1, "no record that the points were shown: read nothing")
+
+    def test_every_tidy_case(self):
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            answers = [str(a_class.teacher_only), "yes"]
+            teacher_only.box(a_class.marking, teacher(answers), lambda _line: None)
+            renamed = a_class.marking.parent / "MDM4U"
+            os.rename(a_class.marking, renamed)
+            assessment = renamed / ASSESSMENT
+            paper = sorted((assessment / "Redacted").rglob("*.pdf"))[0]
+            for case in teacher_run()["tidyCases"]:
+                with tempfile.TemporaryDirectory() as temporary:
+                    path = Path(temporary) / case["name"]
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    if case.get("copyOf"):
+                        shutil.copyfile(paper, path)
+                    else:
+                        path.write_bytes(b"a picture of a page")
+                    result = subprocess.run([sys.executable, "-B", str(TEACHER_ONLY), "--tidy", str(assessment),
+                                             "--look-in", temporary], capture_output=True, text=True, env=environment())
+                    self.assertEqual(result.returncode, 1 if case["found"] else 0, f"{case}: {result.stdout}")
+                    self.assertIn("Not finished" if case["found"] else "cannot be found by it", result.stdout)
+
+    def test_pictures_go_only_into_the_work_folder(self):
+        # Outside the system's temporary folders, as a real marking folder is.
+        root = Path(tempfile.mkdtemp(prefix=".teacher-run-work-", dir=str(Path(__file__).resolve().parent)))
+        self.addCleanup(shutil.rmtree, root, True)
+        render = SCRIPTS / "render_pages.py"
+        work = root / "Marking" / ASSESSMENT / "Work"
+        made = subprocess.run([sys.executable, "-B", str(render), str(BLANK), "--into", str(work)], capture_output=True,
+                              text=True, env=environment())
+        self.assertEqual(made.returncode, 0, made.stdout)
+        self.assertEqual(len(list((work / BLANK.stem).glob("page-*.png"))), redact_tests.page_count(BLANK))
+        for wrong in (root / "Elsewhere", Path(tempfile.gettempdir()) / "Work"):
+            refused = subprocess.run([sys.executable, "-B", str(render), str(BLANK), "--into", str(wrong)],
+                                     capture_output=True, text=True, env=environment())
+            self.assertEqual(refused.returncode, 1, str(wrong))
+            self.assertFalse(wrong.exists() and any(wrong.iterdir()), str(wrong))
+
+    def test_a_stop_line_says_to_tell_the_assistant_and_is_kept_for_it(self):
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            os.remove(a_class.marking / "Scripts" / "redact_scans.py")
+            printed, _status, _killed = box_the_papers(a_class, [(CLOSE_PROMPT, "")])
+            self.assertIn("Stopped: the boxing script named in Box request.json is not in the Scripts folder", printed)
+            self.assertIn("Tell your assistant this Stopped line, word for word", printed)
+            kept = (a_class.marking / ("Box the papers" + teacher_only.LAST_STOP)).read_text(encoding="utf-8")
+            self.assertIn("is not in the Scripts folder", kept)
 
 
 class WhatTheAssistantIsGivenTests(unittest.TestCase):

@@ -39572,6 +39572,28 @@
         {"answers": ["yes please", "yes"], "moved": true, "why": "Asked again, then yes."},
         {"answers": [], "moved": false, "why": "The window closed, or the input ended: nothing moves."}
       ],
+      "pointsRecord": "Privacy points shown.json",
+      "pointsCases": [
+        {"answer": "yes", "shown": true, "why": "The second trial: Claude Code said the four points in neither marking run, so the launcher shows them in the teacher's window and records the teacher's yes to them."},
+        {"answer": "no", "shown": false, "why": "Nothing is done: the folder is not asked for."},
+        {"answer": null, "shown": false, "why": "The window closed: nothing is done."}
+      ],
+      "notes": {"kept": "<Term> Comments/Teacher Notes.md in the teacher-only folder", "released": "<Term> Comments/Teacher Notes (checked).md in the marking folder", "recordStartsWith": "<!-- Checked by Put names on the sheets", "why": "The second trial: Codex read the notes in the same command that looked for the check's result, before the result existed. A sentence cannot hold an order; a file can: the notes are where the assistant never looks, and the only copy it may read exists only after the never-adapted check passed. The check is teacher_only.py's own use of the pinned runner's name comparison, so an adapted script cannot pass notes that hold a name."},
+      "notesReleaseCases": [
+        {"notes": "Student A: steady work.\nStudent B: {name} led the group.\n", "released": false, "lines": [2], "why": "A word from the table on line 2: nothing is copied, and the line is named by number."},
+        {"notes": "Student A: steady work.\nStudent B: led the group.\n", "released": true, "why": "No word from the table: a copy with its record line and the notes' SHA-256."},
+        {"notes": null, "released": false, "why": "No notes: nothing is copied, and an earlier copy is gone."},
+        {"notes": "Student A: steady work.\n", "notesIn": "marking", "released": false, "refused": true, "why": "Notes written in the marking folder could be read before any check: the step stops and asks the teacher to move them."}
+      ],
+      "workFolder": "Work",
+      "renderScript": "scripts/render_pages.py",
+      "tidyCases": [
+        {"name": "mdm4u_u1_review/page-1.png", "found": true, "why": "The second trial's folder: Codex rendered every boxed paper into /tmp. The marking folder's own name (MDM4U) is in it."},
+        {"name": "unit-1-test-sheets/Student A.png", "found": true, "why": "The assessment's name, written another way."},
+        {"name": "copy.pdf", "copyOf": "a boxed paper", "found": true, "why": "The same bytes as a paper in Redacted."},
+        {"name": "render-1.png", "found": false, "why": "Named some other way and not the same bytes: it cannot be found, and the skill and the script say so."}
+      ],
+      "lastStop": "<launcher> - last stop.txt",
       "hidePathCases": [
         {"printed": "Boxing {full}/Unit 1 Test/Originals", "shows": "Boxing your teacher-only folder/Unit 1 Test/Originals", "why": "The path as given."},
         {"printed": "Boxing {relative}/Unit 1 Test/Originals", "shows": "Boxing ../your teacher-only folder/Unit 1 Test/Originals", "why": "A path relative to the marking folder, as os.path.relpath writes it (review M2)."},
