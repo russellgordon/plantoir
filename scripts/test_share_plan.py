@@ -564,7 +564,11 @@ class MarkerTests(ShareTestCase):
         self.give_credential()
         self.run_share("--protect")
         marker = self.marker()
-        self.assertEqual(sorted(marker), sorted(share_plan.share_words()["markerFile"]["keys"]))
+        expected = []
+        for key in share_plan.share_words()["markerFile"]["keys"]:
+            if key != "newPasswordWaiting":
+                expected.append(key)
+        self.assertEqual(sorted(marker), sorted(expected))
         self.assertNotIn("account_id", marker)
         self.assertNotIn("id", marker)
         mode = (self.course_dir / ".cloudflare_sites" / "plans-2026.json").stat().st_mode & 0o777
@@ -685,7 +689,18 @@ class ThisSharesOwnDeploymentTests(ShareTestCase):
         self.assertEqual(self.marker()["state"], "sending")
 
 
+def document_lines(text: str) -> list:
+    """The tables' rows, as the app reads them: one JSON object a line."""
+    marks = share_plan.share_words()["openShareLists"]["markers"]
+    rows = []
+    for line in text.splitlines():
+        if line.startswith(marks["document"] + " "):
+            rows.append(json.loads(line[len(marks["document"]) + 1:]))
+    return rows
+
+
 class OpenShareListTests(ShareTestCase):
+    """unitPlanning.share.openShareLists, since #833 before EVERY share."""
 
     def test_an_open_share_shows_both_lists_and_goes_only_on_a_yes(self):
         words = share_plan.share_words()["openShareLists"]
@@ -703,10 +718,19 @@ class OpenShareListTests(ShareTestCase):
         self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", left_out)
         self.assertEqual(self.questions, [words["question"]])
         marks = words["markers"]
-        self.assertIn(marks["shared"] + " unit/pdfs/Quiz 1.pdf\n", text)
-        self.assertIn(marks["shared"] + " index.html\n", text, "every file going out is listed, not only PDFs")
-        self.assertIn(marks["shared"] + " assets/plan.css\n", text)
-        self.assertIn(marks["leftOut"] + " unit/pdfs/Quiz 1 - Solutions.pdf\n", text)
+        rows = document_lines(text)
+        places = {}
+        for row in rows:
+            self.assertEqual(sorted(row), sorted(marks["documentKeys"]))
+            places[row["place"]] = row
+        self.assertEqual(sorted(places), ["unit/pdfs/Quiz 1 - Solutions.pdf", "unit/pdfs/Quiz 1.pdf"],
+                         "documents only: no page, stylesheet or font is listed")
+        self.assertEqual(places["unit/pdfs/Quiz 1.pdf"]["start"], "shared")
+        self.assertEqual(places["unit/pdfs/Quiz 1 - Solutions.pdf"]["start"], "notShared")
+        self.assertEqual(places["unit/pdfs/Quiz 1 - Solutions.pdf"]["answerKey"], "hint")
+        self.assertRegex(text, re.escape(marks["begin"]) + r" 2026 protected:no tick:no ownFiles:\d+\n")
+        self.assertNotIn("PLANTOIR_PLAN_LISTS_SHARED:", text)
+        self.assertNotIn("PLANTOIR_PLAN_LISTS_LEFT_OUT:", text)
         self.assertLess(text.index(marks["begin"]), text.index(marks["end"]))
         self.answer_the_lists = "yes"
         status, text = self.run_share()
@@ -719,18 +743,190 @@ class OpenShareListTests(ShareTestCase):
         self.assertEqual(status, 0)
         self.assertEqual(self.cloudflare.staged, [])
 
-    def test_a_protected_share_is_not_asked(self):
+    def test_a_protected_share_is_asked_too(self):
+        """Russell, 2026-11-13, ruling 5: the sheet before every share."""
+        words = share_plan.share_words()["openShareLists"]
         self.answer_the_lists = "n"
         self.give_credential()
         status, text = self.run_share("--protect")
         self.assertEqual(status, 0, text)
-        self.assertEqual(self.questions, [])
+        self.assertEqual(self.questions, [words["questionProtected"]])
+        self.assertIn(words["sharedHeadingProtected"], text)
+        self.assertEqual(self.cloudflare.staged, [])
+        starts = {}
+        for row in document_lines(text):
+            starts[row["place"]] = row["start"]
+        self.assertEqual(starts["unit/pdfs/Quiz 1 - Solutions.pdf"], "shared",
+                         "in a protected share answer keys start in Shared")
+        self.assertFalse(self.cred_file.exists())
 
     def test_no_sentence_says_the_share_holds_no_answers(self):
         for key, value in share_plan.share_words()["openShareLists"].items():
             if key == "rule" or not isinstance(value, str):
                 continue
             self.assertNotIn("no answer", value.lower())
+
+
+class SettledListTests(ShareTestCase):
+    """unitPlanning.share.rememberedChoices: the app writes the places the
+    teacher settled into the year's marker before it answers yes, and the
+    share sends exactly those (#833)."""
+
+    def answer_as_the_app(self, choices, also=None):
+        def answering(question=""):
+            self.questions.append(question)
+            path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+            marker = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            marker["documents"] = choices
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(marker, indent=2), encoding="utf-8")
+            if also is not None:
+                also()
+            return "y"
+        import builtins
+        original = builtins.input
+        builtins.input = answering
+        self.addCleanup(setattr, builtins, "input", original)
+        self.answer_the_lists = "y"
+
+    def test_a_document_held_back_in_the_tables_is_not_sent_and_is_remembered(self):
+        self.answer_as_the_app({"unit/pdfs/Quiz 1.pdf": "notShared"})
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        files = self.cloudflare.staged[-1]["files"]
+        self.assertNotIn("unit/pdfs/Quiz 1.pdf", files)
+        self.assertNotIn("unit/pdfs/Quiz 1 - Solutions.pdf", files)
+        self.assertIn("unit/index.html", files)
+        marker = self.marker()
+        self.assertEqual(marker["documents"], {"unit/pdfs/Quiz 1.pdf": "notShared"})
+        self.assertEqual(marker["documentsShared"], 0)
+        self.assertEqual(marker["documentsHeldBack"], 2)
+        self.assertIn("documents:0 heldBack:2", text)
+        # The next share, from the command line, starts it where it was put.
+        self.answer_the_lists = None
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        starts = {}
+        for row in document_lines(text):
+            starts[row["place"]] = row["start"]
+        self.assertEqual(starts["unit/pdfs/Quiz 1.pdf"], "notShared")
+        self.assertNotIn("unit/pdfs/Quiz 1.pdf", self.cloudflare.staged[-1]["files"])
+
+    def test_a_key_dragged_into_shared_goes_and_the_marker_says_so(self):
+        self.answer_as_the_app({"unit/pdfs/Quiz 1 - Solutions.pdf": "shared"})
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", self.cloudflare.staged[-1]["files"])
+        self.assertEqual(self.marker()["answerKeys"], "in")
+        self.assertEqual(self.marker()["answerKeysLeftOut"], 0)
+
+    def test_a_list_naming_a_file_it_would_never_share_is_refused(self):
+        planning = self.course_dir / ".internal" / "planning"
+        (planning / "unit" / "Lesson 3.docx").write_bytes(b"PK invented")
+        for choices in ({"unit/Lesson 3.docx": "shared"}, {"unit/.htpasswd": "shared"},
+                        {"../secret.pdf": "shared"}, {"unit/pdfs/Quiz 1.pdf": "yes"}):
+            with self.subTest(choices=choices):
+                self.cloudflare.staged = []
+                path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+                if path.exists():
+                    path.unlink()
+                self.answer_as_the_app(choices)
+                status, text = self.run_share()
+                self.assertEqual(status, 1, text)
+                self.assertIn("PLANTOIR_PLAN_REFUSED: SNC2D listNotShareable", text)
+                self.assertEqual(self.cloudflare.staged, [])
+
+    def test_a_file_that_cannot_be_shared_is_listed_and_cannot_move(self):
+        planning = self.course_dir / ".internal" / "planning"
+        (planning / "unit" / "Lesson 3.docx").write_bytes(b"PK invented")
+        self.answer_the_lists = "n"
+        status, text = self.run_share()
+        rows = {}
+        for row in document_lines(text):
+            rows[row["place"]] = row
+        self.assertFalse(rows["unit/Lesson 3.docx"]["movable"])
+        self.assertEqual(rows["unit/Lesson 3.docx"]["start"], "notShared")
+        self.assertIn(share_plan.share_words()["wordsForTheTables"]["noteCannotShare"], text)
+
+    def test_a_document_that_appears_after_the_lists_is_held_back(self):
+        planning = self.course_dir / ".internal" / "planning"
+
+        def drop_one_in():
+            (planning / "unit" / "pdfs" / "Late Handout.pdf").write_bytes(b"%PDF-1.4 late")
+        self.answer_as_the_app({}, also=drop_one_in)
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertNotIn("unit/pdfs/Late Handout.pdf", self.cloudflare.staged[-1]["files"])
+
+    def test_a_renamed_file_is_forgotten(self):
+        planning = self.course_dir / ".internal" / "planning"
+        self.answer_as_the_app({"unit/pdfs/Quiz 1.pdf": "notShared"})
+        self.run_share()
+        (planning / "unit" / "pdfs" / "Quiz 1.pdf").rename(planning / "unit" / "pdfs" / "Quiz One.pdf")
+        self.answer_the_lists = None
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertIn("unit/pdfs/Quiz One.pdf", self.cloudflare.staged[-1]["files"])
+        self.assertEqual(self.marker()["documents"], {})
+
+    def test_a_marker_from_before_has_no_choices(self):
+        path = self.course_dir / ".cloudflare_sites" / "plans-2026.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"name": "snc2d-plans-2026-27-gordon-abcdefgh",
+                                    "subdomain": "x.pages.dev", "year": 2026}), encoding="utf-8")
+        self.assertEqual(unit_plan_site.remembered_choices(json.loads(path.read_text())), {})
+
+    def test_the_answer_keys_folder_is_a_key_whatever_its_name(self):
+        planning = self.course_dir / ".internal" / "planning"
+        keys = planning / "unit" / "Answer Keys"
+        keys.mkdir()
+        (keys / "Quiz 2.pdf").write_bytes(b"%PDF-1.4 invented")
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertNotIn("unit/Answer Keys/Quiz 2.pdf", self.cloudflare.staged[-1]["files"])
+        self.assertEqual(self.marker()["answerKeysLeftOut"], 2)
+
+
+class NewPasswordTests(ShareTestCase):
+    """unitPlanning.share.changePasswordCases (#833)."""
+
+    def test_saved_while_shared_marks_the_marker_until_a_share_proves_it(self):
+        self.give_credential()
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 0, text)
+        self.assertNotIn("newPasswordWaiting", self.marker())
+        status, text = self.run_share("--new-password-waiting")
+        self.assertEqual(status, 0, text)
+        self.assertIn("PLANTOIR_PLAN_PASSWORD_SAVED: SNC2D 2026 waiting", text)
+        self.assertTrue(self.marker()["newPasswordWaiting"])
+        self.assertEqual(len(self.cloudflare.staged), 1, "saving a password sends nothing")
+        # A share that fails keeps it.
+        def failing(public, name, token, account):
+            raise RuntimeError("Cloudflare's deploy tool exited with code 1")
+        original = share_plan.deploy_to_cloudflare
+        share_plan.deploy_to_cloudflare = failing
+        self.give_credential()
+        status, text = self.run_share()
+        self.assertEqual(status, 1, text)
+        self.assertTrue(self.marker()["newPasswordWaiting"])
+        # Declined at the lists keeps it.
+        share_plan.deploy_to_cloudflare = original
+        self.give_credential()
+        self.answer_the_lists = "n"
+        self.run_share()
+        self.assertTrue(self.marker()["newPasswordWaiting"])
+        # A share that succeeds removes it.
+        self.answer_the_lists = None
+        self.give_credential()
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertNotIn("newPasswordWaiting", self.marker())
+
+    def test_saved_while_not_shared_writes_nothing(self):
+        status, text = self.run_share("--new-password-waiting")
+        self.assertEqual(status, 0, text)
+        self.assertIn("PLANTOIR_PLAN_PASSWORD_SAVED: SNC2D 2026 notShared", text)
+        self.assertIsNone(self.marker())
 
 
 class CredentialFileTests(ShareTestCase):

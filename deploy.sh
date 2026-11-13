@@ -704,7 +704,7 @@ usage() {
   cat <<USAGE
 🧰 Usage:
   ${SELF_CMD} <COURSE_CODE> <SECTION_NUMBER> [--target netlify|cloudflare] [--account <ACCOUNT_ID>] [--diagnose] [--team <TEAM_SLUG>] [--reset-token|--logout] [--image REF] [--non-interactive]
-  ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
+  ${SELF_CMD} <COURSE_CODE> --plans [--protect|--remove-password] [--change-password [--password-only]] [--include-answer-keys] [--year <YYYY>] [--stop-sharing] [--account <ACCOUNT_ID>] [--image REF] [--non-interactive]
 
 Examples:
   ${SELF_CMD} ICS3U 1
@@ -735,7 +735,8 @@ Notes:
   (courses/<COURSE>/.internal/planning) are shared through Cloudflare Pages as
   a small website of their own for this school year (#709). --protect asks
   for a username and password before any page opens, and stays on until
-  --remove-password; --change-password chooses a new one; --include-answer-keys
+  --remove-password; --change-password chooses a new one (with --password-only
+  it is saved and nothing is shared until the next share); --include-answer-keys
   keeps answer keys in a share without a password; --stop-sharing deletes the
   year's site (--year chooses an earlier school year, by the year it began).
 USAGE
@@ -967,6 +968,7 @@ ACCOUNT_ARG=""
 PLAN_PROTECT="false"
 PLAN_REMOVE_PASSWORD="false"
 PLAN_CHANGE_PASSWORD="false"
+PLAN_PASSWORD_ONLY="false"
 PLAN_ANSWER_KEYS="false"
 PLAN_STOP="false"
 PLAN_YEAR=""
@@ -976,6 +978,7 @@ while [[ $# -gt 0 ]]; do
     --protect) PLAN_PROTECT="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --remove-password) PLAN_REMOVE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --change-password) PLAN_CHANGE_PASSWORD="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
+    --password-only) PLAN_PASSWORD_ONLY="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --include-answer-keys) PLAN_ANSWER_KEYS="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --stop-sharing) PLAN_STOP="true"; PLAN_FLAG_SEEN="${PLAN_FLAG_SEEN:-$1}" ;;
     --year)
@@ -1062,6 +1065,13 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   fi
   if [[ -n "$PLAN_YEAR" && ! "$PLAN_YEAR" =~ ^[0-9]{4}$ ]]; then
     echo "❌ --year takes the year a school year began in, such as 2026."
+    exit 1
+  fi
+  # --password-only (#833): Change Password saves the new username and
+  # password and shares nothing; the app then offers Share Again
+  # (unitPlanning.share.changePasswordCases).
+  if [[ "$PLAN_PASSWORD_ONLY" == "true" && ( "$PLAN_CHANGE_PASSWORD" != "true" || "$PLAN_STOP" == "true" || "$PLAN_REMOVE_PASSWORD" == "true" || "$PLAN_ANSWER_KEYS" == "true" ) ]]; then
+    echo "❌ --password-only goes with --change-password, and with no flag that shares or stops sharing."
     exit 1
   fi
   # Unit plans go to Cloudflare Pages and nowhere else (Russell, 2026-11-12),
@@ -4875,7 +4885,7 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   # share_plan.py, never the secret; share_plan.py deletes both on every
   # way out.
   _plan_cred_file=""
-  if [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
+  if [[ "$PLAN_SHARE_PROTECTED" == "true" && "$PLAN_PASSWORD_ONLY" != "true" ]]; then
     _plan_cred_file="$(printf %s "$PLAN_CRED" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; d="$(mktemp -d /tmp/plan_cred.XXXXXX)" && cat > "$d/cred" && printf %s "$d/cred"')"  # never shown to a teacher: piped into the website builder, never printed
     if [[ "$_plan_cred_file" != */plan_cred.*/cred ]]; then
       echo "❌ Plantoir could not hand the username and password to the website builder, so nothing was shared."
@@ -4888,6 +4898,10 @@ if [[ "$PLANS_MODE" == "true" ]]; then
   if [[ -n "$_plan_cred_file" ]]; then _plan_opts+=(--credential-file "$_plan_cred_file"); fi
   if [[ "$PLAN_STOP" == "true" ]]; then
     _plan_opts+=(--stop)
+  elif [[ "$PLAN_PASSWORD_ONLY" == "true" ]]; then
+    # The new password is saved in the Keychain already; share_plan.py only
+    # notes in the year's marker that it waits for a share (#833).
+    _plan_opts+=(--new-password-waiting)
   elif [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
     _plan_opts+=(--protect)
   elif [[ "$PLAN_REMOVE_PASSWORD" == "true" ]]; then

@@ -1189,8 +1189,8 @@
       },
       {
         "event": "unit plans shared",
-        "carries": "the course, the school year, how many units, with a password or open to anyone with the link, answer keys left out, what a flood would do (protected only, from the marker's failClosed), and that an earlier copy could not be removed. NEVER the address (its random suffix is a line of defence, and the trail goes into problem reports), a username or a password. Written by the app from share_plan.py's PLANTOIR_PLAN_SHARED: line (PlanShareReport).",
-        "line": "{course} · unit plans for {year} shared to Cloudflare Pages, {units}, {with a password | open to anyone with the link}{, answer keys left out}{, the plans close if flooded | , the plans would open if flooded}{, an earlier copy could not be removed}",
+        "carries": "the course, the school year, how many units, with a password or open to anyone with the link, answer keys left out, what a flood would do (protected only, from the marker's failClosed), and that an earlier copy could not be removed; since #833, how many documents went and how many were held back, never a file's name. NEVER the address (its random suffix is a line of defence, and the trail goes into problem reports), a username or a password. Written by the app from share_plan.py's PLANTOIR_PLAN_SHARED: line (PlanShareReport).",
+        "line": "{course} · unit plans for {year} shared to Cloudflare Pages, {units}, {with a password | open to anyone with the link}{, answer keys left out}{, the plans close if flooded | , the plans would open if flooded}{, an earlier copy could not be removed}{, {n} document(s) shared and {m} held back}",
         "why": "#709. A shared plan is something a teacher's colleagues can open from anywhere, and 'my colleague says the plans ask for no password' or 'the answer keys are not there' is answerable only from what the share did. The warning and a changed password are not on the line: the marker does not carry them (a known gap, documentation/09-mac-app.md)."
       },
       {
@@ -1199,6 +1199,12 @@
         "line": "{course} · unit plans not shared: {reason}",
         "launcherLineWhenAlreadySharing": "{course} · unit plans not shared: they were already being shared",
         "why": "#709. A share that did not happen says so in the console, which is gone once the sheet is closed."
+      },
+      {
+        "event": "unit plan password changed",
+        "carries": "the course and the school year, and whether the new password is waiting for a share (the plans have an address) or there was nothing shared to wait. Never the username, the password or the address.",
+        "line": "{course} · new password saved for the {year} unit plans{, not in use until they are shared again | , nothing shared yet}",
+        "why": "#833. 'My colleague says the new password does not work' is answerable only if the trail says the password was changed and whether a share followed (the unit plans shared line, after it)."
       },
       {
         "event": "unit plan sharing stopped",
@@ -38230,7 +38236,7 @@
           ".svg",
           ".txt"
         ],
-        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every answer key (answerKeys) is left out unless the share is protected or the teacher ticked Include Answer Keys. A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). Every share adds _worker.js (worker, edgeCache); an open share adds _headers (X-Robots-Tag) as well, which is what the static files would carry if the worker were ever passed by.",
+        "rule": "Only allowlisted files are copied, compared without case; a hidden file or folder, a link, and anything inside a folder in unitPlanning.neverFolderNames is never copied. The plan's own assets/ is replaced by the app's copy (the skill's template assets/), so a share always carries Plantoir's sheets. Every listed document (documents) that settles in Not shared is left out, and so is any document that was not in the lists the teacher saw (startingPlace, rememberedChoices; until #833, every answer key unless the share was protected or Include Answer Keys was ticked). A 404.html saying words.notSharedHere, with the noindex meta, is written last, so a missing path answers 404 rather than the list of plans: with no top-level 404.html Pages serves index.html for ANY path (measured 2026-11-12, and Cloudflare's serving-pages page). Every share adds _worker.js (worker, edgeCache); an open share adds _headers (X-Robots-Tag) as well, which is what the static files would carry if the worker were ever passed by.",
         "why": "An allowlist rather than a list of what to leave out: a teacher's plan.json, a .tex, an .htaccess or .htpasswd, and a _headers, _redirects, _routes.json or _worker.js of their own (which Cloudflare would obey) are never uploaded, and a new kind of file is left out until somebody decides it belongs."
       },
       "stageCases": {
@@ -38324,7 +38330,7 @@
         "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
       },
       "answerKeys": {
-        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, with its accents folded (Corrigé reads as corrige), in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
+        "rule": "#833: the `Answer Keys` folder is the rule (answerKeysFolder), and this is only a HINT for a file outside it, so that a plan made before the folder existed keeps its keys out of an open share until they are moved (Russell, 2026-11-13). A file the hint applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is a hint match when its name without the extension, with its accents folded (Corrigé reads as corrige) and in lower case, split into words at every character that is not a letter and at a lower-case letter followed by a capital (AnswerKey is answer key), holds one of `phrases` as words in a row, or holds one of `atTheEndOrBeside` as its last word or as a word beside one of `besideWords`. So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter. Only the NAME is read, never the file.",
         "appliesTo": [
           ".pdf",
           ".png",
@@ -38333,23 +38339,63 @@
           ".svg",
           ".txt"
         ],
-        "anywhere": [
-          "answer",
+        "phrases": [
+          [
+            "answer",
+            "key"
+          ],
+          [
+            "answer",
+            "keys"
+          ],
+          [
+            "answerkey"
+          ],
+          [
+            "answerkeys"
+          ],
+          [
+            "answers"
+          ],
+          [
+            "marking",
+            "guide"
+          ],
+          [
+            "marking",
+            "scheme"
+          ],
+          [
+            "mark",
+            "scheme"
+          ],
+          [
+            "markscheme"
+          ],
+          [
+            "corrige"
+          ],
+          [
+            "reponses"
+          ]
+        ],
+        "atTheEndOrBeside": [
           "solution",
-          "markingguide",
-          "markingscheme",
-          "markscheme",
-          "corrige",
-          "reponse"
-        ],
-        "wholeWords": [
+          "solutions",
           "key",
-          "keys",
-          "soln",
-          "solns",
-          "ans"
+          "keys"
         ],
-        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists). Widened again on the fix review: Mark Scheme and Markscheme, Soln and Solns, Ans, and the French Corrigé and Réponses (Ontario's French-language courses), with accents folded before the letters are read.",
+        "besideWords": [
+          "test",
+          "quiz",
+          "exam",
+          "worksheet",
+          "homework",
+          "review",
+          "practice",
+          "assignment"
+        ],
+        "why": "Russell, 2026-11-13, undoing the widening the director ruled on the #709 review (M3): that rule caught every name holding 'answer', 'solution' or 'key' anywhere, and so held back Dissolution Lab.pdf, Answering Questions.pdf, Key Terms.pdf and Solutions and Mixtures.pdf, which are ordinary handouts. A teacher now puts keys in the unit's Answer Keys folder and the assistant does it for them; the hint only has to catch the obvious names a plan made before carries. A singular 'answer' is not a hint (Answer Sheet.pdf is a blank for students), nor is a lone 'key' that is neither last nor beside an assessment word (Key Ideas.pdf). A match outside the folder starts like a key and is marked 'may be an answer key' (startingPlace), and the teacher drags it either way.",
         "cases": [
           {
             "name": "Quiz 1 - Solutions.pdf",
@@ -38420,6 +38466,14 @@
             "answerKey": true
           },
           {
+            "name": "Quiz 1 Mark Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Markscheme.pdf",
+            "answerKey": true
+          },
+          {
             "name": "Test KEY.pdf",
             "answerKey": true
           },
@@ -38440,7 +38494,15 @@
             "answerKey": true
           },
           {
-            "name": "Solutions Manual Notes.pdf",
+            "name": "Quiz Solutions Part 2.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test Key Version B.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Practice Test Key.pdf",
             "answerKey": true
           },
           {
@@ -38457,62 +38519,6 @@
           },
           {
             "name": "Quiz 1 Solutions.jpg",
-            "answerKey": true
-          },
-          {
-            "name": "Worksheet.pdf",
-            "answerKey": false
-          },
-          {
-            "name": "Quiz 1.pdf",
-            "answerKey": false
-          },
-          {
-            "name": "Keyboard Shortcuts.pdf",
-            "answerKey": false
-          },
-          {
-            "name": "Monkey Puzzle.pdf",
-            "answerKey": false
-          },
-          {
-            "name": "Unit 1 Notes.pdf",
-            "answerKey": false
-          },
-          {
-            "name": "solutions.html",
-            "answerKey": false
-          },
-          {
-            "name": "answers.css",
-            "answerKey": false
-          },
-          {
-            "name": "Quiz 1 - Solutions.tex",
-            "answerKey": false
-          },
-          {
-            "name": "Key Concepts.woff2",
-            "answerKey": false
-          },
-          {
-            "name": "Quiz 1 Mark Scheme.pdf",
-            "answerKey": true
-          },
-          {
-            "name": "Markscheme.pdf",
-            "answerKey": true
-          },
-          {
-            "name": "Unit 2 Soln.pdf",
-            "answerKey": true
-          },
-          {
-            "name": "Test Solns.pdf",
-            "answerKey": true
-          },
-          {
-            "name": "Quiz 3 Ans.pdf",
             "answerKey": true
           },
           {
@@ -38536,6 +38542,66 @@
             "answerKey": true
           },
           {
+            "name": "Dissolution Lab.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keyboard Shortcuts.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Key Ideas.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Key Terms.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Key Ideas for the Test.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answering Questions.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Answer Sheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Solutions and Mixtures.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Solutions Manual Notes.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Unit 2 Soln.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 3 Ans.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Worksheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Monkey Puzzle.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Unit 1 Notes.pdf",
+            "answerKey": false
+          },
+          {
             "name": "Hockey Drills.pdf",
             "answerKey": false
           },
@@ -38544,30 +38610,746 @@
             "answerKey": false
           },
           {
-            "name": "Answering Questions.pdf",
-            "answerKey": true
+            "name": "solutions.html",
+            "answerKey": false
           },
           {
-            "name": "Key Terms.pdf",
-            "answerKey": true
+            "name": "answers.css",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1 - Solutions.tex",
+            "answerKey": false
+          },
+          {
+            "name": "Key Concepts.woff2",
+            "answerKey": false
           }
         ]
       },
+      "answerKeysFolder": {
+        "name": "Answer Keys",
+        "rule": "#833 (Russell, 2026-11-13): THE FOLDER IS THE RULE. Each unit's folder in a plan has one place for answer keys, solutions and marking guides, a folder named `Answer Keys` (matched without regard to letter case, the whole name and nothing else: Answer Key and AnswerKeys are not it). A folder of that name at any depth inside a unit folder counts, and so does everything under it, nested folders included, whatever its name or kind, pages and pictures too: anything in it is an answer key (`answerKey` folder in documents). The assistant writes every key it makes there (plantoir-unit-planning and plantoir-test-authoring), and check's advice names a hint match outside it (adviceKinds). Nothing moves a teacher's file for them.",
+        "why": "Russell asked 'What if we instruct agents to separate solution files using a sub folder, so it's clear which ones are answer keys?' and confirmed the name: plain words a teacher sees in Finder, so the rule is one a teacher can check by looking, where a rule on names fails both ways (Dissolution Lab.pdf held back, Quiz 3.pdf with answers written in it shared). A nested folder counts because a teacher who sorts keys into Version A and Version B inside it means them as keys.",
+        "cases": [
+          {
+            "place": "unit/Answer Keys/Quiz 1.pdf",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/answer keys/Quiz 1.pdf",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/ANSWER KEYS/Quiz 1.pdf",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/Answer Keys/Version B/Quiz 1.pdf",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/pdfs/Answer Keys/Quiz 1.pdf",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/Answer Keys/Diagram.png",
+            "inTheFolder": true
+          },
+          {
+            "place": "unit/Answer Key/Quiz 1.pdf",
+            "inTheFolder": false
+          },
+          {
+            "place": "unit/AnswerKeys/Quiz 1.pdf",
+            "inTheFolder": false
+          },
+          {
+            "place": "unit/pdfs/Answer Keys.pdf",
+            "inTheFolder": false
+          },
+          {
+            "place": "unit/pdfs/Quiz 1.pdf",
+            "inTheFolder": false
+          }
+        ]
+      },
+      "documents": {
+        "rule": "#833 (Russell, 2026-11-13, ruling 2): the tables before a share list DOCUMENTS only. Of the files a share would consider (not hidden, not a link, not inside a folder in unitPlanning.neverFolderNames, not under the plan's own assets/, which the app's copy replaces), each place has one `class`: `document` (listed, and the teacher may move it): every .pdf and .txt but the root robots.txt, every file inside an answerKeysFolder whatever its kind when that kind can be shared, and a picture (.png, .jpg, .jpeg, .svg) whose name the answer-key hint matches; `cannotShare` (listed in Not shared, cannot be moved, with the reason `cannotShare`): any file whose kind is not in stage.allowedSuffixes and that is not one of `neverListed`; `alwaysGoes` (not listed; counted in `ownFilesLine`): pages, stylesheets, fonts and pictures; `neverListed` (never shared, not listed): `neverListed` by name anywhere, and the root 404.html, which the share writes itself. The root robots.txt is `alwaysGoes`, the plan's own. `unit` is the place's first folder when that is a unit folder (one with an index.html and a slug name), otherwise empty (wordsForTheTables.noUnit). `folder` is the rest of the path between the unit and the name. `kind` is from `kinds` by extension, compared without case, and otherwise the extension in capitals followed by ' file' (a file with no extension: 'File'). `answerKey` is folder (inside answerKeysFolder), hint (outside it, and the hint matches), or null.",
+        "neverListed": [
+          "plan.json",
+          "_headers",
+          "_redirects",
+          "_routes.json",
+          "_worker.js"
+        ],
+        "kinds": {
+          ".pdf": "PDF",
+          ".txt": "Text",
+          ".png": "PNG image",
+          ".jpg": "JPEG image",
+          ".jpeg": "JPEG image",
+          ".svg": "SVG image",
+          ".html": "Page",
+          ".css": "Stylesheet",
+          ".woff2": "Font"
+        },
+        "why": "Pages, pictures, stylesheets and fonts are the plan itself: a share without them is a broken site, and listing them buried the three PDFs a teacher has to look at under forty lines (the design review of #709's sheet). A picture whose name looks like a key, or anything in the Answer Keys folder, is listed because holding it back is a real choice. A .docx or a .tex is listed, unmovable, so the teacher sees why a handout they expected is not there, rather than finding out from a colleague.",
+        "cases": [
+          {
+            "place": "unit/pdfs/Quiz 1.pdf",
+            "class": "document",
+            "unit": "unit",
+            "folder": "pdfs",
+            "name": "Quiz 1.pdf",
+            "kind": "PDF",
+            "answerKey": null
+          },
+          {
+            "place": "unit/pdfs/Quiz 1 - Solutions.pdf",
+            "class": "document",
+            "unit": "unit",
+            "folder": "pdfs",
+            "name": "Quiz 1 - Solutions.pdf",
+            "kind": "PDF",
+            "answerKey": "hint"
+          },
+          {
+            "place": "unit/Answer Keys/Quiz 1.pdf",
+            "class": "document",
+            "unit": "unit",
+            "folder": "Answer Keys",
+            "name": "Quiz 1.pdf",
+            "kind": "PDF",
+            "answerKey": "folder"
+          },
+          {
+            "place": "unit/Answer Keys/Worked Solutions.html",
+            "class": "document",
+            "unit": "unit",
+            "folder": "Answer Keys",
+            "name": "Worked Solutions.html",
+            "kind": "Page",
+            "answerKey": "folder"
+          },
+          {
+            "place": "unit/Answer Keys/Graph.png",
+            "class": "document",
+            "unit": "unit",
+            "folder": "Answer Keys",
+            "name": "Graph.png",
+            "kind": "PNG image",
+            "answerKey": "folder"
+          },
+          {
+            "place": "unit/Answer Keys/Notes.docx",
+            "class": "cannotShare",
+            "unit": "unit",
+            "folder": "Answer Keys",
+            "name": "Notes.docx",
+            "kind": "DOCX file",
+            "answerKey": "folder"
+          },
+          {
+            "place": "unit/Quiz 1 Answers.png",
+            "class": "document",
+            "unit": "unit",
+            "folder": "",
+            "name": "Quiz 1 Answers.png",
+            "kind": "PNG image",
+            "answerKey": "hint"
+          },
+          {
+            "place": "unit/pdfs/Lab Notes.txt",
+            "class": "document",
+            "unit": "unit",
+            "folder": "pdfs",
+            "name": "Lab Notes.txt",
+            "kind": "Text",
+            "answerKey": null
+          },
+          {
+            "place": "Course Outline.pdf",
+            "class": "document",
+            "unit": "",
+            "folder": "",
+            "name": "Course Outline.pdf",
+            "kind": "PDF",
+            "answerKey": null
+          },
+          {
+            "place": "unit/Lesson 3.docx",
+            "class": "cannotShare",
+            "unit": "unit",
+            "folder": "",
+            "name": "Lesson 3.docx",
+            "kind": "DOCX file",
+            "answerKey": null
+          },
+          {
+            "place": "unit/notes.tex",
+            "class": "cannotShare",
+            "unit": "unit",
+            "folder": "",
+            "name": "notes.tex",
+            "kind": "TEX file",
+            "answerKey": null
+          },
+          {
+            "place": "unit/data.json",
+            "class": "cannotShare",
+            "unit": "unit",
+            "folder": "",
+            "name": "data.json",
+            "kind": "JSON file",
+            "answerKey": null
+          },
+          {
+            "place": "unit/README",
+            "class": "cannotShare",
+            "unit": "unit",
+            "folder": "",
+            "name": "README",
+            "kind": "File",
+            "answerKey": null
+          },
+          {
+            "place": "unit/index.html",
+            "class": "alwaysGoes"
+          },
+          {
+            "place": "unit/correlation.html",
+            "class": "alwaysGoes"
+          },
+          {
+            "place": "unit/diagram.png",
+            "class": "alwaysGoes"
+          },
+          {
+            "place": "index.html",
+            "class": "alwaysGoes"
+          },
+          {
+            "place": "robots.txt",
+            "class": "alwaysGoes"
+          },
+          {
+            "place": "404.html",
+            "class": "neverListed"
+          },
+          {
+            "place": "unit/plan.json",
+            "class": "neverListed"
+          },
+          {
+            "place": "_headers",
+            "class": "neverListed"
+          },
+          {
+            "place": "unit/_worker.js",
+            "class": "neverListed"
+          },
+          {
+            "place": "assets/plan.css",
+            "class": "neverListed"
+          },
+          {
+            "place": "assets/Extra Sheet.pdf",
+            "class": "neverListed"
+          }
+        ],
+        "note": "assets/ is neverListed because the share always replaces the plan's own assets/ with the app's copy (stage.rule), so nothing a teacher put there could ever go; `alwaysGoes` counts the app's own stylesheets and fonts as well when the lists are printed."
+      },
+      "startingPlace": {
+        "rule": "#833: where a listed document starts in the two tables, in this order: a `cannotShare` file in Not shared, always; a document with a remembered choice (rememberedChoices) where the teacher put it; an answer key (in the folder, or matched by the hint outside it) in Shared when the share is protected or Include Answer Keys is ticked, and in Not shared otherwise; any other document in Shared. `mark` is what the table's Note column says beside the name: answerKey for a folder key, mayBeAnswerKey for a hint match, cannotShare for a file that cannot be moved, null otherwise. `warns` is whether the row carries the warning symbol and wordsForTheTables.noteOpenKey: an answer key of either kind that STARTS (or is moved) in Shared in a share with no password.",
+        "why": "Russell's rulings 3 to 5 (2026-11-13): remembered per file; the tick is a shortcut that starts every key in Shared; a protected share starts every key in Shared and the teacher can still hold one back. Read with the folder ruling: a hint match 'starts in Not shared' in an open share without the tick, and like any key in Shared when the share is protected or ticked (the implementer's reading, recorded in the plan for review). A remembered choice wins over the tick and over protection both ways, so a key a teacher held back stays back when they later tick the box, and a key they dragged into Shared in an open share stays there and is marked.",
+        "cases": [
+          {
+            "name": "a handout, open share",
+            "class": "document",
+            "answerKey": null,
+            "protected": false,
+            "tick": false,
+            "remembered": null,
+            "start": "shared",
+            "mark": null,
+            "warns": false
+          },
+          {
+            "name": "a hint match, open share",
+            "class": "document",
+            "answerKey": "hint",
+            "protected": false,
+            "tick": false,
+            "remembered": null,
+            "start": "notShared",
+            "mark": "mayBeAnswerKey",
+            "warns": false
+          },
+          {
+            "name": "a folder key, open share",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": false,
+            "tick": false,
+            "remembered": null,
+            "start": "notShared",
+            "mark": "answerKey",
+            "warns": false
+          },
+          {
+            "name": "a folder key, open share, ticked",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": false,
+            "tick": true,
+            "remembered": null,
+            "start": "shared",
+            "mark": "answerKey",
+            "warns": true
+          },
+          {
+            "name": "a hint match, open share, ticked",
+            "class": "document",
+            "answerKey": "hint",
+            "protected": false,
+            "tick": true,
+            "remembered": null,
+            "start": "shared",
+            "mark": "mayBeAnswerKey",
+            "warns": true
+          },
+          {
+            "name": "a folder key, protected",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": true,
+            "tick": false,
+            "remembered": null,
+            "start": "shared",
+            "mark": "answerKey",
+            "warns": false
+          },
+          {
+            "name": "a hint match, protected",
+            "class": "document",
+            "answerKey": "hint",
+            "protected": true,
+            "tick": false,
+            "remembered": null,
+            "start": "shared",
+            "mark": "mayBeAnswerKey",
+            "warns": false
+          },
+          {
+            "name": "a handout, protected",
+            "class": "document",
+            "answerKey": null,
+            "protected": true,
+            "tick": false,
+            "remembered": null,
+            "start": "shared",
+            "mark": null,
+            "warns": false
+          },
+          {
+            "name": "a handout held back before, protected",
+            "class": "document",
+            "answerKey": null,
+            "protected": true,
+            "tick": false,
+            "remembered": "notShared",
+            "start": "notShared",
+            "mark": null,
+            "warns": false
+          },
+          {
+            "name": "a folder key dragged into Shared before, open share",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": false,
+            "tick": false,
+            "remembered": "shared",
+            "start": "shared",
+            "mark": "answerKey",
+            "warns": true
+          },
+          {
+            "name": "a folder key held back before, open share, ticked",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": false,
+            "tick": true,
+            "remembered": "notShared",
+            "start": "notShared",
+            "mark": "answerKey",
+            "warns": false
+          },
+          {
+            "name": "a folder key held back before, protected",
+            "class": "document",
+            "answerKey": "folder",
+            "protected": true,
+            "tick": false,
+            "remembered": "notShared",
+            "start": "notShared",
+            "mark": "answerKey",
+            "warns": false
+          },
+          {
+            "name": "a file that cannot be shared",
+            "class": "cannotShare",
+            "answerKey": null,
+            "protected": true,
+            "tick": true,
+            "remembered": null,
+            "start": "notShared",
+            "mark": "cannotShare",
+            "warns": false
+          },
+          {
+            "name": "a folder key that cannot be shared",
+            "class": "cannotShare",
+            "answerKey": "folder",
+            "protected": false,
+            "tick": false,
+            "remembered": null,
+            "start": "notShared",
+            "mark": "cannotShare",
+            "warns": false
+          }
+        ]
+      },
+      "rememberedChoices": {
+        "rule": "#833 (ruling 3): the teacher's choices are kept in the year's marker under `documents`, a JSON object from a document's place in the plan (as the tables' rows carry it) to `shared` or `notShared`; names only, never a file's contents. The app writes it when the teacher presses Share in the sheet, BEFORE it answers the question, atomically (a temporary file beside it, then a rename) and with every other key of the marker kept: every document whose place when Share was pressed differs from where it started gets an entry; every earlier entry of a document still listed is kept unless that document was moved again; an entry whose place is not listed this time is dropped, so a renamed or deleted file is forgotten and a new name starts from the rule. share_plan.py reads it after the yes, keeps it on every marker it writes, and prunes it the same way. A marker from before #833 has no `documents`: no choices yet. A successful Stop Sharing removes the marker and the choices with it. The share REFUSES (refusals.listNotShareable) when an entry marks Shared a place that is listed as cannotShare, or a place it would never share (outside the plan, hidden, inside a neverFolderNames folder, or a link), or holds a value other than the two; an entry for a page or a picture that always goes is dropped.",
+        "cases": [
+          {
+            "name": "a marker from before #833",
+            "before": null,
+            "listed": [
+              "u/pdfs/A.pdf"
+            ],
+            "moved": {},
+            "after": {}
+          },
+          {
+            "name": "a move is remembered",
+            "before": {},
+            "listed": [
+              "u/pdfs/A.pdf",
+              "u/pdfs/B.pdf"
+            ],
+            "moved": {
+              "u/pdfs/A.pdf": "notShared"
+            },
+            "after": {
+              "u/pdfs/A.pdf": "notShared"
+            }
+          },
+          {
+            "name": "an earlier choice is kept",
+            "before": {
+              "u/pdfs/A.pdf": "notShared"
+            },
+            "listed": [
+              "u/pdfs/A.pdf",
+              "u/pdfs/B.pdf"
+            ],
+            "moved": {},
+            "after": {
+              "u/pdfs/A.pdf": "notShared"
+            }
+          },
+          {
+            "name": "a file moved back keeps its new place",
+            "before": {
+              "u/Answer Keys/K.pdf": "shared"
+            },
+            "listed": [
+              "u/Answer Keys/K.pdf"
+            ],
+            "moved": {
+              "u/Answer Keys/K.pdf": "notShared"
+            },
+            "after": {
+              "u/Answer Keys/K.pdf": "notShared"
+            }
+          },
+          {
+            "name": "a renamed or deleted file is forgotten",
+            "before": {
+              "u/pdfs/Old Name.pdf": "notShared"
+            },
+            "listed": [
+              "u/pdfs/New Name.pdf"
+            ],
+            "moved": {},
+            "after": {}
+          }
+        ]
+      },
+      "filterCases": {
+        "rule": "#833 (Russell, 2026-11-13: 'Tables must be sortable and filterable so teachers can drill down as needed'). One search field filters BOTH tables as the teacher types. The text is split at white space into words; a document matches when EVERY word is found inside its name, its unit or its kind, in any letter case and with accents folded on both sides; no words matches everything. The Unit popup (`unit`, null for all) keeps only that unit's documents; Answer Keys Only (`keysOnly`) keeps only answer keys of either kind. A filter changes what is SHOWN, never what is shared: a document hidden by it keeps its place, the headers count what is showing against the total (countCases), the sentence by Share counts everything (wordsForTheTables.shareCounts), and a move acts only on rows that are both selected and showing.",
+        "documents": [
+          {
+            "place": "unit-1/pdfs/Quiz 1.pdf",
+            "name": "Quiz 1.pdf",
+            "unit": "unit-1",
+            "kind": "PDF",
+            "answerKey": null
+          },
+          {
+            "place": "unit-1/pdfs/Quiz 1 - Solutions.pdf",
+            "name": "Quiz 1 - Solutions.pdf",
+            "unit": "unit-1",
+            "kind": "PDF",
+            "answerKey": "hint"
+          },
+          {
+            "place": "unit-2/Answer Keys/Réponses.pdf",
+            "name": "Réponses.pdf",
+            "unit": "unit-2",
+            "kind": "PDF",
+            "answerKey": "folder"
+          },
+          {
+            "place": "unit-2/pdfs/Lab Notes.txt",
+            "name": "Lab Notes.txt",
+            "unit": "unit-2",
+            "kind": "Text",
+            "answerKey": null
+          }
+        ],
+        "cases": [
+          {
+            "query": "",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Quiz 1.pdf",
+              "Quiz 1 - Solutions.pdf",
+              "Réponses.pdf",
+              "Lab Notes.txt"
+            ]
+          },
+          {
+            "query": "quiz",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Quiz 1.pdf",
+              "Quiz 1 - Solutions.pdf"
+            ]
+          },
+          {
+            "query": "QUIZ solutions",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Quiz 1 - Solutions.pdf"
+            ]
+          },
+          {
+            "query": "  quiz  ",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Quiz 1.pdf",
+              "Quiz 1 - Solutions.pdf"
+            ]
+          },
+          {
+            "query": "reponses",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Réponses.pdf"
+            ]
+          },
+          {
+            "query": "RÉPONSES",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Réponses.pdf"
+            ]
+          },
+          {
+            "query": "unit-2",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Réponses.pdf",
+              "Lab Notes.txt"
+            ]
+          },
+          {
+            "query": "text",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Lab Notes.txt"
+            ]
+          },
+          {
+            "query": "pdf unit-2",
+            "unit": null,
+            "keysOnly": false,
+            "matches": [
+              "Réponses.pdf"
+            ]
+          },
+          {
+            "query": "zzz",
+            "unit": null,
+            "keysOnly": false,
+            "matches": []
+          },
+          {
+            "query": "",
+            "unit": "unit-1",
+            "keysOnly": false,
+            "matches": [
+              "Quiz 1.pdf",
+              "Quiz 1 - Solutions.pdf"
+            ]
+          },
+          {
+            "query": "",
+            "unit": null,
+            "keysOnly": true,
+            "matches": [
+              "Quiz 1 - Solutions.pdf",
+              "Réponses.pdf"
+            ]
+          },
+          {
+            "query": "",
+            "unit": "unit-2",
+            "keysOnly": true,
+            "matches": [
+              "Réponses.pdf"
+            ]
+          },
+          {
+            "query": "lab",
+            "unit": "unit-1",
+            "keysOnly": false,
+            "matches": []
+          }
+        ]
+      },
+      "countCases": {
+        "rule": "#833: each table's header is its title and a count, wordsForTheTables.sharedTable or notSharedTable with {count}: countAll ({n}, the table's total) while every document of that table is showing, countFiltered ({shown} of {total}) while a filter hides any of them, so a filter never hides the fact that more is going out.",
+        "cases": [
+          {
+            "table": "shared",
+            "shown": 12,
+            "total": 12,
+            "header": "Shared (12)"
+          },
+          {
+            "table": "shared",
+            "shown": 3,
+            "total": 12,
+            "header": "Shared (3 of 12)"
+          },
+          {
+            "table": "shared",
+            "shown": 0,
+            "total": 0,
+            "header": "Shared (0)"
+          },
+          {
+            "table": "shared",
+            "shown": 0,
+            "total": 4,
+            "header": "Shared (0 of 4)"
+          },
+          {
+            "table": "notShared",
+            "shown": 2,
+            "total": 2,
+            "header": "Not shared (2)"
+          },
+          {
+            "table": "notShared",
+            "shown": 1,
+            "total": 2,
+            "header": "Not shared (1 of 2)"
+          }
+        ],
+        "shareCountsCases": [
+          {
+            "shared": 9,
+            "heldBack": 3,
+            "sentence": "9 document(s) will be shared and 3 held back."
+          },
+          {
+            "shared": 0,
+            "heldBack": 0,
+            "sentence": "0 document(s) will be shared and 0 held back."
+          }
+        ]
+      },
+      "wordsForTheTables": {
+        "rule": "#833: every sentence and label the two tables' sheet shows, by key; the app names each by key and its test compares them with these. The sheet's title is openShareLists.sheetTitle, its by-name sentence openShareLists.byName, its button openShareLists.shareButton, and Cancel is the default.",
+        "sharedTable": "Shared ({count})",
+        "notSharedTable": "Not shared ({count})",
+        "countAll": "{n}",
+        "countFiltered": "{shown} of {total}",
+        "columnName": "Name",
+        "columnUnit": "Unit",
+        "columnFolder": "Folder",
+        "columnKind": "Kind",
+        "columnNote": "Note",
+        "noUnit": "Not in a unit",
+        "moveToNotShared": "Don't Share",
+        "moveToShared": "Share",
+        "moveToNotSharedHelp": "Move the selected documents to Not shared",
+        "moveToSharedHelp": "Move the selected documents to Shared",
+        "movedToNotShared": "{n} moved to Not shared.",
+        "movedToShared": "{n} moved to Shared.",
+        "searchPrompt": "Search Documents",
+        "unitPopup": "Unit",
+        "allUnits": "All Units",
+        "keysOnly": "Answer Keys Only",
+        "noteAnswerKey": "Answer key",
+        "noteMayBe": "May be an answer key",
+        "noteOpenKey": "Answer key, open to anyone with the address",
+        "noteCannotShare": "Plantoir shares PDFs, text files, pages and pictures, not files of this kind. Save it as a PDF to share it.",
+        "ownFilesLine": "The plan's own pages, pictures, stylesheets and fonts ({n} files) always go and are not listed here.",
+        "shareCounts": "{shared} document(s) will be shared and {heldBack} held back.",
+        "emptyTable": "(none)"
+      },
       "openShareLists": {
-        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "rule": "Named for #709's open share; since #833 (Russell, 2026-11-13, ruling 5) EVERY share asks, protected ones too. Before anything is sent, share_plan.py prints the plan's DOCUMENTS (documents) in two lists, `sharedHeading` (`sharedHeadingProtected` for a share with a password) and `leftOutHeading`, each by file place with where it starts (startingPlace, remembered choices applied), the `ownFilesLine` count of what always goes, `byName`, and asks `question` (`questionProtected`); the share goes only on y or yes. In the app the question is answered ONLY in a sheet of its own: the two tables (wordsForTheTables), read from the marker lines (`markers`), with drag and drop and the move buttons, the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. When the teacher presses Share the app writes the settled places into the marker (rememberedChoices) and only then answers y; share_plan.py re-reads them, refuses a list naming a file it would never share, and stages exactly the listed documents that settle in Shared, holding back any document that appeared after the lists were printed. Under --non-interactive nothing is asked: the remembered choices and the rule decide, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. No sentence anywhere says a share holds no answers.",
         "sharedHeading": "These files will be shared with anyone who has the address:",
+        "sharedHeadingProtected": "These files will be shared with anyone who has the address and the password:",
         "leftOutHeading": "These files are left out:",
         "none": "(none)",
         "byName": "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it.",
         "question": "Share these files with anyone who has the address? [y/N]: ",
+        "questionProtected": "Share these files with anyone who has the address and the password? [y/N]: ",
         "nonInteractive": "Sharing as the lists say, because nobody is here to look at them.",
         "declined": "Nothing was shared.",
         "markers": {
           "begin": "PLANTOIR_PLAN_LISTS_BEGIN:",
-          "shared": "PLANTOIR_PLAN_LISTS_SHARED:",
-          "leftOut": "PLANTOIR_PLAN_LISTS_LEFT_OUT:",
+          "document": "PLANTOIR_PLAN_LISTS_DOCUMENT:",
           "end": "PLANTOIR_PLAN_LISTS_END:",
-          "rule": "Each file is printed twice: once in the lists a person reads at a terminal, and once as a marker line, `shared` or `leftOut` followed by one space and the file's place in the plan site (a line break in a name written as a space), between `begin` and `end` (each ending in a colon, so every reader's one rule for a machine line, PLANTOIR_ and capitals then a colon, keeps all four out of the console). The app reads only the marker lines, keeps them out of the console, and shows them in the open share's own sheet; it never reads the console's own lines for the lists."
+          "beginShape": "PLANTOIR_PLAN_LISTS_BEGIN: <year> protected:<yes|no> tick:<yes|no> ownFiles:<n>",
+          "documentKeys": [
+            "place",
+            "name",
+            "unit",
+            "unitOrder",
+            "folder",
+            "kind",
+            "answerKey",
+            "movable",
+            "start"
+          ],
+          "rule": "Each listed document is printed twice: once in the lists a person reads at a terminal, and once as a marker line, `document` followed by one space and a JSON object on one line (ASCII only, so a line break or an accent in a name is escaped) carrying `documentKeys`: its place in the plan, its name, its unit and the unit's place in the list of plans (unitOrder, from the order the plan's index.html links its units, then by name), its folder inside the unit, its kind, answerKey (folder, hint or null), whether it can be moved, and where it starts (shared or notShared). Between `begin`, which carries the year whose marker holds the choices, whether the share is protected, whether Include Answer Keys was ticked and the count of the plan's own files, and `end`. Each ends in a colon, so every reader's one rule for a machine line, PLANTOIR_ and capitals then a colon, keeps all three out of the console. The app reads only the marker lines; it never reads the console's own lines for the lists. Until #833 the lists were `shared` and `leftOut` lines carrying a place each; neither is printed now."
         },
         "sheetTitle": "Share these files?",
         "shareButton": "Share"
@@ -39129,7 +39911,7 @@
         ]
       },
       "warningCases": {
-        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
+        "rule": "Whether the public-address warning (words.crawlerWarningTitle and its sheet, warningSheet) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
         "cases": [
           {
             "marker": null,
@@ -39198,6 +39980,147 @@
         "rule": "After the proof, every deployment of the project but the canonical one is deleted (GET .../deployments, then DELETE .../deployments/{id}?force=true). A delete that fails: the plans are shared as asked, refusals.oldCopyStillThere is said, the marker keeps oldCopies, and the next share tries again.",
         "why": "Measured 2026-11-12 (S3): every deploy is also a deployment with an address of its own, and after an open share was re-shared protected, the OLD open deployment's own address still served the list of plans and a PDF with 200 and no password, while the main address answered 401. After its delete the old address answered 404 within 10 s (S4). The active production deployment cannot be deleted (400, 8000034)."
       },
+      "warningSheet": {
+        "rule": "#834 (Russell, 2026-11-13: 'This dialog reads as a wall of text. Separate pertinent information from the message the app is trying to convey.'), applied by #833 to the public-address warning. A small sheet, not a plain alert: the title words.crawlerWarningTitle asks the question; one short sentence, words.crawlerWarningMessage; then labelled rows in the system's own form styling, each label and value its own key: crawlerRowLabel / crawlerRowValue; documentsRowLabel / documentsRowValue with the two tables' full counts; answerKeysRowLabel / answerKeysRowValue ONLY when an answer key of either kind sits in Shared (a row whose fact is missing is absent, never blank); passwordRowLabel / passwordRowValue. Then Cancel, the default and Escape, and words.shareAnyway. Since #833 it comes AFTER the two tables, when the teacher presses Share there in a share warningCases says warns, because only then are the counts known; Cancel goes back to the tables, whose own Cancel shares nothing. VoiceOver reads the message, then each row as 'label, value'. The one-paragraph keys crawlerWarning and answerKeysClause are retired.",
+        "cases": [
+          {
+            "name": "no key in Shared",
+            "shared": 4,
+            "heldBack": 2,
+            "keysInShared": 0,
+            "rows": [
+              "crawlerRowLabel",
+              "documentsRowLabel",
+              "passwordRowLabel"
+            ],
+            "documentsRow": "4 shared, 2 held back"
+          },
+          {
+            "name": "two keys in Shared",
+            "shared": 6,
+            "heldBack": 0,
+            "keysInShared": 2,
+            "rows": [
+              "crawlerRowLabel",
+              "documentsRowLabel",
+              "answerKeysRowLabel",
+              "passwordRowLabel"
+            ],
+            "documentsRow": "6 shared, 0 held back",
+            "answerKeysRow": "Includes 2 answer key(s)"
+          }
+        ]
+      },
+      "changePasswordCases": {
+        "rule": "#833 (Russell, 2026-11-13: 'Yes, in an after the password is changed dialog, which the teacher must acknowledge', the version that offers to send now). Change Password… only SAVES the new username and password (deploy.sh --plans --protect --change-password --password-only: asked in the console as before, kept in the Keychain, and share_plan.py --new-password-waiting writes `newPasswordWaiting` true into the year's marker when it has an address, printing markers.passwordSaved). Then a dialog the teacher must answer, in #834's shape: words.newPasswordSavedTitle, the one-sentence words.newPasswordSavedMessage, then labelled rows (askedForNowLabel and askedForNowValue, whatChangesItLabel and whatChangesItValue, and earlierYearsLabel and earlierYearsValue only when an earlier school year is still shared), with Share Again (words.shareAgain, the default) and Later (words.later; Escape is Later). Share Again goes through the same path as the bar's own button: the two tables first, as before every share. While the marker says `newPasswordWaiting`, the bar shows words.newPasswordNotInUse under the status, across a relaunch, until a share PROVES the address (state shared, written only after the proof); a share that fails, is cancelled, or is declined at the tables leaves it. When the year's plans have no address, Change Password is not on the bar at all: the first protected share asks for the password and sends it in one go, and no dialog follows. The fact that a new password waits for a share is never in a tooltip only.",
+        "cases": [
+          {
+            "name": "changed while shared",
+            "markerHasAddress": true,
+            "event": "passwordSaved",
+            "dialog": true,
+            "lineAfter": true
+          },
+          {
+            "name": "not shared: no Change Password on the bar, and a first protected share sends the password it asks for",
+            "markerHasAddress": false,
+            "event": "passwordSaved",
+            "dialog": false,
+            "lineAfter": false
+          },
+          {
+            "name": "Later, then a relaunch",
+            "markerHasAddress": true,
+            "event": "relaunch",
+            "before": {
+              "newPasswordWaiting": true
+            },
+            "dialog": false,
+            "lineAfter": true
+          },
+          {
+            "name": "Later, then a share that succeeded",
+            "markerHasAddress": true,
+            "event": "shareProved",
+            "before": {
+              "newPasswordWaiting": true
+            },
+            "dialog": false,
+            "lineAfter": false
+          },
+          {
+            "name": "Later, then a share that failed",
+            "markerHasAddress": true,
+            "event": "shareFailed",
+            "before": {
+              "newPasswordWaiting": true
+            },
+            "dialog": false,
+            "lineAfter": true
+          },
+          {
+            "name": "Later, then a share declined at the tables",
+            "markerHasAddress": true,
+            "event": "shareDeclined",
+            "before": {
+              "newPasswordWaiting": true
+            },
+            "dialog": false,
+            "lineAfter": true
+          }
+        ],
+        "why": "Until #833 the fact was a tooltip on the Change Password button (words.changePasswordNote), which a teacher who never hovers never reads, and Change Password also shared at once. Now that every share opens the tables, saving and sending are two steps a teacher can see: the dialog says which password a colleague meets meanwhile, and the line keeps saying it after Later. changePasswordNote is kept as the button's tooltip, a second place for the same fact rather than the only one."
+      },
+      "theVerbIsShare": {
+        "rule": "#833 (Russell, 2026-11-13): the verb for sending unit plans is Share (Share Unit Plans, Share Again, Stop Sharing). Deploy is for class websites only, and publish means marking a page for a class website. No sentence a teacher reads in unitPlanning.share (words, refusals, openShareLists, wordsForTheTables) says deploy or publish, in any form; scripts/test_unit_plan_site.py reads every one.",
+        "forbidden": [
+          "deploy",
+          "publish"
+        ],
+        "checks": [
+          "words",
+          "refusals",
+          "openShareLists",
+          "wordsForTheTables"
+        ]
+      },
+      "advice": {
+        "rule": "#833: check() refuses a plan; advice() never does. It names, in a teacher's words (`line`), each file OUTSIDE an answerKeysFolder whose name the answer-key hint matches, as one to move into its unit's Answer Keys folder. share_plan.py prints the advice before the lists and shares as usual; the skill's own check before hand-over asks the assistant to fix every one in a plan it makes.",
+        "kinds": [
+          "keyOutsideFolder"
+        ],
+        "line": "{place} looks like an answer key. Move it into its unit's Answer Keys folder so every share treats it as one.",
+        "cases": [
+          {
+            "name": "the template as it ships",
+            "add": [],
+            "advice": []
+          },
+          {
+            "name": "a key in pdfs/",
+            "add": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ],
+            "advice": [
+              "unit/pdfs/Quiz 1 - Solutions.pdf"
+            ]
+          },
+          {
+            "name": "a key in the folder",
+            "add": [
+              "unit/Answer Keys/Quiz 1 - Solutions.pdf"
+            ],
+            "advice": []
+          },
+          {
+            "name": "an ordinary handout",
+            "add": [
+              "unit/pdfs/Dissolution Lab.pdf"
+            ],
+            "advice": []
+          }
+        ]
+      },
       "markerFile": {
         "path": "courses/<CODE>/.cloudflare_sites/plans-<year>.json",
         "keys": [
@@ -39213,9 +40136,13 @@
           "answerKeysLeftOut",
           "lastShared",
           "units",
-          "oldCopies"
+          "oldCopies",
+          "documents",
+          "documentsShared",
+          "documentsHeldBack",
+          "newPasswordWaiting"
         ],
-        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded. `state` is sending (written before the upload: the share has not been proved, so the bar says it may be open), shared (proved), or stopping (a Stop Sharing that has not been confirmed); interruptionCases says what each leaves behind."
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded. `state` is sending (written before the upload: the share has not been proved, so the bar says it may be open), shared (proved), or stopping (a Stop Sharing that has not been confirmed); interruptionCases says what each leaves behind. Since #833: `documents` holds the teacher's remembered choices (rememberedChoices), which the APP writes too, into this same file, when the teacher presses Share and before it answers (the one key the app writes; it keeps every other key as it found it); `documentsShared` and `documentsHeldBack` count the listed documents the last share sent and held back; `newPasswordWaiting` is true from a Change Password that saved a new password (share_plan.py --new-password-waiting) until a share proves the address, and is kept by every marker a share writes before that (changePasswordCases). A marker holding only `documents` (choices made before a first share that was then cancelled) has no address and reads as not shared."
       },
       "credential": {
         "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a fresh file for each share, 0600 inside its own 0700 folder (/tmp/plan_cred.XXXXXX/cred, made by mktemp -d), named to share_plan.py by --credential-file (a path, never the secret); share_plan.py deletes the file and the folder as soon as it has read them and again on every way out, so two courses shared at once never read each other's (review M4). The password is used exactly as typed, spaces at either end included; neither the username nor the password is echoed into the console (both are read without echo). Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
@@ -39227,8 +40154,9 @@
         "measured": "2026-11-12: a project holding 2 deployments deleted with 200 and nothing deleted first; the address answered 530 or 522 within 5 s, stopped resolving after about 100 s, and never answered 200 again in 3 minutes. A deleted project's *.pages.dev name could later be taken by another account; the suffix makes that a matter of chance, not of guessing (not measured: it needs a second account)."
       },
       "markers": {
-        "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n>",
-        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>] (notConfirmed when the teacher said no to the open share's lists)",
+        "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n> documents:<n> heldBack:<n>",
+        "passwordSaved": "PLANTOIR_PLAN_PASSWORD_SAVED: <CODE+> <year> <waiting|notShared> (#833: printed by share_plan.py --new-password-waiting; waiting when the year's plans have an address, so the marker now says the new password is not in use, notShared when they have none and nothing was written)",
+        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>] (notConfirmed when the teacher said no to the lists; listNotShareable when the lists the app settled named a file the share would never send)",
         "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed|unconfirmed>",
         "rule": "Printed by share_plan.py for the app to read and keep out of the console (app-rules.json -> markerOrigins, origin shared-python). <CODE+> is the course with its one permitted space written +, as every other marker writes it."
       },
@@ -39249,8 +40177,15 @@
         "lastShared": "Last shared {when}.",
         "answerKeysLeftOut": "{n} answer key(s) left out. Protect the plans with a password, or tick Include Answer Keys, to share them.",
         "crawlerWarningTitle": "Share without a password?",
-        "crawlerWarning": "Anyone with the address can open these plans{answerKeysClause}. Plantoir asks search engines and AI crawlers not to read or keep them, but they can ignore that, so treat anything here as possibly searchable. To require a password, choose Protect with a Username and Password.",
-        "answerKeysClause": ", including the answer keys you chose to include",
+        "crawlerWarningMessage": "Anyone with the address can open these plans.",
+        "crawlerRowLabel": "Search engines and AI crawlers",
+        "crawlerRowValue": "Asked not to read or keep them, but they can ignore that",
+        "documentsRowLabel": "Documents",
+        "documentsRowValue": "{shared} shared, {heldBack} held back",
+        "answerKeysRowLabel": "Answer keys",
+        "answerKeysRowValue": "Includes {n} answer key(s)",
+        "passwordRowLabel": "To require a password",
+        "passwordRowValue": "Choose Protect with a Username and Password",
         "shareAnyway": "Share Without a Password",
         "floodClosed": "If someone floods this address with requests, Cloudflare closes the plans until midnight UTC rather than opening them.",
         "floodOpen": "Cloudflare did not accept the setting that keeps the plans closed if this address is flooded with requests. If that happened, anyone with the address could open the plans until midnight UTC. The address ends in random letters, so it is hard to guess.",
@@ -39263,7 +40198,17 @@
         "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished.",
         "consoleSheetTitle": "Sharing unit plans",
         "lastShareUnfinished": "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing.",
-        "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
+        "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes.",
+        "newPasswordSavedTitle": "Share the plans again with the new password?",
+        "newPasswordSavedMessage": "The new password is not in use yet.",
+        "askedForNowLabel": "Asked for now",
+        "askedForNowValue": "The old password",
+        "whatChangesItLabel": "What changes it",
+        "whatChangesItValue": "Sharing these plans again",
+        "earlierYearsLabel": "Earlier years",
+        "earlierYearsValue": "Keep the password they were shared with",
+        "later": "Later",
+        "newPasswordNotInUse": "The new password is not in use yet: people who open the address are still asked for the old one until these plans are shared again."
       },
       "refusals": {
         "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",
@@ -39277,10 +40222,11 @@
         "notAnsweringYet": "These plans were sent, but their address did not answer yet, so Plantoir cannot say they are shared. Share Again in a minute.",
         "cloudflareSaidNo": "Cloudflare did not take these plans, so they were not shared. The reason Cloudflare gave is above.",
         "referenceCourse": "referenceCourses.refusal.sentence, unchanged",
-        "notConfirmed": "Nothing was shared."
+        "notConfirmed": "Nothing was shared.",
+        "listNotShareable": "These plans were not shared, because the list of files to share named a file Plantoir cannot share."
       },
       "trail": {
-        "rule": "Three events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."
+        "rule": "Four events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped, and since #833 unit plan password changed. The shared line says how many documents went and how many were held back, never a file's name. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."
       },
       "rejected": [
         "one site per course with no year (707c's assumption; Russell, 2026-11-12: one per school year)",
@@ -39297,7 +40243,16 @@
         "answer keys guessed from other words in a file name (Solutions Manual Notes.pdf): only the skills' own endings count",
         "deploy.py --plans: its --section is required and the plans path shares none of its section logic",
         "a share tool for the local assistant or an MCP client: it would move the tool surface, and sharing is the teacher's act",
-        "a flood test on any account (Russell, 2026-11-12)"
+        "a flood test on any account (Russell, 2026-11-12)",
+        "guessing answer keys from names alone, widened to every name holding answer, solution or key (#709's fix review): false hits on ordinary names such as Dissolution Lab.pdf and Key Terms.pdf; ruled out by Russell on 2026-11-13 in favour of the Answer Keys folder, with the names kept only as a hint",
+        "reading inside files to find answers: Plantoir reads names, never contents, and says so beside the lists (openShareLists.byName)",
+        "Deploy for the sending, for consistency with class websites (Russell, 2026-11-13: plans go to a colleague, and Share has an opposite a teacher understands, Stop Sharing)",
+        "SwiftUI Table for the two tables (#833): dragging SEVERAL selected rows to the other table and dropping on the table rather than on a row are the native data-source calls of NSTableView, which a unit test can drive against a real table and pasteboard; with Table, multi-row drag could be proved only by driving the window",
+        "the settled lists in a file under /tmp named on the command line, or on the question's answer line: the share runs inside the website builder, where only courses/ is shared with the app, and a line break in a name would end an answer the terminal also echoes; the year's marker carries them",
+        "remembering every document's place rather than only the teacher's moves: a protected share would then fix every key in Shared for the next open share",
+        "keeping the remembered choices through Stop Sharing: a marker left behind would read to deploy.sh as a year still shared, and the Keychain item would never be deleted",
+        "the tables listing every file, pages and stylesheets included (#709's lists): forty lines of the plan's own files buried the three a teacher must look at",
+        "the public-address warning as one paragraph in a plain alert before the share started (#709): it could not say how many documents and answer keys go, and read as a wall of text (#834)"
       ]
     }
   },
