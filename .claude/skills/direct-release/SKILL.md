@@ -29,7 +29,14 @@ right and this file is corrected.
   Agents commit and push on their own issue branch and nothing else. Asked
   first, always: a force-push, a history rewrite, `git branch -D`. A cut, a
   tag, a merge into `main`, signing and a website deploy happen only when
-  Russell asks for that cut or that deploy.
+  Russell asks for that cut or that deploy; after a cut, `main` is merged
+  back into `dev` in the same session.
+- **If this harness cannot run Fable as the main session, you are not a
+  Fable director**: rule 6's ordinary rule applies, and each merge into
+  `dev` is Russell's. Where the model names differ, use the strongest model
+  to implement and a separate context of it to review, and say which did
+  which. With no question dialog, ask in chat one question at a time, each
+  with a recommendation.
 
 ## Opening a run
 
@@ -38,7 +45,9 @@ right and this file is corrected.
    milestone, body and comments. Rulings are comments on the issues.
 2. Tell Russell briefly: the order you propose and why, what can overlap, an
    estimate in agent-hours and clock time, and each decision that is his.
-3. Then work without checking in. He interrupts when he wants something.
+3. Wait until he agrees the order. On Windows this is `WINDOWS-BOOTSTRAP.md`
+   section 0, and it is not optional. Then work without checking in; he
+   interrupts when he wants something.
 
 Do not trust a milestone label as a plan. Judge a piece by what a teacher
 would meet in ordinary use, and by which way a fault errs: one that reports
@@ -99,6 +108,9 @@ agent's own brief. It carries:
 - **The gate sets the pace.** No new implementation starts while reviewed
   pieces wait to be merged. Keep stacks short: a piece starts from `dev`
   unless it truly needs an unmerged one.
+- Only one working copy runs a full suite at a time (on the Mac the suite's
+  test host is the app, and `verify.sh` refuses a second run). Each Windows
+  working copy needs both fetch scripts run before it builds.
 - Never message a finished implementer while another agent owns its working
   copy: it wakes and commits into someone else's branch.
 
@@ -113,13 +125,19 @@ In a working copy of the director's own, never one an agent is using:
    from the table in `CLAUDE.md` → "Testing — what gates what". The full
    suite passes in ONE run; a test that passes only when run alone has not
    passed (Russell, 2026-11-13).
+   **A test that is red because the other platform merged a contract case
+   is a handover, not damage.** Find its issue, or open one. Do not edit
+   the case, and do not ledger a gap a teacher could see, to go green: ask
+   Russell before merging over it.
 3. Push `dev`. If the push is rejected because the other platform got there
    first: fetch, read what changed, merge, gate again. Never force.
 4. Open the other platform's issue with the same milestone, post the
    closing comment (what landed, what was measured, which model did which
-   review), close the issue, delete the branch.
+   review), close the issue, delete the branch, local and remote, with `git branch
+   -d` (never `-D`) and the remote delete `CLAUDE.md` rule 6 gives.
 
-A change to documents alone needs no gate; say so in the closing comment.
+A change to documents alone needs no gate unless a test reads the document
+(grep `scripts/test_*.py` for the file); say so in the closing comment.
 
 ## What differs by platform
 
@@ -127,7 +145,9 @@ A change to documents alone needs no gate; say so in the closing comment.
 |---|---|---|
 | Never edit | `windows-app/` | `mac-app/` |
 | The other side's work goes in | a `windows` issue | a `mac` issue |
-| Gates | the mac suite, `verify.sh`, `verify-deploy.sh` | `dotnet test` judged by its totals line, `run-ui-tests.ps1`, `verify-deploy.ps1` |
+| Gates | the mac suite, `verify.sh`, and `verify-deploy.sh` (with `--first-publish` for a release) when publishing changes | `dotnet test`, judged by its totals line and read with the named-gap ledger (it also runs the shared `scripts/test_*.py`); `verify-deploy.ps1` (`-SelfTest` first, `-FirstPublish` for a release) when publishing changes |
+| Not a gate | the UI test target: opt-in, alone on a quiet machine | `run-ui-tests.ps1`: opt-in, needs the screen, closes Plantoir |
+| The image (Dockerfile, baked files) | gated by `verify.sh` | not gated here: a change made on Windows needs a `mac` issue |
 | Generated contract halves | `Plantoir --write-contracts` | cannot regenerate: propose authored cases, open a `mac` issue |
 | Build left for Russell | plain Debug build, app left quit | `-p:Platform=x64`, ready at "PT - Dev", not launched |
 
@@ -155,12 +175,18 @@ changing them.
 
 - A new finding becomes an issue with a milestone recommendation; it does
   not ride along in the piece that found it.
-- End only processes the run started. His own Plantoir and his other
-  sessions are his.
+- End only processes the run started; his other sessions are his. The one
+  exception is in `CLAUDE.md` → "Setting up on a new machine": on Windows a
+  running Plantoir may be closed before a build. Say that you closed it,
+  never close it under a build, preview or deploy he is watching, and then
+  remove the lease files you orphaned and any stray `plantoir-mcp`.
 - Never read, print or commit a credential or a signing key. Never `gh auth
   switch`.
 - Student names never enter the repository: run a counts-only check on what
-  a piece adds before merging it, and never print a match.
+  a piece adds before merging it, and never print a match. No such script
+  is kept in the repository, because it reads a list that must not leave
+  his computer: ask him where the list is, and write a script that prints
+  counts and file names only.
 - The interface never mentions the machinery (`CLAUDE.md` rule 1).
 
 ## State
