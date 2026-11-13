@@ -4932,7 +4932,19 @@ Waits are on the state asked about, with a ceiling.
   page as soon as its rows were done, and a request 1, 2, 4 or 12 s after
   load, a frame added at 4 s and a lazy picture or frame 6,000 px down were
   all unseen (fixes review F3). What a page asks for later than that is
-  still unseen, and the row's own line says so.
+  still unseen, and the row's own line says so. A sabotage aimed at a row
+  other than own host or clean page holds only until quiet (no 5 s), which
+  saved about a minute over the forty sabotages; every plain run, and those
+  two rows' sabotages, keep the full hold.
+- **The engines never take the front.** Measured 2026-11-13 with
+  `lsappinfo front` every 0.2 s through a rows run and the keys sabotage, per
+  engine: 287 samples (WebKit) and 276 (Chromium), every one the application
+  that was in front before (Finder). Chrome for Testing headless registers
+  as a BackgroundOnly application; Playwright's WebKit as a UIElement (no
+  Dock icon). Neither became the front application in any sample, and no
+  launch option is needed. (A once-a-second run across all four showed
+  another program's window test in front twice, during a WebKit run; that
+  was the other program, not either engine.)
 - **What the router does not see, and how each is caught** (implementation
   review M1, measured with a script of the site's own asking example.com):
 
@@ -5047,13 +5059,15 @@ Two things made that reliable, both measured 2026-11-13:
   at a time.
 
 **Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
-engines at once, three runs of the step after the review's fixes:** the rows
-in 14 to 15 s; the 31 sabotages (61 engine runs) in about 120 s, three at a
-time with the keys sabotage alone at the end (344 s one at a time, measured
-before they were run in parallel); the whole step in `verify.sh`, its own
-build of the fixture site included (about 10 s), 137 to 139 s, so about two
-and a quarter minutes on a run that takes about 25. With WebKit missing it
-takes 116 s and says SKIP twice; with no engine, 9 s. Cold visits to the isolated Python page: first contentful paint 275 to
+engines at once, three runs of the step after the second fixes review:**
+the rows in 57 s (the hold until quiet adds about 40 s: they took 14 to 15 s
+before it); the 40 sabotages (78 engine runs) in about 150 s, three at a
+time with the keys sabotage alone at the end, one engine at a time (344 s
+one at a time when there were 21); the whole step in `verify.sh`, its own
+build of the fixture site included (about 10 s), 224 to 225 s, so under four
+minutes on a run that takes about 25. Before this round it took 137 to 139 s.
+With WebKit missing it took 116 s (before this round) and said SKIP twice;
+with no engine, 9 s. Cold visits to the isolated Python page: first contentful paint 275 to
 283 ms. A census of every fixture page in both engines found no console line
 at all and only `fonts.googleapis.com`, `fonts.gstatic.com` and (on a page
 with a diagram) `cdnjs.cloudflare.com` asked of other hosts, which is
