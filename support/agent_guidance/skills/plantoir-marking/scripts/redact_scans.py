@@ -25,7 +25,10 @@ How a page is checked before it is blanked, and why (a box that misses its heade
     corner of it lands more than 0.1 in from where the box will be painted, or the page is scaled by
     more than 2 percent, the file is NOT written and the line says CHECK and why;
   - a page that lines up only when turned half a turn is upside down: it is turned upright, blanked,
-    and said so.
+    and said so;
+  - ink just around the box (0.25 in) that the blank test does not have there, once the page is lined
+    up, is writing that runs past the box: a name written longer than the line, or above or below it.
+    More than a speck of it stops the file with CHECK.
 The success line says what was measured: "box placed; header matches your blank test". It never says
 OK about coverage it did not measure. A name written anywhere other than the name box is NOT blanked.
 
@@ -60,6 +63,12 @@ PROFILE_DPI = 50                 # pixels per inch for lining up
 INK_NEIGHBOURS = 2               # ink has at least this many ink neighbours; a lone speck has none
 SMOOTHING = 2                    # profile values averaged this many either way (0.04 in at 50 dpi)
 INK_STEP = 40                    # how much darker than the paper a pixel must be to count as ink
+RING_IN = 0.25                   # how far around the box writing past it is looked for
+RING_DPI = 100                   # pixels per inch for that look
+RING_STEP = 80                   # how much darker than the paper a pixel must be there to count as writing
+RING_SLACK = 1                   # pixels either way the blank's own print may sit after lining up
+RING_SEARCH = 3                  # pixels either way the last of the lining up is looked for
+RING_LIMIT = 10                  # pixels of writing past the box that stop the file (0.001 square inches)
 MIN_MATCH = 0.55                 # how well a profile must match the blank test's to be trusted
 DPI = 150                        # pixels per inch for the blanked pages
 JPEG_QUALITY = 75
@@ -471,11 +480,14 @@ def line_up(blank_image, scan_image, box_in):
             moved = ((a * x + b * y + c) ** 2 + (d * x + e * y + f) ** 2) ** 0.5 / dpi
             worst = max(worst, moved)
     scale_error = max(abs(a), abs(e))
-    return worst, scale_error, weakest
+    centre_x = (box_in[0] + box_in[2]) / 2 * dpi
+    centre_y = (box_in[1] + box_in[3]) / 2 * dpi
+    shift = ((a * centre_x + b * centre_y + c) / dpi, (d * centre_x + e * centre_y + f) / dpi)
+    return worst, scale_error, weakest, shift
 
 
 def compare_with_blank(blank_image, scan_image, box_in):
-    """('upright' | 'upside down', None) when the page lines up, or (None, reason)."""
+    """('upright' | 'upside down', None, shift in inches at the box) when the page lines up, or (None, reason, None)."""
     upright = line_up(blank_image, scan_image, box_in)
     turned = line_up(blank_image, rotate_half_turn(scan_image), box_in)
 
@@ -484,18 +496,87 @@ def compare_with_blank(blank_image, scan_image, box_in):
                 and result[1] <= SCALE_TOLERANCE)
 
     if fits(upright) and (not fits(turned) or upright[2] >= turned[2]):
-        return "upright", None
+        return "upright", None, upright[3]
     if fits(turned):
-        return "upside down", None
+        return "upside down", None, turned[3]
     candidates = [result for result in (upright, turned) if result is not None]
     if not candidates:
-        return None, "the top and foot of the page could not be lined up with your blank test"
+        return None, "the top and foot of the page could not be lined up with your blank test", None
     result = max(candidates, key=lambda measured: measured[2])
     if result[2] < MIN_MATCH:
-        return None, "the top and foot of the page do not match your blank test (another page, or crooked)"
+        return None, "the top and foot of the page do not match your blank test (another page, or crooked)", None
     if result[1] > SCALE_TOLERANCE:
-        return None, f"the page is shrunk or enlarged by about {round(result[1] * 100)} percent against your blank test"
-    return None, f"the header is about {result[0]:.2f} in from where your blank test puts it"
+        return None, f"the page is shrunk or enlarged by about {round(result[1] * 100)} percent against your blank test", None
+    return None, f"the header is about {result[0]:.2f} in from where your blank test puts it", None
+
+
+def writing_past_the_box(source, page, blank_page_image, box_in, shift_in, upside_down, size_pt, folder):
+    """How many pixels of ink just outside the box (within RING_IN of it) the blank test does not have there.
+
+    A name written longer than the blank, or above or below it, shows past the box: this is that ink,
+    after the page is lined up with the blank (the shift found at the box) and lone specks are dropped."""
+    width = round(size_pt[0] / 72 * RING_DPI)
+    height = round(size_pt[1] / 72 * RING_DPI)
+    x0 = max(0, round((box_in[0] - RING_IN) * RING_DPI))
+    y0 = max(0, round((box_in[1] - RING_IN) * RING_DPI))
+    x1 = min(width, round((box_in[2] + RING_IN) * RING_DPI))
+    y1 = min(height, round((box_in[3] + RING_IN) * RING_DPI))
+    if upside_down:
+        crop = (width - x1, height - y1, x1 - x0, y1 - y0)
+    else:
+        crop = (x0, y0, x1 - x0, y1 - y0)
+    crop_width, crop_height, crop_pixels = render_gray(source, page, RING_DPI, folder, crop)
+    if upside_down:
+        crop_pixels = bytes(reversed(crop_pixels))
+    sample = sorted(crop_pixels[::3])
+    paper = sample[len(sample) // 2] if sample else 255
+    blank_width, blank_height, blank_pixels = blank_page_image
+    shift_x = round(shift_in[0] * RING_DPI)
+    shift_y = round(shift_in[1] * RING_DPI)
+    box_x0, box_y0 = round(box_in[0] * RING_DPI), round(box_in[1] * RING_DPI)
+    box_x1, box_y1 = round(box_in[2] * RING_DPI), round(box_in[3] * RING_DPI)
+
+    def scan_ink(column, row):
+        return 0 <= column < crop_width and 0 <= row < crop_height and paper - crop_pixels[row * crop_width + column] > RING_STEP
+
+    writing = []
+    for row in range(crop_height):
+        for column in range(crop_width):
+            x, y = x0 + column, y0 + row
+            if box_x0 <= x < box_x1 and box_y0 <= y < box_y1:
+                continue
+            if not scan_ink(column, row):
+                continue
+            neighbours = 0
+            for neighbour_row in (row - 1, row, row + 1):
+                for neighbour_column in (column - 1, column, column + 1):
+                    if (neighbour_row, neighbour_column) != (row, column) and scan_ink(neighbour_column, neighbour_row):
+                        neighbours += 1
+            if neighbours >= INK_NEIGHBOURS:
+                writing.append((x, y))
+    if not writing:
+        return 0
+    # The blank's print near the box, widened by RING_SLACK, at the blank's own place.
+    reach = RING_SEARCH + RING_SLACK + max(abs(shift_x), abs(shift_y))
+    printed = set()
+    for blank_y in range(max(0, y0 - reach), min(blank_height, y1 + reach)):
+        for blank_x in range(max(0, x0 - reach), min(blank_width, x1 + reach)):
+            if blank_pixels[blank_y * blank_width + blank_x] < 200:
+                for near_y in range(blank_y - RING_SLACK, blank_y + RING_SLACK + 1):
+                    for near_x in range(blank_x - RING_SLACK, blank_x + RING_SLACK + 1):
+                        printed.add((near_x, near_y))
+    # The lining up is to about 0.02 in; the last few pixels are found here, where the least ink is left over.
+    unexplained = len(writing)
+    for offset_y in range(-RING_SEARCH, RING_SEARCH + 1):
+        for offset_x in range(-RING_SEARCH, RING_SEARCH + 1):
+            left_over = 0
+            for x, y in writing:
+                if (x - shift_x - offset_x, y - shift_y - offset_y) not in printed:
+                    left_over += 1
+                    if left_over >= unexplained:
+                        break
+            unexplained = min(unexplained, left_over)
+    return unexplained
 
 
 # ---------------------------------------------------------------- blanking one file
@@ -562,7 +643,7 @@ def verify_blanked(path, boxes, blank, blank_images, folder):
                 if max(pixels[row * width + x0 + 1: row * width + x1 - 1]) != 0:
                     return f"page {number}: the box is not black all through"
         scan_image = ink_of(render_gray(path, number, PROFILE_DPI, folder))
-        way, _reason = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
+        way, _reason, _shift = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
         if way != "upright":
             return f"page {number}: the blanked page does not line up with your blank test"
     return None
@@ -653,6 +734,7 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
         for number in range(1, len(blank_sizes) + 1):
             blank_images.append(ink_of(render_gray(blank, number, PROFILE_DPI, folder)))
         found, left_alone = identifier_files(originals, identifier)
+        ring_blanks = {}
         for label_text, source in found:
             reason = None
             ways = []
@@ -675,10 +757,19 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
                         reason = f"page {number} is a different size from your blank test"
                     break
                 scan_image = ink_of(render_gray(source, number, PROFILE_DPI, folder))
-                way, why = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
+                way, why, shift = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
                 if way is None:
                     reason = f"page {number}: {why}"
                     break
+                page_box = boxes[number - 1]
+                if page_box is not None:
+                    if number not in ring_blanks:
+                        ring_blanks[number] = render_gray(blank, number, RING_DPI, folder)
+                    past = writing_past_the_box(source, number, ring_blanks[number], page_box, shift,
+                                                way == "upside down", size_pt, folder)
+                    if past > RING_LIMIT:
+                        reason = f"page {number}: writing runs past the name box, so part of it would show"
+                        break
                 ways.append(way)
             target = Path(redacted) / (label_text + ".pdf")
             if reason is None:

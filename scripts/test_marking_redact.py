@@ -175,6 +175,12 @@ def variants(width, height):
             out[position] = value
         return width_now, height_now, out
 
+    def written_past_the_box(image, fill):
+        width_now, height_now, pixels = image
+        out = (width_now, height_now, bytearray(pixels))
+        paint(out, [(5.02, 0.57, 5.62, 0.73)], 15 if fill == 255 else 255)
+        return out
+
     return {
         "upright": (lambda image, fill: image, (1, 2)),
         "shifted down 0.15 in": (shift(0.15), (1, 2)),
@@ -190,6 +196,8 @@ def variants(width, height):
         "shifted down 0.05 in": (shift(0.05), (1, 2)),
         "scaled 99%": (scale(0.99), (1, 2)),
         "grey and speckled": (grey_and_speckled, (1, 2)),
+        # A name written longer than the blank runs past the box (750 plan review L2).
+        "a name written past the box": (written_past_the_box, (1,)),
     }
 
 

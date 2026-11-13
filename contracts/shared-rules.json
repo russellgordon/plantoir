@@ -33242,10 +33242,11 @@
       }
     },
     "redaction": {
-      "rule": "redact_scans.py (#750, 750a). The box is in inches from the top-left of the upright page, read from the BLANK test's own PDF: on each page, the label (normalised for case and punctuation, so NAME: and Name both match) that a writing line follows, in the top 1.5 in, preferred over another word equal to it (the starter's 'School Name' is at the same height, 750 plan review L1); box = label left - 11 pt, 0.20 in, the next word on the line - 3 pt (or the right margin), label bottom + 12 pt. A page of the blank with no label gets no box. Every page of a scan is checked against the blank BEFORE it is blanked (750 plan review R2: a check of the painted pixels proves only the painter): its size; then where its header and foot are, by one-dimensional ink profiles (rows and columns) of the top left and each half of the foot, each slid against the blank's, with lone specks dropped and profiles smoothed; from those three shifts the place where the blank's name box lands on the page; more than `shiftToleranceInches` at any corner, or a scale more than `scaleTolerance` off, stops the file with CHECK and a reason and it is not written; a page that lines up only when turned half a turn is turned upright and blanked. Each page is written as the four tiles AROUND the box, rendered by pdftoppm as JPEG, with the box filled black: the box's own pixels are never rendered into the output, so nothing sits under the black. The written file is read back: every box pixel 0, no text, the page count, and every page lined up and upright. The line says what was measured ('box placed; header matches your blank test'), never OK. Poppler and the standard library only.",
+      "rule": "redact_scans.py (#750, 750a). The box is in inches from the top-left of the upright page, read from the BLANK test's own PDF: on each page, the label (normalised for case and punctuation, so NAME: and Name both match) that a writing line follows, in the top 1.5 in, preferred over another word equal to it (the starter's 'School Name' is at the same height, 750 plan review L1); box = label left - 11 pt, 0.20 in, the next word on the line - 3 pt (or the right margin), label bottom + 12 pt. A page of the blank with no label gets no box. Every page of a scan is checked against the blank BEFORE it is blanked (750 plan review R2: a check of the painted pixels proves only the painter): its size; then where its header and foot are, by one-dimensional ink profiles (rows and columns) of the top left and each half of the foot, each slid against the blank's, with lone specks dropped and profiles smoothed; from those three shifts the place where the blank's name box lands on the page; more than `shiftToleranceInches` at any corner, or a scale more than `scaleTolerance` off, stops the file with CHECK and a reason and it is not written; a page that lines up only when turned half a turn is turned upright and blanked; ink within 0.25 in around the box that the blank does not have there (after the page is lined up, the last pixels of it found by a small search) is writing that runs past the box, and more than `ringLimitPixels` of it at 100 dpi stops the file with CHECK (750 plan review L2: a name written longer than the line showed past a box that was otherwise in place). Each page is written as the four tiles AROUND the box, rendered by pdftoppm as JPEG, with the box filled black: the box's own pixels are never rendered into the output, so nothing sits under the black. The written file is read back: every box pixel 0, no text, the page count, and every page lined up and upright. The line says what was measured ('box placed; header matches your blank test'), never OK. Poppler and the standard library only.",
       "boxUnits": "inches from the top-left of the upright page",
       "shiftToleranceInches": 0.10,
       "scaleTolerance": 0.02,
+      "ringLimitPixels": 10,
       "boxCases": [
         {"name": "the blank letter test", "blank": "blank-quiz-letter.pdf", "box": [3.44, 0.20, 5.33, 0.89], "within": 0.02},
         {"name": "the blank legal test", "blank": "blank-quiz-legal.pdf", "box": [3.44, 0.20, 5.33, 0.89], "within": 0.02},
@@ -33253,7 +33254,7 @@
         {"name": "a blank with no such label", "blank": "blank-quiz-letter.pdf", "label": "Nom", "refused": "there is no 'Nom' label"}
       ],
       "scanCases": {
-        "rule": "The nine kinds of scan the 750 plan review measured, plus three a scanner gives every day, each built by scripts/test_marking_redact.py from the blank letter test with an invented name written in the Name blank of every page. `expect` is what the script must do: written (every pixel of the name's ink inside the box), CHECK (no file written), or either (the review measured no name ink surviving, so either is safe; a written file must still have none). The measured result on 2026-11-12 is in `measured`.",
+        "rule": "The nine kinds of scan the 750 plan review measured, three a scanner gives every day, and a name written longer than the box (review L2), each built by scripts/test_marking_redact.py from the blank letter test with an invented name written in the Name blank of every page. `expect` is what the script must do: written (every pixel of the name's ink inside the box), CHECK (no file written), or either (the review measured no name ink surviving, so either is safe; a written file must still have none). The measured result on 2026-11-12 is in `measured`.",
         "cases": [
           {"variant": "upright", "expect": "written", "measured": "written"},
           {"variant": "shifted down 0.15 in", "expect": "either", "measured": "CHECK"},
@@ -33266,7 +33267,8 @@
           {"variant": "phone crop, stretched", "expect": "either", "measured": "CHECK"},
           {"variant": "shifted down 0.05 in", "expect": "written", "measured": "written"},
           {"variant": "scaled 99%", "expect": "written", "measured": "written"},
-          {"variant": "grey and speckled", "expect": "written", "measured": "written"}
+          {"variant": "grey and speckled", "expect": "written", "measured": "written"},
+          {"variant": "a name written past the box", "expect": "CHECK", "measured": "CHECK"}
         ]
       },
       "checkFiles": ["Name box check.pdf", "Blanked papers to skim.pdf", "Papers to name.pdf"],

@@ -218,8 +218,9 @@ nothing else. Tell the teacher that, in those words, the first time.
    it is blanked: its size, then where its header and foot are. A page
    that lines up only when turned upside down is turned upright and
    blanked. Anything else that does not match (shifted more than 0.1 in,
-   shrunk or enlarged, crooked, another size, sideways) stops that file
-   with `CHECK` and the reason, and it is not written:
+   shrunk or enlarged, crooked, another size, sideways, or writing that
+   runs past the box) stops that file with `CHECK` and the reason, and it
+   is not written:
 
    ```text wrap
    python3 -B "<marking folder>/Scripts/redact_scans.py" "<teacher-only>/<Assessment>/Originals" "<marking folder>/<Assessment>/Redacted" --blank "<blank test>.pdf" --check-dir "<teacher-only>/<Assessment>/Check"
@@ -235,8 +236,10 @@ nothing else. Tell the teacher that, in those words, the first time.
    page in one file), and to tell you when they have. Wait for that yes
    before reading any paper. You never open either file.
 
-A long handwritten name can run past the box; the check file shows it.
-The box covers the name box at the top of each page and nothing else.
+A name written longer than the blank's line, or above or below it, is
+stopped with `CHECK` (writing runs past the name box); the teacher can give
+a larger box with `--box`, which the check file then shows. The box covers
+the name box at the top of each page and nothing else.
 
 ## 8. Settings and rulings: whose marking this is
 

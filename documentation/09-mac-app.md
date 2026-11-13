@@ -3729,8 +3729,8 @@ rejected:
   draw.
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
-  only. (Since #707 it is one of two places under a dot folder an
-  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below.) It sits inside the course so it travels with a backup, an archive
+  only. (Since #707 it is one of the places under a dot folder an
+  assistant writes; the others are `.internal/planning/`: "Unit planning (#707)" below, and since #750 `.internal/marking/marking.json`: "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
   and a restore, as `.internal/timetable/` does; a reference import keeps
   `.internal` minus `activity`. It never reaches a site: discovery skips
   dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
@@ -4271,6 +4271,167 @@ first fix's checker, the eight new person-key cases and the swapped
 part-score case fail. NOT MEASURED: a trial with an outside
 assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
+
+**The marking skill (#750, piece 750a: a test from scanned papers).** The
+ninth skill, `plantoir-marking`. It marks a test or quiz written on paper
+and scanned, onto a feedback sheet per student, from the kit #751 writes.
+Coding assignments (750b) and results documents (750c) are later pieces;
+until they land the skill says it does not describe marking anything else.
+The contract is `assessment.agentGuidance.markingSkill`, `folders`,
+`identifiers`, `scriptPrivacy`, `redaction` and `namedCopies`, and its
+sentences are pinned in `mustSay`. The app does nothing new and records no
+trail event: what an assistant does with student files is never written on
+the trail, because it would be student data.
+
+- **The privacy points are true, and said first (750 plan review H1 and
+  R2).** Four points before any student work is opened: whatever is read
+  goes to the AI service (with where to turn model training off, and the
+  school's policy); identifiers only, and the box covers the name box at
+  the top of a page and nothing else, so a name written anywhere else is
+  seen and the teacher skims the blanked papers once, in one file, before
+  any is read; the script stops on any page whose top does not match the
+  blank test; a name seen is never repeated (the identifier and page only,
+  `NAME VISIBLE page N` in `checks`); the files written stay on the
+  computer. REJECTED: v1's "scans are redacted ... what I write stays on
+  this computer", which claimed more than the redaction does, and "what I
+  write" (L7: the assistant's replies go to the service too).
+- **Two folders, outside the working folder (Russell, 2026-11-12).** The
+  marking folder is the assistant's; the teacher-only folder beside it
+  holds the mapping table, the originals, the check files, the named copies
+  and the runner's quarantine, and only scripts write there. One folder
+  with the names inside was REJECTED because a recursive listing of it
+  shows named file names. A marking folder inside the working folder is
+  refused, because it could be built into a site or copied with a course.
+  A folder kept in sync by a service is said ONCE and recorded
+  (`syncAccepted` in `courses/<CODE>/.internal/marking/marking.json`, paths
+  only), because a Mac's Desktop and Documents can be in iCloud with
+  ordinary-looking paths (review M5): the assistant asks rather than
+  infers. No rule about Documents; the offered default is `~/Marking/<CODE>/`.
+- **The redaction checks each page against the BLANK test (review R2).**
+  The plan's prototype checked that the box's pixels were black, which
+  proves the painter and nothing about coverage: run on nine kinds of scan
+  it printed OK on four where the name survived (shifted 0.30 in, scaled
+  94 percent, a duplex page upside down, an A4 page). `redact_scans.py`
+  now reads the box from the blank test's own PDF (the label a writing
+  line follows, case and punctuation ignored, review L1: `Quiz.tex`'s
+  "School Name" sits at the same height), then for every page compares its
+  size with the blank's and lines it up: one-dimensional ink profiles
+  (rows and columns) of the top left and of each half of the foot, slid
+  against the blank's, give three shifts, and from them the place the
+  blank's name box lands. More than 0.1 in at any corner, or more than 2
+  percent of scale, stops the file with `CHECK` and a reason; a page that
+  lines up only turned half a turn is turned upright and blanked (its
+  tiles are placed with a half-turn matrix, so nothing is re-encoded). The
+  written file is read back: the box all black, no text, the page count,
+  and every page lined up and upright. Each page is the four tiles AROUND
+  the box rendered by `pdftoppm` as JPEG, the box filled black, so its
+  pixels are never in the file (REJECTED: a black box drawn over the page,
+  which leaves the original under it). Poppler and the standard library
+  only (REJECTED: Pillow and ImageMagick, which the kit's tool needs and a
+  teacher's computer does not have). The line says what was measured, `box
+  placed; header matches your blank test`, never OK. REJECTED: moving the
+  box to follow a shifted page, since a CHECK the teacher sees is safer
+  than a guess.
+  MEASURED (2026-11-12, Apple M4 Pro, macOS 26.6, Poppler 25.09.1): the
+  box from the blank letter and legal tests is `3.44,0.20,5.33,0.89` in on
+  both; twelve of the thirteen scan cases (`redaction.scanCases`) built from the blank
+  with an invented name in the Name blank of every page give upright,
+  shifted 0.05 in, scaled 99 percent, grey and speckled, and page 2 upside
+  down (turned upright) written with no name ink outside the box, and the
+  other seven stopped. Two thresholds were found by measurement: a phone
+  scan's specks made the profiles match too weakly to trust (0.51), so a
+  pixel counts as ink only with two ink neighbours, and the profiles are
+  smoothed over 0.04 in either way, which raised the clean page's weakest
+  match from 0.65 to 0.90 and the speckled one's to 0.71. Time: about 0.33 s a page with every check (five two-page papers in
+  3.20 s, five speckled ones in 3.32 s). Must-fail, by
+  copy and restore: with the registration removed, three cases leave name
+  ink (2,450, 2,146 and 1,408 pixels of it); with the size check removed
+  as well, four, the A4 page among them (3,176): the four the review
+  measured.
+  **Writing past the box (review L2).** Lining a page up says the box is
+  where the blank's name box is; it does not say the NAME is inside it. A
+  name typed longer than the Name line in the trial fixture showed past a
+  box that was in place, and the line said the header matched. So the ink
+  within 0.25 in around the box is compared with the blank's (at 100 dpi,
+  the blank's print widened by a pixel, the last pixels of the lining up
+  found by a search of 3 pixels either way, lone specks dropped), and more
+  than 10 pixels of ink the blank does not have stops the file. MEASURED:
+  0 such pixels on every scan case the generator makes that must be
+  written (the speckled one included), 237 on a name written 0.3 in past
+  the box, and 18 to 35 on four typed names that touched the Date label
+  (the visible part of each a letter's tail); before the search was added
+  (3 pixels of widening alone) those four read 5 to 15 and slipped under,
+  because the name's ink over the printed Date counted as the blank's.
+  The case "a name written past the box" goes red without the check.
+  A limit, said in the skill: a rotation of 1.5 degrees is stopped
+  although no ink survived it, since 0.1 in at the box's corners is about
+  one degree.
+- **A whole class in one scan (review M4).** `--stack` splits it with
+  Poppler into `Paper 01.pdf ...` in the teacher-only folder and writes
+  `Papers to name.pdf`; the teacher fills a `paper` column in the mapping
+  table, and `--name-papers`, run through the runner, renames them from
+  the `section`, `paper` and `identifier` columns only. A class-list
+  importer was left for a later release.
+- **Scripts are starting points, and one runner is not (Russell,
+  2026-11-12; review R3).** Every script opens with "What you may change
+  for this teacher" and "What must not change" and has a `--self-test`;
+  the skill has the assistant copy it into the marking folder's `Scripts/`,
+  adapt it and self-test it. But the self-test is adapted with the script,
+  so it proves nothing about the adaptation. `run_with_names.py` is never
+  adapted (the skill folder is restored on every mirror): it reads the
+  mapping table, builds every form a name could take, runs the script with
+  its output captured, withholds any line holding one, and moves any new
+  file in the marking folder holding one (its text, a PDF's text, or its
+  path) to `Quarantine/`, counting both. It is a net, not a lock: it cannot
+  stop a script run without it or writing elsewhere, or know a name the
+  table does not hold, and it says so every run. A name that is also a
+  common word (May, Will) withholds every line with that word too: the safe
+  direction. Must-fails: a runner that passes every line, or passes
+  stderr through, lets the invented names out (`test_marking_guard.py`).
+- **The named step (review H2, M3).** `make_named_copies.py` is the only
+  script that puts a name into anything: the TeX-escaped name into each
+  sheet's one `\studentline{}`, compiled in a temporary folder outside both
+  folders with its output captured and thrown away, never `--keep-logs`,
+  the PDF alone moved into `Named/`. MEASURED (tectonic 0.17.0): a failed
+  compile's message holds the line with the name, so a copy that forwards
+  tectonic's output prints it (the must-fail); a copy without the escaping
+  fails to compile `Pupil_Seven & Co`; a name in Chinese characters
+  compiles with exit 0 and a blank where the name should be, so a copy is
+  failed on "Missing character" OR when `pdftotext` does not find the name:
+  with only the first check dropped the second still catches it, with both
+  dropped the case writes a sheet with no name on it.
+- **The sheet.** `build_test_sheet.py` is Russell's `build_sheets.py` with
+  everything test-specific read from the kit (points and meanings, each
+  question's skill, the strength concepts, categories, parts, topics), the
+  kit and record checked first by #751's `check_kit.py` (a copy that skips
+  it lets every refused kit case through to a different error), and the
+  student line one `\studentline{}`. The layout is the default for every
+  teacher (summary, strengths, issues by question, areas to focus on,
+  overall comments, the marks last, because students read marks first and
+  stop); his colours, the orange item's shape and "never the fix" are in
+  `reference/template.md`, OFFERED with the named template (review M1:
+  descriptive feedback with next steps is common practice, so the default
+  assumes neither). A half mark is refused unless `Marking Settings.md`
+  records the teacher's yes; a lost mark with no `studentNote` is refused.
+  MEASURED: the worked example's sheet is two letter pages (the closing and
+  the marks kept together on the second), the teacher's sheet one.
+- **Rulings (Russell, 2026-11-12; review M2).** The teacher's How I Teach
+  page first, then a few questions recorded in `Marking Settings.md`. His
+  rulings are offered with the template to a teacher who shows the
+  interest it bridges; any other teacher is asked the open question, and a
+  template ruling is mentioned only when they ask for a suggestion. A
+  ruling that changes a mark applies only after the teacher's yes, and is
+  then swept across every paper and recorded, numbered.
+- **How a teacher finds out.** The honest answer when asked what it can
+  help with, and the one-time offers: #751's skill mentions marking when a
+  kit is finished, only when this skill is present (that sentence now
+  reads true); this skill mentions report comments once when the marks are
+  final, only when `plantoir-report-comments` is present (#752). No
+  greeting sentence here (piece G), nothing on plantoir.app, no new app text.
+
+NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
+Codex) marking invented scanned papers, which the plan makes the gate that
+matters; it needs the screen-free Mac and is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
