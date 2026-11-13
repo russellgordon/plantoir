@@ -1122,7 +1122,7 @@
         "title" : "Website Address Already Taken"
       },
       {
-        "explanation" : "Colleagues will be asked for this username and a password before the unit plans open. Choose ones made for them, not the password to your own accounts. Plantoir keeps them securely on this Mac, so you are asked once.",
+        "explanation" : "Colleagues will be asked for this username and a password before the unit plans open. Choose ones made for them, not the password to your own accounts. Plantoir keeps them securely on this {machine}, so you are asked once.",
         "fieldLabel" : "Username",
         "isSecret" : false,
         "linkAddress" : "",

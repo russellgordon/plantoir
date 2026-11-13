@@ -12727,6 +12727,7 @@
         "mac": "Mac",
         "windows": "PC",
         "usedIn": [
+          "app-rules.json:credentialRequests.requests[7].explanation",
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
@@ -14701,6 +14702,73 @@
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
+    },
+    "whileUnitPlansAreShared": {
+      "rule": "Sharing a course's unit plans (#709) is work under way like a publish: the share holds the course under a lease of kind publish, so the app's record of active publishes counts it and quitting while it runs asks first. The question names it as SHARING, never as deploying (unitPlanning.share.theVerbIsShare). Since #863 the words are here, so both apps say the same ones; they are the mac's own, chosen by Russell on 2026-11-13 (question dialog, 'Use the Mac's sentence').",
+      "question": "Plantoir is still sharing the unit plans of {course}.",
+      "message": "Quitting now could leave it unfinished, with the class website part way updated.",
+      "messageIsThePublishes": "The message is the one a section's publish gets, because the share is counted as a publish. A preview build's message ('Nothing on the class website changes') is never shown for a share.",
+      "trailLine": "asked whether to quit while still sharing the unit plans of {course}, and the teacher {answer}",
+      "answers": {
+        "keepWorking": "chose to keep working",
+        "quitAnyway": "chose to quit anyway"
+      },
+      "trailEvent": "quit asked about work under way",
+      "placeholders": "{course} is the course's code as the share names it; {answer} is one of answers. The buttons are the question's usual two, in buttons' order with keepWorking the default.",
+      "casesHow": "given.sharesUnderWay lists the course codes whose unit plans are being shared, one share each; the other given keys mean what they mean in cases. expectAsk is the decision; when it is true, expectQuestion and expectMessage are the alert's two lines, and expectTrailKept and expectTrailQuit the trail line for each answer, exactly.",
+      "cases": [
+        {
+          "name": "one course's unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The moment #863 is about. Windows said a deploy was still going here, and a share is never called a deploy."
+        },
+        {
+          "name": "a share and a preview being built: the share is named",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 1,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "A publish wins over a preview build (whatCountsAsUnderWay), and the share is counted as a publish, so the question and its message are the share's."
+        },
+        {
+          "name": "the Mac is logging out while a share runs",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theMacIsLoggingOutOrShuttingDown"
+          },
+          "expectAsk": false,
+          "why": "neverAskWhen holds for a share as for a publish: a question here would block the log out."
+        }
+      ],
+      "notSettledHere": "A share running beside a section's deploy, or two shares at once, are two publishes, and the mac asks about them today as 'deploying 2 sections', which calls the share deploying. No case pins that wording; it is raised with Russell on #863."
     },
     "cases": [
       {

@@ -77,6 +77,98 @@ final class QuitConfirmationTests: XCTestCase {
         }
     }
 
+    /// `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared` (#863): a share
+    /// of unit plans is asked about in the contract's words, which name it
+    /// as sharing and never as deploying. Run through the no-argument forms
+    /// the delegate calls, with the share held the way `PlanShareRunner`
+    /// holds it, so a change to either the words or the record they are
+    /// chosen from fails here.
+    func testSharingUnitPlansIsAskedAboutInTheContractsWords() throws {
+        let section: [String: Any] = try QuitConfirmationTests.section("quittingWhileWorkIsUnderWay")
+        let block: [String: Any] = try XCTUnwrap(section["whileUnitPlansAreShared"] as? [String: Any])
+        let questionTemplate: String = try XCTUnwrap(block["question"] as? String)
+        let message: String = try XCTUnwrap(block["message"] as? String)
+        let trailTemplate: String = try XCTUnwrap(block["trailLine"] as? String)
+        let answers: [String: Any] = try XCTUnwrap(block["answers"] as? [String: Any])
+        let keptAnswer: String = try XCTUnwrap(answers["keepWorking"] as? String)
+        let quitAnswer: String = try XCTUnwrap(answers["quitAnyway"] as? String)
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 3)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let given: [String: Any] = try XCTUnwrap(testCase["given"] as? [String: Any])
+            let shares: [String] = try XCTUnwrap(given["sharesUnderWay"] as? [String], name)
+            let publishCount: Int = try XCTUnwrap(given["sectionPublishesUnderWay"] as? Int, name)
+            let buildCount: Int = try XCTUnwrap(given["previewsBeingBuilt"] as? Int, name)
+            let copyCount: Int = try XCTUnwrap(given["copiesBeingSaved"] as? Int, name)
+            let reasonName: String = try XCTUnwrap(given["quitReason"] as? String, name)
+            let reason: QuitConfirmation.Reason = reasonName == "theMacIsLoggingOutOrShuttingDown"
+                ? .theMacIsLoggingOutOrShuttingDown
+                : .theTeacherAskedToQuit
+            let expectAsk: Bool = try XCTUnwrap(testCase["expectAsk"] as? Bool, name)
+
+            CourseActivity.reset()
+            PreviewLeases.reset()
+            defer {
+                CourseActivity.reset()
+                PreviewLeases.reset()
+            }
+            for code in shares {
+                CourseActivity.beginPublish(
+                    folderPath: "/pretend", courseCode: code, sectionNumber: PlanSharing.leaseSection
+                )
+            }
+            for index in 0..<publishCount {
+                CourseActivity.beginPublish(
+                    folderPath: "/pretend", courseCode: "ADA1O", sectionNumber: index + 1
+                )
+            }
+            for index in 0..<buildCount {
+                CourseActivity.beginPreviewBuild(
+                    folderPath: "/pretend", courseCode: "ENG2D", sectionNumber: index + 1
+                )
+            }
+            for _ in 0..<copyCount {
+                CourseActivity.beginCopy(folderPath: "/pretend", courseCode: "SCH3U")
+            }
+
+            let underWay: String? = QuitConfirmation.workUnderWay()
+            XCTAssertEqual(
+                QuitConfirmation.shouldAsk(reason: reason, workUnderWay: underWay),
+                expectAsk,
+                "\(name): the rule and the contract disagree"
+            )
+            if !expectAsk {
+                continue
+            }
+            let asked: String = try XCTUnwrap(underWay, name)
+            let course: String = try XCTUnwrap(shares.first, name)
+            let expectQuestion: String = try XCTUnwrap(testCase["expectQuestion"] as? String, name)
+            let expectMessage: String = try XCTUnwrap(testCase["expectMessage"] as? String, name)
+            let expectTrailKept: String = try XCTUnwrap(testCase["expectTrailKept"] as? String, name)
+            let expectTrailQuit: String = try XCTUnwrap(testCase["expectTrailQuit"] as? String, name)
+
+            XCTAssertEqual(QuitConfirmation.question(about: asked), expectQuestion, name)
+            XCTAssertEqual(QuitConfirmation.explanation(), expectMessage, name)
+            XCTAssertEqual(
+                QuitConfirmation.trailLine(workUnderWay: asked, choice: .keepWorking), expectTrailKept, name
+            )
+            XCTAssertEqual(
+                QuitConfirmation.trailLine(workUnderWay: asked, choice: .quitAnyway), expectTrailQuit, name
+            )
+
+            // The templates say the same as the case, so a reader building
+            // from the templates gets the case's words.
+            XCTAssertEqual(questionTemplate.replacingOccurrences(of: "{course}", with: course), expectQuestion, name)
+            XCTAssertEqual(message, expectMessage, name)
+            let trailForCourse: String = trailTemplate.replacingOccurrences(of: "{course}", with: course)
+            XCTAssertEqual(trailForCourse.replacingOccurrences(of: "{answer}", with: keptAnswer), expectTrailKept, name)
+            XCTAssertEqual(trailForCourse.replacingOccurrences(of: "{answer}", with: quitAnswer), expectTrailQuit, name)
+            XCTAssertFalse(expectQuestion.lowercased().contains("deploy"), "\(name): a share is never called a deploy")
+        }
+    }
+
     // MARK: - What the teacher is shown
 
     /// The question names what is happening in the teacher's own terms, and

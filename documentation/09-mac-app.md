@@ -16045,13 +16045,29 @@ this is the app's half.
   the Cloudflare token and the plans' username and password are asked the way
   a section's deploy asks (`CredentialRequest.unitPlanUsername`,
   `unitPlanPassword`). No argument ever carries a username or a password.
+  The username's explanation names the computer, so since #863 it is built by
+  `CredentialRequest.unitPlanUsername(machine:)` and the contract's readout
+  (`app-rules.json` → `credentialRequests`) is written with `{machine}`
+  (`specialNames.platformWording.machine.usedIn`); this app fills in "Mac", so
+  the sentence a teacher reads here did not change. REJECTED: "on this
+  computer", as the token explanations say, which would have changed the mac's
+  sentence for no reader's benefit when the placeholder keeps both.
 - **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
   under section 0 (`PlanSharing.leaseSection`), which no section has: a
   section's own deploy is never refused by it, while the course reads as busy
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. A new lease kind was rejected: `publish` already
+  a share builds no section. Since #863 the question, its message and the
+  trail line for both answers are in the contract
+  (`quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`, three cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`),
+  because Windows was telling a teacher a deploy was still going. They are the
+  mac's own words, chosen by Russell; the message is the one a publish gets,
+  since the share is counted as a publish. NOT pinned: a share beside a
+  section's deploy, or two shares, which are two publishes and are asked about
+  as "deploying 2 sections" today; that is raised on #863 rather than written
+  down as the rule. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
