@@ -12758,3 +12758,142 @@ and the contract's `filterCases`, `countCases`, `startingPlace`,
 is kept only once a share used it. It builds on #709's Windows work (#824),
 which is still open. The `windows` issue for #833 lists them.
 
+
+## The launchers refuse an overlapping build (#828, mac #729), and #835's scheduled-deploy words (#854, #868)
+
+The first of #828's two pieces (828a). The second, Deploy greying while
+another program holds the course, is 828b and is not described here yet.
+
+### What was built
+
+- **`preview.ps1 --for-deploy`.** A deploy's own build leg says so on its
+  command line, so another launcher's guard reads it as a deploy rather than
+  as a rebuild (`app-rules.json` → `launcherFlags.preview`). It changes
+  nothing the build does and is not handed to `build_site.py`. Without
+  `--build-only` it is refused at the flags with the contract's line, exit 1.
+- **The shared guard block** (`deploy.ps1` and `preview.ps1`, byte for byte)
+  answers `later`, `another` or `building`. A deploy's build leg is
+  `another`; any other `preview.ps1 C S --build-only` in this folder that is
+  not `--stop` is `building`. Precedence later > another > building, whatever
+  order the rows arrive in. #386's preview guard counts `later` and
+  `another` only, so the assistant's rebuild still does not refuse a preview.
+  `Get-DeployRefusalSentence` maps who and leg to the contract's sentence key;
+  `preview.ps1` asks as `deploy-build` when it carries `--for-deploy`, which
+  prints `buildingDeploy` when another build is in the way. Details in
+  [03](03-launcher-scripts.md) → "A section still being deployed is not
+  deployed again".
+- **One builder for the app's build lines**, `PreviewCommand.BuildOnlyArguments`
+  (`Plantoir.Core/Scripting/PreviewCommand.cs`), with `forADeploy` REQUIRED,
+  as the mac's `buildArguments(forADeploy:)` is: true on
+  `MultiDestinationDeployRunner`'s build leg (the window's Deploy) and
+  `AssistWorkspace.Deploy` (both assistants); false on `RebuildPreview`,
+  `Apply` and `ApplyWholeUnit`. The scheduled wrapper's build
+  (`TaskScheduling`) keeps a plain `--build-only`: its own script already
+  counts as `later`. #799's `deploy.ps1` rebuild stays plain too: the
+  `deploy.ps1` that started it is an ancestor, and anyone else sees the pair
+  as `another`. `PreviewCommandTests.EveryBuildOnlyLineComesFromTheBuilder`
+  fails on a `"--build-only"` string literal anywhere else in `Plantoir.Core`,
+  `Plantoir` or `Plantoir.Mcp` (comment lines skipped, review L3), and on
+  `--for-deploy` in the wrapper's source.
+- **An older launcher is never handed the flag (review M4).** `plantoir-mcp`
+  never refreshes a folder's launchers (only the window's
+  `ToolchainReadiness.Ensure` does), and an older `preview.ps1` refuses the
+  flag: measured, `origin/dev`'s `preview.ps1 ICS4U 2 --build-only
+  --for-deploy` printed `Unknown option: --for-deploy` and exited 1. So the
+  builder adds the flag only when the folder's own `preview.ps1` contains
+  `'--for-deploy'` (one shared-open read; a missing or unreadable file means
+  no). That older launcher's guard cannot count the flag anyway, so nothing
+  is lost. This is the Windows twin of the contract's knownLimits item about
+  two copies of Plantoir of different ages; here the second, non-mirroring
+  copy is `plantoir-mcp`. Rejected: the server calling `RefreshLaunchers`
+  itself, which would write the folder from a second process while the window
+  may be running `Ensure` on it. Pinned by
+  `AssistWorkspaceTests.ADeploysBuildLegSaysItIsADeployOnlyWhereTheLauncherTakesIt`
+  and `PreviewCommandTests.AnOlderLauncherIsNotHandedTheFlag`.
+- **`FailureExplainer`** reads the two building lines (two more markers;
+  `SectionDeployRefusal.ByAnotherBuild`, from "is already being built"), and
+  `MultiDestinationDeployRunner.RefusalAnswer` says
+  `wording.deployRefusedWhileItsSectionIsBeingBuilt` for them; the window,
+  the in-app assistant and `plantoir-mcp` all answer through it.
+- **#835's words (#854).** The `later` lines and trail line, and
+  `AssistWording.DeployRefusedWhileALaterDeployWorks` and
+  `CourseIsBeingBuiltElsewhere`, say "a scheduled deploy that is still
+  running". `FailureExplainer.LaterDeployMarker` follows the new line and
+  `OlderLaterDeployMarker` still reads the old one, for a folder holding an
+  older launcher.
+
+### The runner (`windows-app/test_launcher_rules.ps1`)
+
+- **The translator gives a case's `cwd` precedence over a `{here}` path
+  (review M1).** Rows written `{here}/preview.sh` with cwd `elsewhere` are
+  another folder's run on the mac, where lsof's answer is the folder; on
+  Windows the script's path is the only folder evidence, so `elsewhere` is
+  written into it. With the old order, exactly three rows failed, whatever
+  the guard did (measured: "a deploy's build leg in ANOTHER folder does not
+  count" on each launcher, and the preview guard's "…in ANOTHER working
+  folder does not refuse").
+- Section 5 runs the `deploy-build` leg, three Windows-only build rows (a
+  rebuild started by `preview.bat`, whose `cmd.exe /c` line names no program;
+  a quoted spaced course on a deploy's build leg; a `-Command` build, the
+  known limit), every (who, leg) pair the cases name through the launcher's
+  own `Get-DeployRefusalSentence`, and the nine pairs `launcherCasesShape`
+  describes, and the third trail line.
+- **Section 11 reads the REAL process table.** A stand-in build, really
+  running as `powershell -File <folder>\preview.ps1 ICS4U 2 --build-only
+  [--for-deploy]`, against a copy of each launcher cut off right after its
+  guard (so a guard made wrong reaches no credential, build or network):
+  `buildingDeploy` and `anotherDeploy` from `deploy.ps1`, `buildingDeploy`
+  from `preview.ps1 --build-only --for-deploy`, each with its trail line in
+  `PLANTOIR_TRAIL_DIR`; a stand-in in another folder refuses nothing; each
+  copy passes alone; the real `preview.ps1` refuses `--for-deploy` alone.
+- Must-fail, by copy-and-restore in a scratch copy of the pure sections:
+  `origin/dev`'s guard block fails 32 rows (the 7 #729 cases on each
+  launcher, the preview guard's build-leg case, the Windows build rows, and
+  the sentences and trail lines); a `Get-DeployRefusalSentence` that ignores
+  `deploy-build` fails the fixed pair on each launcher; a preview guard
+  truthy on `building` fails "a build with --build-only is not a deploy" and
+  the `preview.bat` row; the old translator fails the three M1 rows;
+  `origin/dev`'s `MultiDestinationDeployRunner` fails the source scan and
+  the two refusal-answer tests.
+
+### Measured: two builds started at once (knownLimits L-a2, the Windows number)
+
+Real processes: two `powershell -File <folder>\preview.ps1 ICS4U 2
+--build-only`, each a copy of the REAL `preview.ps1` cut off after its guard
+(it then sleeps 5 s; refused, it exits 1), started N ms apart, 10 trials per
+gap (a scratch harness, not committed). Lenovo 20QES70500
+(i5-8365U, 16 GB, Windows 11 Pro 26200), Defender on, CPU at 60% from other
+agents' builds when it began, 2026-11-13.
+
+| Started apart | Both refused | One refused | None refused |
+|---|---|---|---|
+| 0 ms | 10 | 0 | 0 |
+| 250 ms | 10 | 0 | 0 |
+| 500 ms | 10 | 0 | 0 |
+| 1000 ms | 1 | 9 | 0 |
+| 2000 ms | 0 | 10 | 0 |
+| 4000 ms | 0 | 9 | 1 |
+
+The guard's own time, from the start of `Get-ProcessTable` to its answer,
+120 runs: median 810 ms, fastest 492 ms, slowest 1,777 ms. So the window in
+which both refuse is about HALF A SECOND to a second on this PC, against "a
+few milliseconds" on the Mac (both refused 20 of 20 together, exactly one at
+50 ms and up): PowerShell's start plus the `Win32_Process` query is that
+long. The overlap never got through while both were starting: each look saw
+the other. The one "none refused" at 4 s is the first stand-in having
+finished its 5 s before the second's look (under load the second's start and
+look took over a second); nothing overlapped at that look. The consequence
+(review L5), written down rather than built: two rebuilds asked of one
+`plantoir-mcp` in parallel tool calls, or a rebuild and a deploy pressed
+within about a second, are BOTH refused, in words ("already being built"),
+and nothing is built or sent; asking again goes ahead. The contract's
+`knownLimits` text stays the Mac's; no tie-break was added, for the reason it
+gives.
+
+### Rejected
+
+- Fixing M1's three red rows in the guard: the guard was right, the
+  translator wrote another folder's run into this one.
+- A `--for-deploy` on the scheduled wrapper's build or on `deploy.ps1`'s own
+  rebuild (`notUsedFor`): both are already counted through their ancestors.
+- Refreshing launchers from `plantoir-mcp` (above).

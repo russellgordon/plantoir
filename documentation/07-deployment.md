@@ -4751,10 +4751,15 @@ Windows — but the guard and the wait do.
 them needs anything done on the mac.
 
 - **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
-  build leg run all 23 `launcherCases` of #467 (see [03](03-launcher-scripts.md) →
-  "A section still being deployed is not deployed again"). #729 added 13 more
-  (a deploy's build leg, `--for-deploy`, and any other build of the section)
-  and changed one; those are owed by its Windows issue.
+  build leg run all 36 `launcherCases` (see [03](03-launcher-scripts.md) →
+  "A section still being deployed is not deployed again"): the 23 of #467,
+  and since Windows' #828 (828a, 2026-11-13) the 13 #729 added (a deploy's
+  build leg, `--for-deploy`, and any other build of the section) and the one
+  it changed. The window's and an assistant's deploy build with
+  `preview.ps1 C S --build-only --for-deploy`, through one builder
+  (`PreviewCommand.BuildOnlyArguments`), and only where the folder's own
+  `preview.ps1` takes the flag; the rebuilds and the scheduled wrapper's
+  build never carry it.
 - **Windows has the mac's split.** The task runs
   `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
   course and then runs its wrapper as `powershell.exe -File`. A task set since

@@ -2546,11 +2546,11 @@ in Terminal (its legs are refused and it is recorded as stopped).
 
 **Windows (#467).** The same guard is in `deploy.ps1` and in `preview.ps1`'s
 build leg, asked at the same points and printing the same lines, from
-`Win32_Process`. All 23 `launcherCases` of #467 run there
-(`test_launcher_rules.ps1` section 5); the 13 #729 added, and the one it
-changed ("a preview being served, or being stopped, is not a build", which
-held a plain `--build-only` until then), are owed by the Windows issue for
-#729. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
+`Win32_Process`. All 36 `launcherCases` run there (`test_launcher_rules.ps1`
+section 5), the 13 #729 added and the one it changed among them, since
+Windows' #828 (828a, 2026-11-13): `preview.ps1` takes `--for-deploy`, the
+block counts `building`, and the app passes the flag on a deploy's build leg
+only. The four cases once marked `appliesOn: ["mac"]` hold on Windows as
 written. Windows' run has the mac's split as well: Task Scheduler starts
 `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
 course and THEN runs its wrapper as `powershell.exe -File`. And a task set
@@ -2969,21 +2969,38 @@ and what was measured.
   BLOCK` markers. The block is byte-identical in `deploy.ps1` and
   `preview.ps1`, and #386's reader moved into it rather than being copied.
   `LauncherRulesContractTests.TheDeployGuardBlockIsTheSameInBothLaunchers`
-  keeps the copies equal, and `test_launcher_rules.ps1` section 5 runs all 23
-  `launcherCases` against EACH copy.
+  keeps the copies equal, and `test_launcher_rules.ps1` section 5 runs all 36
+  `launcherCases` against EACH copy (23 until #828), and section 11 runs a
+  cut-off copy of each launcher against a REAL running stand-in build.
   - **Where it asks.** `deploy.ps1` asks on every run that deploys (not
     `--reset-token`/`--logout`), after the Open-code question and the
     reference-course refusal, which is where deploy.sh asks. `preview.ps1`
-    asks on `--build-only` that is not `--stop`. Both ask before anything
-    changes, and both exit 1.
+    asks on `--build-only` that is not `--stop`, with the leg `build`, or
+    `deploy-build` when it also carries `--for-deploy` (#828). Both ask
+    before anything changes, and both exit 1. `--for-deploy` without
+    `--build-only` is refused at the flags (`launcherFlags.preview`), exit 1.
   - **What counts.** `Get-WhatIsDeployingThisSection` answers `later`,
-    `another` or nothing, and `later` wins.
+    `another`, `building` (#828) or nothing. `later` wins at once, then
+    `another`, then `building`, whatever order the rows come in.
     - `later` is a wrapper of C/S in this folder (either name above) running
       as the program. The app's `Plantoir.exe --run-scheduled-deploy` line
       alone does NOT count: that run waits up to ten minutes for the course
       before it writes and starts its wrapper, possibly for the very window
       whose deploy would be refused.
-    - `another` is `deploy.ps1 C S` as the program, in this folder.
+    - `another` is `deploy.ps1 C S` as the program, in this folder, or
+      (#828) a deploy's build leg, `preview.ps1 C S --build-only
+      --for-deploy`, by the same course, section and folder rules.
+    - `building` (#828) is any other `preview.ps1 C S --build-only` in this
+      folder that is not `--stop`: the assistant's rebuild, or one typed at
+      a command line. A preview being served is never counted.
+    - #386's preview guard (`Test-SectionIsBeingDeployed`) counts `later`
+      and `another` only, so a plain rebuild still does not refuse a preview
+      and a deploy's build leg now does.
+    - Which sentence: `Get-DeployRefusalSentence` maps who and leg to the
+      contract's key (`launcherCasesShape`): `deploy` takes the `*Deploy`
+      sentences, `build` the `*Build` ones, and `deploy-build` the `*Build`
+      ones except `buildingDeploy`. The trail's `{leg}` is `build` for both
+      build legs.
     - This run and its ancestors never count. That covers the wrapper's
       in-process legs (`$PID` is the wrapper), its `Start-Process` build and
       Cloudflare legs (the wrapper is their parent), and a folder deploy's own
@@ -3003,6 +3020,19 @@ and what was measured.
       The table shows only the host's own line, which names no script.
       Measured in the drive (2026-10-08): a deploy of ICS40 2 held under
       `-Command`, and a second `-File deploy.ps1 ICS40 2` went past the guard.
+      The same is true of a build (#828): `-Command "& …\preview.ps1 …
+      --build-only"` is only mentioned on its line, and a runner row pins
+      that it is not counted.
+    - Another account's process shows an ordinary one a null `CommandLine`,
+      so it is listed and never counted: the contract's #729 known limit
+      ("listed but never counted") comes free here, by the same mechanism as
+      the elevated case below.
+    - An older `preview.ps1` refuses `--for-deploy` as an unknown option
+      (`Unknown option: --for-deploy`, exit 1), and `plantoir-mcp` never
+      refreshes a folder's launchers. So the app's one builder
+      (`PreviewCommand.BuildOnlyArguments`) adds the flag only when the
+      folder's own `preview.ps1` carries it (`documentation/12-windows-app.md`
+      → "The launchers refuse an overlapping build (#828, mac #729)").
     - A process started ELEVATED shows an ordinary process a null
       `CommandLine`, so the guard cannot see it either: the Windows form of
       the contract's "another account's process is not seen". The scheduled

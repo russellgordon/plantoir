@@ -1215,8 +1215,9 @@ public class ContractTests
         string deployScript = File.ReadAllText(Path.Combine(repoRoot, "deploy.ps1"));
 
         var previewFlags = section["preview"]!.AsArray().Select(x => x!["flag"]!.ToString().Split(' ')[0]).ToList();
-        // A flag preview.ps1 does not take yet (#729's --for-deploy, owed by
-        // #828) is held open by name; it closes the day preview.ps1 carries it.
+        // A flag preview.ps1 does not take yet is held open by name; it
+        // closes the day preview.ps1 carries it (#729's --for-deploy was,
+        // until #828 landed).
         var deferred = NamedGapLedger.GapsIn(NamedGapLedger.PreviewLauncherFlags, previewFlags,
             previewFlags.Where(flag => previewScript.Contains(flag, StringComparison.OrdinalIgnoreCase)));
         foreach (var flag in previewFlags.Where(flag => !deferred.Contains(flag)))
