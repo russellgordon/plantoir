@@ -1062,7 +1062,10 @@ names its Netlify calls and runs a no-flag deploy over two saved folders
 (both written; then a first leg that fails, and the run still writes the
 second and ends with exit 1). The rules, sentences and eighteen cases were
 proposed from Windows (four more were added from the mac by #771) as `contracts/app-rules.json` → `savedDestinations`,
-run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. `deploy.py`
+run against `deploy.ps1` by `windows-app/test_launcher_rules.ps1`. Since
+v2.0.0 (#788) `deploy.ps1` turns a tab, a carriage return or a line break in
+a KIND into a space as it already did in a path, so both launchers refuse an
+unknown kind on one line; no deploy goes anywhere new. `deploy.py`
 is unchanged (it does one destination per call). The new-course default, its
 sentences and every case are `contracts/app-rules.json` →
 `publishingDestinations`; the Swift is `PublishingDestinations`.

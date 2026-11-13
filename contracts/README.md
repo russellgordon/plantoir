@@ -262,7 +262,14 @@ entry owed by a genuinely later release rightly survives the cut — the rule is
 "later than this build", not "empty at the cut". A milestone that is not a
 version fails, because it cannot be compared. `RELEASING.md` re-runs the suite
 AFTER the version is set, since a run before the bump compares against the old
-version and passes with entries left. **The ledger is empty since 2026-11-10**
+version and passes with entries left. **Since 2026-11-13 the ledger holds 86
+entries, every one on v2.0.0** — step 0 of the Windows v2.0.0 run
+([#787](https://github.com/russellgordon/plantoir/issues/787)) held open
+every red the mac's v2.0.0 work brought that a later piece of the same run
+builds, each against its own open `windows` issue, and wired eleven more
+lists into the ledger, the launcher runner's rows among them
+(`documentation/12-windows-app.md` → "Step 0 of v2.0.0: what the ledger
+holds and how each entry ends"). It was empty from 2026-11-10 to then
 ([#720](https://github.com/russellgordon/plantoir/issues/720)). From
 2026-10-28 it held two entries, both against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
 (v1.9.1): `wording.obsidianIsNotOnThisMac` and the scenario "open in Obsidian
@@ -2040,8 +2047,9 @@ two. On 2026-10-16 mac 1.7.2's sixteen plan-table sentences (#524:
 #551, and the same day #548 added the members with the plan table and deleted
 the entry, so it was **EMPTY** again — until 2026-10-28, when #690 held two
 entries against mac [#698](https://github.com/russellgordon/plantoir/issues/698)
-(v1.9.1; "Named gaps" above), which #720 deleted on 2026-11-10, so it is
-**EMPTY** again. Before 2026-10-01 it held 6 keys at the end of the overnight run: 4 on
+(v1.9.1; "Named gaps" above), which #720 deleted on 2026-11-10, so it was
+**EMPTY** again — until 2026-11-13, when step 0 of the Windows v2.0.0 run
+(#787) held 86 v2.0.0 entries in it ("Named gaps" above). Before 2026-10-01 it held 6 keys at the end of the overnight run: 4 on
 [#308](https://github.com/russellgordon/plantoir/issues/308) (the caller-side
 wording that names declined pages) and 2 on
 [#157](https://github.com/russellgordon/plantoir/issues/157) (`noCoursesYet`,
