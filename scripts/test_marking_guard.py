@@ -117,7 +117,7 @@ class RunnerTests(unittest.TestCase):
             result, _marking, _teacher = run(RUNNER, Path(folder), CLEAN)
             self.assertIn("Section 1: 2 sheets made\nStudent B: not in the mapping table\n", result.stdout)
             self.assertIn("0 printed lines were withheld", result.stdout)
-            self.assertIn("0 read and clean; 0 files and 0 folders held a word from your table", result.stdout)
+            self.assertIn("0 read, holding none of the forms of the names in your table; 0 files and 0 folders held a word from your table", result.stdout)
             self.assertEqual(result.returncode, 3)
 
     def test_it_says_it_is_a_net_and_not_a_lock(self):
@@ -283,10 +283,10 @@ class RunnerLeakTests(unittest.TestCase):
                     for token in tokens:
                         self.assertNotIn(token.casefold(), path.casefold(), f"{name}: a path named by a name stayed")
                 self.assertEqual(left, [] if name != "a file inside a folder named by a name" else ["Named"], name)
-                self.assertNotIn("1 read and clean", said, f"{name}: nothing here is read and clean")
+                self.assertNotIn("1 read, holding none", said, f"{name}: nothing here is read with no word found")
                 self.assertTrue((teacher / "Quarantine").exists() or "withheld" in said, name)
                 self.assertEqual(result.returncode, 1, f"{name}: {said}")
-                self.assertIn("0 read and clean", said, name)
+                self.assertIn("0 read, holding none", said, name)
 
     def test_a_file_it_cannot_read_is_counted_as_not_checked(self):
         result, marking, _teacher = self.run_leak(UNREADABLE)
@@ -348,7 +348,7 @@ class FalseAlarmTests(unittest.TestCase):
         self.assertIn("3 sheets finished", result.stdout)
         self.assertIn("matched every point", result.stdout)
         self.assertIn("0 printed lines were withheld", result.stdout)
-        self.assertIn("1 read and clean; 0 files and 0 folders", result.stdout)
+        self.assertIn("1 read, holding none of the forms of the names in your table; 0 files and 0 folders", result.stdout)
         self.assertTrue((marking / "June Exam" / "Student A.pdf").exists(), "an untouched folder stays")
         self.assertEqual(result.returncode, 0, result.stdout)
 
