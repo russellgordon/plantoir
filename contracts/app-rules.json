@@ -2529,6 +2529,16 @@
         "why" : "A support tool, run by hand when a teacher's deploy misbehaves."
       },
       {
+        "alsoSpelled" : "--reset-token",
+        "flag" : "--logout",
+        "meaning" : "Clear the saved sign-in for the destination's service (Netlify, or Cloudflare with --target cloudflare or a course that deploys there) and deploy nothing. With a FOLDER destination it is refused in `refusedWithAFolder`'s words, exit 1, and nothing is deployed and nothing is cleared: a --to-folder typed with it, or, with no --target and no --to-folder, a course whose main saved destination is a folder (with either flag the launcher looks only at the main destination, savedDestinations.note). --non-interactive changes nothing.",
+        "refusedWithAFolder" : "A folder on this computer has no sign-in to clear, so nothing was deployed and nothing was cleared: to sign out of Netlify or Cloudflare, give --logout with --target netlify or --target cloudflare.",
+        "usedFor" : [
+
+        ],
+        "why" : "#799, Russell's ruling 2026-11-13. Until #799's review deploy.ps1 ran its folder branch for these flags as well, and with its freshness question skipped for them it mirrored a preview's pages and said \"Deployed.\" (measured on Windows); the first fix then cleared the PC's Netlify token instead, which a folder course never uses, so a scheduled deploy of ANOTHER course to Netlify stopped for its token next morning. A folder has nothing to sign out of, so the one answer that neither copies nor clears something unasked for is to refuse and say how to sign out of a service. A purely web course keeps signing out exactly as before. deploy.sh (the mac) is asked to refuse the same combination with the same words. windows-app/test_launcher_rules.ps1 runs the routes against deploy.ps1 and reads the sentence from here."
+      },
+      {
         "flag" : "--image <tag>",
         "macOnly" : true,
         "meaning" : "Publish using a particular already-built image instead of the one the recipe hashes to.",

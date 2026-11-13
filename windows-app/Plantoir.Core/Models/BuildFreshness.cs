@@ -195,6 +195,11 @@ public static class BuildFreshness
                         string leadsTo;
                         try { leadsTo = (directory.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? directory.FullName).TrimEnd('\\'); }
                         catch { continue; }
+                        // A junction whose target is gone is an entry with its own
+                        // times (read above), not a folder that cannot be listed:
+                        // otherwise every Deploy would build while it exists
+                        // (#799's fixes review, L2). os.walk passes it over too.
+                        if (!Directory.Exists(leadsTo)) continue;
                         if (!walked.Add(leadsTo)) continue;
                     }
                     pending.Push((directory.FullName, depth + 1));

@@ -32,7 +32,9 @@ Notes:
   The account is discovered from the token, so there is nothing else to enter.
 - Use --reset-token (or --logout) to remove the saved token and re-link on next
   run; combine it with --target cloudflare to clear the Cloudflare one instead.
-  It deploys nothing, to a folder included.
+  It deploys nothing. A folder has nothing to sign out of, so it is refused
+  with --to-folder, or for a course that deploys to a folder unless --target
+  names the service to sign out of.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
 "@ | Out-Host
 }
@@ -467,7 +469,23 @@ if (-not $TARGET_WAS_GIVEN -and -not $TO_FOLDER -and (Test-Path -LiteralPath $re
   if ($only.Kind -ceq 'cloudflare_pages') { $TARGET = 'cloudflare' }
   elseif ($only.Kind -ceq 'local_folder') { $TO_FOLDER = $only.Path }
   else { $TARGET = 'netlify' }
-  Write-Host ("Deploying to {0}, as {1}'s settings say." -f $only.Words, $COURSE_CODE)
+  # Not for --reset-token or --logout, which deploy nothing (#799's fixes
+  # review, L1): the line used to say "Deploying to ..." before a sign-out.
+  if (-not $RESET_TOKEN) { Write-Host ("Deploying to {0}, as {1}'s settings say." -f $only.Words, $COURSE_CODE) }
+}
+
+# --reset-token or --logout with a FOLDER destination is refused (#799,
+# Russell's ruling 2026-11-13; contracts/app-rules.json -> launcherFlags.
+# deployExtras, "--logout" -> refusedWithAFolder, word for word): a folder has
+# nothing to sign out of. Typed --to-folder, or the course's main saved
+# destination (the flags look only at the main one, above). Before #799's
+# review this ran the folder branch and mirrored the site without asking
+# whether it was a preview's; the first fix cleared the PC's Netlify token
+# instead, which a folder course never uses. Neither copies nor clears now.
+# A purely web course signs out exactly as before.
+if ($RESET_TOKEN -and $TO_FOLDER) {
+  Write-Host "A folder on this computer has no sign-in to clear, so nothing was deployed and nothing was cleared: to sign out of Netlify or Cloudflare, give --logout with --target netlify or --target cloudflare."
+  exit 1
 }
 
 # >>> DEPLOY WHILE ITS SECTION DEPLOYS BLOCK >>> - identical in preview.ps1 and
@@ -1125,15 +1143,10 @@ if (-not $builtFound) {
 # Each section lands in its own subfolder so sections never overwrite
 # one another. Netlify is not involved.
 #
-# NOT with --reset-token or --logout, which clear a saved token and deploy
-# nothing (the legs above keep only the first for that reason, and the guard
-# at the top does not run for them). Until #799's review (H1) this branch
-# ran for them anyway: a folder deploy typed with either flag mirrored the
-# site, and since the question below was skipped for them it mirrored a
-# preview's pages and said "Deployed." They now go on to the token code
-# below, which clears the token --target names (Netlify unless it says
-# cloudflare) and exits, so a folder course's `deploy.bat ICS3U 1 --logout`
-# does what the flag says and copies nothing.
+# Never with --reset-token or --logout: a folder destination with either is
+# refused above (#799). The condition stays as a belt, so a refusal moved
+# later can never let this branch mirror a site its question was not asked
+# about (#799's review, H1, measured: a preview's pages and "Deployed.").
 if ($TO_FOLDER -and -not $RESET_TOKEN) {
   # Resolved ONCE, against THIS working folder, before anything uses it
   # (#304 / mac #227). The app refuses a partial path outright; a command

@@ -811,23 +811,49 @@ def site_was_built_by_this_toolchain(section_dir, toolchain_id=None):
             Report 'realDeploy' 'two saved legs: one build, one trail line' (($builds -eq 1) -and (@(Get-BuiltLines).Count -eq $before + 1) -and ($run.Code -eq 0)) ("$builds builds, exit $($run.Code); said: " + $run.Said)
             $env:STAMP_STUB_COUNTER = $null
 
-            # --reset-token and --logout deploy NOTHING, to a folder included
-            # (#799's review, H1): typed with --to-folder, or on a course whose
-            # saved destination is a folder, the site (a preview's, here) is
-            # never copied and "Deployed." is never said; the token is cleared.
+            # --reset-token or --logout with a FOLDER destination is REFUSED
+            # (#799, Russell's ruling 2026-11-13): in the contract's words
+            # (launcherFlags.deployExtras "--logout" -> refusedWithAFolder),
+            # exit 1, nothing copied (the site here is a preview's), no token
+            # cleared, no "Deployed." and no "Deploying to a folder" line. Typed
+            # --to-folder, a saved folder destination (beside a Cloudflare one
+            # too), --non-interactive, and --target given with --to-folder.
+            # A purely web course, and one whose folder is only an ADDITIONAL
+            # destination (the flags look only at the main one), still sign out.
+            $logoutEntry = @($appRules.launcherFlags.deployExtras | Where-Object { $_.flag -ceq '--logout' })[0]
+            $refusalWords = [string]$logoutEntry.refusedWithAFolder
+            Report 'realDeploy' 'the contract carries the folder sign-out refusal' ($refusalWords.Length -gt 0) 'launcherFlags.deployExtras --logout has no refusedWithAFolder'
             $env:STAMP_STUB = 'preview'; $env:PREVIEW_STUB_EXIT = '1'
             $resetFolder = Join-Path $work 'published-reset'
             $savedFolder = (Join-Path $work 'published-reset-saved').Replace('\', '/')
+            $savedFolderJson = '{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $savedFolder + '"}'
             foreach ($r in @(
-                @{ name = '--to-folder with --reset-token'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--reset-token'); folder = $resetFolder },
-                @{ name = '--to-folder with --logout'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--logout'); folder = $resetFolder },
-                @{ name = 'a saved folder destination with --logout'; settings = ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $savedFolder + '"}'); args = @('ICS3U', '1', '--logout'); folder = $savedFolder.Replace('/', '\') })) {
-                Remove-Item -LiteralPath $r.folder -Recurse -Force -ErrorAction SilentlyContinue
+                @{ name = '--to-folder with --reset-token'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--reset-token') },
+                @{ name = '--to-folder with --logout'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--logout') },
+                @{ name = '--to-folder with --logout --non-interactive'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--logout', '--non-interactive') },
+                @{ name = '--to-folder with --target cloudflare --logout'; settings = '{"course_code":"ICS3U"}'; args = @('ICS3U', '1', '--to-folder', $resetFolder, '--target', 'cloudflare', '--logout') },
+                @{ name = 'a saved folder destination with --logout'; settings = $savedFolderJson; args = @('ICS3U', '1', '--logout') },
+                @{ name = 'a saved folder destination with --reset-token --non-interactive'; settings = $savedFolderJson; args = @('ICS3U', '1', '--reset-token', '--non-interactive') },
+                @{ name = 'a saved folder destination beside a Cloudflare one, with --logout'; settings = ('{"course_code":"ICS3U","deploy_target":"local_folder","deploy_folder_path":"' + $savedFolder + '","additional_deploy_targets":[{"type":"cloudflare_pages"}]}'); args = @('ICS3U', '1', '--logout') })) {
+                foreach ($folder in @($resetFolder, $savedFolder.Replace('/', '\'))) { Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue }
                 Set-Settings $r.settings
                 $run = Invoke-ScratchDeploy $r.args
-                $copied = (Test-Path -LiteralPath $r.folder) -and @(Get-ChildItem -LiteralPath $r.folder -Recurse -File -Force -ErrorAction SilentlyContinue).Count -gt 0
-                $ok = (-not $copied) -and (-not $run.Said.Contains('Deployed.')) -and (-not $run.Said.Contains('PUBLISHED_FOLDER=')) -and $run.Said.Contains('CLEARED-THE-NETLIFY-TOKEN') -and ($run.Code -eq 0)
-                Report 'realDeploy' ($r.name + ' deploys nothing') $ok ("exit $($run.Code), copied $copied; said: " + $run.Said)
+                $copied = $false
+                foreach ($folder in @($resetFolder, $savedFolder.Replace('/', '\'))) { if ((Test-Path -LiteralPath $folder) -and @(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction SilentlyContinue).Count -gt 0) { $copied = $true } }
+                $ok = (-not $copied) -and $run.Said.Contains($refusalWords) -and (-not $run.Said.Contains('CLEARED-THE')) -and (-not $run.Said.Contains('Deployed.')) -and (-not $run.Said.Contains('PUBLISHED_FOLDER=')) -and (-not $run.Said.Contains('Deploying to a folder')) -and (-not $run.Said.Contains('PREVIEW-WAS-ASKED')) -and ($run.Code -eq 1)
+                Report 'realDeploy' ($r.name + ' is refused, and nothing is copied or cleared') $ok ("exit $($run.Code), copied $copied; said: " + $run.Said)
+            }
+            foreach ($r in @(
+                @{ name = 'a Netlify course with --logout'; settings = '{"course_code":"ICS3U","deploy_target":"netlify"}'; args = @('ICS3U', '1', '--logout'); cleared = 'CLEARED-THE-NETLIFY-TOKEN' },
+                @{ name = 'a Cloudflare course with --logout'; settings = '{"course_code":"ICS3U","deploy_target":"cloudflare_pages"}'; args = @('ICS3U', '1', '--logout'); cleared = 'CLEARED-THE-CLOUDFLARE-TOKEN' },
+                @{ name = 'a Netlify course with a folder also, with --logout'; settings = ('{"course_code":"ICS3U","deploy_target":"netlify","additional_deploy_targets":[{"type":"local_folder","path":"' + $savedFolder + '"}]}'); args = @('ICS3U', '1', '--logout'); cleared = 'CLEARED-THE-NETLIFY-TOKEN' },
+                @{ name = 'a folder course with --target netlify --logout'; settings = $savedFolderJson; args = @('ICS3U', '1', '--target', 'netlify', '--logout'); cleared = 'CLEARED-THE-NETLIFY-TOKEN' })) {
+                Remove-Item -LiteralPath $savedFolder.Replace('/', '\') -Recurse -Force -ErrorAction SilentlyContinue
+                Set-Settings $r.settings
+                $run = Invoke-ScratchDeploy $r.args
+                $copied = (Test-Path -LiteralPath $savedFolder.Replace('/', '\')) -and @(Get-ChildItem -LiteralPath $savedFolder.Replace('/', '\') -Recurse -File -Force -ErrorAction SilentlyContinue).Count -gt 0
+                $ok = (-not $copied) -and $run.Said.Contains($r.cleared) -and (-not $run.Said.Contains($refusalWords)) -and (-not $run.Said.Contains('Deployed.')) -and ($run.Code -eq 0)
+                Report 'realDeploy' ($r.name + ' still signs out, as before') $ok ("exit $($run.Code), copied $copied; said: " + $run.Said)
             }
             Set-Settings '{"course_code":"ICS3U"}'
 

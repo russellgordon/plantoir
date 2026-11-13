@@ -154,6 +154,28 @@ public class ReuseTheLastBuildTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// #799's fixes review, L2: a junction inside the course whose target is
+    /// GONE is an entry with its own times, not a folder that cannot be listed,
+    /// so it does not make every Deploy build (os.walk passes it over too).
+    /// </summary>
+    [Fact]
+    public void ADanglingJunctionInsideTheCourseIsNotAFolderThatCannotBeListed()
+    {
+        string gone = Path.Combine(_root, "a-folder-that-will-go");
+        Directory.CreateDirectory(gone);
+        string course = Path.Combine(_root, "work", "courses", FreshnessCases.CourseCode);
+        // Made with the course, before the build, as a teacher's link would be.
+        Directory.CreateDirectory(course);
+        ReferenceFixtures.Junction(Path.Combine(course, "linked-in"), gone);
+        Thread.Sleep(FreshnessCases.PauseMilliseconds);
+        var built = FreshnessCases.Build(_root, FreshnessCases.Case("nothing has changed since the build"));
+        Directory.Delete(gone);
+        Assert.False(Directory.Exists(gone));
+
+        Assert.Null(BuildFreshness.WhyRebuild(built.Course, built.Section));
+    }
+
     [Fact]
     public void TheKnownLimitsOnWindowsAreSkippedByName()
     {

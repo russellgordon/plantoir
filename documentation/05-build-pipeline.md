@@ -2763,30 +2763,42 @@ see the reason for.
   it). The shared Python's `os.walk` passes such a folder over
   (`onerror=None`) and reads it as unchanged: a known limit of the shared
   reader, for the same later issue as the junction loop above. Reach is low:
-  the teacher's own course and a denied ACL.
+  the teacher's own course and a denied ACL. A junction whose TARGET is gone
+  is not such a folder: it is an entry with its own times, read like any
+  other, and is not walked (`ADanglingJunctionInsideTheCourseIsNotAFolderThatCannotBeListed`;
+  the fixes review measured it making every Deploy build before), as
+  `os.walk` passes it over.
 - **A question that FAILED is recorded with the toolchain's words.** A Python
   that would not start, a traceback or an answer nobody knows builds, and the
   trail line then says "Plantoir had been updated since it was last built":
   deploy.sh's choice for the same failure, inherited (#799's review, L3). The
   words can say an update where there was only a failure; the build itself
   is the safe direction.
-- **`--reset-token` and `--logout` deploy nothing, to a folder included**
-  (#799's review, H1). The flags clear a saved token; the legs keep only the
-  first destination for them and the section guard does not run for them,
-  both because they deploy nothing. But the folder branch still ran for them,
-  and once its question was guarded "not for --reset-token" it mirrored a
-  preview's pages and said "Deployed." (measured by the review; on 1.9.3 the
-  same command refused or rebuilt, because the preview check there was not
-  guarded). The folder branch is now not entered with either flag: the run
-  goes on to the token code, which clears the token `--target` names
-  (Netlify unless it says cloudflare) and exits. So `deploy.bat ICS3U 1
-  --to-folder X --logout`, and `--logout` on a course whose saved destination
-  is a folder, copy nothing. Both calls of the question are unconditional
-  now; the web legs never reach an upload with either flag, because the
-  token code exits first. `test_launcher_rules.ps1` has the three rows, and
-  each fails on the code before the fix. REJECTED: only dropping the
-  condition, which would still have mirrored the site under a flag that
-  says it deploys nothing.
+- **A folder destination with `--logout` or `--reset-token` is refused**
+  (Russell's ruling, 2026-11-13, after #799's two reviews). The flags clear
+  a saved sign-in and deploy nothing. Until #799's first review the folder
+  branch ran for them anyway, and once its question was guarded "not for
+  --reset-token" it mirrored a preview's pages and said "Deployed." (on 1.9.3
+  the same command refused or rebuilt, because the preview check there was
+  not guarded; on the mac today `deploy.sh` mirrors and clears nothing). The
+  first fix sent them on to the token code instead, which cleared the PC's
+  NETLIFY token for a folder course, even one whose web destination is
+  Cloudflare, so a scheduled deploy of another course to Netlify would stop
+  for its token next morning (the fixes review, M1). Now a typed
+  `--to-folder`, or (with no `--target`) a course whose MAIN saved
+  destination is a folder, with either flag and with `--non-interactive` or
+  not, prints `launcherFlags.deployExtras` "--logout" -> `refusedWithAFolder`
+  word for word and exits 1: nothing copied, nothing cleared, and no
+  "Deploying to ..." line (the saved destination's line is no longer printed
+  before a sign-out at all, the review's L1). A purely web course signs out
+  exactly as before, and so does one whose folder is only an ADDITIONAL
+  destination, because with either flag the launcher looks only at the main
+  one (`savedDestinations.note`). The folder branch keeps `-not $RESET_TOKEN`
+  as a belt. `test_launcher_rules.ps1` has seven refusal rows (each red on
+  the code before) and four sign-out rows that still clear a token.
+  REJECTED: dropping the condition only (it still mirrors under a flag that
+  deploys nothing), and clearing the token `--target` names (it clears one
+  the course never uses).
 - **Hidden is the NAME**, never the attribute: the walk skips no attribute (a
   default `EnumerationOptions` skips Hidden and System, the #272 trap), and
   a folder given the Hidden attribute without a dot is read (a Windows-only
