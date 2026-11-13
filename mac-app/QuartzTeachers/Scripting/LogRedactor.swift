@@ -56,6 +56,15 @@ nonisolated enum LogRedactor {
     /// credential. Cloudflare API tokens are 40 characters.
     static let secretLength: Int = 40
 
+    /// **Redacting twice changes nothing (#780).** The two rules that take
+    /// whatever follows a label (`labelledSecret`, `bearerHeader`) do not
+    /// take a value that is already a placeholder, `(?!\[removed: )`. Before
+    /// that, a line redacted at its call site and again by the trail writer
+    /// (`ScriptRunner`'s "started …" line is one) read
+    /// `token=[removed: token] token]`; the trail writer now redacts twice
+    /// on purpose whenever a line held a control character.
+    /// `problemReportRedaction.redactedAgainCases`.
+    ///
     /// The rules that are pattern matches, applied in this order. The
     /// labelled ones come first so that a value with a label round it is
     /// removed WITH its label kept, rather than being swept up namelessly
@@ -78,12 +87,12 @@ nonisolated enum LogRedactor {
         ),
         RedactionRule(
             name: "labelledSecret",
-            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)\S+"#,
+            pattern: #"(?i)\b(\w*(?:token|secret|password|api[_\-]?key)\s*[=:]\s*)(?!\[removed: )\S+"#,
             replacement: "$1" + removedToken
         ),
         RedactionRule(
             name: "bearerHeader",
-            pattern: #"(?i)\bBearer\s+\S+"#,
+            pattern: #"(?i)\bBearer\s+(?!\[removed: )\S+"#,
             replacement: "Bearer " + removedToken
         ),
         RedactionRule(

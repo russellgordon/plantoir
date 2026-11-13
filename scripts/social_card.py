@@ -23,6 +23,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import toolchain_paths
 import contracts
+import course_names
 import json
 import unicodedata
 
@@ -246,7 +247,12 @@ def generate_card(course_config, section_number, output_path):
     """Draws the card for one section and writes it as a PNG."""
     section_key = f"section{section_number}"
 
-    course_name = course_config.get("course_name") or course_config.get("course_code") or "My Course"
+    # Cleaned where it is read (#780), so the card's title is one line; a
+    # name that is nothing but control characters or spaces falls back to
+    # the code, as an absent one does.
+    course_name = course_names.cleaned(str(course_config.get("course_name") or "")).strip()
+    if not course_name:
+        course_name = str(course_config.get("course_code") or "My Course")
     course_code = course_config.get("course_code") or ""
 
     marker_map = (course_config.get("show_section_marker") or {}).get("sections") or {}

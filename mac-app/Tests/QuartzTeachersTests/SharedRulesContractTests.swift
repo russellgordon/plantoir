@@ -1179,7 +1179,8 @@ final class SharedRulesContractTests: XCTestCase {
         if includingAPrompt {
             store.appendActivityLine(
                 "2026-08-16 07:07:00 · COMP/1 · chose check_section(course, section)\n"
-                + AssistTurnRecord.promptMarker + "What will students see?"
+                + AssistTurnRecord.promptMarker + "What will students see?",
+                keepingLineBreaks: true
             )
         }
         return store
