@@ -1134,8 +1134,17 @@ sanitised it. **Left as they are:** C1 controls (U+0080–U+009F), the
 line/paragraph separators U+2028/2029 and the bidi overrides — none ends or
 splits a command line (measured) and they are characters a name might carry.
 Whether a control character belongs in a course name at all — it also reaches
-the sidebar, the title and the trail — is the follow-up
-`issue-control-characters-in-course-name`, not this piece.
+the sidebar, the title and the trail — was the follow-up, and is #780
+(v1.10.0): no, and the name is cleaned where it is READ, by
+`contracts/shared-rules.json` → `courseNameCharacters`, which also spaces out
+C1 and U+2028/2029 and removes the bidi controls. The mac and the shared
+Python did their half on `issue/780-no-control-characters-in-a-course-name`;
+this app's `CourseConfiguration.CourseName` and its trail writer are owed (the
+`windows` issue for #780). **`OutsideDoor.Clean` stays as it is** after that
+lands: a course name will reach it already clean, but it also cleans the page
+names and the working folder a door carries, which are not course names, and
+it is the last layer before `cmd`. Update this paragraph when the Windows half
+lands.
 
 **The caret set includes `(` and `)`**, and an OLD npm shim shape proves it:
 `cmd-shim`'s older form runs `%*` INSIDE an `IF (…) ELSE (…)` block, where an

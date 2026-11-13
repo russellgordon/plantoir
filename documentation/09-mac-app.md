@@ -4099,7 +4099,9 @@ past most recent first (`greetingUnitPlans.order`), so a full-year course, or
 one carrying last year's plans, names what matters now (707a review M2).
 Each name is put on one line first (`UnitPlans.oneLine`: a line break or a
 tab is one space), because Windows' `cmd /k` door cannot carry a line break
-(review M1); #780's clean of course names should meet it in one function.
+(review M1). Since #780 it runs the course name's rule first
+(`OneLineText.cleaned`), so a NUL or an override in a plan's name is a space
+or gone before the white space is collapsed; no #707 case changed.
 `UnitPlans.read` never throws: a plan file that is not JSON,
 or breaks `planFile.rules`, is left out and counted. The trail's
 "assistant opened" line gains " · told about unit planning", " · reminded of
@@ -10804,6 +10806,55 @@ sharing violation, as the issue says — a guessed delay that still drops the
 line after its last retry. **To KNOW:** if Windows ever trims, the trim must
 run under this same mutex, because a trim is the one write that replaces the
 file, which is exactly how the mac lost lines.
+
+### One line per entry: the trail is cleaned, then redacted (#780)
+
+Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+`ProblemReportStore.appendActivityLine` runs every line through
+`OneLineText.cleaned` (the course name's rule, `contracts/shared-rules.json` →
+`courseNameCharacters`) and THEN through `LogRedactor.redacting`, before the
+append described above. Until then nothing removed a control character, so a
+line break in ANY recorded string (a course name, a page title, a folder
+name) split one entry into two and the second read as a line of its own, and
+an escape sequence was written raw for whoever later read the file with `cat`.
+Cleaning the writer, rather than auditing every caller, is what makes "the
+trail never records one" true without a list of call sites to keep.
+
+**The order is the point, and the first plan had it backwards.** It said
+redact first, so that a NUL inside a home folder's name would still be taken
+whole by the home-folder rule; but an account name cannot hold a control
+character. The plan review measured `LogRedactor`'s own patterns in both
+orders, and this branch re-measured them with the real `LogRedactor.swift`:
+a NUL after `Bearer`, an isolate inside `CLOUDFLARE_API_TOKEN` and an override
+before the `@` of an email address each hide the secret from the redactor,
+because its rules look for white space and for words that stay joined.
+Cleaned first, all three are removed; cleaned second, each is written as
+plain readable text. Running the redactor twice was rejected because it is
+not idempotent (`token=[removed: token]` comes back with a second
+`token]`). The three are `trailLines.cases`.
+
+**The one record that keeps its line breaks** is the assistant's turn
+record, `ActivityTrail.note(… wholeLine: true)`, which passes
+`keepingLineBreaks: true`: U+000A is kept there and every other code point is
+cleaned, a carriage return included. Two things inside it are put on one line
+first, because a line break there would otherwise survive:
+`AssistTurnRecord.askedLines` cleans the teacher's sentence before it goes
+behind `promptMarker`, and `AssistTurnRecord.lines` cleans the whole turn
+line (the argument names come from the model's own JSON). The first was a
+real leak, found while writing this: the assistant's field grows to several
+lines (`axis: .vertical`), so a sentence on two lines put its second line on
+the trail with no marker, and a report sent with the prompts left out still
+carried it. `trailLines.promptCases` pins it.
+
+**Not cleaned:** the launchers' `note_on_the_trail` and the quit script's
+`note` append with `printf` and go around this writer; they carry course
+codes and fixed words. Lines already on disk are not cleaned again when a
+report reads them back (the section below), because cleaning on the way out
+would need a second redaction to be safe. No new trail event: this changes
+how every line is written, not what is recorded. Tests:
+`CourseNameCharactersTests` (`testEveryTrailLineCaseIsWrittenAsTheContractSays`,
+`testOnlyAWholeLineRecordKeepsItsLineBreaks`,
+`testTheTeachersSentenceStaysBehindItsMarker`).
 
 ### When the trail holds characters that cannot be read
 
