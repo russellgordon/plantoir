@@ -83,7 +83,10 @@ else
   cp "$HERE/package.json" "$HERE/package-lock.json" "$CACHE/"
   # --ignore-scripts: playwright-core has no install script, and nothing
   # else should run. The lockfile's integrity hash is what npm ci checks.
-  (cd "$CACHE" && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error)
+  if ! (cd "$CACHE" && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error); then
+    echo "fetch-browsers: could not install Playwright's driver $PINNED - it comes from the npm registry, so this needs the network once. Nothing was checked; the rendered check will say SKIPPED until it is here." >&2
+    exit 1
+  fi
   echo "fetch-browsers: installed Playwright's driver $PINNED in $CACHE"
 fi
 
@@ -97,7 +100,10 @@ elif [[ -f "$SHARED/$name/INSTALLATION_COMPLETE" ]]; then
   echo "fetch-browsers: copied $name from $SHARED ($(du -sh "$dir" | cut -f1))"
 else
   echo "fetch-browsers: downloading $name (about 300 MB)…"
-  PLAYWRIGHT_BROWSERS_PATH="$ENGINES" node "$CACHE/node_modules/playwright-core/cli.js" install webkit
+  if ! PLAYWRIGHT_BROWSERS_PATH="$ENGINES" node "$CACHE/node_modules/playwright-core/cli.js" install webkit; then
+    echo "fetch-browsers: could not download $name - it needs the network once. The rendered check will say SKIPPED for WebKit until it is here." >&2
+    exit 1
+  fi
 fi
 [[ -f "$dir/INSTALLATION_COMPLETE" ]] || { echo "fetch-browsers: $name did not arrive" >&2; exit 1; }
 echo "fetch-browsers: ready - the rendered check finds the driver and $name in $CACHE"

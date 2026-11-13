@@ -357,9 +357,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    formula, quiz, task box and runnable program in Chrome for Testing and in
    Safari's engine, then proves each row red on a sabotaged copy. Without the
    variable a missing engine is only a SKIP; with it, a FAILURE, so a cut
-   never passes having checked one engine. Fetch Safari's engine once per Mac
-   with `./browser-checks/fetch-browsers.sh` (296 MB, outside the
-   repository). `documentation/06-quartz-customizations.md` → R.
+   never passes having checked one engine. The director's merge gate runs it
+   the same way (the `direct-release` skill's gate line). Without the network,
+   the rows that still need Google's fonts or cdnjs say SKIPPED by name and
+   the summary's last lines count every SKIP; a SKIP is never a pass. Fetch
+   Safari's engine once per Mac with `./browser-checks/fetch-browsers.sh`
+   (Node 22, npm and the network once; 296 MB, outside the repository).
+   `documentation/06-quartz-customizations.md` → R.
 
    **On Windows, the same audit over the runtime** (#685): run
    `.\windows-app\audit-runtime.ps1` from the repository root, against the

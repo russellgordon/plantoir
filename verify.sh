@@ -6118,6 +6118,19 @@ rendered_cleanup() {
   docker rm -f "$RENDERED_CONTAINER" >/dev/null 2>&1 || true
   rm -rf "$RENDERED_DIR" "$RENDERED_BUILDS" "$RENDERED_SITE"
 }
+RENDERED_NOT_RUN=""
+# The engines a log says ran, in words: "Chrome for Testing and WebKit", or
+# one of them with ONLY, so a pass line can never hide an engine that was not there.
+rendered_engines() {
+  local ran
+  ran="$(grep '^ENGINES: ' "$1" | tail -1 | sed 's/^ENGINES: //')"
+  case "$ran" in
+    chromium,webkit|webkit,chromium) echo "in Chrome for Testing and WebKit" ;;
+    chromium) echo "in Chrome for Testing ONLY (WebKit did not run)" ;;
+    webkit) echo "in WebKit ONLY (Chrome for Testing did not run)" ;;
+    *) echo "in no engine" ;;
+  esac
+}
 rendered_lines() {
   # The checker's own lines of one kind, each as a verify.sh result.
   # Read through a redirect, not a pipe, so fail() sets FAILED in THIS shell.
@@ -6146,7 +6159,12 @@ mkdir -p "$RENDERED_DIR/.toolchain/support"
 cp Dockerfile "$RENDERED_DIR/.toolchain/"
 cp -R support/swift "$RENDERED_DIR/.toolchain/support/swift"
 if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
-  skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
+  if [[ -n "${PLANTOIR_REQUIRE_ENGINES:-}" ]]; then
+    fail "the rendered check (#597): no Node 22 or later on this Mac, and PLANTOIR_REQUIRE_ENGINES asks for ${PLANTOIR_REQUIRE_ENGINES}"
+  else
+    skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
+  fi
+  RENDERED_NOT_RUN="chromium and webkit (no Node 22)"
 elif ! node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
   fail "the rendered check's server does not serve a site as the hosts do (browser-checks/lib/test_site_server.mjs, #597)"
   grep '^FAIL' /tmp/verify_rendered_server.log
@@ -6170,11 +6188,12 @@ else
     node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
       >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
     RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
+    RENDERED_NOT_RUN="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed -n 's/.*NOT run in \([^)]*\)).*/\1/p')"
     if [[ "$RENDERED_STATUS" == "3" ]] && ! grep -q '^OK: ' /tmp/verify_rendered_features.log; then
       # No engine at all: skips only, and no pass line (a SKIP is never a pass).
       rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
     elif [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
-      pass "the rendered check, every row in every engine on this Mac: $(grep -c '^OK: ' /tmp/verify_rendered_features.log) row results passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
+      pass "the rendered check $(rendered_engines /tmp/verify_rendered_features.log): $(grep -c '^OK: ' /tmp/verify_rendered_features.log) row results passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
       rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
     else
       fail "the rendered check: a row failed in a browser ($RENDERED_DONE; browser-checks/rendered_features.mjs, #597)"
@@ -6189,7 +6208,7 @@ else
         >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
       RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
       if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
-        pass "the rendered check sees: in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
+        pass "the rendered check sees, $(rendered_engines /tmp/verify_rendered_red.log): in each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) runs, $(grep '^OK: sabotage ' /tmp/verify_rendered_red.log | sed 's/ \[.*//' | sort -u | wc -l | tr -d ' ') sabotages over the engines each applies to, the row aimed at failed for its own reason and the page's other rows stayed green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
         rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
       else
         fail "the rendered check did not see a sabotage, or saw it for the wrong reason ($RED_DONE; browser-checks/lib/sabotage.py, #597)"
@@ -7179,7 +7198,21 @@ if [[ "$FAILED" == "true" ]]; then
   echo "❌ Verification FAILED — see items above."
   exit 1
 fi
-echo "✅ All checks passed."
+# A SKIP checked nothing; the last lines say how many and which, so one can
+# never scroll past under a green line (#597 implementation review M5).
+SKIPPED_RESULTS=()
+for line in "${RESULTS[@]}"; do
+  [[ "$line" == "⏭️ "* ]] && SKIPPED_RESULTS+=("$line")
+done
+if (( ${#SKIPPED_RESULTS[@]} > 0 )); then
+  echo "✅ All checks that ran passed, but ${#SKIPPED_RESULTS[@]} were SKIPPED and checked nothing:"
+  for line in "${SKIPPED_RESULTS[@]}"; do echo "   $line"; done
+  if [[ -n "$RENDERED_NOT_RUN" ]]; then
+    echo "   ⚠️  The rendered check (#597) did NOT run in: $RENDERED_NOT_RUN. PLANTOIR_REQUIRE_ENGINES=chromium,webkit makes that a failure."
+  fi
+else
+  echo "✅ All checks passed."
+fi
 echo ""
 echo "ℹ️  Notes:"
 echo "   • The '$CONTAINER_NAME' container was left running from $DEV_TEST_IMAGE"

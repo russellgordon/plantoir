@@ -287,6 +287,96 @@ def own_host_worker(site: Path) -> str:
     return "a worker asking example.com for a file"
 
 
+def sabotage_folder(site: Path) -> Path:
+    folder = site / "static" / "rendered-sabotage"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def own_host_frame(site: Path) -> str:
+    path = page_file(site, "Quiz")
+    text = path.read_text(encoding="utf-8")
+    if "<article" not in text:
+        raise SystemExit("sabotage: the Quiz page has no <article>")
+    frame = '<iframe src="https://example.com/plantoir-rendered-sabotage-frame" width="200" height="100" title="a frame"></iframe>'
+    path.write_text(text.replace("<article", frame + "<article", 1), encoding="utf-8")
+    return "a frame from example.com on the Quiz page"
+
+
+def own_host_shared_worker(site: Path) -> str:
+    (sabotage_folder(site) / "shared.js").write_text(
+        "fetch('https://example.com/plantoir-rendered-from-a-shared-worker', { mode: 'no-cors' }).catch(() => {})\n", encoding="utf-8")
+    add_script(site, "Quiz", "start-shared.js", "new SharedWorker(new URL('shared.js', document.currentScript.src))\n")
+    return "a shared worker asking example.com for a file"
+
+
+def own_host_service_worker(site: Path) -> str:
+    (sabotage_folder(site) / "service.js").write_text(
+        "self.addEventListener('activate', () => { fetch('https://example.com/plantoir-rendered-from-a-service-worker', { mode: 'no-cors' }).catch(() => {}) })\n",
+        encoding="utf-8")
+    add_script(site, "Quiz", "start-service.js", "navigator.serviceWorker.register(new URL('service.js', document.currentScript.src))\n")
+    return "a service worker registered"
+
+
+def own_host_websocket(site: Path) -> str:
+    add_script(site, "Quiz", "socket.js", "try { new WebSocket('wss://example.com/plantoir-rendered-socket') } catch (error) {}\n")
+    return "a WebSocket from the page to example.com"
+
+
+def own_host_worker_websocket(site: Path) -> str:
+    (sabotage_folder(site) / "socket-worker.js").write_text(
+        "try { new WebSocket('wss://example.com/plantoir-rendered-socket-from-a-worker') } catch (error) {}\n", encoding="utf-8")
+    add_script(site, "Quiz", "start-socket-worker.js", "new Worker(new URL('socket-worker.js', document.currentScript.src))\n")
+    return "a worker opening a WebSocket to example.com"
+
+
+def graph_one_curve(site: Path) -> str:
+    path = page_file(site, "Graphs")
+    text = path.read_text(encoding="utf-8")
+    changed = text.replace(",&quot;-x + 4&quot;]", "]", 1).replace(",&quot;y = -x + 4&quot;", "", 1)
+    if changed.count("-x + 4") == text.count("-x + 4"):
+        raise SystemExit("sabotage: the Graphs page has no second line to take out")
+    path.write_text(changed, encoding="utf-8")
+    return "the graph's second line taken out"
+
+
+def katex_source(site: Path) -> str:
+    add_script(site, "Diagrams", "katex-source.js",
+               "document.addEventListener('DOMContentLoaded', () => {\n"
+               "  const all = document.querySelectorAll('article .katex')\n"
+               "  const last = all[all.length - 1]\n"
+               "  ;(last.closest('.katex-display') || last).replaceWith(document.createTextNode('$$\\\\frac{19 + 23}{2} = 21$$'))\n"
+               "})\n")
+    return "one formula put back as its TeX"
+
+
+def katex_wrong_face(site: Path) -> str:
+    fonts = site / "static" / "katex" / "fonts"
+    replaced = 0
+    for face in sorted(fonts.glob("KaTeX_Main-*")):
+        donor = fonts / ("KaTeX_Size4-Regular" + face.suffix)
+        if donor.is_file():
+            shutil.copyfile(donor, face)
+            replaced += 1
+    if replaced == 0:
+        raise SystemExit("sabotage: no KaTeX_Main files with a KaTeX_Size4 file to put in their place")
+    return f"{replaced} KaTeX_Main files replaced with KaTeX_Size4's"
+
+
+def quiz_given_away(site: Path) -> str:
+    add_script(site, "Quiz", "given-away.js",
+               "document.addEventListener('DOMContentLoaded', () => {\n"
+               "  const quiz = document.querySelector('.plantoir-quiz')\n"
+               "  for (const choice of quiz.querySelectorAll('.plantoir-quiz-choice')) {\n"
+               "    if ((choice.textContent || '').includes('42')) choice.style.background = 'lightgreen'\n"
+               "  }\n"
+               "  const note = document.createElement('p')\n"
+               "  note.textContent = 'Answer: 42'\n"
+               "  quiz.after(note)\n"
+               "})\n")
+    return "the right choice marked out and its answer shown before any press"
+
+
 def cold_visit(site: Path) -> str:
     if not (site / "index.css").is_file():
         raise SystemExit("sabotage: the site has no index.css")
@@ -316,6 +406,15 @@ DOERS = {
     "clean page": clean_page,
     "own host picture": own_host_picture,
     "own host worker": own_host_worker,
+    "own host frame": own_host_frame,
+    "own host shared worker": own_host_shared_worker,
+    "own host service worker": own_host_service_worker,
+    "own host websocket": own_host_websocket,
+    "own host worker websocket": own_host_worker_websocket,
+    "graph one curve": graph_one_curve,
+    "katex source": katex_source,
+    "katex wrong face": katex_wrong_face,
+    "quiz given away": quiz_given_away,
     "cold visit": cold_visit,
 }
 

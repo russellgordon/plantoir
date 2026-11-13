@@ -4915,10 +4915,40 @@ Waits are on the state asked about, with a ceiling.
   never `page.on("request")` or `context.on("request")`: WebKit hands a
   worker's requests to neither (#597 plan review H1, measured with a
   dedicated worker that fetched from another host). The Pyodide and Swift
-  runners both run in workers. A request from a teacher's embed (any frame
-  whose document is on another host) is not judged; a request to a host
-  outside `thirdPartyHostsToday` is recorded and then REFUSED by the router,
-  so a sabotage's picture never leaves the Mac.
+  runners both run in workers. A request to a host outside
+  `thirdPartyHostsToday` is recorded and then REFUSED by the router, so a
+  sabotage's picture never leaves the Mac. A frame on another host counts as
+  leaving the site on every page; only the Embeds page's frames on the embeds
+  row's `allowedFrames` (YouTube, Vimeo, geogebra.org, PhET), and what loads
+  inside them, are a teacher's embeds (the first version let any frame on
+  any page through, implementation review H1; measured: a frame from
+  example.com on the Quiz page was green in both engines).
+- **What the router does not see, and how each is caught** (implementation
+  review M1, measured with a script of the site's own asking example.com):
+
+  | Request | Chromium | WebKit | How the row sees it |
+  |---|---|---|---|
+  | dedicated worker, nested worker, `sendBeacon` | routed | routed | the router |
+  | WebSocket from the page | not routed | not routed | `context.routeWebSocket`, which records and closes it |
+  | WebSocket from a dedicated worker | not seen | not seen | the page's `Worker` marks the worker's script address; the router puts a watch in front of that script, which records the socket through a request of the site's own and refuses it |
+  | shared worker's requests | not seen | not seen | none can be: starting a shared worker fails the row, and the check refuses to start it |
+  | service worker's requests | routed | not seen | the context blocks service workers, and registering one fails the row |
+
+  What stays out of sight: a WebSocket from a worker made from a `blob:`
+  address, whose script the router never serves. The site starts none of
+  these today.
+- **Rendered, but wrongly.** Four faults the first version passed in both
+  engines (implementation review M2) are rows' assertions now: the graph must
+  draw each of its two lines, not only one; both formulas must be set, with no
+  TeX left in the page's text; the quiz must give nothing away before a press
+  (no feedback, nothing ticked, no answer shown, every choice alike); and the
+  KaTeX_Main face, once loaded, must draw its own letters. That last one is
+  measured as a width: 17 letters at 40 px in `"KaTeX_Main", monospace`
+  against `monospace` alone, 385.6 px against 408.1. Another face's file
+  served under KaTeX_Main's name still loads (its status is `loaded`), but
+  draws no letters, so the text falls back and the widths match to the
+  pixel. Digits and the space are left out of the string because
+  KaTeX_Size4 carries them and moved the width by 28 px.
 - **Fonts by what loaded.** `document.fonts.check()` answers true for a
   family that does not exist, in both engines, and in WebKit for a face whose
   file failed to load (review H4, measured). The katex and fonts rows call
@@ -4955,16 +4985,33 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). Twenty-one sabotages run on every gate,
-three at a time. The one that does not is `geogebra keys`: with the loader's
-hold on Space and Enter dropped, the presses do reset the construction while
-its lines run (Chromium: 0 to 3 of 150 objects through 400 presses), but the
-other half of #792, the hidden marker that tells the loader a reset got in,
-then rebuilds all 150. WebKit was left with 114 of 150 once in four runs and
-all 150 in the other three, Chromium all 150 every time. A sabotage that
-fails only sometimes would fail the gate at random, so it runs by name only;
-the row's must-fail remains `geogebra_applet.mjs` item 12's against the first
-version of #792 (82 and 75 of 150, Chromium).
+row is named there, with its reason). All thirty-one sabotages run on every gate,
+three at a time, each in a browser of its own.
+
+Two things made that reliable, both measured 2026-11-13:
+
+- **The keys row counts points after every press.** With the loader's hold on
+  Space and Enter dropped, the presses do reset the construction while its
+  lines run, but the other half of #792 (the hidden marker that tells the
+  loader a reset got in) then rebuilds all 150. A row that judged only the
+  end saw nothing: WebKit was left with 114 of 150 once in four runs,
+  Chromium never. Counted after each press, the points fall hundreds of times
+  with the hold dropped and never by more than one without it, while the
+  lines run. Once every line has made its point, the loader loads what they
+  built as the sketch's start, and WebKit's count dips to 0 and back then,
+  unbroken; falls are counted only before that. The canvas is focused before
+  EVERY press, so each Shift+Tab starts from the same place in GeoGebra's
+  keyboard cycle; focusing it only when the focus had left the sketch reached
+  the reset icon in some WebKit runs and not others.
+- **What presses keys is not run beside other browsers.** With other
+  browsers busy, WebKit's key presses went astray: the keys sabotage passed in
+  2 of 3 runs started together and never alone, a browser per sabotage did
+  not cure it, and on the reset sabotage (three at a time) WebKit's points
+  fell while the lines ran with the loader's hold in place. So the keys
+  sabotage runs alone, after the others; the keys row is judged on that
+  sabotage only, not on the other Sketch sabotages; and the pages whose rows
+  type (Python, Swift) take WebKit one at a time. Everything else runs three
+  at a time.
 
 **Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
 engines at once, four runs of the step:** the rows in 14 to 15 s; the
@@ -4991,11 +5038,30 @@ count those. The publish's own two `_headers` writers run on a copy with
 GeoGebra steps run `isolation_headers.publish_headers` without it, so it
 raises before writing the isolation block and only the badge block reaches
 their copies; the GeoGebra check sends the isolation headers itself.) A
-build that fails is a FAIL, never a skip. A missing engine or a missing
-network for the mermaid and fonts rows is a SKIP by name; with
-`PLANTOIR_REQUIRE_ENGINES=chromium,webkit` a missing engine is a FAILURE,
-which is how the release gate and the director's merge gate run it. Exit 1
-always wins over 3, so a missing engine never hides a failure.
+build that fails is a FAIL, never a skip.
+
+- **A missing engine is a SKIP by name.** Every pass line names the engines
+  that ran ("in Chrome for Testing ONLY (WebKit did not run)"). The summary's
+  last lines count every SKIP in the run and repeat them under "All checks
+  that ran passed, but N were SKIPPED", with the engines the rendered check
+  did not run in. With `PLANTOIR_REQUIRE_ENGINES=chromium,webkit` a missing
+  engine is a FAILURE, and so is Node older than 22. An engine name the check
+  does not know is a FAILURE too, and an engine the variable requires is run
+  even if `--engines` leaves it out. The release gate and the director's
+  merge gate set the variable (RELEASING.md step 2, the `direct-release`
+  skill).
+- **Without the network.** The mermaid and fonts rows, and the diagram part
+  of the print row, say SKIPPED by name. The clean-page row sets aside only
+  what the absent hosts make a page say, and says how many lines it set
+  aside: an unresolved name for Google's fonts or cdnjs, and Mermaid's failed
+  import. Measured with `--pretend-offline` (Chromium's resolver told the
+  three hosts do not exist, WebKit's requests to them failed as an
+  unresolved name): 37 OK, 0 FAIL, 6 SKIPPED, exit 3. The first version was
+  red on all ten pages there. Fetching the driver or the engine without the
+  network is its own line from `fetch-browsers.sh`, and the check then says
+  SKIPPED.
+- **Exit codes.** Exit 1 always wins over 3, so a missing engine never hides
+  a failure.
 
 **Why the 17 older browser checks stay Chromium only.** They drive Chrome
 over the DevTools protocol with Node's own `WebSocket` and no packages
