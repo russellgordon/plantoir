@@ -22,6 +22,7 @@ script's own --self-test.
 Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate); every case skips, saying
 so, where it is missing. Stdlib only otherwise. Windows' PythonToolchainTests discovers this file.
 """
+import json
 import math
 import random
 import os
@@ -44,6 +45,7 @@ BLANK_LEGAL = FIXTURES / "blank-quiz-legal.pdf"
 TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
 MISSING = [tool for tool in TOOLS if shutil.which(tool) is None]
 SKIP_REASON = "Poppler is not installed here (" + ", ".join(MISSING) + " not found); the redaction cases need it"
+SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
 BOX = (3.44, 0.20, 5.33, 0.89)
 DPI = 100
 INVENTED = ("Testpupil", "Alphaname")
@@ -52,6 +54,14 @@ INVENTED = ("Testpupil", "Alphaname")
 # (the label ends at 3.93 in; its rule runs to 5.19 in), and in the body of page 2.
 NAME_STROKES = [(3.98, 0.56, 4.30, 0.74), (4.36, 0.58, 4.62, 0.75), (4.68, 0.55, 5.02, 0.73)]
 BODY_STROKES = [(1.6, 3.1, 3.2, 3.3)]
+
+
+def redaction():
+    return json.loads(SHARED_RULES.read_text(encoding="utf-8"))["assessment"]["redaction"]
+
+
+def assessment():
+    return json.loads(SHARED_RULES.read_text(encoding="utf-8"))["assessment"]
 
 
 def render(pdf, page, dpi=DPI):
@@ -275,32 +285,32 @@ class RedactionTests(unittest.TestCase):
         self.fail(f"no line for {identifier}:\n{self.outcome.stdout}")
 
     def test_every_variant_is_stopped_or_blanked_with_no_name_ink_left(self):
+        cases = redaction()["scanCases"]["cases"]
+        self.assertEqual(sorted(case["variant"] for case in cases), sorted(variant for variant, _masks in self.made.values()),
+                         "the contract's scan cases and the variants this test builds are the same list")
+        by_variant = {variant: identifier for identifier, (variant, _masks) in self.made.items()}
         report = []
-        for identifier, (variant, masks) in sorted(self.made.items()):
+        for case in cases:
+            identifier = by_variant[case["variant"]]
+            masks = self.made[identifier][1]
             line = self.line_for(identifier)
             blanked = self.root / "Redacted" / "Section 1" / (identifier + ".pdf")
             if "CHECK" in line:
-                self.assertFalse(blanked.exists(), f"{variant}: a CHECK file must not be written")
-                report.append(f"{variant}: CHECK")
+                self.assertNotEqual(case["expect"], "written", f"{case['variant']} must be written: {line}")
+                self.assertFalse(blanked.exists(), f"{case['variant']}: a CHECK file must not be written")
+                report.append(f"{case['variant']}: CHECK")
                 continue
-            self.assertIn("header matches your blank test", line, variant)
+            self.assertNotEqual(case["expect"], "CHECK", f"{case['variant']} must be stopped: {line}")
+            self.assertIn("header matches your blank test", line, case["variant"])
             self.assertNotIn(" OK", line, "the line says what was measured, never OK")
             left = ink_left_outside_the_box(blanked, masks)
-            report.append(f"{variant}: written, {left} name pixels left")
-            self.assertEqual(left, 0, f"{variant}: name ink is visible in a written file")
+            report.append(f"{case['variant']}: written, {left} name pixels left")
+            self.assertEqual(left, 0, f"{case['variant']}: name ink is visible in a written file")
         print("\n" + "\n".join(report) + f"\n({self.seconds:.1f} s for {2 * len(self.made)} pages)")
 
-    def test_the_upright_paper_and_the_duplex_one_are_written(self):
+    def test_the_duplex_paper_has_its_page_turned_upright(self):
         self.assertIn("box placed on 2; header matches your blank test", self.line_for("Student A"))
         self.assertIn("page 2 turned upright", self.line_for("Student G"))
-
-    def test_what_a_scanner_gives_every_day_is_not_stopped(self):
-        for identifier in ("Student J", "Student K", "Student L"):
-            self.assertIn("header matches your blank test", self.line_for(identifier), self.made[identifier][0])
-
-    def test_a_shift_and_a_shrink_and_a4_are_stopped(self):
-        for identifier in ("Student C", "Student D", "Student H"):
-            self.assertIn("CHECK", self.line_for(identifier), self.made[identifier][0])
 
     def test_the_box_is_black_and_nothing_sits_under_it(self):
         blanked = self.root / "Redacted" / "Section 1" / "Student A.pdf"
@@ -353,24 +363,42 @@ class RedactionTests(unittest.TestCase):
 @unittest.skipIf(MISSING, SKIP_REASON)
 class BoxAndRefusalTests(unittest.TestCase):
 
-    def test_the_box_is_read_from_the_blank_letter_and_legal_tests(self):
-        for blank in (BLANK_LETTER, BLANK_LEGAL):
-            result = run_script(SCRIPT, "--box-from", blank)
+    def test_the_box_cases(self):
+        for case in redaction()["boxCases"]:
+            arguments = ["--box-from", FIXTURES / case["blank"]]
+            if "label" in case:
+                arguments += ["--label", case["label"]]
+            result = run_script(SCRIPT, *arguments)
+            if "refused" in case:
+                self.assertEqual(result.returncode, 1, case["name"])
+                self.assertIn(case["refused"], result.stdout, case["name"])
+                continue
             self.assertEqual(result.returncode, 0, result.stdout)
-            for line in result.stdout.splitlines():
+            lines = result.stdout.splitlines()
+            self.assertEqual(len(lines), page_count(FIXTURES / case["blank"]), case["name"])
+            for line in lines:
                 values = [float(value) for value in line.split("box in inches ")[1].split(",")]
-                for found, expected in zip(values, BOX):
-                    self.assertAlmostEqual(found, expected, delta=0.02, msg=f"{blank.name}: {line}")
+                for found, expected in zip(values, case["box"]):
+                    self.assertAlmostEqual(found, expected, delta=case["within"], msg=f"{case['name']}: {line}")
 
-    def test_a_blank_with_no_label_refuses(self):
-        result = run_script(SCRIPT, "--box-from", BLANK_LETTER, "--label", "Nom")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("there is no 'Nom' label", result.stdout)
-
-    def test_a_label_written_another_way_is_found(self):
-        result = run_script(SCRIPT, "--box-from", BLANK_LETTER, "--label", "NAME:")
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("3.44,0.20,5.33,0.89", result.stdout)
+    def test_only_files_named_like_an_identifier_are_papers(self):
+        cases = assessment()["identifiers"]["cases"]
+        with tempfile.TemporaryDirectory() as root:
+            originals = Path(root) / "Originals"
+            originals.mkdir()
+            build_scans(BLANK_LETTER, Path(root) / "made", {"upright"})
+            scan = (Path(root) / "made" / "Section 1" / "Student A.pdf").read_bytes()
+            for case in cases:
+                (originals / case["file"]).write_bytes(scan)
+            result = run_script(SCRIPT, originals, Path(root) / "Redacted", "--blank", BLANK_LETTER, "--check-dir", Path(root) / "Check")
+            papers = [case for case in cases if case["isAPaper"]]
+            for case in cases:
+                stem = case["file"][:-4]
+                if case["isAPaper"]:
+                    self.assertIn(f"{stem}.pdf: 2 pages, box placed on 2", result.stdout, case["file"])
+                else:
+                    self.assertNotIn(stem, result.stdout, f"{case['file']} must be counted, never named")
+            self.assertIn(f"{len(cases) - len(papers)} files or folders not named like an identifier were left alone", result.stdout)
 
     def test_a_page_turned_sideways_refuses(self):
         with tempfile.TemporaryDirectory() as root:

@@ -24177,7 +24177,8 @@
           "If you cannot tell whether they have shown that interest, do not offer it.",
           "then any question that changed goes back to the reviewer",
           "An assessment (a quiz or test) never does.",
-          "Contexts you invent never involve firearms or ammunition"
+          "Contexts you invent never involve firearms or ammunition",
+          "except anything in a teacher-only folder"
         ],
         "plantoir-test-authoring": [
           "Please read and decide on all of it before it reaches a student; I draft, you decide.",
@@ -24197,6 +24198,29 @@
         ],
         "plantoir-unit-planning": [
           "you can also write the unit's test from the plan",
+          "Do not raise it again in this session if they do not take it up."
+        ],
+        "plantoir-marking": [
+          "Every mark, level and comment I draft is a suggestion.",
+          "I draft; you decide.",
+          "Before we start, four things about your students' privacy",
+          "Whatever I read is sent to the AI service I run on",
+          "so please skim the blanked papers once before I start",
+          "the script stops on any page whose top does not match your blank test",
+          "I will not repeat it in any message or file",
+          "The files I write stay on this computer",
+          "**Never set up a marking folder inside the working folder**",
+          "say once, in plain words, that the papers and the name table will be stored by that service as well",
+          "do not raise it again for that folder",
+          "copy the script into the marking folder's `Scripts/` folder",
+          "It is a safety net, not a guarantee",
+          "**Every script that reads the name mapping table is run through `run_with_names.py`, never directly.**",
+          "A ruling that changes a mark applies only once you have said yes to it",
+          "If you cannot tell whether they have shown that interest, do not offer it.",
+          "nothing in the teacher-only folder is opened, rendered or listed",
+          "never involve firearms or ammunition",
+          "Only if it is there, when the sheets are handed over and the marks are final",
+          "draft report card comments from these records",
           "Do not raise it again in this session if they do not take it up."
         ]
       },
@@ -33140,7 +33164,136 @@
           "folding the kit into plantoir-handouts: a kit is a different job with different triggers, so each skill names the other",
           "a page on plantoir.app, or new text in the app: Russell, 2026-11-12, Plantoir is not to read as an app that needs an assistant"
         ]
+      },
+      "markingSkill": {
+        "rule": "The skill `plantoir-marking` (#750, piece 750a: a test or quiz written on paper and scanned) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant: the teacher decides (a sentence in the first reply and under the title of every document written for the teacher); the four privacy points before any student work is opened, which are TRUE (750 plan review H1 and R2: whatever is read goes to the AI service; the box covers the name box at the top of a page and nothing else, so a name written elsewhere is seen and the teacher skims the blanked papers once; a page whose top does not match the blank test is stopped; a name seen is never repeated; the files written stay on the computer); never to open the name mapping table, a class list, a school marks export, or anything in the teacher-only folder, even when asked, offering the script instead; never a marking folder inside the working folder (Russell, 2026-11-12), and a folder kept in sync by a service said ONCE and not again for that folder once the teacher says that is fine; the scripts are STARTING POINTS (Russell, 2026-11-12) copied into the marking folder's Scripts/, adapted, and self-tested, except `runner` and the test-authoring skill's check_kit.py, which are run from their skill folders and never changed; every script that reads the mapping table is run through `runner`; the teacher's How I Teach page first, then a few plain questions recorded in Marking Settings.md; the handouts skill's named template (handoutsSkill.offeredTemplate.name) and reference/template.md's rulings OFFERED only to a teacher who shows the interest it bridges, an open question for anyone else, and a ruling that changes a mark applied only after the teacher's yes; one marker per paper from a brief, calibration first, a reviewer, every ruling numbered and swept across every paper; the default sheet layout (marks last); named copies only at the end, on the teacher's word, by script; invented contexts never involve firearms or ammunition, a teacher's own test marked as it is; report comments mentioned once at the moment of need and only when the plantoir-report-comments skill is in the working folder. Neither app reads or writes anything it makes. #750's later pieces (coding assignments, results) add their own files and sentences.",
+        "skill": "plantoir-marking",
+        "scripts": [
+          "scripts/redact_scans.py",
+          "scripts/make_named_copies.py",
+          "scripts/build_test_sheet.py",
+          "scripts/run_with_names.py"
+        ],
+        "templates": [
+          "templates/Marking Settings.md",
+          "templates/Marker Brief.md",
+          "templates/Reviewer Brief.md",
+          "templates/Marking Rules Applied.md"
+        ],
+        "references": [
+          "reference/test-sheets.md",
+          "reference/template.md"
+        ],
+        "runner": "scripts/run_with_names.py",
+        "mentionedBy": [
+          "plantoir-test-authoring",
+          "plantoir-handouts",
+          "plantoir-page-authoring"
+        ],
+        "rejected": [
+          "a page on plantoir.app, or new text in the app: Russell, 2026-11-12",
+          "opening the mapping table when the teacher asks: the script route always exists, and the teacher may not know a name read is sent to the provider",
+          "one marking folder with the names inside it: a recursive listing of it would show named file names",
+          "the self-test as the guarantee for an adapted script: it is adapted with the script (750 plan review R3), so one never-adapted runner filters what reaches the assistant, and says it is a net, not a lock",
+          "a greeting sentence: how a teacher finds out is the honest answer when asked and the one-time offer at the moment of need (Russell, 2026-11-12); piece G owns the greeting"
+        ]
       }
+    },
+    "folders": {
+      "rule": "Where marking lives (#750, 750a). Two folders per course, both chosen by the teacher and both outside the working folder: the marking folder (the assistant's: settings, adapted scripts, blanked papers, marks records, identifier sheets) and the teacher-only folder beside it (the mapping table, the originals, the check files, the named copies, the runner's quarantine), which only scripts write and the assistant never opens, lists or renders. The pointer `pointerFile.path` holds paths only and travels with the course (a backup, an archive, a restore) inside .internal, which is never built into a site. A marking folder inside the working folder is refused (Russell, 2026-11-12: it could be built into a site or copied with a course). A folder kept in sync by a service is said once and recorded in syncAccepted once the teacher says that is fine; the assistant ASKS rather than infers, because a Mac's Desktop and Documents folders can be in iCloud with ordinary-looking paths (750 plan review M5). No rule about Documents (Russell, 2026-11-12).",
+      "offered": {
+        "marking": "~/Marking/<CODE>/",
+        "teacherOnly": "~/Marking/<CODE> - Teacher Only/"
+      },
+      "pointerFile": {
+        "path": "courses/<CODE>/.internal/marking/marking.json",
+        "keys": ["folder", "teacherOnlyFolder", "syncAccepted", "teacherSaid", "recorded"]
+      },
+      "neverInside": "the working folder",
+      "neverOpenedByTheAssistant": ["the teacher-only folder", "the name mapping table", "a class list", "a marks export from the school's system", "an original scan"],
+      "mappingTable": {
+        "file": "Name Mapping Table.csv",
+        "columns": ["section", "identifier", "name"],
+        "optionalColumns": ["first name", "paper", "email", "handles", "repository"]
+      },
+      "why": "A recursive listing of one folder (find, ls -R, Glob) shows every file name under it, so names must live in a folder the assistant's folder does not contain (750 plan M6, generalised)."
+    },
+    "identifiers": {
+      "rule": "A paper is a PDF named by its identifier, in a `Section N` folder or directly in the originals folder. Anything else is counted, never named (redact_scans.py: 'N files or folders not named like an identifier were left alone'). The teacher may set another pattern in Marking Settings.md (--identifiers).",
+      "pattern": "^Student [A-Z]{1,2}$",
+      "cases": [
+        {"file": "Student A.pdf", "isAPaper": true},
+        {"file": "Student AB.pdf", "isAPaper": true},
+        {"file": "Student b.pdf", "isAPaper": false},
+        {"file": "Testpupil Alpha.pdf", "isAPaper": false},
+        {"file": "Student A (2).pdf", "isAPaper": false},
+        {"file": "scan0001.pdf", "isAPaper": false}
+      ]
+    },
+    "scriptPrivacy": {
+      "rule": "Every shipped script but the runner opens with two blocks, '# MARK: - What you may change for this teacher' and '# MARK: - What must not change', and has a --self-test; the skill has the assistant copy it into the marking folder's Scripts/, adapt it, run --self-test, and only then use it (Russell, 2026-11-12: scripts are starting points). The runner has only the second block and is never adapted. What must not change, in every script: never print, log or write outside the teacher-only folder any value read from a name mapping table; never print a file name that is not an identifier; capture every program's output and print only counts and identifiers; refuse (exit 1, identifier-only message) when anything is unexpected. A script never prints a traceback (it could carry a path holding a name).",
+      "mayChangeMark": "# MARK: - What you may change for this teacher",
+      "mustNotChangeMark": "# MARK: - What must not change",
+      "selfTest": "--self-test",
+      "notAStartingPoint": ["scripts/run_with_names.py", "plantoir-test-authoring: scripts/check_kit.py"],
+      "runner": {
+        "rule": "run_with_names.py reads the mapping table itself and builds every form a name could take (each name part of two letters or more as a whole word; the whole name, the parts run together with and without . - _, first initial and last name, e-mail addresses and their local part, handles, a repository address's user and repository, anywhere), runs the command with its output captured, passes on only lines that hold none, and moves any new or changed file in the watched marking folder that holds one (in its text, its PDF text through pdftotext, or its path) to the teacher-only Quarantine/, counting both, and exits 1 if it caught anything. It refuses a table or a quarantine folder inside the watched folder. It is a safety net, not a guarantee: it cannot know a name the table does not hold, see what a picture shows, or stop a script run without it or writing elsewhere (750 plan review R3). A name part that is also an ordinary word (May, Will) withholds every line holding that word too, which is the safe direction.",
+        "says": "This is a safety net, not a guarantee"
+      }
+    },
+    "redaction": {
+      "rule": "redact_scans.py (#750, 750a). The box is in inches from the top-left of the upright page, read from the BLANK test's own PDF: on each page, the label (normalised for case and punctuation, so NAME: and Name both match) that a writing line follows, in the top 1.5 in, preferred over another word equal to it (the starter's 'School Name' is at the same height, 750 plan review L1); box = label left - 11 pt, 0.20 in, the next word on the line - 3 pt (or the right margin), label bottom + 12 pt. A page of the blank with no label gets no box. Every page of a scan is checked against the blank BEFORE it is blanked (750 plan review R2: a check of the painted pixels proves only the painter): its size; then where its header and foot are, by one-dimensional ink profiles (rows and columns) of the top left and each half of the foot, each slid against the blank's, with lone specks dropped and profiles smoothed; from those three shifts the place where the blank's name box lands on the page; more than `shiftToleranceInches` at any corner, or a scale more than `scaleTolerance` off, stops the file with CHECK and a reason and it is not written; a page that lines up only when turned half a turn is turned upright and blanked. Each page is written as the four tiles AROUND the box, rendered by pdftoppm as JPEG, with the box filled black: the box's own pixels are never rendered into the output, so nothing sits under the black. The written file is read back: every box pixel 0, no text, the page count, and every page lined up and upright. The line says what was measured ('box placed; header matches your blank test'), never OK. Poppler and the standard library only.",
+      "boxUnits": "inches from the top-left of the upright page",
+      "shiftToleranceInches": 0.10,
+      "scaleTolerance": 0.02,
+      "boxCases": [
+        {"name": "the blank letter test", "blank": "blank-quiz-letter.pdf", "box": [3.44, 0.20, 5.33, 0.89], "within": 0.02},
+        {"name": "the blank legal test", "blank": "blank-quiz-legal.pdf", "box": [3.44, 0.20, 5.33, 0.89], "within": 0.02},
+        {"name": "a label written another way", "blank": "blank-quiz-letter.pdf", "label": "NAME:", "box": [3.44, 0.20, 5.33, 0.89], "within": 0.02},
+        {"name": "a blank with no such label", "blank": "blank-quiz-letter.pdf", "label": "Nom", "refused": "there is no 'Nom' label"}
+      ],
+      "scanCases": {
+        "rule": "The nine kinds of scan the 750 plan review measured, plus three a scanner gives every day, each built by scripts/test_marking_redact.py from the blank letter test with an invented name written in the Name blank of every page. `expect` is what the script must do: written (every pixel of the name's ink inside the box), CHECK (no file written), or either (the review measured no name ink surviving, so either is safe; a written file must still have none). The measured result on 2026-11-12 is in `measured`.",
+        "cases": [
+          {"variant": "upright", "expect": "written", "measured": "written"},
+          {"variant": "shifted down 0.15 in", "expect": "either", "measured": "CHECK"},
+          {"variant": "shifted down 0.30 in", "expect": "CHECK", "measured": "CHECK"},
+          {"variant": "scaled 94% (fit to page)", "expect": "CHECK", "measured": "CHECK"},
+          {"variant": "rotated 1.5 degrees", "expect": "either", "measured": "CHECK"},
+          {"variant": "rotated 3 degrees", "expect": "either", "measured": "CHECK"},
+          {"variant": "page 2 upside down", "expect": "written", "measured": "written, page 2 turned upright"},
+          {"variant": "A4, letter test centred", "expect": "CHECK", "measured": "CHECK"},
+          {"variant": "phone crop, stretched", "expect": "either", "measured": "CHECK"},
+          {"variant": "shifted down 0.05 in", "expect": "written", "measured": "written"},
+          {"variant": "scaled 99%", "expect": "written", "measured": "written"},
+          {"variant": "grey and speckled", "expect": "written", "measured": "written"}
+        ]
+      },
+      "checkFiles": ["Name box check.pdf", "Blanked papers to skim.pdf", "Papers to name.pdf"],
+      "rejected": [
+        "a full-width band (750 plan v1): measured, it either blanks the test's title or leaves no room for a shifted scan",
+        "fractions of the page (the kit's tool): the box moves on legal paper",
+        "a black box drawn over the page: the original stays underneath, extractable",
+        "a check of the painted pixels alone, printing OK: it passed four scans where the name survived (750 plan review R2)",
+        "moving the box to follow a shifted page: a CHECK the teacher sees is safer than a guess the script makes",
+        "Pillow, ImageMagick, PyMuPDF: not on a teacher's computer; Poppler and the standard library suffice"
+      ]
+    },
+    "namedCopies": {
+      "rule": "make_named_copies.py (#750, 750a) is the only script that puts a name into anything. It reads the mapping table itself (refusing the run, counts only, when a row is not like `section, Student A, a name`, or a section and identifier repeat), puts the TeX-escaped name into each identifier sheet's one \\studentline{...}, compiles it with tectonic in a temporary folder outside both folders with its output captured and discarded (never --keep-logs or --print: tectonic prints the line holding a name on a failed compile, measured on 0.17), fails a copy whose output says Missing character or whose PDF text does not hold the name (750 plan review M3: a name the font cannot set compiled with exit 0 and a blank where the name should be), and moves only the PDF into the teacher-only Named/Section N/. It never writes in the marking folder and refuses an --out inside it. It prints counts and identifiers only. Each case's `table` is the mapping table, `sheets` the identifier sheets to make (`plain`, or `broken`: an undefined macro on the student line's line, so the failed compile's message holds the name), `out` is `teacherOnly` unless it says `marking`; `says` are lines the output must hold; `written` the named PDFs; and after every case no value of the table is in the output, and no .tex, .log or .aux is in Named.",
+      "script": "scripts/make_named_copies.py",
+      "slot": "\\studentline{...}",
+      "escaped": ["\\", "&", "%", "$", "#", "_", "{", "}", "~", "^"],
+      "neverPassed": ["--keep-logs", "--print"],
+      "cases": [
+        {"name": "a name holding TeX's special characters", "table": "section,identifier,name\n1,Student A,Pupil_Seven & Co\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/Pupil_Seven & Co - Feedback.pdf"]},
+        {"name": "a sheet that does not compile", "table": "section,identifier,name\n1,Student C,Pupilseven Testfamily\n", "sheets": {"Section 1/Student C - Feedback": "broken"}, "exit": 1, "says": ["Section 1: 0 named sheets written; 1 not written (Student C Feedback: the named sheet did not compile)"], "written": []},
+        {"name": "an identifier not in the table", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain", "Section 1/Student D - Feedback": "plain"}, "exit": 1, "says": ["Section 1: 1 named sheets written", "Section 1/Student D: not in the mapping table"], "written": ["Section 1/Pupilseven Testfamily - Feedback.pdf"]},
+        {"name": "a row not like Student A", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Testpupil Alpha,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table are not like section 1, Student A, a name; nothing was written"], "written": []},
+        {"name": "a section and identifier twice", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Student A,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table repeat a section and identifier; nothing was written"], "written": []},
+        {"name": "a name the sheet's font cannot set", "table": "section,identifier,name\n1,Student A,\u8bd5\u9a8c Pupilseven\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["Section 1: 0 named sheets written; 1 not written (Student A Feedback: the name could not be set in this sheet's font)"], "written": []},
+        {"name": "named copies asked for inside the marking folder", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "out": "marking", "exit": 1, "says": ["the named copies must go in the teacher-only folder, never in the marking folder; nothing was written"], "written": []}
+      ]
     },
     "kitFormat": {
       "rule": "A test's marking kit (#751), read by plantoir-marking (#750): `answers.json` in this format (`version`), described in words in the skill's templates/Marking Kit/FORMAT.md and checked by its scripts/check_kit.py. It is Russell's own marks schema (point IDs such as B1.2, one mark each, shared by every version; a marks record's seen, note, studentNote, voided, checks, summary, byQuestion, strengths, focus, closing and feedback) with what his sheet builder hard-coded (the points and their meanings, each question's skill, the strength concepts, the categories and parts) moved INTO the kit, so the marking skill is course-neutral. Every point is one mark and a category is out of the number of its points; every point names an existing question and category and every question an existing part, with at least one point; a followThrough lists EARLIER points of the SAME question; every version answers every point and nothing else; topics and strengths name only what the kit has. No key of the kit or of a marks record looks like it holds a person (personWords, personWholeKeys, personKeysWhy), and no key the format does not define is accepted (unknownKeys): a marks record names its paper by `identifier`, which Russell's schema called `student`, renamed so nobody reads it as a place for a name; a category's label is `title`, not `name`. Keys that start with an underscore are notes. A marks record's `earned` is null, 0, 0.5 or 1; whether 0.5 may be used is the teacher's marking settings (#750), not the kit. `cases` apply `remove` (paths to delete) and `set` (path and value; an index one past a list's end appends) to `base` (file kit) or `baseMarks` (file marks, a marks record checked against `base`), or `replace` (the first occurrence of one text by another) to `basePaper` (file paper, checked as `--paper <version>` against `base`) or `baseGuide` (file guide); `expect` is accepted or refused, a refused case names the `rule` check_kit.py prints in square brackets, and `says` is the whole OK line where a case pins it. scripts/test_assessment_kit.py runs every case through check_kit.py and checks the skill's own worked example passes.",
