@@ -411,6 +411,49 @@ public static class CourseRestorer
     }
 
     /// <summary>The app's one true deletion — the confirmation lives with the caller.</summary>
+    // ---- The trail line of a whole-course restore ("course restored from a backup")
+
+    /// <summary>
+    /// The line a whole course put back from one of its backups leaves, once
+    /// it has been put back (the mac's <c>restoredTrailLine</c>, #572): the
+    /// code it shows and its folder, the backup's file name, the archive the
+    /// caller made of the course as it was first or that there was none to
+    /// make, and whether the course that came back is kept for reference, as
+    /// its settings say NOW. Never a page.
+    /// </summary>
+    /// <param name="archivePath">The archive made first, or null when the folder held no course to archive.</param>
+    public static string RestoredTrailLine(BackupItem item, string? archivePath, string coursesDirectory)
+    {
+        string line = Restored(item.CourseCode, coursesDirectory, out bool kept) + " from " + Path.GetFileName(item.FilePath);
+        line += archivePath is null
+            ? " — there was no course in that folder to archive first"
+            : " — the course as it was is in Archived as " + Path.GetFileName(archivePath);
+        return line + (kept ? "; kept for reference" : "; a course you teach");
+    }
+
+    /// <summary>
+    /// The line a whole course put back from Archived leaves (the mac's
+    /// <c>restoredFromArchivedTrailLine</c>, #572 review L5): the archive's
+    /// file name and what became of it. <see cref="Restore"/> deletes it and
+    /// does not fail when it cannot, so the line says which happened.
+    /// </summary>
+    public static string RestoredFromArchivedTrailLine(ArchivedItem item, string coursesDirectory)
+    {
+        string line = Restored(item.CourseCode, coursesDirectory, out bool kept) + " from Archived, " + Path.GetFileName(item.FilePath);
+        line += File.Exists(item.FilePath)
+            ? " — that archive could not be removed and is still listed"
+            : " — that archive is used up";
+        return line + (kept ? "; kept for reference" : "; a course you teach");
+    }
+
+    /// <summary>"restored ICS3U (ICS3U-2025)": the code a teacher reads, as the restored settings say, and the folder.</summary>
+    private static string Restored(string folderName, string coursesDirectory, out bool kept)
+    {
+        string? shown = ReferenceCourse.KeptOnDisk(Path.Combine(coursesDirectory, folderName));
+        kept = shown is not null;
+        return $"restored {shown ?? folderName} ({folderName})";
+    }
+
     public static void DeleteBackup(BackupItem item) => File.Delete(item.FilePath);
 
     /// <summary>Archives are deletable too (row 106 round two) — same rule.</summary>

@@ -292,6 +292,18 @@ public static class ActivityTrail
         /// them; without it the trail shows six changes and then nothing.
         /// </summary>
         SectionRestored,
+        /// <summary>
+        /// A whole course was put back, from one of its backups (Restore…) or
+        /// from Archived: the code it shows, its folder, the zip's FILE NAME,
+        /// what became of the course as it was first (the archive made of it,
+        /// or that there was none; a restore from Archived uses its archive
+        /// up), and whether the course that came back is kept for reference.
+        /// Written once the restore has happened; a refused one writes
+        /// nothing. Never a page. Windows had the restores and wrote no line
+        /// for either until step 0 of v2.0.0 (the mac's #572 closed the same
+        /// gap): <c>CourseRestorer.RestoredTrailLine</c>.
+        /// </summary>
+        CourseRestoredFromABackup,
         AssistantEngineSaid,
         // The three below are named by contracts/shared-rules.json ->
         // activityTrail.mustRecord, which SharedRules_ActivityTrailEvents_Exist
@@ -845,6 +857,7 @@ public static class ActivityTrail
         Event.HowITeachPageWritten => "How I Teach page written",
         Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
+        Event.CourseRestoredFromABackup => "course restored from a backup",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
         Event.ItemReIncluded => "item re-included",
