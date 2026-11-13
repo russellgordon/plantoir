@@ -70,7 +70,16 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   folder under `public\` that cannot be LISTED answers "rebuild" (review L2):
   its pages were never looked at, and the throw used to escape NeedsRebuild
   and fail the Deploy. Case-sensitivity is pinned by a proposed 16th case
-  (the tag in capitals).
+  (the tag in capitals). **Since #799** the reader is
+  `BuildFreshness.WhyRebuild`, which gives its reason (the trail line's) and
+  reads the whole of `buildFreshness.reuseTheLastBuild`: the course folder's
+  own time, the later of each entry's last-write and CREATION times, folders
+  included, hidden by the name only, a linked course folder read through and
+  as itself, and the clock guard; `ReuseTheLastBuildTests` runs every contract
+  case. The Deploy button, the windowless deploy and the scheduled wrapper
+  all ask now, and `deploy.ps1` asks before every destination, so a Netlify
+  or Cloudflare deploy of an unchanged site no longer rebuilds (it did on
+  every deploy until #768 and #799: 55 to 66 s). 05 → "On Windows (#799)".
 - **Two windows (#272).** Measured by reading and then by test before writing:
   Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
   loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
@@ -1251,8 +1260,28 @@ the moment itself (too late to be worth doing, another program building the
 course, whether the task still stands, where the course deploys NOW) and only
 then writes the wrapper script into `%LOCALAPPDATA%\Plantoir\scheduled\` from
 the settings as they are at that moment and runs it. The wrapper fingerprints
-the section, builds it, deploys to each destination un-chained (one failing
-must not stop the others), and writes a record the app picks up.
+the section, builds it when something asks for it, deploys to each
+destination un-chained (one failing must not stop the others), and writes a
+record the app picks up.
+
+**It builds only when something changed (#799).** Until Russell's ruling of
+2026-11-13 the wrapper built unconditionally ("Build first, always"). It now
+asks the runtime's Python, with the same lines `deploy.ps1` asks
+(`BuildBeforeDeployingQuestion.PythonLines`, pinned byte for byte against
+the file), whether the section must be built first: a preview's site, then
+the toolchain, then the clock and the pages. It builds when the answer is
+anything but a plain `reuse` (a question that cannot be asked, a Python
+missing included) and when there is no front page, and after a build that
+went through writes "site built again before deploying" with the reason,
+through a copy of `deploy.ps1`'s `Write-TrailLine` (pinned the same way),
+since nothing reads the run's log afterwards. The variables the question
+needs to name the toolchain as the launchers do are set for the call and put
+back. A reuse runs no build, so that night captures no folder findings and
+the record the last build left stays. The generated code stays ASCII: the
+wrapper has no byte-order mark and Windows PowerShell 5.1 reads it in the
+ANSI code page. `ScheduledDeployReusesTheLastBuildTests` runs the generated
+wrapper against the real shared Python; 8 of its 10 tests fail on the old
+wrapper. Why, and what was rejected: 05 → "On Windows (#799)".
 
 The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
 four settings the command-line switches cannot set: it may start on battery

@@ -184,11 +184,15 @@ did on its own — and `deploy.py` asks the same in `ensure_base_url_and_rebuild
 Without it 1.9.1's stylesheet changes never reached a redeployed site. What was
 measured, the fix and what was rejected:
 [05 → "Which toolchain built a site (#746)"](05-build-pipeline.md#which-toolchain-built-a-site-746).
-`deploy.ps1`'s folder publish asks the same question since 1.9.3 (#749): it
-runs the shared Python's `site_was_built_by_this_toolchain`, and anything but
-a plain yes builds first, in the one rebuild block it shares with the
-live-reload check below; the Windows section of 05 says how, and why the
-toolchain's id is remembered there.
+`deploy.ps1`'s folder publish asked the toolchain question from 1.9.3 (#749);
+since #799 it asks the WHOLE question before every destination, folder,
+Netlify and Cloudflare: one call to the shared Python's
+`why_build_before_deploying` (a preview's site, the toolchain, the clock,
+the pages), and anything but a plain `reuse` builds first, in the one
+rebuild function, `Invoke-BuildFirstWhenAsked`, which also writes the "site
+built again before deploying" trail line. The Windows section of 05 says how,
+why the toolchain's id is remembered there, and why there are two call sites
+(the native run's comes before any token is in the environment).
 
 ### Automatic production rebuilds (live-reload detection)
 
@@ -253,7 +257,10 @@ lines from deploy.sh rather than retyping them. The other three rebuild lines
 appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
 pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
 that said "published" for a deploy moved with them ("Deploy and publish: the
-two words (v1.4.4, #443)", below).
+two words (v1.4.4, #443)", below). Since #799 those lines are printed before
+any destination, not only the folder leg, and the pages and clock pairs
+("Something in this course has changed since its site was last built…",
+"This site's last build is dated later than now…") are pinned by the same test.
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
@@ -269,8 +276,11 @@ they did not agree:
 | `deploy.ps1`, folder leg | `Test-CarriesLiveReload` | the whole tree, line by line | still the bare address — **owed on [#272](https://github.com/russellgordon/plantoir/issues/272)** |
 | `BuildFreshness.BuiltForPreview` (Windows) | `Plantoir.Core/Models/BuildFreshness.cs` | the front page alone — owed on #272 | still the bare address — owed on #272 |
 
-(Windows' scheduled task builds unconditionally, so it has no check to get
-wrong.)
+(Windows' scheduled task built unconditionally until #799, so it had no check
+to get wrong. Since then it asks the shared Python before it builds, the
+`toolchain_paths.site_carries_preview_client` row above, through the same
+lines deploy.ps1 asks with; and deploy.ps1's own question runs before EVERY
+destination, not only the folder leg.)
 
 **Why the apps being narrower mattered.** The built tree is replaced file by
 file, so a clean front page in front of a preview's pages is a real state. The
