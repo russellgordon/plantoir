@@ -19,11 +19,33 @@ import SwiftUI
 /// `GeometryProxy[anchor]`, walking the actual live view hierarchy rather
 /// than depending on an eagerly-computed value bubbling up through
 /// containers along the way.
+///
+/// Since #832 it also carries the code's whole ROW (the field and the
+/// sentence under it, `CourseCodeAnchors.row`), so the popup opens below
+/// that sentence rather than over it: a code already taken said so in an
+/// orange line the open list covered until focus left the field.
 struct CourseCodeFieldAnchorKey: PreferenceKey {
-    static var defaultValue: Anchor<CGRect>?
-    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = nextValue() ?? value
+    static var defaultValue: CourseCodeAnchors = CourseCodeAnchors()
+    static func reduce(value: inout CourseCodeAnchors, nextValue: () -> CourseCodeAnchors) {
+        let next: CourseCodeAnchors = nextValue()
+        if let field = next.field {
+            value.field = field
+        }
+        if let row = next.row {
+            value.row = row
+        }
     }
+}
+
+/// The two places the suggestion popup is positioned from: the field (its
+/// left edge and width) and the field's row with the sentence under it
+/// (where the popup's top goes).
+struct CourseCodeAnchors {
+
+    // MARK: - Stored properties
+
+    var field: Anchor<CGRect>?
+    var row: Anchor<CGRect>?
 }
 
 /// The course-code field itself — just the field, not the Province
@@ -182,7 +204,7 @@ struct CourseCodePickerView: View {
             // `"wizardCourseCodeField"`.
             .accessibilityIdentifier("wizardCourseCodeField")
             .anchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchor in
-                anchor
+                CourseCodeAnchors(field: anchor, row: nil)
             }
             // Consumes Escape while the popup is shown, so that press
             // closes the popup rather than falling through to the
@@ -295,6 +317,12 @@ struct CourseCodeSuggestionsOverlay: View {
     // MARK: - Stored properties
 
     let fieldFrame: CGRect
+
+    /// The bottom of the field's row, the sentence under the field
+    /// included (#832), in the same coordinates as `fieldFrame`; nil
+    /// places the popup under the field itself.
+    var rowBottom: CGFloat? = nil
+
     let province: String
     let entries: [CourseCatalogEntry]
     let onSelect: (CourseCatalogEntry) -> Void
@@ -365,7 +393,7 @@ struct CourseCodeSuggestionsOverlay: View {
             }
         }
         .shadow(color: .black.opacity(0.15), radius: 8, y: 3)
-        .offset(x: fieldFrame.minX, y: fieldFrame.maxY + 4)
+        .offset(x: fieldFrame.minX, y: CourseCodeSuggestionsOverlay.top(fieldFrame: fieldFrame, rowBottom: rowBottom))
         // `fieldFrame` itself must never be what's animating — only the
         // popup's ENTRANCE (the `.transition` the wizard applies) should.
         // Without this, the wizard's ambient `.animation` (there for that
@@ -378,6 +406,20 @@ struct CourseCodeSuggestionsOverlay: View {
         // snapping back (Russell, 2026-08-22). Every later focus is
         // unaffected because the `Form` has already settled by then.
         .animation(nil, value: fieldFrame)
+        .animation(nil, value: rowBottom)
+    }
+
+    // MARK: - Functions
+
+    /// Where the popup's top goes: four points below the field, or below
+    /// the sentence under it when that is lower, so the list never covers
+    /// what that sentence says (#832).
+    static func top(fieldFrame: CGRect, rowBottom: CGFloat?) -> CGFloat {
+        var bottom: CGFloat = fieldFrame.maxY
+        if let rowBottom, rowBottom > bottom {
+            bottom = rowBottom
+        }
+        return bottom + 4
     }
 
     var card: some View {

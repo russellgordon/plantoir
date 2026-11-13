@@ -5924,7 +5924,6 @@
             "kind": "map",
             "lines": [
               "olderMap",
-              "couldNotMakeAgain",
               "clickHint"
             ],
             "button": "makeTheMapAgain",
@@ -5954,7 +5953,6 @@
             "kind": "map",
             "lines": [
               "olderMapNoTime",
-              "couldNotMakeAgain",
               "mayBeOutOfDate",
               "clickHint"
             ],
@@ -6426,7 +6424,7 @@
           }
         }
       ],
-      "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building; then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf (thisBuild), olderMapWhileBuilding while making (a build in progress has already written .build-id, so 'the latest build made no map' would be false), or olderMap otherwise, each in a NoTime form when the record has no start time (startKnown); the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
+      "stateRule": "making: a refresh is pending, or this window's own build has not yet printed its problems line, or the map is another build's while a build of the section is running (this window's, a deploy's, or another program's). When not making: couldNotMakeAgain (with a map) or couldNotMake (without) when the refresh did not finish or was refused (refused adds the refusal's own sentence, refusedReason), or when the map is another build's and nothing is building, except that couldNotMakeAgain is left out under olderMap or olderMapNoTime, which already say the latest build could not make a new one and name the button (#831, Russell 2026-11-13: one sentence, never the same thing twice); then changedSince or mayBeOutOfDate (with a map); then one of deploying, elsewhere or otherWindow, first that holds. With a map, the first line is asOf (thisBuild), olderMapWhileBuilding while making (a build in progress has already written .build-id, so 'the latest build could not make a new one' would be false), or olderMap otherwise, each in a NoTime form when the record has no start time (startKnown); the last is clickHint, or noObsidian when Obsidian is not installed. The button is makeTheMapAgain with a map and makeTheMap without, and is disabled while making, while this window's build runs, while the section deploys, while another program builds the course, and while another window holds the section's preview (and, outside these cases, while the folder is being copied or made ready, with that reason as its help).",
       "sequenceCases": [
         {
           "name": "one press with no preview running: the build starts at once",
@@ -7000,10 +6998,10 @@
         "tabCoverage": "Coverage",
         "asOf": "Made when this section was last built, {when}.",
         "asOfNoTime": "Made when this section was last built.",
-        "olderMap": "Made by an earlier build of this section, {when}. The latest build made no map.",
-        "olderMapNoTime": "Made by an earlier build of this section. The latest build made no map.",
-        "olderMapWhileBuilding": "Made by an earlier build of this section, {when}.",
-        "olderMapWhileBuildingNoTime": "Made by an earlier build of this section.",
+        "olderMap": "This map is from an earlier build, {when}. The latest build could not make a new one. Make the Map Again to try once more.",
+        "olderMapNoTime": "This map is from an earlier build. The latest build could not make a new one. Make the Map Again to try once more.",
+        "olderMapWhileBuilding": "This map is from an earlier build, {when}.",
+        "olderMapWhileBuildingNoTime": "This map is from an earlier build.",
         "making": "Making the map again with a new build of this section…",
         "makingWithThePreview": "Making the map again with a new build of this section… Its preview starts again when the build is done, at the page you were last reading.",
         "previewRestarts": "Making the map again starts this section’s preview again, at the page you were last reading.",
@@ -7027,8 +7025,16 @@
         "emptyOtherVersion": "This section’s map was made by another version of Plantoir. Make it again to see it here.",
         "emptyNoCurriculum": "The last build of this section found no curriculum expectations to map. If you have added them since, make the map again.",
         "cannotShowTitle": "The Map Can’t Be Shown",
-        "cannotShowDescription": "Plantoir could not get ready to show the map on this {machine}. Quitting Plantoir and opening it again may be enough."
+        "cannotShowDescription": "Plantoir could not get ready to show the map on this {machine}. Quitting Plantoir and opening it again may be enough.",
+        "cautionLabel": "Caution"
       },
+      "cautionLines": [
+        "olderMap",
+        "olderMapNoTime",
+        "changedSince",
+        "mayBeOutOfDate"
+      ],
+      "cautionRule": "#831 (Russell, 2026-11-13): a line saying the map on screen may be out of date is drawn as a caution, with a caution symbol before it whose accessibility label is cautionLabel: an earlier build's map that the latest build could not replace (olderMap, olderMapNoTime) and a map made before pages changed or that cannot be dated (changedSince, mayBeOutOfDate). Every other line, asOf among them, is plain. The words say it too, so the symbol is never the only signal.",
       "trailWords": {
         "looked": "looked at the Coverage tab: {what}",
         "oneMap": "1 map",
@@ -18471,7 +18477,7 @@
         "New Group...: on the Reference Courses heading's menu, beside New Reference Course..., and inside every Move to Group submenu (it makes the group and moves that course into it).",
         "Rename Group...: on a made group's row and on the no-year group's row. A year group offers neither Rename nor Remove: its name is its year.",
         "Remove Group: on a made group's row only. An empty group goes at once; one that holds courses is asked about first (removeGroupAskingMenuItem, removeGroupTitle, and removeGroupMessageOne or removeGroupMessageMany by how many it holds), and its courses go back to their year groups or the no-year group. Cancel is that question's default button.",
-        "Start the Groups Again...: on the Reference Courses heading's menu ONLY while the arrangement cannot be read (file-formats.json -> referenceShelf.startingAgain), under the sentence couldNotReadGroups, and asked first (startAgainTitle, startAgainMessage; Cancel is the default). It moves the unreadable arrangement aside under a dated name, never deleting it, and the shelf is the year layout with every control working again. While a NEWER Plantoir's arrangement is there, the heading's menu says arrangedByANewerPlantoir instead and offers nothing: an older app never moves a newer one's file.",
+        "Start the Groups Again...: on the Reference Courses heading's menu ONLY while the arrangement cannot be read (file-formats.json -> referenceShelf.startingAgain), under the sentence couldNotReadGroups, and asked first (startAgainTitle, startAgainMessage; Escape is Cancel and Return presses neither button). It moves the unreadable arrangement aside under a dated name, never deleting it, and the shelf is the year layout with every control working again. While a NEWER Plantoir's arrangement is there, the heading's menu says arrangedByANewerPlantoir instead and offers nothing: an older app never moves a newer one's file.",
         "Move to Group: a submenu on a reference course's row and in the menu bar's Course menu after Set School Year... (live where Set School Year is: subjectMenus item moveToGroup), so a teacher can reach it from the keyboard through menu search. It lists where the course's school year puts it first, named by what it is (the year label or the no-year group's name), then every made group A to Z, then a divider and New Group.... The group the course is in now carries a checkmark and does nothing.",
         "The Group picker: in the New Course wizard's reference mode ONLY (plan review M8), drawn only when the teacher has made at least one group, defaulting to wording.groupPickerDefault. Every other door (Import, Keep a Copy, Restore from Archived, a backup restored where its course is gone) lands the course by its school year, and Move to Group does the rest."
       ],
@@ -19371,7 +19377,7 @@
         "couldNotStartAgainTitle": "Could not start the groups again",
         "arrangedByANewerPlantoir": "The reference shelf’s groups were last arranged by a newer version of Plantoir, so this one leaves them as they are.",
         "couldNotSaveGroups": "The reference shelf’s groups could not be saved, so nothing was changed.",
-        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {count} a number of courses, two or more (removeGroupMessageOne says one, removeGroupMessageNone none; never '(s)'). The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Cancel is the default button of the removal question and of the start-again question, as it is of the replace warning. couldNotReadGroups says no 'try again in a moment', because waiting does not help a hand-edited or foreign-written copy; it names the way out. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
+        "rule": "{group} is a group's name as the shelf shows it; {course} the code a teacher reads (ICS3U); {target} the group a course would go back to; {name} a name already on the shelf, spelled as the shelf spells it; {count} a number of courses, two or more (removeGroupMessageOne says one, removeGroupMessageNone none; never '(s)'). The menu items that open a sheet or ask first end in a real ellipsis character; Remove Group on an EMPTY group asks nothing and has none. Escape is Cancel on the removal question and on the start-again question, and Return presses neither button, as on the replace warning: in an alert each button takes one key, and a Cancel given Return lost Escape (measured, #832), so the action is the destructive button, which takes no key. couldNotReadGroups says no 'try again in a moment', because waiting does not help a hand-edited or foreign-written copy; it names the way out. The year-group sentences of the shelf rule are unchanged (referenceCourses.wording); a made group's is referenceCourses.wording.codeAlreadyInThatGroup.",
         "machineryCheck": "No 'file', 'JSON', 'placement', 'id', 'folder name', 'script' or 'container' in any sentence here."
       },
       "rejected": "Converting today's layout into a stored list on first open: it would write a file into every working folder on every Mac on upgrade, an older Plantoir and Windows would then disagree with the file, and year labels stored as names drift from reference_school_year the first time a year is set; deriving years and storing only what the teacher made gives the same picture with nothing to convert. The group in each course's course_config.json: a group must exist with no course in it, which a per-course key cannot say, and the arrangement belongs to the folder. Keeping placements when a course is removed so it comes back into its group (the plan's first answer): a freed folder name is reused by the next course of that code and year, which would inherit the group (plan review H2). Remove Group withheld while the group holds a course (the plan's first answer): the teacher would have to move every course out by hand to get rid of a group, when sending them back to their years is exactly what removing it means; asked first instead. The Group picker at every door (plan review M8). A confirmation for an EMPTY group: nothing is lost. Renamable year groups, nested groups, hand ordering and drag and drop (Russell, 2026-11-12, and section 10 of the plan)."
@@ -19487,7 +19493,7 @@
         "couldNotReplace": "{course} could not be replaced. It is as it was.",
         "couldNotPutBackYet": "{course} could not be replaced, and it could not be put back straight away. Plantoir puts it back the next time this working folder is opened, and its backup is in Backups in the sidebar.",
         "replacedNote": "The {course} in {group} was replaced. Its backup is in Backups in the sidebar as {folder}.",
-        "rule": "{course} is the code a teacher reads (ICS3U); {group} the shelf group (a school year label such as 2025–26, or Other); {folder} the course's folder, which is the name its row carries in Backups; {sections} and {pages} are '1 section' / '3 sections' and '1 page' / '40 pages'; {size} the import sheet's size; {date} the day the folder was made, long style. bodyWithoutADate when that day cannot be read. Cancel is the default button; Replace is the destructive one. replacedNote is said in the import sheet's summary; the wizard and Keep a Copy select the course on the shelf instead.",
+        "rule": "{course} is the code a teacher reads (ICS3U); {group} the shelf group (a school year label such as 2025–26, or Other); {folder} the course's folder, which is the name its row carries in Backups; {sections} and {pages} are '1 section' / '3 sections' and '1 page' / '40 pages'; {size} the import sheet's size; {date} the day the folder was made, long style. bodyWithoutADate when that day cannot be read. Escape is Cancel and Return presses neither button; Replace is the destructive one (#832: a Cancel given Return lost Escape). replacedNote is said in the import sheet's summary; the wizard and Keep a Copy select the course on the shelf instead.",
         "machineryCheck": "No 'staging', 'aside', 'zip', 'folder name', 'script' or 'container' in any sentence here."
       },
       "rejected": "A Restore from Backup submenu on the shelf row (plan review M7): Backups already has Restore from Backup..., and it now leaves a trail line. A per-row tick and one alert for several courses at Import (M6): nobody asked for it, and a refused row in a run of several keeps its sentence. A new backup suffix such as _replaced: a Windows machine sharing the folder would not list a name it cannot parse, so the backup would be invisible in the one place it must be found; a teacher kind is accurate (the teacher pressed Replace) and never pruned. The replacement keeping its own new folder name: Restore would land the old course beside the new one in one group. Removing the old course first and then renaming the new one in: a moment with neither. Emptying the old folder and moving the new one's contents in, the way a backup restore keeps Obsidian's vault: it would make the swap many moves instead of one rename, with a half-old, half-new course on disk if any of them failed; refusing while Obsidian holds the course is the plan review's first answer (M2). Completing an unfinished replace with the staged new course on the next launch: it was not checked again, and putting the old course back is the direction that cannot lose anything. Checking the backup by unpacking it again: it doubles the time of a backup measured at 9.7 s for a 467 MB course, and the listing answers the question asked, which is whether every file is in it."
@@ -38554,7 +38560,7 @@
         ]
       },
       "openShareLists": {
-        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default; never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints EVERY file it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question is answered ONLY in a sheet of its own (fix review H1): both lists in full, scrolling when long, read from the marker lines (`markers`), the `byName` sentence, and Share or Cancel with Cancel the default and Escape Cancel too (#832); never the generic question alert and never behind Show Details. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer, Cancel or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
         "sharedHeading": "These files will be shared with anyone who has the address:",
         "leftOutHeading": "These files are left out:",
         "none": "(none)",
@@ -39129,7 +39135,7 @@
         ]
       },
       "warningCases": {
-        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing.",
+        "rule": "Whether the public-address warning (words.crawlerWarningTitle, words.crawlerWarning) is shown before a share, from the year's marker and what the teacher chose (share open, share protected, remove the password, share again). Shown at the first share without a password and again when a password is removed; never when protected; no tick to silence it (Russell, 2026-11-12). Cancel writes nothing. Escape is Cancel and Return presses neither button: words.shareAnyway is the destructive button, which takes no key (#832: it took Return before, and an address shared by a stray Return cannot be taken back).",
         "cases": [
           {
             "marker": null,

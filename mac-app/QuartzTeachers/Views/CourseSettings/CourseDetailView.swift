@@ -174,10 +174,14 @@ struct CourseDetailContent<Planning: View>: View {
     // MARK: - Body
 
     var body: some View {
-        if showsPlanning {
-            planning()
-        } else {
-            CourseSettingsView(course: course, session: session)
+        // In the tab area, so no tab can make the page taller than the
+        // window (#832).
+        TabArea {
+            if showsPlanning {
+                planning()
+            } else {
+                CourseSettingsView(course: course, session: session)
+            }
         }
     }
 }

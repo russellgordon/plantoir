@@ -1761,7 +1761,7 @@ and the credential item (the `windows` issue for #709).
    goes only on their yes** (`openShareLists`); the sentence says the lists
    are by name and that Plantoir has not read the files. In the app the
    question is answered ONLY in a sheet of its own showing both lists in
-   full, with Cancel the default (fix review H1: the plain question alert
+   full, with Cancel the default and Escape Cancel too (#832) (fix review H1: the plain question alert
    showed the `[y/N]` line alone, with the lists behind Show Details, so the
    look the ruling relies on never happened). The app reads the lists from
    marker lines `share_plan.py` prints beside the human ones

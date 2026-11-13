@@ -97,31 +97,32 @@ struct ReferenceGroupPresenter: ViewModifier {
                 ReferenceGroupWording.removeGroupTitle(group: workspace.removeGroupRequest?.title ?? ""),
                 isPresented: isAskingToRemove
             ) {
-                Button(ReferenceGroupWording.removeButton) {
+                // Return presses neither button and Escape is Cancel (the
+                // contract's wording.rule): an alert gives each button ONE
+                // key, so a Cancel that took Return lost Escape (measured,
+                // #832; `QuestionKeysTests`). Destructive, so a Return typed
+                // out of habit never removes a group.
+                Button(ReferenceGroupWording.removeButton, role: .destructive) {
                     if let group = workspace.removeGroupRequest {
                         workspace.removeGroupRequest = nil
                         workspace.removeReferenceGroup(group)
                     }
                 }
-                // Cancel is the default button (the contract's wording.rule),
-                // the shape the replace warning uses.
                 Button(ReferenceGroupWording.cancelButton, role: .cancel) {
                     workspace.removeGroupRequest = nil
                 }
-                .keyboardShortcut(.defaultAction)
             } message: {
                 Text(ReferenceGroupWording.removeGroupMessage(courseCount: removeGroupCourseCount))
             }
             .alert(ReferenceGroupWording.startAgainTitle, isPresented: isAskingToStartAgain) {
-                Button(ReferenceGroupWording.startAgainButton) {
+                // The same keys as the removal question.
+                Button(ReferenceGroupWording.startAgainButton, role: .destructive) {
                     workspace.isAskingToStartReferenceGroupsAgain = false
                     workspace.startReferenceGroupsAgain()
                 }
-                // Cancel is the default button here too.
                 Button(ReferenceGroupWording.cancelButton, role: .cancel) {
                     workspace.isAskingToStartReferenceGroupsAgain = false
                 }
-                .keyboardShortcut(.defaultAction)
             } message: {
                 Text(ReferenceGroupWording.startAgainMessage)
             }

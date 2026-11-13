@@ -93,6 +93,8 @@ struct PlanShareBar: View {
             .padding(.horizontal, 12)
         }
         .padding(.bottom, 8)
+        // A container with its own identifier, keeping its controls' (#832).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planShareBar")
         .task {
             lookAgain()
@@ -122,7 +124,11 @@ struct PlanShareBar: View {
                 }
             )
         ) {
-            Button(PlanSharingWording.shareAnyway) {
+            // Destructive, so Return presses neither button and Escape is
+            // Cancel (#832): until then Share Without a Password took
+            // Return, and an address shared by a stray Return cannot be
+            // taken back from a crawler. `QuestionKeysTests` measures it.
+            Button(PlanSharingWording.shareAnyway, role: .destructive) {
                 if let choice = choiceAwaitingTheWarning {
                     choiceAwaitingTheWarning = nil
                     start(choice)
@@ -191,7 +197,6 @@ struct PlanShareBar: View {
                 Text(PlanSharingWording.netlifyTeacher)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 12) {
                 Toggle(PlanSharingWording.protect, isOn: $protect)
@@ -232,7 +237,6 @@ struct PlanShareBar: View {
                 Text(flood)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if let when = marker.lastShared {
                 Text(PlanSharingWording.lastShared.replacingOccurrences(
@@ -288,12 +292,10 @@ struct PlanShareBar: View {
         case .unfinished:
             Text(PlanSharingWording.lastShareUnfinished)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareUnfinished")
         case .stopping:
             Text(PlanSharingWording.stopUnconfirmed)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareStopping")
         case .protected:
             Text(PlanSharingWording.withPassword)
@@ -306,7 +308,6 @@ struct PlanShareBar: View {
             Text(PlanSharingWording.oldCopyStillThere)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareOldCopy")
         }
     }

@@ -151,6 +151,8 @@ struct CoverageTabView: View {
                 } actions: {
                     makeButton(shown)
                 }
+                // A container with its own identifier, keeping its controls' (#832).
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("coverageEmpty")
             case .map:
                 header(shown)
@@ -189,15 +191,11 @@ struct CoverageTabView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(shown.lines, id: \.self) { line in
-                    Text(CoverageTabWording.sentence(line, when: when, reason: refusalReason))
-                        .font(.callout)
-                        .foregroundStyle(line == "asOf" || line == "clickHint" ? .secondary : .primary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    headerLine(line)
                 }
                 if let clickLine = entry.clickLine {
                     Text(clickLine)
                         .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -205,7 +203,33 @@ struct CoverageTabView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        // A container with its own identifier, keeping its controls' (#832).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("coverageHeader")
+    }
+
+    /// One line above the map. A line saying the map may be out of date
+    /// is a caution (`CoverageTabWording.cautionLines`, #831): the caution
+    /// symbol before it, with its own accessibility label, and the words
+    /// saying it too, so the symbol is never the only signal.
+    @ViewBuilder
+    func headerLine(_ line: String) -> some View {
+        let words: Text = Text(CoverageTabWording.sentence(line, when: when, reason: refusalReason))
+        if CoverageTabWording.cautionLines.contains(line) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel(CoverageTabWording.cautionLabel)
+                words
+                    .font(.callout)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("coverageCaution")
+        } else {
+            words
+                .font(.callout)
+                .foregroundStyle(line == "asOf" || line == "clickHint" ? .secondary : .primary)
+        }
     }
 
     func makeButton(_ shown: CoverageTabDisplay.Display) -> some View {
@@ -256,12 +280,16 @@ struct SectionTabContent<Website: View, Coverage: View, Problems: View>: View {
     // MARK: - Body
 
     var body: some View {
-        if showing == .coverage {
-            coverage()
-        } else if showing == .problems {
-            problems()
-        } else {
-            website()
+        // In the tab area, so no tab can make the page taller than the
+        // window (#831).
+        TabArea {
+            if showing == .coverage {
+                coverage()
+            } else if showing == .problems {
+                problems()
+            } else {
+                website()
+            }
         }
     }
 }
