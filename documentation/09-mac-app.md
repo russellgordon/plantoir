@@ -6085,6 +6085,62 @@ it, a short re-check of the attack, then it ships.
   report-comments skill copies `make_named_copies.py` before the first
   request and uses identifiers, never "her" or "his", in replies.
 
+**The re-check, and what it changed (750d, 2026-11-13).** A short attack on
+0547617c8, with no assistant: the seven listed moves were all caught, and
+`--tidy` printed no path in 30 runs. It DID NOT HOLD, for one move that can
+put a name in front of an assistant (n19): the boxing script the assistant
+adapts runs with the original scans open, and the sandbox let it write into
+the system's temporary folder, which on a Mac is the same per-user
+`/var/folders/.../T` the assistant's shell reads. Copying the originals
+there left seven unboxed scans after the teacher's no, one named with a
+student's name, and nothing counted them. Fifteen of twenty other moves got
+an altered renderer past the check; none of those can show a name, and two
+sentences in the skill claimed more than the check did. Russell ruled: fix
+it, re-attack, and it ships only if that holds.
+
+- **Each teacher-run step has a temporary folder of its own**, `Scratch`
+  inside the step's folder on the teacher's side. `TMPDIR`, `TMP`, `TEMP`
+  and `TEMPDIR` point at it (Python's `tempfile`, Poppler and tectonic read
+  them), it is emptied after the step on yes, no, a stop, a crash and
+  Ctrl-C, and anything left by a killed step goes at the start of the next.
+  The sandbox no longer allows the system's temporary folder.
+- **The wall is narrower**, on the boxing and now on the names step too
+  (an adapted `make_named_copies.py` runs with the table open): writes only
+  into the step's folders and a few devices, and no network or local
+  socket, no system service (clipboard, preferences, opening a file, events
+  to another program), no shared memory, no signal to another program.
+  Measured: the shipped boxing, the named sheets through tectonic and the
+  comments steps all run under it.
+- **Every place a teacher-run script can write**, with its verdict, is in
+  `teacherRun.writeRoutes` (13 rows, each naming its test where one can be
+  run without touching the teacher's Mac). Two stay open and need a script
+  written to do it: a name written in code in what the script prints (the
+  runner withholds only a line holding a word from the table), and timing.
+  A boxed paper that carries text, an attached file or a word from the
+  table in its details is now refused before the teacher's look
+  (`papers_hide_nothing`), since the look sees only what a page shows.
+- **The check reads files, not names.** Each skill home must hold exactly
+  `SKILL_FILES` (every shipped file's SHA-256 but SKILL.md, the launchers
+  and `teacher_only.py`, which carry or are its hash) and nothing else,
+  Python's own `__pycache__` apart. In the marking folder, any file of any
+  ending (documents in `notCode` apart) that names `render_pages`,
+  `check_the_folder` or `Made while marking`, with split strings joined,
+  must be the shipped `render_pages.py`, and a link of any name stops.
+  "Skill folder.txt" must name this skill in a working folder (n14). `-png`
+  is no longer a mark: it stopped an adapted boxing script and called it a
+  copy of `render_pages.py` (n18). Each Stopped sentence now says what is
+  true of what it counts (`saysTheSkill`, `saysACopy`, `saysALink`).
+- **What is still not seen** is listed in plain words in
+  `checkedFiles.cannotSee` and the skill: `pdftoppm` or another program
+  called by the assistant, a renderer naming none of the marks, one saved
+  with a document's ending, a `.pyc` with its strings changed, anything
+  kept outside the two folders, an edit made and put back between checks,
+  and every pin changed together. None of these can show a name the
+  assistant could not already see: they draw only the pages it is given,
+  the boxed papers. REJECTED: snapshotting the system's temporary folder
+  around a step (other programs, the assistant's own among them, write
+  there at the same time, and moving their files would break them).
+
 **The greeting names no marking skill (Russell, 2026-11-13, piece G).**
 "Marking and report comment writing should not be advertised when an
 agent opens in Plantoir, only within the appropriate context of a

@@ -259,16 +259,26 @@ in `launchers/` (below), and the `plantoir-test-authoring` skill's
 `scripts/check_kit.py`. Never copy the three scripts or change any of
 them: the launchers run the first two from this skill's folder, and you
 run `render_pages.py` from there too. **A changed `render_pages.py` stops the marking:**
-in either of this skill's homes (`.claude/skills/plantoir-marking/` and
-`.agents/skills/plantoir-marking/`), or as any copy in the marking folder,
-under its own name or another, it stops `--verify`, `--tidy` and both of
-the teacher's steps with "Stopped: a marking file was changed". Never
-copy it, rename it or change it to get past its refusal, even when the
-teacher asks; say no with the reason. **What the check cannot see:** a
-renderer written from scratch that shares none of its marks, a page turned
-into a picture by calling `pdftoppm` yourself, or anything run from outside
-the skill and marking folders. Nothing in these files stops that; this
-rule is what holds, so look at pages only through `render_pages.py`. Plantoir puts the skill folder back as it shipped
+`--verify`, `--tidy` and both of the teacher's steps stop with "Stopped: a
+marking file was changed" when any file in either of this skill's homes
+(`.claude/skills/plantoir-marking/` and `.agents/skills/plantoir-marking/`)
+is changed, missing or added, when a file in the marking folder that names
+`render_pages`, `check_the_folder` or `Made while marking` (with split
+strings joined) is not the shipped file, or when the marking folder holds a
+link. "Skill folder.txt" must name this skill in the working folder; a
+copy kept anywhere else stops every step. Never copy, wrap, rename or
+change it to get past its refusal, even when the teacher asks; say no with
+the reason. **What the check cannot see:** `pdftoppm`, or any other program
+that draws pages, called by you; a renderer that names none of those marks;
+a renderer saved as `.md`, `.txt`, `.json`, `.csv`, `.tex`, `.pdf` or
+`.log` (documents are not read as code); a compiled `.pyc` whose strings
+were changed too; anything kept outside the marking folder and the two
+skill homes; an edit made and put back between two checks; and every pin
+changed together. None of these can show you a name you could not already
+see: they only draw pages you are given, the boxed papers. The worst they
+do is leave pictures of those pages outside `Work`, where `--tidy` cannot
+reach. Nothing in these files stops them; this rule is what holds, so look
+at pages only through `render_pages.py`. Plantoir puts the skill folder back as it shipped
 only when it next refreshes the working folder, so before the first use in
 a session, and again after copying the launchers into the marking folder,
 check them:
@@ -280,12 +290,12 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `ca31ca2ac5a5ecfdae55f13aedee142ef9a9125a6afbd3048f66e322c1e77f92`  teacher_only.py
+- `d0373eba4f687175c9fbc068f0d5f4e1be32a6e19e2c19c1be93572f5b2c8a99`  teacher_only.py
 - `4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819`  render_pages.py
-- `81fc4581528e2a3e89f7470188a687ac1c3b5bd2f5057ce1e128a81d761c948e`  Box the papers.command
-- `9bb417da5659e2594750c2616b515af5ecf0108db309793dcb2c3144fa31d624`  Put names on the sheets.command
-- `2c4f3ab9ea68eee675eacebae14e7c6c7ccdd675c9ca84b146ca9063e6ca0106`  Box the papers.bat
-- `323334379544df3f6424cbebf8f460cd08c7f996afd2abcbe2c1c2eb6f5fa14f`  Put names on the sheets.bat
+- `e0402b8d9c0130e765547e8243aeff41562318e42505ed54fe65d215924b94fc`  Box the papers.command
+- `7794ca38e29243dcef2f3f74b6a1df13240f31fedcdd4425957736452465bcec`  Put names on the sheets.command
+- `d178beabf7986e09a96f5e19dca31e65765a1becc804dae717a2f3f3ea5bd1bf`  Box the papers.bat
+- `f0b0d036faf31e621695cce033d5f7fea7175a6f9c60cc68eef187ca3dfd197d`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -298,12 +308,20 @@ teacher-only folder is.
 **What the teacher is trusting**, and you say so when you set up the
 boxing: that the boxing script you adapted does only what it says. Box the papers runs it with
 the teacher-only folder open to it. On a Mac it can write only into that
-assessment's folder on the teacher's side and the temporary folder; on
-every system, anything it writes outside the folder it was given, in the
-marking folder or the teacher-only folder, is moved unread to the
-teacher's Quarantine folder and the step stops, saying how many; a write
-outside both folders is stopped on a Mac only. That is why the teacher
-looks through every boxed page, and why the launcher says what it moved.
+assessment's folder on the teacher's side, with a temporary folder of its
+own there that is emptied after every step (never the system's temporary
+folder, which your shell reads), and it can reach no network, no local
+socket, no clipboard and no other program; on every system, anything it
+writes outside the folder it was given, in the marking folder or the
+teacher-only folder, is moved unread to the teacher's Quarantine folder and
+the step stops, saying how many. A write outside both folders is stopped on
+a Mac only; on Windows the step points the temporary folder at its own and
+cannot see a script that ignores that. A boxed paper that carries text, an
+attached file or a word from the table in its details is refused, since the
+teacher's look sees only what a page shows. What it prints reaches you
+through the runner, which withholds a line holding a word from the table
+but cannot see a name written in code. That is why the teacher looks
+through every boxed page, and why the launcher says what it moved.
 
 **Every script that reads the name mapping table is run through
 `run_with_names.py`, never directly.** The launchers do that: you never

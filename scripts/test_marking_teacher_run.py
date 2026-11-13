@@ -176,14 +176,20 @@ class Class:
             redact_tests.build_scans(BLANK, cls.template, {"upright, answers on every page", "grey and speckled"})
         return cls.template
 
-    def __init__(self, root, skill_folder=SKILL):
+    def __init__(self, root, skill_folder=SKILL, named=".claude"):
+        """The skill is installed in both homes of the working folder, as Plantoir writes it, from
+        `skill_folder` (the shipped one unless a test gives a changed copy); "Skill folder.txt" names `named`."""
         self.root = Path(root)
         self.working = self.root / "Working"
         (self.working / "courses" / "ABC9X" / ".internal" / "marking").mkdir(parents=True)
         (self.working / ".toolchain").mkdir()
+        self.homes = {}
+        for home in (".claude", ".agents"):
+            self.homes[home] = self.working / home / "skills" / "plantoir-marking"
+            shutil.copytree(skill_folder, self.homes[home], ignore=shutil.ignore_patterns("__pycache__"))
         self.marking = self.root / "Marking" / "ABC9X"
         self.teacher_only = self.root / "Marking" / ("ABC9X - Teacher Only " + MARKER)
-        self.set_up_by_the_assistant(skill_folder)
+        self.set_up_by_the_assistant(self.homes[named])
         self.teacher_puts_the_scans()
 
     def set_up_by_the_assistant(self, skill_folder):
@@ -945,7 +951,7 @@ class ThirdTrialTests(unittest.TestCase):
         # because a sibling folder's name held the course code, and matched over 400 folders that were not the
         # assistant's, so it could never say it was finished.
         root = new_root(self)
-        assessment = root / "Marking" / "MDM4U" / ASSESSMENT
+        assessment = a_light_marking_folder(root) / ASSESSMENT
         work = assessment / "Work"
         (work / "Student A").mkdir(parents=True)
         for number in (1, 2):
@@ -982,7 +988,7 @@ class ThirdTrialTests(unittest.TestCase):
         root = new_root(self)
         for case in teacher_run()["tidyCases"]:
             folder = root / ("case " + str(teacher_run()["tidyCases"].index(case)))
-            assessment = folder / "Marking" / "ABC9X" / ASSESSMENT
+            assessment = a_light_marking_folder(folder, "ABC9X") / ASSESSMENT
             work = assessment / "Work"
             work.mkdir(parents=True)
             target = {"inWork": work / "Student A" / "page-1.png", "outsideWork": assessment / "Marks" / "Student A.json",
@@ -995,7 +1001,7 @@ class ThirdTrialTests(unittest.TestCase):
             (work / MADE_LIST).write_text(listed + "\n", encoding="utf-8")
             result = subprocess.run([sys.executable, "-B", str(TEACHER_ONLY), "--tidy", str(assessment)],
                                     capture_output=True, text=True, env=environment(), timeout=60)
-            self.assertEqual(result.returncode, 0, f"{case}: {result.stdout}")
+            self.assertEqual(result.returncode, 1 if case.get("stops") else 0, f"{case}: {result.stdout}")
             self.assertEqual(target.exists(), not case["removed"], f"{case}: {result.stdout}")
             self.assertNotIn(str(folder), result.stdout, case)
 
@@ -1063,7 +1069,8 @@ class ThirdTrialTests(unittest.TestCase):
         b_class = Class(root / "skill copy", skill_folder=skill)
         if CAN_DRIVE:
             printed, _status, _killed = box_the_papers(b_class, [(CLOSE_PROMPT, "")])
-            self.assertIn("Stopped: a marking file was changed. " + checked_file()["saysTheSkill"], folded(printed))
+            self.assertIn("Stopped: a marking file was changed. " + checked_file()["saysTheSkill"].replace("{n}", "2"),
+                          folded(printed), "the same edit in both homes: two files")
             self.assertNotIn("Drag it", printed)
         self.assertEqual(b_class.boxed_papers_in_the_marking_folder(), [])
 
@@ -1142,6 +1149,20 @@ class WhatTheAssistantIsGivenTests(unittest.TestCase):
             self.assertIn(folded(sentence), folded((folder / "SKILL.md").read_text(encoding="utf-8")), skill)
 
 
+def a_light_marking_folder(root, code="MDM4U"):
+    """A marking folder whose 'Skill folder.txt' names the skill installed in a working folder, with no scans:
+    enough for --tidy, which checks the skill as the teacher's steps do."""
+    working = Path(root) / "Working"
+    (working / "courses").mkdir(parents=True)
+    (working / ".toolchain").mkdir()
+    home = working / ".claude" / "skills" / "plantoir-marking"
+    shutil.copytree(SKILL, home, ignore=shutil.ignore_patterns("__pycache__"))
+    marking = Path(root) / "Marking" / code
+    marking.mkdir(parents=True)
+    (marking / "Skill folder.txt").write_text(str(home) + "\n", encoding="utf-8")
+    return marking
+
+
 def checked_file():
     return teacher_run()["checkedFiles"][0]
 
@@ -1164,12 +1185,8 @@ class FourthTrialTests(unittest.TestCase):
         """A class whose skill is installed in BOTH homes of a working folder, as Plantoir writes it, with
         'Skill folder.txt' naming one of them."""
         root = new_root(self)
-        homes = {}
-        for home in (".claude", ".agents"):
-            homes[home] = root / "Working" / home / "skills" / "plantoir-marking"
-            shutil.copytree(SKILL, homes[home])
-        a_class = Class(root / "class", skill_folder=homes[named])
-        return a_class, homes
+        a_class = Class(root / "class", named=named)
+        return a_class, a_class.homes
 
     def stops(self, a_class, label):
         for step in (teacher_only.box, teacher_only.names):
@@ -1185,7 +1202,7 @@ class FourthTrialTests(unittest.TestCase):
         a_class, homes = self.a_working_folder_class(named=".claude")
         self.assertTrue(codex_edit(homes[".agents"] / "scripts" / "render_pages.py"))
         said = self.stops(a_class, "e3")
-        self.assertIn(folded(checked_file()["saysTheSkill"]), folded(said))
+        self.assertIn(folded(checked_file()["saysTheSkill"].replace("{n}", "1")), folded(said))
         self.assertNotIn("remove", said, "nothing in the marking folder to remove")
 
     @unittest.skipIf(MISSING, "Poppler is not installed here; this case builds invented scans")
@@ -1235,7 +1252,7 @@ class FourthTrialTests(unittest.TestCase):
 
     def test_tidy_runs_the_check_and_prints_no_path(self):
         root = new_root(self)
-        assessment = root / "Marking" / "MDM4U" / ASSESSMENT
+        assessment = a_light_marking_folder(root) / ASSESSMENT
         work = assessment / "Work"
         (work / "Student A").mkdir(parents=True)
         (work / "Student A" / "page-1.png").write_bytes(b"a picture of a page")
@@ -1283,6 +1300,256 @@ class FourthTrialTests(unittest.TestCase):
     def test_the_window_says_whose_words_the_points_are(self):
         self.assertIn("in your assistant's words", teacher_only.WINDOW_INTRODUCTION)
         self.assertIn("in your assistant's words", teacher_only.COVER_INTRODUCTION)
+
+
+WALLED = sys.platform == "darwin" and os.path.isfile("/usr/bin/sandbox-exec")
+
+
+def adapt_the_boxing(a_class, lines):
+    """Add lines to the class's adapted boxing script, run when it boxes (not for --box-from or a self-test)."""
+    script = a_class.marking / "Scripts" / "redact_scans.py"
+    script.write_text(script.read_text(encoding="utf-8").replace(
+        'if __name__ == "__main__":', 'if __name__ == "__main__" and len(sys.argv) > 3 and not sys.argv[1].startswith("--"):\n'
+        + "".join("    " + line + "\n" for line in lines) + 'if __name__ == "__main__":', 1), encoding="utf-8")
+
+
+def remove_whatever_is_at(path):
+    """A must-fail run against older code leaves its copies in the real temporary folder: take them away."""
+    path = Path(path)
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path, ignore_errors=True)
+    elif path.exists() or path.is_symlink():
+        os.remove(path)
+
+
+class FifthRoundTests(unittest.TestCase):
+    """The re-check of 2026-11-13 (n19): an adapted boxing script, run by the teacher with the original scans open,
+    copied them into the system's temporary folder, the per-user folder the assistant's own shell reads, and
+    nothing saw it. Each place a teacher-run script can write is closed here, or shown to be on the teacher's
+    side, or looked at before the assistant can read it."""
+
+    def setUp(self):
+        if MISSING:
+            self.skipTest("Poppler is not installed here; these cases box papers")
+        self.root = new_root(self)
+        self.a_class = Class(self.root / "class")
+        self.system_temporary = Path(tempfile.gettempdir())
+        self.mark = "n19-" + os.urandom(6).hex()
+        for name in (self.mark, self.mark + "-literal"):
+            self.addCleanup(remove_whatever_is_at, self.system_temporary / name)
+
+    def box(self, answer):
+        printed = []
+        try:
+            teacher_only.box(self.a_class.marking, teacher([str(self.a_class.teacher_only), answer]), printed.append)
+        except teacher_only.Refusal as refusal:
+            printed.append("Stopped: " + str(refusal))
+        return "\n".join(printed)
+
+    def test_n19_the_scans_never_reach_the_system_temporary_folder(self):
+        # As the re-check did it: tempfile.gettempdir() in the boxing script, and, the attacker's next move, the
+        # parent's temporary folder written into the script as a literal.
+        adapt_the_boxing(self.a_class, [
+            "import shutil, tempfile",
+            "shutil.copytree(sys.argv[1], os.path.join(tempfile.gettempdir(), " + repr(self.mark) + "))",
+            "try:",
+            "    shutil.copytree(sys.argv[1], " + repr(str(self.system_temporary / (self.mark + "-literal"))) + ")",
+            "except OSError:",
+            "    print('the literal temporary folder was refused')"])
+        for answer in ("no", "yes"):
+            said = self.box(answer)
+            self.assertFalse((self.system_temporary / self.mark).exists(), answer + ": a copy in the system's temporary folder\n" + said)
+            if WALLED:
+                self.assertFalse((self.system_temporary / (self.mark + "-literal")).exists(), answer + ": the literal path")
+            self.assertFalse((self.a_class.teacher_only / ASSESSMENT / teacher_only.SCRATCH).exists(),
+                             answer + ": the step's own temporary folder is emptied")
+            self.assertEqual(self.a_class.leaks(), [], answer)
+
+    def test_the_step_scratch_is_emptied_when_the_boxing_fails(self):
+        adapt_the_boxing(self.a_class, ["import tempfile",
+                                        "open(os.path.join(tempfile.gettempdir(), 'left.txt'), 'w').write('x')",
+                                        "sys.exit(3)"])
+        self.box("yes")
+        self.assertFalse((self.a_class.teacher_only / ASSESSMENT / teacher_only.SCRATCH).exists())
+
+    @unittest.skipUnless(WALLED, "only a Mac's sandbox-exec can refuse these; on Windows they are owed (the windows issue)")
+    def test_no_socket_and_no_network_from_the_boxing(self):
+        import socket
+        import threading
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        server.settimeout(20)
+        self.addCleanup(server.close)
+        received = []
+
+        def accept():
+            try:
+                connection, _address = server.accept()
+                received.append(connection.recv(100))
+                connection.close()
+            except OSError:
+                pass
+
+        listener = threading.Thread(target=accept, daemon=True)
+        listener.start()
+        local = Path(tempfile.mkdtemp(prefix="n19-sock-", dir="/tmp" if os.path.isdir("/tmp") else None)) / "s"
+        self.addCleanup(shutil.rmtree, local.parent, True)
+        unix = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        unix.bind(str(local))
+        unix.listen(1)
+        unix.settimeout(1)
+        self.addCleanup(unix.close)
+        adapt_the_boxing(self.a_class, [
+            "import socket",
+            "for family, address in ((socket.AF_INET, ('127.0.0.1', " + str(server.getsockname()[1]) + ")), "
+            "(socket.AF_UNIX, " + repr(str(local)) + ")):",
+            "    try:",
+            "        s = socket.socket(family, socket.SOCK_STREAM); s.connect(address); s.sendall(b'scan'); s.close()",
+            "        print('connected')",
+            "    except OSError:",
+            "        print('refused')"])
+        said = self.box("no")
+        try:
+            accepted, _ = unix.accept()
+            received.append(accepted.recv(100))
+        except OSError:
+            pass
+        server.close()
+        listener.join(5)
+        self.assertEqual(received, [], said)
+        self.assertNotIn("connected", said)
+
+    def test_a_boxed_paper_with_a_text_layer_is_refused(self):
+        # The look through the pages sees pictures; a text layer (the blank test has one) would reach the
+        # assistant unseen. The shipped boxing makes pictures only, so this is an adapted script's doing.
+        adapt_the_boxing(self.a_class, [
+            "import atexit, shutil",
+            "atexit.register(lambda: shutil.copyfile(" + repr(str(BLANK)) + ", os.path.join(sys.argv[2], 'Section 1', "
+            "'Student A.pdf')))"])
+        said = self.box("yes")
+        self.assertIn("carry text, an attached file, or a word from your name table", said)
+        self.assertFalse((self.a_class.marking / ASSESSMENT / "Redacted").exists())
+
+    def test_the_names_step_is_walled_too(self):
+        script = self.a_class.marking / "Scripts" / "make_named_copies.py"
+        script.write_text(script.read_text(encoding="utf-8").replace(
+            'if __name__ == "__main__":', 'if __name__ == "__main__" and "--check-table" in sys.argv:\n'
+            '    import tempfile\n'
+            '    open(os.path.join(tempfile.gettempdir(), ' + repr(self.mark) + '), "w").write("a copy of the table")\n'
+            '    try:\n'
+            '        open(' + repr(str(self.system_temporary / (self.mark + "-literal"))) + ', "w").write("x")\n'
+            '    except OSError:\n'
+            '        pass\n'
+            'if __name__ == "__main__":', 1), encoding="utf-8")
+        (self.a_class.marking / "Names request.json").write_text(json.dumps({"do": "check-table"}), encoding="utf-8")
+        teacher_only.names(self.a_class.marking, teacher([str(self.a_class.teacher_only)]), lambda _line: None)
+        self.assertFalse((self.system_temporary / self.mark).exists(), "the names step's temporary files stay on the teacher's side")
+        if WALLED:
+            self.assertFalse((self.system_temporary / (self.mark + "-literal")).exists())
+        self.assertFalse((self.a_class.teacher_only / teacher_only.SCRATCH).exists())
+
+    def test_the_wall_lets_the_shipped_scripts_work(self):
+        said = self.box("yes")
+        self.assertIn("Moved the 2 papers", said)
+
+
+class CheckWideningTests(unittest.TestCase):
+    """The re-check's moves that got an altered renderer past the check, each now caught or written down."""
+
+    def setUp(self):
+        if MISSING:
+            self.skipTest("Poppler is not installed here; these cases build invented scans")
+        self.root = new_root(self)
+        self.a_class = Class(self.root / "class")
+
+    def stopped(self, label):
+        changed = teacher_only.what_was_changed(self.a_class.marking)
+        self.assertIsNotNone(changed, label + ": not caught")
+        return changed
+
+    def edited_copy(self, path):
+        shutil.copyfile(SCRIPTS / "render_pages.py", path)
+        self.assertTrue(codex_edit(path))
+
+    def test_n01_a_wrapper_that_imports_the_shipped_module(self):
+        (self.a_class.marking / "Scripts" / "look.py").write_text(
+            "import sys\nsys.path.insert(0, " + repr(str(self.a_class.homes[".claude"] / "scripts")) + ")\n"
+            "import render_pages\nrender_pages.temporary_folders = lambda: []\n", encoding="utf-8")
+        self.assertIn(folded(checked_file()["saysACopy"].replace("{n}", "1")), folded(self.stopped("n01")))
+
+    def test_n03_a_copy_with_a_name_split_in_pieces(self):
+        path = self.a_class.marking / "Scripts" / "look.py"
+        path.write_text("import subprocess\nTOOL = 'pdf' + 'toppm'\nNAME = 'render' + '_pages'\n", encoding="utf-8")
+        self.stopped("n03")
+
+    def test_n04_to_n06_any_ending(self):
+        import py_compile
+        for name in ("look.pyc", "render_local", "render_local.PY"):
+            for old in (self.a_class.marking / "Scripts").iterdir():
+                if old.name not in ("redact_scans.py", "make_named_copies.py"):
+                    os.remove(old)
+            target = self.a_class.marking / "Scripts" / name
+            if name.endswith(".pyc"):
+                source = self.root / "edited.py"
+                self.edited_copy(source)
+                py_compile.compile(str(source), cfile=str(target), doraise=True)
+            else:
+                self.edited_copy(target)
+            self.stopped(name)
+
+    def test_n08_and_n10_links_of_any_name(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        self.edited_copy(outside / "render_pages.py")
+        os.symlink(str(outside / "render_pages.py"), str(self.a_class.marking / "Scripts" / "look.py"))
+        self.assertIn(folded(checked_file()["saysALink"].replace("{n}", "1")), folded(self.stopped("n08")))
+        os.remove(self.a_class.marking / "Scripts" / "look.py")
+        os.symlink(str(outside), str(self.a_class.marking / "Scripts" / "tools"))
+        self.stopped("n10")
+
+    def test_n11_a_file_anywhere_in_a_skill_home(self):
+        for relative in ("tools/render_local.py", "scripts/extra/render_local.py", "templates/notes.txt"):
+            home = self.a_class.homes[".agents"]
+            (home / relative).parent.mkdir(parents=True, exist_ok=True)
+            (home / relative).write_text("anything", encoding="utf-8")
+            said = self.stopped(relative)
+            self.assertIn(folded(checked_file()["saysTheSkill"].replace("{n}", "1")), folded(said), relative)
+            self.assertNotIn("render_pages.py in", said, "an extra file is not called render_pages.py (e7)")
+            os.remove(home / relative)
+        (self.a_class.homes[".claude"] / "templates" / "Marker Brief.md").write_text("changed", encoding="utf-8")
+        self.stopped("a changed template")
+
+    def test_n14_skill_folder_txt_naming_a_copy_outside_the_working_folder(self):
+        outside = self.root / "a copy of the skill"
+        shutil.copytree(SKILL, outside, ignore=shutil.ignore_patterns("__pycache__"))
+        (self.a_class.marking / "Skill folder.txt").write_text(str(outside) + "\n", encoding="utf-8")
+        with self.assertRaises(teacher_only.Refusal) as raised:
+            teacher_only.box(self.a_class.marking, teacher([str(self.a_class.teacher_only), "yes"]), lambda _line: None)
+        self.assertIn("does not name the plantoir-marking skill in a Plantoir working folder", str(raised.exception))
+
+    def test_n18_an_adapted_boxing_script_that_renders_pngs_is_not_stopped(self):
+        script = self.a_class.marking / "Scripts" / "redact_scans.py"
+        script.write_text(script.read_text(encoding="utf-8") + "\n# pages could also go through pdftoppm -png\n",
+                          encoding="utf-8")
+        self.assertIsNone(teacher_only.what_was_changed(self.a_class.marking))
+
+    def test_every_write_route_names_a_test_that_is_here(self):
+        for route in teacher_run()["writeRoutes"]:
+            if "test" in route:
+                name = route["test"].split(" (")[0]
+                test_class, method = name.split(".")
+                self.assertTrue(hasattr(globals()[test_class], method), route["place"])
+
+    def test_the_manifest_is_the_skill_as_shipped(self):
+        found = {}
+        for path in sorted(SKILL.rglob("*")):
+            if path.is_file() and "__pycache__" not in path.parts:
+                relative = path.relative_to(SKILL).as_posix()
+                if relative not in teacher_only.NOT_IN_SKILL_FILES:
+                    found[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(found, teacher_only.SKILL_FILES)
+        self.assertEqual(teacher_only.what_was_changed(self.a_class.marking), None, "a fresh class is not stopped")
 
 
 class GreetingTests(unittest.TestCase):

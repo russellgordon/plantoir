@@ -32,8 +32,19 @@ Since the fourth trial (750d, 2026-11-13): the check covers the file, not two pa
 every skill home (this file's, the one "Skill folder.txt" names, and the other of .claude and .agents in the same
 working folder), and in the marking folder at any depth, where any Python file that renders pages as
 render_pages.py does (pdftoppm with one of RENDERER_MARKS) must be the shipped file; --tidy runs the same check.
-What no hash can see: an assistant that calls pdftoppm itself, or writes a renderer with none of the marks, or
-runs one from outside these folders. Nothing here stops that; the skill forbids it.
+
+Since the re-check (750d, 2026-11-13): the check reads every file, not every .py: each skill home must hold
+exactly SKILL_FILES and NOT_IN_SKILL_FILES (SKILL.md and the launchers carry this file's hash, so they are not in it), any file of any ending in the marking
+folder that names one of RENDERER_MARKS, its strings joined, must be render_pages.py as shipped (documents in
+NOT_CODE apart), a link anywhere in the marking folder stops, and "Skill folder.txt" must name this skill in a
+working folder. Each teacher-run script (the boxing and the names step) gets a temporary folder of its own on
+the teacher's side, emptied after the step, in place of the system's (n19: an adapted boxing script copied the
+original scans into the per-user temporary folder the assistant's shell reads), and on a Mac a sandbox that
+allows no other write, no network or local socket, no system service (clipboard, preferences, opening a
+file), no shared memory and no signal to another program. A boxed paper with a text layer, an attached file
+or a word from the table in its details is refused before the teacher's look. What no check here sees is
+listed in contracts/shared-rules.json -> teacherRun.checkedFiles.cannotSee; none of it can show the assistant a
+name it could not already see.
 
 #750, piece 750d. Russell, 2026-11-12: "script runs, teacher checks the papers, confirms names are redacted,
 then agent based marking begins. Simple." Six trials found an assistant's FIRST command could list the
@@ -61,13 +72,13 @@ would be doing what the skill forbids, and the re-trial checks for it.
 
 What the teacher trusts: that the boxing script the assistant adapted does only what it says. This file runs
 it with the teacher-only folder open to it, so on a Mac it is run under sandbox-exec, able to write only
-into that assessment's folder on the teacher's side and the temporary folder, and on every system anything
+into that assessment's folder on the teacher's side (its own temporary folder there included), and on every system anything
 the boxing step wrote outside the folder it was given (in the marking folder or the teacher-only folder) is
 moved, unread and never deleted, into the teacher-only Quarantine folder, and the step stops before anything
 is put together for the teacher's look, saying how many. A write outside both folders is stopped on a Mac
 only, by the sandbox; on Windows it cannot be seen. That is why the teacher looks through the boxed papers.
 
-Needs Poppler (pdfinfo, pdfunite) for the combined file, and the Python standard library. Python 3.9 or later.
+Needs Poppler (pdfinfo, pdfunite, pdftotext, pdfdetach) for the combined file, and the Python standard library. Python 3.9 or later.
 """
 import datetime
 import hashlib
@@ -119,13 +130,18 @@ RENDER_PAGES = "render_pages.py"
 # folders away and told no one).
 RENDER_PAGES_SHA256 = "4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819"
 LAST_STOP = " - last stop.txt"
-# The two sentences a "Stopped: a marking file was changed" line carries (contracts: teacherRun.checkedFiles).
-SAYS_THE_SKILL = ("render_pages.py in the plantoir-marking skill's own folder, in your working folder, is not the one "
-                  "Plantoir shipped. Plantoir puts the skill back as it shipped the next time it opens your working "
-                  "folder: open it in Plantoir, then double-click again, and ask your assistant what it changed.")
-SAYS_A_COPY = ("Copies of render_pages.py in the marking folder ({n}), under its own name or another, are not the one "
-               "Plantoir shipped. Ask your assistant to remove them (render_pages.py is run from the skill's folder, "
-               "never copied) and to tell you what it had changed.")
+# The sentences a "Stopped: a marking file was changed" line carries (contracts: teacherRun.checkedFiles), each
+# true of what it counts (the re-check: an extra file in the skill was called render_pages.py, and an adapted
+# boxing script that renders PNGs was called a copy of render_pages.py).
+SAYS_THE_SKILL = ("The plantoir-marking skill's own folder, in your working folder, is not as Plantoir shipped it "
+                  "({n} files changed, missing or added). Plantoir puts the skill back as it shipped the next time it "
+                  "opens your working folder: open it in Plantoir, then double-click again, and ask your assistant "
+                  "what it changed.")
+SAYS_A_COPY = ("Scripts in the marking folder ({n}) name render_pages.py or its parts and are not the file Plantoir "
+               "shipped. Ask your assistant to remove them (render_pages.py is run from the skill's folder, never "
+               "copied, wrapped or changed) and to tell you what it had changed.")
+SAYS_A_LINK = ("Links in the marking folder ({n}) point somewhere else. Ask your assistant to remove them: nothing in "
+               "the marking folder is a link.")
 ASK_POINTS = "Type yes when you have read these four points, or no to stop: "
 IDENTIFIER = re.compile(r"^Student [A-Z]{1,2}$")
 SECTION = re.compile(r"^Section \d+$")
@@ -241,94 +257,141 @@ def the_marking_folder_is_usable(marking):
 
 
 SKILL_HOMES = (".claude", ".agents")
-# What makes a script a page renderer, for a copy of render_pages.py under another name (750d fourth trial: an
-# edited copy as Scripts/render_local.py was not checked). Each is in render_pages.py; none is in the other
-# shipped scripts (redact_scans.py calls pdftoppm for JPEG pages only, and names none of the rest).
-RENDERER_MARKS = (b"-png", b"check_the_folder", b"render_pages", b"Made while marking")
+# The SHA-256 of every file of this skill as Plantoir ships it, but NOT_IN_SKILL_FILES: SKILL.md and the four
+# launchers carry this file's own hash, and this file cannot hold its own. Both homes must hold exactly
+# these files and those three, and nothing else (750d re-check: an edited copy outside scripts/, n11, and an
+# extra file beside the shipped ones, e7, were not seen, or were named wrongly).
+SKILL_FILES = {
+    "reference/results.md": "b7e7b141198b3fbffbeed2828ec866b9f39df560dda3f7a738a6bf8adc6445da",
+    "reference/template.md": "d32ea3cef8931684ce674c814fdecec6aeff685a08c65dcd1aa49ce8501cec20",
+    "reference/test-sheets.md": "52437246e8e6b59f5de791db840a045b480ee383f07abc6c621ad84b9f312b47",
+    "scripts/build_test_sheet.py": "0a55379f4762f5e6e83929cdf8e493ec409c3ced1f2ea041e33bc9a14027d6af",
+    "scripts/class_results.py": "271f3a8d99b58d2f7a97476216388fde04b1ef1f1de230f0d72bd903a82ac836",
+    "scripts/make_named_copies.py": "866a3e258eb90fffe05cc3499902c022d95ccbbc6196ca3fa6f3e01d13afbb94",
+    "scripts/redact_scans.py": "43b36531c9b3c280e7b71760f015bbc0b37b3b49dbeb2d8ef5e6c5e8626155f3",
+    "scripts/render_pages.py": "4440359bb35d986d450fa684aa3e1c3427335804d012e4ac2afdc8c0ac91b819",
+    "scripts/run_with_names.py": "41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb",
+    "templates/Marker Brief.md": "6251ad3e74a2f17ca2a19afd28264e491665c4349e9e13603be62522a4b36187",
+    "templates/Marking Rules Applied.md": "fb991a144af61601c6539075e3bf7f44502272d63aa0601421f6295441a5b45e",
+    "templates/Marking Settings.md": "625f85cf47439f536719f5f6ac0bbaf727dcec8358c7de77943c5a4b66c20e89",
+    "templates/Reviewer Brief.md": "0e9273a507ac8f9187e25c1e9cbe497c0c307eb0877e116c0d762df00e87e341",
+}
+NOT_IN_SKILL_FILES = ("SKILL.md", "scripts/teacher_only.py", "launchers/Box the papers.command",
+                      "launchers/Put names on the sheets.command", "launchers/Box the papers.bat",
+                      "launchers/Put names on the sheets.bat")
+# What makes a file in the marking folder a copy of render_pages.py, or a wrapper around it, whatever it is
+# called and whatever its ending: one of these, with the bytes read as they are and again with every quote,
+# plus sign, backslash and white space taken out (so a name split into pieces is joined). None is in the other
+# shipped scripts. "-png" is NOT one (the re-check: it stopped an adapted boxing script that renders PNGs).
+RENDERER_MARKS = (b"render_pages", b"check_the_folder", b"Made while marking")
+NOT_CODE = (".md", ".txt", ".json", ".csv", ".tex", ".pdf", ".log")   # documents in the marking folder; never read as code
+JOINED = re.compile(rb"[\"'+\\\s]")
 
 
-def skill_homes(marking):
-    """Every plantoir-marking skill folder the marking could be using: this file's own, the one the marking
-    folder's 'Skill folder.txt' names, and for each the other home in the same working folder (.claude and
-    .agents: Codex reads .agents, Claude Code reads .claude, and the fourth trial edited the one 'Skill
-    folder.txt' did not name)."""
-    found = []
+def a_working_folder_home(folder):
+    """The working folder when `folder` is <working folder>/.claude|.agents/skills/plantoir-marking, else None."""
+    folder = Path(os.path.realpath(str(folder)))
+    if folder.name == "plantoir-marking" and folder.parent.name == "skills" and folder.parent.parent.name in SKILL_HOMES:
+        working = folder.parent.parent.parent
+        if (working / "courses").is_dir() and (working / ".toolchain").is_dir():
+            return working
+    return None
 
-    def add(folder):
-        folder = Path(os.path.realpath(str(folder)))
-        if folder not in found:
-            found.append(folder)
 
-    add(SCRIPTS.parent)
+def named_skill_folder(marking):
     try:
         named = (Path(marking) / SKILL_FOLDER_FILE).read_text(encoding="utf-8").splitlines()[0].strip()
     except (OSError, UnicodeDecodeError, IndexError):
-        named = ""
-    if named and Path(named).is_absolute() and Path(named).is_dir():
-        add(named)
-    for folder in list(found):
-        if folder.parent.name == "skills" and folder.parent.parent.name in SKILL_HOMES:
-            for home in SKILL_HOMES:
-                other = folder.parent.parent.parent / home / "skills" / folder.name
-                if other.is_dir():
-                    add(other)
+        return None
+    return Path(named) if named and Path(named).is_absolute() else None
+
+
+def skill_homes(marking):
+    """Both real homes of the working folder the marking folder's 'Skill folder.txt' names (.claude and
+    .agents, each checked whichever one it names), and this file's own folder when it is a home. A Refusal when
+    'Skill folder.txt' names anything but this skill in a Plantoir working folder (the re-check, n14: a shipped
+    copy kept outside the working folder hid edits in both real homes)."""
+    named = named_skill_folder(marking)
+    working = a_working_folder_home(named) if named is not None else None
+    if working is None:
+        raise Refusal("'Skill folder.txt' in the marking folder does not name the plantoir-marking skill in a Plantoir "
+                      "working folder (its .claude or .agents folder), so the skill could not be checked. Nothing "
+                      "was done. Ask your assistant to copy the launchers again, as the skill says")
+    found = []
+    for home in SKILL_HOMES:
+        folder = working / home / "skills" / "plantoir-marking"
+        if folder.is_dir() and folder not in found:
+            found.append(Path(os.path.realpath(str(folder))))
+    own = a_working_folder_home(SCRIPTS.parent)
+    if own is not None and Path(os.path.realpath(str(SCRIPTS.parent))) not in found:
+        found.append(Path(os.path.realpath(str(SCRIPTS.parent))))
     return found
 
 
-def renders_pages(path):
-    """True for a Python file that renders pages as pictures as render_pages.py does."""
+def changed_in_a_home(home):
+    """How many files of one skill home are not as Plantoir shipped them: a shipped file changed or missing, a
+    link where a file should be, and any extra file or link at any depth (Python's own __pycache__ folders apart)."""
+    changed = 0
+    expected = set(SKILL_FILES) | set(NOT_IN_SKILL_FILES)
+    for relative, digest in SKILL_FILES.items():
+        path = home / relative
+        if path.is_symlink() or not path.is_file() or sha256_of(path) != digest:
+            changed += 1
+    for top, folders, files in os.walk(str(home), followlinks=False):
+        folders[:] = [name for name in folders if name != "__pycache__" or Path(top, name).is_symlink()]
+        for name in folders + files:
+            path = Path(top) / name
+            relative = path.relative_to(home).as_posix()
+            if path.is_symlink() or (path.is_file() and relative not in expected):
+                changed += 1
+    return changed
+
+
+def is_a_renderer(path):
+    """True for a file whose bytes name render_pages.py's own markers, as written or with split strings joined."""
     try:
         data = Path(path).read_bytes()
     except OSError:
         return False
-    return b"pdftoppm" in data and any(mark in data for mark in RENDERER_MARKS)
+    joined = JOINED.sub(b"", data)
+    return any(mark in data or mark.replace(b" ", b"") in joined for mark in RENDERER_MARKS)
 
 
 def changed_marking_files(marking):
-    """(skill homes with a changed render_pages.py, copies in the marking folder that are changed) as counts.
-    In every skill home render_pages.py must be the file Plantoir shipped, and any other script there that
-    renders pages is a change. In the marking folder, at any depth, every render_pages.py and every other Python
-    file that renders pages must be the shipped file. teacher_only.py and run_with_names.py are checked by the
-    launchers before this file runs. Counts only: a copy's name is the assistant's choice and is never printed."""
+    """(files changed in the skill's homes, changed copies of render_pages.py in the marking folder, links in
+    the marking folder), as counts. In the marking folder every file, at any depth and whatever its ending
+    (the documents in NOT_CODE apart), that names one of RENDERER_MARKS must be the shipped render_pages.py,
+    and a link of any name is counted on its own. Counts only: a file's name is the assistant's choice."""
     in_the_skill = 0
     for home in skill_homes(marking):
-        scripts = home / "scripts"
-        shipped = scripts / RENDER_PAGES
-        changed = shipped.is_symlink() or not shipped.is_file() or sha256_of(shipped) != RENDER_PAGES_SHA256
-        if scripts.is_dir():
-            for entry in scripts.iterdir():
-                if entry.name in (RENDER_PAGES, "teacher_only.py", "run_with_names.py") or entry.suffix != ".py":
-                    continue
-                if entry.is_symlink() or (entry.is_file() and renders_pages(entry)):
-                    changed = True
-        if changed:
-            in_the_skill += 1
-    in_the_marking_folder = 0
+        in_the_skill += changed_in_a_home(home)
+    copies, links = 0, 0
     for top, folders, files in os.walk(str(marking), followlinks=False):
-        for name in files:
+        for name in folders + files:
             path = Path(top) / name
-            if name != RENDER_PAGES and not name.endswith(".py"):
-                continue
             if path.is_symlink():
-                if name == RENDER_PAGES:
-                    in_the_marking_folder += 1
+                links += 1
                 continue
-            if name == RENDER_PAGES or renders_pages(path):
+            if name in folders or name.lower().endswith(NOT_CODE):
+                continue
+            if name == RENDER_PAGES or is_a_renderer(path):
                 if sha256_of(path) != RENDER_PAGES_SHA256:
-                    in_the_marking_folder += 1
-    return in_the_skill, in_the_marking_folder
+                    copies += 1
+    return in_the_skill, copies, links
 
 
 def what_was_changed(marking):
     """The sentence a Stopped line carries when a marking file was changed, or None."""
-    in_the_skill, in_the_marking_folder = changed_marking_files(marking)
-    if not in_the_skill and not in_the_marking_folder:
+    in_the_skill, copies, links = changed_marking_files(marking)
+    if not in_the_skill and not copies and not links:
         return None
     parts = []
     if in_the_skill:
-        parts.append(SAYS_THE_SKILL)
-    if in_the_marking_folder:
-        parts.append(SAYS_A_COPY.replace("{n}", str(in_the_marking_folder)))
+        parts.append(SAYS_THE_SKILL.replace("{n}", str(in_the_skill)))
+    if copies:
+        parts.append(SAYS_A_COPY.replace("{n}", str(copies)))
+    if links:
+        parts.append(SAYS_A_LINK.replace("{n}", str(links)))
     return "a marking file was changed. " + " ".join(parts) + " Nothing was done"
 
 
@@ -669,6 +732,37 @@ def page_count(pdf):
     return int(match.group(1))
 
 
+def papers_hide_nothing(holding, teacher_only):
+    """A Refusal, naming identifiers only, when a boxed paper carries anything the teacher's look through the
+    pages cannot see: a text layer (the shipped boxing makes every page a picture, so an original scan's text, a
+    name in it, would survive an adapted script that kept it), a file attached inside it, or a word from the name
+    table in its metadata. The teacher's look sees what a page shows, and nothing else (750d re-check: think of
+    every place a teacher-run script can put a name)."""
+    for tool in ("pdftotext", "pdfdetach", "pdfinfo"):
+        if shutil.which(tool) is None:
+            raise Refusal("Poppler is not installed (" + tool + " not found). On a Mac with Homebrew: brew install "
+                          "poppler. Nothing was moved")
+    runner = the_name_comparison()
+    names = runner.tokens_from(runner.read_rows(teacher_only / TABLE))
+    carrying = []
+    for label, relative in papers_of_a_batch(holding):
+        path = Path(holding) / relative
+        text = subprocess.run(["pdftotext", str(path), "-"], capture_output=True)
+        attached = subprocess.run(["pdfdetach", "-list", str(path)], capture_output=True)
+        about = subprocess.run(["pdfinfo", str(path)], capture_output=True).stdout + \
+            subprocess.run(["pdfinfo", "-meta", str(path)], capture_output=True).stdout
+        listed = attached.stdout.decode("utf-8", "replace").strip().splitlines()
+        if (text.returncode != 0 or text.stdout.decode("utf-8", "replace").strip()
+                or attached.returncode != 0 or (listed and not listed[0].startswith("0 "))
+                or runner.holds_any_form(about.decode("utf-8", "replace"), names)):
+            carrying.append(label)
+    if carrying:
+        raise Refusal(f"{len(carrying)} boxed papers carry text, an attached file, or a word from your name table in "
+                      "their details, which your look through the pages would not show (" + "; ".join(carrying)
+                      + "). Nothing was put together for you to look through, and nothing was moved. Tell your "
+                      "assistant the boxing script needs looking at: a boxed paper is pictures of pages only")
+
+
 def prepare(holding, check, assessment):
     """Put exactly the papers in the holding folder in ONE file in the check folder, after a cover; return
     ({relative path: SHA-256}, papers, pages)."""
@@ -809,19 +903,53 @@ def runner_command(teacher_only, marking, command):
             "--quarantine", str(teacher_only / QUARANTINE), "--"] + command
 
 
+SCRATCH = "Scratch"   # a teacher-run script's own temporary folder, on the teacher's side; emptied after every step
+SCRATCH_ENVIRONMENT = ("TMPDIR", "TMP", "TEMP", "TEMPDIR")
+SANDBOX_DEVICES = ("/dev/null", "/dev/zero", "/dev/tty", "/dev/dtracehelper", "/dev/random", "/dev/urandom")
+
+
 def walled(command, writable):
-    """On a Mac, the command run so that it can write only into the given folders and the temporary folder
-    (750d review M1): sandbox-exec, with a profile that denies every write and allows those. Elsewhere, the
-    command as it is (the snapshot in a_boxing_step still catches writes into either folder)."""
+    """On a Mac, the command run so that it can write only into the given folders (750d review M1), with no other
+    way out: sandbox-exec, with a profile that denies every write but into those folders and a few devices, every
+    network connection (a local socket included), every lookup of a system service (the clipboard, preferences,
+    opening a file or a web page, sending an event to another program), shared memory, and signals to other
+    programs. The system's temporary folder is NOT among the folders (750d re-check, n19: an adapted boxing script
+    copied the original scans there, the same per-user folder the assistant's shell reads); each step is given a
+    temporary folder of its own on the teacher's side instead (a_step_scratch). Elsewhere, the command as it is."""
     sandbox = "/usr/bin/sandbox-exec"
     if sys.platform != "darwin" or not os.path.isfile(sandbox):
         return command
-    folders = [os.path.realpath(str(folder)) for folder in writable]
-    folders += [os.path.realpath(tempfile.gettempdir()), "/dev"]
     allowed = ""
-    for folder in folders:
+    for folder in writable:
+        folder = os.path.realpath(str(folder))
         allowed += ' (subpath "' + folder.replace("\\", "\\\\").replace('"', '\\"') + '")'
-    return [sandbox, "-p", "(version 1)(allow default)(deny file-write*)(allow file-write*" + allowed + ")"] + command
+    for device in SANDBOX_DEVICES:
+        allowed += ' (literal "' + device + '")'
+    allowed += ' (regex #"^/dev/fd/")'
+    profile = ("(version 1)(allow default)(deny file-write*)(allow file-write*" + allowed + ")"
+               "(deny network*)(deny mach-lookup)(deny ipc-posix-shm*)(deny ipc-sysv*)(deny signal (target others))")
+    return [sandbox, "-p", profile] + command
+
+
+def a_step_scratch(folder):
+    """A fresh, empty temporary folder for one teacher-run step, inside `folder` on the teacher's side, and the
+    environment that points every program the step runs at it (TMPDIR, TMP, TEMP and TEMPDIR: Python's tempfile,
+    Poppler and tectonic read them). Anything left from an earlier step that was killed goes first."""
+    scratch = Path(folder) / SCRATCH
+    empty_the_scratch(scratch)
+    scratch.mkdir(parents=True)
+    environment = dict(os.environ)
+    for name in SCRATCH_ENVIRONMENT:
+        environment[name] = str(scratch)
+    return scratch, environment
+
+
+def empty_the_scratch(scratch):
+    scratch = Path(scratch)
+    if scratch.is_symlink() or scratch.is_file():
+        os.remove(scratch)
+    elif scratch.is_dir():
+        shutil.rmtree(scratch, ignore_errors=True)
 
 
 def written_state(folder, leave_out):
@@ -846,10 +974,20 @@ def a_boxing_step(script_command, allowed, teacher_only, marking, assessment, sa
     on the teacher's side; then move anything it wrote outside `allowed` (in the marking folder or the
     teacher-only folder) to the teacher's Quarantine, unread and never deleted, and stop when there was any."""
     quarantine = teacher_only / QUARANTINE
-    allowed = [Path(path) for path in allowed] + [quarantine]
+    scratch, environment = a_step_scratch(teacher_only / assessment)
+    try:
+        return a_walled_boxing_step(script_command, allowed, teacher_only, marking, assessment, say, said, scratch,
+                                    environment, quarantine)
+    finally:
+        empty_the_scratch(scratch)   # on yes, no, a stop, a crash and Ctrl-C alike
+
+
+def a_walled_boxing_step(script_command, allowed, teacher_only, marking, assessment, say, said, scratch, environment,
+                         quarantine):
+    allowed = [Path(path) for path in allowed] + [quarantine, scratch]
     before = {**written_state(marking, []), **written_state(teacher_only, allowed)}
     code = run_and_say(runner_command(teacher_only, marking, walled(script_command, [teacher_only / assessment])),
-                       teacher_only, say, said)
+                       teacher_only, say, said, environment)
     after = {**written_state(marking, []), **written_state(teacher_only, allowed)}
     strays = []
     for path, state in sorted(after.items()):
@@ -871,10 +1009,10 @@ def a_boxing_step(script_command, allowed, teacher_only, marking, assessment, sa
     return code
 
 
-def run_and_say(command, teacher_only, say, said):
+def run_and_say(command, teacher_only, say, said, environment=None):
     """Run a command with its output captured, and pass on its lines with the teacher-only folder's path put back
     as 'your teacher-only folder'. Returns its exit code."""
-    result = subprocess.run(command, capture_output=True)
+    result = subprocess.run(command, capture_output=True, env=environment)
     output = (result.stdout + result.stderr).decode("utf-8", "replace")
     for line in hide_the_folder(output, teacher_only).splitlines():
         say(line)
@@ -982,6 +1120,7 @@ def box(marking, ask, say):
     try:
         a_boxing_step([sys.executable, "-B", str(script), str(originals), str(holding), "--blank", str(blank)] + options,
                       [holding], teacher_only, marking, assessment, say, said)
+        papers_hide_nothing(holding, teacher_only)
         batch, papers, pages = prepare(holding, teacher_only / assessment / CHECK, assessment)
     except Refusal as refusal:
         said.append(f"Stopped: {refusal}")
@@ -1098,8 +1237,18 @@ def names(marking, ask, say):
     said = [f"Asked: {request.get('do')}, {datetime.datetime.now().isoformat(timespec='seconds')}."]
     worst = 0
     for arguments in steps:
-        code = run_and_say(runner_command(teacher_only, marking, [sys.executable, "-B", str(script)] + arguments),
-                           teacher_only, say, said)
+        # Walled as the boxing is (the re-check: an adapted script run with the table open could write anywhere):
+        # it may write only into the folder it writes named copies to, and its own scratch, both on the teacher's side.
+        writable = [Path(arguments[arguments.index("--out") + 1])] if "--out" in arguments else []
+        scratch, environment = a_step_scratch(teacher_only)
+        try:
+            for folder in writable:
+                folder.mkdir(parents=True, exist_ok=True)
+            code = run_and_say(runner_command(teacher_only, marking, walled([sys.executable, "-B", str(script)] + arguments,
+                                                                              writable + [scratch])),
+                               teacher_only, say, said, environment)
+        finally:
+            empty_the_scratch(scratch)
         worst = max(worst, code)
     if request.get("do") == "comment-facts":
         worst = max(worst, release_the_notes(teacher_only, marking, f"{request['term']} Comments", say, said))

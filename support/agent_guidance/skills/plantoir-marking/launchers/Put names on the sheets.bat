@@ -8,7 +8,7 @@ rem (teacher_only.py and run_with_names.py, in the skill folder named in "Skill 
 setlocal
 set "STEP=names"
 set "TITLE=Put names on the sheets"
-set "TEACHER_ONLY_SHA256=ca31ca2ac5a5ecfdae55f13aedee142ef9a9125a6afbd3048f66e322c1e77f92"
+set "TEACHER_ONLY_SHA256=d0373eba4f687175c9fbc068f0d5f4e1be32a6e19e2c19c1be93572f5b2c8a99"
 set "RUNNER_SHA256=41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb"
 title %TITLE%
 cd /d "%~dp0"

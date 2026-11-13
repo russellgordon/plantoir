@@ -2789,7 +2789,14 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   too, and Put names on the sheets shows the report-comments skill's four
   points before a comments step; all plain Python, NOT MEASURED on
   Windows, where the homes are found by the same `.claude` and `.agents`
-  folder names. They are checked out with
+  folder names. Since the re-check (09 → "The re-check, and what it
+  changed"): each teacher-run step points `TMPDIR`, `TMP`, `TEMP` and
+  `TEMPDIR` at a `Scratch` folder of its own on the teacher's side and
+  empties it after; on Windows that is the whole wall, since there is no
+  `sandbox-exec`. A script that writes to `%TEMP%`, `%LOCALAPPDATA%` or a
+  network share by name is not stopped there, and the boxing step's snapshot
+  sees only the marking and teacher-only folders; the `windows` issue says
+  what is owed. They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft
