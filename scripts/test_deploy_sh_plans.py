@@ -169,7 +169,7 @@ class PlansModeTests(unittest.TestCase):
     def test_a_plan_flag_without_plans_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = a_folder(tmp)
-            for flag in ("--protect", "--remove-password", "--change-password", "--include-answer-keys", "--stop-sharing"):
+            for flag in ("--protect", "--remove-password", "--change-password", "--password-only", "--include-answer-keys", "--stop-sharing"):
                 with self.subTest(flag=flag):
                     done = subprocess.run(["bash", str(folder / "deploy.sh"), "SNC2D", "1", flag, "--image", "x"],
                                           capture_output=True, text=True, cwd=str(folder), timeout=60,
@@ -274,6 +274,28 @@ class PlansModeTests(unittest.TestCase):
             status, out = run(folder, ["--protect", "--change-password"], f"{USERNAME}\n{PASSWORD}\n")
             self.assertEqual(status, 0, out)
             self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:{PASSWORD}")
+
+    def test_password_only_saves_the_new_password_and_shares_nothing(self):
+        """#833 changePasswordCases: Change Password saves, then the app offers Share Again."""
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            (folder / "stub" / "plan_item").write_text("old:OldPassword1")
+            status, out = run(folder, ["--protect", "--change-password", "--password-only"], f"{USERNAME}\n{PASSWORD}\n")
+            self.assertEqual(status, 0, out)
+            self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:{PASSWORD}")
+            self.assertIn("--new-password-waiting", docker_args(folder))
+            self.assertNotIn("--credential-file", docker_args(folder))
+            self.assertNotIn(PASSWORD, docker_stdin(folder))
+
+    def test_password_only_goes_only_with_change_password(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            for flags in (["--password-only"], ["--protect", "--password-only"],
+                          ["--change-password", "--password-only", "--include-answer-keys"]):
+                with self.subTest(flags=flags):
+                    status, out = run(folder, flags)
+                    self.assertEqual(status, 1, out)
+                    self.assertIn("--password-only goes with --change-password", out)
 
     def test_protection_is_sticky_through_the_years_marker(self):
         with tempfile.TemporaryDirectory() as tmp:

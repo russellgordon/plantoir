@@ -27981,11 +27981,15 @@
           "If it is not there, say nothing about marking, and do not mark papers from this kit",
           "If it is there, when the kit is finished and the teacher has looked at it, you may mention once",
           "it reads keys, not prose: a name typed inside a value is not something it can find",
-          "the checker refuses any key the format does not define"
+          "the checker refuses any key the format does not define",
+          "and each solutions PDF into that unit's `Answer Keys` folder"
         ],
         "plantoir-unit-planning": [
           "you can also write the unit's test from the plan",
-          "Do not raise it again in this session if they do not take it up."
+          "Do not raise it again in this session if they do not take it up.",
+          "**Every answer key, solutions file and marking guide goes into the unit's `Answer Keys` folder**",
+          "never move a teacher's file into it unasked",
+          "no file outside it has a name that looks like one"
         ],
         "plantoir-marking": [
           "Every mark, level and comment I draft is a suggestion.",
@@ -36775,7 +36779,8 @@
       "<unit-slug>/index.html": "the unit's plan page, linking ../assets/plan.css",
       "<unit-slug>/correlation.html": "the unit's curriculum correlation page, linking ../assets/correlation.css",
       "<unit-slug>/plan.json": "the unit's facts (planFile)",
-      "<unit-slug>/pdfs/": "copies of the unit's handouts, under their real names"
+      "<unit-slug>/pdfs/": "copies of the unit's handouts, under their real names",
+      "<unit-slug>/Answer Keys/": "every answer key, solutions file and marking guide the unit carries, and nothing else (#833, share.answerKeysFolder)"
     },
     "assetsAreThePlantoirs": "assets/ holds the template's two stylesheets and its fonts, and belongs to Plantoir rather than to the plan: the skill copies it whole from the template and never edits a file in it or adds one beside it, so every plan in every course looks the same and a later release can refresh it. Its rules are only ever added to (appendOnly).",
     "planFile": {
@@ -36959,7 +36964,7 @@
     },
     "appendOnly": "A rule in either stylesheet is never removed or renamed by a later release; changes are added at the end. Each sheet is the example page's own <style> block byte for byte (scripts/fixtures/unit_plan/), after Plantoir's comment and its @font-face rules, with ONE edit: a --ok colour token in :root and both dark blocks, and the reviewed mark's fixed green replaced by var(--ok) (Russell's ruling 2, 2026-11-01: the one change to the exact look). scripts/test_unit_plan_template.py proves the sheet equals its fixture once those are taken out, that the colour tokens and dark blocks are the same in both sheets, and that every class every shipped release defined still has a rule (scripts/fixtures/unit_plan/classes-shipped.json).",
     "agentGuidance": {
-      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); since #709 it says the plans are shared from the Planning tab, that a share without a password leaves answer keys out, and that the assistant never shares or deploys them (unitPlanning.share). The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
+      "rule": "The skill `plantoir-unit-planning` sits beside the others in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance), template folder and fonts included, so it needs no code on either platform. It opens as every skill does, tells an assistant to gather (How I Teach, every section's timetable and class pages, a colleague's dates, prior materials as sources to adapt, the strand's expectations), agree in chat, and build only on a clear go; to take the lesson shape from How I Teach; to have a second agent check the calendar; to lay the plan page out in the fixed order (header, calendar, how the sections differ, lessons, each day's materials, assessment drafts) from the template's commented patterns; to make assessments through `plantoir-handouts` with an author, a reviewer and a sweep and copy their PDFs into the unit's pdfs/; to build the correlation page from exact expectation codes with every share totalling 100.0%; to mark a day reviewed only after its review; the folder rules (siteLayout, slugRules, neverFolderNames); the checks before handing over; adopting an existing plan folder only when offered and never opening an .htpasswd; and turning a plan into class pages one day at a time. Since #708 it tells the teacher to look on the course's Planning tab, and says a plan page has no script and nothing from the internet, because the tab shows it with neither (unitPlanning.tab.whatAPageMayRead); since #709 it says the plans are shared from the Planning tab, that a share without a password leaves answer keys out, and that the assistant never shares or deploys them (unitPlanning.share); since #833 it writes every answer key, solutions file and marking guide into the unit's Answer Keys folder (share.answerKeysFolder), and plantoir-test-authoring puts a test's solutions there too. The root AGENTS.md and CLAUDE.md sections name it in one bullet each; plantoir-handouts and plantoir-page-authoring name it (mentionedBy) and each now names .internal/planning/ beside handouts.json as the places under a dot folder an assistant may write. It is NOT in pageAuthoringSkill.routesTo: a plan is not part of a page.",
       "skill": "plantoir-unit-planning",
       "template": [
         "template/index.html",
