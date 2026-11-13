@@ -53,6 +53,37 @@ enum CourseActivity {
         let displayCode: String
     }
 
+    /// What a run of the unit plans' launcher is doing (#863): sharing,
+    /// changing the plans' password, or stopping sharing. All three hold the
+    /// same lease, a publish under `PlanSharing.leaseSection`, so the quit
+    /// question reads this to name the one that is under way.
+    enum PlanWork: String, Equatable {
+        case sharing
+        case changingPassword
+        case stopping
+
+        // MARK: - Functions
+
+        /// The work a choice on the Planning tab's share bar starts.
+        static func of(_ choice: PlanSharing.Choice) -> PlanWork {
+            switch choice {
+            case .changePassword:
+                return .changingPassword
+            case .stop:
+                return .stopping
+            case .shareOpen, .shareProtected, .shareAgain, .removePassword, .addPassword:
+                return .sharing
+            }
+        }
+    }
+
+    /// One course's unit plans being shared, re-passworded or stopped.
+    struct PlanWorkRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+        let work: PlanWork
+    }
+
     /// The backing store is observable for the same reason as
     /// `PreviewLeases.Store`: views reading `courseIsBusy` must
     /// re-render the moment a publish begins or ends.
@@ -61,6 +92,7 @@ enum CourseActivity {
         var activePublishes: [PublishRecord] = []
         var activePreviewBuilds: [PreviewBuildRecord] = []
         var activeCopies: [CopyRecord] = []
+        var activePlanWork: [PlanWorkRecord] = []
     }
 
     // MARK: - Stored properties
@@ -90,7 +122,32 @@ enum CourseActivity {
         return store.activeCopies
     }
 
+    /// What each run of the unit plans' launcher is doing (#863).
+    static var activePlanWork: [PlanWorkRecord] {
+        return store.activePlanWork
+    }
+
     // MARK: - Functions
+
+    /// Records what a run of the unit plans' launcher is doing, beside the
+    /// lease it holds (#863).
+    static func beginPlanWork(folderPath: String, courseCode: String, work: PlanWork) {
+        store.activePlanWork.append(PlanWorkRecord(folderPath: folderPath, courseCode: courseCode, work: work))
+    }
+
+    /// Records that a run of the unit plans' launcher has ended.
+    static func endPlanWork(folderPath: String, courseCode: String) {
+        var remaining: [PlanWorkRecord] = []
+        var didRemoveOne: Bool = false
+        for existing in activePlanWork {
+            if existing.folderPath == folderPath && existing.courseCode == courseCode && !didRemoveOne {
+                didRemoveOne = true
+                continue
+            }
+            remaining.append(existing)
+        }
+        store.activePlanWork = remaining
+    }
 
     /// Records that a course's folder has started being zipped (#351). One
     /// record per zip, so two at once of one course end one at a time.
@@ -297,36 +354,75 @@ enum CourseActivity {
         return nil
     }
 
-    // MARK: - A Claude or Codex session holding the course (#458)
+    // MARK: - A Claude, Codex or GitHub Copilot session holding the course (#458)
 
     /// Which Revise item is asking (`reviseUnavailableReason`).
     enum ReviseItem: Equatable {
         case claude
         case codex
+        case copilot
         case localAssistant
     }
 
+    /// The Revise item an outside door's button stands for, so Fix with and
+    /// Plan a Unit make the same click-time check as Revise With ▸.
+    static func reviseItem(for assistant: FixWithAssistant.Assistant) -> ReviseItem {
+        switch assistant {
+        case .claude:
+            return .claude
+        case .codex:
+            return .codex
+        case .copilot:
+            return .copilot
+        }
+    }
+
+    /// What a teacher is told when an outside door did not open.
+    static func couldNotStartSentence(for assistant: FixWithAssistant.Assistant, courseCode: String) -> String {
+        switch assistant {
+        case .claude:
+            return ClaudeCodeLauncher.couldNotStartSentence(courseCode: courseCode)
+        case .codex:
+            return CodexLauncher.couldNotStartSentence(courseCode: courseCode)
+        case .copilot:
+            return CopilotLauncher.couldNotStartSentence(courseCode: courseCode)
+        }
+    }
+
     /// True while ANOTHER live program holds an `assist` lease on this course
-    /// — on the mac, a Claude or Codex session opened from Plantoir, through its
+    /// — on the mac, a Claude, Codex or GitHub Copilot session opened from Plantoir, through its
     /// `Plantoir --mcp-stdio` (#458); on a folder Windows also opens,
     /// `plantoir-mcp`. Read from disk, because that program has a memory of
     /// its own. This process's own lease never counts (`heldElsewhere`), and
     /// neither does one whose owner has gone.
     static func isRevisedElsewhere(folderPath: String, courseCode: String) -> Bool {
+        return revisingAssistant(folderPath: folderPath, courseCode: courseCode) != nil
+    }
+
+    /// Who is revising this course elsewhere, as the busy sentences' slot
+    /// says it (#783): the assistant each live `assist` lease on the course
+    /// records (`WorkLeaseFiles.Holding.assistant`), through
+    /// `AssistWording.outsideAssistantNamed`, so a hold that names none
+    /// gives all three. Nil when nothing holds the course.
+    static func revisingAssistant(folderPath: String, courseCode: String) -> String? {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
         let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
             courseCode: courseCode, coursesDirectory: coursesDirectory
         )
+        var keys: [String?] = []
         for holding in holdings where holding.kind.lowercased() == WorkLeaseFiles.assistKind {
-            return true
+            keys.append(holding.assistant)
         }
-        return false
+        if keys.isEmpty {
+            return nil
+        }
+        return AssistWording.outsideAssistantNamed(keys)
     }
 
     /// The short line naming what stands in the way of STRUCTURAL work on a
     /// course — Rename Course, Add Section…, restoring a backup — or nil when
-    /// it is free: `busyDescription`, and then a Claude or Codex session open on the
+    /// it is free: `busyDescription`, and then a Claude, Codex or GitHub Copilot session open on the
     /// course elsewhere (#458; Windows' `BusyReason`, which includes it).
     ///
     /// **Separate from `busyDescription` on purpose.** That one is also the
@@ -337,19 +433,28 @@ enum CourseActivity {
     /// neither (#458's ruling 2), so they stay on `busyDescription`.
     ///
     /// `revisedElsewhere` is the answer already read, for a menu drawn from
-    /// a window's snapshot (`WorkspaceModel.coursesRevisedElsewhere`); nil
-    /// reads the disk now, which is what every click-time check does.
+    /// a window's snapshot (`WorkspaceModel.coursesRevisedElsewhere`), with
+    /// `revisingAssistant` the snapshot's name for who (nil lists all three);
+    /// nil reads the disk now, which is what every click-time check does.
     static func structuralHoldReason(
         folderPath: String,
         courseCode: String,
-        revisedElsewhere: Bool? = nil
+        revisedElsewhere: Bool? = nil,
+        revisingAssistant: String? = nil
     ) -> String? {
         if let busy = busyDescription(folderPath: folderPath, courseCode: courseCode) {
             return busy
         }
-        let held: Bool = revisedElsewhere ?? isRevisedElsewhere(folderPath: folderPath, courseCode: courseCode)
-        if held {
-            return AssistWording.availableOnceYouFinishRevisingWithClaude
+        if let revisedElsewhere {
+            if revisedElsewhere {
+                return AssistWording.availableOnceYouFinishRevising(
+                    with: revisingAssistant ?? AssistWording.anyOutsideAssistant
+                )
+            }
+            return nil
+        }
+        if let named = CourseActivity.revisingAssistant(folderPath: folderPath, courseCode: courseCode) {
+            return AssistWording.availableOnceYouFinishRevising(with: named)
         }
         return nil
     }
@@ -358,10 +463,10 @@ enum CourseActivity {
     /// words that go under it — or nil when it can (#458).
     ///
     /// Two causes, each said as itself (ruling 7):
-    /// - a Claude or Codex session open on the course elsewhere greys ALL THREE items
+    /// - a Claude, Codex or GitHub Copilot session open on the course elsewhere greys EVERY Revise item
     ///   (Windows' `CanReviseNow`): a second session on one course would
     ///   have two conversations writing the same pages;
-    /// - the in-app assistant open on this course greys the two DOORS, with
+    /// - the in-app assistant open on this course greys the outside DOORS, with
     ///   the sentence that names the window to close — the same symmetry
     ///   Windows gets from its window taking the lease too. The local item
     ///   keeps its own one-window rule (`AssistActivity.reasonItIsUnavailable`).
@@ -371,16 +476,19 @@ enum CourseActivity {
         courseCode: String,
         sectionNumber: Int?,
         revisedElsewhere: Bool,
+        revisingAssistant: String? = nil,
         active: AssistActivity.Session?
     ) -> String? {
         if revisedElsewhere {
-            return AssistWording.availableOnceYouFinishRevisingWithClaude
+            return AssistWording.availableOnceYouFinishRevising(
+                with: revisingAssistant ?? AssistWording.anyOutsideAssistant
+            )
         }
         guard let active else {
             return nil
         }
         switch item {
-        case .claude, .codex:
+        case .claude, .codex, .copilot:
             if active.courseCode.lowercased() == courseCode.lowercased()
                 && FolderIdentity.isSameFolder(active.folderPath, folderPath) {
                 return AssistActivity.closeTheAssistantFirst(active)
@@ -405,6 +513,7 @@ enum CourseActivity {
         store.activePublishes = []
         store.activePreviewBuilds = []
         store.activeCopies = []
+        store.activePlanWork = []
         WorkLeaseRegistry.reconcile()
     }
 }

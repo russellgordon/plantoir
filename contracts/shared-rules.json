@@ -122,15 +122,15 @@
         "why": "GitHub #668. Since Cloudflare Pages is the default for every new course (app-rules.json -> publishingDestinations), the new-course window no longer stops a teacher with no Account ID; the first DEPLOY does, before anything runs. That refusal is now the ordinary path for every new teacher, and a report of 'Deploy said Cannot Deploy Yet' was answered by an empty trail. The other line is 'deploy refused: the Cloudflare Account ID in Settings is not a whole ID'. Both are pinned with the refusal itself in publishingDestinations.deployWithoutAnAccountID. Written where a window is open: the Deploy button and the assistant in that window (one path, SectionDetailView.deployAndWait). A deploy asked for by an MCP client with no window open (AssistSiteWork.deploy) is refused with the same sentence and writes NO line — named here so a report from that path is not read as the trail missing something; a refused SCHEDULE has its own sentence and is not this event either."
       },
       {
-        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… add nothing: their message replaces the greeting.",
+        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…', 'GitHub Copilot…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report. Since #707 a REVISE door's line also says what its greeting said about unit planning, after the door's own words: ' · told about unit planning' for a course with no plan, ' · reminded of 1 unit plan' or ' · reminded of N unit plans' when it named some, and ' · N plan.json could not be read' when plan files were left out (app-rules.json -> outsideAgents.greetingUnitPlans.trail). Fix with Claude… / Fix with Codex… / Fix with GitHub Copilot… add nothing: their message replaces the greeting.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
       {
-        "carries": "the course a Claude or Codex session opened from Plantoir is holding - nothing else: no page, no section, no process id in the sentence",
+        "carries": "the course a session opened from Plantoir through an outside door (Claude, Codex or GitHub Copilot) is holding, and which assistant's session it is, through the same slot the busy sentences use (doorCourseHold.naming: the name its door wrote into the server's environment, or all three when none was); nothing else: no page, no section, no process id",
         "event": "outside session held a course",
-        "line": "a Claude or Codex session started from Plantoir is holding {course} while it is open",
-        "why": "#458 (the mac) and #430 (Windows): while a Claude or Codex session is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold)."
+        "line": "a {assistant} session started from Plantoir is holding {course} while it is open",
+        "why": "#458 (the mac) and #430 (Windows): while a session from an outside door is open on a course, Rename Course, Add Section, restoring a backup and every Revise item wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold). Until #783 the line said 'a Claude or Codex session'; since #783 it names the door's assistant through {assistant} (doorCourseHold.naming), as the busy sentences do (Russell, 2026-11-13)."
       },
       {
         "carries": "course, section, and how long the engine took",
@@ -413,7 +413,7 @@
         "appliesOnWhy": "Permanent for the same reason as the two above: there is no stop to fail where there is nothing to stop."
       },
       {
-        "carries": "what was under way - a publish, or since issue #232 a preview being built - in the words the teacher was shown, and which of the two buttons they pressed",
+        "carries": "what was under way - a publish, or since issue #232 a preview being built, since #351 a copy of a course being saved, and since #863 a course's unit plans being shared, having their password changed or being stopped (each named for what it is, beside any deploys) - in the words the teacher was shown, and which of the two buttons they pressed",
         "event": "quit asked about work under way",
         "why": "BOTH answers are recorded, and 'keep working' is the one that matters most: a teacher who says 'I pressed Quit and it would not quit' is describing that branch and nothing else would explain it. Since issue #232 the line also names a preview being BUILT when that is what was under way (a publish, when there is one, is still what is named), so 'it would not quit while my preview was loading' has the same answer on the trail. The other branch explains a publish that stopped part way with no error anywhere - the teacher was told and went ahead, which is a completely different report from a publish that died on its own. Never asked, and so never recorded, when the Mac is logging out, restarting or shutting down: a question put up there holds up the whole log out."
       },
@@ -583,7 +583,7 @@
         "why": "Added with #397. When students see yesterday's class, the trail shows the teacher was asked and chose, or that the answer could not be carried out. A question never answered changed nothing, and a question not asked (Not Today already said for that class today) is not an action: neither writes a line."
       },
       {
-        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from and, separately, which ones a Claude or Codex session still open made (#458), and how many could not be deleted",
+        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from and, separately, which ones a session from an outside door still open made (#458), and how many could not be deleted",
         "event": "backups deleted",
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
@@ -594,7 +594,7 @@
       },
       {
         "event": "outside assistant worked while a preview was open",
-        "carries": "which course and section, and which of three things an outside assistant (Claude or Codex) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
+        "carries": "which course and section, and which of three things an outside assistant (Claude, Codex or GitHub Copilot) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
         "why": "Added with #433 (2026-10-03). An outside assistant's change while the teacher reads the preview is written and the preview left alone, so the page on screen is the page as it was until the teacher presses Stop Preview, then Preview. 'Claude said it changed the page and my preview still shows the old one', or 'my preview closed by itself', arrives next week with the conversation long closed; this line is what says the preview was left alone on purpose, or closed by a deploy that was asked for. The 'assistant chose a tool' line carries the tool, not what it met."
       },
       {
@@ -1113,9 +1113,9 @@
       },
       {
         "event": "asked an assistant to fix problems",
-        "carries": "the course and section, which assistant (Claude or Codex), how many problems were handed over and their KINDS (sectionProblems.kinds' names), how many of them the opening message names (at most app-rules.json -> outsideAgents.fixWith.mostRowsInThePrompt), and how many rows were left out - unticked, or fixed in the source - never a page, which is the teacher's own name",
+        "carries": "the course and section, which assistant (Claude, Codex or GitHub Copilot, as fixWith.buttons names them), how many problems were handed over and their KINDS (sectionProblems.kinds' names), how many of them the opening message names (at most app-rules.json -> outsideAgents.fixWith.mostRowsInThePrompt), and how many rows were left out - unticked, or fixed in the source - never a page, which is the teacher's own name",
         "line": "{course}/{section} · asked {assistant} to fix {count} problem(s) ({kinds}); named in the message: {named}; left out: {unticked} unticked, {fixed} fixed in the source",
-        "why": "#717 part two (717b): Fix with Claude… / Fix with Codex… on a section's Problems tab. The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, and a report of 'it changed the wrong page' starts there. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for ticking a row."
+        "why": "#717 part two (717b): Fix with Claude… / Fix with Codex… on a section's Problems tab, and Fix with GitHub Copilot… since #783. The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, and a report of 'it changed the wrong page' starts there. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for ticking a row."
       },
       {
         "event": "site built again before deploying",
@@ -1148,9 +1148,9 @@
       },
       {
         "event": "asked an assistant to plan a unit",
-        "carries": "the course and which assistant (Claude or Codex) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
+        "carries": "the course and which assistant (Claude, Codex or GitHub Copilot) - nothing the teacher typed, and nothing from a plan: its title and contents are the teacher's own",
         "line": "{course} · asked {assistant} to plan a unit from the Planning tab",
-        "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
+        "why": "#708: Plan a Unit with Claude… / Plan a Unit with Codex… on a course's empty Planning tab, and Plan a Unit with GitHub Copilot… since #783, (unitPlanning.tab, app-rules.json -> outsideAgents.planAUnit). The door's own 'assistant opened' line says a session started; it cannot say what the session was ASKED to do, as 'asked an assistant to fix problems' argued. Written once the door has opened (a door that did not open says so in its own alert and writes nothing here). No line for looking at a plan, choosing a unit, Back, Forward or Reload: none of them changes anything."
       },
       {
         "event": "looked at a section's curriculum coverage",
@@ -12731,6 +12731,7 @@
         "mac": "Mac",
         "windows": "PC",
         "usedIn": [
+          "app-rules.json:credentialRequests.requests[7].explanation",
           "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
           "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
           "assist-wording.json:wording.obsidianIsNotOnThisMachine",
@@ -14705,6 +14706,331 @@
       "defaultWhy": "The safe answer is the default answer: a teacher who presses Return without reading keeps their work. Quitting anyway is the deliberate one.",
       "keepWorking": "the app stays open and nothing is stopped or released",
       "quitAnyway": "the app goes, and it does not END the publish: that is a separate program and the app deliberately passes it over rather than being the thing that kills a teacher's publish. It will very likely stop on its own anyway, which is why the sentence the teacher reads says quitting COULD leave the publish unfinished and promises neither outcome - on the mac the launcher runs under `set -euo pipefail` and writes to a terminal the app owned, so when the app goes its next line of output fails. Measured 2026-09-19, twice independently: two orphaned children of identical shape, the plain one ran to the end and the `set -e` one died at its next line of output. Whatever is left, the quit path then handles safely - a builder still working is left running and said so on the trail, an idle one is stopped. For a preview being built, quitting ends a section window's preview the way the Stop button does; the assistant's own rebuild with no window is passed over like a publish and may run to its end, since the preview launcher does not stop at its first failed line of output - which is why that sentence says COULD as well. Nothing a student can see is touched either way."
+    },
+    "whileUnitPlansAreShared": {
+      "rule": "A run of the unit plans' launcher (#709) holds the course under a lease of kind publish, so quitting while it runs asks first. It can be doing one of three things a teacher tells apart: SHARING (Share, Share Again, Add a Password, Remove Password), CHANGING THE PASSWORD (Change Password, which saves a new password and sends nothing) and STOPPING SHARING. Since #863 (Russell, 2026-11-13: sharing gets its own wording on quit) the question names each for what it is and never counts it as a section being deployed, and the message says what each could leave part way, and names the class website only when a section is being deployed. The lease cannot tell the three apart, so the app keeps a record beside it of what the run was started to do (on the mac `CourseActivity.PlanWorkRecord`, written by `PlanShareRunner.start` and removed with the lease).",
+      "words": {
+        "question": "Plantoir is still {underWay}.",
+        "deployingOne": "deploying Section {section} of {course}",
+        "deployingSeveral": "deploying {n} sections",
+        "sharingOne": "sharing the unit plans of {course}",
+        "sharingSeveral": "sharing the unit plans of {n} courses",
+        "changingPasswordOne": "changing the password for the unit plans of {course}",
+        "changingPasswordSeveral": "changing the password for the unit plans of {n} courses",
+        "stoppingOne": "stopping the sharing of the unit plans of {course}",
+        "stoppingSeveral": "stopping the sharing of the unit plans of {n} courses",
+        "listSeparator": ", ",
+        "lastSeparator": " and ",
+        "messageOne": "Quitting now could leave it unfinished, with {clauses}.",
+        "messageSeveral": "Quitting now could leave them unfinished, with {clauses}.",
+        "deployClause": "the class website part way updated",
+        "shareClause": "the plans part way shared",
+        "passwordClause": "the new password not saved yet",
+        "stopClause": "the plans' address still working",
+        "deployMessage": "Quitting now could leave it unfinished, with the class website part way updated.",
+        "trailLine": "asked whether to quit while still {underWay}, and the teacher {answer}"
+      },
+      "answers": {
+        "keepWorking": "chose to keep working",
+        "quitAnyway": "chose to quit anyway"
+      },
+      "trailEvent": "quit asked about work under way",
+      "howItIsAssembled": "{underWay} is a list of parts, in this order: the deploys (deployingOne for one section, deployingSeveral for more), then the shares, the password changes and the stops (each kind's One for one course, its Several for more). One part alone; two joined by lastSeparator; three or more with listSeparator between all but the last two. The message takes one clause per part present, in the same order (deployClause, shareClause, passwordClause, stopClause), joined the same way, in messageOne when there is one clause and messageSeveral when there are more. deployMessage is messageOne with deployClause, the sentence deploys alone have always had. {course} is a course's code, {section} a section's number, {n} how many, {answer} one of answers. The buttons are the question's usual two, in buttons' order with keepWorking the default.",
+      "whatEachLeaves": "Measured from the contract's own records of each run stopping early. A SHARE (unitPlanning.share.interruptionCases): once its upload began, the marker stays at sending and the Planning tab shows words.lastShareUnfinished until a Share Again finishes it or a Stop Sharing takes it down; stopped earlier, nothing was sent. So the plans could be part way shared, open or protected, until they are shared again or stopped (the bar offers both): shareClause, which makes no claim about who can open them, because a protected share re-shared with its password stays behind the password. A CHANGE PASSWORD (changePasswordCases): it sends nothing, so the shared plans do not change, and the new password may not have been saved yet: passwordClause. A STOP SHARING (stopSharing): until its delete is confirmed the address still answers, and the marker stays at stopping, so the bar offers Stop Sharing again: stopClause. Each runs deploy.sh on the app's terminal and can stop when the app goes, as a deploy can; hence 'could'.",
+      "casesHow": "given.sharesUnderWay, given.passwordChangesUnderWay and given.stopsUnderWay list the course codes with a plans run of that kind, one run each. given.sectionPublishesUnderWay is how many SECTIONS are being deployed, as sections 1, 2, ... of ADA1O (cases' publishesUnderWay with the plans runs left out, since each is also a publish). previewsBeingBuilt, copiesBeingSaved and quitReason mean what they mean in cases; previewsOpen is left out because an open preview never counts. expectAsk is the decision; when it is true, expectQuestion and expectMessage are the alert's two lines, and expectTrailKept and expectTrailQuit the trail line for each answer, exactly.",
+      "rejected": [
+        "The deploy's message for a share (the first commit's recording of the mac's old words): it told a teacher the class website was part way updated, which a share never touches.",
+        "'anyone with the address could still open the plans' (the first fix round): untrue for protected plans re-shared with their password, for a first share stopped before anything was sent, for a Change Password and for a Stop Sharing (the fix review's MEDIUM).",
+        "Calling a Change Password or a Stop Sharing 'sharing' because they hold the same lease: the run knows what it was started to do, so the app records it beside the lease.",
+        "A remedy inside each clause ('until you share them again or stop sharing them', the second fix round): a message of two or three clauses then misparsed, and the share bar already offers Share Again and Stop Sharing (the second fix review).",
+        "'stopping sharing the unit plans of', which reads as two verbs in a row beside 'sharing the unit plans of'.",
+        "A fixed sentence for every combination: 14 cases would need 10 sentences, and a fourth kind of run would double them. The parts and clauses are fixed text, and only their joining is a rule."
+      ],
+      "cases": [
+        {
+          "name": "one course's unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The moment #863 is about. Windows said a deploy was still going here, and a share is never called a deploy."
+        },
+        {
+          "name": "two courses' unit plans are being shared",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Two shares are two courses' plans, not two sections: until #863 the mac asked about them as 'deploying 2 sections'."
+        },
+        {
+          "name": "a share beside one section's deploy",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Both are named, the deploy first, and the message names what each could leave."
+        },
+        {
+          "name": "a share beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The sections are counted without the share."
+        },
+        {
+          "name": "two shares beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and sharing the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and sharing the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Each part counts its own kind."
+        },
+        {
+          "name": "a share and a preview being built: the share is named",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 1,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans part way shared.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "A publish wins over a preview build (whatCountsAsUnderWay), and a plans run is held as a publish."
+        },
+        {
+          "name": "the Mac is logging out while a share runs",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theMacIsLoggingOutOrShuttingDown"
+          },
+          "expectAsk": false,
+          "why": "neverAskWhen holds for a share as for a publish: a question here would block the log out."
+        },
+        {
+          "name": "a Change Password is under way",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [
+              "SNC2D"
+            ],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still changing the password for the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the new password not saved yet.",
+          "expectTrailKept": "asked whether to quit while still changing the password for the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still changing the password for the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Change Password holds the same lease and sends nothing (changePasswordCases): it is not a share, and the plans are not part way shared."
+        },
+        {
+          "name": "a Change Password beside one section's deploy",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [
+              "SNC2D"
+            ],
+            "stopsUnderWay": [],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the new password not saved yet.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O and changing the password for the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Named after the deploy, with its own clause."
+        },
+        {
+          "name": "a Stop Sharing is under way",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still stopping the sharing of the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still stopping the sharing of the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still stopping the sharing of the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "The opposite of a share, so never called one: the console's own title says stopping sharing, and a Stop Sharing stopped part way leaves the address answering (stopSharing, interruptionCases)."
+        },
+        {
+          "name": "a Stop Sharing beside two sections' deploys",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D"
+            ],
+            "sectionPublishesUnderWay": 2,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying 2 sections and stopping the sharing of the unit plans of SNC2D.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still deploying 2 sections and stopping the sharing of the unit plans of SNC2D, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying 2 sections and stopping the sharing of the unit plans of SNC2D, and the teacher chose to quit anyway",
+          "why": "Named after the deploys, with its own clause."
+        },
+        {
+          "name": "two Stop Sharings",
+          "given": {
+            "sharesUnderWay": [],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "SNC2D",
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still stopping the sharing of the unit plans of 2 courses.",
+          "expectMessage": "Quitting now could leave it unfinished, with the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still stopping the sharing of the unit plans of 2 courses, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still stopping the sharing of the unit plans of 2 courses, and the teacher chose to quit anyway",
+          "why": "Counted as courses, as two shares are."
+        },
+        {
+          "name": "a share of one course and a Stop Sharing of another",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 0,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U.",
+          "expectMessage": "Quitting now could leave them unfinished, with the plans part way shared and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to quit anyway",
+          "why": "Each named for what it is, sharing before stopping, and each clause said."
+        },
+        {
+          "name": "a deploy, a share and a Stop Sharing at once",
+          "given": {
+            "sharesUnderWay": [
+              "SNC2D"
+            ],
+            "passwordChangesUnderWay": [],
+            "stopsUnderWay": [
+              "ICS3U"
+            ],
+            "sectionPublishesUnderWay": 1,
+            "previewsBeingBuilt": 0,
+            "copiesBeingSaved": 0,
+            "quitReason": "theTeacherAskedToQuit"
+          },
+          "expectAsk": true,
+          "expectQuestion": "Plantoir is still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U.",
+          "expectMessage": "Quitting now could leave them unfinished, with the class website part way updated, the plans part way shared and the plans' address still working.",
+          "expectTrailKept": "asked whether to quit while still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to keep working",
+          "expectTrailQuit": "asked whether to quit while still deploying Section 1 of ADA1O, sharing the unit plans of SNC2D and stopping the sharing of the unit plans of ICS3U, and the teacher chose to quit anyway",
+          "why": "Three parts: joined 'A, B and C', in the order deploys, shares, password changes, stops."
+        }
+      ]
     },
     "cases": [
       {
@@ -19420,7 +19746,7 @@
     "replacing": {
       "appliesOn": ["mac", "windows"],
       "note": "Replacing a course on the Reference Courses shelf with a new one, after a warning and a backup (#572, second piece). Offered beside the shelf rule's refusal (codeUniqueWithinAGroup) at three doors: the New Course wizard with Keep this course for reference on, Keep a Copy for Reference..., and an import of ONE course (Import Courses for Reference..., a folder or a backup or archive zip). Russell's ruling of 2026-11-12 (all of #572 in v1.9.4, the release called v1.10.0 from that day and v2.0.0 since 2026-11-13); scope as amended by the plan review (M6: no batch replace at Import; M7: no Restore from Backup submenu on the shelf row; M9: the warning says what the backup is called, where it is, and what restoring it does).",
-      "rule": "In order. (0) The door makes the NEW course first, exactly as it would with nothing in the way, under the hidden staging name of the OLD course's folder (.plantoir-importing-<OLD>), claimed and leased by ReferenceStaging.claim, and already marked, neutralised and locked. Nothing of the old course is touched until it exists. (1) Refuse anything that is not a reference course directly inside courses/ (kept_for_reference read from disk, never from a window's list), a course that is previewing, publishing, being copied, read from by a Copy a Page pass (implementation review L3) or held by a Claude or Codex session (replaceWhileBusy), and a course Obsidian holds (obsidianCases); an aside folder of that name already there refuses too (an earlier replace not yet settled). (2) Back the old course up as an ordinary TEACHER-kind backup (<OLD>_backup_<stamp>.zip, never pruned, listed by both apps). From here to the end of the act the course counts as being copied, so nothing else starts on it. (3) CHECK the backup (backupCheck): its listing must hold every file of the course on disk. (4) Ask (1) again, because the backup took time. (5) Rename the old course aside to .plantoir-replacing-<OLD>, one rename inside courses/, which works on a locked tree and keeps its lock. (6) Rename the new course to <OLD>: the replacement takes the replaced course's FOLDER NAME and so its group. If that fails, the old course is renamed back first, then the new one removed. (7) Remove the aside folder, unlocked first, and the old built website. Every failure before (5) leaves the old course exactly where it was, and every failure removes the staged new course. Nothing on any failure path deletes the old course; its only removal is (7), after the new one is in place with a checked backup on disk. A quit or a crash between (5) and (7) leaves the aside folder, which the next reading of the working folder settles (sweepCases).",
+      "rule": "In order. (0) The door makes the NEW course first, exactly as it would with nothing in the way, under the hidden staging name of the OLD course's folder (.plantoir-importing-<OLD>), claimed and leased by ReferenceStaging.claim, and already marked, neutralised and locked. Nothing of the old course is touched until it exists. (1) Refuse anything that is not a reference course directly inside courses/ (kept_for_reference read from disk, never from a window's list), a course that is previewing, publishing, being copied, read from by a Copy a Page pass (implementation review L3) or held by a session from an outside door (replaceWhileBusy), and a course Obsidian holds (obsidianCases); an aside folder of that name already there refuses too (an earlier replace not yet settled). (2) Back the old course up as an ordinary TEACHER-kind backup (<OLD>_backup_<stamp>.zip, never pruned, listed by both apps). From here to the end of the act the course counts as being copied, so nothing else starts on it. (3) CHECK the backup (backupCheck): its listing must hold every file of the course on disk. (4) Ask (1) again, because the backup took time. (5) Rename the old course aside to .plantoir-replacing-<OLD>, one rename inside courses/, which works on a locked tree and keeps its lock. (6) Rename the new course to <OLD>: the replacement takes the replaced course's FOLDER NAME and so its group. If that fails, the old course is renamed back first, then the new one removed. (7) Remove the aside folder, unlocked first, and the old built website. Every failure before (5) leaves the old course exactly where it was, and every failure removes the staged new course. Nothing on any failure path deletes the old course; its only removal is (7), after the new one is in place with a checked backup on disk. A quit or a crash between (5) and (7) leaves the aside folder, which the next reading of the working folder settles (sweepCases).",
       "why": "GitHub #572: 'the newer ICS3U example instead of last year's', within a group, carefully. The worst fault is a teacher's reference course gone with no way back: deleted or half-moved while the new one failed, a backup that does not hold it, or a roll-back that fails silently. Making the new course first means a failed setup, copy or import costs nothing. The checked backup is plan review M3: a zip nobody opened is not a backup, and every zip of a course leaves out names (build, out, dist, node_modules...) that can be a teacher's own folders in a course an older Plantoir or Windows made. The Obsidian refusal is M2: the folder is swapped, and Obsidian's file watcher is anchored to it. The old folder name is what makes Restore the ordinary in-place restore: it archives the replacement and puts the old course back; a new folder name would land the restored course beside the new one in the same group, which codeUniqueWithinAGroup forbids.",
       "whereOffered": [
         "The New Course wizard, with Keep this course for reference on: beside the shelf rule's sentence under the course code.",
@@ -22577,7 +22903,7 @@
         "#433, proposed in the plan and accepted by the director, then REVERSED by Russell 2026-10-03 23:00: holding an outside deploy_section back while a preview is only being served (because the deploy ends that section's open preview). His words: 'if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running.' The deploy goes ahead and the success sentence says the preview may have closed (wording.deployClosedAnOpenPreview)."
       ],
       "outsideChanges": {
-        "rule": "What an OUTSIDE assistant (Claude or Codex, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases. THE RESIDUAL, named the way takeThenCheck names its own: an outside change looks at the leases ONCE, at the door, and takes no lease of its own, so nothing it writes is visible to another program. A Deploy pressed in the window while a multi-page outside change is still being written can therefore build and deploy a half-applied change (some pages written, others not yet). Not new with #433: an outside write took no lease before it either. Accepted rather than closed, because a page write lasts milliseconds against a deploy's minutes and closing it means a new lease kind both apps would have to read; a deploy run again after the change has finished carries all of it.",
+        "rule": "What an OUTSIDE assistant (Claude, Codex or GitHub Copilot, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases. THE RESIDUAL, named the way takeThenCheck names its own: an outside change looks at the leases ONCE, at the door, and takes no lease of its own, so nothing it writes is visible to another program. A Deploy pressed in the window while a multi-page outside change is still being written can therefore build and deploy a half-applied change (some pages written, others not yet). Not new with #433: an outside write took no lease before it either. Accepted rather than closed, because a page write lasts milliseconds against a deploy's minutes and closing it means a new lease kind both apps would have to read; a deploy run again after the change has finished carries all of it.",
         "whatIsSaid": {
           "changeHeldBack": "wording.courseIsBeingBuilt - nothing was written, and it says so",
           "changeWrittenWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages, where the preview would have been refreshed - never a refusal word (busy, couldn't, wait): the change succeeded",
@@ -22731,7 +23057,7 @@
         {"name": "another program is publishing (build and publish held): declined", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}, {"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "a publish lease alone still declines a build: it uploads what its build wrote", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "ANOTHER program's preview declines a build here (#156, stricter than Windows' 'only build blocks') - a build ends that section's serving preview, and a preview is the teacher's live work", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "preview", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
-        {"name": "an assist lease never declines a build (a Claude or Codex session holding its course - Windows' plantoir-mcp since #430, the mac's Plantoir --mcp-stdio since #458 - only greys the Revise items and structural work: doorCourseHold)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
+        {"name": "an assist lease never declines a build (a session from an outside door holding its course - Windows' plantoir-mcp since #430, the mac's Plantoir --mcp-stdio since #458 - only greys the Revise items and structural work: doorCourseHold)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "an import lease is about a staging folder, never a build", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "import", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "a build lease whose owner is gone is ignored (workLeases.liveness decides who is gone)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": false}], "expect": "allowed"},
         {"name": "a build of ANOTHER course is not in the way", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "MPM2D", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
@@ -25073,7 +25399,7 @@
     ]
   },
   "previewWhileItsSectionDeploys": {
-    "rule": "A preview of a section cannot start while that same section is being deployed, whoever started the deploy: the same window, another window of the app, the in-app assistant, an outside assistant (Revise with Claude or Codex), a deploy set for later, or a command line. The preview is refused before anything is changed, with a sentence that says why. A preview of ANOTHER section of the same course is decided as it was before this rule: allowed from the same copy of the app, and refused by the other program's course-level work lease (workLeases) when another program deploys.",
+    "rule": "A preview of a section cannot start while that same section is being deployed, whoever started the deploy: the same window, another window of the app, the in-app assistant, an outside assistant (Revise with Claude, Codex or GitHub Copilot), a deploy set for later, or a command line. The preview is refused before anything is changed, with a sentence that says why. A preview of ANOTHER section of the same course is decided as it was before this rule: allowed from the same copy of the app, and refused by the other program's course-level work lease (workLeases) when another program deploys.",
     "why": "GitHub #381, split from #378 on 2026-09-29. Russell's decision 4 on #378: 'A preview of a section cannot start AT ALL while that same section is being deployed — from this window or another.' A preview builds into the same folder a deploy is uploading from, and a preview that has to set the folder up again removes the workspace a deploy is about to run in. Read from code on 2026-09-29 (the #378 plan review), the mac refused only four of the six ways in: the same window only through its disabled Preview button (startPreview itself asked nothing, and the in-app assistant and the restart path call it directly); another window of the app and the in-app assistant's windowless deploy NOT AT ALL (startPreview read other programs' leases, never this program's own publishes); a deploy set for later and an outside assistant through their work leases; a command line NOT AT ALL, either way round (a bare launcher writes no lease, and preview.sh checked nothing).",
     "layers": {
       "window": "The one function every preview a window starts goes through (mac: SectionDetailView.startPreview; the button, the in-app assistant and the restart path all call it) asks, FIRST, before any lease is taken or anything is stopped or started, whether THIS copy of the app is deploying that section (mac: CourseActivity.sectionPublishIsRunning, the record the window's Deploy and the assistant's windowless deploy both write). It shows sentences.window under the title 'Cannot Preview Yet' and writes the trail line.",
@@ -25121,7 +25447,7 @@
         "why": "The same gap: the assistant's windowless deploy writes the same in-process record and no lease another window reads."
       },
       {
-        "name": "an outside assistant (Revise with Claude or Codex) is deploying the section",
+        "name": "an outside assistant (Revise with Claude, Codex or GitHub Copilot) is deploying the section",
         "deployer": "outsideAssistant",
         "previewFrom": "window",
         "section": "same",
@@ -26632,11 +26958,13 @@
   },
   "doorCourseHold": {
     "issue": "#458 (the mac, 2026-10-07), matching Windows' #430 (v1.4.3).",
-    "rule": "Both doors name the course they were opened from to their server's environment, as PLANTOIR_DOOR_COURSE (app-rules.json -> outsideAgents.doorCourseVariable): the Claude door in its MCP configuration's env, the Codex door as a fifth -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE override (each agent's serverEnvironment). The server - Plantoir --mcp-stdio on the mac, plantoir-mcp on Windows - takes an assist lease on that course for the life of the session, WITHOUT locking to it: the session still reaches every course in the folder (#430). The lease is what keeps the protections a session opened from Plantoir had before #430: the backup its conversation made is kept (#283), a second session on the course is refused, and structural work on the course waits.",
+    "rule": "Every outside door names the course it was opened from to its server's environment, as PLANTOIR_DOOR_COURSE (app-rules.json -> outsideAgents.doorCourseVariable): the Claude door in its MCP configuration's env, the Codex door as a fifth -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE override, the GitHub Copilot door in its connection file's env (#783) (each agent's serverEnvironment). The server - Plantoir --mcp-stdio on the mac, plantoir-mcp on Windows - takes an assist lease on that course for the life of the session, WITHOUT locking to it: the session still reaches every course in the folder (#430). The lease is what keeps the protections a session opened from Plantoir had before #430: the backup its conversation made is kept (#283), a second session on the course is refused, and structural work on the course waits.",
     "whichDoors": {
       "claude": true,
       "codex": true,
-      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
+      "copilot": true,
+      "copilotWhy": "#783 (2026-11-13): the third door holds its course as the other two do, written as env in mcp-{course}-copilot.json. Its sentences are the same ones, which since #783 name the assistant holding the course (naming, below).",
+      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences named both ('Claude or Codex') until #783. Since #783 every door also names itself (app-rules.json -> outsideAgents.doorAssistantVariable) and the sentences name the assistant holding the course (naming, below; Russell, 2026-11-13). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a server started by hand does.",
@@ -26689,7 +27017,7 @@
     },
     "holds": {
       "backups": "Each backup the session's conversation made is recorded beside its lease (file-formats.json -> heldBackupRecord); a delete keeps it while that process holds a live assist lease on any course in the folder. Said with assist-wording.json -> backupKeptForAClaudeSession / backupsKeptForAClaudeSession before a delete-several, and finishTheClaudeSessionToDeleteItsBackup(s) after one, or at once for the single Delete Backup. A backup the in-app assistant window holds keeps its own sentences - the two are told apart, never merged.",
-      "reviseItems": "All three Revise items on the course - Revise with Claude, Revise with Codex, Revise with Local AI Assistant - are greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
+      "reviseItems": "Every Revise item on the course - Revise with Claude, Revise with Codex, Revise with GitHub Copilot (#783), Revise with Local AI Assistant - is greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
       "structuralWork": [
         "Rename",
         "Add Section",
@@ -26709,7 +27037,46 @@
       "quit": "quittingWhileWorkIsUnderWay counts only this app's own work, so another program's assist lease never makes quitting ask - and the app's quit removes only its own leases, never a session's.",
       "update": "appUpdates.mayNotInstallWhile.doesNotCount: 'a lease of any other kind (assist, import)'."
     },
-    "reviseCasesNote": "item is claude, codex or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
+    "naming": {
+      "rule": "Russell, #783, 2026-11-13: each busy sentence names the assistant that is working on the course, through ONE slot, {assistant}, never a list to reword when a door is added. The nine assist-wording.json keys availableOnceYouFinishRevisingWithClaude, finishTheClaudeSessionFirst, claudeIsRevisingTheCourseRename, claudeIsRevisingTheCourseRestore, claudeIsRevisingTheCourseAddSection, backupKeptForAClaudeSession, backupsKeptForAClaudeSession, finishTheClaudeSessionToDeleteItsBackup and finishTheClaudeSessionToDeleteItsBackups carry it, and so does activityTrail.mustRecord -> 'outside session held a course'. Each door writes its key into its server's environment (app-rules.json -> outsideAgents.doorAssistantVariable), and the server writes it as its assist lease's fifth line (file-formats.json -> workLease.lines), set and cleared with the lease. A reader fills the slot from the keys of the live assist leases on the course: one name when they all name the same door; the names of different doors in the order Claude, Codex, GitHub Copilot joined with 'or' (a comma before the last but one); and anyAssistant when any lease names no door (an older Plantoir, Windows before it writes one, a key no door has) or the answer has not been read. For a kept backup, the keys are those of the sessions that made the backups the sentence counts.",
+      "names": {
+        "claude": "Claude",
+        "codex": "Codex",
+        "copilot": "GitHub Copilot"
+      },
+      "namesWhy": "The names teachers see in the menus (each agent's menuItem without its ellipsis). 'GitHub Copilot', never bare 'Copilot' (Russell, #783: not Microsoft 365 Copilot).",
+      "anyAssistant": "Claude, Codex or GitHub Copilot",
+      "anyAssistantWhy": "What the sentences said before #783 ('Claude or Codex') with the third door added: true of any hold, so a hold that cannot say which is never named wrongly.",
+      "rejected": [
+        "Naming no assistant ('an assistant session opened from Plantoir'), ruled the same morning and reversed the same day (Russell, 2026-11-13): 'the assistant' is what Plantoir already calls its own window (AssistActivity.closeTheAssistantFirst), and a sentence naming nobody no longer told the teacher where to look.",
+        "Reading which program the server's parent is from the process table: it would name the program, not the door, and fails for a server started by hand; the door already knows which it is.",
+        "A new line on every lease kind, or a sidecar file beside the lease: the fifth line on the assist lease alone is set and cleared with the hold itself, and Windows' readers, which read the first lines by position, are not disturbed."
+      ],
+      "cases": [
+        {"name": "a GitHub Copilot session holds the course", "keys": ["copilot"], "expect": "GitHub Copilot"},
+        {"name": "a Claude session holds the course", "keys": ["claude"], "expect": "Claude"},
+        {"name": "a Codex session holds the course", "keys": ["codex"], "expect": "Codex"},
+        {"name": "the hold names no assistant (an older Plantoir, or Windows before it writes one)", "keys": [null], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "a key no door has is named as none", "keys": ["gemini"], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "the key is read without regard to case or space", "keys": [" Copilot "], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: a key in capitals is the same door", "keys": ["COPILOT"], "expect": "GitHub Copilot"},
+        {"name": "#783 fix review H1: two spellings of one door are one name", "keys": ["Codex", " codex"], "expect": "Codex"},
+        {"name": "#783 fix review H1: two doors, spelt loosely, in menu order", "keys": [" Copilot ", "CLAUDE"], "expect": "Claude or GitHub Copilot"},
+        {"name": "#783 fix review H1: an empty key names none", "keys": [""], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "#783 fix review H1: a key of spaces names none", "keys": ["   "], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "all three doors: all three, in menu order", "keys": ["copilot", "codex", "claude"], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "nothing read: all three", "keys": [], "expect": "Claude, Codex or GitHub Copilot"},
+        {"name": "two holds of the same door: one name", "keys": ["copilot", "copilot"], "expect": "GitHub Copilot"},
+        {"name": "holds of two doors: both, in menu order", "keys": ["copilot", "claude"], "expect": "Claude or GitHub Copilot"},
+        {"name": "one hold names a door and another names none: all three", "keys": ["codex", null], "expect": "Claude, Codex or GitHub Copilot"}
+      ],
+      "leaseCases": [
+        {"name": "a door's assist lease records its key as its fifth line", "kind": "assist", "assistant": "copilot", "fifthLine": "copilot"},
+        {"name": "an assist lease from a server no door named has four lines", "kind": "assist", "assistant": null, "fifthLine": null},
+        {"name": "only an assist lease carries it", "kind": "build", "assistant": "copilot", "fifthLine": null}
+      ]
+    },
+    "reviseCasesNote": "item is claude, codex, copilot or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. revisingAssistant, where given, is the door key the holding lease records (naming); absent, the hold names none and the slot is naming.anyAssistant. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
     "reviseCases": [
       {
         "name": "nothing open: every item may be used",
@@ -26719,21 +27086,29 @@
         "expect": null
       },
       {
-        "name": "a Claude or Codex session holds the course: the Claude door is greyed",
+        "name": "a session from an outside door holds the course: the Claude door is greyed",
         "item": "claude",
         "revisedElsewhere": true,
         "active": null,
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "a Claude or Codex session holds the course: the Codex door is greyed too",
+        "name": "a session from an outside door holds the course: the Codex door is greyed too",
         "item": "codex",
         "revisedElsewhere": true,
         "active": null,
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "a Claude or Codex session holds the course: the local assistant is greyed too",
+        "name": "a session from an outside door holds the course: the GitHub Copilot door is greyed too (#783)",
+        "item": "copilot",
+        "revisedElsewhere": true,
+        "revisingAssistant": "copilot",
+        "active": null,
+        "expect": "availableOnceYouFinishRevisingWithClaude"
+      },
+      {
+        "name": "a session from an outside door holds the course: the local assistant is greyed too",
         "item": "local",
         "revisedElsewhere": true,
         "active": null,
@@ -26752,6 +27127,16 @@
       {
         "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door, saying WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}') since #468.",
         "item": "codex",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "ICS3U",
+          "section": 2
+        },
+        "expect": "closeTheAssistantFirst"
+      },
+      {
+        "name": "the in-app assistant is open on this course: the GitHub Copilot door names that window (#783)", "appliesOn": ["mac"], "onWindows": "As the Codex case above: on Windows the window's own lease greys the GitHub Copilot door, saying WindowHoldWording.AvailableOnceTheAssistantCloses.",
+        "item": "copilot",
         "revisedElsewhere": false,
         "active": {
           "course": "ICS3U",
@@ -26815,7 +27200,7 @@
     "afterwardsInTheLinksChecklist": "A class hidden at Deploy is a hidden class like any other: when a later build offers the links checklist (#379) it may appear among the classes not yet published, UNTICKED, as every class row starts. Publishing it from there is a choice, so the class is recorded as kept at its date (file-formats.json -> laterClassesKept) and the next Deploy does not offer to hide it again - without that, the two questions undid each other: hidden at Deploy, its link dead, offered back by the checklist, published, flagged again (#457 batch B's implementation review, finding 2).",
     "rejected": [
       "Asking on a scheduled deploy: there is nobody at half six to answer, and a deploy held for a question fails exactly the teacher who set it up to run unattended.",
-      "Refusing the outside assistant for ever: without the kept record, a teacher who posts a week ahead on purpose could never deploy from Claude or Codex - the same reason wording.deployNeedsAnAnswer ends 'after that it can be deployed from here'.",
+      "Refusing the outside assistant for ever: without the kept record, a teacher who posts a week ahead on purpose could never deploy from Claude, Codex or GitHub Copilot - the same reason wording.deployNeedsAnAnswer ends 'after that it can be deployed from here'.",
       "Asking before deployAndWait's refusals: a teacher could hide pages - a backup and a write - and then be refused, against the rule that a refusal never follows a change (the plan review's finding 6).",
       "Asking after the preview is stopped, in the assistant's deploy: a Cancel would leave the teacher's preview gone for nothing.",
       "Hiding with a quiet write of its own: the unticked classes go through Hide Pages...'s own call, so they are backed up, undoable and hidden by the same rule (pages only they link to go with them) as anywhere else.",
@@ -26861,14 +27246,14 @@
       "sheetIsUp": "A sheet or alert is attached to the window in front, or the app is in a modal session. Greys EVERY item here, Open Working Folder… and Open Recent included: with a sheet up they would open a second window behind it.",
       "row": "What is selected in the sidebar: none, course, section, backup, archived, allBackups.",
       "keptForReference": "The selected course, or the selected section's course, is kept for reference.",
-      "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a Claude or Codex session is open on it in another program (#458).",
+      "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a session from an outside door is open on it in another program (#458).",
       "busy": "The course is previewing or deploying.",
       "copying": "A copy of the course is being zipped — a backup, or the archive before a restore or removal (#351).",
       "deploying": "A deploy of the course is running.",
       "hasSchedule": "The selected section has a deploy scheduled.",
       "hasStartOfYearUndo": "The selected section holds a start-of-the-year undo (#96).",
       "hasLinksOffer": "The selected section's last build left a links checklist (#379).",
-      "reviseBlocked": "Which Revise targets are greyed for a reason (#458): claude, codex, localAssistant.",
+      "reviseBlocked": "Which Revise targets are greyed for a reason (#458): claude, codex, copilot (#783), localAssistant.",
       "obsidianInstalled": "Obsidian is installed.",
       "settingsMaySave": "Course Settings is showing with an unsaved change Save would write.",
       "settingsMayRevert": "Course Settings is showing with an unsaved change Revert would discard.",
@@ -26900,6 +27285,7 @@
       "restoreFromBackup",
       "courseReviseWithClaude",
       "courseReviseWithCodex",
+      "courseReviseWithCopilot",
       "courseReviseWithLocalAssistant",
       "courseOpenInObsidian",
       "courseShowInFinder",
@@ -26917,6 +27303,7 @@
       "publishPagesLinksLeadTo",
       "sectionReviseWithClaude",
       "sectionReviseWithCodex",
+      "sectionReviseWithCopilot",
       "sectionReviseWithLocalAssistant",
       "sectionOpenInObsidian",
       "sectionShowInFinder",
@@ -26973,6 +27360,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27000,6 +27388,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27029,6 +27418,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "newCourse",
@@ -27053,6 +27443,7 @@
           "courseOpenInObsidian",
           "courseReviseWithClaude",
           "courseReviseWithCodex",
+          "courseReviseWithCopilot",
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
@@ -27072,7 +27463,8 @@
           "structuralHold": true,
           "reviseBlocked": [
             "claude",
-            "codex"
+            "codex",
+            "copilot"
           ]
         },
         "enabled": [
@@ -27126,6 +27518,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27179,6 +27572,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionShowInFinder",
           "undoGettingReady"
         ]
@@ -27209,6 +27603,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27375,6 +27770,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder",
           "undoLastChange"
@@ -27412,6 +27808,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -27474,6 +27871,7 @@
           "sectionOpenInObsidian",
           "sectionReviseWithClaude",
           "sectionReviseWithCodex",
+          "sectionReviseWithCopilot",
           "sectionReviseWithLocalAssistant",
           "sectionShowInFinder"
         ]
@@ -36314,7 +36712,7 @@
       "Only a heading that is a child of the page itself opens a section; a success-criteria heading inside a callout or a list does not.",
       "A dash the site's parser turns into a typographic one (-- into –) in a heading is a different word to the course's list.",
       "A page reached only through another page, or only from a hidden or undated class, is under Other pages, not under a class (the date pass's own rule).",
-      "None of the 39 example courses has a task item under one of the default headings (104 headings match, all over tables; measured on #545's plan review), so no example course gets the page until its pages say so.",
+      "One of the 39 example courses has task items under one of the default headings: GLC2O, whose seven task pages each close with tick boxes under a Success criteria heading since #878 (2026-11-13; measured with my_progress.page_has_counted_items over every page of every payload: GLC2O's seven, its held-back task template, and no other), so a course made from GLC2O gets the page. The other 38 have none (104 headings matched on #545's plan review, all over tables), so none of them gets the page until its pages say so.",
       "Class dates are in the manifest and not on the page (ruling Q6); the date and unit filter is #595's.",
       "Three shapes the two readings still read differently, each said on a `plantoir: note:` line (notes) when a real page has it (#545 implementation review 3, measured): a heading written in HTML (`<h2>Success criteria</h2>`) - the site counts its section, the build's gate does not; a task line inside a `$$` maths block - the gate counts it, the site draws maths; a callout whose TITLE holds `[!quiz]` - the gate reads it as a quiz, the site does not."
     ],
@@ -37206,14 +37604,15 @@
       "a summary of each plan in the greeting: Russell, 2026-11-01, names and where to see them, never contents"
     ],
     "tab": {
-      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code or Codex is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
+      "rule": "The course page (#708) gets two tabs, Settings and Planning, in the thin bar a section's Website | Problems tabs use, while Claude Code, Codex or GitHub Copilot is installed (tabCases). Settings is what the course page has always shown. Only the chosen tab is in the window: with Planning showing, the settings form is not drawn at all, so no setting can take a key, be reached by Tab or be read by VoiceOver (708 implementation and fix reviews, H1: a form drawn under the plan, even disabled, kept the keyboard in its footer box). What the teacher typed and has not saved lives in the course's settings model and survives the switch; a switch clears the window's Undo, so Undo on Planning does nothing to Settings; Save on Planning saves the settings as the teacher left them, and Revert is not offered there. Planning shows the course's planning folder on this Mac: a unit popup (choiceCases), Back, Forward, Reload and Open in Browser (openInBrowser), and the page chosen; or, when there is nothing to show, an empty tab that offers to plan a unit with each assistant installed (app-rules.json -> outsideAgents.planAUnit). Since #709 the share bar sits at the foot of the tab (unitPlanning.share).",
       "tabCases": {
-        "rule": "claude and codex say which assistant is installed (OutsideAssistantPresence on the mac); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
+        "rule": "claude, codex and copilot say which assistant is installed (OutsideAssistantPresence on the mac; copilot since #783, and a reader that predates it treats it as false); referenceCourse whether the course is kept for reference; plans whether the course has any. expect is shown (both tabs in the bar) or absent (the course page exactly as before #708: no tabs, no word about planning). Absent, never disabled (Russell, 2026-11-01). Whether plans exist never matters: the empty tab is the offer. A course kept for reference shows its facts rather than its settings, and gets no tabs whatever is installed.",
         "cases": [
           {
             "name": "neither assistant, no plans",
             "claude": false,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": false,
             "expect": "absent"
@@ -37222,6 +37621,7 @@
             "name": "neither assistant, with plans",
             "claude": false,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "absent"
@@ -37230,6 +37630,7 @@
             "name": "Claude only, no plans",
             "claude": true,
             "codex": false,
+            "copilot": false,
             "referenceCourse": false,
             "plans": false,
             "expect": "shown"
@@ -37238,6 +37639,7 @@
             "name": "Codex only, with plans",
             "claude": false,
             "codex": true,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "shown"
@@ -37246,14 +37648,34 @@
             "name": "both",
             "claude": true,
             "codex": true,
+            "copilot": false,
             "referenceCourse": false,
             "plans": true,
             "expect": "shown"
           },
           {
+            "name": "GitHub Copilot only, no plans (#783)",
+            "claude": false,
+            "codex": false,
+            "copilot": true,
+            "referenceCourse": false,
+            "plans": false,
+            "expect": "shown"
+          },
+          {
+            "name": "a course kept for reference, GitHub Copilot installed (#783)",
+            "claude": false,
+            "codex": false,
+            "copilot": true,
+            "referenceCourse": true,
+            "plans": false,
+            "expect": "absent"
+          },
+          {
             "name": "a course kept for reference, both installed",
             "claude": true,
             "codex": true,
+            "copilot": false,
             "referenceCourse": true,
             "plans": true,
             "expect": "absent"
@@ -41001,6 +41423,28 @@
       { "name": "a long value is cut", "header": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDE", "body": "Inter", "headerFile": "Inter.ttf", "bodyFile": "Inter.ttf", "told": ["ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ…"] }
     ]
   },
+  "typescriptStrings": {
+    "note": "GitHub #871 (v2.0.0). Every value from a course's settings that the build writes INSIDE a string in a TypeScript file of the site: the title line (the emoji, the course code or a club's short label `custom_short_name`) and `locale`, `baseUrl` (a custom domain), the three font names and the colour values in quartz.config.ts, and `footer_html` in Footer.tsx. Written as typed, a double quote ended the string and the site did not build, a backslash was read as an escape (C:\\Club showed as C:Club, a backslash before a u that is not a hex escape stopped the build), and a dollar brace in the footer's template literal ran as code. Shared Python only: both apps write the settings and neither writes these files, so Windows inherits the rule with its builds.",
+    "rule": "The value is written as a JSON string (`json.dumps(value, ensure_ascii=False)`), which is a valid JavaScript string literal that reads back as exactly the value: a double quote, a backslash and every control character are escaped, and every other character is written as itself. A footer's `</` is then written `<\\/`, the same text in a JavaScript string, so the footer cannot close the `<footer>` element the next build looks for. The patterns that find a value from an earlier build match a whole string literal, escapes included, so a value written escaped is replaced whole. Nothing is cleaned here: removing control characters is `courseNameCharacters`' rule and is applied, where it is applied, before this.",
+    "whereItIsApplied": "`scripts/build_site.py` -> `typescript_string`, called by `update_page_title`, `patch_quartz_locale`, `patch_quartz_base_url`, `patch_typography_fonts` (through `_escape_font`), `format_colors_block` (and `apply_color_scheme_to_quartz_config`'s fallback, which inserts that block where the config has none) and `inject_custom_footer_components`. The front page's title goes through YAML (`set_landing_title`, python-frontmatter) and the hidden names into quartz.layout.ts through `json.dumps` already, and were not changed. Pinned by `scripts/test_typescript_strings.py`, which every case goes through, which `verify.sh` runs by name and which Windows' PythonToolchainTests discovers.",
+    "rejected": "Refusing a quote or a backslash in the short label: a teacher may want one (a club called \"The Quad\"), and the short label's field is free text on both apps. Escaping only the double quote, as `_escape_font` did: the backslash was then read as an escape. Keeping the footer's template literal and escaping a dollar brace too: a plain string literal has fewer special characters, and multi-line HTML reads back the same.",
+    "cases": [
+      { "name": "a double quote in a club's short label", "raw": "Chess \"Club\"", "written": "\"Chess \\\"Club\\\"\"" },
+      { "name": "a backslash", "raw": "C:\\Club", "written": "\"C:\\\\Club\"" },
+      { "name": "a backslash at the end, which would escape the closing quote", "raw": "Club\\", "written": "\"Club\\\\\"" },
+      { "name": "a backslash before a u that is not a hex escape", "raw": "C:\\users", "written": "\"C:\\\\users\"" },
+      { "name": "a backslash and a quote together", "raw": "A\\\"B", "written": "\"A\\\\\\\"B\"" },
+      { "name": "a backtick and a dollar brace, which a template literal would run", "raw": "Back`tick ${x}", "written": "\"Back`tick ${x}\"" },
+      { "name": "a single quote is kept as it is", "raw": "Teacher's Club", "written": "\"Teacher's Club\"" },
+      { "name": "a line feed, for a value no rule has cleaned", "raw": "Robotics\nClub", "written": "\"Robotics\\nClub\"" },
+      { "name": "a tab", "raw": "A\tB", "written": "\"A\\tB\"" },
+      { "name": "a NUL", "raw": "A\u0000B", "written": "\"A\\u0000B\"" },
+      { "name": "an emoji and accents are written as themselves", "raw": "📚 Échecs", "written": "\"📚 Échecs\"" },
+      { "name": "the teacher emoji, held together by U+200D", "raw": "👩\u200d🏫 Club", "written": "\"👩\u200d🏫 Club\"" },
+      { "name": "a closing tag in the footer", "raw": "<p>Made by us</p>", "written": "\"<p>Made by us</p>\"", "footerWritten": "\"<p>Made by us<\\/p>\"" },
+      { "name": "an empty value", "raw": "", "written": "\"\"" }
+    ]
+  },
   "courseNameCharacters": {
     "note": "GitHub #780 (v2.0.0), ruled by Russell on 2026-11-12: no control character is legitimate in a course's name. `course_config.json` -> `course_name` is a JSON string, and JSON can carry any code point as an escape, so a script, a hand edit or another tool can put a NUL, a line break or a right-to-left override in it. Both apps clean the name where they READ it, by this one rule, and the shared Python does the same, so no reader is left to remember on its own. The same rule cleans every line the apps write on the breadcrumb trail (`trailLines`).",
     "rule": "Work on Unicode code points (scalars), never on what a reader sees as one character and never on UTF-16 units. Every code point in `spacedOut` becomes ONE space (U+0020); every code point in `removed` is taken out; every other code point is kept as it is. Nothing is trimmed and nothing is collapsed. Applying the rule twice gives the same result as applying it once (`idempotent`).",
@@ -41022,12 +41466,69 @@
     ],
     "noTrimming": "A control at the end becomes a trailing space and the space is kept. The mac's Course Settings field reads and writes the name through this rule on every keystroke, so a rule that trimmed would eat the space a teacher types before \"11\" one keystroke at a time. A reader that wants the ends trimmed trims AFTER cleaning: `build_site.computed_landing_title` does, and the New Course window does before it decides whether the name is empty.",
     "whereItIsApplied": {
-      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule.",
-      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780.",
-      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it.",
+      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule. Since #822 (Russell, 2026-11-13: 'fix both labels') the same rule cleans the two other teacher-typed labels where the app reads them: `CourseConfiguration.customShortName` (a club's short label, getter AND setter) and `emoji(forSection:)` / `setEmoji(_:forSection:)` (each section's label beside the title, cleaned before it is read as one emoji), `CourseConfiguration.write(to:)` through `cleanLabels(in:)`, so every Save writes both cleaned, and the New Course window's short label and section labels before it writes them.",
+      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780. Owed for #822: `CourseConfiguration.CustomShortName` and the section labels, where Windows reads and writes them, planned by Windows under #822 itself.",
+      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it. Since #822, also `build_site.resolve_header_label` (the short label, then trimmed, falling back to the code when nothing is left) and `build_site.resolve_section_emoji` (each section's label and the legacy course-wide `emojis.default`, then trimmed, falling back to the book emoji), both written into the `pageTitle` line of `quartz.config.ts` where a line feed breaks the line; `social_card.generate_card` (the section's label on the card); and `setup_course.setup_course` and `select_header_emojis_for_sections` (the saved short label and section labels before they are offered again, and a typed short label before it is written). Cases: `labelCases`.",
       "notHere": "Windows' `OutsideDoor.Clean` (#736) stays as it is: it also cleans the page names and the working folder an outside door carries, which are not course names, and it is the last layer before `cmd`. The file is not rewritten when a bad name is read: the next Save of ANY setting writes the cleaned name (the mac's `CourseConfiguration.write(to:)` cleans the key whatever was edited; a per-key merge would otherwise keep the raw name from the file)."
     },
     "idempotent": true,
+    "labelCasesHow": "Each case is a course_config.json (config) and a section. expectHeaderLabel is what build_site.resolve_header_label gives for it and expectSectionLabel what build_site.resolve_section_emoji gives, both written into the pageTitle line; a key that is absent is not checked. On the mac, CourseConfiguration.customShortName reads the short label cleaned and untrimmed, and emoji(forSection:) reads the section label cleaned (the legacy emojis.default is not read there).",
+    "labelCases": [
+      {
+        "name": "a short label with a line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "Code\nClub"},
+        "section": 1,
+        "expectHeaderLabel": "Code Club"
+      },
+      {
+        "name": "a short label with an override, a NUL and a trailing line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "\u202eRobots\u0000\n"},
+        "section": 1,
+        "expectHeaderLabel": "Robots"
+      },
+      {
+        "name": "a short label that is only controls falls back to the code",
+        "config": {"course_code": "CODING", "custom_short_name": "\n\u0000\u2066"},
+        "section": 1,
+        "expectHeaderLabel": "CODING"
+      },
+      {
+        "name": "an ordinary course code never shows the short label",
+        "config": {"course_code": "ICS3U", "custom_short_name": "X\nY"},
+        "section": 1,
+        "expectHeaderLabel": "ICS3U"
+      },
+      {
+        "name": "a section label with a line feed",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "📚\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "a section label of letters with an override inside",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section2": "C\u202eS"}}},
+        "section": 2,
+        "expectSectionLabel": "CS"
+      },
+      {
+        "name": "the teacher emoji keeps its joiner",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "👩\u200d🏫"}}},
+        "section": 1,
+        "expectSectionLabel": "👩\u200d🏫"
+      },
+      {
+        "name": "a section label that is only controls gets the book",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "\u0000\r\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "the legacy course-wide label is cleaned too",
+        "config": {"course_code": "ICS3U", "emojis": {"default": "\u001b🔬"}},
+        "section": 3,
+        "expectSectionLabel": "🔬"
+      }
+    ],
     "cases": [
       { "name": "French with accents", "raw": "Français, 11e année", "expect": "Français, 11e année" },
       { "name": "an en dash", "raw": "Physics – Grade 11", "expect": "Physics – Grade 11" },
@@ -41109,7 +41610,7 @@
       "Normalising the name to NFC at the same time. A different question, two spellings of one accented letter, with its own risks for comparisons (#189 is about folder names).",
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
-      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue. (That follow-up is #822, ruled by Russell on 2026-11-13: both labels are cleaned by this rule, and not the wider every-one-line-label option; see `whereItIsApplied` and `labelCases`.)"
     ]
   },
   "scheduledRunGetsItsFolderReady": {

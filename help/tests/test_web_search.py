@@ -1,0 +1,366 @@
+"""The web copy: the assistant switch, platform runs, the search index and
+its search function (run with node), --release-web and --serve."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import json  # noqa: E402
+import os  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+import time  # noqa: E402
+import unittest  # noqa: E402
+import urllib.request  # noqa: E402
+
+from helpers import BUILD_HELP, HELP_DIR, Fixture, run_page_search, write_webp  # noqa: E402
+
+NODE = shutil.which("node")
+
+NODE_SEARCH = """
+const fs = require("fs");
+const vm = require("vm");
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(process.argv[2], "utf8"), sandbox);
+const search = require(process.argv[3]);
+const results = search.searchHelp(sandbox.window.PLANTOIR_HELP_INDEX, process.argv[4]);
+const ids = [];
+for (const result of results) { ids.push(result.id); }
+console.log(JSON.stringify(ids));
+"""
+
+
+class WebTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.fixture = Fixture()
+        self.web = self.fixture.out / "web"
+
+    def tearDown(self) -> None:
+        self.fixture.close()
+
+    def build(self, *extra: str) -> str:
+        code, output = self.fixture.run("--web", str(self.web), *extra)
+        self.assertEqual(code, 0, output)
+        return output
+
+    def read(self, name: str) -> str:
+        return (self.web / name).read_text(encoding="utf-8")
+
+    def test_the_assistant_section_is_left_out_while_the_switch_is_off(self) -> None:
+        output = self.build()
+        self.assertIn("web copy: 4 pages", output)
+        self.assertFalse((self.web / "helper-page.html").exists())
+        self.assertNotIn("helper-page", self.read("assets/search-index.js"))
+        self.assertNotIn("zanzibarword", self.read("assets/search-index.js"))
+        contents = self.read("index.html")
+        self.assertNotIn("helper-page", contents)
+        self.assertNotIn("Optional: with an assistant", contents)
+        # The {{assistant}} run on an ordinary page is left out with it.
+        self.assertNotIn("helper page", self.read("send-section.html"))
+        self.assertNotIn('href="helper-page.html"', self.read("send-section.html"))
+        self.assertNotIn("assistant", self.read("send-section.html"))
+
+    def test_the_switch_puts_the_assistant_section_back(self) -> None:
+        self.fixture.replace("help/facts.json", '"assistantOnTheWeb": false', '"assistantOnTheWeb": true')
+        output = self.build()
+        self.assertIn("web copy: 5 pages", output)
+        self.assertTrue((self.web / "helper-page.html").exists())
+        self.assertIn("Optional: with an assistant", self.read("index.html"))
+        self.assertIn('href="helper-page.html"', self.read("send-section.html"))
+        self.assertIn('<div data-assistant="true">', self.read("send-section.html"))
+
+    def test_every_page_has_the_search_form_and_its_scripts(self) -> None:
+        self.build()
+        for name in ("index.html", "first-steps.html", "second-look.html"):
+            text = self.read(name)
+            self.assertIn('<form class="search" role="search" action="index.html" method="get">', text)
+            self.assertIn('<html lang="en-CA">', text)
+            # Only the contents page loads the index and searches.
+            self.assertEqual('<script src="assets/search-index.js"></script>' in text, name == "index.html")
+        self.assertIn("<label for=\"help-search\">Search Help</label>", self.read("first-steps.html"))
+        self.assertNotIn("Planner's words", self.read("index.html"))
+        for name in ("tokens.css", "help.css", "search.js", "search-index.js"):
+            self.assertTrue((self.web / "assets" / name).exists(), name)
+        self.assertTrue((self.web / "pictures" / "first-steps-2-light.webp").exists())
+
+    def test_platform_runs_are_marked_for_the_site(self) -> None:
+        self.build()
+        self.assertIn('<div data-platform="mac" data-shared="true">', self.read("first-steps.html"))
+        self.fixture.page("second-look", "{{mac}}\nOn a Mac.\n{{/mac}}\n\n{{windows}}\nOn Windows.\n{{/windows}}\n")
+        self.build()
+        text = self.read("second-look.html")
+        self.assertIn('<div data-platform="mac">', text)
+        self.assertNotIn('data-shared', text)
+        self.assertIn('<div data-platform="windows">', text)
+        # The hidden Windows run is not searchable.
+        self.assertNotIn("On Windows", self.read("assets/search-index.js"))
+        self.assertIn("On a Mac", self.read("assets/search-index.js"))
+
+    def test_the_mac_book_keeps_only_the_mac_run(self) -> None:
+        if shutil.which("hiutil") is None:
+            self.skipTest("hiutil is not on this machine")
+        self.fixture.page("second-look", "{{mac}}\nOn a Mac.\n{{/mac}}\n\n{{windows}}\nOn Windows.\n{{/windows}}\n")
+        book = self.fixture.out / "Plantoir.help"
+        code, output = self.fixture.run("--mac", str(book))
+        self.assertEqual(code, 0, output)
+        text = (book / "Contents" / "Resources" / "en.lproj" / "second-look.html").read_text(encoding="utf-8")
+        self.assertIn("On a Mac.", text)
+        self.assertNotIn("On Windows.", text)
+        self.assertNotIn("data-platform", text)
+
+    def test_the_mac_book_keeps_the_assistant_run(self) -> None:
+        if shutil.which("hiutil") is None:
+            self.skipTest("hiutil is not on this machine")
+        book = self.fixture.out / "Plantoir.help"
+        code, output = self.fixture.run("--mac", str(book))
+        self.assertEqual(code, 0, output)
+        text = (book / "Contents" / "Resources" / "en.lproj" / "send-section.html").read_text(encoding="utf-8")
+        self.assertIn('<a href="helper-page.html">helper page</a>', text)
+
+    def test_the_search_index_is_javascript_the_search_reads(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the search index was not run")
+        self.build()
+        script = self.fixture.out / "search-test.js"
+        script.write_text(NODE_SEARCH, encoding="utf-8")
+        index = self.web / "assets" / "search-index.js"
+        search = self.web / "assets" / "search.js"
+
+        def search_for(query: str):
+            completed = subprocess.run(
+                [NODE, str(script), str(index), str(search), query],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            return json.loads(completed.stdout)
+
+        # marmaladeword is in the body of first-steps only: not its title, keywords or description.
+        self.assertEqual(search_for("marmaladeword"), ["first-steps"])
+        self.assertEqual(search_for("MARMALADEWORD item"), ["first-steps"])
+        self.assertEqual(search_for("zanzibarword"), [])
+        self.assertEqual(search_for(""), [])
+        self.assertEqual(search_for("how do I"), [])
+        # The interface words around a page are not searchable as the page's own.
+        self.assertEqual(search_for("being written"), [])
+        self.assertNotIn("Picture to come", self.read("assets/search-index.js"))
+        # Pages need not hold every word; the one holding more ranks first.
+        self.assertEqual(search_for("marmaladeword nothingelse"), ["first-steps"])
+        # Token text is indexed: a shortcut, a control label, a contract sentence.
+        self.assertEqual(search_for("⌘P"), ["first-steps"])
+        self.assertEqual(search_for("Coverage tab")[0], "send-section")
+        self.assertEqual(search_for("copied into the folder")[0], "first-steps")
+        # Stems and a last word typed half way.
+        self.assertEqual(search_for("deployed")[0], "send-section")
+        self.assertEqual(search_for("deploying"), search_for("deploys"))
+        self.assertEqual(search_for("marmaladew"), ["first-steps"])
+        self.assertEqual(search_for("how do I deploy my site")[0], "send-section")
+
+    def test_the_contents_page_shows_its_results_as_a_browser_would(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the page's search was not run")
+        self.build()
+        for ready_state in ("loading", "complete"):
+            with self.subTest(ready_state=ready_state):
+                shown = run_page_search(NODE, self.web, "marmaladeword", ready_state)
+                self.assertIsNone(shown["threw"], shown)
+                self.assertFalse(shown["hidden"])
+                self.assertEqual(shown["heading"], "Search results")
+                self.assertEqual(shown["fieldValue"], "marmaladeword")
+                self.assertEqual(shown["items"][0], {"href": "first-steps.html", "title": "Take the first steps"})
+        # No match: the box shows the interface sentence.
+        shown = run_page_search(NODE, self.web, "zzzqqq")
+        self.assertIsNone(shown["threw"], shown)
+        self.assertFalse(shown["hidden"])
+        self.assertEqual(shown["items"], [])
+        self.assertEqual(shown["paragraphs"], ["No page matches."])
+        # No query: the box stays hidden and the contents show.
+        shown = run_page_search(NODE, self.web, "")
+        self.assertIsNone(shown["threw"], shown)
+        self.assertTrue(shown["hidden"])
+
+    def test_the_more_line_agrees_with_its_number(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the page's search was not run")
+        self.build()
+        words = self.read("assets/search-index.js").split("\n", 1)[0]
+        for pages, expected in ((11, "1 more page matches."), (12, "2 more pages match.")):
+            with self.subTest(pages=pages):
+                folder = self.fixture.out / ("synthetic-" + str(pages))
+                (folder / "assets").mkdir(parents=True)
+                entries = []
+                for number in range(pages):
+                    entries.append({"id": "p" + str(number), "title": "Page " + str(number), "description": "", "keywords": [], "text": "lantern"})
+                (folder / "assets" / "search-index.js").write_text(
+                    words + "\nwindow.PLANTOIR_HELP_INDEX = " + json.dumps(entries) + ";\n", encoding="utf-8"
+                )
+                shown = run_page_search(NODE, folder, "lantern", search_js=self.web / "assets" / "search.js")
+                self.assertIsNone(shown["threw"], shown)
+                self.assertEqual(len(shown["items"]), 10)
+                self.assertEqual(shown["paragraphs"], [expected])
+
+    def test_the_date_facts_were_checked_is_printed_with_its_authority(self) -> None:
+        self.fixture.replace(
+            "help/pages/helper-page.md", "description: What the helper does.\n",
+            "description: What the helper does.\nfactsChecked: 2026-11-13\nauthority: https://docs.example.com/benefits/\n",
+        )
+        self.fixture.replace("help/pages/python-page.md", "description: Students run Python code on a page.\n", "description: Students run Python code on a page.\nfactsChecked: 2026-11-01\n")
+        self.fixture.replace("help/facts.json", '"assistantOnTheWeb": false', '"assistantOnTheWeb": true')
+        self.build()
+        expected = ('<p class="facts-checked">Facts checked on <time datetime="2026-11-13">2026-11-13</time> against '
+                    '<a href="https://docs.example.com/benefits/">docs.example.com/benefits</a>.</p>')
+        self.assertIn(expected, self.read("helper-page.html"))
+        self.assertIn('<p class="facts-checked">Facts checked on <time datetime="2026-11-01">2026-11-01</time>.</p>', self.read("python-page.html"))
+        self.assertNotIn("facts-checked", self.read("send-section.html"))
+        if shutil.which("hiutil") is not None:
+            book = self.fixture.out / "Plantoir.help"
+            code, output = self.fixture.run("--mac", str(book))
+            self.assertEqual(code, 0, output)
+            mac = (book / "Contents" / "Resources" / "en.lproj" / "helper-page.html").read_text(encoding="utf-8")
+            self.assertIn(expected, mac)
+        # An authority without the date it was checked against is refused.
+        self.fixture.replace("help/pages/helper-page.md", "factsChecked: 2026-11-13\n", "")
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("add `factsChecked:`", output)
+
+    def test_the_assistant_pages_are_found_once_the_switch_is_on(self) -> None:
+        if NODE is None:
+            self.skipTest("node is not installed; the search index was not run")
+        self.fixture.replace("help/facts.json", '"assistantOnTheWeb": false', '"assistantOnTheWeb": true')
+        self.build()
+        script = self.fixture.out / "search-test.js"
+        script.write_text(NODE_SEARCH, encoding="utf-8")
+        completed = subprocess.run(
+            [NODE, str(script), str(self.web / "assets" / "search-index.js"), str(self.web / "assets" / "search.js"), "GitHub Copilot"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True,
+        )
+        self.assertEqual(json.loads(completed.stdout)[0], "helper-page")
+
+    def test_an_assistant_mention_on_an_ordinary_page_stops_the_web_copy(self) -> None:
+        self.fixture.page("second-look", "Words.\n\nAsk Claude to revise it.\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("FAILED: help/pages/second-look.md:10: on the web copy: names 'Claude'", output)
+        self.assertFalse(self.web.exists())
+        # Only a warning for the Mac book and --check, so the Xcode build is never failed by it.
+        code, output = self.fixture.run("--check")
+        self.assertEqual(code, 0, output)
+        self.assertIn("warning: help/pages/second-look.md:10: on the web copy: names 'Claude'", output)
+        # Inside an {{assistant}} run it passes, and the Mac book keeps it.
+        self.fixture.page("second-look", "Words.\n\n{{assistant}}\nAsk Claude to revise it.\n{{/assistant}}\n")
+        self.build()
+        self.assertNotIn("Claude", self.read("second-look.html"))
+
+    def test_every_route_to_an_assistant_name_is_caught_on_the_rendered_page(self) -> None:
+        routes = {
+            "a menu token": ("Choose {{menu:revise-claude}} from the menu.\n", "help/pages/second-look.md:8"),
+            "a code span": ("Type `copilot` in the window.\n", "help/pages/second-look.md:8"),
+            "a fenced block": ("Type this:\n\n```text wrap\ncopilot fix\n```\n", "help/pages/second-look.md:10"),
+            "a word split by bold": ("Ask **Clau**de to help.\n", "help/pages/second-look.md:8"),
+            "a link target": ("Read [the vendor's page](https://github.com/features/copilot).\n", "help/pages/second-look.md:8"),
+        }
+        for name in routes:
+            with self.subTest(route=name):
+                body, where = routes[name]
+                self.fixture.page("second-look", body)
+                code, output = self.fixture.run("--web", str(self.web))
+                self.assertNotEqual(code, 0, output)
+                self.assertIn("FAILED: " + where + ": on the web copy: names", output)
+        # The introduction on the contents page.
+        self.fixture.page("second-look", "Words.\n")
+        self.fixture.write("help/pages/index.md", "---\ndescription: Help.\n---\nGitHub Copilot can help too.\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("FAILED: help/pages/index.md:4: on the web copy: names 'Copilot'", output)
+        # A run may wrap a token; then the web copy passes and leaves it out.
+        self.fixture.path("help/pages/index.md").unlink()
+        self.fixture.page("second-look", "Words.\n\n{{assistant}}\nChoose {{menu:revise-claude}}.\n{{/assistant}}\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertEqual(code, 0, output)
+        self.assertNotIn("Claude", self.read("second-look.html"))
+
+    def test_a_withheld_page_is_left_out_of_the_web_copy(self) -> None:
+        self.fixture.replace("help/withheld-on-the-web.json", '"pages": []', '"pages": [{"id": "python-page", "why": "fixture"}]')
+        self.build()
+        self.assertFalse((self.web / "python-page.html").exists())
+        self.fixture.replace("help/withheld-on-the-web.json", '"id": "python-page"', '"id": "no-such-page"')
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("pages: no-such-page is not in the outline", output)
+
+    def test_a_bad_withheld_pattern_is_a_named_failure(self) -> None:
+        self.fixture.replace("help/withheld-on-the-web.json", '"\\\\bClaude\\\\b"', '"(Claude"')
+        code, output = self.fixture.run("--check")
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("is not a valid pattern", output)
+        self.assertNotIn("Traceback", output)
+
+    def test_a_link_to_an_assistant_page_outside_a_run_stops_the_web_copy(self) -> None:
+        self.fixture.page("second-look", "Read [this page](page:helper-page).\n")
+        code, output = self.fixture.run("--web", str(self.web))
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("links to helper-page, which the web copy leaves out (#804), outside an", output)
+
+    def test_release_web_refuses_stubs_and_placeholders(self) -> None:
+        code, output = self.fixture.run("--release-web", str(self.web))
+        self.assertNotEqual(code, 0, output)
+        self.assertIn("second-look is still a stub", output)
+        self.assertIn("scene first-steps-1 is still a placeholder", output)
+        self.assertFalse(self.web.exists())
+        self.fixture.page("second-look", "Words.\n")
+        self.fixture.replace("help/scenes.json", '"awaiting_capture": true', '"awaiting_capture": false')
+        write_webp(self.fixture.help_dir / "pictures" / "first-steps-1-light.webp", 800, 600)
+        write_webp(self.fixture.help_dir / "pictures" / "first-steps-1-dark.webp", 800, 600)
+        code, output = self.fixture.run("--release-web", str(self.web))
+        self.assertEqual(code, 0, output)
+        self.assertIn('width="400" height="300"', self.read("first-steps.html"))
+
+    def test_serve_prints_an_address_and_serves_the_copy(self) -> None:
+        self.build()
+        environment = dict(os.environ)
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        server = subprocess.Popen(
+            [sys.executable, "-I", "-B", str(BUILD_HELP), "--serve", str(self.web)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=environment,
+        )
+        try:
+            line = server.stdout.readline()
+            self.assertTrue(line.startswith("Serving Plantoir Help at http://127.0.0.1:"), line)
+            address = line.split(" at ", 1)[1].split(" ", 1)[0]
+            for attempt in range(20):
+                try:
+                    with urllib.request.urlopen(address + "first-steps.html", timeout=5) as response:
+                        body = response.read().decode("utf-8")
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            self.assertIn("<h1>Take the first steps</h1>", body)
+        finally:
+            server.terminate()
+            server.wait(timeout=10)
+            server.stdout.close()
+
+
+class AssetTests(unittest.TestCase):
+    def test_the_tokens_hold_both_palettes(self) -> None:
+        text = (HELP_DIR / "assets" / "tokens.css").read_text(encoding="utf-8")
+        for value in ("#FCFDFB", "#F1F5EF", "#FFFFFF", "#D9E2D6", "#1E2721", "#566259", "#1F7A3A", "#0F4A27", "#7FB069", "#9CC788", "#d0312d"):
+            self.assertIn(value, text)
+        self.assertIn("@media (prefers-color-scheme: dark)", text)
+        self.assertIn('"Helvetica Neue", Helvetica, Arial, sans-serif', text)
+        self.assertNotIn("@import", text)
+        self.assertNotIn("url(", text)
+
+    def test_the_layout_never_loads_from_the_web(self) -> None:
+        text = (HELP_DIR / "assets" / "help.css").read_text(encoding="utf-8")
+        self.assertNotIn("http", text)
+        self.assertIn("@media print", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

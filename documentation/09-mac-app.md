@@ -1142,12 +1142,13 @@ view raises one alert from the record. Must-fail, by copy-and-restore: no
 `pagesShown` guard, "lacks this id" for "no row of that kind", the marker from
 any record, answers kept in memory only — each fails a named test.
 
-### Fix with Claude… and Fix with Codex… (#717, part two)
+### Fix with Claude…, Fix with Codex… and Fix with GitHub Copilot… (#717, part two; #783)
 
-**What it is.** Two buttons under the Problems table (`ProblemsTableView.
+**What it is.** Buttons under the Problems table (`ProblemsTableView.
 fixButtons`) that hand the ticked problems to an outside assistant the teacher
-already has (rulings 3, 5 and 6 on #717). They open the SAME two doors as
-Revise With ▸ — `ClaudeCodeLauncher` and `CodexLauncher`, at the WORKING
+already has (rulings 3, 5 and 6 on #717). They open the SAME doors as
+Revise With ▸ — `ClaudeCodeLauncher`, `CodexLauncher` and, since #783,
+`CopilotLauncher` (in that order, Russell 2026-11-13), at the WORKING
 folder, where the skills and the guidance are — and the only difference is the
 opening message: `open(…, greeting:)` sends `FixWithAssistant.greeting`'s text
 in place of the plain greeting. Every word, number and case is
@@ -1164,7 +1165,7 @@ shows fixed in the source is LEFT OUT (`fixWith.fixedInTheSourceIsLeftOut`):
 the page is already right, this section needs only a build, and an assistant
 asked to fix it would find nothing wrong and might change something that is not
 broken while looking. At the click, the refusal Revise With ▸ makes (#458: a
-Claude or Codex session already open on the course, or the course busy) is
+session from an outside door already open on the course, or the course busy) is
 made here in its own words, and nothing opens.
 
 **The message** (`fixWith.fixGreeting`, one line): the course and its name,
@@ -4764,6 +4765,25 @@ two blocks of CSS came from Russell's example; its lessons, its file names and
 its people did not. Every component of the example is a commented PATTERN in
 the template pages, so an assistant writes each component the same way.
 
+**The reference-courses sentence in the same greeting (#856).** A live
+course whose code has courses kept for reference tells the session they are
+there to read and build on (decision (s), since v1.3.0). The sentence had no
+contract key, so Windows' greeting lacked it and no test noticed. It is now
+`app-rules.json` → `outsideAgents.greetingReferenceCourses`: the template with
+`{course}` and `{courses}`, the separator, how each listed course is made
+(`referenceCoursesToMention`: same code, folder and school year, sorted), where
+it goes, and four cases, run by
+`AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
+`ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
+`referenceCoursesSentence(courseCode:referenceCourses:)`; and ten
+`listCases` (the review's finding), which give a course and its shelf and
+expect the list, run through `referenceCoursesToMention` by
+`testTheReferenceCoursesListIsMadeAsTheContractSays`, so Windows runs how the
+list is made rather than working it out from `eachCourse`. The mac's greeting
+did not move by a byte (the old and new code compiled side by side and compared
+on four inputs), and the greeting is not shown to the local model, whose
+digest is unchanged.
+
 **The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
 gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
 reference-courses sentence, so the opening instructions keep their order.
@@ -4828,7 +4848,7 @@ page scrolls inside its web view. Measured and rejected shapes: "A blank
 window: when a child claims a size the window cannot give", the sixth and
 seventh cases.
 
-A course's page has two tabs while Claude Code or Codex is installed:
+A course's page has two tabs while Claude Code, Codex or GitHub Copilot (#783) is installed:
 Settings, which is what the page has always shown, and Planning, which shows
 the course's unit plans from `courses/<CODE>/.internal/planning/` on this Mac.
 The contract is `shared-rules.json` → `unitPlanning.tab` (`tabCases`,
@@ -4961,8 +4981,9 @@ ships, and #709 refreshes the same folder from the same bytes.
 
 **The empty tab: Plan a Unit.** When there is nothing to offer, the tab is a
 `ContentUnavailableView` ("No Unit Plans Yet", `words.emptyDescription`,
-which names no assistant) with Plan a Unit with Claude… and Plan a Unit with
-Codex…, each only while its assistant is installed, Claude's first. The
+which names no assistant) with Plan a Unit with Claude…, Plan a Unit with
+Codex… and (since #783) Plan a Unit with GitHub Copilot…, each only while its
+assistant is installed, in that order. The
 click makes Revise With's refusal (`WorkspaceModel.reviseRefusal`) in its own
 alert, then opens the door with `PlanAUnit.openingMessage` in place of the
 greeting, so the reference-courses and unit-planning sentences do not ride
@@ -5078,7 +5099,7 @@ the greeting look for pages too. Said in `choiceCases.rule`.
 the plans are on the course's Planning tab, and the skill tells the
 assistant to send the teacher there (707 plan review M5). That is always
 true on the mac when a greeting is said, since a Revise door and the tab
-both need Claude Code or Codex. Windows does #790 (#707's greeting) and
+both need Claude Code, Codex or GitHub Copilot. Windows does #790 (#707's greeting) and
 #708's tab together, because `greetingUnitPlansCases` now carries these
 sentences and a greeting written with the folder wording fails them.
 
@@ -7031,7 +7052,8 @@ it (#627, 2026-10-23): Obsidian does the same here, on 1.13.7 and 1.14.4, and
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
 SHA-256 and address from `obsidianAddOnsForFigures.addOns` with
-`/usr/bin/plutil` (21 ms on the 1.7 MB contract) and carries no pin of its own
+`/usr/bin/jq` (see "Why the fetch reads the contract with jq (#864)" below)
+and carries no pin of its own
 (`ObsidianFigureAddOnsTests.testTheFetchScriptCarriesNoPinOfItsOwn`); a
 mismatch installs nothing; its cache is outside the repository like
 fetch-helpers.sh's. `project.yml` carries `Vendor/obsidian-addons` as
@@ -7044,6 +7066,50 @@ JavaScript and CSS, so nothing to sign beyond the app's seal. Not in
 `support/`: everything there is hashed into the image tag and mirrored into
 `.toolchain/`. At install time the app hashes the files it is about to write
 against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
+
+**Why the fetch reads the contract with jq (#864).** The script read the
+contract with `/usr/bin/plutil -extract` until 2026-11-13. plutil refuses a
+whole JSON file that holds an escaped NUL anywhere in it ("Unsupported
+escaped (unicode) null"), and #780's cases put eight `\u0000` escapes into
+`shared-rules.json` on 2026-11-12, where they stay because they are what
+those cases test. From then on the script read nothing, said the contract
+had no `obsidianAddOnsForFigures.addOns`, and exited 1. That stopped a fresh
+clone or worktree (no `Vendor/obsidian-addons`, so `xcodegen generate`
+fails) and also every machine that already had the folder, because the
+"already in place" check reads the pins first: `publish.sh` runs the script
+under `set -e` before it generates the project, so a release build stopped
+there too. No suite ran the script, so no suite saw it. Measured on macOS
+26.6: of the ten contract files, `plutil -convert json` refuses only
+`shared-rules.json`. Both plutil and jq refuse a lone surrogate escape
+(`\ud800`), which no contract holds; the test below would catch one.
+
+The reader is now `/usr/bin/jq` (jq-1.7.1-apple, in the system volume),
+which macOS has shipped since macOS 15; the Xcode this project builds with
+(26 or later, `mac-app/README.md`) needs macOS 15.6 or later. It reads the escaped NUL as JSON says, 29 ms a
+read on the contract against plutil's 21 ms; all seven pins in about one
+second. `--print-pins` runs the reading step alone and prints what it read,
+one tab-separated line per file, fetching and installing nothing.
+`scripts/test_fetch_obsidian_addons.py` runs it against the real contract
+and compares every line with Python's own reading of the file, so the next
+character a reader refuses fails a suite rather than a new machine; it
+skips where there is no `/usr/bin/jq`, Windows included. Rejected:
+
+- **`sed 's/\\u0000/\\u0001/g' | plutil … -`** works on any macOS and keeps
+  the JSON valid whatever the escapes stand next to, but it edits the text
+  before reading it, fixes only the one character met so far, and leaves a
+  reader that is not reading the file as written.
+- **`/usr/bin/python3`** is only a stub until the developer tools are
+  installed, and the script's rule is that nothing but macOS is needed.
+- **`perl -MJSON::PP`** is on every Mac and reads the file, but at 0.67 s a
+  read it would take most of a minute across the script's reads.
+- **`osascript -l JavaScript`** was ruled out before measuring: osascript
+  is not run on this machine during unattended work.
+
+Windows' `fetch-obsidian-addons.ps1` reads the same file with
+`ConvertFrom-Json` (PowerShell 7) or `JavaScriptSerializer` (5.1). Neither
+was run here, since this Mac has no PowerShell. Both are documented to
+decode `\u0000` into a character rather than refuse it, so no Windows issue
+was opened; a Windows run of the script on the current contract confirms it.
 
 **The sequence** (`obsidianAddOnsForFigures.sequence`, the route
 `WorkspaceModel.openInObsidian(course:sectionNumber:)` in
@@ -7740,7 +7806,7 @@ is already recording, and `CourseActivity` and `PreviewLeases` call its
 | `build` | any preview of the course is being built (press → first answer), or any section of it is publishing |
 | `publish` | any section of the course is publishing (the whole deploy, its build included — Windows' shape) |
 | `preview` | any section of the course has a preview up in a window |
-| `assist` | `--mcp-stdio` only: the course the Claude or Codex door named, for the whole conversation (#458) |
+| `assist` | `--mcp-stdio` only: the course the outside door (Claude, Codex or GitHub Copilot) named, for the whole conversation (#458) |
 
 That covers the window, the in-app assistant and the `--mcp-stdio` process
 with no new call site, because every build of theirs already went through
@@ -11518,7 +11584,7 @@ pruner" above for why.
   first or together.
 
 
-**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it", never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
+**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it" until #783 and since then with the slot naming the session's own assistant ("a GitHub Copilot session still open on {CODE} made it", or all three when its lease names none: `shared-rules.json` → `doorCourseHold.naming`), never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
 ## Notifications: the one permission, and where it is asked (#212)
 
@@ -12006,7 +12072,7 @@ an application was NOT measured — the dress rehearsal (`RELEASING.md`, V3) che
    one from a shell (plan and review). The scan also names the folder an
    assistant working from another app has open, so step 2 can read its leases.
    An assistant that holds no build or publish lease is not under way — it can
-   stay connected for days. (Since #458 a Claude or Codex session's server always holds
+   stay connected for days. (Since #458 an outside door's session's server (Claude, Codex or GitHub Copilot) always holds
    an `assist` lease on its door's course; `UpdateGate.leaseKindsThatHold` is
    build and publish only, so that lease never holds an update.)
 
@@ -16045,13 +16111,51 @@ this is the app's half.
   the Cloudflare token and the plans' username and password are asked the way
   a section's deploy asks (`CredentialRequest.unitPlanUsername`,
   `unitPlanPassword`). No argument ever carries a username or a password.
+  The username's explanation names the computer, so since #863 it is built by
+  `CredentialRequest.unitPlanUsername(machine:)` and the contract's readout
+  (`app-rules.json` → `credentialRequests`) is written with `{machine}`
+  (`specialNames.platformWording.machine.usedIn`); this app fills in "Mac", so
+  the sentence a teacher reads here did not change. REJECTED: "on this
+  computer", as the token explanations say, which would have changed the mac's
+  sentence for no reader's benefit when the placeholder keeps both.
 - **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
   under section 0 (`PlanSharing.leaseSection`), which no section has: a
   section's own deploy is never refused by it, while the course reads as busy
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a run of the plans' launcher has
+  its own words on quit** (Russell, 2026-11-13), in the contract so Windows
+  says the same ones: `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`,
+  `words` and fourteen cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`,
+  with every fragment pinned key by key by
+  `testEveryShareFragmentIsTheContractsKeyByKey`. The lease is the same for
+  a share, a Change Password and a Stop Sharing, so `PlanShareRunner.start`
+  records what the run was started to do beside it
+  (`CourseActivity.beginPlanWork`, `PlanWork.of(choice)`), and removes it with
+  the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
+  password changes and stops; the question names each part ("sharing the unit
+  plans of <CODE>", "changing the password for the unit plans of <CODE>",
+  "stopping the sharing of the unit plans of <CODE>", or "of N courses"), deploys
+  first, joined "A and B" or "A, B and C". The message is
+  `messageOne`/`messageSeveral` with one clause per part: the class website
+  part way updated, the plans part way shared, the new password not saved
+  yet, the plans' address still working. No clause carries its remedy: the
+  share bar already offers Share Again and Stop Sharing, and a remedy in each
+  clause made a two- or three-clause message misparse (the second fix
+  review). A Change Password's console is titled "Changing the password for
+  the … unit plans", not "Sharing". Each clause was read off what that run leaves
+  when it stops early (`interruptionCases`, `changePasswordCases`,
+  `stopSharing`); deploys alone read exactly as before. The update banner
+  borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the
+  block's `rejected`: the deploy's message for a share (the first commit's
+  recording of the mac's old words); "anyone with the address could still
+  open the plans" (the first fix round), untrue for protected plans re-shared
+  with their password, a first share stopped before anything was sent, a
+  Change Password and a Stop Sharing; calling the latter two "sharing"
+  because they share a lease; and one fixed sentence per combination, which
+  would be ten sentences for these fourteen cases. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):

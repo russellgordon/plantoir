@@ -50,9 +50,9 @@ A representative example:
 |---|---|---|---|---|
 | `course_code` | string | setup | build | Uppercased code, e.g. `ICS3U`. The 4th character, if a digit, encodes grade (1→9 … 4→12) and selects "course mode"; a non-digit (e.g. `CODING`) selects "club mode". |
 | `course_name` | string | setup | setup (starting titles) + build (computed landing title, every build) | Human name. The build recomputes each section's landing title from it every time, so renames reach the site. **Cleaned where it is read** (#780): a control character becomes a space and a bidirectional control is removed, by both apps and the shared Python; see "Control characters in `course_name`" below. |
-| `custom_short_name` | string | setup (club mode only) | build | ≤ 12-char label shown beside the header emoji instead of the course code. Empty → fall back to title-cased code. |
+| `custom_short_name` | string | setup (club mode only) | build | ≤ 12-char label shown beside the header emoji instead of the course code. Empty → fall back to the code, in capitals. **Cleaned where it is read** (#822), by the course name's rule; see "Control characters in `course_name`" below. Then written into the title as an escaped string, so a quote or a backslash reads back as typed (#871). |
 | `locale` | string | setup | build → `quartz.config.ts` | One of Quartz's 27 locale codes; drives UI strings ([teacher-customized](06-quartz-customizations.md#d-locale-files-replaced-at-build-time)) and date formats. |
-| `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. |
+| `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. **Cleaned where it is read** (#822), as `course_name` is. |
 | `num_sections` | int | setup | setup (prompt default) + build and launchers (fallback when `section_numbers` is absent) | Count of sections; normalized to `len(section_numbers)`. |
 | `section_numbers` | int[] | setup | build (validation); `preview.ps1` also checks it host-side and asks | The teacher's actual timetable section numbers, e.g. `[1,3,4]`. Only these sections can be built or deployed. |
 | `shared_folders` | string[] | setup + build discovery | build | Course-root folders copied into every section's site. `Media` never appears here (symlinked instead). |
@@ -62,7 +62,7 @@ A representative example:
 | `hidden` | string[] | setup + the apps ONLY — the build never changes it (#265); it adds `Media`, `Curriculum Coverage.md` and every other coverage map's file (#128) to the sidebar's list in memory, never to this file | build → Explorer omit set | Items filtered out of the sidebar. Still built, linkable, and searchable. Each entry is the STORED name of a TOP-LEVEL item — a file with `.md` (`"Key Links.md"`), a folder by name (`"Tasks"`) — matched ignoring case and Unicode normalisation; a name without `.md` also hides `<name>.md`; nothing nested is hidden by a name. Contract: `file-formats.json` → `sidebarHiding`. |
 | `expandable` | string[] | setup + build discovery | patched Explorer (statically imported) | Folders rendered as collapsible trees; all other folders render as plain links to their index page. |
 | `expandOnFolderClick` | bool | setup | build → `folderClickBehavior` + `data-expand-on-navigate` | `true`: clicking a folder name expands it. `false` (default): name navigates; only the chevron expands. |
-| `footer_html` | string | setup | build → `Footer.tsx` | Raw HTML injected into every page's footer. |
+| `footer_html` | string | setup | build → `Footer.tsx` | Raw HTML injected into every page's footer, written as an escaped string literal (#871, [Quartz customizations](06-quartz-customizations.md) → "Settings written inside a TypeScript string"). |
 | `show_reading_time` | bool | setup | build → `ContentMeta.tsx` | Show "N min read" on pages. |
 | `fonts.default` / `fonts.sections.section<N>` | object | setup | build → `quartz.config.ts` typography | `header`, `body`, `code` font family names (Google Fonts or system stacks). Section entry wins over default. |
 | `show_section_marker.sections.section<N>` | bool | setup | build (page title + computed landing title) | Whether the header shows `S<N>` and the computed landing title carries ", Section N". The build also accepts several legacy shapes (plain bool, flat map, alternate key names). |
@@ -167,9 +167,25 @@ file on read, all of Unicode category Cf (breaks emoji and three scripts),
 normalising to NFC at the same time (a different question), trimming, and
 either single order of cleaning and redacting a trail line.
 
-**Not in this piece:** `custom_short_name` and the section labels can carry
-the same characters; that is a drafted follow-up, because the ruling is about
-the course name.
+**The short label and the section labels, since #822.** Russell ruled on
+2026-11-13 to clean both by the same rule: `custom_short_name` and each
+`emojis.sections.section<N>` (and the legacy `emojis.default`). Both reach
+`quartz.config.ts`'s `pageTitle` line, where a line feed breaks the line and
+so the site's build. On the mac, `CourseConfiguration.customShortName` (getter
+and setter), `emoji(forSection:)` and `setEmoji(_:forSection:)`, and
+`write(to:)` through `cleanLabels(in:)`, so any Save heals both; the New Course
+window's `shortLabelToWrite` and `sectionLabelToWrite`. In the shared Python,
+`build_site.resolve_header_label` and `resolve_section_emoji` (cleaned, then
+trimmed, each with its old fallback when nothing is left), `social_card`'s
+section label, and `setup_course` (a saved label before it is offered again, a
+typed short label before it is written). Cases:
+`courseNameCharacters.labelCases` (9). Measured: the new Python tests fail
+on the old scripts (10 failures in `test_course_names.py`) and pass on the
+new. REJECTED: cleaning every one-line label a teacher types
+(`front_page_heading`, `print_school_name` and the rest), which Russell did
+not choose; and escaping a double quote or a backslash in the `pageTitle`
+line, which is a different fault from a control character and is not in this
+piece. Windows plans its readers under #822.
 
 ### Publishing destination
 

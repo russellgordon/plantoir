@@ -32,8 +32,9 @@ import Foundation
 /// `isAvailable` — a teacher without Claude Code should not be offered a
 /// door that opens onto an error.
 ///
-/// `CodexLauncher` is the same door for `codex`, and borrows the helpers
-/// below rather than copying them.
+/// `CodexLauncher` is the same door for `codex`, and `CopilotLauncher` for
+/// GitHub's `copilot` (#783); both borrow the helpers below rather than
+/// copying them.
 nonisolated enum ClaudeCodeLauncher {
 
     // MARK: - Stored properties
@@ -82,23 +83,65 @@ nonisolated enum ClaudeCodeLauncher {
     /// inherits launchd's minimal PATH, so `onPath` usually finds nothing even
     /// on a Mac where the teacher's own shell finds the tool immediately.
     ///
-    /// The same directories serve both doors — Codex's official installer
-    /// script uses `$HOME/.local/bin`, and Homebrew, npm-global and bun land
-    /// where they always do — so the list is written once with the name as a
-    /// parameter rather than copied with one word changed.
+    /// The same directories serve every door — Codex's official installer
+    /// script and GitHub's install script for Copilot use `$HOME/.local/bin`,
+    /// and Homebrew, npm-global and bun land where they always do — so the
+    /// list is written once with the name as a parameter rather than copied
+    /// with one word changed.
     static func findCommandLineTool(named name: String) -> String? {
-        if let onPath = onPath(name) {
-            return onPath
+        for candidate in commandLineToolCandidates(named: name) {
+            if FileManager.default.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// The first of `candidates` that is executable AND passes `accepting`,
+    /// or nil. The Copilot door's search (#783): a `copilot` on the list may
+    /// be another maker's program (Homebrew's own `copilot` formula is AWS's
+    /// tool, and writes the same `/opt/homebrew/bin/copilot`), so a candidate
+    /// that is not GitHub's is skipped and the search goes on down the list.
+    static func firstCommandLineTool(
+        among candidates: [String],
+        accepting isTheRightProgram: (String) -> Bool
+    ) -> String? {
+        for candidate in candidates {
+            if !FileManager.default.isExecutableFile(atPath: candidate) {
+                continue
+            }
+            if isTheRightProgram(candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    /// Every place a command-line assistant called `name` is looked for, in
+    /// order: each folder on PATH, then the places its own installers put it
+    /// (`contracts/app-rules.json` → `outsideAgents.searchedForInOrder`).
+    /// `findCommandLineTool(named:)` takes the first that is executable,
+    /// which is what it always did: PATH first, then the list.
+    static func commandLineToolCandidates(named name: String) -> [String] {
+        var candidates: [String] = []
+        if let pathVariable = ProcessInfo.processInfo.environment["PATH"] {
+            for directory in pathVariable.components(separatedBy: ":") {
+                let trimmed: String = directory.trimmingCharacters(in: .whitespacesAndNewlines)
+                candidates.append((trimmed as NSString).appendingPathComponent(name))
+            }
         }
 
         let homeDirectory: URL = RealHome.forFiles
-        var candidates: [String] = [
+        let installerPlaces: [String] = [
             homeDirectory.appendingPathComponent(".local/bin/\(name)").path,
             "/opt/homebrew/bin/\(name)",
             "/usr/local/bin/\(name)",
             homeDirectory.appendingPathComponent(".npm-global/bin/\(name)").path,
             homeDirectory.appendingPathComponent(".bun/bin/\(name)").path,
         ]
+        for place in installerPlaces {
+            candidates.append(place)
+        }
 
         let nvmNodeDirectory: URL = homeDirectory.appendingPathComponent(".nvm/versions/node")
         if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmNodeDirectory.path) {
@@ -107,13 +150,7 @@ nonisolated enum ClaudeCodeLauncher {
                 candidates.append(nvmToolPath)
             }
         }
-
-        for candidate in candidates {
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        return nil
+        return candidates
     }
 
     /// The MCP server, which is the Plantoir binary itself answering `--mcp-stdio`.
@@ -306,16 +343,38 @@ nonisolated enum ClaudeCodeLauncher {
         // own file tools and with the read tools it already has. In v1.3.0
         // there is no copy feature, and a sentence pointing at one would be
         // pointing at #207.
-        if !referenceCourses.isEmpty {
-            let listed: String = referenceCourses.joined(separator: ", ")
-            text.append(" I also keep earlier \(courseCode) courses for reference: \(listed). ")
-            text.append("You can read them and build on what is there; they are never deployed, ")
-            text.append("and nothing in them can be changed.")
+        if let sentence = referenceCoursesSentence(courseCode: courseCode, referenceCourses: referenceCourses) {
+            text.append(" " + sentence)
         }
         if let unitPlans {
             text.append(" " + UnitPlans.greetingSentence(unitPlans, courseCode: courseCode))
         }
         return text.replacingOccurrences(of: "\"", with: "'")
+    }
+
+    /// The sentence naming the same-code courses kept for reference, as
+    /// `contracts/app-rules.json` → `outsideAgents.greetingReferenceCourses`
+    /// writes it (#856), or nil when there are none. `{course}` is the
+    /// course's code and `{courses}` the list `referenceCoursesToMention`
+    /// gives, joined by `referenceCoursesSeparator`.
+    static let referenceCoursesSentenceTemplate: String =
+        "I also keep earlier {course} courses for reference: {courses}. "
+        + "You can read them and build on what is there; they are never deployed, "
+        + "and nothing in them can be changed."
+
+    /// What goes between two of the listed courses.
+    static let referenceCoursesSeparator: String = ", "
+
+    /// The reference-courses sentence for `courseCode`, filled, or nil for
+    /// an empty list, which says nothing at all.
+    static func referenceCoursesSentence(courseCode: String, referenceCourses: [String]) -> String? {
+        if referenceCourses.isEmpty {
+            return nil
+        }
+        let listed: String = referenceCourses.joined(separator: referenceCoursesSeparator)
+        return referenceCoursesSentenceTemplate
+            .replacingOccurrences(of: "{course}", with: courseCode)
+            .replacingOccurrences(of: "{courses}", with: listed)
     }
 
     /// The reference courses a session on `course` should be told about:
@@ -365,7 +424,9 @@ nonisolated enum ClaudeCodeLauncher {
                     // HOLD (#458, as Windows since #430): an `assist` lease,
                     // never a narrowing — `args` stays the folder alone.
                     "env": [
-                        AssistMCPServer.doorCourseVariable: courseCode
+                        AssistMCPServer.doorCourseVariable: courseCode,
+                        // Which door, so the hold can name it (#783).
+                        AssistMCPServer.doorAssistantVariable: "claude"
                     ]
                 ]
             ]
