@@ -462,7 +462,7 @@ Look for `.claude/skills/plantoir-report-comments/SKILL.md` (or
 the root `CLAUDE.md` and `AGENTS.md` list the skills that are here. Only if
 it is there, when the sheets are handed over and the marks are final, you
 may mention once, in one sentence, that you can draft report card comments
-from these records with the plantoir-report-comments skill. Do not raise it
+from these records with the `plantoir-report-comments` skill. Do not raise it
 again in this session if they do not take it up. If it is not there, say
 nothing about report comments.
 
