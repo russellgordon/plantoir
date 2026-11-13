@@ -36416,7 +36416,7 @@
         "note": "The last case is the name part's own rule (letters and digits only); deploy.py's sanitize_last_name has already folded côté to cote before it is saved, so a real surname never reaches it with an accent."
       },
       "modeCases": {
-        "rule": "Whether a share is protected, from the year's marker (`protected`, or absent) and the flag given. Protection is sticky: a share with neither flag keeps what the marker says, and only --remove-password opens a protected site.",
+        "rule": "Whether a share is protected, from the year's marker (`marker` is true when its `asked` is protected, false when open, null when there is no marker) and the flag given. Protection is sticky: a share with neither flag keeps what the marker says, and only --remove-password opens a protected site.",
         "cases": [
           {
             "marker": null,
@@ -36532,14 +36532,16 @@
           "subdomain",
           "address",
           "year",
+          "asked",
           "protected",
           "failClosed",
           "answerKeys",
+          "answerKeysLeftOut",
           "lastShared",
           "units",
           "oldCopies"
         ],
-        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `answerKeys` is in or out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded."
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded."
       },
       "credential": {
         "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a file only the user can read (/tmp/plan_cred), which share_plan.py deletes as soon as it has read it. Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
@@ -36594,6 +36596,8 @@
         "stillSharing": "These unit plans are already being shared, so they cannot be shared again until that has finished.",
         "notToAFolder": "Unit plans are shared through Cloudflare Pages, not to a folder.",
         "netlifyNever": "Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password.",
+        "notAnsweringYet": "These plans were sent, but their address did not answer yet, so Plantoir cannot say they are shared. Share Again in a minute.",
+        "cloudflareSaidNo": "Cloudflare did not take these plans, so they were not shared. The reason Cloudflare gave is above.",
         "referenceCourse": "referenceCourses.refusal.sentence, unchanged"
       },
       "trail": {

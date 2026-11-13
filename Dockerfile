@@ -375,6 +375,11 @@ COPY scripts/isolation_headers.py /opt/scripts/isolation_headers.py
 # link's path in memory as it uploads - deploy.py imports it by bare name, so
 # it is baked beside it (test_baked_modules.py).
 COPY scripts/netlify_paths.py /opt/scripts/netlify_paths.py
+# Sharing a course's unit plans (#709): deploy.sh <CODE> --plans runs
+# share_plan.py, which imports unit_plan_site.py (check, stage, the worker,
+# names) and deploy.py by bare name, so both are baked beside it.
+COPY scripts/unit_plan_site.py /opt/scripts/unit_plan_site.py
+COPY scripts/share_plan.py /opt/scripts/share_plan.py
 
 # Bake the Explorer's hide filter into the image.
 #
