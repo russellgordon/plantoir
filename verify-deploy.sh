@@ -51,7 +51,7 @@
 #   ./verify-deploy.sh --self-test         # checks this script's own wait for
 #                                          # Cloudflare (#665) and its retry of a
 #                                          # new site's files (#740) and pages
-#                                          # (#869), offline, ~50 s
+#                                          # (#869), offline, ~75 s
 #   ./verify-deploy.sh --first-publish [<folder> <CODE> <N>]
 #                                          # publishes as a NEW teacher would:
 #                                          # new sites, both questions asked (#712)
@@ -251,6 +251,13 @@ wait_for_new_address() {  # wait_for_new_address <label> <url>
 # already ask again on their own, in every run.
 NS_POLL="${VERIFY_DEPLOY_NS_POLL:-5}"
 NS_WAIT="${VERIFY_DEPLOY_NS_WAIT:-60}"
+# One deadline for a whole check_engine or check_page_links call as well
+# (#869 review): once it has passed, a fetch that does not settle is asked
+# once and judged, so a genuinely broken new site fails in at most about
+# NS_CALL_WAIT s a call plus one answer per remaining fetch, rather than
+# NS_WAIT for every fetch (18 broken links would have been 18 minutes).
+NS_CALL_WAIT="${VERIFY_DEPLOY_NS_CALL_WAIT:-180}"
+NS_CALL_DEADLINE=""
 
 # The last block of `curl -L -D -`'s headers: the answer the redirects led to.
 last_header_block() {
@@ -273,6 +280,9 @@ fetch_headers() {
   # (the self-test asserts a range).
   start=$(date +%s)
   deadline=$(( start + NS_WAIT ))
+  if [ -n "$NS_CALL_DEADLINE" ] && [ "$NS_CALL_DEADLINE" -lt "$deadline" ]; then
+    deadline=$NS_CALL_DEADLINE
+  fi
   while :; do
     headers=$(curl -s $follow -D - -o "$out" --max-time 30 "$url" 2>/dev/null | tr -d '\r')
     final=$(printf '%s\n' "$headers" | last_header_block)
@@ -306,15 +316,15 @@ fetch_headers() {
 
 # One line per site for the Result block: how many of its files (and, since
 # #869, its pages) a brand-new site needed asking again, and the most it took.
-measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in /> [what]
+measure_new_site_retries() {  # measure_new_site_retries <label> <base url ending in /> [what] [counted, one, none]
   local log="${NS_RETRY_LOG:-$WORK/new-site-retries.tsv}" line
   [ "$FIRST_PUBLISH" = true ] || return 0
   case "$2" in http://localhost:*) return 0 ;; esac
-  line=$(awk -F '\t' -v b="$2" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
-    END { if (n == 0) print "no file needed asking again"; else printf "%d file(s) needed asking again, %d retries in all, at most %d for one file, the longest %d s", n, t, m, w }' "$log" 2>/dev/null)
-  local what="${3:-}"
+  local what="${3:-}" counted="${4:-file(s)}" one="${5:-one file}" none="${6:-no file}"
   [ -n "$what" ] || what="a brand-new site's files and pages (#740, #869)"
-  MEASURED+=("$1, $what: ${line:-no file needed asking again}")
+  line=$(awk -F '\t' -v b="$2" -v counted="$counted" -v one="$one" -v none="$none" 'index($1, b) == 1 { n++; t += $2; if ($2 > m) m = $2; if ($3 > w) w = $3 }
+    END { if (n == 0) print none " needed asking again"; else printf "%d %s needed asking again, %d retries in all, at most %d for %s, the longest %d s", n, counted, t, m, one, w }' "$log" 2>/dev/null)
+  MEASURED+=("$1, $what: ${line:-$none needed asking again}")
 }
 
 # ------------------------------- what a published site is checked for
@@ -334,6 +344,7 @@ check_engine() {  # check_engine <label> <site base url ending in />
   NS_LEG=$(( ${NS_LEG:-0} + 1 ))
   NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
   : >"$NS_RETRY_LOG"
+  NS_CALL_DEADLINE=$(( $(date +%s) + NS_CALL_WAIT ))
   local base="$2" name type code headers csp
   for name in pyodide.asm.wasm pyodide.asm.mjs pyodide.mjs plantoir-worker.js python_stdlib.zip pyodide-lock.json; do
     headers=$(fetch_headers 200 "${base}static/pyodide/$name")
@@ -417,8 +428,13 @@ check_engine() {  # check_engine <label> <site base url ending in />
       no "$1 sends no COEP on static/$name, which an isolated page's worker needs"
     fi
   done
+  # The two checks for an ABSENT header pass only on a real answer (#869
+  # review): a page that never came is a failure, not a pass.
   headers=$(fetch_headers page "${base}" | last_header_block)
-  if printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy:'; then
+  code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+  if [ "$code" != "200" ]; then
+    no "$1's front page answered HTTP ${code:-000}, so whether it sends COEP could not be judged"
+  elif printf '%s\n' "$headers" | grep -qi '^cross-origin-embedder-policy:'; then
     no "$1 sends COEP on the front page, which has no runnable code - its frames would break"
   else
     ok "$1 sends no COEP on the front page, which has no runnable code"
@@ -432,11 +448,15 @@ check_engine() {  # check_engine <label> <site base url ending in />
   code=$(fetch_headers 200 "${base}static/katex/fonts/KaTeX_Main-Regular.woff2" | awk 'NR==1{print $2}')
   [ "$code" = "200" ] && ok "$1 serves KaTeX's faces itself" || no "$1 answered HTTP $code for a KaTeX face"
   headers=$(fetch_headers page "${base}Runner-Deploy-Check")
-  if printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
+  code=$(printf '%s\n' "$headers" | last_header_block | awk 'NR==1{print $2}')
+  if [ "$code" != "200" ]; then
+    no "$1's page of runnable code answered HTTP ${code:-000}, so whether its CSP names a CDN could not be judged"
+  elif printf '%s\n' "$headers" | grep -iq "^content-security-policy:.*jsdelivr"; then
     no "$1's CSP still names cdn.jsdelivr.net"
   else
     ok "$1's CSP names no CDN for the maths"
   fi
+  NS_CALL_DEADLINE=""
   measure_new_site_retries "$1" "$base"
 }
 
@@ -458,14 +478,16 @@ check_page_links() {  # check_page_links <label> <site base url ending in /> <ne
   NS_LEG=$(( ${NS_LEG:-0} + 1 ))
   NS_RETRY_LOG="$WORK/new-site-retries-$NS_LEG.tsv"
   : >"$NS_RETRY_LOG"
-  said=$(python3 - "$2" "$3" "$FIRST_PUBLISH" "$NS_POLL" "$NS_WAIT" "$NS_RETRY_LOG" <<'PY'
+  said=$(python3 - "$2" "$3" "$FIRST_PUBLISH" "$NS_POLL" "$NS_WAIT" "$NS_RETRY_LOG" "$NS_CALL_WAIT" <<'PY'
 import html, re, sys, time, urllib.error, urllib.parse, urllib.request
 base, host_kind = sys.argv[1], sys.argv[2]
-# The four after them are optional, because Windows' verify-deploy.ps1 runs
+# The five after them are optional, because Windows' verify-deploy.ps1 runs
 # this same program read out of this file and passes the first two only
 # (Get-PageLinksProgram): without them nothing is asked again, as before #869.
-extra = sys.argv[3:7] if len(sys.argv) >= 7 else ["false", "5", "60", ""]
+extra = sys.argv[3:8] if len(sys.argv) >= 8 else ["false", "5", "60", "", "180"]
 first_publish, ns_poll, ns_wait, retry_log = extra[0] == "true", float(extra[1]), float(extra[2]), extra[3]
+# One deadline for the whole call, as check_engine's NS_CALL_WAIT.
+call_deadline = time.time() + float(extra[4])
 own = urllib.parse.urlsplit(base).netloc.lower()
 def asked_again(url, attempt, settled):
     # fetch_headers' rule (#740, #869), for the fetches made here: on a first
@@ -477,7 +499,7 @@ def asked_again(url, attempt, settled):
     while True:
         answer = attempt(url)
         good = settled(answer)
-        if good or not first_publish or url.startswith("http://localhost:") or time.time() >= start + ns_wait:
+        if good or not first_publish or url.startswith("http://localhost:") or time.time() >= min(start + ns_wait, call_deadline):
             break
         tries += 1
         time.sleep(ns_poll)
@@ -584,7 +606,7 @@ PY
   else
     ok "$1's page links: $(printf '%s\n' "$said" | sed -n 's/^SUMMARY //p')"
   fi
-  measure_new_site_retries "$1" "$2" "a brand-new site's page links (#869)"
+  measure_new_site_retries "$1" "$2" "a brand-new site's page links (#869)" "page(s) or link(s)" "one page or link" "no page or link"
 }
 
 # ----------------------------------------------------------------- self-test
@@ -913,7 +935,7 @@ STUB
       for line in ${MEASURED[@]+"${MEASURED[@]}"}; do printf 'MEASURED %s\n' "$line"; done ) 2>"$ST_DIR/said.txt"
   }
   WORK="$ST_DIR/work"; mkdir -p "$WORK"
-  NS_POLL=1; NS_WAIT=4
+  NS_POLL=1; NS_WAIT=4; NS_CALL_WAIT=60
 
   ws_start good good good
   FIRST_PUBLISH=true
@@ -962,12 +984,60 @@ STUB
   if printf '%s\n' "$out" | grep -q "✅ case's page links: 2 same-site links, 2 answered 200" \
      && grep -q '127.0.0.1:[0-9]*/ needed 2 retries' "$ST_DIR/said.txt" \
      && grep -q 'Lesson-One needed 1 retry' "$ST_DIR/said.txt" \
-     && printf '%s\n' "$out" | grep -q "^MEASURED case, a brand-new site's page links (#869): 2 file(s) needed asking again, 3 retries in all"; then
+     && printf '%s\n' "$out" | grep -q "^MEASURED case, a brand-new site's page links (#869): 2 page(s) or link(s) needed asking again, 3 retries in all"; then
     ok "a brand-new site's front page and one link answer 404 at first: the page links are asked again, pass, and are counted in the Result block"
   else
     no "a brand-new site's page links: $(printf '%s\n' "$out" | head -4) said: $(cat "$ST_DIR/said.txt")"
   fi
   st_stop
+
+  # A negative check passes only on a real answer (#869 review): the front
+  # page never answering is a failure on the no-COEP line, never a pass.
+  ws_start good 522:inf good
+  out=$(ws_run check_engine)
+  if printf '%s\n' "$out" | grep -q "❌ case's front page answered HTTP 522, so whether it sends COEP could not be judged" \
+     && ! printf '%s\n' "$out" | grep -q "✅ case sends no COEP on the front page"; then
+    ok "a front page that never answers fails the no-COEP check rather than passing it"
+  else
+    no "a front page that never answers: $(printf '%s\n' "$out" | grep -i 'front page' | head -2)"
+  fi
+  st_stop
+
+  # The same for the CSP check when the page of runnable code never comes.
+  ws_start 522:inf good good
+  out=$(ws_run check_engine)
+  if printf '%s\n' "$out" | grep -q "❌ case's page of runnable code answered HTTP 522, so whether its CSP names a CDN could not be judged" \
+     && ! printf '%s\n' "$out" | grep -q "✅ case's CSP names no CDN"; then
+    ok "a page of runnable code that never answers fails the CSP check rather than passing it"
+  else
+    no "a page that never answers, CSP: $(printf '%s\n' "$out" | grep -i 'CSP' | head -2)"
+  fi
+  st_stop
+
+  # One deadline per call: once NS_CALL_WAIT has passed, the fetches left are
+  # asked once. check_engine's page fetches (three) and check_page_links'
+  # front page and link would each wait NS_WAIT; with the call's deadline at
+  # NS_WAIT, only the first one is asked again.
+  NS_CALL_WAIT=4
+  ws_start 522:inf good good
+  out=$(ws_run check_engine)
+  n=$(grep -c 'Runner-Deploy-Check needed' "$ST_DIR/said.txt")
+  if [ "$n" -eq 1 ] && printf '%s\n' "$out" | grep -q "page of runnable code carries no Swift program"; then
+    ok "check_engine's call deadline: of the page's three fetches only the first is asked again, and the checks still fail"
+  else
+    no "check_engine's call deadline: $n fetches asked again, said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+  ws_start good 404:inf 404:inf
+  out=$(ws_run check_page_links)
+  if grep -q '127.0.0.1:[0-9]*/ needed' "$ST_DIR/said.txt" && ! grep -q 'Lesson-One needed' "$ST_DIR/said.txt" \
+     && printf '%s\n' "$out" | grep -q "❌ case's page links"; then
+    ok "check_page_links' call deadline: the front page is asked again, the link after the deadline is asked once, and the check still fails"
+  else
+    no "check_page_links' call deadline: said: $(cat "$ST_DIR/said.txt")"
+  fi
+  st_stop
+  NS_CALL_WAIT=60
 
   # Windows' verify-deploy.ps1 reads check_page_links' program out of this
   # file with its own expression and runs it with two arguments only. Read

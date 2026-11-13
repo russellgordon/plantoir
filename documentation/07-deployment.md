@@ -2427,7 +2427,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740 and #869, the retries below) in about 50 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740 and #869, the retries below) in about 75 s,
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -2523,7 +2523,10 @@ reading every fetch in the script:
 - the front page's "no COEP" check and the page's "CSP names no CDN" check.
   Both check that a header is ABSENT, so a 404 or a 522 used to pass them
   without the page ever being read. Now the header is judged on a 200
-  whenever one comes within the deadline;
+  whenever one comes within the deadline, and since #869's review an answer
+  that is not 200 is a FAILURE that says the header could not be judged, on
+  every run, plain ones included: a negative check passes only on a real
+  answer;
 - in `check_page_links`, the two pages it starts from (retried until they
   load) and every link (retried while it answers 404, a 5xx or nothing; a
   redirect is a settled answer that the check judges by its class, so
@@ -2531,8 +2534,20 @@ reading every fetch in the script:
   The Cloudflare control, a lower-case address that is meant to fail, is
   asked once. The Python carries the same rule as `asked_again`, writing the
   same `↻` line and the same four-column log. The Result block gains one
-  line per call, "<site>, a brand-new site's page links (#869): …", and
-  `check_engine`'s line now reads "files and pages (#740, #869)".
+  line per call, "<site>, a brand-new site's page links (#869): N page(s)
+  or link(s) needed asking again, …", and `check_engine`'s line now reads
+  "files and pages (#740, #869)".
+
+**One deadline per call as well (#869 review).** NS_WAIT is per fetch, so a
+genuinely broken new site would cost 60 s for every fetch that never
+settles: the test course's 18 same-site links alone would be 18 minutes a
+`check_page_links` call, and a first-publish run makes six such calls. Each
+`check_engine` and each `check_page_links` call therefore also has one
+deadline, `NS_CALL_WAIT` (180 s, `VERIFY_DEPLOY_NS_CALL_WAIT`), after which a
+fetch that does not settle is asked once and judged. A broken call so takes
+at most about 180 s plus one answer for each fetch left (each `curl` is
+capped at 30 s), and a healthy one is unaffected. The page-links program
+takes it as its seventh argument, optional like the rest.
 
 Already asked again, and left alone: `check_url` (40 tries 5 s apart, every
 run), the Cloudflare production wait and the new-address wait above, and the
@@ -2553,14 +2568,19 @@ fails here first.
 change of their own beyond the above), so the self-test runs the real checks
 against a whole stub site on 127.0.0.1 (`whole.py`). That stub serves every
 engine file at its type with COEP, the page with its block, program and
-isolation, and a front page with one more link. Eight cases: a control that
+isolation, and a front page with one more link. Twelve cases: a control that
 passes every check at once; the page answering 404, 522 or a placeholder
 without its block twice, then passing, with the count in the Result block;
 a page that never comes (still both checks' failure, judged on the last
 answer, at least 12 s for its three fetches, measured 12 to 28 s); the front
-page and a link answering 404 at first; the program as Windows reads it; and
-a plain run judging the page and a link once. Measured: 21 passed, 0 failed,
-in about 50 s, on every run of the final script (three in a row). Proved must-fail with the new self-test
+page and a link answering 404 at first; the program as Windows reads it; a front page that never answers failing
+the no-COEP check, and a page that never answers failing the CSP check,
+rather than passing them; the call deadline in `check_engine` (of the page's
+three fetches only the first is asked again) and in `check_page_links` (the
+link fetched after the deadline is asked once); and a plain run judging the
+page and a link once. Measured: 25 passed, 0 failed, in about 75 s, three
+runs in a row. The four review cases and the new page-links wording fail on
+247be1336's functions (20 passed, 5 failed). Proved must-fail with the new self-test
 over `origin/dev`'s `fetch_headers`, `check_engine`, `check_page_links` and
 `measure_new_site_retries`: 5 of the 8 fail; the control, the two-argument
 case and the plain run pass either way. Rejected: retrying in the caller with a loop of its own (a

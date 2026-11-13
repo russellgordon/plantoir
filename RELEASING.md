@@ -424,14 +424,14 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    >
    > **Run the self-test first: `verify-deploy.ps1 -SelfTest` on Windows,
    > `./verify-deploy.sh --self-test` on the mac** (#680, #665). Offline, no
-   > credentials, about 50 s on the mac and about 30 s on Windows: it proves
+   > credentials, about 75 s on the mac and about 30 s on Windows: it proves
    > the wait for Cloudflare's production address against a stub, so a real
    > run's Cloudflare lines can be trusted, and (since #740 on the mac, #743
    > on Windows) that a first-publish run retries a brand-new site's files
    > for up to 60 s before failing one. Since #869 on the mac, the same goes
    > for its pages: the page of runnable code, the page and front-page
    > headers, and the page links. The run's Result block counts the
-   > retries. It reads 21 passed, 0 failed on the mac, and 13 passed,
+   > retries. It reads 25 passed, 0 failed on the mac, and 13 passed,
    > 0 failed on Windows until Windows has #869's cases.
 3. **Build the signed Windows bundle**, after re-running the runtime fetch
    (it is quick when nothing changed, and the build refuses a runtime made
