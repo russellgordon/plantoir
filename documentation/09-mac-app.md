@@ -4560,7 +4560,8 @@ the trail, because it would be student data.
   the top of a page and nothing else, so a name written anywhere else is
   seen and the teacher skims the blanked papers once, in one file, before
   any is read; the script stops on any page whose top does not match the
-  blank test; a name seen is never repeated (the identifier and page only,
+  blank test, and the name box check file (the top of every page with the
+  box drawn) is looked at FIRST; a name seen is never repeated (the identifier and page only,
   `NAME VISIBLE page N` in `checks`); the files written stay on the
   computer. REJECTED: v1's "scans are redacted ... what I write stays on
   this computer", which claimed more than the redaction does, and "what I
@@ -4574,9 +4575,12 @@ the trail, because it would be student data.
   refused, because it could be built into a site or copied with a course.
   A folder kept in sync by a service is said ONCE and recorded
   (`syncAccepted` in `courses/<CODE>/.internal/marking/marking.json`, paths
-  only), because a Mac's Desktop and Documents can be in iCloud with
-  ordinary-looking paths (review M5): the assistant asks rather than
-  infers. No rule about Documents; the offered default is `~/Marking/<CODE>/`.
+  only, one entry per synced folder's path so a new folder is asked about
+  again, 750a review L4), because a Mac's Desktop and Documents can be in
+  iCloud with ordinary-looking paths (review M5): the assistant asks rather
+  than infers. Since the 750a review (L5) every script also refuses a
+  folder inside a working folder (one with `courses/` and `.toolchain/`
+  above it), so the refusal is not the skill's words alone. No rule about Documents; the offered default is `~/Marking/<CODE>/`.
 - **The redaction checks each page against the BLANK test (review R2).**
   The plan's prototype checked that the box's pixels were black, which
   proves the painter and nothing about coverage: run on nine kinds of scan
@@ -4633,6 +4637,34 @@ the trail, because it would be student data.
   (3 pixels of widening alone) those four read 5 to 15 and slipped under,
   because the name's ink over the printed Date counted as the blank's.
   The case "a name written past the box" goes red without the check.
+  **The 750a review's fixes (2026-11-12).** H1: at 80 levels darker than
+  the paper the ring missed a light pencil name (pixel about 178) past the
+  box, which was written with 2,124 name pixels visible; at 40 it was
+  caught, and at 30 so is the trial fixture's light-pencil name that runs
+  over the printed Date label (6 pixels at 40, 14 at 30, the limit 10).
+  So that paper marks are not writing, a THIN straight line 0.5 in long
+  (a ruled line, a fold) is left out of the ring and of the lining up, and
+  the left 0.6 in (punched holes, a staple) is left out of the lining up.
+  MEASURED on the review's 50 invented scans: every one that must be
+  written still is, with 0 name pixels outside the box; scale 101 percent
+  is now stopped (writing past the box), a nuisance in the safe direction.
+  M1: the written page was lined up again with its black box in it, so a
+  page shifted right 0.04 in or turned 0.5 degrees lined up against solid
+  black and was stopped; the box is masked out first, and both are cases.
+  The tolerances moved into "What must not change", because loosening one
+  to clear a CHECK lets a name through, and the skill says so.
+  H2: what the box covers is said exactly, in the skill, point 2 and the
+  run's last line: the name box of each page whose blank test has one, and
+  writing within 0.25 in of it. A surname after a gap, a name on the Date
+  line (MEASURED: 1,010 pixels survive, written), a name on a page with no
+  name blank, and a name in the body are NOT caught, and the name box check
+  file is put first in what the teacher looks at, since it shows the
+  original header with the box drawn. REJECTED: making the script look for
+  names anywhere on a page, which it cannot do (ink on the Date line cannot
+  be told from a date). Found while fixing it: on a blank whose Name blank
+  is on page 1 only, page 2's "School Name" was taken for the label and a
+  box drawn over the school's name; once a page has a label a writing line
+  follows, a page without one gets no box, and the file's line names it.
   A limit, said in the skill: a rotation of 1.5 degrees is stopped
   although no ink survived it, since 0.1 in at the box's corners is about
   one degree.
@@ -4648,11 +4680,23 @@ the trail, because it would be student data.
   the skill has the assistant copy it into the marking folder's `Scripts/`,
   adapt it and self-test it. But the self-test is adapted with the script,
   so it proves nothing about the adaptation. `run_with_names.py` is never
-  adapted (the skill folder is restored on every mirror): it reads the
+  adapted (the skill folder is put back when Plantoir next refreshes the working folder): it reads the
   mapping table, builds every form a name could take, runs the script with
   its output captured, withholds any line holding one, and moves any new
   file in the marking folder holding one (its text, a PDF's text, or its
-  path) to `Quarantine/`, counting both. It is a net, not a lock: it cannot
+  path) to `Quarantine/`, counting both. Since the 750a review (H3) it
+  never says "checked" of a file it could not read: it reads UTF-16, gzip,
+  a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
+  and XMP; it reports read and clean, moved, and NOT checked by kind, and
+  exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
+  file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
+  name were "checked, 0 held a name", and a folder named by a name stayed
+  behind; each is now a case. It compares without accents (M4), runs the
+  script in the marking folder so a relative path is watched (M5), and
+  looks at everything before passing anything on. The skill names its
+  SHA-256 and has the assistant check it before use, because it can be
+  edited in place until Plantoir next refreshes the working folder (L6).
+  It is a net, not a lock: it cannot
   stop a script run without it or writing elsewhere, or know a name the
   table does not hold, and it says so every run. A name that is also a
   common word (May, Will) withholds every line with that word too: the safe
@@ -4669,13 +4713,19 @@ the trail, because it would be student data.
   compiles with exit 0 and a blank where the name should be, so a copy is
   failed on "Missing character" OR when `pdftotext` does not find the name:
   with only the first check dropped the second still catches it, with both
-  dropped the case writes a sheet with no name on it.
+  dropped the case writes a sheet with no name on it. 750a review M2: a
+  name with an apostrophe or with ff, fi or ffi was failed as "could not be
+  set", because `pdftotext` returns a typeset apostrophe and ligatures; the
+  comparison now reads NFKC with the apostrophe as typed, and both are
+  cases. `--check-table` answers "is my table right?" in counts only (L1).
 - **The sheet.** `build_test_sheet.py` is Russell's `build_sheets.py` with
   everything test-specific read from the kit (points and meanings, each
   question's skill, the strength concepts, categories, parts, topics), the
   kit and record checked first by #751's `check_kit.py` (a copy that skips
   it lets every refused kit case through to a different error), and the
-  student line one `\studentline{}`. The layout is the default for every
+  student line one `\studentline{}`. Its footer reads "Test: Feedback ·
+  COURSE" (it printed two hyphens, L9), and the teacher-decides sentence is
+  in "What must not change" (L8). The layout is the default for every
   teacher (summary, strengths, issues by question, areas to focus on,
   overall comments, the marks last, because students read marks first and
   stop); his colours, the orange item's shape and "never the fix" are in
