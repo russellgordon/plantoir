@@ -235,7 +235,7 @@ public static class UnitPlans
     /// included. A plan with only one of its two dates is read as starting and
     /// ending on that day; a plan with neither covers no day. ONE rule for the
     /// greeting's order (<see cref="NamedFirst"/>) and for the entry the
-    /// Planning tab starts on (<c>PlanningTab.StartingChoice</c>), so the
+    /// Planning tab starts on (<see cref="PlanningTab.StartingChoice"/>), so the
     /// two cannot disagree about which unit is current (#820 item 1).
     /// </summary>
     public static bool Covers(Plan plan, DateOnly today)
