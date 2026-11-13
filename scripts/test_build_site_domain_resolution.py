@@ -20,9 +20,11 @@ verify.sh runs this early, before the (slow) Docker build, since nothing
 here needs the image.
 """
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import build_site
 
@@ -84,6 +86,68 @@ class ResolveSectionDomainTests(unittest.TestCase):
             )
             domain = build_site.resolve_section_domain(course_dir, config, 1)
             self.assertEqual(domain, "ics3u-s1-2026-teacher.netlify.app")
+
+    def _both_markers(self, course_dir: Path):
+        (course_dir / ".netlify_sites").mkdir()
+        (course_dir / ".netlify_sites" / "section1.json").write_text(
+            json.dumps({"name": "ics3u-s1-2026-teacher"}), encoding="utf-8")
+        (course_dir / ".cloudflare_sites").mkdir()
+        (course_dir / ".cloudflare_sites" / "section1.json").write_text(
+            json.dumps({"name": "ics3u-s1-2026-teacher", "subdomain": "ics3u-s1-2026-teacher.pages.dev"}),
+            encoding="utf-8")
+
+    def test_a_cloudflare_course_with_a_netlify_record_too_is_built_with_its_cloudflare_address(self):
+        """#799, measured on Windows: the Netlify marker was read first
+        whatever the course deployed to, so a Cloudflare course that had ever
+        been deployed to Netlify carried the Netlify address, and deploy.py,
+        comparing it with the Cloudflare destination's, rebuilt on every
+        Cloudflare deploy."""
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            self._both_markers(course_dir)
+            domain = build_site.resolve_section_domain(course_dir, {"deploy_target": "cloudflare_pages"}, 1)
+            self.assertEqual(domain, "ics3u-s1-2026-teacher.pages.dev")
+
+    def test_a_netlify_course_with_a_cloudflare_record_too_keeps_its_netlify_address(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            self._both_markers(course_dir)
+            for config in ({"deploy_target": "netlify"}, {}, {"deploy_target": "local_folder"}):
+                with self.subTest(config=config):
+                    domain = build_site.resolve_section_domain(course_dir, config, 1)
+                    self.assertEqual(domain, "ics3u-s1-2026-teacher.netlify.app")
+
+    def test_a_cloudflare_course_with_only_a_netlify_record_still_has_an_address(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            (course_dir / ".netlify_sites").mkdir()
+            (course_dir / ".netlify_sites" / "section1.json").write_text(
+                json.dumps({"name": "ics3u-s1-2026-teacher"}), encoding="utf-8")
+            domain = build_site.resolve_section_domain(course_dir, {"deploy_target": "cloudflare_pages"}, 1)
+            self.assertEqual(domain, "ics3u-s1-2026-teacher.netlify.app")
+
+    def test_a_deploys_own_rebuild_bakes_the_address_it_was_asked_for(self):
+        """#799: deploy.py's rebuild for a destination's address sets the
+        variable on that build, and it wins over the records and the custom
+        domain, so the rebuild comes out with the address it was started for
+        (a Cloudflare leg of a course whose primary is Netlify included)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            course_dir = Path(tmp)
+            self._both_markers(course_dir)
+            config = {"deploy_target": "netlify",
+                      "custom_domains": {"sections": {"section1": {"netlify": "ics3u.school.ca"}}}}
+            with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: "https://ics3u-s1-2026-teacher.pages.dev/"}):
+                domain = build_site.resolve_section_domain(course_dir, config, 1)
+            self.assertEqual(domain, "ics3u-s1-2026-teacher.pages.dev")
+            with mock.patch.dict(os.environ, {build_site.DEPLOY_BASE_URL_VARIABLE: "  "}):
+                self.assertEqual(build_site.resolve_section_domain(course_dir, config, 1), "ics3u.school.ca")
+
+    def test_deploy_py_sets_the_same_variable(self):
+        """Read from deploy.py's text, not imported: this file imports
+        build_site alone (a shared test must not import a sibling the image's
+        verify.sh run lacks)."""
+        source = (Path(__file__).resolve().parent / "deploy.py").read_text(encoding="utf-8")
+        self.assertIn('DEPLOY_BASE_URL_VARIABLE = "%s"' % build_site.DEPLOY_BASE_URL_VARIABLE, source)
 
     def test_no_custom_domain_at_all_falls_through_cleanly(self):
         config = {"deploy_target": "netlify"}

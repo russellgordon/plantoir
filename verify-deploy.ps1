@@ -1761,6 +1761,19 @@ Check-Folder "the leg after a failed one" (Join-Path $folderB "section$Section")
 # deploy makes the course's hidden site records at its top, which changes the
 # course folder's own time, so the next deploy builds ONCE by the contract's
 # knownLimits; that run is measured, not asserted.
+# #799: the site carries ITS OWN address. Until #799 a Cloudflare course that
+# had ever been deployed to Netlify was built with the Netlify address (the
+# Netlify record was read first), so its social cards named the other site,
+# and deploy.py rebuilt it on every Cloudflare deploy for an address the
+# rebuild never gave it. Quartz writes og:image from the build's baseUrl.
+function Check-BuiltForItsAddress([string]$Name, [string]$Url) {
+    $want = ([Uri]$Url).Host
+    try { $html = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 "$($Url.TrimEnd('/'))/").Content } catch { No "$Name's front page could not be fetched to read its address"; return }
+    if ($html -match 'property="og:image" content="https://([^/"]+)/') {
+        if ($Matches[1] -ceq $want) { Ok "$Name's pages carry its own address ($want)" }
+        else { No "$Name's pages carry another site's address ($($Matches[1]), not $want)" }
+    } else { No "$Name's front page names no address in og:image" }
+}
 function Check-DeployedAgainUnchanged([string]$Name, [string]$Target) {
     $again = Measure-Deploy "$Name, the same site again, nothing changed (#799)" "deploy.bat" @($Course, "$Section", "--target", $Target) (Join-Path $work "deploy-$Target-again.log")
     $built = $again.Log -match $script:BuiltAgainLines
@@ -1783,6 +1796,7 @@ if ($haveNetlify) {
         Check-Url "Netlify" $netlifyUrl -MustEndWith "netlify.app"
         Check-Engine "Netlify" "$($netlifyUrl.TrimEnd('/'))/"
         Check-PageLinks "Netlify" "$($netlifyUrl.TrimEnd('/'))/" netlify
+        Check-BuiltForItsAddress "Netlify" $netlifyUrl
     } else { No "no Netlify address in the output" }
     Check-DeployedAgainUnchanged "Netlify" "netlify"
 } else { Skipped "Netlify (no credentials)" }
@@ -1808,6 +1822,7 @@ if ($haveCloudflare) {
         if ($cfSnapped) { [void](Wait-CloudflareProduction "Cloudflare Pages" $cloudflareUrl (Join-Path $work "cf-alone")) }
         Check-Engine "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/"
         Check-PageLinks "Cloudflare Pages" "$($cloudflareUrl.TrimEnd('/'))/" cloudflare
+        Check-BuiltForItsAddress "Cloudflare Pages" $cloudflareUrl
     } else { No "no Cloudflare address in the output" }
     Check-DeployedAgainUnchanged "Cloudflare" "cloudflare"
 } else { Skipped "Cloudflare Pages (no credentials)" }

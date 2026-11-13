@@ -2799,6 +2799,44 @@ see the reason for.
   REJECTED: dropping the condition only (it still mirrors under a flag that
   deploys nothing), and clearing the token `--target` names (it clears one
   the course never uses).
+- **A Cloudflare deploy of an unchanged site built every time, for its
+  ADDRESS, not its pages.** The director's plain `verify-deploy.ps1` found
+  it at #799's gate: "a second Cloudflare deploy with nothing changed built
+  again" took 69 s, while Netlify's second deploy built nothing in 5 s.
+  - **What happened:** `deploy.ps1`'s question answered `reuse`. Then
+    `deploy.py`'s address check found the build's `baseUrl` was the NETLIFY
+    address, and rebuilt "for production".
+  - **Why:** `build_site.resolve_section_domain` read the Netlify record
+    before the Cloudflare one, whatever the course deployed to. This course
+    had both records, as any course deployed to both, or moved from
+    Netlify to Cloudflare, has. The rebuild resolved the same Netlify
+    address again, so every Cloudflare deploy rebuilt, and the live
+    Cloudflare site's social cards named the Netlify site.
+  - **Reproduced offline,** with a real native build of a scratch course
+    carrying both records: the build said `Set Quartz baseUrl ->
+    "...netlify.app"`, then `deploy.py for ...pages.dev -> REBUILDS`.
+  - **Fixed in the shared Python, in two parts:**
+    - The PRIMARY destination's record is read first, so a Cloudflare course
+      gets its `pages.dev` address.
+    - `deploy.py` hands its own rebuild the destination's address in
+      `PLANTOIR_DEPLOY_BASE_URL`, set on that one build only, so a rebuild
+      for an address comes out with that address. That includes a Cloudflare
+      leg of a Netlify-primary course; such a course still rebuilds once per
+      leg for the address ("Known extra builds").
+  - **Measured after the fix,** with the same reproduction: the build sets
+    `pages.dev` and `deploy.py` reuses, and a Netlify course still builds
+    with, and reuses, its `netlify.app` address.
+  - **Tests:** six new shared tests in `test_build_site_domain_resolution.py`
+    and `test_build_freshness_reuse.py` fail on the old code. The first file
+    imports nothing new: it reads `deploy.py` as text. `verify-deploy.ps1`
+    now also reads each live site's `og:image` host and requires it to be
+    the site's own.
+  - **The mac, by reading only (not measured on a Mac):** it has the same
+    fault, because it runs the same `resolve_section_domain` and the same
+    `ensure_base_url_and_rebuild` inside the website builder. So a mac course
+    deploying to Cloudflare with a Netlify record rebuilt on every Cloudflare
+    deploy too. `verify-deploy.sh` asks no "second deploy builds nothing"
+    question, so it could not see it.
 - **Hidden is the NAME**, never the attribute: the walk skips no attribute (a
   default `EnumerationOptions` skips Hidden and System, the #272 trap), and
   a folder given the Hidden attribute without a dot is read (a Windows-only

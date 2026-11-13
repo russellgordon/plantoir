@@ -459,6 +459,7 @@ class DeployPyLooksInTheWorkFolderAndAsksThePages(unittest.TestCase):
     def setUpClass(cls):
         import deploy
         cls.deploy = deploy
+        cls.real_rebuild = staticmethod(deploy.rebuild_for_production)
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -554,6 +555,37 @@ class DeployPyLooksInTheWorkFolderAndAsksThePages(unittest.TestCase):
         text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
         self.assertIn("  -e PLANTOIR_PAGES_ALREADY_ASKED=1 \\\n", text)
         self.assertEqual(self.deploy.PAGES_ALREADY_ASKED_VARIABLE, "PLANTOIR_PAGES_ALREADY_ASKED")
+
+    def test_a_rebuild_for_the_address_is_asked_for_that_address(self):
+        """#799, measured on Windows: deploy.py's rebuild for a Cloudflare
+        address ran build_site.py, which resolved the address from the
+        course's records again (the Netlify one first), so the rebuild came
+        out with the same wrong address and every Cloudflare deploy rebuilt.
+        The rebuild is now handed the destination's address."""
+        (self.tmp / "work" / "C" / "section1" / "quartz.config.ts").write_text(
+            'baseUrl: "example.netlify.app",\n', encoding="utf-8")
+        self._deploy()
+        self.assertEqual(len(self.rebuilds), 1)
+        self.assertEqual(self.rebuilds[0][3:], ("example.pages.dev",))
+
+    def test_every_rebuild_here_is_asked_for_the_destinations_address(self):
+        with open(self.course / "notes" / "day-1.md", "a", encoding="utf-8") as handle:
+            handle.write("edited\n")
+        self._deploy()
+        self.assertEqual(self.rebuilds[0][3:], ("example.pages.dev",))
+
+    def test_the_rebuild_hands_the_address_to_the_build_alone(self):
+        import subprocess
+        seen = []
+        def run(command, **arguments):
+            seen.append(arguments.get("env"))
+        with mock.patch.object(subprocess, "run", run):
+            with redirect_stdout(io.StringIO()):
+                self.real_rebuild("C", "1", "windows", "example.pages.dev")
+                self.real_rebuild("C", "1", "windows")
+        self.assertEqual(seen[0][self.deploy.DEPLOY_BASE_URL_VARIABLE], "example.pages.dev")
+        self.assertIsNone(seen[1], "a rebuild with no address inherits the environment unchanged")
+        self.assertNotIn(self.deploy.DEPLOY_BASE_URL_VARIABLE, os.environ)
 
     def test_the_build_folder_is_not_a_literal(self):
         source = (REPOSITORY_ROOT / "scripts" / "deploy.py").read_text(encoding="utf-8")

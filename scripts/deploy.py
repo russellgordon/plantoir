@@ -174,12 +174,18 @@ def safe_clean_public_dir(public_dir: Path):
     except Exception:
         pass
 
-def rebuild_for_production(course_code: str, section: str, host_os: str):
+def rebuild_for_production(course_code: str, section: str, host_os: str, base_url: str = ""):
     """
     Rebuild the section site for production using build_site.py --build-only.
     Stages the build workspace on container-internal ext4 storage (/tmp/quartz-builds),
     syncs public/ to host courses/<COURSE>/.merged_output/section<N>/public,
     and ensures all live site domains and OpenGraph metadata are up to date.
+
+    `base_url`, when given, is the address of the destination this deploy is
+    for, and the build bakes it in (build_site.DEPLOY_BASE_URL_VARIABLE, set
+    on that one build only). Without it the build resolved the address from
+    the course's records again, so a rebuild "for the address" could come out
+    with the same wrong one, and every deploy then rebuilt for it (#799).
     """
     print(" Rebuilding site for production…")
     build_script = toolchain_paths.SCRIPTS_DIR / "build_site.py"
@@ -194,8 +200,12 @@ def rebuild_for_production(course_code: str, section: str, host_os: str):
         "--build-only",
         f"--host-os={host_os}",
     ]
+    environment = None
+    if base_url:
+        environment = dict(os.environ)
+        environment[DEPLOY_BASE_URL_VARIABLE] = base_url
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=environment)
         print("✅ Production build complete.")
     except (subprocess.CalledProcessError, OSError) as e:
         if build_was_stopped_by_the_teacher(e):
@@ -249,6 +259,11 @@ SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW = (
 # is the one that asks.
 PAGES_ALREADY_ASKED_VARIABLE = "PLANTOIR_PAGES_ALREADY_ASKED"
 
+# The address this deploy's own rebuild is for, set on that build only: build_site.py's
+# DEPLOY_BASE_URL_VARIABLE, the same name (test_build_site_domain_resolution pins the two).
+# Without it a rebuild for the address could resolve the same wrong one again (#799).
+DEPLOY_BASE_URL_VARIABLE = "PLANTOIR_DEPLOY_BASE_URL"
+
 
 def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_code: str, section: str, host_os: str):
     """
@@ -288,7 +303,7 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
 
     if needs_rebuild:
         print(f" Updating Quartz baseUrl to '{clean_target}' and rebuilding for production…")
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
         return
     reason = why_this_deploy_builds_first(course_code, section_dir)
     if reason == toolchain_paths.REASON_TOOLCHAIN:
@@ -298,19 +313,19 @@ def ensure_base_url_and_rebuild(section_dir: Path, target_domain: str, course_co
         # one place both destinations decide whether to rebuild, so a deploy
         # builds at most once.
         print(SAY_BUILT_BY_AN_EARLIER_VERSION)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_PREVIEW:
         # main() has rebuilt a preview's site already; this is the backstop.
         print(" Preview build detected (live-reload client) — rebuilding for production…")
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_CLOCK:
         print(SAY_THE_BUILD_IS_DATED_LATER_THAN_NOW)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
     elif reason == toolchain_paths.REASON_PAGES:
         # #768: a page, a picture, a setting, a deleted or renamed page.
         # Without this a deploy typed at a command line sent the last build.
         print(SAY_SOMETHING_CHANGED_SINCE_THE_BUILD)
-        rebuild_for_production(course_code, section, host_os)
+        rebuild_for_production(course_code, section, host_os, clean_target)
 
 
 def why_this_deploy_builds_first(course_code: str, section_dir: Path):
