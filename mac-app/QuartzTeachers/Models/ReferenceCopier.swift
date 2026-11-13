@@ -128,6 +128,74 @@ enum ReferenceCopier {
         }
     }
 
+    /// Keeps a copy of `course` for reference IN PLACE OF the reference
+    /// course in `replacing` (#572, second piece), after the teacher was
+    /// warned. The copy is made first, under the old course's hidden name,
+    /// exactly as `keepACopy` makes one; then `ReferenceReplacer.replace`
+    /// backs the old one up, checks the backup, and swaps the copy in under
+    /// the old folder name. The live course is only ever read.
+    ///
+    /// Writes `courseKeptForReference` and the replacer's own line when it
+    /// is done; `courseCouldNotBeKeptForReference` (and, once the swap was
+    /// reached, the replacer's failure line) when it is not.
+    static func keepACopy(
+        of course: Course,
+        replacing folderName: String,
+        schoolYear: Int?,
+        coursesDirectoryURL: URL,
+        world: ReferenceReplacer.World = ReferenceReplacer.World(),
+        at moment: Date = Date()
+    ) async throws -> Made {
+        do {
+            switch ReferenceStaging.claim(folderName, inCoursesDirectory: coursesDirectoryURL) {
+            case .claimed:
+                break
+            case .someoneElseIsMakingIt:
+                throw Problem.alreadyBeingMade(folderName)
+            case .couldNotStart(let reason):
+                throw Problem.couldNotCopy(reason)
+            }
+            defer {
+                ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
+            }
+            let stagingURL: URL = coursesDirectoryURL.appendingPathComponent(
+                ReferenceStaging.stagingName(for: folderName)
+            )
+            let staged: (made: Made, addOnsLeftBehind: ObsidianAddOns.Found) = try ReferenceCopier.stageTheCopy(
+                of: course, into: stagingURL, schoolYear: schoolYear, at: moment
+            )
+            _ = try await ReferenceReplacer.replace(
+                ReferenceReplacer.Asked(folderName: folderName, source: "a copy of \(course.displayCode)"),
+                withStagedAt: stagingURL,
+                coursesDirectoryURL: coursesDirectoryURL,
+                world: world
+            )
+            let made: Made = Made(
+                folderName: folderName,
+                displayCode: staged.made.displayCode,
+                schoolYear: staged.made.schoolYear,
+                sectionCount: staged.made.sectionCount
+            )
+            ActivityTrail.note(
+                .courseKeptForReference,
+                ReferenceCopier.trailLine(
+                    for: made, copiedFrom: course.displayCode, addOnsLeftBehind: staged.addOnsLeftBehind
+                )
+            )
+            return made
+        } catch {
+            ActivityTrail.note(
+                .courseCouldNotBeKeptForReference,
+                ReferenceCopier.failureTrailLine(
+                    copiedFrom: course.displayCode,
+                    folderName: folderName,
+                    reason: error.localizedDescription
+                )
+            )
+            throw error
+        }
+    }
+
     /// The trail line for a copy that was not made, and why — the reason is
     /// the sentence the sheet showed the teacher.
     static func failureTrailLine(copiedFrom source: String, folderName: String, reason: String) -> String {
@@ -177,6 +245,48 @@ enum ReferenceCopier {
             ReferenceStaging.giveBack(folderName, inCoursesDirectory: coursesDirectoryURL)
         }
 
+        let staged: (made: Made, addOnsLeftBehind: ObsidianAddOns.Found) = try ReferenceCopier.stageTheCopy(
+            of: course, into: stagingURL, schoolYear: schoolYear, at: moment
+        )
+        do {
+            // The one step that makes it visible, and the only one that has
+            // to be atomic: a rename within `courses/`. Measured: a folder
+            // whose contents carry the lock renames cleanly, and the lock
+            // survives.
+            try fileManager.moveItem(at: stagingURL, to: destinationURL)
+        } catch {
+            ReferenceStaging.remove(at: stagingURL)
+            throw Problem.couldNotCopy(error.localizedDescription)
+        }
+
+        // `staged` was made under the hidden name; everything else in it was
+        // read from the settings and is right.
+        let made: Made = Made(
+            folderName: folderName,
+            displayCode: staged.made.displayCode,
+            schoolYear: staged.made.schoolYear,
+            sectionCount: staged.made.sectionCount
+        )
+        ActivityTrail.note(
+            .courseKeptForReference,
+            ReferenceCopier.trailLine(
+                for: made, copiedFrom: course.displayCode, addOnsLeftBehind: staged.addOnsLeftBehind
+            )
+        )
+        return made
+    }
+
+    /// The copy, made and turned into a reference course under the hidden
+    /// name the caller has CLAIMED, for both kinds of Keep a Copy: one that
+    /// lands under a new name and one that replaces a course on the shelf.
+    /// On any failure the half-made folder is removed (it is the claimer's)
+    /// and a `Problem` thrown.
+    private static func stageTheCopy(
+        of course: Course,
+        into stagingURL: URL,
+        schoolYear: Int?,
+        at moment: Date
+    ) throws -> (made: Made, addOnsLeftBehind: ObsidianAddOns.Found) {
         // What of `.obsidian` stays behind, read before the copy so the trail
         // can name it (#255). A LIVE course keeps its add-ons; only the copy
         // is made without them.
@@ -210,16 +320,11 @@ enum ReferenceCopier {
             throw Problem.couldNotCopy(error.localizedDescription)
         }
 
-        let staged: Made
         do {
-            staged = try ReferenceCopier.makeIntoAReferenceCourse(
+            let staged: Made = try ReferenceCopier.makeIntoAReferenceCourse(
                 at: stagingURL, schoolYear: schoolYear, at: moment
             )
-            // The one step that makes it visible, and the only one that has
-            // to be atomic: a rename within `courses/`. Measured: a folder
-            // whose contents carry the lock renames cleanly, and the lock
-            // survives.
-            try fileManager.moveItem(at: stagingURL, to: destinationURL)
+            return (made: staged, addOnsLeftBehind: addOnsLeftBehind)
         } catch {
             // The lock may be ON by now — it is applied inside the call
             // above — so the clear comes first, and both are `ReferenceStaging`'s
@@ -227,22 +332,6 @@ enum ReferenceCopier {
             ReferenceStaging.remove(at: stagingURL)
             throw Problem.couldNotCopy(error.localizedDescription)
         }
-
-        // `staged` was made under the hidden name; everything else in it was
-        // read from the settings and is right.
-        let made: Made = Made(
-            folderName: folderName,
-            displayCode: staged.displayCode,
-            schoolYear: staged.schoolYear,
-            sectionCount: staged.sectionCount
-        )
-        ActivityTrail.note(
-            .courseKeptForReference,
-            ReferenceCopier.trailLine(
-                for: made, copiedFrom: course.displayCode, addOnsLeftBehind: addOnsLeftBehind
-            )
-        )
-        return made
     }
 
     /// Turns a folder that has just been COPIED into a reference course: cut

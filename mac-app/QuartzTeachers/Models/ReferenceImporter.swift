@@ -37,6 +37,11 @@ enum ReferenceImporter {
         /// The school year it is filed under, or nil for "Other".
         let schoolYear: Int?
 
+        /// The reference course this one replaces, by its folder, when the
+        /// teacher chose Replace It… beside the shelf rule's refusal on a
+        /// one-course import (#572, second piece).
+        var replacing: String? = nil
+
         // MARK: - Computed properties
 
         var id: String {
@@ -121,6 +126,7 @@ enum ReferenceImporter {
         alreadyShelved: [ReferenceCourseRule.Shelved],
         from sourceFolderURL: URL,
         leavingBehind leftBehindNames: Set<String>? = nil,
+        replaceWorld: ReferenceReplacer.World = ReferenceReplacer.World(),
         progress: @escaping @Sendable @MainActor (Progress) -> Void
     ) async -> [Outcome] {
         let fileManager: FileManager = FileManager.default
@@ -136,22 +142,38 @@ enum ReferenceImporter {
 
             // The shelf rule first, before anything is read or written: a
             // course that cannot be filed is refused with a sentence, and the
-            // rest of the run carries on.
+            // rest of the run carries on. A replace is the one answer to its
+            // refusal, and only for the course the rule names (#572).
+            var replacing: ReferenceReplacer.Asked?
             if let trouble = ReferenceCourseRule.trouble(
                 placing: displayCode, inYear: request.schoolYear, among: shelved
             ) {
-                ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: trouble.sentence)
-                outcomes.append(.notImported(course: displayCode, reason: trouble.sentence))
-                continue
+                let inTheWay: ReferenceCourseRule.Shelved? = ReferenceCourseRule.courseInTheWay(
+                    placing: displayCode, inYear: request.schoolYear, among: shelved
+                )
+                if let wanted = request.replacing, let inTheWay, inTheWay.folderName == wanted {
+                    replacing = ReferenceReplacer.Asked(
+                        folderName: wanted,
+                        source: "a course imported from \(sourceFolderURL.lastPathComponent)"
+                    )
+                } else {
+                    ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: trouble.sentence)
+                    outcomes.append(.notImported(course: displayCode, reason: trouble.sentence))
+                    continue
+                }
             }
 
-            let folderName: String = ReferenceCourseRule.proposedFolderName(
+            var folderName: String = ReferenceCourseRule.proposedFolderName(
                 forCode: displayCode,
                 schoolYear: request.schoolYear,
                 existingFolderNames: folderNames
             )
+            if let replacing {
+                // The replacement takes the replaced course's folder name.
+                folderName = replacing.folderName
+            }
             let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
-            if fileManager.fileExists(atPath: destinationURL.path) {
+            if replacing == nil && fileManager.fileExists(atPath: destinationURL.path) {
                 let problem: ReferenceCopier.Problem = .folderAlreadyExists(folderName)
                 let reason: String = problem.errorDescription ?? folderName
                 ReferenceImporter.noteNotImported(displayCode, from: sourceFolderURL, because: reason)
@@ -210,6 +232,8 @@ enum ReferenceImporter {
                             named: folderName,
                             stagedAt: stagingURL,
                             into: destinationURL,
+                            replacing: replacing,
+                            replaceWorld: replaceWorld,
                             leavingBehind: namesToLeaveBehind,
                             courseNumber: courseNumber,
                             courseCount: requests.count,
@@ -240,6 +264,8 @@ enum ReferenceImporter {
                             named: folderName,
                             stagedAt: stagingURL,
                             into: destinationURL,
+                            replacing: replacing,
+                            replaceWorld: replaceWorld,
                             leavingBehind: namesToLeaveBehind,
                             courseNumber: courseNumber,
                             courseCount: requests.count,
@@ -275,6 +301,8 @@ enum ReferenceImporter {
                         named: folderName,
                         stagedAt: stagingURL,
                         into: destinationURL,
+                        replacing: replacing,
+                        replaceWorld: replaceWorld,
                         leavingBehind: namesToLeaveBehind,
                         courseNumber: courseNumber,
                         courseCount: requests.count,
@@ -510,6 +538,8 @@ enum ReferenceImporter {
         named folderName: String,
         stagedAt stagingURL: URL,
         into destinationURL: URL,
+        replacing: ReferenceReplacer.Asked?,
+        replaceWorld: ReferenceReplacer.World,
         leavingBehind leftBehindNames: Set<String>,
         courseNumber: Int,
         courseCount: Int,
@@ -584,7 +614,9 @@ enum ReferenceImporter {
         // The one step that makes it visible, and the only one that has to be
         // atomic: a rename within `courses/`. Measured: a folder whose
         // contents carry the lock renames cleanly, and the lock survives.
-        try fileManager.moveItem(at: stagingURL, to: destinationURL)
+        try await ReferenceImporter.land(
+            stagingURL, at: destinationURL, replacing: replacing, world: replaceWorld
+        )
 
         // `staged` was made under the hidden name, so the folder it reports
         // is that one; everything else in it — the code a teacher reads, the
@@ -608,6 +640,8 @@ enum ReferenceImporter {
         named folderName: String,
         stagedAt stagingURL: URL,
         into destinationURL: URL,
+        replacing: ReferenceReplacer.Asked?,
+        replaceWorld: ReferenceReplacer.World,
         leavingBehind leftBehindNames: Set<String>,
         courseNumber: Int,
         courseCount: Int,
@@ -652,13 +686,15 @@ enum ReferenceImporter {
             }
         }
 
-        let made: ReferenceCopier.Made = try ReferenceImporter.finishPlacedImport(
+        let made: ReferenceCopier.Made = try await ReferenceImporter.finishPlacedImport(
             stagedAt: stagingURL,
             into: destinationURL,
             named: folderName,
             settingsValues: plan.settingsValues(),
             createsEmptyMedia: plan.createsEmptyMedia,
-            schoolYear: request.schoolYear
+            schoolYear: request.schoolYear,
+            replacing: replacing,
+            replaceWorld: replaceWorld
         )
         return (made: made, plan: plan)
     }
@@ -675,8 +711,10 @@ enum ReferenceImporter {
         named folderName: String,
         settingsValues: [String: Any],
         createsEmptyMedia: Bool,
-        schoolYear: Int?
-    ) throws -> ReferenceCopier.Made {
+        schoolYear: Int?,
+        replacing: ReferenceReplacer.Asked?,
+        replaceWorld: ReferenceReplacer.World
+    ) async throws -> ReferenceCopier.Made {
         let fileManager: FileManager = FileManager.default
 
         // Nothing supplied `Media`: an empty one, so the build does not
@@ -701,7 +739,9 @@ enum ReferenceImporter {
         let staged: ReferenceCopier.Made = try ReferenceCopier.makeIntoAReferenceCourse(
             at: stagingURL, schoolYear: schoolYear
         )
-        try fileManager.moveItem(at: stagingURL, to: destinationURL)
+        try await ReferenceImporter.land(
+            stagingURL, at: destinationURL, replacing: replacing, world: replaceWorld
+        )
 
         return ReferenceCopier.Made(
             folderName: folderName,
@@ -720,6 +760,8 @@ enum ReferenceImporter {
         named folderName: String,
         stagedAt stagingURL: URL,
         into destinationURL: URL,
+        replacing: ReferenceReplacer.Asked?,
+        replaceWorld: ReferenceReplacer.World,
         leavingBehind leftBehindNames: Set<String>,
         courseNumber: Int,
         courseCount: Int,
@@ -760,15 +802,40 @@ enum ReferenceImporter {
             }
         }
 
-        let made: ReferenceCopier.Made = try ReferenceImporter.finishPlacedImport(
+        let made: ReferenceCopier.Made = try await ReferenceImporter.finishPlacedImport(
             stagedAt: stagingURL,
             into: destinationURL,
             named: folderName,
             settingsValues: plan.settingsValues(),
             createsEmptyMedia: plan.createsEmptyMedia,
-            schoolYear: request.schoolYear
+            schoolYear: request.schoolYear,
+            replacing: replacing,
+            replaceWorld: replaceWorld
         )
         return (made: made, plan: plan)
+    }
+
+    /// The last step of every route: one rename into place, or, when the
+    /// course replaces one on the shelf (#572), `ReferenceReplacer.replace`,
+    /// which backs the old one up, checks the backup and swaps this one in
+    /// under the old folder name. On a failed replace the replacer has
+    /// already removed the staged course and written its own line.
+    private static func land(
+        _ stagingURL: URL,
+        at destinationURL: URL,
+        replacing: ReferenceReplacer.Asked?,
+        world: ReferenceReplacer.World
+    ) async throws {
+        guard let replacing else {
+            try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
+            return
+        }
+        _ = try await ReferenceReplacer.replace(
+            replacing,
+            withStagedAt: stagingURL,
+            coursesDirectoryURL: destinationURL.deletingLastPathComponent(),
+            world: world
+        )
     }
 
     /// The website plan, off the main actor. `@concurrent` for the reason

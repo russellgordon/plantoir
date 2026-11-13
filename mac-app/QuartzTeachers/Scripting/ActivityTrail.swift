@@ -937,6 +937,36 @@ nonisolated enum ActivityTrail {
         /// it" gets an answer.
         case unfinishedImportForReferenceTidiedAway = "unfinished import for reference tidied away"
 
+        /// A course on the Reference Courses shelf was replaced by a new one
+        /// after the warning (#572): its folder, the code it shows and its
+        /// group, where the new one came from (made from the ready-made
+        /// pages, a copy of a live course, or an import, by folder or zip
+        /// name), what the old one held (sections, files, pages, size) and
+        /// the backup's FILE NAME, which is how it comes back. Never a page.
+        case referenceCourseReplaced = "reference course replaced"
+
+        /// A replace the teacher confirmed did not happen: the folder, the
+        /// code and group, where the new one came from, and the sentence the
+        /// teacher read, with what failed (the backup, its check, a rename)
+        /// in brackets. Written for every way it ends without a replace, so
+        /// "I pressed Replace and the old one is still there" has an answer.
+        case referenceCourseCouldNotBeReplaced = "reference course could not be replaced"
+
+        /// A working folder was opened and a replace that did not finish was
+        /// found in it and settled: the old course renamed back to its own
+        /// folder, or its old copy removed because the new one was in place
+        /// and a backup was there, or that it could not be renamed back yet.
+        /// Carries the folder only.
+        case unfinishedReplaceOfAReferenceCoursePutRight = "unfinished replace of a reference course put right"
+
+        /// A whole course was put back from one of its backups (Restore from
+        /// Backup…): the code it shows, its folder, the backup's FILE NAME,
+        /// the archive made of the course as it was first, and whether the
+        /// restored course is kept for reference. For EVERY whole-course
+        /// restore, live or reference (#572 closed the gap: only a section's
+        /// restore left a line before). Never a page.
+        case courseRestoredFromABackup = "course restored from a backup"
+
         /// A reference course was filed under a different school year — the
         /// one thing about a frozen course a teacher can still change.
         /// Carries the code they read, the folder, and both years.

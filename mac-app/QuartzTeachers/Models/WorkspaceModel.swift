@@ -2028,6 +2028,15 @@ class WorkspaceModel {
             return
         }
 
+        // A replace of a reference course that did not finish (#572) is
+        // settled FIRST, before the folder is listed, so a course renamed
+        // back to its own folder is in the list this reading makes.
+        for outcome in ReferenceReplacer.sweepLeftovers(inCoursesDirectory: coursesDirectoryURL) {
+            ActivityTrail.note(
+                .unfinishedReplaceOfAReferenceCoursePutRight, ReferenceReplacer.trailLine(for: outcome)
+            )
+        }
+
         var entryURLs: [URL] = []
         do {
             entryURLs = try WorkspaceModel.listCoursesFolder(coursesDirectoryURL)
@@ -2577,9 +2586,13 @@ class WorkspaceModel {
             // contents in place, so Obsidian's file watcher — anchored to
             // the course folder, which is the vault — keeps up instead of
             // showing stale files until the vault is reopened.
+            var archiveFileName: String?
             for course in courses {
                 if course.code == item.courseCode {
-                    try await CourseArchiver.archiveCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+                    let archiveURL: URL = try await CourseArchiver.archiveCourse(
+                        course, coursesDirectoryURL: coursesDirectoryURL
+                    )
+                    archiveFileName = archiveURL.lastPathComponent
                 }
             }
             // Asked AGAIN after the zip (#351). It runs off the main actor
@@ -2616,6 +2629,18 @@ class WorkspaceModel {
             )
             // (The records of renames under way are cleared by the restorer
             // itself, so a test can see it.)
+            //
+            // One line for every whole-course restore (#572): it is how a
+            // replaced reference course comes back, and until then nothing on
+            // the trail said a course had been put back at all.
+            ActivityTrail.note(
+                .courseRestoredFromABackup,
+                WorkspaceModel.restoredTrailLine(
+                    item: item,
+                    archiveFileName: archiveFileName,
+                    coursesDirectoryURL: coursesDirectoryURL
+                )
+            )
         } catch {
             backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = error.localizedDescription
@@ -2625,6 +2650,35 @@ class WorkspaceModel {
         selection = nil
         reloadCourses()
         selection = SidebarSelection.course(item.courseCode)
+    }
+
+    /// The line a whole-course restore leaves: the code it shows (read from
+    /// the settings that came back), its folder, the backup's file name, the
+    /// archive made of the course as it was first (or that there was no
+    /// course to archive), and whether what came back is kept for reference.
+    static func restoredTrailLine(item: BackupItem, archiveFileName: String?, coursesDirectoryURL: URL) -> String {
+        let folderName: String = item.courseCode
+        let restored: CourseConfiguration? = try? CourseConfiguration(
+            contentsOf: coursesDirectoryURL.appendingPathComponent(folderName)
+                .appendingPathComponent("course_config.json")
+        )
+        var shown: String = folderName
+        var kept: Bool = false
+        if let restored {
+            kept = restored.keptForReference
+            let recorded: String = restored.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            if kept && !recorded.isEmpty {
+                shown = recorded
+            }
+        }
+        var line: String = "restored \(shown) (\(folderName)) from \(item.fileURL.lastPathComponent)"
+        if let archiveFileName {
+            line += " — the course as it was is in Archived as \(archiveFileName)"
+        } else {
+            line += " — there was no course in that folder to archive first"
+        }
+        line += kept ? "; kept for reference" : "; a course you teach"
+        return line
     }
 
     /// Deletes a backup for good — no archive behind it, which is why
