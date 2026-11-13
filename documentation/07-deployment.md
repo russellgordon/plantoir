@@ -1719,6 +1719,229 @@ anything on the Mac looks it up, and reports how long that took; on the
 first run, which did not, 43 Cloudflare checks failed (HTTP 000, or no answer) against a site that
 was serving.
 
+## Sharing a unit plan (#709)
+
+A course's unit plans (`courses/<CODE>/.internal/planning/`, #707) can be
+shared as a small website of their own, from the share bar at the foot of the
+course page's Planning tab or as `./deploy.sh <CODE> --plans …`. The rules and
+every case are `contracts/shared-rules.json` → `unitPlanning.share`; this
+section says why they are what they are, what was measured, and what was
+rejected. Shipped on the mac first; Windows owes the launcher, the share bar
+and the credential item (the `windows` issue for #709).
+
+### The rulings (Russell, 2026-11-12)
+
+1. **Cloudflare Pages only, never Netlify.** Netlify's free plan has no
+   password protection, so a protected plan cannot be promised there. A
+   teacher whose class websites go to Netlify reads one sentence saying so
+   (`words.netlifyTeacher`), and the launcher refuses `--target netlify` with
+   `refusals.netlifyNever`. This replaced the 2026-11-01 plan to probe a
+   Netlify site and refuse on a free plan (707d, dropped).
+2. **One plan site per school year**, the year in its name
+   (`schoolYear`: the year it began, rolling over on 1 August, as
+   `SchoolYear` and Windows' `Timetable.AcademicYearStarting`). A new school
+   year starts a new address; the old one stays up until Stop Sharing, and
+   the bar lists each earlier year with its own Stop Sharing.
+3. **A random suffix on every plan site**, open or protected, so the address
+   never changes when a password is added or removed.
+4. **Answer keys** (`answerKeys`: a PDF whose name ends ` - Answers`,
+   ` - Solutions`, ` - with Answers` or ` - with Solutions`, or is
+   `Marking Guide`) are left out of a share without a password unless the
+   teacher ticks Include Answer Keys. A protected share includes them.
+5. **The public-address warning** comes before the first share without a
+   password and again when a password is removed; never when protected, and
+   there is no tick to silence it (`warningCases`).
+6. **Fail closed**, set through the API and read back, with no flood test.
+   The weaker sentence (`words.floodOpen`) is shown only when the setting
+   could not be made.
+
+### The shape: deploy.sh → share_plan.py → wrangler
+
+`deploy.sh <CODE> --plans` takes `--plans` in the section number's place. It
+reuses the reference-course refusal, the Cloudflare token and account code and
+the website builder unchanged, and skips everything about a section: the
+course's saved destinations (#668), the rebuild checks (#746, #768), the
+build-output link, the built-site preflight and the folder deploy. It then
+runs `scripts/share_plan.py` inside the website builder, which imports
+`deploy.py` for its Cloudflare calls and surname question and
+`scripts/unit_plan_site.py` for everything that needs no network (check,
+stage, the worker, names). `deploy.py` itself is not changed: its `main()` is
+pinned by a test and its `--section` is required, and the plans path shares
+none of its section logic.
+
+A share, in order: refuse a reference course; `check()` the planning folder
+(`checkKinds`, each a rule the skill already asks an assistant to keep);
+read the year's marker and decide the mode (`modeCases`: `--protect`
+protects, `--remove-password` opens, neither keeps what the marker last
+asked for); make the year's project, or re-make it under the same name when
+Cloudflare says 404; set fail closed and read it back; stage; deploy; prove;
+delete every older deployment; write the marker. Stop Sharing deletes the
+year's project.
+
+### The worker, on every share (and the edge cache that made it so)
+
+A protected share uploads `_worker.js` (Pages' Advanced mode). It keeps a
+fresh 16-byte salt and SHA-256 of the salt and the base64 of
+`username:password`, never the password, and answers 401 with a Basic
+challenge for every path without the right `Authorization`. Salted SHA-256
+rather than a slow hash: the worker's source is readable only inside the
+teacher's own Cloudflare account, and the password is one made for
+colleagues. PBKDF2 at 100,000 iterations measured 16.1 ms against the free
+plan's 10 ms CPU limit; at about 10,000, 2.0 ms, which is the upgrade if that
+ever changes. Measured from inside a worker: the static file server answers
+`/_worker.js` with 404, not its source.
+
+**An open share carries a worker too, and that was measured, not designed.**
+The plan had an open share upload `_headers` and no worker. The first full run
+on the teacher's account (2026-11-12) failed one check: after Remove Password,
+the answer key colleagues had opened with the password answered **200 to
+anyone** at its old address. A probe isolated it: an open share with the key
+included, the key fetched, then an open share without it and with no worker:
+the key went on answering 200 from Cloudflare's edge (`cf-cache-status: HIT`,
+`Cache-Control: public, s-maxage=604800`) at every sample for 90 s, while the
+same address with a query string answered 404. So a file a later share leaves
+out, an answer key or a deleted page, stays readable at its old address for up
+to a week. The worker runs before that cache, so every share now uploads one
+that answers ONLY the files the share staged (a list written into it), with
+404 for anything else. Measured again with it: the left-out key answered 404
+at 0.3 s and at every sample to 37 s, and a changed page was served changed at
+once. An open share keeps `_headers` as well, which is what the static files
+would carry if the worker were ever passed by. The cost: every request to an
+open plan site now counts against the Workers Free plan's 100,000 a day, and
+at the limit an open site closes rather than opening (`edgeCache`).
+
+### Fail closed, and what it rests on
+
+On every share, open or protected, `share_plan.py` PATCHes
+`deployment_configs.production.fail_open` and `preview.fail_open` to false
+and GETs the project; `failClosed` is true only when both read back false.
+A new project is created with the same values in its POST. Measured with the
+teacher's Pages: Edit token: a new project starts at `true` on both; the PATCH
+answers 200 and changes nothing else; the value survives later deploys; a
+malformed PATCH answers 400 (8000006) and changes nothing.
+
+**What is inferred, not measured:** that the API's `fail_open` is the
+dashboard's Settings > Runtime > Fail open / closed. For it: the name, the
+per-environment place, the default of true. Against it: the API reference
+describes the field as "Whether to fail open when the deployment config
+cannot be applied". The flood itself was ruled out (Russell, 2026-11-12). So
+`words.floodClosed` says only what Cloudflare's own routing page says fail
+closed does (an error page rather than static files) and when the free limit
+resets (midnight UTC). A PATCH or read-back that fails records `failClosed:
+false`, the share goes on (Russell, 2026-11-01, refined: the suffix is the
+fallback), and the teacher reads `words.floodOpen` beside a protected address.
+
+### Prove it before saying it
+
+Nothing is called shared until the address answers as the share promises
+(`proof`): without a password, 401 with a Basic challenge (protected) or 200
+(open); with it, 200; a random path that is not shared, 404 with the worker's
+`Cache-Control: no-store`; and the project's `canonical_deployment.uses_functions`
+true. **All of these are retried together**, every 2 s for up to 60 s. The
+main address answered the new deployment 0.2 to 2.2 s after wrangler returned,
+and the second full run met the case that makes retrying all of them
+necessary: after Change Password the OLD deployment also answers 401 without a
+password, so only the new password's 200 tells the two apart, and a proof that
+stopped at the first wrong answer refused a share that was fine. A protected
+share that is not proved by 60 s is `refusals.notProtectedYet`: the marker
+records `protected: false` with `asked: protected`, so the bar does not show
+it as protected and the next Share Again asks for protection again.
+
+### Older deployments are deleted
+
+Every deploy is also a deployment with an address of its own,
+`https://<hash>.<project>.pages.dev`. Measured (S3): after an open share was
+re-shared protected, the old open deployment's own address still served the
+list of plans and a PDF with 200 and no password, while the main address
+answered 401. So after the proof every deployment but the canonical one is
+deleted (`DELETE …/deployments/{id}?force=true`); the old address answered 404
+within 10 s (S4), so there is a window of seconds. The active deployment
+cannot be deleted (400, 8000034). A delete that fails: the share stands, the
+teacher reads `refusals.oldCopyStillThere`, the marker keeps `oldCopies`, and
+the next share tries again. A new project's deployment addresses fail the TLS
+handshake for their first 120 to 135 s (the project's own certificate is
+issued after creation), so a check that an old address is closed must use a
+project at least three minutes old, or it passes for the wrong reason.
+
+### A missing path, names and addresses
+
+With no top-level `404.html`, Pages serves `index.html` with 200 for ANY path
+(its single-page-app rule), so staging always writes one saying
+`words.notSharedHere`, with the noindex meta. Staging is by allowlist
+(`.html .css .woff2 .pdf .png .jpg .jpeg .svg .txt`), never a hidden file, a
+link, or a folder a backup leaves out, and the plan's own `assets/` is
+replaced by the app's (the skill's template), into a temporary folder inside
+the website builder that is never backed up and needs no link.
+
+A project is named `<code>-plans-<year label>-<surname>-<suffix>`, at most
+58 characters (Cloudflare refused 59, a capital and an underscore with code
+8000003). The suffix is eight letters and digits and is never cut: the
+surname is shortened first, then dropped, then the code (`names.cases`);
+`sanitize_pages_name` alone would cut the end, which is the suffix. A name
+taken in the account (409) gets a new suffix, at most three tries. The address
+is always read from the project's `subdomain`, never built from the name,
+because Cloudflare may add characters to a name taken elsewhere. The
+`subdomain` did not change across open, protected, a new password and open
+again.
+
+### The username and password
+
+Kept in the macOS Keychain, service `containerized-quartz-unit-plan`, account
+`<folder id>/<CODE>`, secret `username:password`: one per course across
+school years, so a colleague keeps one password, and a new password applies
+to this year's site once it is shared again. Asked by `deploy.sh` in the
+console (`read -rp`, then `read -rsp`) only when there is none or
+`--change-password` is given, and refused under `--non-interactive`; the app
+turns the two prompts into its own requests (`credentialPrompts`,
+`unitPlanUsername`, `unitPlanPassword`). Handed to the website builder through
+a pipe into `/tmp/plan_cred`, readable only by the user, which `share_plan.py`
+reads once and deletes at once and again on the way out, even when the upload
+fails. Never in argv beyond the Keychain store's instant (as the tokens' are),
+an environment variable, the trail, the console, the marker or a fixture. Only
+`--remove-password` deletes the item, after the share succeeded; Stop Sharing
+deletes it when no school year of the course is still shared.
+
+### The marker
+
+`courses/<CODE>/.cloudflare_sites/plans-<year>.json` (`markerFile`), mode
+600, written with the name and subdomain as soon as the project exists, so a
+crash never leaves a project the next share cannot find, and whole after the
+share. No account id and no project id: every call is by name. A reference
+copy of the course renames every year's marker aside
+(`plans-<year>.previous-<moment>.json`), as `releaseSite` does a section's,
+and nothing reads a name of that shape.
+
+### Stop Sharing
+
+`DELETE …/pages/projects/{name}`, measured on a project holding 2 deployments:
+200 with nothing deleted first. The address answered 530 or 522 within 5 s,
+stopped resolving after about 100 s, and never answered 200 again in 3
+minutes. A deleted project's `*.pages.dev` name could later be taken by
+another account, so an old link could one day show somebody else's site; the
+suffix makes that a matter of chance, not of guessing (not measured: it needs
+a second account).
+
+### Measured timings (2026-11-12, the teacher's free account, wrangler 4.156.0)
+
+| Step | Seconds |
+|---|---|
+| A first share (create, fail closed, deploy, proof) | 8.4 to 14.4, plus the website builder's start |
+| A re-share | 4.9 to 11.3 |
+| The address answering the new deployment after wrangler returned | 0.2 to 2.2 |
+| A new project's deployment-address certificate | about 130 to 135 |
+| Stop Sharing to 530 | under 5 |
+
+### Rejected
+
+The list is `unitPlanning.share.rejected`. The ones most likely to be
+proposed again: an open share with no worker (measured above: the edge cache
+serves what it left out); the suffix only on open sites; leaving old
+deployments up; a share without `--protect` dropping the password;
+`functions/_middleware.js` (wrangler takes `functions/` from the folder it
+runs in, not the one it uploads); Cloudflare Access (dashboard set-up, an
+email PIN, not makeable with the teacher's token); a share tool for the
+assistant (it would move the tool surface, and sharing is the teacher's act).
+
 ## A folder on this PC (`--to-folder`)
 
 Chosen with `deploy_target: "local_folder"` plus `deploy_folder_path`. This

@@ -36,9 +36,10 @@ Mac first. The Windows app follows in its own update.
   drafts, a curriculum correlation — and the plan shows right there, with
   the files it links. ([#707](https://github.com/russellgordon/plantoir/issues/707),
   [#708](https://github.com/russellgordon/plantoir/issues/708))
-- **Share a unit plan with a colleague.** Publish the plan as its own small
-  website, kept well apart from your class sites, optionally behind a
-  username and password, and stop sharing it when you're done.
+- **Share a unit plan with a colleague.** Share the plans as their own small
+  website for the school year, kept well apart from your class sites,
+  optionally behind a username and password, and stop sharing them when
+  you're done.
   ([#709](https://github.com/russellgordon/plantoir/issues/709))
 - **Reference courses, more flexible.** Add or import a course straight to
   your reference shelf — even for a course code you're already teaching —

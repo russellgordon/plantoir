@@ -294,6 +294,9 @@ enum ReferenceCopier {
         for sectionNumber in copy.sectionNumbers {
             _ = DeployCommand.releaseSite(forSection: sectionNumber, in: copy, at: moment)
         }
+        // And the course's shared unit plans, every school year (#709,
+        // review M6): a reference copy must never reach this year's plan site.
+        PlanSharing.releasePlanMarkers(courseDirectory: destinationURL, at: moment)
 
         // `course_code` is deliberately NOT touched: it stays the real code,
         // which is what the teacher reads and what keeps this copy's preview
