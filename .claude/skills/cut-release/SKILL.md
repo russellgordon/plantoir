@@ -16,7 +16,7 @@ If this release changes what a teacher sees (a new control, a moved one, a new o
 changed sentence), the UI/UX review page comes BEFORE the cut: run the
 [`ui-review`](../ui-review/SKILL.md) skill, take Russell through the page, and cut
 only when what it found is fixed and his rulings are in. Standing practice since
-v1.10.0 (Russell, 2026-11-13). The smoke test that follows covers only what a
+v2.0.0 (Russell, 2026-11-13). The smoke test that follows covers only what a
 picture cannot show.
 
 ## Gather
