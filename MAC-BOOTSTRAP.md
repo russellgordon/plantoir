@@ -120,7 +120,9 @@ A new clone or worktree needs the four vendored folders first —
 the repository, so later worktrees take seconds) and, since #495,
 `fetch-obsidian-addons.sh` (12.9 MB, pinned in the contract, cached the same
 way) — or `xcodegen generate` fails ("Setting up on a new machine" in
-CLAUDE.md).
+CLAUDE.md). `./browser-checks/fetch-browsers.sh` is optional: it fetches
+Safari's engine (296 MB, outside the repository) for `verify.sh`'s rendered
+check (#597), which says SKIPPED without it.
 
 ```bash
 cd mac-app && xcodegen generate && \

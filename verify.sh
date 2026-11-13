@@ -6123,11 +6123,20 @@ echo ""
 echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
 rendered_cleanup
 RENDERED_STARTED=$SECONDS
+if python3 browser-checks/lib/test_rendered_lib.py >/tmp/verify_rendered_lib.log 2>&1; then
+  pass "the rendered check's planting and sabotages: the pages planted and taken out leave a course's settings byte for byte, a teacher's own folder is never replaced, every sabotage aims at a real row and every row but the deployed-only embeds has one, a real site is refused - $(grep '^Ran ' /tmp/verify_rendered_lib.log) (browser-checks/lib/test_rendered_lib.py, #597)"
+else
+  fail "the rendered check's planting or sabotages (browser-checks/lib/test_rendered_lib.py, #597)"
+  tail -20 /tmp/verify_rendered_lib.log
+fi
 mkdir -p "$RENDERED_DIR/courses"
 cp setup.sh preview.sh deploy.sh "$RENDERED_DIR/"
 cp -R support/example_course/EXC2O "$RENDERED_DIR/courses/EXC2O"
 if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
   skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
+elif ! node browser-checks/lib/test_site_server.mjs >/tmp/verify_rendered_server.log 2>&1; then
+  fail "the rendered check's server does not serve a site as the hosts do (browser-checks/lib/test_site_server.mjs, #597)"
+  grep '^FAIL' /tmp/verify_rendered_server.log
 elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
      || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
      || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then

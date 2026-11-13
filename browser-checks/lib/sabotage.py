@@ -203,6 +203,32 @@ def geogebra_keys(site: Path) -> str:
     return "the loader's hold on Space and Enter while lines run dropped"
 
 
+def geogebra_reset(site: Path) -> str:
+    # The loader builds each sketch with `new GGBApplet(params)`, params
+    # carrying showResetIcon: true (#792). GGBApplet arrives with the
+    # engine's own script, later than this one, so it is caught as it is
+    # set and the icon is asked for no more: a press where the icon was
+    # then changes nothing.
+    add_script(site, "Sketch", "geogebra-reset.js", """
+(() => {
+  let real
+  Object.defineProperty(window, "GGBApplet", {
+    configurable: true,
+    get() { return real },
+    set(given) {
+      real = function (params, ...rest) {
+        if (params && typeof params === "object") params.showResetIcon = false
+        return new given(params, ...rest)
+      }
+      real.prototype = given.prototype
+      Object.assign(real, given)
+    },
+  })
+})()
+""")
+    return "the sketches asked for without GeoGebra's reset icon"
+
+
 def pdf_file(site: Path) -> str:
     if remove_files(sorted((site / "Rendered-Check").glob("*.pdf"))) == 0:
         raise SystemExit("sabotage: no PDF beside the Handout page")
@@ -281,6 +307,7 @@ DOERS = {
     "geogebra file": geogebra_file,
     "geogebra dialog": geogebra_dialog,
     "geogebra keys": geogebra_keys,
+    "geogebra reset": geogebra_reset,
     "pdf file": pdf_file,
     "print layout": print_layout,
     "copy stacking": copy_stacking,

@@ -1333,8 +1333,9 @@ Safari does not, and there a pinch zooms the page) — so a plain scroll
   would not show a PRINT: under safaridriver `print()` returns in 0 ms with no
   event and no sheet, Safari 26.6, measured for #576 —
   `research/print-safari/FINDINGS.md`. Reading what the page holds at the
-  moment it calls `print()` still works, which is what #597's WebKit leg can
-  carry; its stand-in must send the print events, as the Chrome checks' do.)
+  moment it calls `print()` still works, which is what the rendered check's
+  print row does in WebKit (R); its stand-in sends the print events, as the
+  Chrome checks' do.)
 
 **Found in passing, not E1's, and fixed in the same release:** Quartz's own ⌘P on a page that is NOT
 printable used to overlay the sidebar's folder list on page 2 of the paper and
@@ -3026,8 +3027,9 @@ and restored) verify.sh failed only this check, on all seven places: −3.37px
 on screen and under print media, −4.02px on the printable page under print and
 in the handout's frame. With the rule: at most 0.01px on screen (29 boxes on
 Task Fixture, 2 on Task Loose, 3 on Task Printable), 0.02px on the printable
-page under print and in the handout's frame, every box 16px. WebKit has no gate; its numbers above were measured
-once. The paper step (K6) had to change with it: its box finder scanned each
+page under print and in the handout's frame, every box 16px. These sizes are
+gated in Chromium only; their WebKit numbers above were measured once. (A tick
+surviving a reload is a row of the rendered check in both engines, R.) The paper step (K6) had to change with it: its box finder scanned each
 word's tall pdftotext box from the TOP, and with rows 4px shorter it found the
 previous item's box (the unticked box read the ticked one's 62 inked pixels
 though the PDF draws it empty, checked by rendering it); it now scans from the
@@ -3523,8 +3525,8 @@ a second, then asks: each picture well below the window (or the check could
 not fail), each with a height above 0 BEFORE anything is scrolled, and
 neither the page's height nor any picture's changing as each is scrolled to.
 Chrome is enough because the zero-height layout is the same in both engines;
-only whether the shift can be SEEN is WebKit's. A WebKit leg belongs with
-#597's release gate. Must-fail, by copy-and-restore of `pictures.scss` with
+only whether the shift can be SEEN is WebKit's, so it stays Chromium only in
+the rendered check's table too (R). Must-fail, by copy-and-restore of `pictures.scss` with
 its rule taken out: red three runs out of three (`plantoir-hazard-wide.png,
 3067 px down the page, had no height before it was scrolled to (0 px)`), green
 three out of three with it back.
@@ -4694,10 +4696,10 @@ must be there, and again after a press on its reset icon. Against the
 loader before #792 (the old file put back, spliced into a built site, the
 new file restored) item 11 fails on both sketches, in both phases; against
 the first version of #792, without the keys held, item 12 failed with 82
-and 75 of 150 points. **The gate runs Chromium only:** the check speaks the
-DevTools protocol and carries no packages, so WebKit was measured by hand
-with Playwright as above and is in no gate (a follow-up issue asks whether
-it should be). `scripts/test_geogebra.py` → `ResetKeepsTheSketchTextPinTests`
+and 75 of 150 points. This check runs Chromium only (it speaks the DevTools
+protocol and carries no packages); since #807 the drag, the reset and the
+keys while lines run are also rows of the rendered check, which runs them in
+WebKit as well on every `verify.sh` (R). `scripts/test_geogebra.py` → `ResetKeepsTheSketchTextPinTests`
 is a text pin, for the Windows suite.
 
 **Rejected for #792:** running the lines again after every reset (on a
@@ -4775,7 +4777,8 @@ the print (#576's rule holds without a restore). A sketch that was never
 opened prints its thumbnail; one with neither prints its description. The
 button never prints. Headless Chrome's `printToPDF` fires `beforeprint`
 (measured), so ⌘P is covered by the browser check; Safari is checked by hand
-as for #576.
+as for #576 (headless WebKit cannot print; the rendered check's print row reads
+the handout's layout in WebKit, R).
 
 GeoGebra's licence asks for "Made with GeoGebra®" and a link to
 https://www.geogebra.org on every applet: the link is under every sketch on
@@ -4869,6 +4872,166 @@ the site the same `single` and safety-net line; one quote marker taken off a
 quoted fence's lines (`markdown_code._QUOTE_MARKERS`) → `test_geogebra.py`
 `test_every_key_case`, and in the build the explanation's sketch left as
 code; the search-text branch removed → 6i-g's quiz-page check.
+
+## R. The rendered check, in Chrome and in Safari's engine (#597, #807, v2.0.0)
+
+Nothing here changes a site. It is the check that every kind of diagram,
+sketch, graph, formula, quiz, task box and runnable program on a built site
+works when a student's press reaches it, in **Chrome for Testing and in
+Playwright's WebKit build** (Safari's engine), and that the page reported
+nothing and asked nothing of a host it should not. This piece (597a) runs it
+locally in `verify.sh`; the second half of #597 runs the same file against
+the deployed test sites on every host in a list.
+
+**The pieces.**
+
+| File | What it is |
+|---|---|
+| `browser-checks/rendered_features.mjs` | the checker: `--site <folder>` serves a built site itself, `--base <url/> --host <name>` reads a deployed one; `--expect-red <sabotage>\|all` proves the rows see |
+| `browser-checks/rendered_rows.json` | the rows, what each passes on, the sabotages and what each may turn red, `thirdPartyHostsToday`, the expected console lines per host. Data both platforms run |
+| `browser-checks/fixtures/rendered/` | eleven Markdown pages (Diagrams, Graphs, Python, Swift, Quiz, Tasks, Sketch, Embeds, Handout, Wrapped Text, Anchor) |
+| `browser-checks/lib/plant_rendered.py` | plants them as `Rendered Check/` in a course, makes the sketch, PDF and picture they show (recipes, not binaries), shares the folder; `remove` takes it all out again |
+| `browser-checks/lib/site_server.mjs` | serves a folder as the hosts do: addresses without `.html`, every response with the headers the site's own `_headers` gives its path (read as Netlify reads it, the path lower-cased), on `[::1]` (GeoGebra's rule, Q) |
+| `browser-checks/lib/sabotage.py` | breaks a COPY of the site one way at a time; refuses a real site |
+| `browser-checks/package.json`, `package-lock.json` | `playwright-core` pinned exactly at 1.63.0; the pin names the WebKit build |
+| `browser-checks/fetch-browsers.sh` | installs the driver from the lockfile and the engine into `~/Library/Caches/Plantoir-dev/browsers/playwright/`, copying WebKit from Playwright's shared cache when it is there |
+
+**The rows** are `rendered_rows.json` → `rows`, each with the words it passes
+on: mermaid (drawn, and drawn again after the site's own dark-mode button),
+katex, tikz, graph, python (Run, then a line typed live where the host
+isolates the page), swift, quiz (the contract's words), tasks, progress,
+geogebra, geogebra drag, geogebra reset, geogebra keys (#807's three: the
+drag, the reset and keys while lines run), embeds (deployed sites only),
+pdf, print, copy (#759), heading anchor (#604, ported from
+`heading_anchor.mjs`), and on every page fonts, clean page and own host;
+cold visit (#625) in WebKit only. Presses are Playwright's own, which wait
+for the element to be visible, still and topmost at its centre and then
+send the engine's own pointer events; drags and keys are the engine's input.
+Waits are on the state asked about, with a ceiling.
+
+**How each judgement is made, and why.**
+
+- **Every request through the context's router** (`context.route("**/*")`),
+  never `page.on("request")` or `context.on("request")`: WebKit hands a
+  worker's requests to neither (#597 plan review H1, measured with a
+  dedicated worker that fetched from another host). The Pyodide and Swift
+  runners both run in workers. A request from a teacher's embed (any frame
+  whose document is on another host) is not judged; a request to a host
+  outside `thirdPartyHostsToday` is recorded and then REFUSED by the router,
+  so a sabotage's picture never leaves the Mac.
+- **Fonts by what loaded.** `document.fonts.check()` answers true for a
+  family that does not exist, in both engines, and in WebKit for a face whose
+  file failed to load (review H4, measured). The katex and fonts rows call
+  `document.fonts.load()` and then require a `FontFace` of the family whose
+  status is `loaded`; for the theme's fonts, at least one face of each family
+  that is not one of the device's own, since `display=swap` loads only the
+  weights the text uses.
+- **Copy through a spy.** WebKit refuses `navigator.clipboard.readText()` and
+  throws "Unknown permission" for `grantPermissions(["clipboard-write"])`
+  (review L1), so the row wraps `writeText` (passing through to the real one,
+  whose promise must resolve) and compares its argument with the block.
+- **Print without a printer.** The print frame's `print()` is replaced as the
+  frame appears (the Chrome checks' stand-in, which sends `beforeprint` and
+  `afterprint`); what the print layout made is read at that moment: pages,
+  the diagram drawn on them, and the Latin Modern face's status. This runs in
+  WebKit too, which `print_handout.mjs`'s PDF read-back cannot.
+- **The heading anchor needs a nudge on this Mac.** Measured 2026-11-13:
+  served locally every piece above the heading has its size before the page
+  is shown, and WebKit keeps a fragment in view by itself through later
+  layout until a script scrolls the window, so with the site's landing
+  removed (`scrollIntoView` made to do nothing) the heading still sat at
+  0 px in both engines and the row could not fail. The row therefore moves
+  the window 400 px by script (what the sidebar's scroll to its entry does,
+  #604) and adds 1,500 px above the heading once the page has settled; the
+  landing brings the heading back (0 px), and without it the heading is
+  left at 1,116 px (Chromium) and -400 px (WebKit).
+- **A GeoGebra drag must be paced like a hand.** Playwright's moves sent back
+  to back after the press read as a tap in WebKit (point A unmoved) while
+  Chromium dragged; with 50 ms after the press and 30 ms between moves, the
+  pacing `geogebra_applet.mjs` uses, both drag.
+
+**Proven red, every gate.** `--expect-red all` copies the site (an APFS
+clone), applies one sabotage, serves the copy and runs that page's rows in
+both engines; it passes only when the aimed row FAILS with its own reason's
+words and every other row on the page passes, except those the sabotage's
+`alsoRed` names (a missing file is also a console error, so the clean-page
+row is named there, with its reason). Twenty sabotages run on every gate,
+three at a time. The one that does not is `geogebra keys`: with the loader's
+hold on Space and Enter dropped, the presses do reset the construction while
+its lines run (Chromium: 0 to 3 of 150 objects through 400 presses), but the
+other half of #792, the hidden marker that tells the loader a reset got in,
+then rebuilds all 150. WebKit was left with 114 of 150 once in four runs and
+all 150 in the other three, Chromium all 150 every time. A sabotage that
+fails only sometimes would fail the gate at random, so it runs by name only;
+the row's must-fail remains `geogebra_applet.mjs` item 12's against the first
+version of #792 (82 and 75 of 150, Chromium).
+
+**Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
+engines at once:** the rows in RENDERED_PLAIN_SECONDS s; the twenty
+sabotages in RENDERED_RED_SECONDS s (344 s one at a time, 145 s three at a
+time); the step in `verify.sh`, its own build included, RENDERED_STEP_SECONDS
+s. Cold visits to the isolated Python page: first contentful paint 275 to
+283 ms. A census of every fixture page in both engines found no console line
+at all and only `fonts.googleapis.com`, `fonts.gstatic.com` and (on a page
+with a diagram) `cdnjs.cloudflare.com` asked of other hosts, which is
+`thirdPartyHostsToday`. Neither engine found a fault in the site the other
+did not; what differed was in the check itself (the drag's pacing, WebKit's
+keeping of a fragment, the keys sabotage).
+
+**Where it runs in `verify.sh` (6h-r).** In a working folder of its own
+(`~/.plantoir-verify-rendered`), from the pristine
+`support/example_course/EXC2O` with only `Rendered Check/` planted, with its
+own container and builds folder, removed before and after (6e's pattern).
+Planting into the course the other checks build would change what that site
+carries (its Python pages, its quizzes, its sketches), and a dozen checks
+count those. The publish's own two `_headers` writers run on a copy with
+`PLANTOIR_CONTRACTS_DIR=../contracts`. (Found in passing: the Mermaid and
+GeoGebra steps run `isolation_headers.publish_headers` without it, so it
+raises before writing the isolation block and only the badge block reaches
+their copies; the GeoGebra check sends the isolation headers itself.) A
+build that fails is a FAIL, never a skip. A missing engine or a missing
+network for the mermaid and fonts rows is a SKIP by name; with
+`PLANTOIR_REQUIRE_ENGINES=chromium,webkit` a missing engine is a FAILURE,
+which is how the release gate and the director's merge gate run it. Exit 1
+always wins over 3, so a missing engine never hides a failure.
+
+**Why the 17 older browser checks stay Chromium only.** They drive Chrome
+over the DevTools protocol with Node's own `WebSocket` and no packages
+(8,330 lines that pass); WebKit speaks no DevTools protocol. Each one, and
+whether the rendered check covers it in WebKit:
+
+| Check | Chromium only, because | In WebKit through |
+|---|---|---|
+| `code_runner.mjs` | its 40-odd cases need `Network.*` holds and `Runtime.evaluate` at exact moments | the python row |
+| `swift_runner.mjs` | the same protocol holds | the swift row |
+| `wasi_run.mjs` | runs the WASI shim in Node, no browser at all | not a browser check |
+| `geogebra_applet.mjs` | `Fetch.requestPaused` holds the engine's request mid-open (#756) | the four geogebra rows |
+| `mermaid_draws.mjs` | the #594 policy check, kept as it was | the mermaid row, under the same policy |
+| `graphs_draw.mjs` | the page-id cases (#502) need three pages in one session | the graph row |
+| `maths_offline.mjs` | refuses every other host through `Fetch` | the katex row |
+| `quiz_check.mjs` | every quiz kind, storage refused, print order | the quiz row |
+| `task_boxes.mjs` | storage refused, transclusions, the router's reuse | the tasks row |
+| `my_progress.mjs` | the manifest's totals across classes | the progress row |
+| `print_handout.mjs` | `Page.printToPDF` and poppler read the paper back; WebKit has no print-to-PDF | the print row (the layout, not the paper) |
+| `print_plain_page.mjs` | the same | none: ⌘P's paper is Chromium's own |
+| `print_fallback.mjs` | it stands in for "WebKit's way" of printing (#576); headless WebKit cannot print, and under `safaridriver` `print()` returns in 0 ms with no event | stays an imitation, by design |
+| `text_wrap.mjs` | the wrap layout cases at two widths and on paper | the copy row (#759, found in WebKit) |
+| `heading_anchor.mjs` | it switches off Chrome's scroll anchoring, "which Safari has never had" (#604) | the heading anchor row, in the real engine |
+| `picture_heights.mjs` | the zero-height layout it proves is the same in both engines (M); only whether the shift is SEEN is WebKit's | none: stays Chromium only |
+| `sidebar_page_marker.mjs` | forced colours and per-pixel contrast through the protocol | none |
+
+**Rejected.** Porting the 17 to Playwright, or a shim under them (three to
+four times this piece, and `printToPDF` has no WebKit counterpart, so print
+would split anyway). Playwright's bundled Chromium (153) beside the gate's
+Chrome for Testing 155: the same binary everywhere makes a red in one check
+reproducible in another. The engine in Playwright's shared
+`~/Library/Caches/ms-playwright`: `playwright install` from any other
+project removes builds it no longer pins from there, and the gate would turn
+into a quiet SKIP (review M1). Planting the pages into verify.sh's own test
+course (above). A per-host or per-engine checker (the 2026-10-31 ruling asks
+for a host as an entry in a list). Firefox (not asked for; `firefox-1543` is
+cached and the checker could add it by name). Screenshots to judge paint
+(blank in headless WebKit until `load`, #625).
 
 ## E. Summary: what is *not* customized
 

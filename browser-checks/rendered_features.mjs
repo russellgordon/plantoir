@@ -1189,6 +1189,17 @@ async function redRun(engines, network) {
   return { seconds: Math.round((Date.now() - started) / 1000) }
 }
 
+// Every row the data names must be one this file can check, and every
+// row this file checks must be named: a row added to rendered_rows.json
+// alone would otherwise never run and never fail.
+const COMMON = new Set(["fonts", "clean page", "own host", "cold visit"])
+for (const row of ROWS.rows) {
+  if (!COMMON.has(row.name) && !(row.name in ROW_CHECKS)) say("FAIL", row.name, null, "rendered_rows.json names this row and rendered_features.mjs has no check for it")
+}
+for (const name of Object.keys(ROW_CHECKS)) {
+  if (!ROWS.rows.some((row) => row.name === name)) say("FAIL", name, null, "rendered_features.mjs checks a row rendered_rows.json does not name")
+}
+
 const { engines, missing } = loadEngines()
 let engineMissing = false
 for (const engine of options.engines) {
