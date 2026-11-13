@@ -2256,11 +2256,14 @@ The advice those outcomes carry (deploy it yourself) still recovers.
 #136 already rejected a launcher exit code of its own for the rerun.
 (Corrected with #768: this said the wrapper is written when a deploy is
 SCHEDULED, so every one set before 1.9.2 kept its old text. Since #323 the
-`--run-scheduled-deploy` process writes it afresh at the run.) What does
-stay old is the folder's own launchers: the scheduled runner does not
-refresh them, so a run before a newer Plantoir has opened the folder once
-uses the `preview.sh` and `deploy.sh` last mirrored there. That is #748
-part 4, its own piece after #768.
+`--run-scheduled-deploy` process writes it afresh at the run.) Until #748
+part 4 the folder's own launchers stayed old: the scheduled run did not
+refresh them, so a run before a newer Plantoir had opened the folder once
+used the `preview.sh` and `deploy.sh` last mirrored there, whose image
+matched the old stamp, so this rebuild never happened at all. Since #748
+part 4 (2026-11-13) the run brings the launchers and `.toolchain/` up to date
+first (09 → "A scheduled deploy brings its folder up to date first (#748
+part 4)"), so the first scheduled deploy after an update does rebuild here.
 
 ### Rejected
 
