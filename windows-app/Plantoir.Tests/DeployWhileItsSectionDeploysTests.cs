@@ -147,6 +147,25 @@ public class DeployWhileItsSectionDeploysTests
         }
     }
 
+    /// <summary>
+    /// shared-rules.json -> twoPreviewsOneAddress.failureExplanationCases
+    /// (mac #835, Windows #868): the window lifts the builder's refusal of a
+    /// preview whose address another preview holds, and it is not read as a
+    /// section-deploy refusal.
+    /// </summary>
+    [Fact]
+    public void ThePreviewAddressRefusalIsLiftedAsTheContractSays()
+    {
+        var cases = ContractLoader.LoadJson("shared-rules.json")["twoPreviewsOneAddress"]!["failureExplanationCases"]!.AsArray();
+        Assert.NotEmpty(cases);
+        foreach (var c in cases)
+        {
+            string output = c!["output"]!.ToString();
+            Assert.Equal(c["expect"]!.ToString(), FailureExplainer.Explanation(output));
+            Assert.Null(FailureExplainer.SectionDeployRefusalOf(output));
+        }
+    }
+
     [Theory]
     [InlineData("❌ ICS4U section 2 is being deployed right now, so it cannot be previewed until that has finished.")]
     [InlineData("Error: the build failed.\nNothing was deployed.")]

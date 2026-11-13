@@ -478,6 +478,8 @@ class ATeacherAlreadyBittenGetsOutOfIt(unittest.TestCase):
 
 
 @unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+@unittest.skipIf(os.name == "nt", "ends its run with os.killpg and signal.SIGKILL, which Windows has neither of "
+                                  "(#868's handover; the mac guards it in #835's third part)")
 class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
     """#378 review N1: a course code may carry one space ("AP CALC",
     CourseCodeRule). deploy.sh writes the code into the `sh -lc` script it
