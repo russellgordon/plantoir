@@ -560,6 +560,42 @@ class VerifyTests(unittest.TestCase):
             os.remove(assessment / "Teacher looked.json")
             self.assertEqual(check(), 1, "no record")
 
+    def test_a_whole_class_in_one_scan_is_split_then_named_then_boxed(self):
+        # Box request.json's wholeClass: the first double-click splits the stack and asks for the paper column;
+        # the next names the papers from the table, through the runner, and boxes them.
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            originals = a_class.teacher_only / ASSESSMENT / "Originals"
+            shutil.rmtree(originals)
+            pages = []
+            for _paper in range(2):
+                pages += [redact_tests.render(BLANK, 1), redact_tests.render(BLANK, 2)]
+            redact_tests.write_image_pdf(a_class.teacher_only / ASSESSMENT / "Whole class.pdf", pages)
+            originals.mkdir()
+            request = a_class.marking / ASSESSMENT / "Box request.json"
+            request.write_text(json.dumps({"blank": str(BLANK), "script": "Scripts/redact_scans.py", "options": [],
+                                           "wholeClass": {"file": "Whole class.pdf", "pagesPerPaper": 2, "section": 1}}),
+                               encoding="utf-8")
+            said = []
+            answers = [str(a_class.teacher_only)]
+            self.assertEqual(teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None,
+                                              said.append), 1)
+            self.assertIn("Fill in the paper column", "\n".join(said))
+            self.assertTrue((a_class.teacher_only / ASSESSMENT / "Check" / "Papers to name.pdf").is_file())
+            table = a_class.teacher_only / "Name Mapping Table.csv"
+            table.write_text(table.read_text(encoding="utf-8").replace("first name\n", "first name,paper\n", 1)
+                             .replace(f"{CANARIES[1]}\n", f"{CANARIES[1]},2\n").replace(f"{CANARIES[3]}\n", f"{CANARIES[3]},1\n"),
+                             encoding="utf-8")
+            said = []
+            answers = [str(a_class.teacher_only), "yes"]
+            self.assertEqual(teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None,
+                                              said.append), 0, "\n".join(said))
+            redacted = a_class.marking / ASSESSMENT / "Redacted" / "Section 1"
+            self.assertEqual(sorted(path.name for path in redacted.iterdir()), ["Student A.pdf", "Student B.pdf"])
+            for token in CANARIES + (MARKER,):
+                self.assertNotIn(token.casefold(), "\n".join(said).casefold())
+            self.assertEqual(a_class.leaks(), [])
+
     def test_anything_in_the_holding_folder_but_a_boxed_paper_is_refused(self):
         with tempfile.TemporaryDirectory() as root:
             holding = Path(root) / "Holding" / "Section 1"
