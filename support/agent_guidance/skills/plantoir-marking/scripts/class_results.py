@@ -11,7 +11,7 @@ no name mapping table, so it is run directly, not through run_with_names.py.
     python3 -B class_results.py --assessment "<marking folder>/Unit 2 Test" --kit "<test>/Marking Kit/answers.json"
         [--assessment "<marking folder>/<another>" [--kit ...]] --checker ".../plantoir-test-authoring/scripts/check_kit.py"
         --settings "<marking folder>/Marking Settings.md" [--out "<marking folder>/<Term> Results"] [--title "Term 1"]
-        [--school "School Name"] [--identifiers REGEX] [--tex-only]
+        [--school "School Name"] [--tex-only]
     python3 -B class_results.py --self-test --checker ".../check_kit.py"
 
 For each --assessment (a folder of the marking folder, as plantoir-marking section 4 lays it out) it reads:
@@ -66,7 +66,7 @@ from pathlib import Path
 #   or below the mark as printed, or "nearest"); the ways of rounding a percentage the settings may name
 #   (ROUNDINGS); the columns of the grade tables (a report system's own order); weighting categories
 #   differently for an overall mark (the default is the plain sum of points); charts or a test-against-assignment
-#   comparison added to the document (reference/results.md); the identifier pattern (or give --identifiers).
+#   comparison added to the document (reference/results.md).
 DOCUMENT = "Class Results"
 GRADES = "Grades - {assessment}.csv"
 LEVELS = "Levels - {assessment}.csv"
@@ -78,7 +78,6 @@ DEFAULT_ROUNDING = "whole numbers, half up"
 NO_REVISION_TITLE = "No revised levels"
 NO_RECORD_TITLE = "No level record"
 NOT_COUNTED = "not counted"
-IDENTIFIER = r"^Student [A-Z]{1,2}$"
 SECTION = r"^Section (\d+)$"
 SHEET_SUFFIX = " - Marks by Question.tex"
 
@@ -98,6 +97,20 @@ TEACHER_DECIDES = ("Every mark, level and comment here is a suggestion drafted f
                    "a student. I draft; you decide.")
 EARLIER = " - earlier run, do not use"
 BUILDING = ".building results"
+
+
+# >>> The identifier rule. ONE rule, carried byte for byte in every plantoir-marking script that reads an
+# identifier (redact_scans.py, build_test_sheet.py, make_named_copies.py, class_results.py; 750c fix review M1:
+# a loose pattern let a record named like a person through, and the scripts disagreed). An identifier is the
+# WHOLE name, matched in full: Student A to Student ZZ, and nothing else. scripts/test_marking_results.py fails if
+# the copies differ or the contract's assessment.identifiers.pattern is not this one. A teacher whose papers are
+# named another way renames them (redact_scans.py --name-papers does it from the mapping table).
+IDENTIFIER = r"^Student [A-Z]{1,2}$"
+
+
+def is_identifier(text):
+    return isinstance(text, str) and re.fullmatch(IDENTIFIER, text) is not None
+# <<< The identifier rule.
 
 
 class Refusal(Exception):
@@ -143,6 +156,10 @@ class Settings:
         for line in text.splitlines():
             found = re.match(r"\s*[-*]\s*(Half marks|Levels scale|Percentages):\s*(.*?)\s*$", line, re.IGNORECASE)
             if found is None:
+                near = re.match(r"\s*[-*]\s*(half[ -]?marks?|levels?[ -]?scales?|percentages?)\s*:", line, re.IGNORECASE)
+                if near is not None:
+                    raise Refusal("Marking Settings.md has a line that looks like one this script reads but is not written "
+                                  "as - Half marks:, - Levels scale: or - Percentages:; rewrite it so it is not passed over")
                 continue
             key = found.group(1).casefold()
             value = found.group(2)
@@ -265,15 +282,15 @@ def identifier_files(folder, identifier, problems, where):
         for path in sorted(section_folder.iterdir(), key=lambda entry: (len(entry.stem), entry.name)):
             if path.name.startswith("."):
                 continue
-            if path.suffix == ".json" and path.is_file() and re.match(identifier, path.stem):
+            if path.suffix == ".json" and path.is_file() and is_identifier(path.stem):
                 found.append((int(match.group(1)), path.stem, path))
             else:
                 strays += 1
     if strays:
         problems.append(f"{where}: {plural(strays, 'file or folder')} not named like Section N/<identifier>.json "
-                        "(a rescan or a copy saved beside a record, or a name that is not like the identifiers) would "
+                        "(a rescan or a copy saved beside a record, or a name that is not an identifier) would "
                         "not be counted; rename or move "
-                        + ("it" if strays == 1 else "them") + ", or give the identifier pattern with --identifiers")
+                        + ("it" if strays == 1 else "them") + " (only identifiers like Student A are read)")
     return found
 
 
@@ -287,9 +304,9 @@ def check_record(checker, kit_path, record_path, label):
 
 
 def category_marks(kit, record, label):
-    """[(category key, earned, out of)] in the kit's order. A point voided for everyone counts for no one: it is
-    out of both the mark and the out of, as build_test_sheet.py counts it."""
-    voided = record.get("voided", {}) or {}
+    """[(category key, earned, out of)] in the kit's order. A point the kit voids for the whole class counts for no
+    one: it is out of both the mark and the out of, as build_test_sheet.py counts it."""
+    voided = kit.get("voided", {}) or {}
     result = []
     for category in kit["categories"]:
         earned = 0.0
@@ -343,6 +360,21 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
         label = f"Section {section}/{name}"
         keys.add((section, name))
         read_paths.append(path)
+        # A point is voided for the whole class or for nobody (750c fix review H1): the ruling is the kit's
+        # voided list, and every record must void exactly those points. Checked here first, so the stop names
+        # the identifier and the points rather than a checker rule.
+        try:
+            first_look = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError):
+            first_look = None
+        if isinstance(first_look, dict) and isinstance(first_look.get("voided", {}), dict):
+            in_record = sorted(first_look.get("voided", {}) or {})
+            in_kit = sorted(kit.get("voided", {}) or {})
+            if in_record != in_kit:
+                problems.append(f"{label}: its record voids {', '.join(in_record) or 'nothing'}, and the kit voids "
+                                f"{', '.join(in_kit) or 'nothing'} for the whole class; record the ruling in the kit's "
+                                "voided and in every record, then build every sheet again")
+                continue
         check_record(checker, entry["kit_path"], path, label)
         record = read_json(path, f"{label}'s marks record")
         if record.get("identifier") != name or str(record.get("section")) != str(section):
@@ -381,7 +413,12 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
                     kit_keys.append(key)
                     printed = on_sheet.get(key)
                     if printed is None or abs(printed[0] - earned) > 1e-9 or printed[1] != out_of:
-                        said.append(f"{key} nothing" if printed is None else said_as(key, printed[0], printed[1]))
+                        if printed is None:
+                            said.append(f"{key} nothing")
+                        elif printed[1] == 0 and printed[0] != 0:
+                            said.append(f"{key} {number(printed[0])}/0")      # a sheet built before voided points counted for no one
+                        else:
+                            said.append(said_as(key, printed[0], printed[1]))
                         now.append(said_as(key, earned, out_of))
                 for key in on_sheet:
                     if key not in kit_keys:
@@ -405,7 +442,7 @@ def read_marks(entry, checker, settings, identifier, problems, notes, read_paths
                 if not path.name.endswith(SHEET_SUFFIX):
                     continue
                 name = path.name[:-len(SHEET_SUFFIX)]
-                if not re.match(identifier, name):
+                if not is_identifier(name):
                     problems.append(f"{entry['name']}/Sheets: a Marks by Question sheet not named like an identifier")
                 elif (int(match.group(1)), name) not in keys:
                     problems.append(f"Section {match.group(1)}/{name}: a Marks by Question sheet with no marks record "
@@ -793,10 +830,6 @@ def build(entries, checker, settings_path, out, title, school, tex_only, identif
                       "skill's scripts/check_kit.py")
     if not entries:
         raise Refusal("give at least one --assessment")
-    try:
-        re.compile(identifier)
-    except re.error:
-        raise Refusal("--identifiers is not a pattern that can be read")
     if out is None:
         if len(entries) != 1:
             raise Refusal("give --out (a results folder in the marking folder) when there is more than one assessment")
@@ -1039,12 +1072,19 @@ def self_test(checker):
                                    "--kit", str(kit_path), "--checker", str(checker), "--settings", str(settings)] + extra,
                                   capture_output=True, text=True, encoding="utf-8")
 
+        split = run(["--tex-only"])
+        if split.returncode != 1 or "Section 1/Student B: its record voids B1.2, and the kit voids nothing" not in split.stdout:
+            problems.append("records voiding different points did not stop the build")
+        kit["voided"] = voided
+        kit_path.write_text(json.dumps(kit), encoding="utf-8")
+        (assessment / "Marks" / "Section 1" / "Student A.json").write_text(
+            json.dumps(record("Student A", [1, 0, 1], voided)), encoding="utf-8")
         stale = run(["--tex-only"])
-        if stale.returncode != 1 or "Section 1/Student A: its sheet says T 2/2, and its marks record now gives T 1/2" not in stale.stdout:
+        if stale.returncode != 1 or "Section 1/Student A: its sheet says T 2/2, and its marks record now gives T 0/1" not in stale.stdout:
             problems.append("a sheet whose totals differ from its record did not stop the build")
         if (assessment / "Results" / (DOCUMENT + ".tex")).exists():
             problems.append("a stopped build put a document in place")
-        sheet.write_text("{\\large\\bfseries\\sffamily K 1/1 $\\cdot$ T 1/2}\\par\\vspace{2pt}\n", encoding="utf-8")
+        sheet.write_text("{\\large\\bfseries\\sffamily K 1/1 $\\cdot$ T 0/1}\\par\\vspace{2pt}\n", encoding="utf-8")
         (assessment / "Records" / "Section 1").mkdir(parents=True)
         (assessment / "Records" / "Section 1" / "Student A.json").write_text(json.dumps(
             {"identifier": "Student A", "section": 1, "levels": {"K": {"first": "2", "revised": "3"}}}), encoding="utf-8")
@@ -1056,7 +1096,7 @@ def self_test(checker):
                 rows = list(csv.DictReader(handle))
         except OSError:
             rows = []
-        if len(rows) != 2 or rows[0].get("T marks") != "1" or rows[0].get("total %") != "67" or rows[0].get("total level") != "2":
+        if len(rows) != 2 or rows[0].get("T marks") != "0" or rows[0].get("total %") != "50" or rows[0].get("total level") != "below 1":
             problems.append("the grade table's totals are not the sum of the points")
         if len(rows) == 2 and (rows[1].get("T marks") != "1" or rows[1].get("T out of") != "1"):
             problems.append("a voided point was counted")
@@ -1074,10 +1114,14 @@ def self_test(checker):
     if problems:
         print("self-test FAILED: " + "; ".join(sorted(set(problems))))
         return 1
-    print("self-test passed: invented records counted point by point with a voided point counted for no one, a sheet "
-          "whose totals differ stopped the build and put nothing in place, levels read through an invented scale, a "
-          "marked student with no level record listed, every row stamped. This checks the paths the test knows; it is "
-          "no guarantee about changes it does not reach.")
+    compiled_too = shutil.which("tectonic") is not None and shutil.which("pdftotext") is not None
+    print("self-test passed: records voiding different points stopped the build, invented records counted point by "
+          "point with a point the kit voids counted for no one, a sheet whose totals differ stopped the build and put "
+          "nothing in place, levels read through an invented scale, a marked student with no level record listed, "
+          "every row stamped. "
+          + ("The PDF was compiled. " if compiled_too else "The PDF was NOT tested: tectonic or pdftotext is not "
+             "installed, and it cannot be made without them. ")
+          + "This checks the paths the test knows; it is no guarantee about changes it does not reach.")
     return 0
 
 
@@ -1125,7 +1169,7 @@ def main(arguments):
         return self_test(checker)
     return build(assessments_from(arguments), checker, option(arguments, "--settings"), option(arguments, "--out"),
                  option(arguments, "--title"), option(arguments, "--school", ""), "--tex-only" in arguments,
-                 option(arguments, "--identifiers", IDENTIFIER))
+                 IDENTIFIER)
 
 
 if __name__ == "__main__":

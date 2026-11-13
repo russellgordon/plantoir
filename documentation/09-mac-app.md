@@ -5562,7 +5562,7 @@ from invented marks records; it is written up for the director.
 script, `scripts/class_results.py`, and a third reference,
 `reference/results.md`; `make_named_copies.py` gained `--document` and
 `--grades`. The contract is `assessment.results` (its `cases`) and
-`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and eight
+`namedCopies.resultsRule` with `gradeCases` and `documentCases`, and nine
 sentences are pinned in `mustSay` → `plantoir-marking`, the two about names
 in the results section among them (implementation review M4: removing
 either left every test green before). Nothing in the app changes, no trail
@@ -5616,9 +5616,11 @@ event (as for 750a), nothing on plantoir.app.
   other totals than its record (both numbers named), names a category the
   kit does not have, or cannot be read; a sheet with no record beside it; any
   file or folder in `Marks/` or `Records/` not named `Section N/<identifier>.json`
-  (counted, never named), which catches a rescan saved beside a record and a
-  class named another way unless `--identifiers` gives its pattern (review
-  M1: each of these gave exit 0 and a document that looked complete); an
+  (counted, never named), which catches a rescan saved beside a record, a
+  record named like a person and a class named another way (review M1: each
+  of these gave exit 0 and a document that looked complete); a record that
+  voids other points than the kit (below); a settings line written nearly as
+  one it reads (`- Percentage:`), which was passed over; an
   assessment with no marks record; a half mark without the settings' yes
   (yes or no, then at most bracketed words: review L2 found `yes-only-on-part-B`
   read as yes); a level off the scale, and a scale that names a level or a
@@ -5638,6 +5640,44 @@ event (as for 750a), nothing on plantoir.app.
   use"; a test kills a build while it compiles and finds no finished-looking
   document. REJECTED: marking a set "incomplete" in place, which leaves a
   half-written folder for someone to misread.
+- **A point is voided for the whole class, recorded once, in the kit (fix
+  review H1; this changed #751's merged `check_kit.py` and `FORMAT.md`, and
+  750a's `build_test_sheet.py` again).** MEASURED by the fix review: with
+  the ruling held in each record, a ruling reaching only the records marked
+  after it gave two students with the same answers two out-ofs and two
+  levels, with exit 0, while every sheet said "not counted for anyone". The
+  kit now carries an optional `voided` ({point: {reason, intended}}), and
+  `check_kit.py --marks` refuses a record that voids other points
+  (`marks-voided`); the sheet builder takes the list and its reasons from the
+  kit, so its sentence is true of the class; `class_results.py` checks every
+  record against the kit first and stops naming the identifier and the
+  points. A void applies to every version (point IDs are shared). REJECTED:
+  the reviewer's class-wide comparison in `class_results.py` alone, because
+  the sheet builder sees one record and would still print the sentence on
+  one record's word; and the settings file as the one place, because a void
+  is about one test, and the settings are the course's.
+- **One identifier rule (fix review M1).** MEASURED: `--identifiers '.*'`
+  built results from a record named with a full name and printed it in the
+  `.tex`, and a non-default pattern built results the named step then
+  refused. Every script that reads an identifier now carries one block,
+  byte for byte, matched with `fullmatch` (`Student A` to `Student ZZ`); the
+  option is gone from `class_results.py` and from 750a's `redact_scans.py`,
+  and a test fails if the copies differ or the contract's pattern is
+  another. Papers named another way are renamed with `--name-papers`.
+- **What was left, and why (fix review LOWs).** The staging leaves windows
+  of microseconds between the final renames in which a kill leaves some new
+  documents in place beside a hidden PDF; each is the consistent output of
+  one build, so no wrong number results, and it is written here rather
+  than closed with a marker file. A record not fully marked still puts the
+  documents in place with exit 1, the identifier printed and listed in the
+  document; the named grade table names the student with no row. A test
+  with every point voided builds, "not counted" throughout, which is the
+  ruling as given. `build_test_sheet.py --self-test` fails without tectonic,
+  which is the true answer for a script that cannot run without it. Fixed:
+  a near-miss settings line stops the build; a pre-fix sheet's `K 1/0` is
+  named with its own numbers; the feedback sheet says "2 marks in this
+  question are not counted for anyone" once; `class_results.py --self-test`
+  says when the PDF was not tested.
 - **The scale is the teacher's.** Read from `Marking Settings.md`, never
   filled in by the assistant. REJECTED: Russell's scale, his weighting and
   his school as defaults, and his scale as a format example (review M5: the
@@ -5659,7 +5699,7 @@ event (as for 750a), nothing on plantoir.app.
 - **Measured** (Apple M4 Pro, macOS 26.6, tectonic 0.17.0, Python 3.14.4
   and 3.9.6): 60 invented records in two sections build in 1.6 s with the
   PDF and 1.4 s without, most of it the 60 runs of `check_kit.py`.
-  `scripts/test_marking_results.py`: 12 tests, every `results` case (36,
+  `scripts/test_marking_results.py`: 13 tests, every `results` case (40,
   each `sheetLine` case also through `build_test_sheet.py`), `gradeCases`
   (9) directly and through the runner, `documentCases` (5, skipped without
   tectonic and pdftotext), one case compiled, three scales giving three

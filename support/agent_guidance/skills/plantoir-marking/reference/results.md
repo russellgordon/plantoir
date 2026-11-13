@@ -29,8 +29,10 @@ come first, and the script is a starting point like the others (copy it into `Sc
   `whole numbers, down`; whole numbers, half up when there is none). The scale is always the teacher's.
   Never fill it in yourself, from another teacher's scale or from an example; ask, and record the answer
   with the teacher's words and the date.
-- **The identifiers**: `Student A`, `Student B` ... by default. A teacher whose papers are named
-  another way gives the pattern (recorded in `Marking Settings.md`) with `--identifiers`.
+- **The identifiers**: `Student A` to `Student ZZ`, matched in full, one rule in every script. Papers
+  named another way are renamed first (`redact_scans.py --name-papers`).
+- **The kit's `voided`**: the points voided for the whole class. Every marks record must void exactly
+  those points; a record that voids others stops the build, named by identifier with the points.
 
 ## What it writes, into the marking folder
 
@@ -56,7 +58,7 @@ build that stops part way leaves no document that looks finished.
 ## How the numbers are made
 
 - A category's mark is the sum of its points earned, out of its points. A point the teacher removed from
-  the count (`voided` in the record) counts for no one: it is in neither the mark nor the out of, here and
+  the count (the kit's `voided`) counts for no one: it is in neither the mark nor the out of, here and
   on the feedback sheet, so no one shows more than the total. A category with nothing counted is shown
   as "not counted" and left out of the means; it is never 0 percent.
 - The total is the sum of the categories. There is no weighting unless the teacher asks for one; then
@@ -80,9 +82,12 @@ It puts nothing new in place, names the identifier and the reason, and exits 1, 
   copy saved beside a record, or a name not like the identifiers); it is counted and never named, and
   the teacher says which file is the right one;
 - an assessment's `Marks/` folder holds no record;
+- a record voids other points than the kit's `voided` (the ruling is recorded once, in the kit, and
+  copied into every record);
 - a record has a half mark and the settings record no yes to half marks;
 - a level is not on the teacher's scale, or the scale gives a level or a percent twice, a percent over
-  100, or is written twice; or the `- Percentages:` line names a rounding the script does not know;
+  100, or is written twice; or the `- Percentages:` line names a rounding the script does not know; or
+  a settings line is written nearly as one it reads (`- Percentage:`), so it would be passed over;
 - a record's identifier or section is not its file's and folder's, a record is not in the shape above,
   or the kit checker refuses a record.
 

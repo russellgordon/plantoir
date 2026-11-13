@@ -73,7 +73,6 @@ from pathlib import Path
 #   default), the file names of the named copies, which kinds of sheet are named (every
 #   "<identifier> - <kind>.tex" by default), the folder names, the wording of the lines it prints.
 NAME_COLUMN = "name"
-IDENTIFIER = r"^Student [A-Z]{1,2}$"
 SECTION = r"^Section (\d+)$"
 SHEET = r"^(Student [A-Z]{1,2}) - (.+)\.tex$"
 SLOT = re.compile(r"\\studentline\{([^{}]*)\}")
@@ -269,6 +268,20 @@ def holds_any_form(text, names):
 # <<< The name comparison.
 
 
+# >>> The identifier rule. ONE rule, carried byte for byte in every plantoir-marking script that reads an
+# identifier (redact_scans.py, build_test_sheet.py, make_named_copies.py, class_results.py; 750c fix review M1:
+# a loose pattern let a record named like a person through, and the scripts disagreed). An identifier is the
+# WHOLE name, matched in full: Student A to Student ZZ, and nothing else. scripts/test_marking_results.py fails if
+# the copies differ or the contract's assessment.identifiers.pattern is not this one. A teacher whose papers are
+# named another way renames them (redact_scans.py --name-papers does it from the mapping table).
+IDENTIFIER = r"^Student [A-Z]{1,2}$"
+
+
+def is_identifier(text):
+    return isinstance(text, str) and re.fullmatch(IDENTIFIER, text) is not None
+# <<< The identifier rule.
+
+
 class Refusal(Exception):
     """A reason to stop, worded for the teacher, holding identifiers and counts only."""
 
@@ -321,7 +334,7 @@ def read_table_rows(path):
     wrong = 0
     repeated = 0
     for row in rows:
-        if not row.get("section", "").isdigit() or not re.match(IDENTIFIER, row.get("identifier", "")) or not row.get(NAME_COLUMN):
+        if not row.get("section", "").isdigit() or not is_identifier(row.get("identifier", "")) or not row.get(NAME_COLUMN):
             wrong += 1
             continue
         key = (int(row["section"]), row["identifier"])
@@ -523,7 +536,7 @@ def read_drafts(path):
             raise Refusal(shape)
         identifier = entry.get("identifier")
         options = entry.get("options")
-        if not isinstance(section, int) or not isinstance(identifier, str) or not re.match(IDENTIFIER, identifier):
+        if not isinstance(section, int) or not isinstance(identifier, str) or not is_identifier(identifier):
             raise Refusal(shape)
         if not isinstance(options, list):
             raise Refusal(shape)
@@ -854,7 +867,7 @@ def make_named_document(table, document, out):
         raise Refusal("the document has no \\student{section}{identifier} for a name to go in; nothing was written")
     strange = 0
     for _section, identifier in slots:
-        if not re.match(IDENTIFIER, identifier):
+        if not is_identifier(identifier):
             strange += 1
     if strange:
         raise Refusal(f"{plural(strange, 'place')} in the document marked \\student hold something not like an "
@@ -949,7 +962,7 @@ def read_grades(path):
     for row in rows[1:]:
         if not row:
             continue
-        if len(row) != len(rows[0]) or not row[0].strip().isdigit() or not re.match(IDENTIFIER, row[1].strip()):
+        if len(row) != len(rows[0]) or not row[0].strip().isdigit() or not is_identifier(row[1].strip()):
             raise Refusal("a row of the grade table is not like 1, Student A, then its marks; nothing was written")
         if not BUILT.match(row[-1]):
             raise Refusal("a row of the grade table has a built cell not as class_results.py writes it; nothing was written")

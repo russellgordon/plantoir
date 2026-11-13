@@ -77,6 +77,10 @@ def kit_for(entry):
     """The contract's base kit, or with `kitPoints` one with that many points per category, every version
     answering each point."""
     kit = json.loads(json.dumps(assessment()["kitFormat"]["base"]))
+    if entry.get("kitVoided"):
+        kit["voided"] = {}
+        for point_id in entry["kitVoided"]:
+            kit["voided"][point_id] = {"reason": "the question did not work", "intended": "a second roll"}
     sizes = entry.get("kitPoints")
     if not sizes:
         return kit
@@ -174,8 +178,6 @@ def set_up(case, root):
     else:
         out = marking / case["assessments"][0]["folder"] / "Results"
     command.extend(["--checker", str(CHECKER), "--settings", str(settings)])
-    if "identifiers" in case:
-        command.extend(["--identifiers", case["identifiers"]])
     return command, out, kits
 
 
@@ -447,6 +449,22 @@ class NamedResultsTests(unittest.TestCase):
 
 
 class SkillFileTests(unittest.TestCase):
+
+    def test_every_script_carries_the_one_identifier_rule(self):
+        # 750c fix review M1: --identifiers took any pattern, matched at its start only, and the scripts that put
+        # names in still read the default. One block, byte for byte, matched in full; no option anywhere.
+        blocks = set()
+        for name in ("redact_scans.py", "build_test_sheet.py", "make_named_copies.py", "class_results.py"):
+            source = (SKILL / "scripts" / name).read_text(encoding="utf-8")
+            start = source.index("# >>> The identifier rule.")
+            blocks.add(source[start:source.index("# <<< The identifier rule.", start)])
+            self.assertNotIn("--identifiers", source, name)
+            self.assertNotIn("re.match(IDENTIFIER", source, name)
+            self.assertNotIn("re.match(identifier", source, name)
+        self.assertEqual(len(blocks), 1, "the identifier rule differs between scripts")
+        block = blocks.pop()
+        self.assertIn('IDENTIFIER = r"' + assessment()["identifiers"]["pattern"] + '"', block)
+        self.assertIn("re.fullmatch(IDENTIFIER, text)", block)
 
     def test_the_skill_names_the_script_and_its_reference(self):
         results = assessment()["results"]

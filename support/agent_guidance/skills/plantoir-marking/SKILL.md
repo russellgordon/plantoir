@@ -400,6 +400,12 @@ Never a total: totals are counted from the points. Check each record with
   find before anything is handed over.
 - **After every ruling**, apply it to every paper already marked, then
   write a short check over `Marks/*/*.json` that proves it was, and run it.
+- **A point voided for the whole class** (a question that did not work,
+  on the teacher's yes) is recorded once, in the kit's `voided`, and the
+  same entry is copied into every marks record of the test: a point is
+  voided for everyone or for no one, and `check_kit.py --marks` refuses a
+  record that does not match. Then build every sheet again, and the class
+  results.
 - If you cannot start separate agents, mark one paper at a time yourself,
   and say plainly that the sheets had no independent check.
 - **Reporting**: one short line per paper as it lands (`Section 1/Student
@@ -489,10 +495,10 @@ It writes `Class Results.pdf` and a grade table per assessment into
 `<Assessment>/Results/`, identifiers only (`--assessment` again, each with
 its own `--kit`, and `--out` for a term's results across assessments). It
 reads level records in `Records/` only if that folder holds any, and the
-document says plainly which parts it had no records for. If the teacher's
-papers are named another way than `Student A`, give the pattern recorded in
-`Marking Settings.md` with `--identifiers`, as for the scans. Render every
-page and look, as for the sheets.
+document says plainly which parts it had no records for. Every script reads
+identifiers one way only, `Student A` to `Student ZZ`, matched in full;
+papers named another way are renamed first (`redact_scans.py
+--name-papers`). Render every page and look, as for the sheets.
 
 - **The scale is the teacher's.** Levels come from the `- Levels scale:`
   line of `Marking Settings.md`. Never fill in the levels scale yourself:
