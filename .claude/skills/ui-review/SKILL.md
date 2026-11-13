@@ -5,7 +5,7 @@ description: Build the UI/UX review page for a release that changes what a teach
 
 # The UI/UX review page
 
-**Standing practice since v1.10.0 (Russell, 2026-11-13):** a release that
+**Standing practice since v2.0.0 (Russell, 2026-11-13):** a release that
 changes what a teacher sees gets a review page before it is cut. In his words,
 "It's way more efficient than a smoke test." The first one found two layout
 faults that every unit test and three reviews had passed (#831, #832), and in
