@@ -11,8 +11,20 @@
 # live in contracts/shared-rules.json → obsidianAddOnsForFigures.addOns, which
 # the app's own pins and Windows' fetch read too; two lists would be two
 # answers. ObsidianFigureAddOnsTests fails if a 64-character hex run is ever
-# written into this file. Read with /usr/bin/plutil, so nothing but macOS is
-# needed.
+# written into this file. Read with /usr/bin/jq, which macOS has shipped since
+# macOS 15, and the Xcode this project builds with (26 or later) needs macOS
+# 15.6 or later, so nothing but macOS is needed.
+#
+# **Not plutil (#864).** This used /usr/bin/plutil until 2026-11-13. plutil
+# refuses a whole JSON file that holds an escaped NUL anywhere in it
+# ("Unsupported escaped (unicode) null"), and #780's cases in the same
+# contract carry eight of them on purpose, so from 2026-11-12 the script
+# read nothing, said the contract had no add-ons, and stopped every fresh
+# clone and every release build at this step. jq reads the file as JSON
+# says. `--print-pins` runs only the reading step and prints what it read,
+# which scripts/test_fetch_obsidian_addons.py compares with Python's own
+# reading of the contract, so the next character a reader refuses fails a
+# suite rather than a new machine.
 #
 # **Checked before anything is installed.** Every file must be the size and
 # SHA-256 its pin says; one mismatch installs NOTHING. The app hashes them
@@ -38,10 +50,24 @@ DESTINATION="${HERE}/obsidian-addons"
 CACHE="${PLANTOIR_ADDONS_CACHE:-$HOME/Library/Caches/Plantoir-dev/obsidian-addons}"
 KEY="obsidianAddOnsForFigures.addOns"
 
-# One value out of the contract: `field 0.files.1.sha256`.
+JQ="/usr/bin/jq"
+if [[ ! -x "${JQ}" ]]; then
+  echo "❌ ${JQ} is not on this Mac (macOS 15 or later has it). Nothing was installed." >&2
+  exit 1
+fi
+
+# One value out of the contract: `field 0.files.1.sha256`. A list answers
+# with its length, as `plutil -extract … raw` did; anything missing, or an
+# object where a value was expected, is refused.
+# shellcheck disable=SC2016  # the $ names are jq's, not the shell's
+READ_ONE='($path | split(".") | map(if test("^[0-9]+$") then tonumber else . end)) as $steps
+  | getpath($steps)
+  | if type == "array" then length
+    elif type == "string" or type == "number" then .
+    else error("no value") end'
 field() {
   local value path="${KEY}${1:+.${1}}"
-  if ! value="$(/usr/bin/plutil -extract "${path}" raw -o - "${CONTRACT}" 2>/dev/null)"; then
+  if ! value="$("${JQ}" -er --arg path "${path}" "${READ_ONE}" "${CONTRACT}" 2>/dev/null)"; then
     echo "❌ contracts/shared-rules.json has no ${path}. Nothing was installed." >&2
     exit 1
   fi
@@ -57,6 +83,22 @@ size_of() {
 }
 
 ADDON_COUNT="$(field "")"
+
+# The reading step alone (#864): every pin, one tab-separated line per file,
+# and nothing fetched, checked or installed.
+if [[ "${1:-}" == "--print-pins" ]]; then
+  for ((a = 0; a < ADDON_COUNT; a++)); do
+    id="$(field "${a}.id")"
+    version="$(field "${a}.version")"
+    file_count="$(field "${a}.files")"
+    for ((f = 0; f < file_count; f++)); do
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${id}" "${version}" \
+        "$(field "${a}.files.${f}.name")" "$(field "${a}.files.${f}.bytes")" \
+        "$(field "${a}.files.${f}.sha256")" "$(field "${a}.files.${f}.from")"
+    done
+  done
+  exit 0
+fi
 
 # Already in place? Every pinned file present at its size and hash, and
 # nothing else.
