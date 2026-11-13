@@ -4238,13 +4238,11 @@ Settings.
 **The popup.** "All Plans" (the folder's own `index.html`) when there is
 one, then each plan whose folder has an `index.html`, in `UnitPlans.read`'s
 order; each is labelled by `UnitPlans.nameInTheGreeting`. It starts on the
-first of the offered plans in `UnitPlans.namedFirst` order for today (the
-plan covering today, then the next to start, then the last to end), which is
-the greeting's own ordering, so there is one ordering and not two; a course
-whose plans have no dates starts on All Plans (`choiceCases`, 14). A plan
-without a page is not offered, because choosing it would show nothing.
-Back, Forward (bound to the web view's `canGoBack` and `canGoForward`, plus
-the two-finger swipe) and Reload sit on the right of the bar.
+plan covering today, and on All Plans when no plan does (#803, below;
+`choiceCases`, 21). A plan without a page is not offered, because choosing
+it would show nothing. Back, Forward (bound to the web view's `canGoBack`
+and `canGoForward`, plus the two-finger swipe), Reload and Open in Browser
+(#803, below) sit on the right of the bar.
 
 **When it looks again**: when the tab appears, when the window becomes key
 (`controlActiveState`, the pattern `CourseSettingsView` uses: the teacher
@@ -4393,6 +4391,112 @@ each unit in the popup (the page shows its dates, and a date in a menu would
 need its own rule on both platforms); JavaScript on (the template needs
 none); a copyable sample prompt in the empty tab (#708's first idea: the
 buttons do it in one click, Russell's ruling 5).
+
+### The Planning tab opens a plan in the browser, and starts on All Plans (#803)
+
+Two changes to #708's tab, agreed with Russell on 2026-11-12. The issue's
+second item, dates beside each unit in the popup, was dropped by his ruling
+the same day; the popup lists titles only, as #708 shipped it.
+
+**Where the tab starts.** `PlanningTab.startingChoice` starts on the offered
+plan that covers today, and otherwise on All Plans. #708 started on the
+first plan in the greeting's order, which between units meant the next to
+begin, before the first unit the first, and after the last the last to end.
+Each of those is a guess at which unit the teacher meant, and the list of
+every unit is a better place to land when no unit is current. "Covers" is
+one function, `UnitPlans.covers` (first class on or before today, last class
+on or after, both days included; a plan with one date is that one day; a
+plan with no date covers nothing), and `UnitPlans.namedFirst` now asks it
+too, so the greeting's order and the tab cannot disagree about which unit is
+current. With no All Plans page (the template always writes one, so this is
+a course built by hand) it still falls back to the greeting's order. The day
+is handed in (`CalendarDay.today()` in the view), never read in a test.
+`choiceCases` holds the first day, the last day, both sides of a gap, no
+units, one undated unit, two units overlapping today, a unit with only a
+last class, and the two no-course-page fallbacks; six of #708's cases changed
+their expected start to All Plans.
+
+**Open in Browser.** A button beside Reload (`planningOpenInBrowser`,
+the `safari` symbol, icon only like its neighbours) hands the page now
+showing to the teacher's default browser as a `file:` address. The planning
+folder is hidden in Finder (`.internal`), so this is how a teacher reaches a
+plan outside Plantoir, to print it, keep it open beside something else, or
+read it with Plantoir closed. The rule is `PlanInTheBrowser.pageToOpen`
+(`unitPlanning.tab.openInBrowser`, 14 cases):
+
+- It follows the page the web view is ON, not the popup: after a link to the
+  correlation page or a PDF the teacher means what they are looking at, and
+  a correlation page opens at its `#` anchor. The popup's page is used only
+  before any page has loaded. A page on screen that has since been deleted
+  is refused, never swapped silently for the popup's page.
+- Only a `file:` address inside the course's planning folder opens, judged by
+  `PlanNavigation.isInside`, the same check that guards the web view's
+  navigation (`..` taken out, every link followed, compared folder by
+  folder). Anything else is refused before the browser is asked:
+  `PlanningTabTests.testOpenInBrowserHandsTheBrowserOnlyAPageOfThePlan`
+  hands the action a recording browser and proves the course's own
+  `course_config.json` and a web address never reach it.
+- Dimmed while refused, with the reason as its help
+  (`words.openInBrowserNothingToOpen`, `openInBrowserOutsideThePlan`,
+  `openInBrowserPageIsGone`); otherwise `words.openInBrowserHelp`. The rule
+  runs again at the click with the web view's address at that moment, and a
+  refusal then, or a Mac that could not open the page, is an alert
+  (`openInBrowserCouldNotOpenTitle`), never a click that does nothing.
+- `PlanBrowserOpener` asks for the DEFAULT BROWSER by name (the app that
+  opens an `https:` address) and opens the file with it. With no browser set
+  it opens the file as the Mac does.
+- The trail writes "opened a unit plan in the browser" once the browser has
+  answered: the course and the kind of page (the list of plans, a unit's
+  plan, its correlation page, a file from a unit's plan), or that the Mac
+  could not open it. Never the page's name or its unit's folder, which is
+  made from the unit's title, the teacher's own words. A refusal writes
+  nothing: the button already says why.
+
+The web view's three guards (above) do not travel with the page: the browser
+shows it as it shows any local file. That is acceptable because the page is
+the teacher's own plan, opened by the teacher, and the template's pages
+carry no `<script>` and no address on the internet
+(`scripts/test_unit_plan_template.py` checks the second).
+
+MEASURED (2026-11-12, macOS 26.6 on Apple silicon, headless, muted): a plan
+made from the shipped template (`template/` copied whole, the unit's Files
+row written out as the template's PATTERN comment shows it, and its two
+PDFs made), opened from `file:` addresses with no web server and Plantoir
+playing no part, in Chromium 153.0.8010.12, WebKit 26.6 and Firefox 155.0
+(playwright-core 1.63, the browsers cached in `~/Library/Caches/ms-playwright`,
+the script kept in the scratchpad). On each of All Plans, the unit's plan
+and its correlation page: the stylesheet applied; all 19 `@font-face` faces
+loaded when each was asked to load (the unit pages' fonts sit in
+`../assets/fonts`, outside the page's own folder, which Firefox's file
+origin rules could have refused, and did not); the body set in IBM Plex
+Sans and the titles in IBM Plex Serif; every request a `file:` one (Chromium
+and WebKit report them; Firefox reports none for `file:`); and every link
+between pages, followed by a real click, arrived with its stylesheet
+applied. Each PDF link resolved: WebKit opened it in a new page, and headless
+Chromium and Firefox, which have no PDF viewer, downloaded it under its real
+name. Nothing in the template or in what writes a plan needed changing. NOT
+MEASURED: Safari itself and the Chrome and Firefox PDF viewers with a
+window, which the hand test sees.
+
+MEASURED, the rules in a standalone harness (this branch's
+`PlanningTab.swift`, `UnitPlans.swift` and `CalendarDay.swift` with four
+stubs, swiftc 6): the 21 `choiceCases`, 14 `openInBrowser` cases and 7
+`followsThePage` cases held, and the action passed only the plan's page to a
+recording browser. `UnitPlans.namedFirst` gave the same order as before the
+change for 84,000 random pairs of plans and days. Made to fail: #708's
+`startingChoice` put back failed 6 `choiceCases`; the inside-the-folder check
+taken out failed 3 cases and let the course's settings reach the browser;
+falling back to the popup's page when the page on screen is gone failed the
+deleted-page case.
+
+REJECTED: starting on the next unit to begin when none covers today (#708's
+behaviour; Russell, 2026-11-12); opening the file with whatever app opens its
+type (`NSWorkspace.open` alone: an `.html` file can belong to a text editor,
+a PDF to Preview, and the button says Browser); opening the popup's unit
+rather than the page on screen; serving the plan over a local web server for
+the browser (measured unnecessary, and a server would have to be running for
+the page to open); the trail naming the unit or the page; dates beside each
+unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 ### Tests, marking and report comments (#751, #750, #752)
 
