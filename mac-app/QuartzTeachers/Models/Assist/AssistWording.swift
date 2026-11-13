@@ -1654,6 +1654,32 @@ nonisolated enum AssistWording {
     /// relayed to a teacher, as a complaint about what they typed.
     static let noCourseNamed: String = "No course was named, so nothing was done."
 
+    /// A call that named no section, for a course with more than one (#865).
+    ///
+    /// `sections` is the course's sections as a phrase, "Sections 1 and 2" or
+    /// "Sections 1, 2 and 3". Replaces "MPM2D has no Section 0.", which read a
+    /// missing argument as the number 0: true, no help, and a complaint about
+    /// a section nobody sent.
+    static func noSectionNamed(course: String, sections: String) -> String {
+        return "No section was named. \(course) has \(sections); say which one."
+    }
+
+    /// A call that named no section, for a course that has none (#865).
+    static func noSectionNamedAndNoSections(course: String) -> String {
+        return "No section was named, and \(course) has no sections."
+    }
+
+    /// `add_classes` or its plan with no unit (#865). A missing unit used to
+    /// send the call down the "next class" path, which planned one class
+    /// after the last one in the section.
+    static let addClassesNeedsAUnit: String =
+        "No unit was named. Which unit should the class pages be added to? Give its number, for example 4."
+
+    /// `add_classes` or its plan with no count, or a count below one (#865).
+    /// A missing count used to be read as 0, with the same result.
+    static let addClassesNeedsACount: String =
+        "No number of class pages was given. How many should be added?"
+
     /// A finished answer chose a tool that needs something this window cannot
     /// supply — which pages, which day, which time — and wrote nothing for it,
     /// so nothing was done (issue #198).

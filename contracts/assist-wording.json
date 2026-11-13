@@ -17,6 +17,8 @@
   },
   "wording" : {
     "aCreatedPageCanBeTakenBack" : "“Undo that” takes the page away again, as long as you have not written anything in it yet. Once you have, it is yours and I will leave it alone.",
+    "addClassesNeedsACount" : "No number of class pages was given. How many should be added?",
+    "addClassesNeedsAUnit" : "No unit was named. Which unit should the class pages be added to? Give its number, for example 4.",
     "addedTheNextPage" : "Added the next class page.",
     "addedTheNextPageForAMeeting" : "Added the next meeting page.",
     "allScheduledDatesHaveConcluded" : "All 12 scheduled classes for {course} Section {section} have concluded (last class was on Tuesday, 2026-12-15).",
@@ -206,6 +208,8 @@
     "noPageCalledFromTheMenu" : "“{page}” is no longer in {course} Section {section} — it may have been renamed or moved since the list was shown. Choose the menu item again to see the pages as they are now.",
     "noPagesCalled" : "No page in {course} Section {section} is called {pages}. Check the names as the sidebar shows them and ask again.",
     "noPagesCalledFromTheMenu" : "{pages} are no longer in {course} Section {section} — they may have been renamed or moved since the list was shown. Choose the menu item again to see the pages as they are now.",
+    "noSectionNamed" : "No section was named. {course} has {sections}; say which one.",
+    "noSectionNamedAndNoSections" : "No section was named, and {course} has no sections.",
     "notANumberedClassPage" : "“{page}” isn’t a numbered class page, so there is no next day for it to become.",
     "nothingToDo" : "I am not sure what to do with that.",
     "nothingToUndo" : "There is nothing on my undo list — I have not changed any pages in this conversation yet. Anything older is in Plantoir's Backups list.",

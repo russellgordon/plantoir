@@ -90,6 +90,13 @@ final class AssistMissingSectionTests: XCTestCase {
         let none: String = AssistToolRefusal.noSectionNamed("MPM2D", []).message
         XCTAssertTrue(none.contains("MPM2D"), none)
         XCTAssertNotEqual(none, three)
+
+        // The sentences are AssistWording's, by key.
+        XCTAssertEqual(none, AssistWording.noSectionNamedAndNoSections(course: "MPM2D"))
+        XCTAssertEqual(
+            AssistToolRefusal.noSectionNamed("MPM2D", [1, 2]).message,
+            AssistWording.noSectionNamed(course: "MPM2D", sections: "Sections 1 and 2")
+        )
     }
 
     /// The schedule card names the section the deploy will go to: the only
@@ -118,12 +125,13 @@ final class AssistMissingSectionTests: XCTestCase {
     /// down the "next class" path, which planned one class after the last.
     @MainActor
     func testAddClassesWithoutACountOrAUnitAsksAndWritesNothing() async throws {
-        let shapes: [[String: Any]] = [
-            ["course": "ICS3U", "section": 1, "unit": 1],
-            ["course": "ICS3U", "section": 1, "unit": 1, "howMany": 0],
-            ["course": "ICS3U", "section": 1, "howMany": 2],
+        // Each shape with the question it must be asked.
+        let shapes: [([String: Any], String)] = [
+            (["course": "ICS3U", "section": 1, "unit": 1], AssistWording.addClassesNeedsACount),
+            (["course": "ICS3U", "section": 1, "unit": 1, "howMany": 0], AssistWording.addClassesNeedsACount),
+            (["course": "ICS3U", "section": 1, "howMany": 2], AssistWording.addClassesNeedsAUnit),
         ]
-        for arguments in shapes {
+        for (arguments, question) in shapes {
             for name in ["plan_add_classes", "add_classes"] {
                 let made = try AssistFixture.makeRunner(surface: .mcp)
                 defer { try? FileManager.default.removeItem(at: made.root) }
@@ -134,6 +142,8 @@ final class AssistMissingSectionTests: XCTestCase {
                 let said: String = outcome.summary + "\n" + outcome.detail
 
                 XCTAssertEqual(pageNames(in: made.course), before, "\(name) \(arguments) wrote: \(said)")
+                XCTAssertTrue(said.contains(question), "\(name) \(arguments) did not ask: \(said)")
+                XCTAssertFalse(outcome.isPlan, "\(name) \(arguments) answered with a plan: \(said)")
                 XCTAssertFalse(said.contains("Unit 1, Day 3"), "\(name) \(arguments): \(said)")
                 XCTAssertFalse(said.contains("Unit 2, Day 1"), "\(name) \(arguments): \(said)")
             }

@@ -78,6 +78,10 @@ enum AssistContract {
     /// refusal for names that match no page (#197).
     static let pagesPlaceholder: String = "{pages}"
 
+    /// A course's sections as a phrase, "Sections 1 and 2", in the refusal
+    /// for a call that named no section (#865).
+    static let sectionsPlaceholder: String = "{sections}"
+
     static let wordingFileName: String = "assist-wording.json"
     static let casesFileName: String = "assist-cases.json"
 
@@ -363,6 +367,12 @@ enum AssistContract {
             "answerLeftOutWhatItWasFor": AssistWording.answerLeftOutWhatItWasFor,
             "wentRoundWithoutFinishing": AssistWording.wentRoundWithoutFinishing,
             "noCourseNamed": AssistWording.noCourseNamed,
+            // A call that named no section (#865), and add_classes with no
+            // unit or no count.
+            "noSectionNamed": AssistWording.noSectionNamed(course: course, sections: sectionsPlaceholder),
+            "noSectionNamedAndNoSections": AssistWording.noSectionNamedAndNoSections(course: course),
+            "addClassesNeedsAUnit": AssistWording.addClassesNeedsAUnit,
+            "addClassesNeedsACount": AssistWording.addClassesNeedsACount,
             "didNotFollowThat": AssistWording.didNotFollowThat,
             // A call naming a course that is not this window's. Two keys for
             // two different facts, not two phrasings of one: the first can

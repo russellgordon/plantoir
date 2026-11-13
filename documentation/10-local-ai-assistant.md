@@ -1685,9 +1685,9 @@ no Section 0". `AssistToolRunner.locate` answers every tool that takes a
 section, and when none was named it already resolved a course with exactly one
 section to that section (no guess), but for any other course it refused with
 `noSuchSection(code, 0)`: a missing argument read as the number 0. It now
-refuses with `AssistToolRefusal.noSectionNamed(code, numbers)`, which says no
-section was named and lists the ones the course has ("1, 2 and 3"), or says it
-has none. A section that IS named and is not there keeps `noSuchSection`.
+refuses with `AssistToolRefusal.noSectionNamed(code, numbers)`, whose sentence
+is `wording.noSectionNamed` (no section was named, and the course has
+`{sections}`, "Sections 1, 2 and 3") or `wording.noSectionNamedAndNoSections`. A section that IS named and is not there keeps `noSuchSection`.
 
 *Expectations were not answered for the course instead*, although the issue
 offered it: `list_curriculum_expectations` reads them from the pages that
@@ -1703,17 +1703,20 @@ Measured for the same kind of default on the other number arguments:
 missing `unit` as no number), which sent the call down the "next class" path:
 a call to add days to Unit 4 with no count planned ONE class after the last
 one in the section. Both now ask for what is missing
-(`AssistToolRunner.addClassesQuestion`), after the course and section are
-found. The schedule card (`explain(call:)`, the local window's approval card)
-read a missing section as 0 too, so a one-section course's card said
-"Section 0" about a deploy to Section 1; it now names the section `locate`
-resolves, and no section when there is a choice. Left as they are: the
+(`AssistToolRunner.addClassesQuestion`: `wording.addClassesNeedsAUnit`,
+`wording.addClassesNeedsACount`), after the course and section are found. The schedule card (`explain(call:)`, the local window's approval card)
+read a missing section as 0 too. That was not reachable in the window,
+because `AssistAgent.boundToThisSection` writes the window's section into
+every call that declares one before the card is made, so the change is
+defensive: the card names the section `locate` resolves, and none when
+there is a choice. For the same reason the local model never meets
+`noSectionNamed`. Left as it is: the
 outside-change gate's trail line (`noteDeclined`) still records section 0 for
 a call with no section; the caller's answer there is right (the course is
-being built), and changing the line is a trail change for another piece.
+being built), and the line is #879.
 `make_room_for_classes`' `howMany ?? 1` is what its schema says ("Leave empty
-for one"). The sentences are inline in `AssistToolRefusal`, beside
-`noSuchSection`'s, not in `AssistWording`, so no generated contract moved; no
+for one"). The four sentences are `AssistWording` keys, as #198's `noCourseNamed` is, so
+`contracts/assist-wording.json` gained them through `--write-contracts`; no
 description, schema or prompt byte moved (`scripts/test_tool_surface_digest.py`
 green). Windows' `plantoir-mcp.exe` binds `int section` and `int howMany`,
 so what it answers for a missing one is the SDK's choice; the `windows` issue

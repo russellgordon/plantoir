@@ -5245,12 +5245,11 @@ final class AssistToolRunner {
         guard case .success = locate(arguments) else {
             return nil
         }
-        guard let unit = number("unit", in: arguments) else {
-            return "No unit was named. Which unit should the class pages be added to? "
-                 + "Give its number, for example 4."
+        if number("unit", in: arguments) == nil {
+            return AssistWording.addClassesNeedsAUnit
         }
         guard let howMany = number("howMany", in: arguments), howMany > 0 else {
-            return "No number of class pages was given. How many should be added to Unit \(unit)?"
+            return AssistWording.addClassesNeedsACount
         }
         return nil
     }

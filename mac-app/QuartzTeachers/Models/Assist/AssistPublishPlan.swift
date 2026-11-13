@@ -1856,7 +1856,7 @@ enum AssistToolRefusal: LocalizedError, Equatable {
             return "\(code) has no Section \(number)."
         case .noSectionNamed(let code, let numbers):
             if numbers.isEmpty {
-                return "No section was named, and \(code) has no sections."
+                return AssistWording.noSectionNamedAndNoSections(course: code)
             }
             // "1", "1 and 2", "1, 2 and 3".
             var listed: String = ""
@@ -1870,7 +1870,7 @@ enum AssistToolRefusal: LocalizedError, Equatable {
                 }
             }
             let word: String = numbers.count == 1 ? "Section" : "Sections"
-            return "No section was named. \(code) has \(word) \(listed); say which one."
+            return AssistWording.noSectionNamed(course: code, sections: "\(word) \(listed)")
         case .noSuchPage(let title, let code, let number):
             return "No page in \(code) Section \(number) is called “\(title)”. "
                  + "Use list_pages to find its exact title."
