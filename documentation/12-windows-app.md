@@ -5574,6 +5574,28 @@ Not yet on Windows. The mac's write-up, with what was measured and rejected, is
   names inside and makes links as links; the contract's checks refuse all
   three either way.
 
+### Owed: replacing a reference course after a warning and a backup (#572, second piece)
+
+Not yet on Windows. The mac's write-up, with what was measured and rejected,
+is `09-mac-app.md` → "Replacing a reference course (#572)"; every rule is a
+case in `shared-rules.json` → `referenceCourses.replacing`, and the `windows`
+issue for #572's second piece lists the work.
+
+- **Inherited free:** nothing in the shared Python. A backup the mac made
+  while replacing is an ordinary teacher-kind `<FOLDER>_backup_<stamp>.zip`,
+  which Windows already lists and restores.
+- **Owed:** Replace It… beside the shelf rule's refusal at the three doors,
+  the warning, `ReferenceReplacer`'s order (`sequence.cases`), the backup
+  check against the zip's listing (`backupCheck`), the Obsidian refusal
+  (`obsidianCases`), the sweep of `.plantoir-replacing-<FOLDER>` at the top of
+  a folder's reading (`sweepCases`; on Windows "unlocked first" means removing
+  the DENY entries first), and four trail events, one of them "course
+  restored from a backup" on EVERY whole-course restore (check whether
+  `CourseRestorer.cs` writes one today).
+- **To measure on Windows rather than copy:** whether `Directory.Move` of a
+  folder whose files carry the DENY entries succeeds, as a rename of a locked
+  tree does on APFS; the order depends on it.
+
 ## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
 
 What a Windows implementer needs that the mac's write-up cannot give; the

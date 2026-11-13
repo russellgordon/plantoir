@@ -8158,6 +8158,10 @@ course in it does no work at all.
   no attempts — and the view drew the button anyway, so pressing it said
   *"That is already put right. Nothing needed changing."* about a folder that
   was really missing. The findings still report; the action is gone.
+- **Replacing the whole course is offered, after a warning and a checked
+  backup**, beside the shelf rule's refusal at three doors (#572); see
+  "Replacing a reference course (#572)". The old course is renamed aside
+  locked and removed only after the new one is in place.
 - **Removing one SECTION is refused**, with `ReferenceWording.staysAsItIs` —
   removing a section changes the course, so "frozen" already requires it. The
   sidebar does not offer the item; the refusal exists so no other caller gets
@@ -8554,7 +8558,10 @@ inside `courses/` — and is marked, filed under its year, neutralised and
 locked THERE. The last act is a rename into the real name, which within one
 folder is atomic. Every way of making a reference course does this: Keep a
 Copy, this import, and since #572 a course made in the wizard ("Making a
-reference course from nothing, or from a backup", below).
+reference course from nothing, or from a backup", below). A replace (#572,
+"Replacing a reference course", below) uses a second hidden name,
+`.plantoir-replacing-<folder>`, for the OLD course while the new one is
+renamed in; its own sweep puts the old course back rather than removing it.
 
 **The fault it closes was measured.** Until 2026-09-20 the copy was made at
 its final name, so for the length of the copy `courses/ICS4U-2025/` held last
@@ -9562,6 +9569,121 @@ their release in `makeIntoAReferenceCourse` (plan review M4).
   in for a free-space check** (above).
 - **Stopping the setup inside the website builder on Cancel** (below).
 - **Offering the choice for a code with no ready-made pages** (above).
+
+### Replacing a reference course (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's second piece says. Every rule is a case in `contracts/shared-rules.json` → `referenceCourses.replacing`; nothing here is shared code.
+
+Where the shelf rule refuses a second course of one code in one group ("You
+already have a ICS3U kept for reference from 2025–26"), a **Replace It…**
+button sits beside the sentence. It is offered at three doors and nowhere
+else: the New Course wizard with Keep this course for reference on, Keep a
+Copy for Reference…, and an import of ONE course (a folder or a backup or
+archive zip). A refused row in an import of several keeps its sentence (plan
+review M6). Set School Year… never offers it, because a clash there is two
+real courses; nor does the assistant, which has no tool for it.
+
+Replace It… first asks whether the course can be replaced at all (it must be
+a reference course, not previewing or being copied, and not open in
+Obsidian), and says why not where the door says its other problems. Then the
+warning: title `wording.title`, body `wording.body`, which gives the
+sections, pages and size, the day the folder was made, the name the backup
+will have in Backups (the folder's), and that restoring that backup puts the
+old course back in place of the new one (plan review M9). Cancel is the
+default button. Composed by `ReferenceReplacer.offer`; the alert is the
+shared `ReplaceReferenceCourseAlert`.
+
+**The order is the design.** `ReferenceReplacer.replace`:
+
+0. The door makes the new course FIRST, exactly as it would with nothing in
+   the way, under the hidden staging name of the OLD folder
+   (`.plantoir-importing-ICS3U-2025`), claimed and leased. A failed setup,
+   copy or import therefore costs the old course nothing, and the claim on
+   the old folder's name is what refuses a second replace of the same course
+   (`twoAtOnce`).
+1. Refuse anything that is not a reference course directly inside `courses/`,
+   read from DISK (`courseOnTheShelf`), a busy course, and a course Obsidian
+   holds (below). The LIVE course of the same code is refused like anything
+   else; a test takes the guard out and watches the live course be backed up
+   and swapped, which is what it is there for.
+2. Back it up: `CourseArchiver.backUpCourse(madeBy: .teacher)`. From here to
+   the end the course counts as being copied (`CourseActivity.beginCopy`), so
+   no removal, restore, backup or preview starts on it.
+3. Check the backup (plan review M3, `backupCheck`): `zipinfo -1` must list
+   every file of the course on disk, compared in NFC. Only `.merged_output`,
+   `.DS_Store` and Plantoir's own Obsidian add-on folders may be missing.
+   Every other name the archiver leaves out (`build`, `out`, `dist`,
+   `node_modules`…) fails the check, because a course an older Plantoir or
+   Windows made can hold a teacher's own folder of that name. Measured: a
+   reference course with `build/Notes.md` backs up without it and is refused
+   with `couldNotBackUp`; the failed backup is kept and the trail names it
+   and the missing file.
+4. Ask (1) again: the backup takes time (9.7 s for a 467 MB course, measured
+   for #351).
+5. Rename the old course aside to `.plantoir-replacing-ICS3U-2025`.
+6. Rename the new course to `ICS3U-2025`. If that fails, the old course is
+   renamed back BEFORE the staged one is removed (`couldNotReplace`); if that
+   fails too, `couldNotPutBackYet`, and the next reading puts it back.
+7. Remove the aside folder, unlocked first, and the built site.
+
+Nothing on a failure path deletes the old course. Every case, with the steps
+run and what is on disk afterwards, is `sequence.cases`, and
+`ReferenceReplacerTests` runs them on real folders through the seams in
+`ReferenceReplacer.World`, failing one step at a time.
+
+**Why the replacement takes the old folder name** (the plan's Q6): Restore
+from Backup on the backup made in step 2 is then the ordinary in-place
+restore. It archives the replacement and puts the old course back, locked
+again from its marker. Measured end to end in
+`testKeepACopyReplacesAndRestoreBringsTheOldOneBack`. A new folder name would
+land the restored course beside the new one in one group, which the shelf
+rule forbids. One consequence to leave alone (plan review L7): a replacement
+can sit in `ICS3U-2025` holding a different `reference_school_year` once
+groups exist; identity is the folder.
+
+**Obsidian** (plan review M2). The swap renames the folder, and Obsidian's
+watcher is anchored to it, so the act refuses while the course is open,
+or cannot tell, by #742's open-state rule (`openStateCases`), or while a
+vault INSIDE it is open (`openVaultWouldBeStranded`). A vault that contains
+the course (the whole `courses` folder) is not affected. `obsidianCases`.
+
+**A quit part way** (plan review M1). `ReferenceReplacer.sweepLeftovers`
+runs at the top of `reloadCourses`, BEFORE the folder is listed, so a course
+put back is in that reading's list. For each `.plantoir-replacing-<OLD>`
+nobody is still replacing: `<OLD>` free → renamed BACK; `<OLD>` a course and
+a backup in `_backups/<OLD>/` → removed; no backup → left alone. Only the
+whole prefix, dash included, is touched (`sweepCases`, with three look-alike
+teacher folders). The staged new course is the staging sweep's, as before.
+Windows' discovery skips dot-folders, so a leftover from a mac crash is
+hidden there until a mac of this version opens the folder.
+
+**Every whole-course restore now leaves a line**, "course restored from a
+backup" (`WorkspaceModel.restoredTrailLine`), live or reference, after the
+restore has happened. Until #572 only a section's restore did.
+
+Trail: "reference course replaced", "reference course could not be
+replaced", "unfinished replace of a reference course put right", "course
+restored from a backup". The door's own line ("created … for reference",
+"kept a copy …", "imported …") is written as well.
+
+#### Rejected
+
+- **A Restore from Backup submenu on the shelf row** (plan review M7):
+  Backups already has the door.
+- **Several ticked rows and one alert at Import** (M6).
+- **A new backup suffix such as `_replaced`.** Windows would not list a name
+  it cannot parse, so the backup would be invisible in the one place it must
+  be found.
+- **Removing the old course first.** A moment with neither.
+- **Emptying the old folder and moving the new contents in**, which would keep
+  Obsidian's vault anchored. That is many moves instead of one rename, and a
+  half-old, half-new course if one failed. Refusing while Obsidian holds the
+  course is the safer answer.
+- **Finishing an unfinished replace with the staged course on the next
+  launch.** It was never checked again; putting the old course back cannot
+  lose anything.
+- **Checking the backup by unpacking it.** Twice the time, and the listing
+  answers the question asked.
 
 ## Copying a page from one course into another
 
