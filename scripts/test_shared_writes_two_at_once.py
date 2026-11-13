@@ -134,11 +134,15 @@ class TheConfigSurvivesTwoWriters(unittest.TestCase):
                             not_json += 1
                         else:
                             backups_not_json += 1
-            for writer in writers:
-                lost += lost_writes.get(timeout=120)
+            # Both writers have ended (the loop above waits for that), so a
+            # writer that crashed fails here by its exit code, before its
+            # count is asked for; a count is one small int, so it is already
+            # in the queue by the time a writer that put it has exited.
             for writer in writers:
                 writer.join()
                 self.assertEqual(writer.exitcode, 0)
+            for writer in writers:
+                lost += lost_writes.get(timeout=10)
             json.loads(self.config.read_text(encoding="utf-8"))
         self.assertGreater(reads, 0)
         self.assertEqual(lost, 0, f"{lost} of {2 * CONFIG_TRIALS * CONFIG_WRITES} writes were lost")

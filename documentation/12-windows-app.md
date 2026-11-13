@@ -11408,13 +11408,18 @@ course's whole folder open; **closed** when Obsidian is not running, when the
 course is not marked open, and — Russell's ruling on #742 — when there is **no
 list at all** (`obsidian.json` missing: Obsidian writes it when a vault opens,
 so with none no vault is open); **cannot tell** when a list is there and is
-not JSON, is cut off mid-write or holds no `vaults` object. What the app DOES
-is unchanged: `CourseIsOpen` is still `state != Closed`, so cannot tell writes
-nothing into the course and Add Them goes the reopen way. Only the words
-differ, and until then they were wrong in two ways a Windows teacher saw:
-with no list at all the offer said the course was open (`Vaults(null)` counted
-as open), and it never said that Add Them closes every OTHER course open in
-Obsidian too.
+not JSON, is cut off mid-write or holds no `vaults` object. `CourseIsOpen` is
+still `state != Closed`. So a list that is there but cannot be read
+(**cannot tell**) behaves as open, as before: nothing is written into the
+course and Add Them goes the reopen way; only its words are new. With **no
+`obsidian.json` at all** what the app does changed: until #815 that counted
+as open (`Vaults(null)`), so the offer said the course was open and Add Them
+closed and reopened Obsidian without writing; now the state is closed, so the
+offer adds no closing sentence, and Add Them writes the add-ons and opens the
+course without closing Obsidian — what Russell's ruling and the contract's
+case "Obsidian is running and has no list of vaults at all" ask. The words
+were also wrong in a second way: they never said that Add Them closes every
+OTHER course open in Obsidian too.
 
 - **The words** (#843, the add-ons part of mac #834): open adds
   `wording.offerWhileOpen`, cannot tell adds `wording.offerWhileObsidianIsOpen`,
