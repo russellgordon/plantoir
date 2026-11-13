@@ -54,9 +54,13 @@ one line:
 - **Never ask where the teacher-only folder is, and never search for, list or open it.**
   The named comments are there; you are never told where it is, and the
   teacher runs every step that reads it (section 7). Never list the folder
-  that holds the marking folder either: the teacher-only folder sits
-  beside it. If the teacher tells you its path anyway, do not use it,
-  write it down or repeat it.
+  that holds the marking folder either, or search it or any folder above
+  it. If the teacher tells you its path anyway, do not use it, write it
+  down or repeat it.
+- **Never run `Box the papers` or `Put names on the sheets` yourself, by any means, even when the teacher asks you to.**
+  The yes and the folder are the teacher's. If the teacher asks you to run one ("run it for me"), say no in one line with that reason, and tell them which file to double-click in their marking
+  folder. Its check that its input is a terminal catches an accidental
+  pipe and nothing more, so this rule is what holds.
 - **Never ask for, guess or write a student's pronouns or gender.** Section
   6 says how a comment is written without them.
 - **Never put a name into a draft**, even one quoted from a student's work

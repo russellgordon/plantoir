@@ -8,7 +8,7 @@ rem (teacher_only.py and run_with_names.py, in the skill folder named in "Skill 
 setlocal
 set "STEP=names"
 set "TITLE=Put names on the sheets"
-set "TEACHER_ONLY_SHA256=364fb9bb87b691d3f9c650e98f2c2180933a3daacda366cfd302d537ac2c87f1"
+set "TEACHER_ONLY_SHA256=5815a0236452c3fb38edee10999d886a66ec99db64a9cef53dedbd84fc2c537d"
 set "RUNNER_SHA256=41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb"
 title %TITLE%
 cd /d "%~dp0"
@@ -22,7 +22,7 @@ if not defined SKILL goto no_skill
 if not exist "%SKILL%\scripts" goto no_skill
 %PYTHON% -I -B -c "import hashlib,os,sys;a=sys.argv[1:];c=sum(1 for i in range(0,len(a),2) if not os.path.isfile(a[i]) or hashlib.sha256(open(a[i],'rb').read()).hexdigest()!=a[i+1]);print('Stopped: '+str(c)+' of the two scripts this step runs are not the ones Plantoir shipped, so nothing was run. Ask your assistant to copy the launchers again from the plantoir-marking skill. If it still stops, Plantoir puts the skill back as it shipped the next time it opens your working folder.') if c else None;sys.exit(1 if c else 0)" "%SKILL%\scripts\teacher_only.py" %TEACHER_ONLY_SHA256% "%SKILL%\scripts\run_with_names.py" %RUNNER_SHA256%
 if errorlevel 1 goto failed
-%PYTHON% -I -B "%SKILL%\scripts\teacher_only.py" %STEP% "%CD%"
+%PYTHON% -I -B "%SKILL%\scripts\teacher_only.py" %STEP% "%CD%\."
 set "CODE=%ERRORLEVEL%"
 echo.
 pause

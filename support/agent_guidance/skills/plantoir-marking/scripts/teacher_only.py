@@ -24,10 +24,22 @@ never a name, and never the teacher-only folder's path (each line from another s
 back as "your teacher-only folder", and passed through the runner, which withholds any line holding a word
 from the name mapping table).
 
-It is a safety net against an accident and a well-meant change, not a lock: an assistant that set out to
-find the teacher-only folder could look for it, and an assistant that edited this file and every pin
-together would not be caught by the pins. The protection is that the teacher starts these steps and the
-assistant is never told the path.
+It is a safety net against an accident and a well-meant change, not a lock. Nothing in this file or in a
+launcher can stop an assistant that runs a launcher itself and types the yes: its check that its input is a
+terminal stops an accidental pipe and nothing more, and an assistant could run it through a
+pseudo-terminal. An assistant that set out to find the teacher-only folder could look for it, and one that
+edited this file and every pin together would not be caught by the pins. The design holds because the
+assistant is never told where the teacher-only folder is, is told never to run these steps (even when the
+teacher asks) and to wait for the teacher, and because the teacher starts them; an assistant that ran one
+would be doing what the skill forbids, and the re-trial checks for it.
+
+What the teacher trusts: that the boxing script the assistant adapted does only what it says. This file runs
+it with the teacher-only folder open to it, so on a Mac it is run under sandbox-exec, able to write only
+into that assessment's folder on the teacher's side and the temporary folder, and on every system anything
+the boxing step wrote outside the folder it was given (in the marking folder or the teacher-only folder) is
+moved, unread and never deleted, into the teacher-only Quarantine folder, and the step stops before anything
+is put together for the teacher's look, saying how many. A write outside both folders is stopped on a Mac
+only, by the sandbox; on Windows it cannot be seen. That is why the teacher looks through the boxed papers.
 
 Needs Poppler (pdfinfo, pdfunite) for the combined file, and the Python standard library. Python 3.9 or later.
 """
@@ -40,14 +52,16 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 # MARK: - What must not change
 #   This file is never adapted. It never prints, or writes in the marking folder, a value read from the name
 #   mapping table or the teacher-only folder's path; it moves boxed papers into the marking folder only after
 #   the teacher types yes in this window, and only the papers it put in the file the teacher looked through;
-#   it refuses to run without a terminal (an assistant's command has none); and it never says a name is
-#   covered, removed or safe.
+#   it stops when its input is not a terminal (that catches an accidental pipe, nothing more); it moves to the
+#   teacher's Quarantine, never deleting, anything the boxing step wrote outside the folder it was given, and
+#   stops; and it never says a name is covered, removed or safe.
 
 SCRIPTS = Path(__file__).resolve().parent
 RUNNER = SCRIPTS / "run_with_names.py"
@@ -174,7 +188,8 @@ def chosen_in_a_window():
 def ask_for_the_teacher_only_folder(marking, ask, say):
     """The teacher-only folder, from the teacher, checked; a Refusal if it is not usable."""
     say("Which is your teacher-only folder (the one with your name mapping table and the original scans)?")
-    answer = ask("Drag it into this window and press Return, or press Return alone to choose it from a list: ")
+    say("(Keep it beside your marking folder, outside your Plantoir working folder, and named as you like.)")
+    answer = ask("Drag it into this window and press Return, or press Return alone to choose it in a window: ")
     if answer is None:
         raise Refusal("no folder was given; nothing was done")
     folder = typed_path(answer)
@@ -184,6 +199,8 @@ def ask_for_the_teacher_only_folder(marking, ask, say):
             raise Refusal("no folder was chosen; nothing was done. Double-click again and drag the folder into "
                           "the window")
     folder = Path(os.path.expanduser(folder))
+    if not folder.is_absolute():
+        raise Refusal("give the folder's full path: drag it into the window. Nothing was done")
     if not folder.is_dir():
         raise Refusal("that is not a folder I can open; nothing was done")
     if inside(folder, marking) or inside(marking, folder):
@@ -201,7 +218,11 @@ def ask_for_the_teacher_only_folder(marking, ask, say):
 def hide_the_folder(text, teacher_only):
     """The text with the teacher-only folder's path, in every spelling it could be printed in, put back as
     'your teacher-only folder'."""
-    spellings = {str(teacher_only), str(Path(teacher_only).resolve()), os.path.realpath(str(teacher_only))}
+    full = {str(teacher_only), str(Path(teacher_only).resolve()), os.path.realpath(str(teacher_only))}
+    spellings = set()
+    for spelling in full | {Path(teacher_only).name}:
+        # as written, as a relative path or a file:// address would hold it (750d review M2)
+        spellings |= {spelling, urllib.parse.quote(spelling), urllib.parse.quote(spelling, safe="")}
     for spelling in sorted(spellings, key=len, reverse=True):
         if spelling:
             text = text.replace(spelling, THE_FOLDER)
@@ -531,6 +552,68 @@ def runner_command(teacher_only, marking, command):
             "--quarantine", str(teacher_only / QUARANTINE), "--"] + command
 
 
+def walled(command, writable):
+    """On a Mac, the command run so that it can write only into the given folders and the temporary folder
+    (750d review M1): sandbox-exec, with a profile that denies every write and allows those. Elsewhere, the
+    command as it is (the snapshot in a_boxing_step still catches writes into either folder)."""
+    sandbox = "/usr/bin/sandbox-exec"
+    if sys.platform != "darwin" or not os.path.isfile(sandbox):
+        return command
+    folders = [os.path.realpath(str(folder)) for folder in writable]
+    folders += [os.path.realpath(tempfile.gettempdir()), "/dev"]
+    allowed = ""
+    for folder in folders:
+        allowed += ' (subpath "' + folder.replace("\\", "\\\\").replace('"', '\\"') + '")'
+    return [sandbox, "-p", "(version 1)(allow default)(deny file-write*)(allow file-write*" + allowed + ")"] + command
+
+
+def written_state(folder, leave_out):
+    """{path: (kind, size, time)} of every entry under the folder but those under leave_out; links not followed."""
+    state = {}
+    for top, folders, files in os.walk(folder, followlinks=False):
+        for name in folders + files:
+            path = Path(top) / name
+            if any(path == skipped or skipped in path.parents for skipped in leave_out):
+                continue
+            try:
+                info = path.lstat()
+            except OSError:
+                continue
+            kind = "link" if path.is_symlink() else ("folder" if path.is_dir() else "file")
+            state[path] = (kind, info.st_size if kind == "file" else 0, info.st_mtime_ns if kind == "file" else 0)
+    return state
+
+
+def a_boxing_step(script_command, allowed, teacher_only, marking, assessment, say, said):
+    """Run one step of the adapted boxing script through the runner, walled on a Mac to that assessment's folder
+    on the teacher's side; then move anything it wrote outside `allowed` (in the marking folder or the
+    teacher-only folder) to the teacher's Quarantine, unread and never deleted, and stop when there was any."""
+    quarantine = teacher_only / QUARANTINE
+    allowed = [Path(path) for path in allowed] + [quarantine]
+    before = {**written_state(marking, []), **written_state(teacher_only, allowed)}
+    code = run_and_say(runner_command(teacher_only, marking, walled(script_command, [teacher_only / assessment])),
+                       teacher_only, say, said)
+    after = {**written_state(marking, []), **written_state(teacher_only, allowed)}
+    strays = []
+    for path, state in sorted(after.items()):
+        if before.get(path) == state or (state[0] == "folder" and path in before):
+            continue
+        if any(other in path.parents for other in strays):
+            continue
+        strays.append(path)
+    if strays:
+        held = quarantine / ("From the boxing " + datetime.datetime.now().strftime("%Y-%m-%d %H.%M.%S"))
+        for path in strays:
+            side, root = ("marking folder", marking) if inside(path, marking) else ("teacher-only folder", teacher_only)
+            target = held / side / path.relative_to(root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(path), str(target))
+        raise Refusal(f"the boxing script wrote {len(strays)} things outside the folder it was given; they were moved, "
+                      f"unread, to the {QUARANTINE} folder in {THE_FOLDER}, and nothing was put together for you to "
+                      "look through or moved. Tell your assistant the boxing script needs looking at")
+    return code
+
+
 def run_and_say(command, teacher_only, say, said):
     """Run a command with its output captured, and pass on its lines with the teacher-only folder's path put back
     as 'your teacher-only folder'. Returns its exit code."""
@@ -577,16 +660,17 @@ def a_whole_class_first(request, teacher_only, assessment, marking, script, say,
         if not stack.is_file():
             raise Refusal(f"the whole-class scan is not in {THE_FOLDER} yet (put it in the '{assessment}' folder "
                           "there, named as your assistant said). Nothing was done")
-        run_and_say([sys.executable, "-B", str(script), "--stack", str(stack), "--pages-per-paper",
-                     str(whole["pagesPerPaper"]), "--into", str(into), "--check-dir",
-                     str(teacher_only / assessment / CHECK)], teacher_only, say, said)
+        a_boxing_step([sys.executable, "-B", str(script), "--stack", str(stack), "--pages-per-paper",
+                       str(whole["pagesPerPaper"]), "--into", str(into), "--check-dir",
+                       str(teacher_only / assessment / CHECK)], [into, teacher_only / assessment / CHECK],
+                      teacher_only, marking, assessment, say, said)
         say("Fill in the paper column of your name mapping table from 'Papers to name.pdf' in the Check folder, then "
             "double-click Box the papers again. Nothing was boxed yet.")
         return False
     if numbered:
-        code = run_and_say(runner_command(teacher_only, marking, [
-            sys.executable, "-B", str(script), "--name-papers", str(teacher_only / TABLE), "--section",
-            str(whole["section"]), "--into", str(into)]), teacher_only, say, said)
+        code = a_boxing_step([sys.executable, "-B", str(script), "--name-papers", str(teacher_only / TABLE),
+                              "--section", str(whole["section"]), "--into", str(into)], [into],
+                             teacher_only, marking, assessment, say, said)
         if code != 0:
             say("Some papers could not be named from your table. Fix the paper column, then double-click Box the "
                 "papers again. Nothing was boxed yet.")
@@ -627,15 +711,20 @@ def box(marking, ask, say):
                       f"Student A.pdf and so on, in '{assessment}/{ORIGINALS}/Section 1' (one Section folder per "
                       f"class) in {THE_FOLDER}, then double-click again. Nothing was done")
     said = []
-    if not a_whole_class_first(request, teacher_only, assessment, marking, script, say, said):
+    try:
+        whole_class_done = a_whole_class_first(request, teacher_only, assessment, marking, script, say, said)
+    except Refusal as refusal:
+        said.append(f"Stopped: {refusal}")
+        write_what_it_said(marking / assessment / BOX_SAID, said, teacher_only)
+        raise
+    if not whole_class_done:
         write_what_it_said(marking / assessment / BOX_SAID, said, teacher_only)
         return 1
     holding = teacher_only / assessment / HOLDING
     say("Boxing the papers. This takes a few seconds a paper.")
-    run_and_say(runner_command(teacher_only, marking, [
-        sys.executable, "-B", str(script), str(originals), str(holding), "--blank", str(blank)] + options),
-        teacher_only, say, said)
     try:
+        a_boxing_step([sys.executable, "-B", str(script), str(originals), str(holding), "--blank", str(blank)] + options,
+                      [holding], teacher_only, marking, assessment, say, said)
         batch, papers, pages = prepare(holding, teacher_only / assessment / CHECK, assessment)
     except Refusal as refusal:
         said.append(f"Stopped: {refusal}")

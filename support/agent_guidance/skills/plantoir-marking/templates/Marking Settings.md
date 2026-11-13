@@ -12,7 +12,7 @@ teacher's own words, and the date. Edit this file to change one; the next markin
 ## Folders
 
 - Marking folder: (the full path)
-- Teacher-only folder: beside the marking folder, made and named by the teacher. Never write its path here or anywhere: the launchers ask the teacher for it.
+- Teacher-only folder: made and named by the teacher. Never write its name or path here or anywhere: the launchers ask the teacher for it.
 - Kept in sync by a service: (no, or which service, and that the teacher said it is fine)
 
 ## How marks are counted

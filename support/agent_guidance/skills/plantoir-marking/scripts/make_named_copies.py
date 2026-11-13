@@ -4,10 +4,11 @@ the plantoir-marking skill that puts a student's name into anything.
 
 Part of the plantoir-marking skill. A STARTING POINT: copy it into the marking folder's Scripts/ folder,
 adjust it to this teacher (see the two MARK blocks below), run --self-test, and only then use it. Run it
-through run_with_names.py, never directly:
+through run_with_names.py, never directly. Since 750d only the teacher's "Put names on the sheets" runs it,
+filling in TEACHER-ONLY (the teacher-only folder, which the assistant is never told) as below:
 
-    python3 -B <skill>/scripts/run_with_names.py --table TABLE --watch <marking folder> --quarantine <teacher-only>/Quarantine --
-        python3 -B make_named_copies.py --table TABLE --sheets "<marking folder>/<Assessment>/Sheets" --out "<teacher-only>/<Assessment>/Named"
+    python3 -B <skill>/scripts/run_with_names.py --table TABLE --watch <marking folder> --quarantine TEACHER-ONLY/Quarantine --
+        python3 -B make_named_copies.py --table TABLE --sheets "<marking folder>/<Assessment>/Sheets" --out "TEACHER-ONLY/<Assessment>/Named"
     python3 -B make_named_copies.py --check-table --table TABLE      (through the runner too: counts only)
     python3 -B make_named_copies.py --self-test
 
@@ -24,7 +25,7 @@ Report card comments (#752, for the plantoir-report-comments skill), through the
     python3 -B make_named_copies.py --longest-first-name --table TABLE
     python3 -B make_named_copies.py --check-file FILE --table TABLE
     python3 -B make_named_copies.py --comments "<marking folder>/<Term> Comments/Comments.json" --table TABLE
-        --out "<teacher-only>/<Term> Comments/Named" --limit 450 [--count characters|bytes]
+        --out "TEACHER-ONLY/<Term> Comments/Named" --limit 450 [--count characters|bytes]
 
 --comments reads the drafts the assistant wrote with identifiers only ({"students": [{"section": 1,
 "identifier": "Student A", "cites": [...], "options": ["...", "...", "..."]}]}), refuses the whole run

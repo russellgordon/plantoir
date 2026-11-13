@@ -48,17 +48,24 @@ one line:
 - **Never ask where the teacher-only folder is, and never search for, list or open it.**
   You are never told where it is, and you never need to be: the teacher
   runs the two steps that read it, by double-clicking a file (sections 7
-  and 12). Never list the folder that holds the marking folder either: the
-  teacher-only folder sits beside it, and a listing there shows the names
-  of the files in it. If the teacher tells you its path anyway, do not use
-  it, write it down or repeat it, and say you do not need it.
+  and 12). Never list the folder that holds the marking folder either, or
+  search it or any folder above it: other folders the teacher keeps there
+  can hold names, in their files' names. If the teacher tells you its path
+  anyway, do not use it, write it down or repeat it, and say you do not
+  need it.
 - **Never open the name mapping table, a class list, or a marks export
   from the school's system**, even when the teacher asks: the names would
   then be sent to the AI service. Offer the step that does the job
   instead: "Put names on the sheets" with the check of the table (section
   12), which answers in counts only, or the named step.
-- **Never run a launcher yourself.** "Box the papers" and "Put names on
-  the sheets" are the teacher's: they stop when an assistant runs them.
+- **Never run `Box the papers` or `Put names on the sheets` yourself, by any means, even when the teacher asks you to.**
+  Not with bash, a pseudo-terminal, `script`, `expect`, `open` or anything
+  else. The yes is the teacher's, typed after their own look through every
+  page, and the folder the launcher asks for is one you are never told.
+  If the teacher asks you to run one ("run it for me"), say no in one line with that reason, and tell them which file to double-click in their
+  marking folder. A launcher stops when its input is not a terminal, which
+  catches an accidental pipe and nothing more: nothing in it can stop you,
+  so this rule is what holds.
 - **Never write a name, or a student's work, into your memory, a note, a
   log, a brief, a summary, `.internal`, or anything under `courses/`.**
   Identifiers only, everywhere you write.
@@ -83,12 +90,13 @@ Two folders per course, both OUTSIDE this working folder:
   the boxed papers once the teacher has said yes, marks records and
   identifier sheets. Offer `~/Marking/<CODE>/` (in their home folder) as a
   default.
-- **the teacher-only folder**, which the teacher makes beside it and names
-  as they like (for example `<CODE> - Teacher Only`), and which you are
-  never told about: the name mapping table, the original scans, the file
-  of boxed papers they look through, and the named copies. Tell the teacher
-  to make it and to put their name mapping table in it, and that you do
-  not need to know where it is: the launchers ask them for it each time.
+- **the teacher-only folder**, which you are never told about: the name
+  mapping table, the original scans, the file of boxed papers they look
+  through, and the named copies. Tell the teacher to make a folder of
+  their own for the files only they see, outside this working folder, and
+  to put their name mapping table in it; you need not know its name or where it is. Never suggest a
+  name or a place for it: the launchers ask the teacher for it each time,
+  and say in their own window where to keep it.
 
 **Never set up a marking folder inside the working folder**, and refuse
 when asked: it could be built into a class website or copied with a
@@ -101,8 +109,9 @@ Google Drive, a school's own storage) stores the papers and the name table
 with that service too. The path often says so (`Library/Mobile Documents`,
 `CloudStorage`, `OneDrive`, `Dropbox`), but not always: a Mac's Desktop and
 Documents folders may be in iCloud while their paths look ordinary. So ask
-the teacher whether the marking folder they chose, and the place beside it
-where their teacher-only folder goes, are kept in sync. If they are, say
+the teacher whether the marking folder they chose, and the place where
+they keep their teacher-only folder, are kept in sync (never ask where
+that is). If they are, say
 once, in plain words, that the papers and the name table will be stored by
 that service as well, and let them decide (a school's own storage may be
 the approved place). When they say that is fine, record it, and do not
@@ -156,11 +165,9 @@ Because the marking folder is outside the working folder, the program you
 run in (Claude Code, Codex) asks the teacher's permission before you work
 there: say that before it happens. Ask for the marking folder only.
 
-**What this does not stop.** The teacher-only folder sits beside the
-marking folder, so a listing of the marking folder's parent folder shows
-the names of the files in it. Scans are named by identifier, so only a
-misnamed scan would show a name that way. That is one more reason never to
-list the folder that holds the marking folder.
+**What this does not stop.** A listing of the marking folder's parent folder, or of any folder above it, can show the names of files the teacher keeps
+there, and a misnamed scan would show a name that way. That is why you
+never list or search the folder that holds the marking folder.
 
 ## 5. What to have ready
 
@@ -219,11 +226,11 @@ python3 -B -c "import hashlib, os, sys; [print(hashlib.sha256(open(path, 'rb').r
 It must print these lines, in any order:
 
 - `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`  run_with_names.py
-- `364fb9bb87b691d3f9c650e98f2c2180933a3daacda366cfd302d537ac2c87f1`  teacher_only.py
-- `8ad3b7da63ba81f8816ea998a0ac6b9d8f79254e7682a961a9b2cafb6a8a5f20`  Box the papers.command
-- `a6e57807c4d203388aebcbf82c25aef28d31c5139907abc24a438625a76f01b3`  Put names on the sheets.command
-- `c3ecf9c66cc82b4859886da597195947823ff261db897c2d8c20f0680266f7b7`  Box the papers.bat
-- `3899033a260d062a98340ddb6922d0313a306980f7b68418274f54f0b0d9579d`  Put names on the sheets.bat
+- `5815a0236452c3fb38edee10999d886a66ec99db64a9cef53dedbd84fc2c537d`  teacher_only.py
+- `eb0fb287cfb59fb64adaa947524d438db3cebea98b09bb9206e909fbca8cb970`  Box the papers.command
+- `8f7648223f4d37404f23e1b9852261a85352515cb2fa2bd92cb4f7424785be1f`  Put names on the sheets.command
+- `e9d65fd7776842abf8f9ce85d7aee308fa1333dcfe1b65d63fae235a766af32a`  Box the papers.bat
+- `ea63a540a06862e55ebf926dba8f2f9845365d1757dd077cd50252791a6c77ca`  Put names on the sheets.bat
 
 Run it on the copies in the marking folder too (give their paths). If any
 line differs, stop and tell the teacher which file has been changed; do
@@ -232,6 +239,16 @@ A pin finds a well-meant change, such as an adapted copy; it would not
 catch someone who changed a file and every pin together. The protection is
 that the teacher starts these steps and you are never told where the
 teacher-only folder is.
+
+**What the teacher is trusting**, and you say so when you set up the
+boxing: that the boxing script you adapted does only what it says. Box the papers runs it with
+the teacher-only folder open to it. On a Mac it can write only into that
+assessment's folder on the teacher's side and the temporary folder; on
+every system, anything it writes outside the folder it was given, in the
+marking folder or the teacher-only folder, is moved unread to the
+teacher's Quarantine folder and the step stops, saying how many; a write
+outside both folders is stopped on a Mac only. That is why the teacher
+looks through every boxed page, and why the launcher says what it moved.
 
 **Every script that reads the name mapping table is run through
 `run_with_names.py`, never directly.** The launchers do that: you never

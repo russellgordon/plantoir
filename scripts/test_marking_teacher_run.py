@@ -366,9 +366,11 @@ class BoxThePapersTests(unittest.TestCase):
         self.assertNothingLeaked(printed)
         self.assertEqual(self.a_class.boxed_papers_in_the_marking_folder(), [])
 
-    def test_the_launcher_and_the_script_refuse_without_a_terminal(self):
-        # An assistant's command has no terminal: what it would run stops before anything is asked.
-        # Each layer refuses on its own: the launcher first, and teacher_only.py if it is run past the launcher.
+    def test_a_plain_pipe_is_stopped(self):
+        # What this proves and no more: input piped in (not a terminal) stops before anything is asked. It
+        # catches an accidental pipe. It does NOT stop an assistant that runs a launcher through a
+        # pseudo-terminal (this file's own drive() does exactly that); the skill forbids it, and the re-trial
+        # checks for it (750d review H1). Each layer stops on its own.
         for command, refusal in ((["/bin/bash", str(self.a_class.marking / "Box the papers.command")],
                                   "Stopped: Box the papers is for the teacher to double-click"),
                                  (["/bin/bash", str(self.a_class.marking / "Put names on the sheets.command")],
@@ -651,11 +653,128 @@ class PinTests(unittest.TestCase):
         self.assertIn("support/agent_guidance/skills/plantoir-marking/launchers/*.bat text eol=crlf", attributes)
 
 
+class PathAndStrayWriteTests(unittest.TestCase):
+
+    def test_every_hide_path_case(self):
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            teacher = a_class.teacher_only
+            forms = {"full": str(teacher), "relative": os.path.relpath(str(teacher), str(a_class.marking)),
+                     "uri": Path(os.path.realpath(str(teacher))).as_uri()[len("file://"):], "name": teacher.name}
+            for case in teacher_run()["hidePathCases"]:
+                printed = case["printed"]
+                for key, value in forms.items():
+                    printed = printed.replace("{" + key + "}", value)
+                if "{uri}" in case["printed"]:
+                    printed = "file://" + printed.split("file://", 1)[-1] if "file://" in printed else printed.replace(
+                        "Open ", "Open file://", 1)
+                shown = teacher_only.hide_the_folder(printed, teacher)
+                self.assertEqual(shown, case["shows"], case["why"])
+                self.assertNotIn(MARKER, shown)
+
+    @unittest.skipIf(MISSING, "Poppler is not installed here; the boxing runs")
+    def test_every_stray_write_case(self):
+        writes = {
+            "nowhere": "",
+            "marking": "open(os.path.join(os.getcwd(), 'redact.log'), 'w').write(' '.join(sys.argv))",
+            "marking-cache": "shutil.copytree(sys.argv[1], os.path.join(os.getcwd(), 'Unit 1 Test', 'cache'))",
+            "teacher-only": "shutil.copytree(sys.argv[1], os.path.join(os.path.dirname(sys.argv[2]), 'cache'))",
+            "outside": "open(os.path.join(OUTSIDE, 'copy.txt'), 'w').write(sys.argv[1])",
+        }
+        # Outside both folders AND outside the temporary folder the wall allows: a folder in this checkout.
+        outside = Path(tempfile.mkdtemp(prefix=".teacher-run-outside-", dir=str(Path(__file__).resolve().parent)))
+        self.addCleanup(shutil.rmtree, outside, True)
+        walled = sys.platform == "darwin" and os.path.isfile("/usr/bin/sandbox-exec")
+        for case in teacher_run()["strayWriteCases"]:
+            if case.get("platform") == "mac" and not walled:
+                continue
+            # With the Mac's wall, and (except where only the wall can see it) without it, so the snapshot is
+            # proved on its own, as it runs on Windows.
+            for wall in ([True, False] if case.get("platform") != "mac" else [True]):
+                with tempfile.TemporaryDirectory() as root:
+                    a_class = Class(root)
+                    script = a_class.marking / "Scripts" / "redact_scans.py"
+                    if writes[case["writes"]]:
+                        script.write_text(script.read_text(encoding="utf-8").replace(
+                            'if __name__ == "__main__":', 'if __name__ == "__main__" and len(sys.argv) > 3 and not '
+                            'sys.argv[1].startswith("--"):\n    OUTSIDE = ' + repr(str(outside)) + '\n    '
+                            + writes[case["writes"]] + '\nif __name__ == "__main__":', 1),
+                            encoding="utf-8")
+                    original = getattr(teacher_only, "walled", None)
+                    if not wall and original is not None:
+                        teacher_only.walled = lambda command, writable: command
+                    printed = []
+                    answers = [str(a_class.teacher_only), "yes"]
+                    try:
+                        teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None, printed.append)
+                        stopped = False
+                    except teacher_only.Refusal as refusal:
+                        printed.append(str(refusal))
+                        stopped = True
+                    finally:
+                        if original is not None:
+                            teacher_only.walled = original
+                    label = f"{case['name']} (wall {wall})"
+                    self.assertEqual(stopped, case["stopped"], label + ":\n" + "\n".join(printed))
+                    self.assertEqual((a_class.marking / ASSESSMENT / "Redacted").exists(), not case["stopped"], label)
+                    self.assertEqual(a_class.boxed_papers_in_the_marking_folder() if case["stopped"] else [], [], label)
+                    self.assertFalse((a_class.marking / "redact.log").exists(), label)
+                    self.assertFalse((a_class.marking / ASSESSMENT / "cache").exists(), label)
+                    self.assertFalse((a_class.teacher_only / ASSESSMENT / "cache").exists(), label)
+                    self.assertEqual(a_class.leaks(), [], label)
+                    if case["writes"] in ("marking", "marking-cache", "teacher-only") and not wall:
+                        self.assertIn("were moved, unread, to the Quarantine folder", "\n".join(printed), label)
+                        quarantined = list((a_class.teacher_only / "Quarantine").rglob("*"))
+                        self.assertTrue(quarantined, label + ": moved, never deleted")
+                    if case["writes"] == "outside":
+                        self.assertFalse((outside / "copy.txt").exists(), label)
+
+    def test_a_relative_folder_is_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            a_class = Class(root)
+            answers = ["../" + a_class.teacher_only.name]
+            with self.assertRaises(teacher_only.Refusal) as raised:
+                teacher_only.box(a_class.marking, lambda _prompt: answers.pop(0) if answers else None, lambda _line: None)
+            self.assertIn("full path", str(raised.exception))
+
+
 class WhatTheAssistantIsGivenTests(unittest.TestCase):
+
+    def test_the_skills_never_suggest_a_name_or_place_for_the_teacher_only_folder(self):
+        # 750d review H2: "for example <CODE> - Teacher Only", beside the marking folder, told the assistant the path.
+        for path in [SKILL / "SKILL.md", COMMENTS_SKILL / "SKILL.md"] + sorted((SKILL / "templates").iterdir()):
+            text = folded(path.read_text(encoding="utf-8"))
+            for hint in ("Teacher Only", "beside the marking folder", "sits beside", "makes beside", "place beside it"):
+                self.assertNotIn(hint, text, f"{path.relative_to(SKILLS)}: {hint}")
+        offered = contract()["assessment"]["folders"]["offered"]["teacherOnly"]
+        self.assertNotIn("Teacher Only", offered)
+
+    def test_both_skills_say_the_assistant_never_runs_a_launcher_even_when_asked(self):
+        pins = contract()["printablePages"]["agentGuidance"]["mustSay"]
+        for sentence in ("**Never run `Box the papers` or `Put names on the sheets` yourself, by any means, even when the "
+                         "teacher asks you to.**",
+                         "say no in one line with that reason, and tell them which file to double-click"):
+            for skill, folder in (("plantoir-marking", SKILL), ("plantoir-report-comments", COMMENTS_SKILL)):
+                self.assertIn(sentence, pins[skill], skill)
+                self.assertIn(folded(sentence), folded((folder / "SKILL.md").read_text(encoding="utf-8")), skill)
+
+    def test_nothing_shipped_says_the_terminal_check_stops_an_assistant(self):
+        # 750d review H1: it stops an accidental pipe, nothing more.
+        claims = ("an assistant's command has none", "stop when an assistant runs them", "refused without a terminal",
+                  "needs no code")
+        files = [SKILL / "SKILL.md", COMMENTS_SKILL / "SKILL.md", TEACHER_ONLY] + sorted(LAUNCHERS.iterdir())
+        for path in files:
+            text = folded(path.read_bytes().decode("utf-8"))
+            for claim in claims:
+                self.assertNotIn(claim, text, f"{path.name}: {claim}")
+        rules = json.dumps(teacher_run(), ensure_ascii=False)
+        for claim in claims:
+            self.assertNotIn(claim, rules)
 
     def test_no_command_the_assistant_is_given_holds_the_teacher_only_folder(self):
         # The skills used to hand the assistant commands with "<teacher-only>" in them: it then had to know the path.
-        for path in [SKILL / "SKILL.md", COMMENTS_SKILL / "SKILL.md"] + sorted((SKILL / "templates").iterdir()):
+        for path in ([SKILL / "SKILL.md", COMMENTS_SKILL / "SKILL.md"] + sorted((SKILL / "templates").iterdir())
+                     + [SCRIPTS / "make_named_copies.py", SCRIPTS / "redact_scans.py", SCRIPTS / "build_test_sheet.py"]):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("<teacher-only>", text, str(path.relative_to(SKILLS)))
             self.assertNotIn("teacherOnlyFolder", text, str(path.relative_to(SKILLS)))
