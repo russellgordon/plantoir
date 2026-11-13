@@ -62,6 +62,16 @@ other piece of work in this course.
 - **Composure under a real question.** Not having an answer is fine.
   "I don't know, and here is how I would find out" is a good answer.
 
+### Success criteria
+
+Before you hand in, tick each one that your own work does.
+
+- [ ] Someone who has never heard any of this could follow me, and I explain any term from this course that I use.
+- [ ] I chose the evidence that fits each claim, instead of showing everything I have.
+- [ ] I can say which parts of my plan come from what I know about myself, and which from what I found out.
+- [ ] I can describe how my goals changed over the ten weeks, and what changed them.
+- [ ] I am ready for a question I cannot answer: I can say how I would find out.
+
 ## Preparing for it
 
 The last two periods are for this: the first of them is where the

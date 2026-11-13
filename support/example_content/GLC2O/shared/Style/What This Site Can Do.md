@@ -62,6 +62,11 @@ graph LR
 > the boxes start again. Copy the list into your own notebook if you want
 > it everywhere.
 
+Boxes under a heading called **Success criteria** do one thing more: the
+site counts the ones you have ticked on a page called **My Progress**,
+first in Key Links. Every task in this course ends with such a list —
+[[The Budget]] has one.
+
 ## Money
 
 Amounts are written as ordinary text — \$5, \$1,200 — and that backslash

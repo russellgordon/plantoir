@@ -606,6 +606,16 @@ from Phase 5 apply here too.
   quoting it — describe the WORK, never the worker (Phase 2). A task with
   no success criteria cannot support assessment *as* learning, because
   there is nothing for a student to judge their own work against.
+  **GLC2O is the payload that also carries them as tick boxes** (#878):
+  each of its seven task pages closes with `### Success criteria` and one
+  `- [ ]` line per criterion, worded about the work ("Every figure in my
+  budget has its source and the date I looked"). A checklist under that
+  heading is what gives a section its My Progress page
+  (`plantoir-page-authoring`, section 11), so GLC2O is the one ready-made
+  course whose sites have one. A payload that gains such a list changes
+  the count in `contracts/shared-rules.json` → `myProgress.knownLimits`
+  and in `documentation/06-quartz-customizations.md` (section L); correct
+  both.
 - **Checklists on the site can be ticked** (since #519, v1.8.1). `- [ ]`
   outside a `[!quiz]` renders a box each student can tick for themselves;
   the ticks are kept in that student's own browser, on that computer, and

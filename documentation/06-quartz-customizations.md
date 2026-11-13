@@ -3291,8 +3291,13 @@ the `const` reassignment each fail `test_my_progress.py`; in the fixes round,
 the Key Links guard matching `[[My Progress Journal]]`, the gate's
 indented-code, HTML-comment, `&nbsp;` and next-line-words rules, a console
 line saying "script", and the check run without Latex each fail their test. None of the 39
-example payloads qualifies (104 headings match, all over tables), so no
-shipped course builds the page until its pages say so.
+example payloads qualified when this was built (104 headings matched, all
+over tables). Since #878 (2026-11-13) one does: GLC2O's seven task pages
+each close with tick boxes under `### Success criteria`, so a course made
+from GLC2O builds the page (measured with
+`my_progress.page_has_counted_items` over every page of every payload:
+GLC2O's seven and no other). The other 38 build none until their pages say
+so.
 
 Rejected (`myProgress.rejected`): a Python pass over `public/*.html`; ids
 re-derived from the Markdown; a transformer that stamps counted items; a
