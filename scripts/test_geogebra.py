@@ -841,21 +841,52 @@ class ResetKeepsTheSketchTextPinTests(unittest.TestCase):
         self.assertIn("setErrorDialogsActive(false)", reopened)
         self.assertIn("opened = true", load[load.index(removal):])
 
+    def build_from_lines(self):
+        text = self.source()
+        start = text.index("const buildFromLines = async (")
+        return text[start:text.index("\n  }\n", start)]
+
     def test_what_the_lines_built_becomes_the_sketch_file(self):
         keep = self.function("keepAsStart")
-        self.assertIn("api.setBase64(api.getBase64(),", keep)
+        self.assertIn("file = api.getBase64()", keep)
+        self.assertIn("api.setBase64(file,", keep)
+        # Nothing is kept from an empty file: setBase64("") empties the
+        # sketch and never calls back (#792 review L1).
+        self.assertIn('if (typeof file !== "string" || file === "") {', keep)
+        build = self.build_from_lines()
+        self.assertIn("await keepAsStart(api)", build)
         load = self.applet_on_load()
-        self.assertIn("await keepAsStart(api)", load)
         # "ran" is said only once what the lines built is the sketch's file,
         # so the browser check's reset cannot come before it.
-        self.assertLess(load.index("await keepAsStart(api)"), load.index('figure.dataset.geogebraCommands = "ran"'))
+        after = load[load.index("void buildFromLines("):]
+        self.assertIn(".then(() => {", after)
+        self.assertLess(after.index(".then(() => {"), after.index('figure.dataset.geogebraCommands = "ran"'))
+
+    def test_only_lines_run_from_start_to_end_are_kept(self):
+        # #792 review M1: a reset while the lines run left a half-built
+        # sketch, and keepAsStart kept that half as its start.
+        build = self.build_from_lines()
+        self.assertIn("markUntouched(api)", build)
+        self.assertIn("!stillUntouched(api)", build)
+        self.assertIn("startFrom(api, file)", build)
+        self.assertIn("whole = ran.complete", build)
+        self.assertIn("if (whole) {", build)
+        self.assertLess(build.index("if (whole) {"), build.index("await keepAsStart(api)"))
+        self.assertIn("unmark(api)", build)
+        run = self.function("runCommands")
+        self.assertIn("return { refused, complete: false }", run)
 
     def test_presses_are_held_while_the_lines_run_but_not_the_loaders_own_click(self):
         hold = self.function("holdPresses")
         self.assertIn("if (!event.isTrusted) {", hold,
                       "holdPresses would also stop the click() that closes GeoGebra's dialogs, leaving a shade per line (#755)")
-        for kind in ("pointerdown", "mousedown", "touchstart"):
+        for kind in ("pointerdown", "mousedown", "touchstart", "keydown", "keyup"):
             self.assertIn(f'"{kind}"', hold)
+        # Space and Enter press the reset icon from GeoGebra's keyboard
+        # cycle (#792 review M1); every other key, Tab included, goes through.
+        self.assertIn('event.key !== " "', hold)
+        self.assertIn('event.key !== "Enter"', hold)
+        self.assertNotIn('"Tab"', hold)
         load = self.applet_on_load()
         self.assertIn("holdPresses(box)", load)
         self.assertIn(".finally(letPressesThrough)", load)

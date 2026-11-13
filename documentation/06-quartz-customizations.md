@@ -4524,46 +4524,103 @@ already opened (`opened`) is its reset: the sketch is kept, its entry in
 change use it), and error dialogs are turned off again. Once a sketch's
 lines have run, `keepAsStart` loads what they built back in as the
 applet's file (`setBase64` of `getBase64`), and only then is the figure
-marked as having run its lines. That load changes nothing on screen
-(screenshots before and after it are the same, pixel for pixel, in both
-engines, with and without the toolbar and the algebra view), does not call
-`appletOnLoad`, and took about 65 ms in Chromium; the whole open took 569
-to 668 ms in Chromium and 549 to 622 ms in WebKit, one run each. Reset then
-reloads that file like any other: every object, each slider at the value
-the lines gave it, the view the lines zoomed to. Pressed five times in a
-row, it came back as it opened, in both engines. No line runs again, so a reset opens no
-dialog and lays no shade; dragged after a reset, slider `a` and point `A`
-both moved. While the lines run and that load is made, `holdPresses`
-stops a person's presses and touches on the sketch (capture phase, only
-`isTrusted` events, so the loader's own `click()` on a dialog's button
+marked as having run its lines. That load does not call `appletOnLoad`
+and took 41 to 65 ms; the whole open took 569 to 668 ms in Chromium and
+549 to 622 ms in WebKit, one run each. Reset then reloads that file like
+any other: every object, each slider at the value the lines gave it, the
+view the lines zoomed to. Pressed five times in a row, it came back as it
+opened, in both engines. No line runs again, so a reset opens no dialog
+and lays no shade; dragged after a reset, slider `a` and point `A` both
+moved.
+
+**What the load changes.** It looks the same, and every object's XML is
+the same before and after (styles, fixing, labels, captions, layers,
+conditions to show, dynamic colours, scripts; the view and the
+perspective too, but for float noise of about 1e-14), measured by the
+#792 review. Three things differ. A selection the lines made
+(`SelectObjects`) is cleared. Random numbers (`RandomBetween` and the
+like) are drawn again by this load, and again by every reset. And the
+picture is not identical: WebKit stops drawing a 1 px frame round the
+applet (about 2,600 px), and Chromium redrew one patch of 46 px on a sketch
+with the toolbar and the algebra view; the fixture's sketch and the
+toolbar sketch compared equal in the implementer's screenshots, so "the
+same picture" holds for those and not in general. **Redrawn random
+numbers are not a fault a teacher would mind**, and they are left as
+they are: a reset of a sketch from a file has always drawn them again,
+because that is what GeoGebra does when it loads a file, and a teacher
+who writes `RandomBetween` into a sketch with a reset icon gets a new
+example each press, which is how such sketches are used on geogebra.org.
+Avoiding it would mean rewriting the random objects into fixed numbers
+before keeping the file, which changes what the teacher wrote and would
+make a lines sketch behave differently from a file one.
+
+**Only a whole run is kept** (#792 review M1). `keepAsStart` is called only
+from a construction the lines ran on from start to end. Before the lines,
+the loader puts a hidden, auxiliary number into the construction
+(`plantoirLinesUntouched`) and takes it out after. A reset while they run
+empties the construction (or reloads the file) without it, and nothing
+else tells the page, so when it is gone the sketch starts again from its
+file, or empty (`newConstruction`), and the lines run again, three tries at
+most. Lines that gave up (`giveUpSeconds`) are not tried again, and
+nothing is kept from them. Nothing is kept either when `getBase64` gives
+no file: the review found that `setBase64("")` empties the sketch and
+never calls back (the pinned engine always answers with a file, so this is
+a guard, not a case met), so the loader leaves the sketch as its lines
+left it, lets presses through at once, and a reset empties it as before
+#792.
+
+**Presses and keys are held while the lines run.** `holdPresses` stops a
+person's presses, touches, Space and Enter on the sketch (capture phase,
+only `isTrusted` events, so the loader's own `click()` on a dialog's button
 still reaches it; holding those as well left 17 shades in the first try).
 Measured on a 163-line sketch with the icon pressed again and again until
 its lines were done (14 to 17 presses): without the hold, 5 of its 155
-objects were left in Chromium and 8 in WebKit; with it, all 155.
+objects were left in Chromium and 8 in WebKit; with it, all 155. The reset
+icon is also in GeoGebra's own keyboard cycle (the review: Tab four times
+then Space resets a file sketch; Enter does not), so Shift+Tab then Space,
+again and again with the focus in the sketch, reset it while its lines ran:
+130 of 155 objects left in Chromium and 0 in WebKit, one run each, and
+that half kept as its start. With Space and Enter held as well, all 155,
+one run of the lines. With the hold taken out and the marker left in, the
+lines ran twice in Chromium and three times in WebKit and all 155 were
+kept, so each half of the fix works alone. Tab still moves the focus while
+the lines run, and Space still scrolls the page when the focus is outside
+the sketch (723 to 810 px in Chromium, 725 to 929 in WebKit).
 
-`browser-checks/geogebra_applet.mjs` item 11 checks it in each phase: a
-real drag on slider `a` and on point `A`, a real press at
+`browser-checks/geogebra_applet.mjs` item 11 checks the reset in each
+phase: a real drag on slider `a` and on point `A`, a real press at
 `geogebraFences.reset.icon`, then the construction read back until it is
 what the sketch opened as (its own state is what is waited on; ten seconds
 is only the bound), no shade, the canvas on top, and a drag that moves it
-again. Against the loader before #792 (the old file put back, spliced into
-a built site, the new file restored) it fails on both sketches, in both
-phases. **The gate runs Chromium only:** the check speaks the DevTools
-protocol and carries no packages, so WebKit was measured by hand with
-Playwright as above and is in no gate. `scripts/test_geogebra.py` →
-`ResetKeepsTheSketchTextPinTests` is a text pin, for the Windows suite.
+again. A press that misses the icon is reported as that, not as a broken
+reset. Item 12 opens a third sketch on page B, 150 lines that each make a
+point (planted by `verify.sh`), and presses Shift+Tab then Space with real
+key events, with the focus in it, until its lines have run; all 150 points
+must be there, and again after a press on its reset icon. Against the
+loader before #792 (the old file put back, spliced into a built site, the
+new file restored) item 11 fails on both sketches, in both phases; against
+the first version of #792, without the keys held, item 12 failed with 82
+and 75 of 150 points. **The gate runs Chromium only:** the check speaks the
+DevTools protocol and carries no packages, so WebKit was measured by hand
+with Playwright as above and is in no gate (a follow-up issue asks whether
+it should be). `scripts/test_geogebra.py` → `ResetKeepsTheSketchTextPinTests`
+is a text pin, for the Windows suite.
 
-**Rejected for #792:** running the lines again after a reset (on a sketch
-loaded empty nothing tells the page that a reset happened, and each run
-would open the lines' dialogs again, which #755 had to tame); hiding the
-icon on sketches written as lines, the issue's fallback (not needed: it
+**Rejected for #792:** running the lines again after every reset (on a
+sketch loaded empty nothing tells the page that a reset happened, and each
+run would open the lines' dialogs again, which #755 had to tame); hiding
+the icon on sketches written as lines, the issue's fallback (not needed: it
 works on both kinds, in both engines, and a student loses the quickest way
-back); turning the icon off and drawing one of our own; calling the
-engine's internal reset or its scrambled names; any fixed wait after the
-press. **Not measured:** an iPad itself, and a touch press; the hold also
-holds `touchstart` and `touchend`. A press during the lines does nothing
-rather than being remembered for later. **No trail event:** a student's
-press on a published site is not something the teacher did in Plantoir.
+back); turning the icon off and drawing one of our own; holding every key
+while the lines run (Tab must still move the focus); calling the engine's
+internal reset or its scrambled names; any fixed wait after the press.
+**Touch:** the review measured an emulated touch tap on the icon at phone
+width (390 px wide, the sketches scaled to 0.45 and 0.56; Chromium with
+`isMobile`, WebKit with `hasTouch`): both sketches came back in both
+engines with the fix, and were emptied and removed without it. An iPad
+itself is not measured. A press during the lines does nothing rather than
+being remembered for later. **No trail event:** a student's press on a
+published site is not something the teacher did in Plantoir.
 
 **A failed fetch is not remembered** (stage 3+4 review item 4). With no
 saved copy, every build asks geogebra.org again, and a build while it does

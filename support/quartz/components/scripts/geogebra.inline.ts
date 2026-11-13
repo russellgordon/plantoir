@@ -50,6 +50,11 @@ type Api = {
   getPNGBase64: (exportScale: number, transparent: boolean, dpi: number) => string
   getBase64: () => string
   setBase64: (base64: string, callback: () => void) => void
+  exists: (name: string) => boolean
+  setVisible: (name: string, visible: boolean) => void
+  setAuxiliary: (name: string, auxiliary: boolean) => void
+  deleteObject: (name: string) => void
+  newConstruction: () => void
   remove: () => void
 }
 type Applet = { setHTML5Codebase: (codebase: string, offline: boolean) => void; inject: (container: string) => void }
@@ -206,13 +211,15 @@ function closeDialog(dialog: Element) {
 // opens follows their own input. The accepted cost: a queued line's
 // dialog that arrives after that first touch is drawn, and the student
 // closes it by hand, which is GeoGebra's ordinary behaviour.
-async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Array<{ line: number; said: string }>> {
+type Ran = { refused: Array<{ line: number; said: string }>; complete: boolean }
+
+async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Ran> {
   const refused: Array<{ line: number; said: string }> = []
   if (spec.commands.length === 0) {
     try {
       api.setErrorDialogsActive(false)
     } catch {}
-    return refused
+    return { refused, complete: true }
   }
   const seen: string[] = []
   const marker = spec.endOfLine.replace(/\(.*$/, "")
@@ -264,7 +271,7 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
       while (!seen.slice(from).some(isMarker)) {
         const left = giveUpAt - performance.now()
         if (left <= 0) {
-          return refused
+          return { refused, complete: false }
         }
         const came = await new Promise<boolean>((resolve) => {
           const timer = window.setTimeout(() => resolve(false), left)
@@ -275,7 +282,7 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
         })
         arrived = null
         if (!came) {
-          return refused
+          return { refused, complete: false }
         }
       }
       const said: string[] = []
@@ -288,7 +295,7 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
         refused.push({ line: command.line, said: said.join(" ") })
       }
     }
-    return refused
+    return { refused, complete: true }
   } finally {
     try {
       api.setErrorDialogsActive(false)
@@ -315,18 +322,24 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Arra
 // only the axes. Measured in headless Chromium 1243 and WebKit 2359 with a
 // real press: no object left, appletOnLoad not called again, and no client,
 // add or clear listener event that the page could act on. Loading the built
-// construction back in as the applet's file (setBase64 of getBase64) changes
-// nothing on screen (the screenshots before and after are the same, pixel
-// for pixel, with and without the toolbar and the algebra view), does not
-// call appletOnLoad, and makes reset reload it: every object, each slider
-// at the value the lines gave it, the view the lines zoomed to. No line runs
-// again, so a reset opens no dialog, lays no shade and has nothing to stack,
-// however often it is pressed. It took about 65 ms (Chromium).
+// construction back in as the applet's file (setBase64 of getBase64) does
+// not call appletOnLoad, and makes reset reload it: every object with the
+// same XML, each slider at the value the lines gave it, the view the lines
+// zoomed to. No line runs again, so a reset opens no dialog, lays no shade
+// and has nothing to stack, however often it is pressed. It took 41 to 65
+// ms. It looks the same, with three differences measured: a selection the
+// lines made (SelectObjects) is cleared; RandomBetween and the other random
+// numbers are drawn again, by this load and by every reset, as GeoGebra
+// does for every file; and WebKit no longer draws a 1 px frame round the
+// applet (Chromium: one small patch of 46 px redrawn on a sketch with the
+// toolbar and the algebra view).
 //
 // Answers when GeoGebra's own callback says the construction is loaded.
-// LINES_GIVE_UP_MS is only a last resort, should it never say so.
+// LINES_GIVE_UP_MS is only a last resort, should it never say so. Keeps
+// nothing when getBase64 gives no file (an empty string, or a throw).
 function keepAsStart(api: Api): Promise<boolean> {
   return new Promise((resolve) => {
+    let timer: number | undefined = undefined
     let answered = false
     const answer = (loaded: boolean) => {
       if (answered) {
@@ -336,29 +349,113 @@ function keepAsStart(api: Api): Promise<boolean> {
       window.clearTimeout(timer)
       resolve(loaded)
     }
-    const timer = window.setTimeout(() => answer(false), LINES_GIVE_UP_MS)
+    // Nothing is kept when GeoGebra gives no file: setBase64 of "" empties
+    // the sketch and never calls back (measured, #792 review L1).
+    let file: unknown = null
     try {
-      api.setBase64(api.getBase64(), () => answer(true))
+      file = api.getBase64()
+    } catch {
+      file = null
+    }
+    if (typeof file !== "string" || file === "") {
+      answer(false)
+      return
+    }
+    timer = window.setTimeout(() => answer(false), LINES_GIVE_UP_MS)
+    try {
+      api.setBase64(file, () => answer(true))
     } catch {
       answer(false)
     }
   })
 }
 
-// Holds back a person's presses and touches on a sketch while its lines run
-// and while keepAsStart loads what they built (#792), so that the reset
-// icon, or anything else on the sketch, cannot act on a construction still
-// being made. Measured on a 163-line sketch, the reset icon pressed again
-// and again until the lines were done (14 to 17 presses): without the hold,
-// 5 objects of 155 were left in Chromium and 8 in WebKit; with it, all 155,
-// and reset worked as soon as the hold was lifted. Answers the function
-// that lets presses through again.
+// Loads `file` into the applet again, or empties it when there is none:
+// where a sketch's lines start from (#792). Answers when GeoGebra says it
+// is loaded; LINES_GIVE_UP_MS is only a last resort.
+function startFrom(api: Api, file: string | null): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (file === null) {
+      try {
+        api.newConstruction()
+        resolve(true)
+      } catch {
+        resolve(false)
+      }
+      return
+    }
+    let timer: number | undefined = undefined
+    let answered = false
+    const answer = (loaded: boolean) => {
+      if (answered) {
+        return
+      }
+      answered = true
+      window.clearTimeout(timer)
+      resolve(loaded)
+    }
+    timer = window.setTimeout(() => answer(false), LINES_GIVE_UP_MS)
+    try {
+      api.setBase64(file, () => answer(true))
+    } catch {
+      answer(false)
+    }
+  })
+}
+
+// A hidden number put into the construction before the lines run and
+// taken out after (#792). A reset while they run empties the construction
+// or reloads the file without it, and nothing else tells the page, so its
+// absence afterwards is how the loader knows the lines did not all run on
+// the construction now showing.
+const UNTOUCHED = "plantoirLinesUntouched"
+
+function markUntouched(api: Api) {
+  try {
+    api.evalCommand(`${UNTOUCHED} = 1`)
+    api.setVisible(UNTOUCHED, false)
+    api.setAuxiliary(UNTOUCHED, true)
+  } catch {}
+}
+
+function stillUntouched(api: Api): boolean {
+  try {
+    return api.exists(UNTOUCHED)
+  } catch {
+    return false
+  }
+}
+
+function unmark(api: Api) {
+  try {
+    api.deleteObject(UNTOUCHED)
+  } catch {}
+}
+
+// Holds back a person's presses, touches, Space and Enter on a sketch while
+// its lines run and while keepAsStart loads what they built (#792), so that
+// the reset icon, or anything else on the sketch, cannot act on a
+// construction still being made. Measured on a 163-line sketch, the reset
+// icon pressed again and again until the lines were done (14 to 17
+// presses): without the hold, 5 objects of 155 were left in Chromium and 8
+// in WebKit; with it, all 155. The reset icon is also in GeoGebra's own
+// keyboard cycle: Shift+Tab then Space, again and again with the focus in
+// the sketch, left 130 of 155 (Chromium) and 0 (WebKit), one run each,
+// before Space and Enter were held (#792 review M1). Tab still moves the focus, and the page
+// still scrolls with Space when the focus is outside the sketch (measured
+// while the lines ran). Answers the function that lets presses through
+// again.
 function holdPresses(box: HTMLElement): () => void {
-  const kinds = ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend", "click"]
+  const kinds = ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend", "click", "keydown", "keypress", "keyup"]
   const hold = (event: Event) => {
     // Only a person's own press: runCommands closes GeoGebra's dialogs with
     // a click() of their button, which must still reach it (#755).
     if (!event.isTrusted) {
+      return
+    }
+    // Of the keys, only those that press what has the focus: Space and
+    // Enter. Tab still moves the focus, and the other keys are left alone.
+    if (event instanceof KeyboardEvent && event.key !== " " && event.key !== "Spacebar" && event.key !== "Enter") {
       return
     }
     event.stopPropagation()
@@ -418,6 +515,8 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
   let settled = false
   // True once the sketch has opened: a later appletOnLoad is its reset.
   let opened = false
+  // The applet as the latest load handed it over: a reset passes a new one.
+  let current: Api | null = null
   const failed = () => {
     if (settled) {
       return
@@ -433,6 +532,50 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
     say(figure, spec.couldNotLoad)
   }
   const timer = window.setTimeout(failed, GIVE_UP_MS)
+  // Runs the fence's lines and makes what they built the sketch's file
+  // (keepAsStart), only ever from a construction the lines ran on from its
+  // start to their end (#792 review M1). Should a reset come while they run
+  // (presses, Space and Enter are held, so only something unforeseen), the
+  // marker is gone: the sketch starts again from its file, or empty, and
+  // the lines run again. Measured with the hold taken out and Shift+Tab and
+  // Space pressed again and again: 2 runs in Chromium, 3 in WebKit, all 155
+  // objects kept. After three tries, or when the lines gave up, nothing is
+  // kept, and reset reloads the file the sketch was loaded with, as before
+  // #792.
+  const buildFromLines = async (file: string | null) => {
+    let ran: Ran = { refused: [], complete: false }
+    let whole = false
+    for (let attempt = 0; attempt < 3 && !whole; attempt += 1) {
+      const api = current
+      if (api === null || !samePage() || !open.has(figure)) {
+        return
+      }
+      if (attempt > 0 && !(await startFrom(api, file))) {
+        break
+      }
+      markUntouched(api)
+      ran = await runCommands(api, box, spec)
+      const resetMeanwhile = current !== api || !stillUntouched(api)
+      if (!resetMeanwhile) {
+        // Run to their end, or given up (LINES_GIVE_UP_MS): only the first
+        // is kept, and a give-up is not tried again.
+        whole = ran.complete
+        break
+      }
+    }
+    if (!samePage() || !open.has(figure) || current === null) {
+      return
+    }
+    const api = current
+    unmark(api)
+    showRefused(figure, box, spec, ran.refused)
+    if (whole) {
+      await keepAsStart(api)
+    }
+    try {
+      api.setErrorDialogsActive(false)
+    } catch {}
+  }
   try {
     if (!(await loadDeploy(spec.root))) {
       throw new Error("GeoGebra did not load")
@@ -470,6 +613,7 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
             return
           }
           open.set(figure, api)
+          current = api
           try {
             api.setErrorDialogsActive(false)
           } catch {}
@@ -489,21 +633,22 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
         window.clearTimeout(timer)
         delete figure.dataset.geogebraOpening
         open.set(figure, api)
+        current = api
         figure.classList.add("pl-geogebra-loaded")
         say(figure, "")
-        const letPressesThrough = spec.commands.length > 0 ? holdPresses(box) : () => {}
-        void runCommands(api, box, spec)
-          .then(async (refused) => {
-            if (!samePage() || !open.has(figure)) {
-              return
+        if (spec.commands.length === 0) {
+          void runCommands(api, box, spec).then(() => {
+            if (samePage() && open.has(figure)) {
+              figure.dataset.geogebraCommands = "ran"
             }
-            showRefused(figure, box, spec, refused)
-            if (spec.commands.length > 0) {
-              await keepAsStart(api)
-              try {
-                api.setErrorDialogsActive(false)
-              } catch {}
-            }
+          })
+          return
+        }
+        const letPressesThrough = holdPresses(box)
+        const file = typeof parameters.ggbBase64 === "string" ? parameters.ggbBase64 : null
+        void buildFromLines(file)
+          .catch(() => {})
+          .then(() => {
             if (samePage() && open.has(figure)) {
               figure.dataset.geogebraCommands = "ran"
             }

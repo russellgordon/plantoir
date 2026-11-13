@@ -67,6 +67,13 @@
 //    was removed (an empty box), which is how this item fails on the old
 //    loader. Chromium only here; WebKit was measured by hand
 //    (documentation/06, "The reset icon").
+// 12. Real key presses while a sketch's lines run (#792 review M1): the
+//    third sketch on page B, 150 lines that each make a point, is opened
+//    and Shift+Tab then Space are pressed again and again with the focus in
+//    it until its lines have run. Every point must be there, and again after
+//    a press on its reset icon. Before the fix a reset reached through the
+//    keyboard got in while the lines ran: a sketch left half built, and that
+//    half kept as its start.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
@@ -387,7 +394,7 @@ async function connect(chunk) {
     const pressed = await pressReset(index)
     if (pressed.why) return `${phase}: on the ${kind}, the reset icon could not be pressed: ${pressed.why}`
     const comes = await constructionComesBack(index, start)
-    if (!comes.back) return `${phase}: on the ${kind}, a real press on the reset icon (at ${pressed.x}, ${pressed.y}) left ${JSON.stringify(comes.now)}, not what it opened as, ${JSON.stringify(start)}`
+    if (!comes.back) return `${phase}: on the ${kind}, the press at (${pressed.x}, ${pressed.y}), where geogebraFences.reset.icon puts the reset icon, did not bring it back to what it opened as, ${JSON.stringify(start)}: it holds ${JSON.stringify(comes.now)}. Either the icon is no longer there to press (a sketch it misses is left as dragged), or reset did not put it back`
     const usable = await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); const r = box.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { shades: document.querySelectorAll(".gwt-PopupPanelGlass").length, onTop: !!top && top.tagName === "CANVAS" && box.contains(top), top: top ? top.tagName + "." + top.className : null } })()`)
     if (usable?.shades !== 0 || !usable?.onTop) return `${phase}: after a reset the ${kind} is shaded over: ${usable?.shades} shades, ${usable?.top} at its centre`
     const again = await change()
@@ -395,6 +402,49 @@ async function connect(chunk) {
     const draggedAgain = await construction(index)
     if (JSON.stringify(draggedAgain) === JSON.stringify(start)) return `${phase}: after a reset the ${kind} no longer takes a drag`
     return ""
+  }
+  // 12 (#792 review M1): the sketch at `index` on this page is tapped open
+  // and, while its lines run, Shift+Tab and Space are pressed again and
+  // again with real key events (Input.dispatchKeyEvent) with the focus in
+  // it - which reaches GeoGebra's reset icon through its own keyboard
+  // cycle - until its lines have run. Every line makes one point, so all
+  // of them must be there once they have, and again after a real press on
+  // the reset icon: a reset that got in while they ran left a sketch half
+  // built, and kept that half as its start.
+  const keysWhileLinesRun = async (phase, index) => {
+    tapped = true
+    const ready = await waitFor(`document.querySelectorAll("figure.pl-geogebra .pl-geogebra-open").length > ${index}`, 40)
+    if (!ready) return { why: "no such sketch on the page" }
+    await evaluate(`(() => { document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-open").click(); return true })()`)
+    const loaded = await waitFor(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; return !!f && f.classList.contains("pl-geogebra-loaded") && !!f.querySelector(".pl-geogebra-applet canvas") })()`, 240)
+    if (!loaded) return { why: "it did not open" }
+    const ran = `document.querySelectorAll("figure.pl-geogebra")[${index}].dataset.geogebraCommands === "ran"`
+    const key = async (type, key, code, keyCode, modifiers, text) => send("Input.dispatchKeyEvent", { type, key, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, modifiers, ...(text ? { text } : {}) })
+    let presses = 0
+    let pressedBeforeRan = false
+    while (presses < 400 && (await evaluate(ran)) !== true) {
+      await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); if (!box.contains(document.activeElement)) { let canvas = null; for (const each of Array.from(box.querySelectorAll("canvas"))) { if (canvas === null || each.width * each.height > canvas.width * canvas.height) canvas = each } canvas.focus() } return true })()`)
+      await key("rawKeyDown", "Tab", "Tab", 9, 8)
+      await key("keyUp", "Tab", "Tab", 9, 8)
+      await key("keyDown", " ", "Space", 32, 0, " ")
+      await key("keyUp", " ", "Space", 32, 0)
+      presses += 1
+      pressedBeforeRan = true
+    }
+    if (!pressedBeforeRan) return { why: "its lines had run before a key could be pressed, so the keys prove nothing" }
+    if (!(await waitFor(ran, 120))) return { why: "its lines did not finish running" }
+    const wanted = await evaluate(`JSON.parse(document.querySelectorAll("figure.pl-geogebra")[${index}].dataset.geogebra).commands.length`)
+    const count = async () => { const now = await construction(index); return now.names === "threw" ? -1 : now.names === "" ? 0 : now.names.split(",").length }
+    const built = await count()
+    const pressed = await pressReset(index)
+    if (pressed.why) return { why: `its reset icon could not be pressed: ${pressed.why}` }
+    let afterReset = -1
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      afterReset = await count()
+      if (afterReset === wanted) break
+      await pause(250)
+    }
+    return { presses, wanted, built, afterReset }
   }
   const change = async (page) => {
     const target = urlOf(page)
@@ -414,6 +464,7 @@ async function connect(chunk) {
     const said = []
     let dragSaid = ""
     let resetSaid = ""
+    let keysSaid = ""
     if (copies.length !== 1) problems.push(`the site holds ${copies.length} files with the sketch's SHA-256 (${copies.join(", ")}), not exactly one`)
     for (const phase of ["policy", "isolated"]) {
       isolated = phase === "isolated"
@@ -507,6 +558,11 @@ async function connect(chunk) {
       const credit = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; return Array.from(f.querySelectorAll(".pl-geogebra-attribution a")).map((a) => a.getAttribute("href")) })()`)
       const wantedCredit = [contract.attribution.engineUrl, contract.attribution.materialUrl.replace("{id}", "plantoirvrfy578"), contract.attribution.licenceUrl]
       if (JSON.stringify(credit) !== JSON.stringify(wantedCredit)) problems.push(`${phase}: the geogebra.org sketch's links are ${JSON.stringify(credit)}, not ${JSON.stringify(wantedCredit)}`)
+      // 12 (#792 review M1): keys pressed while a long sketch's lines run.
+      const keyed = await keysWhileLinesRun(phase, 2)
+      if (keyed.why) problems.push(`${phase}: the long sketch on ${pageB}: ${keyed.why}`)
+      else if (keyed.built !== keyed.wanted || keyed.afterReset !== keyed.wanted) problems.push(`${phase}: with Shift+Tab and Space pressed ${keyed.presses} times while the long sketch's ${keyed.wanted} lines ran, it held ${keyed.built} of their ${keyed.wanted} points once they had run, and ${keyed.afterReset} after a press on its reset icon: a reset got in while the lines ran`)
+      else keysSaid = `, ${keyed.presses} presses of Shift+Tab and Space while a ${keyed.wanted}-line sketch ran left all ${keyed.wanted} of its points, and its reset brought back all ${keyed.afterReset}`
       const backToA = await change(pageA)
       if (!backToA.changed) problems.push(`${phase}: Quartz's page change back to ${pageA} did not happen`)
       const third = await tap(0)
@@ -569,7 +625,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}${resetSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}${resetSaid}${keysSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))
