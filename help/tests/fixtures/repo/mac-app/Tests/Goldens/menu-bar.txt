@@ -1,0 +1,16 @@
+# A fixture golden in the real file's shape.
+menus: Plantoir · File · Section · Help
+== File
+  New Course…  [⇧⌘N]
+  ----
+  Open Recent
+    Clear Menu
+== Section
+  Preview  [⇧⌘P]
+  Preview at Last Viewed  [⌥⇧⌘P]  (alternate)
+  Deploy…  [⇧⌘D]
+  ----
+  Revise With  [if any reviser]
+    Claude…  [if claude]
+== Help
+  Plantoir Help

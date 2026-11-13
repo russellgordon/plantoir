@@ -1,0 +1,13 @@
+{
+ "userFacingLabelWords": {
+  "forbidden": ["docker", "python", "script", "scripts", "json"],
+  "matching": "Whole word and case-insensitive."
+ },
+ "fixtureNotice": {
+  "wording": {
+   "finished": "The section was copied into the folder you chose.",
+   "button": "Open in Browser"
+  },
+  "count": 3
+ }
+}

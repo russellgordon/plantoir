@@ -1,0 +1,8 @@
+{
+ "about": "fixture",
+ "entries": {
+  "new-course": {"mac": "File ▸ New Course…", "windows": null},
+  "preview": {"mac": "Section ▸ Preview", "windows": null},
+  "settings": {"mac": "Plantoir ▸ Settings…", "system": true, "windows": null}
+ }
+}

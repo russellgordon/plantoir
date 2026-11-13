@@ -1,0 +1,32 @@
+{
+ "title": "A fixture outline",
+ "pageCount": 5,
+ "sceneCount": 2,
+ "landingPage": {"indexed": false},
+ "sections": [
+  {
+   "title": "Getting going",
+   "purpose": "Planner's words that must not appear on the contents page.",
+   "pages": [
+    {"id": "first-steps", "anchor": "first-steps", "title": "Take the first steps", "question": "How do I begin with the fixture?", "section": "Getting going", "assistant": false, "indexed": true, "scenes": 2, "sceneIds": ["first-steps-1", "first-steps-2"]},
+    {"id": "second-look", "anchor": "second-look", "title": "Have a second look", "question": "What else is in the fixture window?", "section": "Getting going", "assistant": false, "indexed": true, "scenes": 0, "sceneIds": []}
+   ]
+  },
+  {
+   "title": "Working",
+   "purpose": "Planner's words.",
+   "pages": [
+    {"id": "send-section", "anchor": "send-section", "title": "Send a section", "question": "How do I send a section to a folder?", "section": "Working", "assistant": false, "indexed": true, "scenes": 0, "sceneIds": []},
+    {"id": "python-page", "anchor": "python-page", "title": "Code in a page", "question": "How do students run code on a page?", "section": "Working", "assistant": false, "indexed": true, "scenes": 0, "sceneIds": []}
+   ]
+  },
+  {
+   "title": "Optional: with an assistant",
+   "purpose": "Planner's words.",
+   "assistant": true,
+   "pages": [
+    {"id": "helper-page", "anchor": "helper-page", "title": "About the helper", "question": "What does the helper do?", "section": "Optional: with an assistant", "assistant": true, "indexed": true, "scenes": 0, "sceneIds": []}
+   ]
+  }
+ ]
+}

@@ -1,0 +1,7 @@
+{
+ "about": "fixture",
+ "scenes": {
+  "first-steps-1": {"page": "first-steps", "shows": "The fixture window with its sidebar", "labels": ["Sidebar", "Send the Section"], "expectText": [], "awaiting_capture": true, "setup": "fixture", "windows": null, "raw": false},
+  "first-steps-2": {"page": "first-steps", "shows": "The fixture window", "labels": ["Window"], "expectText": [], "awaiting_capture": false, "setup": "fixture", "windows": null, "raw": false}
+ }
+}
