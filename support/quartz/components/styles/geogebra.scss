@@ -121,13 +121,19 @@
 
     // z-index 0 makes the box a stacking context of its own: GeoGebra's
     // white preview inside it has z-index 90, which drew over the card
-    // (measured in Chromium) until the box held it.
+    // (measured in Chromium) until the box held it. contain: size keeps the
+    // box at the card's size: positioned like this, WebKit sized its height
+    // from GeoGebra's unscaled content (360 px under a 201 px card at a
+    // 390 px window, 500 under 224 for an 800 x 500 sketch), so the white
+    // box hung below the card over the caption until the sketch drew
+    // (#756 review H1). Chromium kept the ratio either way.
     .pl-geogebra-applet {
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
       z-index: 0;
+      contain: size;
     }
 
     .pl-geogebra-thumbnail {

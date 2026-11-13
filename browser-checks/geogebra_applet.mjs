@@ -81,8 +81,10 @@
 //    can be read, then let go. Inside the sketch's own card, where the
 //    student pressed, the contract's words.site.loading and under it
 //    words.site.loadingFirstTime show, in a polite live region, readable
-//    (contrast at least 4.5) in light and dark, the card on top of the
-//    applet's box laid out underneath it; the figure's height and the
+//    (contrast at least 4.5) in light and in dark, each set explicitly,
+//    the card on top of the applet's box, which lies exactly under it
+//    (in WebKit it once hung below; that engine is measured outside the
+//    gate); the figure's height and the
 //    page's scroll height stay within 1 px from before the press, through
 //    every change while it opens, to the drawn sketch (before #756 the
 //    page grew by one sketch height while the engine arrived, 393.6 px on
@@ -359,7 +361,7 @@ async function connect(chunk) {
   // 13 (#756): the sketch at `index`, its card's words and the sizes that
   // must not move. `figure` and `scroll` are the figure's height and the
   // page's scroll height; the rest describe the card's live region.
-  const opening = async (index) => await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; const card = f.querySelector(":scope > .pl-geogebra-card"); const region = card && card.querySelector(":scope > .pl-geogebra-loading"); const box = f.querySelector(":scope > .pl-geogebra-applet"); const message = f.querySelector(":scope > .pl-geogebra-message"); const button = f.querySelector(".pl-geogebra-open"); const rgb = (text) => (text.match(/[0-9.]+/g) || []).slice(0, 3).map(Number); const lum = (c) => { const [r, g, b] = c.map((v) => { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }; const ratio = (a, b) => { const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((p, q) => q - p); return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100 }; const out = { figure: f.getBoundingClientRect().height, scroll: document.documentElement.scrollHeight, opening: f.classList.contains("pl-geogebra-opening"), loaded: f.classList.contains("pl-geogebra-loaded"), boxShown: !!box && !box.hidden, button: !!button && !button.disabled && getComputedStyle(button).visibility !== "hidden" && getComputedStyle(card).display !== "none", message: message && !message.hidden ? message.textContent : "" }; if (!region) return { ...out, region: false }; const r = region.getBoundingClientRect(); const c = card.getBoundingClientRect(); const style = getComputedStyle(region); const lines = Array.from(region.querySelectorAll(".pl-geogebra-loading-line")); const spinner = region.querySelector(".pl-geogebra-spinner"); const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); return { ...out, region: true, role: region.getAttribute("role"), live: region.getAttribute("aria-live"), text: region.textContent, lines: lines.map((line) => line.textContent), contrast: lines.map((line) => ratio(getComputedStyle(line).color, style.backgroundColor)), visible: r.width > 0 && r.height > 0 && Number(style.opacity) > 0 && style.visibility !== "hidden", inCard: r.top >= c.top - 0.5 && r.bottom <= c.bottom + 0.5 && r.left >= c.left - 0.5 && r.right <= c.right + 0.5, cardOnTop: !!top && card.contains(top), spinner: spinner ? getComputedStyle(spinner).animationName : null } })()`)
+  const opening = async (index) => await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; const card = f.querySelector(":scope > .pl-geogebra-card"); const region = card && card.querySelector(":scope > .pl-geogebra-loading"); const box = f.querySelector(":scope > .pl-geogebra-applet"); const message = f.querySelector(":scope > .pl-geogebra-message"); const button = f.querySelector(".pl-geogebra-open"); const rgb = (text) => (text.match(/[0-9.]+/g) || []).slice(0, 3).map(Number); const lum = (c) => { const [r, g, b] = c.map((v) => { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }; const ratio = (a, b) => { const [x, y] = [lum(rgb(a)), lum(rgb(b))].sort((p, q) => q - p); return Math.round(((x + 0.05) / (y + 0.05)) * 100) / 100 }; const boxRect = box ? box.getBoundingClientRect() : null; const cardRect = card ? card.getBoundingClientRect() : null; const out = { theme: document.documentElement.getAttribute("saved-theme"), boxOnCard: !!boxRect && !!cardRect && Math.abs(boxRect.left - cardRect.left) <= 1 && Math.abs(boxRect.top - cardRect.top) <= 1 && Math.abs(boxRect.width - cardRect.width) <= 1 && Math.abs(boxRect.height - cardRect.height) <= 1, boxSize: boxRect ? Math.round(boxRect.width) + "×" + Math.round(boxRect.height) : null, cardSize: cardRect ? Math.round(cardRect.width) + "×" + Math.round(cardRect.height) : null, figure: f.getBoundingClientRect().height, scroll: document.documentElement.scrollHeight, opening: f.classList.contains("pl-geogebra-opening"), loaded: f.classList.contains("pl-geogebra-loaded"), boxShown: !!box && !box.hidden, button: !!button && !button.disabled && getComputedStyle(button).visibility !== "hidden" && getComputedStyle(card).display !== "none", message: message && !message.hidden ? message.textContent : "" }; if (!region) return { ...out, region: false }; const r = region.getBoundingClientRect(); const c = card.getBoundingClientRect(); const style = getComputedStyle(region); const lines = Array.from(region.querySelectorAll(".pl-geogebra-loading-line")); const spinner = region.querySelector(".pl-geogebra-spinner"); const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); return { ...out, region: true, role: region.getAttribute("role"), live: region.getAttribute("aria-live"), text: region.textContent, lines: lines.map((line) => line.textContent), contrast: lines.map((line) => ratio(getComputedStyle(line).color, style.backgroundColor)), visible: r.width > 0 && r.height > 0 && Number(style.opacity) > 0 && style.visibility !== "hidden", inCard: r.top >= c.top - 0.5 && r.bottom <= c.bottom + 0.5 && r.left >= c.left - 0.5 && r.right <= c.right + 0.5, cardOnTop: !!top && card.contains(top), spinner: spinner ? getComputedStyle(spinner).animationName : null } })()`)
   // 13 (#756): every change to the figure while it opens, and every frame
   // until it is drawn, records the figure's height and the page's scroll
   // height; read back as their least and greatest.
@@ -377,6 +379,7 @@ async function connect(chunk) {
     fetchMode = "hold"
     await send("Fetch.enable", { patterns: [{ urlPattern: "*/static/geogebra/HTML5/*", requestStage: "Request" }] })
     let during = null
+    let light = null
     let dark = null
     let still = null
     const opened = await tap(0, {
@@ -389,9 +392,19 @@ async function connect(chunk) {
         for (let attempt = 0; attempt < 120 && held.length === 0; attempt += 1) await pause(250)
         if (!laidOut || held.length === 0) found.push(`${phase}: the first sketch's box was ${laidOut ? "" : "not "}laid out and ${held.length} of the engine's requests were held, so the state while it opens could not be read`)
         during = await opening(0)
+        // Each theme set explicitly, the page's attribute and the browser's
+        // colour scheme both: Quartz takes the theme from the browser, and
+        // headless Chrome follows the Mac's appearance, so a reading taken
+        // as the page came was dark on a Mac in Dark Mode (#756 review M1).
         const theme = await evaluate(`document.documentElement.getAttribute("saved-theme")`)
-        await evaluate(`(() => { document.documentElement.setAttribute("saved-theme", "dark"); return true })()`)
-        dark = await opening(0)
+        const inTheme = async (scheme) => {
+          await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] })
+          await evaluate(`(() => { document.documentElement.setAttribute("saved-theme", ${JSON.stringify(scheme)}); return true })()`)
+          return await opening(0)
+        }
+        light = await inTheme("light")
+        dark = await inTheme("dark")
+        await send("Emulation.setEmulatedMedia", { media: "", features: [] })
         await evaluate(`(() => { const theme = ${JSON.stringify(theme)}; if (theme === null) document.documentElement.removeAttribute("saved-theme"); else document.documentElement.setAttribute("saved-theme", theme); return true })()`)
         await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] })
         still = await opening(0)
@@ -411,8 +424,12 @@ async function connect(chunk) {
       if (JSON.stringify(during.lines) !== JSON.stringify(words)) found.push(`${phase}: while the first sketch opens its card says ${JSON.stringify(during.lines)}, not the contract's ${JSON.stringify(words)}`)
       if (!during.visible || !during.inCard || !during.cardOnTop) found.push(`${phase}: while the first sketch opens its words are not seen inside its card on top of the box: ${JSON.stringify({ visible: during.visible, inCard: during.inCard, cardOnTop: during.cardOnTop, boxShown: during.boxShown })}`)
       if (!during.boxShown) found.push(`${phase}: the first sketch's box was not laid out while it opened, so GeoGebra could not measure it`)
+      // The box lies exactly under the card while it opens: in WebKit it
+      // once hung below it, white, over the caption (#756 review H1).
+      for (const read of [during, light, dark]) if (read && !read.boxOnCard) found.push(`${phase}: while the first sketch opens (theme ${read.theme}) its box is ${read.boxSize} and its card ${read.cardSize}: the box is not exactly under the card`)
       if (during.message !== "") found.push(`${phase}: while the first sketch opens the line below it says ${JSON.stringify(during.message)}, a second live region saying it again`)
-      for (const [theme, read] of [["light", during], ["dark", dark]]) {
+      for (const [theme, read] of [["light", light], ["dark", dark]]) {
+        if (read?.theme !== theme) found.push(`${phase}: the ${theme} reading was taken with the page's theme ${read?.theme}`)
         for (const ratio of read?.contrast ?? []) if (!(ratio >= 4.5)) found.push(`${phase}: in ${theme}, a line of the first sketch's words has contrast ${ratio}, under 4.5`)
       }
       if (during.spinner !== "pl-geogebra-spin") found.push(`${phase}: the first sketch's spinner does not turn (${during.spinner})`)
@@ -425,7 +442,7 @@ async function connect(chunk) {
       if (moved(sizes.scroll, before.scroll) > 1 || Math.abs(after.scroll - before.scroll) > 1) found.push(`${phase}: the page's scroll height was ${before.scroll} px before the press, ${sizes.scroll[0]} to ${sizes.scroll[1]} px while the first sketch opened and ${after.scroll} px once drawn`)
     }
     if (opened.opened && (after.opening || (after.region && (after.visible || after.text !== "")) || !centre)) found.push(`${phase}: once drawn, the first sketch still shows its words, or its canvas is not at its centre: ${JSON.stringify({ opening: after.opening, visible: after.visible, text: after.text, canvasAtCentre: centre })}`)
-    const said = `the first sketch pressed for real, its card saying the contract's two lines while its engine was held (contrast ${during?.contrast?.join(" and ")} light, ${dark?.contrast?.join(" and ")} dark), the figure ${Math.round(before.figure * 100) / 100} px tall throughout (${sizes?.samples ?? 0} readings)`
+    const said = `the first sketch pressed for real, its card saying the contract's two lines while its engine was held (contrast ${light?.contrast?.join(" and ")} with the theme set to ${light?.theme}, ${dark?.contrast?.join(" and ")} with it set to ${dark?.theme}; box ${during?.boxSize} under a ${during?.cardSize} card), the figure ${Math.round(before.figure * 100) / 100} px tall throughout (${sizes?.samples ?? 0} readings)`
     return { ...opened, found, said }
   }
   // 13 (#756): the sketch from a file at `index` on this page, not opened

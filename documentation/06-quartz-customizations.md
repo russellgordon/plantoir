@@ -4385,6 +4385,18 @@ the figure went 435.58 → 829.17 → 433.58 px, a 393.6 px jump and back.
   real width when it is made. The `z-index: 0` matters: GeoGebra's own white
   preview inside the box has `z-index: 90` and drew over the card until the
   box became a stacking context (measured, Chromium).
+- **WebKit needs `contain: size` on that box** (#756 implementation review
+  H1). Positioned so, WebKit took the box's height from GeoGebra's unscaled
+  content, not from the ratio: 358 × 360 under a 358 × 201 card at a 390 px
+  window, 358 × 500 under 224 for the 800 × 500 sketch, 750 × 500 under
+  469 at 1400 px, so the white box hung below the card over the caption
+  and the attribution until the sketch drew. The figure's height never
+  changed, which is why the height readings did not see it. With
+  `contain: size` the box equals the card in Chromium and WebKit at 1400
+  and 390 px, for the sketch from a file and the one from lines. The
+  review measured `overflow: hidden` and `right: auto; width: 100%` and
+  rejected both (WebKit still 360 and 500). Chromium kept the ratio
+  without it.
 - **The card is `box-sizing: border-box`.** Its 1 px border was outside the
   sketch's shape, so the card was 362 px tall where the box is 360, and the
   page jumped 2 px when the sketch arrived. Now the figure is 433.58 px
@@ -4393,19 +4405,35 @@ the figure went 435.58 → 829.17 → 433.58 px, a 393.6 px jump and back.
   design, and the drawn sketch is exactly as before.
 - **Theme and motion.** The words sit on a `var(--light)` panel in
   `var(--dark)` and `var(--darkgray)`: contrast 12.13 and 7.24 in light,
-  16.27 and 13.28 in dark (read by the check). The ring is still under
+  16.27 and 13.28 in dark. The check sets each theme itself (the page's
+  `saved-theme` and the browser's `prefers-color-scheme`): Quartz takes the
+  theme from the browser, and headless Chrome follows the Mac's
+  appearance, so until the review (M1) both of its readings were dark on a
+  Mac in Dark Mode. The ring is still under
   `prefers-reduced-motion: reduce`; the words carry it.
 - **"Up to a minute"** is `GIVE_UP_MS`; "the first time" because a later
-  open is quick once the browser has the engine.
+  open is quick once the browser has the engine (the review measured a
+  second open after a reload with Netlify's default headers: 15 answers of
+  304, 0 engine bytes, about 0.1 s; a private window starts again).
+- **What still moves, after the sketch draws.** A sketch whose lines
+  GeoGebra refuses gets the list of those lines under it once they have
+  run (128 px on the fixture's 13-line sketch, +136 px at 1400 px and
+  +187 px at 390). That is the list arriving, not the loading state, and
+  it is the same as before #756.
 - **The check** (`browser-checks/geogebra_applet.mjs` item 13) presses the
   first sketch with real pointer events, holds the engine's first request
   (`Fetch.requestPaused`) while it reads the card's words against the
-  contract, the contrast in light and dark, the ring with and without
-  reduced motion, and the figure's height and the page's scroll height on
+  contract, the contrast in light and in dark (each set by the check), that
+  the box lies exactly under the card (within 1 px each edge), the ring
+  with and without reduced motion, and the figure's height and the page's scroll height on
   every change and every frame until drawn (within 1 px); then presses a
   fourth, unopened sketch with its file refused (`Fetch.failRequest`) and
   reads `couldNotLoad` below it with the button back. On dev's loader it
-  fails nine ways per phase, the 393.6 px jump among them. It takes no
+  fails twelve ways per phase, the 393.6 px jump among them. The box-under-card
+  reading cannot fail in Chromium, which kept the ratio without the fix;
+  the same reading in headless WebKit (outside the gate, Playwright) fails
+  without `contain: size` at 390 px and for the 800 × 500 sketch at 1400 px,
+  and passes with it. It takes no
   screenshot: `Page.captureScreenshot` made Chrome fetch the theme's font
   again after the tap, which the off-site count reported.
 - **Rejected.** A grid on the figure to stack the card and the box (it stops
