@@ -7205,7 +7205,7 @@ for line in "${RESULTS[@]}"; do
   [[ "$line" == "⏭️ "* ]] && SKIPPED_RESULTS+=("$line")
 done
 if (( ${#SKIPPED_RESULTS[@]} > 0 )); then
-  echo "✅ All checks that ran passed, but ${#SKIPPED_RESULTS[@]} were SKIPPED and checked nothing:"
+  echo "✅ All checks that ran passed, but ${#SKIPPED_RESULTS[@]} SKIPPED check(s) checked nothing:"
   for line in "${SKIPPED_RESULTS[@]}"; do echo "   $line"; done
   if [[ -n "$RENDERED_NOT_RUN" ]]; then
     echo "   ⚠️  The rendered check (#597) did NOT run in: $RENDERED_NOT_RUN. PLANTOIR_REQUIRE_ENGINES=chromium,webkit makes that a failure."

@@ -5014,12 +5014,13 @@ Two things made that reliable, both measured 2026-11-13:
   at a time.
 
 **Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
-engines at once, four runs of the step:** the rows in 14 to 15 s; the
-sabotages in 118 to 119 s three at a time (344 s one at a time, measured
+engines at once, three runs of the step after the review's fixes:** the rows
+in 14 to 15 s; the 31 sabotages (61 engine runs) in about 120 s, three at a
+time with the keys sabotage alone at the end (344 s one at a time, measured
 before they were run in parallel); the whole step in `verify.sh`, its own
-build of the fixture site included (about 10 s), 142 to 147 s, so about two
-and a half minutes on a run that takes about 25. With no engine on the Mac
-the step takes 9 s and says SKIP twice. Cold visits to the isolated Python page: first contentful paint 275 to
+build of the fixture site included (about 10 s), 137 to 139 s, so about two
+and a quarter minutes on a run that takes about 25. With WebKit missing it
+takes 116 s and says SKIP twice; with no engine, 9 s. Cold visits to the isolated Python page: first contentful paint 275 to
 283 ms. A census of every fixture page in both engines found no console line
 at all and only `fonts.googleapis.com`, `fonts.gstatic.com` and (on a page
 with a diagram) `cdnjs.cloudflare.com` asked of other hosts, which is
