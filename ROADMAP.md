@@ -3,7 +3,7 @@
 What is planned for Plantoir, release by release, in plain words. If you are a
 teacher wondering "is that coming?", this is the page to read.
 
-*Last updated: 12 November 2026. The current release is **1.9.3** on both the Mac and Windows.*
+*Last updated: 13 November 2026. The current release is **1.9.3** on both the Mac and Windows.*
 
 A few things to know before you read on:
 
@@ -54,17 +54,22 @@ Mac first. The Windows app follows in its own update.
   handout are brought up to date: copyable text that wraps, lettered parts
   that line up on quizzes and tests, and a settled shape for a lesson page.
   ([#758](https://github.com/russellgordon/plantoir/issues/758), [#754](https://github.com/russellgordon/plantoir/issues/754), [#765](https://github.com/russellgordon/plantoir/issues/765))
-- **Guidance for writing tests, marking, and report comments.** Three more
-  sets of notes for an assistant working beside Plantoir: writing a unit
-  test with its solutions, marking guide and practice test; marking tests
-  and coding assignments onto feedback sheets; and drafting report comments
-  from the marks. Student names stay on your computer.
-  ([#751](https://github.com/russellgordon/plantoir/issues/751), [#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
+- **Guidance for writing tests.** Notes for an assistant working beside
+  Plantoir on writing a unit test with its solutions, marking guide and
+  practice test. ([#751](https://github.com/russellgordon/plantoir/issues/751))
 
 ## Version 1.11.0
 
 Small fixes and conveniences. Mac first where it says so.
 
+- **Guidance for marking and report comments.** Notes for an assistant
+  working beside Plantoir on marking tests and coding assignments onto
+  feedback sheets, and on drafting report comments from the marks. These
+  were planned for 1.10.0; they moved here so that the steps that touch
+  your students' names can be tried out once more, with you doing those
+  steps yourself, before anyone relies on them. Student names stay on your
+  computer.
+  ([#750](https://github.com/russellgordon/plantoir/issues/750), [#752](https://github.com/russellgordon/plantoir/issues/752))
 - **GitHub Copilot beside Plantoir.** When the Copilot command-line tool is
   installed, Plantoir offers it wherever it offers Claude Code or Codex
   today: revising a course, fixing a section's problems, planning a unit.
