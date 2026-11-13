@@ -377,6 +377,81 @@ def quiz_given_away(site: Path) -> str:
     return "the right choice marked out and its answer shown before any press"
 
 
+def own_host_embeds_page(site: Path) -> str:
+    # The four planted embeds pointed at a page of the site's own (so the
+    # check needs no network here), then a frame and a request of another
+    # host's beside them: the Embeds page is judged like any other, and only
+    # frames on the embeds row's allowedFrames may come from elsewhere.
+    path = page_file(site, "Embeds")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'(<iframe[^>]*\ssrc=")https?://[^"]*(")', r"\1../Rendered-Check/Quiz\2", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Embeds page has no frame")
+    frame = '<iframe src="https://example.com/plantoir-rendered-embeds-extra" width="200" height="100" title="another host"></iframe>'
+    path.write_text(changed.replace("<article", frame + "<article", 1), encoding="utf-8")
+    add_script(site, "Embeds", "embeds-fetch.js", "fetch('https://example.com/plantoir-rendered-embeds-fetch', { mode: 'no-cors' }).catch(() => {})\n")
+    return f"{count} embeds pointed at the site, a frame and a request of example.com's added"
+
+
+def own_host_late(site: Path) -> str:
+    add_script(site, "Quiz", "late.js",
+               "addEventListener('load', () => setTimeout(() => fetch('https://example.com/plantoir-rendered-late', { mode: 'no-cors' }).catch(() => {}), 4000))\n")
+    return "a request asked of example.com 4 s after the page loaded"
+
+
+def own_host_lazy(site: Path) -> str:
+    path = page_file(site, "Quiz")
+    text = path.read_text(encoding="utf-8")
+    if "</article>" not in text:
+        raise SystemExit("sabotage: the Quiz page has no </article>")
+    lazy = ('<div style="height: 6000px"></div>'
+            '<img loading="lazy" src="https://example.com/plantoir-rendered-lazy.png" alt="" width="10" height="10">')
+    path.write_text(text.replace("</article>", lazy + "</article>", 1), encoding="utf-8")
+    return "a lazy picture of example.com's 6,000 px below the fold"
+
+
+def own_host_media(site: Path) -> str:
+    add_script(site, "Quiz", "media.js",
+               "document.addEventListener('DOMContentLoaded', () => { const a = document.createElement('audio'); a.preload = 'auto'; a.src = 'https://example.com/plantoir-rendered-sound.mp3'; document.body.append(a) })\n")
+    return "a sound asked of example.com (never played)"
+
+
+def own_host_webrtc(site: Path) -> str:
+    add_script(site, "Quiz", "webrtc.js",
+               "try { const c = new RTCPeerConnection({ iceServers: [{ urls: 'stun:example.com:3478' }] }); c.createDataChannel('x'); c.createOffer().then((o) => c.setLocalDescription(o)) } catch (error) {}\n")
+    return "a WebRTC connection asking example.com's STUN server"
+
+
+def own_host_module_worker_websocket(site: Path) -> str:
+    folder = sabotage_folder(site)
+    (folder / "socket-dep.mjs").write_text("try { new WebSocket('wss://example.com/plantoir-rendered-socket-from-a-module') } catch (error) {}\nexport const done = true\n", encoding="utf-8")
+    (folder / "module-worker.mjs").write_text("import { done } from './socket-dep.mjs'\nself.postMessage(done)\n", encoding="utf-8")
+    add_script(site, "Quiz", "start-module-worker.js",
+               "new Worker(new URL('module-worker.mjs', document.currentScript.src), { type: 'module' })\n")
+    return "a module worker whose imported module opens a WebSocket to example.com"
+
+
+def tikz_empty(site: Path) -> str:
+    add_script(site, "Diagrams", "tikz-empty.js",
+               "document.addEventListener('DOMContentLoaded', () => { for (const svg of document.querySelectorAll('.pl-tikz svg')) svg.replaceChildren() })\n")
+    return "the drawing's svg emptied, its size kept"
+
+
+def handout_answers_open(site: Path) -> str:
+    path = page_file(site, "Handout")
+    text = path.read_text(encoding="utf-8")
+    changed, count = re.subn(r'(<blockquote class="callout (?:success|solution|answer)[^"]*?) is-collapsed', r"\1", text)
+    if count == 0:
+        raise SystemExit("sabotage: the Handout page has no folded answer")
+    path.write_text(changed, encoding="utf-8")
+    return f"{count} answer(s) left unfolded"
+
+
+def graph_invisible(site: Path) -> str:
+    add_style(site, "Graphs", ".pl-plot svg path.line { stroke: none !important; }")
+    return "the graph's curves stroked with nothing"
+
+
 def cold_visit(site: Path) -> str:
     if not (site / "index.css").is_file():
         raise SystemExit("sabotage: the site has no index.css")
@@ -415,6 +490,15 @@ DOERS = {
     "katex source": katex_source,
     "katex wrong face": katex_wrong_face,
     "quiz given away": quiz_given_away,
+    "own host embeds page": own_host_embeds_page,
+    "own host late": own_host_late,
+    "own host lazy": own_host_lazy,
+    "own host media": own_host_media,
+    "own host webrtc": own_host_webrtc,
+    "own host module worker websocket": own_host_module_worker_websocket,
+    "tikz empty": tikz_empty,
+    "handout answers open": handout_answers_open,
+    "graph invisible": graph_invisible,
     "cold visit": cold_visit,
 }
 

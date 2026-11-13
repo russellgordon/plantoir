@@ -131,15 +131,25 @@ function findChrome() {
   if (process.env.PLANTOIR_CHROME) return process.env.PLANTOIR_CHROME
   const root = join(homedir(), "Library", "Caches", "Plantoir-dev", "browsers", "chrome")
   let found = null
+  let versions = []
   try {
-    for (const version of readdirSync(root).sort()) {
-      for (const platform of readdirSync(join(root, version))) {
-        const binary = join(root, version, platform, "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing")
-        if (existsSync(binary)) found = binary
-      }
-    }
+    versions = readdirSync(root).sort()
   } catch {
     // No copy: the engine is reported missing below.
+  }
+  for (const version of versions) {
+    // The cache also holds files (a .metadata), which are no version folder
+    // (fixes review: one made the whole search give up).
+    let platforms = []
+    try {
+      platforms = readdirSync(join(root, version))
+    } catch {
+      continue
+    }
+    for (const platform of platforms) {
+      const binary = join(root, version, platform, "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing")
+      if (existsSync(binary)) found = binary
+    }
   }
   return found
 }
@@ -258,6 +268,22 @@ const PAGE_WATCH = `(() => {
   if (navigator.serviceWorker && typeof navigator.serviceWorker.register === "function") {
     navigator.serviceWorker.register = (url) => { asked("service worker", url); return Promise.reject(refusal()) }
   }
+  // WebRTC asks its STUN and TURN servers over UDP, which no router sees
+  // (fixes review F4: one STUN packet left each engine). Recorded by its
+  // servers' addresses and refused.
+  for (const name of ["RTCPeerConnection", "webkitRTCPeerConnection"]) {
+    if (typeof window[name] === "function") {
+      window[name] = function (config) {
+        const servers = []
+        for (const server of (config && config.iceServers) || []) {
+          for (const address of [].concat(server.urls || server.url || [])) servers.push(String(address))
+        }
+        const named = servers.length > 0 ? servers.join(" ").replace(/^(stun|turns?):/, "https://") : location.href
+        asked("WebRTC connection", named.split(" ")[0])
+        throw refusal()
+      }
+    }
+  }
   // A worker's script is marked, so the router can put WORKER_WATCH in front
   // of it (the engines do not name a worker's script alike: Chromium calls it
   // a script, WebKit a fetch for a worker).
@@ -268,7 +294,7 @@ const PAGE_WATCH = `(() => {
       try {
         const parsed = new URL(String(url), location.href)
         if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          parsed.searchParams.set("${WORKER_MARK}", "1")
+          parsed.searchParams.set("${WORKER_MARK}", options && options.type === "module" ? "module" : "classic")
           marked = parsed.href
         }
       } catch {}
@@ -282,6 +308,7 @@ const PAGE_WATCH = `(() => {
 // it opens is told to the router through a request of the site's own (which
 // the router does see from a dedicated worker) and refused.
 const ASKED_PATH = "/__plantoir-rendered-check-asked"
+const WATCH_MODULE_PATH = "/__plantoir-rendered-check-watch.mjs"
 const WORKER_WATCH = `;(() => {
   if (typeof WorkerGlobalScope === "undefined" || !(self instanceof WorkerGlobalScope) || self.__plantoirRenderedWatch) return
   self.__plantoirRenderedWatch = true
@@ -295,7 +322,7 @@ const WORKER_WATCH = `;(() => {
       let marked = url
       try {
         const parsed = new URL(String(url), self.location.href)
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") { parsed.searchParams.set("${WORKER_MARK}", "1"); marked = parsed.href }
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") { parsed.searchParams.set("${WORKER_MARK}", options && options.type === "module" ? "module" : "classic"); marked = parsed.href }
       } catch {}
       return new RealWorker(marked, options)
     }
@@ -342,6 +369,25 @@ async function openContext(browser, engine, origin, pageName) {
   // Every other request, from every frame and every dedicated worker,
   // through the context's own router: WebKit hands a worker's requests to no
   // page or context listener (#597 review H1, measured).
+  // A request is a teacher's embed's only on the Embeds page, from (or
+  // for) a frame whose outermost frame below the page is on a host the
+  // embeds row lists.
+  const embedOf = (request, url) => {
+    try {
+      let frame = request.frame()
+      let outermost = null
+      while (frame && frame.parentFrame()) {
+        outermost = frame
+        frame = frame.parentFrame()
+      }
+      const frameHost = outermost ? (/^https?:/.test(outermost.url()) ? new URL(outermost.url()).host : null) : null
+      if (outermost && embedHosts.has(frameHost ?? "")) return true
+      if (request.isNavigationRequest() && request.frame().parentFrame() !== null && request.frame().parentFrame().parentFrame() === null && embedHosts.has(url.host)) return true
+    } catch {
+      // A worker's request has no frame: it is the page's own.
+    }
+    return false
+  }
   await context.route("**/*", async (route) => {
     const request = route.request()
     let url
@@ -351,6 +397,9 @@ async function openContext(browser, engine, origin, pageName) {
       return route.continue()
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return route.continue()
+    // When the page last asked for anything: the quiet period before the
+    // judging waits on it (fixes review F3).
+    record.lastRequestAt = Date.now()
     if (url.host === siteHost && url.pathname === ASKED_PATH) {
       let told
       try {
@@ -362,20 +411,34 @@ async function openContext(browser, engine, origin, pageName) {
       return route.fulfill({ status: 204 })
     }
     if (request.resourceType() === "media" || MEDIA.test(url.pathname)) {
+      // Nothing plays, but a sound or a film asked of another host is still
+      // the site asking another host (fixes review F4), so it is recorded
+      // first, a teacher's embed's included as one.
+      if (url.host !== siteHost) record.offSite.push({ host: url.host, path: url.pathname, fromEmbed: embedOf(request, url), kind: "media" })
       record.aborted.add(request.url())
       return route.abort()
     }
     if (url.host === siteHost) {
       // A worker's script, marked by PAGE_WATCH: fetched without the mark and
       // given WORKER_WATCH in front (after a "use strict" that must stay first).
+      if (url.pathname === WATCH_MODULE_PATH) {
+        return route.fulfill({ status: 200, contentType: "text/javascript; charset=utf-8", headers: { "Cross-Origin-Resource-Policy": "same-origin" }, body: WORKER_WATCH })
+      }
       if (url.searchParams.has(WORKER_MARK)) {
+        const module = url.searchParams.get(WORKER_MARK) === "module"
         const clean = new URL(url.href)
         clean.searchParams.delete(WORKER_MARK)
         try {
           const response = await route.fetch({ url: clean.href })
           const body = await response.text()
+          // A module worker evaluates its imports before its own first line,
+          // so the watch is an import of its own, first among them, and runs
+          // before any module the worker imports (fixes review F4: a
+          // WebSocket from an imported module left WebKit unseen).
           const strict = /^\s*(["'])use strict\1;?/.exec(body)
-          const watched = strict ? strict[0] + WORKER_WATCH + body.slice(strict[0].length) : WORKER_WATCH + body
+          const watched = module
+            ? `import "${WATCH_MODULE_PATH}";\n` + body
+            : strict ? strict[0] + WORKER_WATCH + body.slice(strict[0].length) : WORKER_WATCH + body
           return route.fulfill({ response, body: watched })
         } catch {
           return route.continue({ url: clean.href })
@@ -390,23 +453,7 @@ async function openContext(browser, engine, origin, pageName) {
       record.offSite.push({ host: url.host, path: url.pathname, kind: "request" })
       return route.abort("namenotresolved")
     }
-    // Another host. A request is a teacher's embed's only on the Embeds page,
-    // from (or for) a frame whose outermost frame below the page is on a host
-    // the embeds row lists.
-    let fromEmbed = false
-    try {
-      let frame = request.frame()
-      let outermost = null
-      while (frame && frame.parentFrame()) {
-        outermost = frame
-        frame = frame.parentFrame()
-      }
-      const frameHost = outermost ? (/^https?:/.test(outermost.url()) ? new URL(outermost.url()).host : null) : null
-      if (outermost && embedHosts.has(frameHost ?? "")) fromEmbed = true
-      if (request.isNavigationRequest() && request.frame().parentFrame() !== null && request.frame().parentFrame().parentFrame() === null && embedHosts.has(url.host)) fromEmbed = true
-    } catch {
-      // A worker's request has no frame: it is the page's own.
-    }
+    const fromEmbed = embedOf(request, url)
     record.offSite.push({ host: url.host, path: url.pathname, fromEmbed, kind: request.isNavigationRequest() ? "frame" : "request" })
     if (fromEmbed || allowed.has(url.host)) return route.continue()
     // Recorded and refused: nothing the site should not ask for leaves this Mac.
@@ -451,6 +498,7 @@ async function openPage(context, record, url) {
   const page = await context.newPage()
   watchPage(page, record)
   await page.goto(url, { waitUntil: "load", timeout: 60000 })
+  record.loadedAt = Date.now()
   return page
 }
 
@@ -531,7 +579,19 @@ ROW_CHECKS.tikz = async ({ page }) => {
   const box = await waitInPage(page, () => { const svg = document.querySelector(".pl-tikz svg"); if (!svg) return null; const r = svg.getBoundingClientRect(); return { width: Math.round(r.width), height: Math.round(r.height) } }, 5000)
   if (!box) return { fail: "the drawing's svg is not on the page" }
   if (box.width < 1 || box.height < 1) return { fail: `the drawing has no size (${box.width} by ${box.height} px)` }
-  return { ok: `the drawing is ${box.width} by ${box.height} px` }
+  // Drawn, not only sized: marks inside it that themselves take up room
+  // (fixes review F5: an svg emptied of its children kept its 175 by 138 px).
+  const marks = await page.evaluate(() => {
+    const svg = document.querySelector(".pl-tikz svg")
+    let count = 0
+    for (const mark of svg.querySelectorAll("path, line, polyline, polygon, rect, circle, ellipse, text, use")) {
+      const r = mark.getBoundingClientRect()
+      if (r.width > 0 || r.height > 0) count += 1
+    }
+    return count
+  })
+  if (marks === 0) return { fail: `the drawing is empty: ${box.width} by ${box.height} px with nothing drawn in it` }
+  return { ok: `the drawing is ${box.width} by ${box.height} px, ${marks} marks drawn in it` }
 }
 
 ROW_CHECKS.graph = async ({ page }) => {
@@ -550,7 +610,18 @@ ROW_CHECKS.graph = async ({ page }) => {
     const some = await page.evaluate(() => Array.from(document.querySelectorAll(".pl-plot svg path.line")).filter((path) => ((path.getAttribute("d") ?? "").match(/[LlCcQqHhVv]/g) ?? []).length > 1).length)
     return { fail: `no curve drawn for ${wanted - some} of the graph's ${wanted} lines (${some} drawn)` }
   }
-  return { ok: `all ${wanted} curves drawn (${drawn.join(" and ")} segments)` }
+  // And visible: a curve stroked with nothing, or wholly transparent, is
+  // drawn for nobody (fixes review F5).
+  const unseen = await page.evaluate(() => {
+    let count = 0
+    for (const path of document.querySelectorAll(".pl-plot svg path.line")) {
+      const style = getComputedStyle(path)
+      if (style.stroke === "none" || style.visibility === "hidden" || Number(style.strokeOpacity) === 0 || Number(style.opacity) === 0 || parseFloat(style.strokeWidth) === 0) count += 1
+    }
+    return count
+  })
+  if (unseen > 0) return { fail: `${unseen} of the graph's curves are drawn but cannot be seen (no stroke, or none visible)` }
+  return { ok: `all ${wanted} curves drawn and visible (${drawn.join(" and ")} segments)` }
 }
 
 // Runs block `index` of the page's runnable code and waits for `wanted` in its
@@ -987,6 +1058,30 @@ const PRINT_PROBE = `(() => {
 })()`
 
 ROW_CHECKS.print = async ({ page, network }) => {
+  // On screen, before anything is printed, every answer is folded away
+  // (fixes review F5: an answer left open passed every row).
+  const answers = await page.evaluate(() => {
+    const open = []
+    let count = 0
+    for (const callout of document.querySelectorAll("article blockquote.callout")) {
+      if (!/^(success|solution|answer)$/i.test(callout.dataset.callout ?? "")) continue
+      count += 1
+      const content = callout.querySelector(".callout-content")
+      // Quartz folds a callout by capping the callout's own height (its
+      // overflow hidden), so the content keeps its size below the cap: what
+      // is shown is the part of the content inside the callout's box.
+      let shown = false
+      if (content !== null && getComputedStyle(content).display !== "none" && getComputedStyle(content).visibility !== "hidden") {
+        const box = callout.getBoundingClientRect()
+        const inside = content.getBoundingClientRect()
+        shown = Math.min(box.bottom, inside.bottom) - Math.max(box.top, inside.top) > 1
+      }
+      if (!callout.classList.contains("is-collapsed") || shown) open.push((callout.querySelector(".callout-title")?.textContent ?? "").trim())
+    }
+    return { count, open }
+  })
+  if (answers.count === 0) return { fail: "the handout has no answer to fold" }
+  if (answers.open.length > 0) return { fail: `an answer is not folded on screen: ${answers.open.join(", ")}` }
   const button = page.locator(".plantoir-print-button")
   try {
     await button.waitFor({ state: "visible", timeout: 10000 })
@@ -1104,6 +1199,42 @@ ROW_CHECKS["heading anchor"] = async ({ page }) => {
 
 // -------------------- the rows every page carries --------------------
 
+const QUIET_MS = 1000
+const AFTER_LOAD_MS = 5000
+const QUIET_CEILING_MS = 8000
+
+// Scrolls the page to its end a window at a time, then waits until nothing
+// has been asked for QUIET_MS and at least AFTER_LOAD_MS have passed since
+// the page loaded, at most QUIET_CEILING_MS after the scroll began. Answers
+// how long it held, in ms. What a page asks for later than that is not
+// seen, and the row says so.
+async function quietPage(page, record, fullQuiet = true) {
+  const began = Date.now()
+  try {
+    await page.evaluate(async () => {
+      const step = Math.max(200, innerHeight - 100)
+      for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
+        window.scrollTo({ top: y, behavior: "instant" })
+        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 50)))
+      }
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" })
+    })
+  } catch {
+    // a page that went away: nothing more to ask for on it
+  }
+  while (Date.now() - began < QUIET_CEILING_MS) {
+    const sinceLast = Date.now() - (record.lastRequestAt ?? 0)
+    // A sabotage aimed at another row holds only until quiet: the 5 s after
+    // load is what the own-host and clean-page rows need (and their own
+    // sabotages, and every plain run, keep it), and it cost about a minute
+    // over the forty sabotages (measured 2026-11-13).
+    const loadedLongEnough = !fullQuiet || Date.now() - (record.loadedAt ?? began) >= AFTER_LOAD_MS
+    if (loadedLongEnough && sinceLast >= QUIET_MS) break
+    await pause(100)
+  }
+  return Date.now() - began
+}
+
 async function judgeFonts(page, network) {
   if (network.google) return { skip: `no network - ${network.google}; the theme's fonts come from Google until #566` }
   const outcome = await page.evaluate(async (deviceFamilies) => {
@@ -1152,7 +1283,7 @@ function expectedLine(text) {
 // import from cdnjs, whose failure the engines word in their own ways.
 const OFFLINE_LINES = {
   google: /fonts\.googleapis\.com|fonts\.gstatic\.com/,
-  cdnjs: /cdnjs\.cloudflare\.com|dynamically imported module|Importing a module script failed|mermaid/i,
+  cdnjs: /cdnjs\.cloudflare\.com|dynamically imported module|Importing a module script failed/i,
 }
 
 function judgeClean(record, network) {
@@ -1195,7 +1326,7 @@ function judgeOwnHost(record, siteHost) {
   }
   for (const [host, path] of asked) if (!allowed.has(host)) strangers.push(`asked another host for ${host}${path}`)
   if (strangers.length > 0) return { fail: strangers.slice(0, 4).join("; ") }
-  return { ok: asked.size === 0 ? "nothing asked of any other host" : `asked only ${Array.from(asked.keys()).sort().join(", ")} (thirdPartyHostsToday, until #566)` }
+  return { ok: (asked.size === 0 ? "nothing asked of any other host" : `asked only ${Array.from(asked.keys()).sort().join(", ")} (thirdPartyHostsToday, until #566)`) + `; scrolled to its end and watched ${Math.round((record.quiet ?? 0) / 100) / 10} s more until quiet. Not seen: anything asked for after that, and a WebSocket from a blob: or data: worker` }
 }
 
 // -------------------- the cold visit (#625) --------------------
@@ -1255,7 +1386,7 @@ function rowsWanted() {
 
 // Runs every row of `pageName` in one engine, then the rows every page
 // carries; answers [{ row, state, detail }].
-async function runPage(browser, engine, base, pageName, rows, network) {
+async function runPage(browser, engine, base, pageName, rows, network, fullQuiet = true) {
   const outcomes = []
   const pageRows = rows.filter((row) => row.page === pageName && (!row.engines || row.engines.includes(engine)))
   const { context, record } = await openContext(browser, engine, new URL(base).origin, pageName)
@@ -1283,6 +1414,11 @@ async function runPage(browser, engine, base, pageName, rows, network) {
       }
       outcomes.push(toOutcome(row.name, outcome))
     }
+    // Before the page is judged: scrolled to its end, so what loads only
+    // below the fold is asked for, then held until it has asked for nothing
+    // for a second (fixes review F3: the context used to close as soon as
+    // the rows were done).
+    record.quiet = await quietPage(page, record, fullQuiet)
     const common = rows.filter((row) => row.page === "*" && !(row.except ?? []).includes(pageName))
     for (const row of common) {
       let outcome
@@ -1424,7 +1560,7 @@ async function redRun(engines, network) {
     // three at a time, WebKit passed it in 2 runs of 3 (measured 2026-11-13).
     const alone = named.filter((one) => one.aims === "geogebra keys")
     const queue = named.filter((one) => one.aims !== "geogebra keys")
-    const runOne = async (sabotage) => {
+    const runOne = async (sabotage, onlyEngine = null) => {
       const began = Date.now()
       const aimed = ROWS.rows.find((row) => row.name === sabotage.aims)
       // The keys row runs only on its own sabotage, which runs alone (below):
@@ -1440,9 +1576,14 @@ async function redRun(engines, network) {
         server = await startSiteServer(copy)
         const base = server.origin + "/"
         await Promise.all(live.map(async ([name]) => {
+          if (onlyEngine !== null && name !== onlyEngine) return
           if (aimed.engines && !aimed.engines.includes(name)) return
           if (sabotage.engines && !sabotage.engines.includes(name)) {
             say("NOTE", `sabotage ${sabotage.name}`, name, `not run in ${name}: ${sabotage.whyEngines}`)
+            return
+          }
+          if (options.expectRed === "all" && sabotage.gateEngines && !sabotage.gateEngines.includes(name)) {
+            say("NOTE", `sabotage ${sabotage.name}`, name, `not run in ${name} at a gate (run it by name): ${sabotage.whyGateEngines}`)
             return
           }
           if ((aimed.needsNetwork === "cdnjs" && network.cdnjs) || (aimed.needsNetwork === "google" && network.google)) {
@@ -1463,7 +1604,7 @@ async function redRun(engines, network) {
           try {
             const browser = await engines[name].type.launch({ headless: true, ...engines[name].launch })
             try {
-              outcomes = await runPage(browser, name, base, sabotage.page, rows, network)
+              outcomes = await runPage(browser, name, base, sabotage.page, rows, network, ["own host", "clean page"].includes(sabotage.aims))
             } finally {
               await browser.close().catch(() => {})
             }
@@ -1499,7 +1640,12 @@ async function redRun(engines, network) {
       })())
     }
     await Promise.all(workers)
-    for (const one of alone) await runOne(one)
+    // Alone means one engine at a time too: with Chromium pressing keys
+    // beside it, WebKit passed the keys sabotage in 2 of 30 runs (fixes
+    // review F1).
+    for (const one of alone) {
+      for (const [name] of live) await runOne(one, name)
+    }
   } finally {
     // each sabotage closed its own browsers
   }

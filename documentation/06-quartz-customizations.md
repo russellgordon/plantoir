@@ -4922,7 +4922,17 @@ Waits are on the state asked about, with a ceiling.
   row's `allowedFrames` (YouTube, Vimeo, geogebra.org, PhET), and what loads
   inside them, are a teacher's embeds (the first version let any frame on
   any page through, implementation review H1; measured: a frame from
-  example.com on the Quiz page was green in both engines).
+  example.com on the Quiz page was green in both engines). The Embeds page is
+  judged like every other: until the fixes review (F2) the own-host row
+  skipped it, so that rule decided nothing.
+- **Until the page is quiet.** Before a page is judged it is scrolled to its
+  end a window at a time, so what loads only below the fold is asked for,
+  then held until it has asked for nothing for a second and at least 5 s
+  have passed since it loaded (ceiling 8 s). The first version closed each
+  page as soon as its rows were done, and a request 1, 2, 4 or 12 s after
+  load, a frame added at 4 s and a lazy picture or frame 6,000 px down were
+  all unseen (fixes review F3). What a page asks for later than that is
+  still unseen, and the row's own line says so.
 - **What the router does not see, and how each is caught** (implementation
   review M1, measured with a script of the site's own asking example.com):
 
@@ -4933,10 +4943,16 @@ Waits are on the state asked about, with a ceiling.
   | WebSocket from a dedicated worker | not seen | not seen | the page's `Worker` marks the worker's script address; the router puts a watch in front of that script, which records the socket through a request of the site's own and refuses it |
   | shared worker's requests | not seen | not seen | none can be: starting a shared worker fails the row, and the check refuses to start it |
   | service worker's requests | routed | not seen | the context blocks service workers, and registering one fails the row |
+  | WebSocket from a module a module worker imports | not seen | not seen | a module worker's script is given `import "/__plantoir-rendered-check-watch.mjs"` as its first line, so the watch runs before the modules it imports (a watch put in front of the script's text ran after them, and the socket left WebKit) |
+  | WebRTC (STUN and TURN, over UDP) | not seen | not seen | the page's `RTCPeerConnection` records its servers and refuses, which fails the row |
+  | a sound or film of another host's | refused unrecorded | refused unrecorded | recorded before it is refused (media is never played), which fails the row |
 
-  What stays out of sight: a WebSocket from a worker made from a `blob:`
-  address, whose script the router never serves. The site starts none of
-  these today.
+  Still out of sight, and said in the own-host row's line: a WebSocket from a
+  worker made from a `blob:` or `data:` address, whose script the router never
+  serves (on a published site the policy refuses such workers, which the
+  clean-page row sees), and anything asked for after the quiet period. A
+  `preconnect` opens a connection and asks nothing, so there is nothing to
+  judge. The site uses none of these today.
 - **Rendered, but wrongly.** Four faults the first version passed in both
   engines (implementation review M2) are rows' assertions now: the graph must
   draw each of its two lines, not only one; both formulas must be set, with no
@@ -4947,7 +4963,11 @@ Waits are on the state asked about, with a ceiling.
   against `monospace` alone, 385.6 px against 408.1. Another face's file
   served under KaTeX_Main's name still loads (its status is `loaded`), but
   draws no letters, so the text falls back and the widths match to the
-  pixel. Digits and the space are left out of the string because
+  pixel. Three more from the fixes review (F5): the TikZ drawing must have
+  marks inside it that take up room (an emptied svg kept its 175 by 138 px),
+  the graph's curves must be stroked visibly, and the handout's answers must
+  be folded on screen before anything is printed. Digits and the space are
+  left out of the KaTeX string because
   KaTeX_Size4 carries them and moved the width by 28 px.
 - **Fonts by what loaded.** `document.fonts.check()` answers true for a
   family that does not exist, in both engines, and in WebKit for a face whose
@@ -4985,8 +5005,9 @@ clone), applies one sabotage, serves the copy and runs that page's rows in
 both engines; it passes only when the aimed row FAILS with its own reason's
 words and every other row on the page passes, except those the sabotage's
 `alsoRed` names (a missing file is also a console error, so the clean-page
-row is named there, with its reason). All thirty-one sabotages run on every gate,
-three at a time, each in a browser of its own.
+row is named there, with its reason). All forty sabotages run on every gate
+(the keys one in Chromium only, below), three at a time, each in a browser
+of its own.
 
 Two things made that reliable, both measured 2026-11-13:
 
@@ -5004,13 +5025,25 @@ Two things made that reliable, both measured 2026-11-13:
   keyboard cycle; focusing it only when the focus had left the sketch reached
   the reset icon in some WebKit runs and not others.
 - **What presses keys is not run beside other browsers.** With other
-  browsers busy, WebKit's key presses went astray: the keys sabotage passed in
-  2 of 3 runs started together and never alone, a browser per sabotage did
-  not cure it, and on the reset sabotage (three at a time) WebKit's points
-  fell while the lines ran with the loader's hold in place. So the keys
-  sabotage runs alone, after the others; the keys row is judged on that
-  sabotage only, not on the other Sketch sabotages; and the pages whose rows
-  type (Python, Swift) take WebKit one at a time. Everything else runs three
+  browsers busy, WebKit's key presses went astray: the keys sabotage passed
+  in 2 of 3 runs started together and never alone, and on the reset sabotage
+  (three at a time) WebKit's points fell while the lines ran with the
+  loader's hold in place. So the keys sabotage runs alone, after the others,
+  and one engine at a time (with Chromium beside it, WebKit still passed it
+  in 2 of 30 runs, fixes review F1); the keys row is judged on that sabotage
+  only; and the pages whose rows type (Python, Swift) take WebKit one at a
+  time. Everything else runs three at a time.
+- **The keys sabotage is gated in Chromium only.** Measured 2026-11-13, one
+  engine at a time with nothing else running: Chromium red 50 of 50 (10 of
+  them beside twelve busy processes), its unbroken row green 50 of 50; WebKit
+  red 46 of 50 (38 of 40, and 8 of 10 under load), its unbroken row green 50
+  of 50. In WebKit's failing runs the Shift+Tab presses never reach
+  GeoGebra's reset icon and the lines run untouched, which nothing the page
+  shows can tell from the hold working: the canvas keeps the focus, and no
+  pixel around the icon changes when GeoGebra's own focus moves (measured).
+  A sabotage that passes 1 time in 12 would fail the gate at random, so in
+  WebKit it runs by name (`--expect-red "geogebra keys" --engines webkit`)
+  and the gate runs it in Chromium; the row itself runs in both engines. Everything else runs three
   at a time.
 
 **Measured on this Mac (M4 Pro, 2026-11-13), the EXC2O fixture site, both
@@ -5044,7 +5077,7 @@ build that fails is a FAIL, never a skip.
 - **A missing engine is a SKIP by name.** Every pass line names the engines
   that ran ("in Chrome for Testing ONLY (WebKit did not run)"). The summary's
   last lines count every SKIP in the run and repeat them under "All checks
-  that ran passed, but N were SKIPPED", with the engines the rendered check
+  that ran passed, but N SKIPPED check(s) checked nothing", with the engines the rendered check
   did not run in. With `PLANTOIR_REQUIRE_ENGINES=chromium,webkit` a missing
   engine is a FAILURE, and so is Node older than 22. An engine name the check
   does not know is a FAILURE too, and an engine the variable requires is run
