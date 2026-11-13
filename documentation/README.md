@@ -34,6 +34,8 @@ static-site generator.
 | 12 | [The Windows App — Plantoir](12-windows-app.md) | The WinUI 3 GUI (`windows-app/`), how it differs from the mac (no container, a native runtime, ConPTY, Credential Manager, Task Scheduler), where it keeps things, the flags it answers, and how its interface is driven by tests — and, since the catch-up to mac 1.7.1 (2026-10-15), its menu bar and the Section menu's functions, the one Settings window, Preview at Last Viewed, printable pages, diagrams and graphs in its runtime, and the HIG sweep screen by screen |
 | 13 | [Archive — the Windows port](13-windows-port-archive.md) | **History, not a specification.** Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. Closed to new entries; where it and a contract disagree, the contract is true |
 
+**Plantoir Help** (#839) is not in this folder: its source, page format, build and checks are described in [`help/README.md`](../help/README.md), for builders.
+
 ## The one-paragraph summary
 
 A teacher writes course notes as Markdown files in an

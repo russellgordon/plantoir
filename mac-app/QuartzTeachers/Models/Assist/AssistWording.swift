@@ -383,7 +383,7 @@ nonisolated enum AssistWording {
     /// conversation saved a copy of the course (#412). Names the banner's own
     /// button (`AssistSectionRestore.buttonTitle`). Not said to an outside
     /// assistant: the button is in Plantoir's assistant window, which a
-    /// Claude or Codex session does not have.
+    /// Claude, Codex or GitHub Copilot session does not have.
     static func restoreSectionPutsItBack(section: String) -> String {
         // The button's own title, spelled out so the contract can show
         // {section}; a test pins it to `AssistSectionRestore.buttonTitle`.
@@ -401,7 +401,7 @@ nonisolated enum AssistWording {
              + "particular pages, name them."
     }
 
-    /// Said to an outside assistant (Claude or Codex) whose change, rebuild
+    /// Said to an outside assistant (Claude, Codex or GitHub Copilot) whose change, rebuild
     /// or deploy was held back because Plantoir is BUILDING the course's
     /// website — a preview that is still being built, or a deploy (#433).
     /// Nothing was written, and it says so: a preview that is only open does
@@ -1654,6 +1654,32 @@ nonisolated enum AssistWording {
     /// relayed to a teacher, as a complaint about what they typed.
     static let noCourseNamed: String = "No course was named, so nothing was done."
 
+    /// A call that named no section, for a course with more than one (#865).
+    ///
+    /// `sections` is the course's sections as a phrase, "Sections 1 and 2" or
+    /// "Sections 1, 2 and 3". Replaces "MPM2D has no Section 0.", which read a
+    /// missing argument as the number 0: true, no help, and a complaint about
+    /// a section nobody sent.
+    static func noSectionNamed(course: String, sections: String) -> String {
+        return "No section was named. \(course) has \(sections); say which one."
+    }
+
+    /// A call that named no section, for a course that has none (#865).
+    static func noSectionNamedAndNoSections(course: String) -> String {
+        return "No section was named, and \(course) has no sections."
+    }
+
+    /// `add_classes` or its plan with no unit (#865). A missing unit used to
+    /// send the call down the "next class" path, which planned one class
+    /// after the last one in the section.
+    static let addClassesNeedsAUnit: String =
+        "No unit was named. Which unit should the class pages be added to? Give its number, for example 4."
+
+    /// `add_classes` or its plan with no count, or a count below one (#865).
+    /// A missing count used to be read as 0, with the same result.
+    static let addClassesNeedsACount: String =
+        "No number of class pages was given. How many should be added?"
+
     /// A finished answer chose a tool that needs something this window cannot
     /// supply — which pages, which day, which time — and wrote nothing for it,
     /// so nothing was done (issue #198).
@@ -2059,59 +2085,127 @@ nonisolated enum AssistWording {
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."
 
-    // MARK: - A Claude or Codex session holding its course (#458)
+    // MARK: - An outside assistant's session holding its course (#458, #783)
+    //
+    // **Each sentence names the assistant that is working on the course**
+    // (Russell, #783, 2026-11-13: "Let's name the assistant (Codex, Claude,
+    // or GitHub Copilot)", reversing the same day's "name none", which read
+    // as Plantoir's own assistant window and no longer told the teacher where
+    // to look). The name comes through ONE slot, `assistant`, filled by
+    // `outsideAssistantNamed(_:)` from what the hold records: the door writes
+    // its key into the server's environment (`AssistMCPServer
+    // .doorAssistantVariable`), and the server writes it as the `assist`
+    // lease's fifth line (`contracts/file-formats.json` → `workLease.lines`).
+    // A hold that carries no name (an older Plantoir, or Windows before it
+    // writes one) lists all three, which is still true. From #458 until #783
+    // these sentences said "Claude or Codex"; the shape and voice are kept.
+    // The key names keep "Claude" because Windows reads them from
+    // `contracts/assist-wording.json` by name.
 
-    /// Under the greyed items while a Claude or Codex session opened from
-    /// Plantoir is open on this course: the three Revise items, Rename Course
-    /// and Add Section…. Menu-length, in the shape of
-    /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
-    /// with "or Codex" added, so one sentence greys the same items on both
-    /// platforms — Windows' Codex door holds its course too, since #468.
+    /// The name each outside door's assistant goes by in these sentences,
+    /// by door key: the names in the menus, without the ellipsis.
+    static let outsideAssistantNames: [(key: String, name: String)] = [
+        (key: "claude", name: "Claude"),
+        (key: "codex", name: "Codex"),
+        (key: "copilot", name: "GitHub Copilot"),
+    ]
+
+    /// What fills the slot when the hold cannot say which assistant it is.
+    static let anyOutsideAssistant: String = "Claude, Codex or GitHub Copilot"
+
+    /// The slot's words for the assistants holding a course, from the keys
+    /// their holds record (nil, or a key no door has, for a hold that names
+    /// none). One known name when every hold names the same one; the known
+    /// names in menu order joined with "or" when holds name different ones;
+    /// all three when any hold names none, or there is no hold to read.
     ///
-    /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
-    /// BOTH doors name their course to the server, which holds it. The
-    /// server cannot tell which door started it, so one sentence names both;
-    /// Windows said "with Claude" while only its Claude door held a course.
-    static let availableOnceYouFinishRevisingWithClaude: String =
-        "Available once you finish revising with Claude or Codex"
+    /// Each key is read as `outsideAssistantName(forKey:)` reads it (trimmed,
+    /// any case), and the function cannot trap whatever it is given: until
+    /// the second fix round of #783 it stored the key unread, so " Copilot "
+    /// matched no name and an empty list's `removeLast()` crashed (measured
+    /// with a copy under swiftc, exit 133).
+    static func outsideAssistantNamed(_ keys: [String?]) -> String {
+        var seen: Set<String> = []
+        for key in keys {
+            guard let key, outsideAssistantName(forKey: key) != nil else {
+                return anyOutsideAssistant
+            }
+            seen.insert(key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        }
+        var names: [String] = []
+        for entry in outsideAssistantNames where seen.contains(entry.key) {
+            names.append(entry.name)
+        }
+        if names.isEmpty {
+            return anyOutsideAssistant
+        }
+        if names.count == 1 {
+            return names[0]
+        }
+        var leading: [String] = names
+        let last: String = leading.removeLast()
+        return leading.joined(separator: ", ") + " or " + last
+    }
+
+    /// The name for one door key, or nil for a key no door has.
+    static func outsideAssistantName(forKey key: String) -> String? {
+        let wanted: String = key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for entry in outsideAssistantNames where entry.key == wanted {
+            return entry.name
+        }
+        return nil
+    }
+
+    /// Under the greyed items while an outside door's session is open on this
+    /// course: the Revise items, Rename Course and Add Section….
+    /// Menu-length, in the shape of `CourseActivity.busyDescription`'s lines.
+    /// Key `availableOnceYouFinishRevisingWithClaude`.
+    static func availableOnceYouFinishRevising(with assistant: String) -> String {
+        return "Available once you finish revising with \(assistant)"
+    }
 
     /// The title of the alert a Revise item gives when it is clicked while a
-    /// Claude or Codex session is open on the course — the click-time
+    /// session from an outside door is open on the course — the click-time
     /// re-check behind the greyed menu, since a session can start between the
     /// menu opening and the click. Windows' title for its own second-session refusal.
     static func courseIsAlreadyBeingRevised(course: String) -> String {
         return "\(course) is already being revised"
     }
 
-    /// The message under `courseIsAlreadyBeingRevised`.
-    static let finishTheClaudeSessionFirst: String =
-        "A Claude or Codex session is working on this course already. Finish that session, then start again here."
+    /// The message under `courseIsAlreadyBeingRevised`. Key
+    /// `finishTheClaudeSessionFirst`.
+    static func finishTheSessionFirst(assistant: String) -> String {
+        return "A \(assistant) session is working on this course already. Finish that session, then start again here."
+    }
 
     /// What Rename Course, Restore and Add Section say when they are asked
-    /// for while a Claude or Codex session is open on the course — the
+    /// for while a session from an outside door is open on the course — the
     /// click-time check behind the greyed menu item. `then` is the act, in a teacher's
-    /// words: "rename", "restore", "add the section".
-    static func claudeIsRevisingTheCourse(course: String, then act: String) -> String {
-        return "A Claude or Codex session is working on \(course) right now. Finish that session, then \(act)."
+    /// words: "rename", "restore", "add the section". Keys
+    /// `claudeIsRevisingTheCourseRename`, `…Restore`, `…AddSection`.
+    static func sessionIsRevisingTheCourse(course: String, then act: String, assistant: String) -> String {
+        return "A \(assistant) session is working on \(course) right now. Finish that session, then \(act)."
     }
 
-    /// The delete-several confirmation's sentence for backups a Claude or
-    /// Codex session still open on a course made — and which are therefore kept.
-    /// `count` is how many of the chosen backups that session holds.
-    static func backupsKeptForAClaudeSession(course: String, count: Int) -> String {
+    /// The delete-several confirmation's sentence for backups a session from
+    /// an outside door, still open on a course, made — and which are therefore kept.
+    /// `count` is how many of the chosen backups that session holds. Keys
+    /// `backupKeptForAClaudeSession`, `backupsKeptForAClaudeSession`.
+    static func backupsKeptForASession(course: String, count: Int, assistant: String) -> String {
         if count == 1 {
-            return "One of these is kept: a Claude or Codex session still open on \(course) made it."
+            return "One of these is kept: a \(assistant) session still open on \(course) made it."
         }
-        return "\(count) of these are kept: a Claude or Codex session still open on \(course) made them."
+        return "\(count) of these are kept: a \(assistant) session still open on \(course) made them."
     }
 
-    /// What a delete that kept a Claude or Codex session's backup tells the teacher
-    /// afterwards, and what the single "Delete Backup…" says at once.
-    static func finishTheClaudeSessionToDeleteItsBackup(course: String, count: Int) -> String {
+    /// What a delete that kept an outside session's backup tells the teacher
+    /// afterwards, and what the single "Delete Backup…" says at once. Keys
+    /// `finishTheClaudeSessionToDeleteItsBackup`, `…Backups`.
+    static func finishTheSessionToDeleteItsBackup(course: String, count: Int, assistant: String) -> String {
         if count == 1 {
-            return "Finish the Claude or Codex session working on \(course) first. It made this backup, so it was kept."
+            return "Finish the \(assistant) session working on \(course) first. It made this backup, so it was kept."
         }
-        return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
+        return "Finish the \(assistant) session working on \(course) first. It made these backups, so they were kept."
     }
 
     // MARK: - The Section menu (#457 batch B)

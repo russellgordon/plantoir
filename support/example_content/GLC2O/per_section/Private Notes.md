@@ -27,6 +27,15 @@ students. %%
   cannot find an interview subject through their own network. Every year
   it is the same four or five students, and it is not their fault.
 
+## My Progress
+
+Your class site has a page called My Progress, first in Key Links and
+second in the sidebar. Plantoir makes it because each of the seven tasks
+closes with tick boxes under a heading called Success criteria; it shows
+each student how many they have ticked, in their own browser, and sends
+nothing to you. There is no switch for it yet. If you do not want the
+page, take the boxes under those headings out of the task pages.
+
 ## Which GLC2O this is
 
 Built from the course **effective September 2024**, which replaced the

@@ -41,6 +41,24 @@ in [[Role and Character]].
 > thought. A thought wants something, fears something, or hides something.
 > If the sentence could be read aloud by a narrator, tap again and go deeper.
 
+## Check your ear
+
+A tableau shows a family posed for a photograph at a graduation. One
+performer is tapped on the shoulder. Nothing you answer here is sent to
+anyone.
+
+> [!quiz] Which line is a thought, and not a caption?
+> - [ ] "I am standing beside my sister at her graduation."
+> - [x] "If she moves away, who is going to notice me?"
+> - [ ] "She felt proud of her sister that day."
+> - [ ] "Everyone is smiling for the photograph."
+>
+> > [!explain]- Why
+> > A tracked thought is first person, present tense, one sentence, and it
+> > wants, fears, or hides something. The second line fears something. The
+> > first and the last could be read out by a narrator, and the third is
+> > about someone else, in the past.
+
 Thought tracking is the natural second layer of [[Tableau Story Sequence]] —
 three frozen images, each with one spoken thought, is already a play.
 

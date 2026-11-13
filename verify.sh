@@ -276,6 +276,54 @@ else
 fi
 rm -rf "$DEMO_HOME"
 
+# Plantoir Help (#839): help/build_help.py and its checks, on fixtures and on
+# the real help/. Stdlib only; hiutil and node are used when present.
+if ! command -v node >/dev/null 2>&1; then
+  echo "note: node is not on PATH, so help/tests/test_web_search.py skips its search test (the pass line below does not cover search)"
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_build_help.py >/tmp/verify_help_test_build_help.log 2>&1; then
+  pass "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+else
+  fail "Help: the real help/ builds green with its 104 stubs, the Mac book has every outline id as an anchor, the web copy leaves out the assistant section, and the script keeps to Python 3.9 and the standard library (help/tests/test_build_help.py, #839)"
+  cat /tmp/verify_help_test_build_help.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_markdown.py >/tmp/verify_help_test_markdown.log 2>&1; then
+  pass "Help: the page format's Markdown subset, and every refusal named with its file and line (help/tests/test_markdown.py, #839)"
+else
+  fail "Help: the page format's Markdown subset, and every refusal named with its file and line (help/tests/test_markdown.py, #839)"
+  cat /tmp/verify_help_test_markdown.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_tokens.py >/tmp/verify_help_test_tokens.log 2>&1; then
+  pass "Help: menu, control, say, fact, key and count tokens resolve against the menu golden, the Swift source and the contract (help/tests/test_tokens.py, #839)"
+else
+  fail "Help: menu, control, say, fact, key and count tokens resolve against the menu golden, the Swift source and the contract (help/tests/test_tokens.py, #839)"
+  cat /tmp/verify_help_test_tokens.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_checks.py >/tmp/verify_help_test_checks.log 2>&1; then
+  pass "Help: the outline owns each page's identity, and pages, scenes, links and head fields agree with it (help/tests/test_checks.py, #839)"
+else
+  fail "Help: the outline owns each page's identity, and pages, scenes, links and head fields agree with it (help/tests/test_checks.py, #839)"
+  cat /tmp/verify_help_test_checks.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_words.py >/tmp/verify_help_test_words.log 2>&1; then
+  pass "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
+else
+  fail "Help: no machinery, no selling, no typed counts, quoted runs or whole contract sentences typed by hand, and doubtful uses of publish and deploy listed for the page's reviewer (help/tests/test_words.py, #839)"
+  cat /tmp/verify_help_test_words.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_macbook.py >/tmp/verify_help_test_macbook.log 2>&1; then
+  pass "Help: the Mac Help book's Info.plist, pages and both indexes, read back with hiutil, rebuilt atomically and quietly (help/tests/test_macbook.py, #839)"
+else
+  fail "Help: the Mac Help book's Info.plist, pages and both indexes, read back with hiutil, rebuilt atomically and quietly (help/tests/test_macbook.py, #839)"
+  cat /tmp/verify_help_test_macbook.log
+fi
+if PYTHONDONTWRITEBYTECODE=1 python3 help/tests/test_web_search.py >/tmp/verify_help_test_web_search.log 2>&1; then
+  pass "Help: the web copy, its assistant switch, platform runs, search (run with node), --release-web and --serve (help/tests/test_web_search.py, #839)"
+else
+  fail "Help: the web copy, its assistant switch, platform runs, search (run with node), --release-web and --serve (help/tests/test_web_search.py, #839)"
+  cat /tmp/verify_help_test_web_search.log
+fi
+
 if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
   pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
 else
@@ -824,6 +872,18 @@ if (cd scripts && python3 test_course_names.py) >/tmp/verify_course_names_test.l
 else
   fail "a course's name is cleaned of control characters where it is read (scripts/test_course_names.py, #780)"
   cat /tmp/verify_course_names_test.log
+fi
+
+# A value from a course's settings is written into the site's TypeScript as an
+# escaped string (GitHub #871): every typescriptStrings case, and every writer
+# (title, locale, baseUrl, fonts, colours, footer) read back from its file and
+# run again over its own output. Pure stdlib; Node reads the literals back
+# when it is on PATH.
+if (cd scripts && python3 test_typescript_strings.py) >/tmp/verify_typescript_strings_test.log 2>&1; then
+  pass "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+else
+  fail "a quote or a backslash in a short label, a footer, a domain or a font reads back as typed (scripts/test_typescript_strings.py, #871)"
+  cat /tmp/verify_typescript_strings_test.log
 fi
 
 # A deploy reuses the last build only when nothing has changed (GitHub #768,

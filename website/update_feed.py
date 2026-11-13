@@ -70,6 +70,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 WEBSITE = Path(__file__).resolve().parent
@@ -98,11 +99,77 @@ def tool(name: str) -> Path:
     return path
 
 
+# How a DMG is attached and let go of (#872). A detach that failed used to be
+# ignored, and its image stayed attached with its folder gone: every later
+# attach of the same file then fails with "Resource busy" (measured: hdiutil
+# refuses a second attach of an image that is already attached, exit 1), which
+# is how one busy volume turned into seven errors in website/test_update_feed.py
+# and an image left on the Mac until somebody detached it. A volume is busy for
+# a moment when something else on the Mac is reading it, so a detach is tried
+# again after a short, deliberate pause, and then forced; a detach that still
+# fails is an error with hdiutil's own words, never silence.
+DETACH_ATTEMPTS = 3
+DETACH_PAUSE_SECONDS = 1.0
+
+
+def _hdiutil(arguments: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(["hdiutil"] + arguments, capture_output=True, text=True)
+
+
+def _said(result: subprocess.CompletedProcess) -> str:
+    """hdiutil's own words for a failure, on one line."""
+    words: str = (result.stderr or "").strip() or (result.stdout or "").strip()
+    if not words:
+        words = f"exit {result.returncode}, nothing printed"
+    return " ".join(words.split())
+
+
+def attached_devices(image: Path) -> list[str]:
+    """The whole-disk device (/dev/diskN) of every attachment of this image file."""
+    result = subprocess.run(["hdiutil", "info", "-plist"], capture_output=True)
+    if result.returncode != 0:
+        return []
+    wanted: str = str(Path(image).resolve())
+    devices: list[str] = []
+    for entry in plistlib.loads(result.stdout).get("images", []):
+        if str(Path(entry.get("image-path", "")).resolve()) != wanted:
+            continue
+        whole: str | None = None
+        for entity in entry.get("system-entities", []):
+            device: str = entity.get("dev-entry", "")
+            if whole is None or len(device) < len(whole):
+                whole = device
+        if whole:
+            devices.append(whole)
+    return devices
+
+
+def detach(target: str) -> None:
+    """Detach a mount point or device: tried again after a pause, then forced."""
+    last: subprocess.CompletedProcess | None = None
+    for attempt in range(DETACH_ATTEMPTS):
+        last = _hdiutil(["detach", target])
+        if last.returncode == 0:
+            return
+        if attempt < DETACH_ATTEMPTS - 1:
+            time.sleep(DETACH_PAUSE_SECONDS)
+    forced = _hdiutil(["detach", target, "-force"])
+    if forced.returncode == 0:
+        return
+    raise Refusal(f"hdiutil could not detach {target}: {_said(last)}; forced: {_said(forced)}")
+
+
 def read_dmg_version(dmg: Path) -> tuple[str, str]:
-    """(version, build) of the one app inside a DMG, mounted read-only."""
+    """(version, build) of the one app inside a DMG, mounted read-only at a
+    mount point of its own, and always detached again (#872)."""
+    for device in attached_devices(dmg):
+        # Left attached by an earlier run that stopped half way: it would make
+        # this attach fail with "Resource busy".
+        detach(device)
     with tempfile.TemporaryDirectory(prefix="plantoir-feed-mount-") as mount:
-        subprocess.run(["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", mount, str(dmg)],
-                       check=True, capture_output=True)
+        attached = _hdiutil(["attach", "-readonly", "-nobrowse", "-mountpoint", mount, str(dmg)])
+        if attached.returncode != 0:
+            raise Refusal(f"hdiutil could not attach {dmg.name}: {_said(attached)}")
         try:
             apps = sorted(Path(mount).glob("*.app"))
             if len(apps) != 1:
@@ -111,7 +178,7 @@ def read_dmg_version(dmg: Path) -> tuple[str, str]:
                 info = plistlib.load(handle)
             return str(info.get("CFBundleShortVersionString", "")), str(info.get("CFBundleVersion", ""))
         finally:
-            subprocess.run(["hdiutil", "detach", mount, "-quiet"], capture_output=True)
+            detach(mount)
 
 
 # Lines the approved GitHub notes carry that do not belong in the Mac's update

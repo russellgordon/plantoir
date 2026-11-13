@@ -524,11 +524,19 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     they are read-only and clicking one does nothing. Checked by installing
     against origin/dev 20e19be58 and diffing: that one file, that one
     paragraph (three lines become four), nothing else.
+
+    Moved ON PURPOSE again: #878 (2026-11-13) gave Drama one real example
+    of two things a page can show. `Conventions/Tableau.md` gained a part
+    with an embedded interview, and `Conventions/Thought Tracking.md` a
+    part with one self-check question. Checked by installing against
+    origin/dev 5df8602dc and diffing: those two files, forty lines added
+    and none removed, nothing else. The file count and the names hash did
+    not move.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "f12fe56815b95bb764fde1707864f10cbbe0430b04afeea8b9966bc69c419c9c"
+    PAYLOAD_CONTENT_HASH = "283b1331094701bb58d615fcc78701ce6e16e452ccd8cca237a1240e27de1143"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")

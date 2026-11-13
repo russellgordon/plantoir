@@ -86,6 +86,11 @@ enum WorkLeaseRegistry {
     /// prevent.
     private(set) static var heldForTheConversation: Wanted?
 
+    /// The door key the conversation's hold records as its lease's fifth
+    /// line (#783), set and cleared with `heldForTheConversation`, so the
+    /// other programs' sentences name the assistant. Nil names none.
+    private(set) static var heldForTheConversationAssistant: String?
+
     /// The held-backup records this process has written (#283, #458), each
     /// `<COURSE>.held-backup.<pid>` naming the backup its conversation made.
     /// Removed at exit by `forgetRecordedBackups()`, BEFORE the leases go.
@@ -129,8 +134,13 @@ enum WorkLeaseRegistry {
             }
             let coursesDirectory: URL = URL(fileURLWithPath: item.folderPath)
                 .appendingPathComponent("courses", isDirectory: true)
+            var assistant: String? = nil
+            if item == heldForTheConversation {
+                assistant = heldForTheConversationAssistant
+            }
             if let made = WorkLeaseFiles.write(
-                kind: item.kind, courseCode: item.courseCode, coursesDirectory: coursesDirectory
+                kind: item.kind, courseCode: item.courseCode, coursesDirectory: coursesDirectory,
+                assistant: assistant
             ) {
                 written[item] = Written(url: made.url, moment: made.moment)
             }
@@ -159,13 +169,15 @@ enum WorkLeaseRegistry {
         }
         written = [:]
         heldForTheConversation = nil
+        heldForTheConversationAssistant = nil
     }
 
     /// Holds an `assist` lease on one course for as long as this process
     /// serves its conversation (#458) — Windows' `plantoir-mcp` does the same
     /// for the course `PLANTOIR_DOOR_COURSE` names. Written at once, and kept
     /// by every reconcile until `releaseEverything()`.
-    static func holdForTheConversation(folderPath: String, courseCode: String) {
+    static func holdForTheConversation(folderPath: String, courseCode: String, assistant: String? = nil) {
+        heldForTheConversationAssistant = assistant
         heldForTheConversation = Wanted(
             folderPath: folderPath, courseCode: courseCode, kind: WorkLeaseFiles.assistKind
         )
