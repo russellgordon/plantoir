@@ -66,7 +66,10 @@ nonisolated struct AssistTurnRecord {
         if stoppedAtGate {
             parts.append("waited for the button")
         }
-        return parts.joined(separator: " · ")
+        // One line whatever the model wrote (#780): the argument names come
+        // from the model's own JSON, and this record is written with its line
+        // breaks kept, so a name holding one would otherwise start a line.
+        return OneLineText.cleaned(parts.joined(separator: " · "))
     }
 
     // MARK: - Functions
@@ -82,6 +85,13 @@ nonisolated struct AssistTurnRecord {
     /// It is kept locally and withheld from a report unless the teacher ticks
     /// the box, because their own words are the one thing here unmistakably
     /// theirs to hand over or not.
+    ///
+    /// The sentence is put on ONE line first (#780). The assistant's field
+    /// grows to several lines (`axis: .vertical`), so a sentence can hold a
+    /// line break, pasted or typed, and this record is written with its line
+    /// breaks kept. A sentence on two lines used to put its second line on
+    /// the trail with no marker in front of it, where leaving the prompts out
+    /// of a report could not see it. `courseNameCharacters.trailLines`.
     static func askedLines(
         prompt: String,
         courseCode: String,
@@ -91,7 +101,7 @@ nonisolated struct AssistTurnRecord {
     ) -> String {
         return AssistTurnRecord.formatter(timeZone: timeZone).string(from: moment)
             + " · \(courseCode)/\(sectionNumber) · asked the local AI assistant\n"
-            + AssistTurnRecord.promptMarker + prompt
+            + AssistTurnRecord.promptMarker + OneLineText.cleaned(prompt)
     }
 
     static func formatter(timeZone: TimeZone = TimeZone.current) -> DateFormatter {

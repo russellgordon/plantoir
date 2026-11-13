@@ -26,9 +26,18 @@ class CourseConfiguration {
         return stringValue(forKey: "course_code")
     }
 
+    /// The course's name, cleaned where it is read and where it is set
+    /// (#780): a control character becomes a space and a bidirectional
+    /// control is removed, so a name holding a NUL, a line break or an
+    /// override that a script or a hand edit put in the file never reaches a
+    /// label, the assistant's course list or an outside door's greeting.
+    /// Nothing is trimmed, so the Course Settings field keeps the space a
+    /// teacher types. The file itself is left as it is until the next Save,
+    /// which writes the cleaned name. `contracts/shared-rules.json` →
+    /// `courseNameCharacters`.
     var courseName: String {
-        get { return stringValue(forKey: "course_name") }
-        set { values["course_name"] = newValue }
+        get { return CourseName.cleaned(stringValue(forKey: "course_name")) }
+        set { values["course_name"] = CourseName.cleaned(newValue) }
     }
 
     /// Where deploys go: "cloudflare_pages", "netlify", or "local_folder" —

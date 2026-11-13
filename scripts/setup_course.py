@@ -9,6 +9,7 @@ from pathlib import Path
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 import class_pages
+import course_names
 import markdown_code
 import page_visibility
 import toolchain_paths
@@ -2932,6 +2933,10 @@ def setup_course(no_backup: bool = False):
     else:
         looked_up_name = get_course_name_from_json(course_code) or "Course Website"
         course_name = prompt_with_default("Enter the course name you wish to use", looked_up_name)
+    # Cleaned where it is read (#780): the saved name, a looked-up name and a
+    # typed one alike, before it goes into course_config.json, the page
+    # templates and each section's front page title.
+    course_name = course_names.cleaned(course_name)
 
     
     # ---------- NEW: Optional custom short label for clubs (no grade) -------

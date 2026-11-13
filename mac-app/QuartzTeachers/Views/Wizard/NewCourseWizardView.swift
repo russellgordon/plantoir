@@ -1748,7 +1748,10 @@ struct NewCourseWizardView: View {
             }
         }
 
-        var name: String = courseName.trimmingCharacters(in: .whitespaces)
+        // Cleaned before it is trimmed (#780), so a pasted name that ends in a
+        // line break loses it, and a name that is only a line break gets the
+        // default.
+        var name: String = CourseName.cleaned(courseName).trimmingCharacters(in: .whitespaces)
         if name.isEmpty {
             name = WizardWording.panelWords(isClub: isClubCourse).defaultSiteName
         }
@@ -1867,7 +1870,7 @@ struct NewCourseWizardView: View {
 
         var config: [String: Any] = [
             "course_code": code,
-            "course_name": name,
+            "course_name": CourseName.cleaned(name),
             "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
             "locale": locale,
             "emojis": ["sections": emojiMap],

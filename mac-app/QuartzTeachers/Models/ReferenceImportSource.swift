@@ -898,7 +898,7 @@ nonisolated struct ReferenceImportSource: Sendable {
 
         var courseName: String = ""
         if let recorded = values["course_name"] as? String {
-            courseName = recorded
+            courseName = CourseName.cleaned(recorded)
         }
 
         var sectionNumbers: [Int] = []

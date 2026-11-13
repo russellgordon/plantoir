@@ -800,16 +800,30 @@ nonisolated struct ProblemReportStore {
     ///   and their write either. The folder is the lock so that no extra
     ///   file appears in the folder a teacher is shown.
     ///
-    /// The line is redacted BEFORE any of this, so nothing unredacted is ever
-    /// held or written. If the folder cannot be opened, or `flock` refuses
+    /// The line is cleaned and then redacted BEFORE any of this, so nothing
+    /// unredacted is ever held or written. **Cleaned first (#780):** a
+    /// control character becomes a space and a bidirectional control is
+    /// removed (`contracts/shared-rules.json` → `courseNameCharacters` →
+    /// `trailLines`), so a line break inside a course name, a page title or
+    /// a folder name cannot start a forged line of its own. The ORDER is the
+    /// point. `LogRedactor`'s rules look for white space and for words that
+    /// stay joined, so a NUL after `Bearer`, an isolate inside
+    /// `CLOUDFLARE_API_TOKEN` or an override before the `@` of an email
+    /// address hid the secret from it; cleaned afterwards, the secret would
+    /// have been written as plain readable text (measured in the #780 plan
+    /// review). `keepingLineBreaks` is for the assistant's turn record,
+    /// which is several lines on purpose.
+    ///
+    /// If the folder cannot be opened, or `flock` refuses
     /// (`ENOTSUP` on some network volumes), the line is still written, just
     /// unlocked — which is exactly the old behaviour, and better than
     /// dropping it. The lock is held for one append and, rarely, one trim:
     /// about a millisecond. It dies with its process, so nothing can leave it
     /// held. ``documentation/09-mac-app.md` → "Two writers at once"` has the measurements and what
     /// was rejected.
-    func appendActivityLine(_ line: String) {
-        let safeLine: String = LogRedactor.redacting(line)
+    func appendActivityLine(_ line: String, keepingLineBreaks: Bool = false) {
+        let oneLine: String = OneLineText.cleaned(line, keepingLineBreaks: keepingLineBreaks)
+        let safeLine: String = LogRedactor.redacting(oneLine)
         do {
             try FileManager.default.createDirectory(
                 at: folderURL, withIntermediateDirectories: true
