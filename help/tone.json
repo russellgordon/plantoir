@@ -38,7 +38,11 @@
  "exemptions": [
   {"phrase": "Python", "pages": ["code", "subject-computer-studies"], "why": "Students' code runs in Python on these pages; it is the language a teacher writes, not the machinery that runs it."},
   {"phrase": "3D models", "pages": ["models-3d"], "why": "The page is about 3D models students can turn (#691); the site's MACHINERY list means a language model."},
-  {"phrase": "3D model", "pages": ["models-3d"], "why": "As above, singular."}
+  {"phrase": "3D model", "pages": ["models-3d"], "why": "As above, singular."},
+  {"phrase": "Python", "pages": ["code-blocks", "subject-mathematics"], "why": "Python is the language of the code these pages show (the ready-made courses' code blocks, MTH1W's Coding pages); it is what a teacher writes, not the machinery that runs anything."}
  ],
- "quotes": []
+ "quotes": [
+  {"phrase": "Trust author and enable plugins", "pages": ["obsidian-addons"], "why": "Obsidian's own name for a button in its trust question; the app's sentence (obsidianAddOnsForFigures.wording.settingFooter) quotes it the same way, and a teacher must match it on screen."},
+  {"phrase": "Browse vault in Restricted Mode", "pages": ["obsidian-addons"], "why": "Obsidian's own name for a button in its trust question; the app's sentence (obsidianAddOnsForFigures.wording.settingFooter) quotes it the same way, and a teacher must match it on screen."}
+ ]
 }
