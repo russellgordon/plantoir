@@ -374,7 +374,7 @@ final class PlanShareTablesTests: XCTestCase {
 
     func testEveryWarningSheetCase() throws {
         for testCase in try PlanShareTablesTests.cases("warningSheet") {
-            let rows: [PlanShareRow] = PlanSharing.warningRows(
+            let rows: [FactsQuestionRow] = PlanSharing.warningRows(
                 shared: try XCTUnwrap(testCase["shared"] as? Int),
                 heldBack: try XCTUnwrap(testCase["heldBack"] as? Int),
                 keysInShared: try XCTUnwrap(testCase["keysInShared"] as? Int)
@@ -397,8 +397,8 @@ final class PlanShareTablesTests: XCTestCase {
 
     func testTheNewPasswordDialogsEarlierYearsRowIsThereOnlyWithAnEarlierYear() {
         XCTAssertEqual(PlanSharing.newPasswordRows(earlierYearShared: false).count, 2)
-        let rows: [PlanShareRow] = PlanSharing.newPasswordRows(earlierYearShared: true)
-        XCTAssertEqual(rows.last, PlanShareRow(label: PlanSharingWording.earlierYearsLabel, value: PlanSharingWording.earlierYearsValue))
+        let rows: [FactsQuestionRow] = PlanSharing.newPasswordRows(earlierYearShared: true)
+        XCTAssertEqual(rows.last, FactsQuestionRow(label: PlanSharingWording.earlierYearsLabel, value: PlanSharingWording.earlierYearsValue))
     }
 
     /// changePasswordCases, as the app reads them: the dialog after a save

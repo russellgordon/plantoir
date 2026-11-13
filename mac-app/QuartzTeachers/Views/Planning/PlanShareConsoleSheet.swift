@@ -42,12 +42,14 @@ struct PlanShareConsoleSheet: View {
                 }
             }
         )) {
-            PlanShareNewPasswordSheet(
-                earlierYearShared: planRunner.earlierYearShared,
-                onShareAgain: {
+            FactsQuestionSheet(
+                question: PlanSharing.newPasswordQuestion(earlierYearShared: planRunner.earlierYearShared),
+                identifier: "planShareNewPassword",
+                goAheadIsTheDefault: true,
+                goAhead: {
                     planRunner.shareAgain()
                 },
-                onLater: {
+                cancel: {
                     planRunner.isAskingAboutNewPassword = false
                 }
             )

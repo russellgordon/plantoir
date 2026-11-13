@@ -91,6 +91,8 @@ struct PlanShareBar: View {
             .padding(.horizontal, 12)
         }
         .padding(.bottom, 8)
+        // A container with its own identifier, keeping its controls' (#832).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("planShareBar")
         .task {
             lookAgain()
@@ -166,7 +168,6 @@ struct PlanShareBar: View {
                 Text(PlanSharingWording.netlifyTeacher)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 12) {
                 Toggle(PlanSharingWording.protect, isOn: $protect)
@@ -207,7 +208,6 @@ struct PlanShareBar: View {
                 Text(flood)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if let when = marker.lastShared {
                 Text(PlanSharingWording.lastShared.replacingOccurrences(
@@ -263,12 +263,10 @@ struct PlanShareBar: View {
         case .unfinished:
             Text(PlanSharingWording.lastShareUnfinished)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareUnfinished")
         case .stopping:
             Text(PlanSharingWording.stopUnconfirmed)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareStopping")
         case .protected:
             Text(PlanSharingWording.withPassword)
@@ -281,14 +279,12 @@ struct PlanShareBar: View {
             // Said in words on the bar, never in a tooltip only (#833).
             Text(PlanSharingWording.newPasswordNotInUse)
                 .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareNewPasswordWaiting")
         }
         if PlanSharing.showsOldCopies(marker) {
             Text(PlanSharingWording.oldCopyStillThere)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("planShareOldCopy")
         }
     }

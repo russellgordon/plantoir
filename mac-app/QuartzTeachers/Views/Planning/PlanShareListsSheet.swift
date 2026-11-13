@@ -81,23 +81,28 @@ struct PlanShareListsSheet: View {
         // Two tables of five columns fit side by side, and the sheet grows.
         .frame(minWidth: 900, idealWidth: 1040, maxWidth: .infinity, minHeight: 480, idealHeight: 580, maxHeight: .infinity)
         .interactiveDismissDisabled()
-        // Escape is Cancel too: Cancel holds Return, and a button has one key.
+        // Escape is Cancel too (#832). Cancel holds Return, and a button
+        // has one key, so Escape is the sheet's own: measured, it did
+        // nothing before (`QuestionKeysTests`).
         .onExitCommand {
             onCancel()
         }
         .sheet(isPresented: $isShowingWarning) {
-            PlanSharePublicWarningSheet(
-                rows: PlanSharing.warningRows(
+            // #834's one component for a question with its facts: Cancel
+            // answers Return and Escape, and goes back to the tables, whose
+            // own Cancel shares nothing.
+            FactsQuestionSheet(
+                question: PlanSharing.warningQuestion(
                     shared: model.sharedCount,
                     heldBack: model.heldBackCount,
                     keysInShared: model.answerKeysInShared
                 ),
-                onShare: {
+                identifier: "planShareWarning",
+                goAhead: {
                     isShowingWarning = false
                     onShare(model)
                 },
-                onCancel: {
-                    // Back to the tables, whose own Cancel shares nothing.
+                cancel: {
                     isShowingWarning = false
                 }
             )

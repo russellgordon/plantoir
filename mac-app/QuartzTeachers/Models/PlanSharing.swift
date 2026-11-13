@@ -300,32 +300,57 @@ nonisolated enum PlanSharing {
     /// The public-address warning's rows (unitPlanning.share.warningSheet,
     /// #834's shape): the answer-key row only when a key sits in Shared, so
     /// a row whose fact is missing is absent.
-    static func warningRows(shared: Int, heldBack: Int, keysInShared: Int) -> [PlanShareRow] {
-        var rows: [PlanShareRow] = []
-        rows.append(PlanShareRow(label: PlanSharingWording.crawlerRowLabel, value: PlanSharingWording.crawlerRowValue))
+    static func warningRows(shared: Int, heldBack: Int, keysInShared: Int) -> [FactsQuestionRow] {
+        var rows: [FactsQuestionRow] = []
+        rows.append(FactsQuestionRow(label: PlanSharingWording.crawlerRowLabel, value: PlanSharingWording.crawlerRowValue))
         let documents: String = PlanSharingWording.documentsRowValue
             .replacingOccurrences(of: "{shared}", with: String(shared))
             .replacingOccurrences(of: "{heldBack}", with: String(heldBack))
-        rows.append(PlanShareRow(label: PlanSharingWording.documentsRowLabel, value: documents))
+        rows.append(FactsQuestionRow(label: PlanSharingWording.documentsRowLabel, value: documents))
         if keysInShared > 0 {
             let keys: String = PlanSharingWording.answerKeysRowValue.replacingOccurrences(of: "{n}", with: String(keysInShared))
-            rows.append(PlanShareRow(label: PlanSharingWording.answerKeysRowLabel, value: keys))
+            rows.append(FactsQuestionRow(label: PlanSharingWording.answerKeysRowLabel, value: keys))
         }
-        rows.append(PlanShareRow(label: PlanSharingWording.passwordRowLabel, value: PlanSharingWording.passwordRowValue))
+        rows.append(FactsQuestionRow(label: PlanSharingWording.passwordRowLabel, value: PlanSharingWording.passwordRowValue))
         return rows
     }
 
     /// The dialog after Change Password (changePasswordCases): the
     /// earlier-years row only while an earlier year is still shared.
-    static func newPasswordRows(earlierYearShared: Bool) -> [PlanShareRow] {
-        var rows: [PlanShareRow] = [
-            PlanShareRow(label: PlanSharingWording.askedForNowLabel, value: PlanSharingWording.askedForNowValue),
-            PlanShareRow(label: PlanSharingWording.whatChangesItLabel, value: PlanSharingWording.whatChangesItValue),
+    static func newPasswordRows(earlierYearShared: Bool) -> [FactsQuestionRow] {
+        var rows: [FactsQuestionRow] = [
+            FactsQuestionRow(label: PlanSharingWording.askedForNowLabel, value: PlanSharingWording.askedForNowValue),
+            FactsQuestionRow(label: PlanSharingWording.whatChangesItLabel, value: PlanSharingWording.whatChangesItValue),
         ]
         if earlierYearShared {
-            rows.append(PlanShareRow(label: PlanSharingWording.earlierYearsLabel, value: PlanSharingWording.earlierYearsValue))
+            rows.append(FactsQuestionRow(label: PlanSharingWording.earlierYearsLabel, value: PlanSharingWording.earlierYearsValue))
         }
         return rows
+    }
+
+    /// The public-address warning as #834's question: the title asks, one
+    /// sentence, the rows, Cancel the default and Escape.
+    static func warningQuestion(shared: Int, heldBack: Int, keysInShared: Int) -> FactsQuestion {
+        return FactsQuestion(
+            title: PlanSharingWording.crawlerWarningTitle,
+            message: PlanSharingWording.crawlerWarningMessage,
+            rows: warningRows(shared: shared, heldBack: heldBack, keysInShared: keysInShared),
+            action: PlanSharingWording.shareAnyway,
+            cancel: "Cancel"
+        )
+    }
+
+    /// The dialog after Change Password, as #834's question. Its button that
+    /// goes ahead, Share Again, is the default (Russell, 2026-11-13), and
+    /// Later is Escape.
+    static func newPasswordQuestion(earlierYearShared: Bool) -> FactsQuestion {
+        return FactsQuestion(
+            title: PlanSharingWording.newPasswordSavedTitle,
+            message: PlanSharingWording.newPasswordSavedMessage,
+            rows: newPasswordRows(earlierYearShared: earlierYearShared),
+            action: PlanSharingWording.shareAgain,
+            cancel: PlanSharingWording.later
+        )
     }
 
     /// What `PLANTOIR_PLAN_PASSWORD_SAVED:` said in a stretch of output:
@@ -526,15 +551,6 @@ nonisolated struct PlanShareLists: Equatable {
         let trimmed: String = question.trimmingCharacters(in: .whitespaces)
         return trimmed.hasPrefix(PlanShareLists.question) || trimmed.hasPrefix(PlanShareLists.questionProtected)
     }
-}
-
-/// One row of a labelled-rows dialog (#834): a few words and their value.
-nonisolated struct PlanShareRow: Equatable {
-
-    // MARK: - Stored properties
-
-    let label: String
-    let value: String
 }
 
 /// The share bar's words (contracts/shared-rules.json → unitPlanning.share
