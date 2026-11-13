@@ -744,7 +744,10 @@ enum ReferenceReplacer {
 
         let fileManager: FileManager = FileManager.default
         let folderName: String = courseDirectoryURL.lastPathComponent
-        let baseCount: Int = courseDirectoryURL.pathComponents.count
+        // Asked of the folder's resolved path, because the walk hands back
+        // `/private/var/…` for a folder named `/var/…`, and a count of path
+        // components taken from one spelling is wrong for the other.
+        let basePath: String = courseDirectoryURL.resolvingSymlinksInPath().path
         var couldNotRead: Bool = false
         let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
         guard let walker = fileManager.enumerator(
@@ -764,11 +767,16 @@ enum ReferenceReplacer {
         var bytes: Int64 = 0
         var missing: [String] = []
         for case let entryURL as URL in walker {
-            let components: [String] = Array(entryURL.pathComponents.dropFirst(baseCount))
-            if components.isEmpty {
-                continue
+            // The entry's own name is never resolved: a link stays a link.
+            let parentPath: String = entryURL.deletingLastPathComponent().resolvingSymlinksInPath().path
+            var relative: String = entryURL.lastPathComponent
+            if parentPath != basePath {
+                guard parentPath.hasPrefix(basePath + "/") else {
+                    couldNotRead = true
+                    continue
+                }
+                relative = String(parentPath.dropFirst(basePath.count + 1)) + "/" + relative
             }
-            let relative: String = components.joined(separator: "/")
             let values: URLResourceValues? = try? entryURL.resourceValues(forKeys: Set(keys))
             let isLink: Bool = values?.isSymbolicLink ?? false
             let isFolder: Bool = (values?.isDirectory ?? false) && !isLink

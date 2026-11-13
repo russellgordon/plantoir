@@ -59,6 +59,8 @@ final class ReferenceReplacerTests: XCTestCase {
         workingFolderURL = rootURL.appendingPathComponent("workspace")
         coursesDirectoryURL = workingFolderURL.appendingPathComponent("courses")
         try ReferenceReplacerTests.writeCourse(at: liveURL, reference: false, says: "live")
+        // What makes a folder a working folder to `reloadCourses`.
+        try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("preview.sh"))
         try ReferenceReplacerTests.writeCourse(at: oldURL, reference: true, says: "old")
         ReferenceLock.lock(courseDirectory: oldURL)
 
@@ -545,6 +547,7 @@ final class ReferenceReplacerTests: XCTestCase {
 
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.chooseWorkspace(at: workingFolderURL)
+        workspace.reloadCourses()
         var backup: BackupItem?
         for item in workspace.backupItems where item.courseCode == "ICS3U-2025" {
             backup = item
@@ -679,6 +682,8 @@ final class ReferenceReplacerTests: XCTestCase {
             )
             ReferenceLock.lock(courseDirectory: coursesDirectoryURL.appendingPathComponent(entry))
         }
+        try FileManager.default.createDirectory(at: coursesDirectoryURL, withIntermediateDirectories: true)
+        try Data("#!/bin/bash\n".utf8).write(to: workingFolderURL.appendingPathComponent("preview.sh"))
         if try XCTUnwrap(testCase["backup"] as? Bool) {
             let backups: URL = coursesDirectoryURL.appendingPathComponent("_backups").appendingPathComponent("ICS3U-2025")
             try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
@@ -693,6 +698,7 @@ final class ReferenceReplacerTests: XCTestCase {
         // The reading a window makes of the folder, sweeps and all.
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.chooseWorkspace(at: workingFolderURL)
+        workspace.reloadCourses()
 
         let expect: [String: Any] = try XCTUnwrap(testCase["expect"] as? [String: Any])
         var after: [String] = []
@@ -742,6 +748,7 @@ final class ReferenceReplacerTests: XCTestCase {
         try prepareWorkingFolder()
         let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
         workspace.chooseWorkspace(at: workingFolderURL)
+        workspace.reloadCourses()
         var live: Course?
         for course in workspace.courses where course.code == "ICS3U" {
             live = course
