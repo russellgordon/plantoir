@@ -175,6 +175,43 @@ def variants(width, height):
             out[position] = value
         return width_now, height_now, out
 
+    def shift_right(right_in):
+        return lambda image, fill: transform(image, width, height, lambda x, y: (x - right_in * DPI, y), fill)
+
+    def faint_past_the_box(image, fill):
+        width_now, height_now, pixels = image
+        if fill == 0:
+            out = (width_now, height_now, bytearray(pixels))
+            paint(out, [(5.02, 0.57, 5.62, 0.73)], 255)
+            return out
+        out = (width_now, height_now, bytearray(pixels))
+        for row in range(height_now):
+            for column in range(width_now):
+                if pixels[row * width_now + column] == 15:
+                    out[2][row * width_now + column] = 178   # the name, in light pencil
+        paint(out, [(5.02, 0.57, 5.62, 0.73)], 178)
+        return out
+
+    def paper_marks(image, fill):
+        if fill == 0:
+            return image
+        grain = random.Random(11)
+        width_now, height_now, pixels = image
+        out = bytearray(len(pixels))
+        for position, value in enumerate(pixels):
+            out[position] = max(0, min(255, value - grain.randint(0, 18)))
+        page = (width_now, height_now, out)
+        paint(page, [(0.0, 0.98, width_now / DPI, 1.0)], 150)        # a ruled line across the page, under the box
+        paint(page, [(5.9, 0.0, 5.91, 1.4)], 160)                    # a fold line, down past the box's right
+        for step in range(25):                                       # a staple's shadow at the top left
+            paint(page, [(0.2 + step * 0.012, 0.15 + step * 0.006, 0.22 + step * 0.012, 0.17 + step * 0.006)], 90)
+        centre_x, centre_y, radius = 0.375 * DPI, 1.25 * DPI, 0.13 * DPI  # a three-hole punch's top hole
+        for row in range(int(centre_y - radius), int(centre_y + radius)):
+            for column in range(int(centre_x - radius), int(centre_x + radius)):
+                if (row - centre_y) ** 2 + (column - centre_x) ** 2 <= radius ** 2:
+                    out[row * width_now + column] = 40
+        return page
+
     def written_past_the_box(image, fill):
         width_now, height_now, pixels = image
         out = (width_now, height_now, bytearray(pixels))
@@ -198,6 +235,13 @@ def variants(width, height):
         "grey and speckled": (grey_and_speckled, (1, 2)),
         # A name written longer than the blank runs past the box (750 plan review L2).
         "a name written past the box": (written_past_the_box, (1,)),
+        # The same in light pencil (750a review H1: 80 levels darker than the paper missed it).
+        "a faint pencil name past the box": (faint_past_the_box, (1,)),
+        # Everyday scans the check after writing stopped (750a review M1).
+        "shifted right 0.04 in": (shift_right(0.04), (1, 2)),
+        "rotated 0.5 degrees": (rotate(0.5), (1, 2)),
+        # Paper and its marks near the header that are not writing (750a review H1, the other direction).
+        "paper grain, a ruled line, a staple and a punched hole": (paper_marks, (1, 2)),
     }
 
 
@@ -221,7 +265,7 @@ def build_scans(blank, folder, names):
     for index, (variant, (change, which)) in enumerate(variants(width, height).items()):
         if variant not in names:
             continue
-        identifier = "Student " + "ABCDEFGHIJKLMNOP"[index]
+        identifier = "Student " + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[index]
         scan_pages = []
         masks = []
         for number, (image, mask) in enumerate(pages, start=1):

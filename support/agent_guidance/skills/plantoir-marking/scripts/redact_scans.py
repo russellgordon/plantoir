@@ -44,9 +44,9 @@ import zlib
 from pathlib import Path
 
 # MARK: - What you may change for this teacher
-#   the header label (--label, LABEL), the box margins below, the regions used to line a page up
-#   (HEADER_DEPTH_IN, FOOTER_DEPTH_IN), the tolerances, the identifier pattern, the folder names,
-#   the wording of the lines it prints, and the resolution.
+#   the header label (--label, LABEL), the box margins below (larger, never smaller), the regions used
+#   to line a page up (HEADER_DEPTH_IN, FOOTER_DEPTH_IN), the identifier pattern, the folder names, the
+#   wording of the lines it prints (never claiming more than was measured), and the resolution.
 LABEL = "Name"
 BOX_LEFT_MARGIN_PT = 11          # the box starts this far left of the label
 BOX_TOP_IN = 0.20                # and this far from the top of the page
@@ -55,21 +55,6 @@ BOX_BEFORE_NEXT_PT = 3           # and stops this far before the next word on th
 LABEL_SEARCH_DEPTH_IN = 1.5      # the label is looked for in the top of the page only
 HEADER_DEPTH_IN = 1.6            # the band at the top used to line a page up
 FOOTER_DEPTH_IN = 1.2            # the band at the foot used to line a page up
-SHIFT_TOLERANCE_IN = 0.10        # how far the box may land from the blank test's name box
-SCALE_TOLERANCE = 0.02           # how much a page may be shrunk or enlarged
-SIZE_TOLERANCE_IN = 0.08         # how far a page's size may differ from the blank test's
-SEARCH_IN = 0.8                  # how far a header is looked for, either way
-PROFILE_DPI = 50                 # pixels per inch for lining up
-INK_NEIGHBOURS = 2               # ink has at least this many ink neighbours; a lone speck has none
-SMOOTHING = 2                    # profile values averaged this many either way (0.04 in at 50 dpi)
-INK_STEP = 40                    # how much darker than the paper a pixel must be to count as ink
-RING_IN = 0.25                   # how far around the box writing past it is looked for
-RING_DPI = 100                   # pixels per inch for that look
-RING_STEP = 80                   # how much darker than the paper a pixel must be there to count as writing
-RING_SLACK = 1                   # pixels either way the blank's own print may sit after lining up
-RING_SEARCH = 3                  # pixels either way the last of the lining up is looked for
-RING_LIMIT = 10                  # pixels of writing past the box that stop the file (0.001 square inches)
-MIN_MATCH = 0.55                 # how well a profile must match the blank test's to be trusted
 DPI = 150                        # pixels per inch for the blanked pages
 JPEG_QUALITY = 75
 IDENTIFIER = r"^Student [A-Z]{1,2}$"
@@ -84,7 +69,26 @@ PAPERS_TO_NAME = "Papers to name.pdf"
 #   capture every program's output and print only counts and identifiers; refuse (exit 1, with an
 #   identifier-only message) when anything is unexpected; never write a page whose header does not
 #   match the blank test; never render the box's own pixels into a blanked page; never say OK about
-#   coverage that was not measured.
+#   coverage that was not measured; never write inside a Plantoir working folder; and the TOLERANCES
+#   below, which were measured (documentation/09-mac-app.md): loosening one to clear a CHECK lets a
+#   name through. A CHECK goes to the teacher, who rescans.
+SHIFT_TOLERANCE_IN = 0.10        # how far the box may land from the blank test's name box
+SCALE_TOLERANCE = 0.02           # how much a page may be shrunk or enlarged
+SIZE_TOLERANCE_IN = 0.08         # how far a page's size may differ from the blank test's
+SEARCH_IN = 0.8                  # how far a header is looked for, either way
+PROFILE_DPI = 50                 # pixels per inch for lining up
+INK_NEIGHBOURS = 2               # ink has at least this many ink neighbours; a lone speck has none
+SMOOTHING = 2                    # profile values averaged this many either way (0.04 in at 50 dpi)
+INK_STEP = 40                    # how much darker than the paper a pixel must be to count as ink
+RING_IN = 0.25                   # how far around the box writing past it is looked for
+RING_DPI = 100                   # pixels per inch for that look
+RING_STEP = 40                   # how much darker than the paper a pixel must be there to count as writing
+RING_SLACK = 1                   # pixels either way the blank's own print may sit after lining up
+RING_SEARCH = 3                  # pixels either way the last of the lining up is looked for
+RING_LIMIT = 10                  # pixels of writing past the box that stop the file (0.001 square inches)
+RING_RULED = 0.5                 # a thin straight line at least this long (inches) is the paper's, not writing
+EDGE_SKIP_IN = 0.6               # the left margin, where holes and staples are, is left out of lining up
+MIN_MATCH = 0.55                 # how well a profile must match the blank test's to be trusted
 
 TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
 
@@ -111,7 +115,8 @@ def need_tools():
             missing.append(tool)
     if missing:
         raise Refusal("Poppler is not installed (" + ", ".join(missing) + " not found). "
-                      "On a Mac with Homebrew: brew install poppler. Nothing was read.")
+                      "On a Mac with Homebrew: brew install poppler. Nothing was read, and no scan may be read "
+                      "any other way until this script has blanked it.")
 
 
 def page_sizes(pdf):
@@ -342,7 +347,43 @@ def ink_of(image):
                 supported = neighbours >= INK_NEIGHBOURS
                 if supported:
                     darkness[row * width + column] = min(255, value)
+    drop_thin_lines(width, height, darkness, int(RING_RULED * PROFILE_DPI))
     return width, height, bytes(darkness)
+
+
+def drop_thin_lines(width, height, darkness, long_run):
+    """Clear every thin straight line at least long_run pixels long: a ruled line, a fold or a writing
+    line is the paper's, and the blank test and the scan are treated alike."""
+    def inked(column, row):
+        return 0 <= column < width and 0 <= row < height and darkness[row * width + column] > 0
+
+    clear = []
+    for row in range(height):
+        run_start = None
+        for column in range(width + 1):
+            here = column < width and inked(column, row)
+            if here and run_start is None:
+                run_start = column
+            elif not here and run_start is not None:
+                if column - run_start >= long_run:
+                    for ruled in range(run_start, column):
+                        if not inked(ruled, row - 2) and not inked(ruled, row + 2):
+                            clear.append(row * width + ruled)
+                run_start = None
+    for column in range(width):
+        run_start = None
+        for row in range(height + 1):
+            here = row < height and inked(column, row)
+            if here and run_start is None:
+                run_start = row
+            elif not here and run_start is not None:
+                if row - run_start >= long_run:
+                    for ruled in range(run_start, row):
+                        if not inked(column - 2, ruled) and not inked(column + 2, ruled):
+                            clear.append(ruled * width + column)
+                run_start = None
+    for position in clear:
+        darkness[position] = 0
 
 
 def darkness_profile(image, columns, rows, axis):
@@ -439,9 +480,10 @@ def line_up(blank_image, scan_image, box_in):
     head = (0, int(HEADER_DEPTH_IN * dpi))
     foot = (height - int(FOOTER_DEPTH_IN * dpi), height)
     box_left = int(box_in[0] * dpi)
+    margin = int(EDGE_SKIP_IN * dpi)   # punched holes and a staple's shadow sit in the left margin
     regions = [
-        ("head", (0, box_left), head),
-        ("foot left", (0, width // 2), foot),
+        ("head", (margin, box_left), head),
+        ("foot left", (margin, width // 2), foot),
         ("foot right", (width // 2, width), foot),
     ]
     points = []
@@ -539,13 +581,41 @@ def writing_past_the_box(source, page, blank_page_image, box_in, shift_in, upsid
     def scan_ink(column, row):
         return 0 <= column < crop_width and 0 <= row < crop_height and paper - crop_pixels[row * crop_width + column] > RING_STEP
 
+    # A ruled line, a fold or a scanner's edge is a straight line longer than any stroke of writing:
+    # its pixels are the paper's, not the student's.
+    ruled = set()
+    long_run = int(RING_RULED * RING_DPI)
+    for row in range(crop_height):
+        run_start = None
+        for column in range(crop_width + 1):
+            inked = column < crop_width and scan_ink(column, row)
+            if inked and run_start is None:
+                run_start = column
+            elif not inked and run_start is not None:
+                if column - run_start >= long_run:
+                    for ruled_column in range(run_start, column):
+                        if not scan_ink(ruled_column, row - 2) and not scan_ink(ruled_column, row + 2):
+                            ruled.add((ruled_column, row))   # thin: a line, not a long stroke of writing
+                run_start = None
+    for column in range(crop_width):
+        run_start = None
+        for row in range(crop_height + 1):
+            inked = row < crop_height and scan_ink(column, row)
+            if inked and run_start is None:
+                run_start = row
+            elif not inked and run_start is not None:
+                if row - run_start >= long_run:
+                    for ruled_row in range(run_start, row):
+                        if not scan_ink(column - 2, ruled_row) and not scan_ink(column + 2, ruled_row):
+                            ruled.add((column, ruled_row))
+                run_start = None
     writing = []
     for row in range(crop_height):
         for column in range(crop_width):
             x, y = x0 + column, y0 + row
             if box_x0 <= x < box_x1 and box_y0 <= y < box_y1:
                 continue
-            if not scan_ink(column, row):
+            if not scan_ink(column, row) or (column, row) in ruled:
                 continue
             neighbours = 0
             for neighbour_row in (row - 1, row, row + 1):
@@ -643,6 +713,15 @@ def verify_blanked(path, boxes, blank, blank_images, folder):
                 if max(pixels[row * width + x0 + 1: row * width + x1 - 1]) != 0:
                     return f"page {number}: the box is not black all through"
         scan_image = ink_of(render_gray(path, number, PROFILE_DPI, folder))
+        if box_in is not None:
+            # The black box is the script's own ink, not the page's: left in, a page shifted right by
+            # 0.04 in lined up against solid black and was stopped (750a review M1).
+            width, height, ink = scan_image
+            ink = bytearray(ink)
+            for row in range(max(0, int(box_in[1] * PROFILE_DPI) - 1), min(height, int(box_in[3] * PROFILE_DPI) + 2)):
+                for column in range(max(0, int(box_in[0] * PROFILE_DPI) - 1), min(width, int(box_in[2] * PROFILE_DPI) + 2)):
+                    ink[row * width + column] = 0
+            scan_image = (width, height, bytes(ink))
         way, _reason, _shift = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
         if way != "upright":
             return f"page {number}: the blanked page does not line up with your blank test"
@@ -717,8 +796,25 @@ def write_check_file(entries, path, folder):
         writer.write(path)
 
 
+def inside_a_working_folder(path):
+    """True when the path, or a folder above it, is a Plantoir working folder (it holds courses/ and .toolchain/)."""
+    path = Path(path).resolve()
+    for folder in [path] + list(path.parents):
+        if (folder / "courses").is_dir() and (folder / ".toolchain").is_dir():
+            return True
+    return False
+
+
+def refuse_inside_a_working_folder(*paths):
+    for path in paths:
+        if path is not None and inside_a_working_folder(path):
+            raise Refusal("a folder given is inside the Plantoir working folder, where it could be built into a "
+                          "class website or copied with a course; choose folders outside it. Nothing was written")
+
+
 def redact_folder(originals, redacted, blank, check_dir, label, given_box, identifier):
     need_tools()
+    refuse_inside_a_working_folder(redacted, check_dir)
     for folder_path, what in ((originals, "the originals folder"), (blank, "the blank test")):
         if not Path(folder_path).exists():
             raise Refusal(f"{what} is not there; nothing was read")
@@ -804,6 +900,10 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
             if turned:
                 totals["turned"] += 1
                 note = "; page" + ("s " if len(turned) > 1 else " ") + ", ".join(turned) + " turned upright"
+            unboxed = [str(number) for number, box_in in enumerate(boxes, start=1) if box_in is None]
+            if unboxed:
+                note += ("; pages " if len(unboxed) > 1 else "; page ") + ", ".join(unboxed) + \
+                    (" have" if len(unboxed) > 1 else " has") + " no name box on your blank test, so nothing there was blanked"
             totals["written"] += 1
             blanked_paths.append(str(target))
             print(f"{label_text}.pdf: {len(sizes)} pages, box placed on {boxed}; header matches your blank test{note}")
@@ -818,8 +918,10 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
     if left_alone:
         print(f"{left_alone} files or folders not named like an identifier were left alone")
     print(f"{totals['written']} files blanked, {totals['check']} to CHECK; {totals['turned']} had a page turned upright. "
-          "The box covers the name box at the top of each page and nothing else: please skim "
-          f"'{SKIM_FILE}' and '{NAME_BOX_CHECK}' in your check folder before any paper is read.")
+          "The box covers the name box at the top of each page whose blank test has one, and writing that runs on "
+          "within a quarter inch of it stops the file. A name anywhere else on a page is not blanked. Please open "
+          f"'{NAME_BOX_CHECK}' in your check folder first (the top of every page with the box drawn in red), then skim "
+          f"'{SKIM_FILE}', before any paper is read.")
     return 0 if totals["check"] == 0 else 1
 
 
@@ -828,6 +930,7 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
 
 def split_stack(stack, pages_per_paper, into, check_dir):
     need_tools()
+    refuse_inside_a_working_folder(into, check_dir)
     sizes = page_sizes(stack)
     if pages_per_paper < 1 or len(sizes) % pages_per_paper != 0:
         raise Refusal(f"the stack has {len(sizes)} pages, which is not a whole number of papers of {pages_per_paper} pages")

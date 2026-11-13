@@ -41,6 +41,12 @@ def named_copies():
     return json.loads(SHARED_RULES.read_text(encoding="utf-8"))["assessment"]["namedCopies"]
 
 
+def comparable(text):
+    """The font's ligatures as their letters and a typeset apostrophe as a typed one, without spaces."""
+    text = unicodedata.normalize("NFKC", text).replace("\u2019", "'").replace("\u2018", "'")
+    return re.sub(r"\s+", "", text)
+
+
 def table_words(table):
     """Every word of every name in an invented table, to look for in what the script printed."""
     words = set()
@@ -97,8 +103,7 @@ class NamedCopyTests(unittest.TestCase):
                 for relative in written:
                     text = subprocess.run(["pdftotext", str(out / relative), "-"], capture_output=True).stdout.decode("utf-8")
                     name = relative.split("/", 1)[1].rsplit(" - ", 1)[0]
-                    self.assertIn(re.sub(r"\s+", "", unicodedata.normalize("NFC", name)),
-                                  re.sub(r"\s+", "", unicodedata.normalize("NFC", text)), f"{case['name']}: the name is not printed")
+                    self.assertIn(comparable(name), comparable(text), f"{case['name']}: the name is not printed")
 
     def test_the_script_never_keeps_or_prints_tectonics_logs(self):
         source = SCRIPT.read_text(encoding="utf-8")

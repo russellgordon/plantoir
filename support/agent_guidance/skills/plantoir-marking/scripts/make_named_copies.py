@@ -8,6 +8,7 @@ through run_with_names.py, never directly:
 
     python3 -B <skill>/scripts/run_with_names.py --table TABLE --watch <marking folder> --quarantine <teacher-only>/Quarantine --
         python3 -B make_named_copies.py --table TABLE --sheets "<marking folder>/<Assessment>/Sheets" --out "<teacher-only>/<Assessment>/Named"
+    python3 -B make_named_copies.py --check-table --table TABLE      (through the runner too: counts only)
     python3 -B make_named_copies.py --self-test
 
 TABLE is the teacher's Name Mapping Table (CSV or tab-separated) with the columns section, identifier and
@@ -105,9 +106,18 @@ def file_safe(name):
     return re.sub(r'[\\/:*?"<>|]', "-", name).strip(" .")
 
 
+def comparable(text):
+    """Text as a PDF and a table can both be compared: the font's ligatures (ffi, fi) as their letters,
+    a typeset apostrophe as a typed one, and no spaces (750a review M2: O'Testpupil and Griffith failed)."""
+    text = unicodedata.normalize("NFKC", text)
+    for curly, straight in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", '"'), ("\u201d", '"')):
+        text = text.replace(curly, straight)
+    return re.sub(r"\s+", "", text)
+
+
 def printed_text(pdf):
     text = subprocess.run(["pdftotext", str(pdf), "-"], capture_output=True).stdout.decode("utf-8", "replace")
-    return re.sub(r"\s+", "", unicodedata.normalize("NFC", text))
+    return comparable(text)
 
 
 def name_one(tex, name):
@@ -125,9 +135,29 @@ def name_one(tex, name):
             return None, "the named sheet did not compile"
         if "Missing character" in said:
             return None, "the name could not be set in this sheet's font"
-        if re.sub(r"\s+", "", name) not in printed_text(pdf):
+        if comparable(name) not in printed_text(pdf):
             return None, "the name could not be set in this sheet's font"
         return pdf.read_bytes(), None
+
+
+def in_a_working_folder(path):
+    path = Path(path).resolve()
+    for folder in [path] + list(path.parents):
+        if (folder / "courses").is_dir() and (folder / ".toolchain").is_dir():
+            return True
+    return False
+
+
+def check_table(table):
+    """Say whether the table is right, in counts only: rows, sections, and nothing of what a row holds."""
+    names = read_table(table)
+    sections = {}
+    for section, _identifier in names:
+        sections[section] = sections.get(section, 0) + 1
+    print(f"The mapping table has {len(names)} rows, in " + ", ".join(
+        f"section {section} ({count})" for section, count in sorted(sections.items())) +
+        "; every row is like section 1, Student A, a name, and no section and identifier repeat.")
+    return 0
 
 
 def make_copies(table, sheets, out):
@@ -136,6 +166,8 @@ def make_copies(table, sheets, out):
     sheets = Path(sheets).resolve()
     out = Path(out).resolve()
     marking_folder = sheets.parent.parent
+    if in_a_working_folder(out):
+        raise Refusal("the named copies must go in the teacher-only folder, outside the Plantoir working folder; nothing was written")
     if out == marking_folder or marking_folder in out.parents or sheets in out.parents:
         raise Refusal("the named copies must go in the teacher-only folder, never in the marking folder; nothing was written")
     names = read_table(table)
@@ -241,6 +273,10 @@ def main(arguments):
         return 0
     if "--self-test" in arguments:
         return self_test()
+    if "--check-table" in arguments:
+        if option(arguments, "--table") is None:
+            raise Refusal("give --table")
+        return check_table(option(arguments, "--table"))
     for needed in ("--table", "--sheets", "--out"):
         if option(arguments, needed) is None:
             raise Refusal(f"give {needed}")

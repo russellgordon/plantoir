@@ -50,9 +50,6 @@ FOCUS_NONE = "Nothing to focus on from this test: keep going."
 CLOSING_TITLE = "Overall comments"
 MARKS_TITLE = "Your marks"
 NOTHING_LOST = "Nothing lost: full marks on every question."
-TEACHER_DECIDES = ("Every mark, level and comment here is a suggestion drafted for you. Grading is your "
-                   "professional responsibility: please read and decide on each one before anything reaches "
-                   "a student. I draft; you decide.")
 PAPER = "letterpaper"
 MAX_FOCUS = 4
 IDENTIFIER = r"^Student [A-Z]{1,2}$"
@@ -62,7 +59,11 @@ IDENTIFIER = r"^Student [A-Z]{1,2}$"
 #   (this script reads none); never print a file name that is not an identifier; capture every
 #   program's output and print only counts and identifiers; refuse (exit 1, identifier-only message)
 #   when anything is unexpected; every lost mark carries a plain-words reason; the student line is
-#   \studentline{identifier} and nothing else; a sheet that does not compile is never left half-built.
+#   \studentline{identifier} and nothing else; a sheet that does not compile is never left half-built;
+#   never write inside a Plantoir working folder; and the teacher-decides sentence below, word for word.
+TEACHER_DECIDES = ("Every mark, level and comment here is a suggestion drafted for you. Grading is your "
+                   "professional responsibility: please read and decide on each one before anything reaches "
+                   "a student. I draft; you decide.")
 
 
 class Refusal(Exception):
@@ -340,7 +341,7 @@ def part_row(part, continued=False):
 def feedback_tex(sheet, school):
     kit = sheet.kit
     title = kit["test"] + ": Feedback"
-    tex = preamble(kit["test"] + " -- Feedback", kit["course"], school)
+    tex = preamble(kit["test"] + ": Feedback", kit["course"], school)
     tex += "{\\LARGE\\bfseries\\sffamily " + esc(title) + "}\\par\\vspace{2pt}\n"
     tex += "\\studentline{" + esc(sheet.identifier) + "}\n"
     tex += inline(sheet.marks.get("summary", "")) + "\\par\\vspace{6pt}\n"
@@ -422,7 +423,7 @@ def teacher_tex(sheet, school):
     kit = sheet.kit
     marks_line = " $\\cdot$ ".join(f"{esc(category['key'])} {number(earned)}/{out_of}"
                                    for category, earned, out_of in sheet.category_marks())
-    tex = preamble(kit["test"] + " -- Marks by question (teacher only)", kit["course"], school)
+    tex = preamble(kit["test"] + ": Marks by question (teacher only)", kit["course"], school)
     tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"]) + ": Marks by question}\\par\\vspace{2pt}\n"
     tex += "{\\large\\bfseries\\sffamily " + marks_line + "}\\par\\vspace{2pt}\n"
     tex += "\\studentline{" + esc(sheet.identifier) + "}\n"
@@ -501,6 +502,9 @@ def compile_and_check(tex, target_pdf, identifier, part_titles):
 def build(kit_path, marks_path, out, checker, settings, school, site, links_path):
     if shutil.which("tectonic") is None or shutil.which("pdftotext") is None:
         raise Refusal("tectonic and Poppler's pdftotext are needed (on a Mac with Homebrew: brew install tectonic poppler)")
+    for folder in [Path(out).resolve()] + list(Path(out).resolve().parents):
+        if (folder / "courses").is_dir() and (folder / ".toolchain").is_dir():
+            raise Refusal("the sheets folder is inside the Plantoir working folder; marking is kept outside it")
     check_with_kit_checker(checker, kit_path, marks_path)
     kit = read_json(kit_path, "the kit")
     marks = read_json(marks_path, "the marks record")

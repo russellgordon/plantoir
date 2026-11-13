@@ -34052,7 +34052,11 @@
           {"variant": "shifted down 0.05 in", "expect": "written", "measured": "written"},
           {"variant": "scaled 99%", "expect": "written", "measured": "written"},
           {"variant": "grey and speckled", "expect": "written", "measured": "written"},
-          {"variant": "a name written past the box", "expect": "CHECK", "measured": "CHECK"}
+          {"variant": "a name written past the box", "expect": "CHECK", "measured": "CHECK"},
+          {"variant": "a faint pencil name past the box", "expect": "CHECK", "measured": "CHECK"},
+          {"variant": "shifted right 0.04 in", "expect": "written", "measured": "written"},
+          {"variant": "rotated 0.5 degrees", "expect": "written", "measured": "written"},
+          {"variant": "paper grain, a ruled line, a staple and a punched hole", "expect": "written", "measured": "written"}
         ]
       },
       "checkFiles": ["Name box check.pdf", "Blanked papers to skim.pdf", "Papers to name.pdf"],
@@ -34066,7 +34070,7 @@
       ]
     },
     "namedCopies": {
-      "rule": "make_named_copies.py (#750, 750a) is the only script that puts a name into anything. It reads the mapping table itself (refusing the run, counts only, when a row is not like `section, Student A, a name`, or a section and identifier repeat), puts the TeX-escaped name into each identifier sheet's one \\studentline{...}, compiles it with tectonic in a temporary folder outside both folders with its output captured and discarded (never --keep-logs or --print: tectonic prints the line holding a name on a failed compile, measured on 0.17), fails a copy whose output says Missing character or whose PDF text does not hold the name (750 plan review M3: a name the font cannot set compiled with exit 0 and a blank where the name should be), and moves only the PDF into the teacher-only Named/Section N/. It never writes in the marking folder and refuses an --out inside it. It prints counts and identifiers only. Each case's `table` is the mapping table, `sheets` the identifier sheets to make (`plain`, or `broken`: an undefined macro on the student line's line, so the failed compile's message holds the name), `out` is `teacherOnly` unless it says `marking`; `says` are lines the output must hold; `written` the named PDFs; and after every case no value of the table is in the output, and no .tex, .log or .aux is in Named.",
+      "rule": "make_named_copies.py (#750, 750a) is the only script that puts a name into anything. It reads the mapping table itself (refusing the run, counts only, when a row is not like `section, Student A, a name`, or a section and identifier repeat), puts the TeX-escaped name into each identifier sheet's one \\studentline{...}, compiles it with tectonic in a temporary folder outside both folders with its output captured and discarded (never --keep-logs or --print: tectonic prints the line holding a name on a failed compile, measured on 0.17), fails a copy whose output says Missing character or whose PDF text does not hold the name, both read with the font's ligatures as their letters and a typeset apostrophe as a typed one (750 plan review M3: a name the font cannot set compiled with exit 0 and a blank where the name should be; 750a review M2: O'Testpupil and a name with ffi were failed as unsettable), and moves only the PDF into the teacher-only Named/Section N/. It never writes in the marking folder and refuses an --out inside it. It prints counts and identifiers only. Each case's `table` is the mapping table, `sheets` the identifier sheets to make (`plain`, or `broken`: an undefined macro on the student line's line, so the failed compile's message holds the name), `out` is `teacherOnly` unless it says `marking`; `says` are lines the output must hold; `written` the named PDFs; and after every case no value of the table is in the output, and no .tex, .log or .aux is in Named.",
       "script": "scripts/make_named_copies.py",
       "slot": "\\studentline{...}",
       "escaped": ["\\", "&", "%", "$", "#", "_", "{", "}", "~", "^"],
@@ -34078,6 +34082,8 @@
         {"name": "a row not like Student A", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Testpupil Alpha,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table are not like section 1, Student A, a name; nothing was written"], "written": []},
         {"name": "a section and identifier twice", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Student A,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table repeat a section and identifier; nothing was written"], "written": []},
         {"name": "a name the sheet's font cannot set", "table": "section,identifier,name\n1,Student A,\u8bd5\u9a8c Pupilseven\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["Section 1: 0 named sheets written; 1 not written (Student A Feedback: the name could not be set in this sheet's font)"], "written": []},
+        {"name": "a name with an apostrophe", "table": "section,identifier,name\n1,Student A,O'Testpupil Alphaname\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/O'Testpupil Alphaname - Feedback.pdf"]},
+        {"name": "a name the font sets with ff, fi and ffi ligatures", "table": "section,identifier,name\n1,Student A,Ffinlaygh Offingtree\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/Ffinlaygh Offingtree - Feedback.pdf"]},
         {"name": "named copies asked for inside the marking folder", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "out": "marking", "exit": 1, "says": ["the named copies must go in the teacher-only folder, never in the marking folder; nothing was written"], "written": []}
       ]
     },
