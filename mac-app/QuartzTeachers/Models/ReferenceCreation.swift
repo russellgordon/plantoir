@@ -110,6 +110,12 @@ enum ReferenceCreation {
         /// The working folder's `courses`.
         let coursesDirectoryURL: URL
 
+        /// The reference course this one replaces, by its folder, when the
+        /// teacher chose Replace It… beside the shelf rule's refusal (#572,
+        /// second piece). The new course is then made under THAT folder's
+        /// hidden name and given its folder name.
+        var replacing: String? = nil
+
         // MARK: - Computed properties
 
         /// The name setup is given.
@@ -244,7 +250,8 @@ enum ReferenceCreation {
         schoolYear: Int?,
         coursesDirectoryURL: URL,
         existingFolderNames: [String],
-        shelved: [ReferenceCourseRule.Shelved]
+        shelved: [ReferenceCourseRule.Shelved],
+        replacing: String? = nil
     ) throws -> Prepared {
         let rawCode: String = (configuration["course_code"] as? String) ?? ""
         let code: String = CourseCodeRule.normalized(rawCode)
@@ -253,20 +260,37 @@ enum ReferenceCreation {
         }
 
         // The shelf rule again, at the act, so the caption and the act agree.
+        // A replace is the one answer to its refusal, and only for the course
+        // the rule names: the course in the way must be the one the teacher
+        // was warned about, or this is refused like any other clash.
+        var replacingFolder: String?
         if let trouble = ReferenceCourseRule.trouble(placing: code, inYear: schoolYear, among: shelved) {
-            let problem: Problem = .onTheShelfAlready(trouble, sentence: trouble.sentence)
-            ReferenceCreation.noteNotMade(code: code, folderName: nil, because: problem)
-            throw problem
+            let inTheWay: ReferenceCourseRule.Shelved? = ReferenceCourseRule.courseInTheWay(
+                placing: code, inYear: schoolYear, among: shelved
+            )
+            if let replacing, let inTheWay, inTheWay.folderName == replacing {
+                replacingFolder = replacing
+            } else {
+                let problem: Problem = .onTheShelfAlready(trouble, sentence: trouble.sentence)
+                ReferenceCreation.noteNotMade(code: code, folderName: nil, because: problem)
+                throw problem
+            }
         }
 
-        let folderName: String = ReferenceCourseRule.proposedFolderName(
+        var folderName: String = ReferenceCourseRule.proposedFolderName(
             forCode: code, schoolYear: schoolYear, existingFolderNames: existingFolderNames
         )
-        let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            let problem: Problem = .folderAlreadyExists(folderName)
-            ReferenceCreation.noteNotMade(code: code, folderName: folderName, because: problem)
-            throw problem
+        if let replacingFolder {
+            // The replacement takes the replaced course's folder name, so the
+            // ordinary Restore from Backup puts the old one back in place.
+            folderName = replacingFolder
+        } else {
+            let destinationURL: URL = coursesDirectoryURL.appendingPathComponent(folderName)
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                let problem: Problem = .folderAlreadyExists(folderName)
+                ReferenceCreation.noteNotMade(code: code, folderName: folderName, because: problem)
+                throw problem
+            }
         }
 
         switch ReferenceStaging.claim(folderName, inCoursesDirectory: coursesDirectoryURL) {
@@ -307,7 +331,8 @@ enum ReferenceCreation {
             displayCode: code,
             schoolYear: schoolYear,
             stagingURL: stagingURL,
-            coursesDirectoryURL: coursesDirectoryURL
+            coursesDirectoryURL: coursesDirectoryURL,
+            replacing: replacingFolder
         )
     }
 
@@ -329,21 +354,9 @@ enum ReferenceCreation {
             ReferenceStaging.giveBack(prepared.folderName, inCoursesDirectory: prepared.coursesDirectoryURL)
         }
 
-        var problem: Problem?
-        if wasStopped {
-            problem = .stopped
-        } else if !setupSucceeded {
-            problem = .couldNotBeMade(code: prepared.displayCode)
-        } else if !ReferenceCreation.pagesLanded(at: prepared.stagingURL, transcript: transcript) {
-            problem = .pagesDidNotLand(code: prepared.displayCode)
-        }
-        if let problem {
-            ReferenceStaging.remove(at: prepared.stagingURL)
-            ReferenceCreation.noteNotMade(
-                code: prepared.displayCode, folderName: prepared.folderName, because: problem
-            )
-            throw problem
-        }
+        try ReferenceCreation.refuseUnlessTheRunFinished(
+            prepared, setupSucceeded: setupSucceeded, wasStopped: wasStopped, transcript: transcript
+        )
 
         let destinationURL: URL = prepared.coursesDirectoryURL.appendingPathComponent(prepared.folderName)
         let staged: ReferenceCopier.Made
@@ -373,6 +386,86 @@ enum ReferenceCreation {
         ActivityTrail.note(.courseCreatedForReference, ReferenceCreation.trailLine(for: made))
         return made
     }
+
+    /// Finishes a course made to REPLACE a reference course (#572, second
+    /// piece): the same checks of how setup ended as `finish`, the same one
+    /// dangerous sequence on the hidden folder, and then, instead of a
+    /// rename to a new folder, `ReferenceReplacer.replace`, which backs the
+    /// old course up, checks the backup, and swaps the new one in under the
+    /// old folder name. Nothing of the old course is touched before the new
+    /// one is complete. The claim is given back last, however it ended.
+    static func finishByReplacing(
+        _ prepared: Prepared,
+        setupSucceeded: Bool,
+        wasStopped: Bool,
+        transcript: String,
+        world: ReferenceReplacer.World = ReferenceReplacer.World()
+    ) async throws -> ReferenceCopier.Made {
+        defer {
+            ReferenceStaging.giveBack(prepared.folderName, inCoursesDirectory: prepared.coursesDirectoryURL)
+        }
+        guard let replacing = prepared.replacing else {
+            // Giving the claim back twice is harmless: it is a set removal
+            // and a lease file that is already gone.
+            return try ReferenceCreation.finish(
+                prepared, setupSucceeded: setupSucceeded, wasStopped: wasStopped, transcript: transcript
+            )
+        }
+
+        try ReferenceCreation.refuseUnlessTheRunFinished(
+            prepared, setupSucceeded: setupSucceeded, wasStopped: wasStopped, transcript: transcript
+        )
+
+        let staged: ReferenceCopier.Made
+        do {
+            staged = try ReferenceCopier.makeIntoAReferenceCourse(
+                at: prepared.stagingURL, schoolYear: prepared.schoolYear
+            )
+        } catch {
+            ReferenceStaging.remove(at: prepared.stagingURL)
+            let made: Problem = .couldNotBeMade(code: prepared.displayCode)
+            ReferenceCreation.noteNotMade(
+                code: prepared.displayCode, folderName: prepared.folderName, because: made
+            )
+            throw made
+        }
+
+        do {
+            _ = try await ReferenceReplacer.replace(
+                ReferenceReplacer.Asked(
+                    folderName: replacing, source: ReferenceCreation.replacementSource
+                ),
+                withStagedAt: prepared.stagingURL,
+                coursesDirectoryURL: prepared.coursesDirectoryURL,
+                world: world
+            )
+        } catch {
+            // The replacer removed the new course and wrote its own line;
+            // this one says no course was made, in the same sentence.
+            ActivityTrail.note(
+                .courseCouldNotBeCreatedForReference,
+                ReferenceCreation.failureTrailLine(
+                    code: prepared.displayCode,
+                    folderName: prepared.folderName,
+                    reason: error.localizedDescription
+                )
+            )
+            throw error
+        }
+
+        let made: ReferenceCopier.Made = ReferenceCopier.Made(
+            folderName: prepared.folderName,
+            displayCode: staged.displayCode,
+            schoolYear: staged.schoolYear,
+            sectionCount: staged.sectionCount
+        )
+        ActivityTrail.note(.courseCreatedForReference, ReferenceCreation.trailLine(for: made))
+        return made
+    }
+
+    /// Where a course made from the wizard came from, as the replace line
+    /// says it.
+    static let replacementSource: String = "a new course made from the ready-made pages"
 
     /// Whether the ready-made pages are really there (plan review H3): setup
     /// said it installed them, AND a page other than a folder's front page is
@@ -425,6 +518,32 @@ enum ReferenceCreation {
     }
 
     // MARK: - Private helpers
+
+    /// Stopped, failed, or without its pages: the hidden folder is removed
+    /// and the failure line written, for `finish` and `finishByReplacing`
+    /// alike.
+    private static func refuseUnlessTheRunFinished(
+        _ prepared: Prepared,
+        setupSucceeded: Bool,
+        wasStopped: Bool,
+        transcript: String
+    ) throws {
+        var problem: Problem?
+        if wasStopped {
+            problem = .stopped
+        } else if !setupSucceeded {
+            problem = .couldNotBeMade(code: prepared.displayCode)
+        } else if !ReferenceCreation.pagesLanded(at: prepared.stagingURL, transcript: transcript) {
+            problem = .pagesDidNotLand(code: prepared.displayCode)
+        }
+        if let problem {
+            ReferenceStaging.remove(at: prepared.stagingURL)
+            ReferenceCreation.noteNotMade(
+                code: prepared.displayCode, folderName: prepared.folderName, because: problem
+            )
+            throw problem
+        }
+    }
 
     private static func noteNotMade(code: String, folderName: String?, because problem: Problem) {
         ActivityTrail.note(

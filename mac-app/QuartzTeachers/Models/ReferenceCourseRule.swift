@@ -95,6 +95,30 @@ enum ReferenceCourseRule {
         return nil
     }
 
+    /// The course on the shelf that `trouble` would refuse `code` because
+    /// of, or nil when there is none: the one a Replace It… beside the
+    /// refusal would replace (#572). The same walk as `trouble`, so the two
+    /// can never name different courses.
+    static func courseInTheWay(
+        placing code: String,
+        inYear schoolYear: Int?,
+        among shelved: [Shelved]
+    ) -> Shelved? {
+        let wanted: String = CourseCodeRule.normalized(code)
+        if wanted.isEmpty {
+            return nil
+        }
+        for existing in shelved {
+            if existing.schoolYear != schoolYear {
+                continue
+            }
+            if CourseCodeRule.normalized(existing.displayCode) == wanted {
+                return existing
+            }
+        }
+        return nil
+    }
+
     /// A folder name to offer for a new reference course: `ICS3U-2025`, or
     /// `ICS3U-REF` for one with no school year.
     ///
