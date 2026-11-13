@@ -50,6 +50,12 @@ nonisolated enum ObsidianFigureAddOnsWording {
     /// Added under the offer when the course is open in Obsidian now.
     static let offerWhileOpen: String = "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept."
 
+    /// Added under the offer instead when Obsidian is running and Plantoir
+    /// cannot tell whether the course is open in it (#742): its list of
+    /// vaults is there but cannot be read. Add Them still closes Obsidian,
+    /// so this says only what is known to be true.
+    static let offerWhileObsidianIsOpen: String = "Obsidian is open now, so it closes and opens again to show them. What you've written is kept."
+
     /// The offer's answers.
     static let offerAdd: String = "Add Them"
     static let offerNotNow: String = "Not Now"
@@ -69,12 +75,18 @@ nonisolated enum ObsidianFigureAddOnsWording {
 
     // MARK: - Functions
 
-    /// The offer's whole message: the sentence about closing Obsidian is
-    /// added when the course is open in it now.
-    static func offerText(course: String, courseIsOpen: Bool) -> String {
+    /// The offer's whole message: a sentence about closing Obsidian is added
+    /// when the course is open in it now, or when Obsidian is running and
+    /// Plantoir cannot tell (#742). Only `.open` names the course as open.
+    static func offerText(course: String, openState: ObsidianFigureAddOnsOffer.CourseOpenState) -> String {
         var text: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerMessage, course: course)
-        if courseIsOpen {
+        switch openState {
+        case .open:
             text += "\n\n" + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: course)
+        case .cannotTell:
+            text += "\n\n" + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen, course: course)
+        case .closed:
+            break
         }
         return text
     }
@@ -132,6 +144,20 @@ nonisolated enum ObsidianFigureAddOnsOffer {
         /// Ask whether to reopen Obsidian; nothing is written into an open
         /// course.
         case askReopen
+    }
+
+    /// Whether the course is open in Obsidian, as far as Plantoir can tell
+    /// (#742, `openStateCases`). What the app DOES treats `.cannotTell` as
+    /// open; only the words differ.
+    enum CourseOpenState: String, CaseIterable, Sendable {
+        /// Obsidian is running and its list of vaults marks this folder open.
+        case open
+        /// Obsidian is not running, or its list does not mark this folder
+        /// open, or there is no list at all.
+        case closed
+        /// Obsidian is running and its list is there but cannot be read: it
+        /// is rewritten in place, so a read can land mid-write.
+        case cannotTell
     }
 
     /// What a finished preview does (the second trigger).
@@ -215,20 +241,44 @@ nonisolated enum ObsidianFigureAddOnsOffer {
         return FolderActions.openVaultPaths(registryData: registryData)
     }
 
-    /// Whether the course counts as open in Obsidian: Obsidian is running
-    /// and its registry marks the course open — or the registry cannot be
-    /// read at all while Obsidian runs (fixes review N1: Obsidian rewrites it
-    /// in place, so a read can land mid-write; not knowing is not "closed").
-    static func courseIsOpen(coursePath: String, obsidianRunning: Bool, registryData: Data?) -> Bool {
+    /// Whether the course is open in Obsidian (`openStateCases`, #742).
+    ///
+    /// - Obsidian not running: `.closed`.
+    /// - No registry at all (`registryData` nil, which `ObsidianOpening`
+    ///   returns only when the file does not exist): `.closed`. Obsidian
+    ///   writes its list of vaults when a vault opens, so with no list none
+    ///   is open (Russell's ruling on #742, 2026-11-12).
+    /// - A registry that is there but cannot be read, or has no `vaults`
+    ///   object: `.cannotTell` (fixes review N1: Obsidian rewrites it in
+    ///   place, so a read can land mid-write; not knowing is not "closed").
+    /// - Otherwise `.open` exactly when the registry marks THIS folder's path
+    ///   open. The compare is on the whole path, never on the course's code
+    ///   or the vault's name, so a same-named vault elsewhere is not it.
+    static func courseOpenState(coursePath: String, obsidianRunning: Bool, registryData: Data?) -> CourseOpenState {
         if !obsidianRunning {
-            return false
+            return .closed
         }
-        guard let registryData,
-              let registry = try? JSONSerialization.jsonObject(with: registryData) as? [String: Any],
+        guard let registryData else {
+            return .closed
+        }
+        guard let registry = try? JSONSerialization.jsonObject(with: registryData) as? [String: Any],
               registry["vaults"] is [String: Any] else {
-            return true
+            return .cannotTell
         }
-        return FolderActions.openVaultPaths(registryData: registryData).contains(coursePath)
+        if FolderActions.openVaultPaths(registryData: registryData).contains(coursePath) {
+            return .open
+        }
+        return .closed
+    }
+
+    /// Whether the course counts as open for what Plantoir DOES: open, or
+    /// cannot tell. Over-reporting is the safe direction, since nothing is
+    /// written into a course open in Obsidian (plan review S3).
+    static func courseIsOpen(coursePath: String, obsidianRunning: Bool, registryData: Data?) -> Bool {
+        let state: CourseOpenState = ObsidianFigureAddOnsOffer.courseOpenState(
+            coursePath: coursePath, obsidianRunning: obsidianRunning, registryData: registryData
+        )
+        return state != .closed
     }
 
     /// The vault Obsidian opens for a path: the longest registered vault

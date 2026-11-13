@@ -5512,7 +5512,8 @@ against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
    never reads, and promise a trust question that never comes.
 6. Not asked: the offer. If the course is open in Obsidian the offer carries
    `wording.offerWhileOpen`, and Add Them closes Obsidian first (one dialog,
-   not two — review N6).
+   not two — review N6). If Plantoir cannot tell whether it is open, the offer
+   carries `wording.offerWhileObsidianIsOpen` instead (#742, below).
 7. Yes, course not open: add, then open. Installing BEFORE the first load is
    what avoids a reopen in the common case: Obsidian reads
    `community-plugins.json` and the manifests only when a vault loads
@@ -5544,6 +5545,50 @@ one marked open, hidden ones included. After Plantoir's quit request, a pass
 writes only once Obsidian is no longer RUNNING. The preview pass checks after
 its scan, right before writing; the remaining window is the milliseconds
 between that check and the write.
+
+**What the offer says about an open course (#742).** The check has three
+answers, not two: `ObsidianFigureAddOnsOffer.courseOpenState` gives `.open`,
+`.closed` or `.cannotTell`, and the contract's
+`obsidianAddOnsForFigures.openStateCases` are its cases. Every decision Plantoir
+TAKES still reads `.cannotTell` as open (`courseIsOpen` is `state != .closed`),
+so nothing is written into a course that might be open. Only the words follow
+the three answers: `.open` adds `wording.offerWhileOpen`, which names the
+course; `.cannotTell` adds `wording.offerWhileObsidianIsOpen`, which says only
+that Obsidian is open and closes; `.closed` adds neither.
+
+- **The fault.** At the v1.9.1 gate (2026-11-01) the offer said a scratch
+  course "is open in Obsidian now" when it had never been opened there. The
+  code never matched on the course's code or a vault's name: the compare is
+  the whole path, exactly as the registry writes it, and
+  `openStateCases` pins a same-named vault at another folder as closed. The
+  cause was the run's `--state-dir`: `RealHome.forFiles` is the state folder,
+  so `obsidianRegistryFileURL` pointed at a file that did not exist, and a
+  missing registry while the real Obsidian ran read as open, said as a fact.
+  The #742 plan review measured it by compiling `RealHome.swift` on its own
+  with `--state-dir`: the registry read was nil and the old `courseIsOpen`
+  answered true. That a redirected app drives the real Obsidian at all is a
+  separate issue.
+- **No list at all is closed.** Russell's ruling on #742 (2026-11-12):
+  Obsidian writes its list of vaults when a vault opens, so with no list none
+  is open. `ObsidianOpening.readRegistry` keeps the two cases apart: nil only
+  when the file is not there, empty data when it is there and cannot be read,
+  and empty data reads as `.cannotTell`. This was ruled rather than measured;
+  the measurement it rests on (does Obsidian write the file before its first
+  vault window is up?) needs Obsidian on the screen.
+- **Cannot tell is a list that is there but is not JSON, is cut off, or has no
+  `vaults` object**: a read that landed while Obsidian rewrote the file.
+- **Rejected:** the hedge "If {course} is open in Obsidian now, Obsidian
+  closes…" (the plan's first wording), because Add Them closes Obsidian
+  whether or not the course is open in it (plan review H2). Comparing paths
+  through `FolderIdentity.canonicalPath` (no case needed it, it would make
+  `vaultThatOpens` disagree with Obsidian's own string-prefix match, and it
+  opens a file per registered vault on every press). Re-reading the registry
+  to settle `.cannotTell` (a second read can land in the same write, and a
+  timed wait is a guess).
+- **Known limits** (`knownLimits`): a stale open mark still reads as open, since
+  Obsidian does not always clear it; and when Plantoir cannot tell, the list of
+  vaults to reopen could not be read either, so Add Them reopens only this
+  course.
 
 **What a pass writes** (`ObsidianFigureAddOns.install`, serialised by the
 `ObsidianFigureAddOnsQueue` actor — review S2: Open in Obsidian and a finished

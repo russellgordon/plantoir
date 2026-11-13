@@ -443,7 +443,7 @@ private struct ObsidianAddOnsOfferDialog: ViewModifier {
                 }
             }
         } message: { shown in
-            Text(ObsidianFigureAddOnsWording.offerText(course: shown.course.code, courseIsOpen: shown.courseIsOpen))
+            Text(ObsidianFigureAddOnsWording.offerText(course: shown.course.code, openState: shown.openState))
         }
         .dialogSuppressionToggle(ObsidianFigureAddOnsWording.dontAskAgain, isSuppressed: $dontAskAgain)
         .onChange(of: workspace.obsidianAddOnsOfferRequest?.id) { _, _ in

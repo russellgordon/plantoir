@@ -23,8 +23,9 @@ struct LockedPagesNoteRequest: Identifiable {
 /// Obsidian's add-ons question (#495), or the reopen question, waiting to
 /// be shown before Obsidian opens: the course, the folder Obsidian reveals
 /// afterwards, the add-ons the course needs, and whether the course is open
-/// in Obsidian right now — and the page the section's preview was showing
-/// at the press (#518), which opens instead of the folder once answered.
+/// in Obsidian right now, as far as Plantoir can tell (#742) — and the page
+/// the section's preview was showing at the press (#518), which opens
+/// instead of the folder once answered.
 struct ObsidianAddOnsRequest: Identifiable {
 
     // MARK: - Stored properties
@@ -32,8 +33,15 @@ struct ObsidianAddOnsRequest: Identifiable {
     let course: Course
     let folder: URL
     let needed: [ObsidianFigureAddOn]
-    let courseIsOpen: Bool
+    let openState: ObsidianFigureAddOnsOffer.CourseOpenState
     var page: URL? = nil
+
+    // MARK: - Computed properties
+
+    /// Open, or cannot tell: what the app DOES treats both as open.
+    var courseIsOpen: Bool {
+        return openState != .closed
+    }
 
     // MARK: - Computed properties
 
@@ -120,9 +128,12 @@ struct ObsidianOpening {
         return FolderActions.obsidianIsRunning
     }
 
-    /// Obsidian's registry, as it is on disk now.
+    /// Obsidian's registry, as it is on disk now: nil ONLY when there is no
+    /// such file, which `ObsidianFigureAddOnsOffer.courseOpenState` reads as
+    /// no vault open (#742). A file that is there but cannot be read gives
+    /// empty data, which reads as "cannot tell".
     var registryData: @MainActor () -> Data? = {
-        return try? Data(contentsOf: FolderActions.obsidianRegistryFileURL)
+        return ObsidianOpening.readRegistry(at: FolderActions.obsidianRegistryFileURL)
     }
 
     /// Opens a folder in Obsidian — registering the course first when
@@ -172,6 +183,21 @@ struct ObsidianOpening {
 
     /// The answer's home; nil is `AppSettings.shared`.
     var settings: AppSettings?
+
+    // MARK: - Functions
+
+    /// Obsidian's registry at `registryURL`: nil only when there is no such
+    /// file, and empty data when the file is there but cannot be read, so
+    /// that the second reads as "cannot tell" rather than as no list (#742).
+    nonisolated static func readRegistry(at registryURL: URL) -> Data? {
+        if !FileManager.default.fileExists(atPath: registryURL.path) {
+            return nil
+        }
+        if let contents = try? Data(contentsOf: registryURL) {
+            return contents
+        }
+        return Data()
+    }
 }
 
 extension WorkspaceModel {
@@ -459,6 +485,7 @@ extension WorkspaceModel {
         if let page {
             target = FolderActions.pageTarget(page, vaultURL: course.directoryURL)
         }
+        let openState: ObsidianFigureAddOnsOffer.CourseOpenState = courseOpenStateInObsidian(coursePath)
         let situation: ObsidianFigureAddOnsOffer.Situation = ObsidianFigureAddOnsOffer.Situation(
             reference: course.isKeptForReference,
             obsidianInstalled: true,
@@ -468,7 +495,7 @@ extension WorkspaceModel {
             vaultIsTheCourse: ObsidianFigureAddOnsOffer.vaultIsTheCourse(
                 targetPath: target.path, coursePath: coursePath, registryData: obsidianOpening.registryData()
             ),
-            courseOpenInObsidian: courseIsOpenInObsidian(coursePath),
+            courseOpenInObsidian: openState != .closed,
             reopenDeclinedThisRun: ObsidianFigureAddOnsThisRun.reopenDeclined.contains(coursePath)
         )
         switch ObsidianFigureAddOnsOffer.decision(situation) {
@@ -481,15 +508,13 @@ extension WorkspaceModel {
                 ActivityTrail.note(.obsidianAddOnsOffered, line)
             }
             openObsidian(folder, page: page, course: course)
-        case .offer:
-            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: false, page: page)
-        case .offerWhileOpen:
-            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true, page: page)
+        case .offer, .offerWhileOpen:
+            obsidianAddOnsOfferRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, openState: openState, page: page)
         case .installThenOpen:
             await addObsidianAddOns(toCourse: course, needed, trigger: .openInObsidian)
             openObsidian(folder, page: page, course: course)
         case .askReopen:
-            obsidianReopenRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, courseIsOpen: true, page: page)
+            obsidianReopenRequest = ObsidianAddOnsRequest(course: course, folder: folder, needed: needed, openState: openState, page: page)
         }
     }
 
@@ -528,9 +553,16 @@ extension WorkspaceModel {
     }
 
     /// Whether this course counts as open in Obsidian right now
-    /// (`ObsidianFigureAddOnsOffer.courseIsOpen`).
+    /// (`ObsidianFigureAddOnsOffer.courseIsOpen`): open, or cannot tell.
     private func courseIsOpenInObsidian(_ coursePath: String) -> Bool {
-        return ObsidianFigureAddOnsOffer.courseIsOpen(
+        return courseOpenStateInObsidian(coursePath) != .closed
+    }
+
+    /// Whether this course is open in Obsidian right now, as far as Plantoir
+    /// can tell (`ObsidianFigureAddOnsOffer.courseOpenState`, #742): the
+    /// offer's words follow it, and what the app does follows `courseIsOpen`.
+    private func courseOpenStateInObsidian(_ coursePath: String) -> ObsidianFigureAddOnsOffer.CourseOpenState {
+        return ObsidianFigureAddOnsOffer.courseOpenState(
             coursePath: coursePath,
             obsidianRunning: obsidianOpening.isRunning(),
             registryData: obsidianOpening.registryData()

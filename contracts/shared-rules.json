@@ -30000,7 +30000,7 @@
       {
         "step": 6,
         "when": "the answer is notAsked",
-        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian. Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
       },
       {
         "step": 7,
@@ -30063,7 +30063,7 @@
       ]
     },
     "offerCases": {
-      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
+      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place - which counts as open for what Plantoir does and is said as wording.offerWhileObsidianIsOpen; openStateCases) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
       "cases": [
         {
           "name": "a reference course is never scanned",
@@ -30962,6 +30962,7 @@
       "offerTitle": "Show diagrams and graphs in Obsidian too?",
       "offerMessage": "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button. Obsidian then opens its settings in a window of its own, showing the add-ons switched on; close that window and carry on.",
       "offerWhileOpen": "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept.",
+      "offerWhileObsidianIsOpen": "Obsidian is open now, so it closes and opens again to show them. What you've written is kept.",
       "offerAdd": "Add Them",
       "offerNotNow": "Not Now",
       "dontAskAgain": "Don't ask again",
@@ -31029,7 +31030,9 @@
       "A page the cloud has not downloaded is not read, so a course whose only figure page is still in the cloud is offered nothing until the page is downloaded.",
       "Obsidian Sync carries about 12.9 MB per course to other devices if the teacher turned on its add-on categories; the add-ons say they run on iPad too (isDesktopOnly false), which was not tried.",
       "If Obsidian updates TikZJax, Plantoir leaves the newer copy alone, and Obsidian may then draw a diagram differently from the site, whose engine stays the one TikZJax 0.5.2 carries.",
-      "A restored backup has the list and not the folders; the next pass on a computer whose answer is yes adds them back - switched on, even if the teacher had switched one off before the backup."
+      "A restored backup has the list and not the folders; the next pass on a computer whose answer is yes adds them back - switched on, even if the teacher had switched one off before the backup.",
+      "A course Obsidian marked open and then closed can still read as open, because Obsidian does not always clear the mark (FolderActions' own measurement); the offer then says the course is open and Add Them closes and reopens Obsidian.",
+      "When Plantoir cannot tell (openStateCases: cannotTell), Add Them closes Obsidian whatever it had open, and the list of what was open could not be read, so Plantoir opens only this course again; any other course comes back only if Obsidian restores it itself."
     ],
     "rejected": [
       "Writing Obsidian's trust answer (enable-plugin-<appId>) into its LevelDB storage: Obsidian-internal, unsafe while Obsidian runs, and it removes a security question the teacher should answer.",
@@ -31039,8 +31042,71 @@
       "Asking at course creation, in Course Settings, after a preview, or through an assistant: Open in Obsidian is the moment the question means something, and asking before Obsidian opens means no reopen in the common case. No assistant tool or schema changes.",
       "A marker printed by the build saying which kinds a course uses: the build sees one section's student-visible pages, the vault is the whole course; a scan works at Open in Obsidian with no preview ever run.",
       "Writing into a course while it is open in Obsidian: Obsidian writes its in-memory list back on every add-on switch and drops the new id, and the marker would then read as the teacher switching it off - so the preview pass waits and Open in Obsidian asks to reopen.",
-      "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated."
-    ]
+      "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated.",
+      "Saying a course is open in Obsidian when Plantoir cannot tell (#742): the sentence offerWhileOpen stated as a fact what the code did not know. The hedge \"If {course} is open in Obsidian now, Obsidian closes...\" was rejected too (#742 plan review H2): Add Them closes Obsidian whether or not the course is open in it, so the closing is not conditional.",
+      "Re-reading the registry to settle cannotTell (#742): a second read with no wait can land in the same write, and a timed wait to let it settle is a guess."
+    ],
+    "openStateCases": {
+      "note": "Whether the course is open in Obsidian, as far as Plantoir can tell (#742). `running` is whether Obsidian is running; `registryText` is the whole text of Obsidian's list of vaults (obsidian.json), or null when there is no such file; `course` is the course folder's path. `expect` is open, closed or cannotTell. The match is on the WHOLE folder path, exactly as the registry writes it, never on the course's code or a vault's name. What the app does treats cannotTell as open (no write into the course; Add Them goes the reopen way); only the words differ: open adds wording.offerWhileOpen to the offer, cannotTell adds wording.offerWhileObsidianIsOpen, closed adds neither. No list at all is closed by Russell's ruling on #742 (2026-11-12): Obsidian writes the list when a vault opens, so with no list none is open. A list that is there but is not JSON, is cut off, or has no vaults object is a read that landed mid-write, which is cannotTell.",
+      "cases": [
+        {
+          "name": "Obsidian is not running, whatever its list says",
+          "running": false,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "Obsidian is running and has no list of vaults at all",
+          "running": true,
+          "registryText": null,
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "The list is an empty file",
+          "running": true,
+          "registryText": "",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The list is cut off mid-write",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/cou",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The list has no vaults object",
+          "running": true,
+          "registryText": "{\"frame\":\"hidden\"}",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The course's own folder is marked open",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course is registered but not marked open",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "A vault with the same name is open at another folder (the #742 sighting's shape)",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/elsewhere/Teaching/ADA1O\",\"ts\":1,\"open\":true},\"a2\":{\"path\":\"/w/courses/ADA1O\",\"ts\":2}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        }
+      ]
+    }
   },
   "taskBoxes": {
     "note": "Task boxes students tick (#519, v1.8.1). A Markdown task item (`- [ ] Bring a pencil`) is drawn by Quartz as a disabled checkbox; on a class site every such box outside a self-check quiz can be ticked by a student, and the tick is kept in that student's own browser. The teacher's page never changes: a tick on the site is the student's, not the page's. Implemented once, in support/quartz (plugins/transformers/taskRules.ts and plantoirTasks.ts, components/scripts/tasks.inline.ts, components/styles/tasks.scss), so Windows inherits it with the build; run by scripts/check_task_rules_against_the_site.py, verify.sh 6l and browser-checks/task_boxes.mjs. documentation/06-quartz-customizations.md -> K.",
