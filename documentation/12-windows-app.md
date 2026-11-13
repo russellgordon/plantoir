@@ -1252,13 +1252,17 @@ inherits by reading the contract: the arguments, the connection file's shape
 `fixWith.buttonCases`, `planAUnit.buttons`, `doorCourseHold` and `tabCases`
 entries, and the nine hold sentences in `assist-wording.json`, which since #783
 name the assistant holding the course through one `{assistant}` slot
-(`doorCourseHold.naming`). For that, every Windows door owes
-`PLANTOIR_DOOR_ASSISTANT` (its own key) in its server's environment, and
-`plantoir-mcp` owes the key as its `assist` lease's fifth line
+(`doorCourseHold.naming`). For that, every Windows door writes
+`PLANTOIR_DOOR_ASSISTANT` (its own key) in its server's environment — the
+Claude and Codex doors do since #884's first part (2026-11-13: the config's
+`env`, and a sixth `-c` pair; `AssistWorkspace.DoorAssistantVariable`), and
+`plantoir-mcp` does not read it yet — and `plantoir-mcp` owes the key as its `assist` lease's fifth line
 (`file-formats.json` → `workLease.lines`), writing line 4 first (the start, or
 an empty line): its assist lease has three lines today, and a key appended
 would be read as the start and the hold as gone (`workLease.bodyCases`); until then a Windows hold names
-none and the mac's sentences list all three, which is still true. What it owes, and the windows issue for #783 lists:
+none and the mac's sentences list all three, which is still true. (Windows
+keeps its older "Claude or Codex" words until then, held by name: see
+"After the mac's #783, #850 and #865" below.) What it owes, and the windows issue for #783 lists:
 a `CopilotLauncher` that writes `mcp-<CODE>-copilot.json` into Plantoir's data
 folder and starts `copilot.exe` by argument vector, or npm's `copilot.cmd`
 through `OutsideDoor.CmdArguments` (the `@` path's quoting measured per parse,
@@ -2177,6 +2181,67 @@ ways on copies of deploy.sh (an `echo` before the guard; the call wrapped in
 `appliesOn` on any of these (the softening "Named gaps" rejects); and building
 #835's wording now (#854 owns it, on the milestone's do-not-start list —
 the director's ruling).
+
+### After the mac's #783, #850 and #865: held by name, the same way (#884, 2026-11-13)
+
+The mac merged six pieces into `dev` the same evening (#783 GitHub Copilot,
+#865, #871, #872, #878, #839's Help format, then #850 and #846), and a full
+suite on `dev` 39e7b5cf5 read BASELINE_TOTALS. Step 0's method again: what is
+a few lines and changes nothing a teacher sees was FIXED, everything a later
+piece of v2.0.0 builds was HELD by name against its open `windows` issue.
+
+**Fixed now.** Both doors write `PLANTOIR_DOOR_ASSISTANT`
+(`AssistWorkspace.DoorAssistantVariable`) with their own key into their
+server's environment, as each agent's `serverEnvironment` says: the Claude
+door in the config's `env`, the Codex door as a sixth `-c` pair (13 arguments
+now, `CodexLauncherTests.AssertArrived`). `plantoir-mcp` does not read it and
+no lease line changes, so nothing a teacher sees moves; it is the half of #884
+item 7 that cannot go wrong. Proved red on the old code (the two lines taken
+out: `TheOutsideDoorsPassWhatTheContractSays` fails on the env).
+
+**Held, 23 entries, all v2.0.0.** #884 (13): the `copilot` door; the menu
+items `courseReviseWithCopilot`, `sectionReviseWithCopilot`; the nine busy
+sentences as said in older words (`AssistWordingSaidDifferently`); and the
+trail line of "outside session held a course" as said in older words. #889
+(6): its three trail events, the item `stopShowingDeployedFolder`, the
+situation keys `deployedFolderReady` and `deployedFolderShown`. #885 (4):
+`noSectionNamed`, `noSectionNamedAndNoSections`, `addClassesNeedsAUnit`,
+`addClassesNeedsACount`.
+
+**Why the nine sentences are held rather than filled.** Filling `{assistant}`
+by `doorCourseHold.naming` needs the hold's door, which only the assist
+lease's fifth line carries, and Windows writes three lines (#884 item 7, with
+`WorkLease`, deliberately not touched here). With no line 5 every Windows
+hold names none, and the contract's `anyAssistant` for that is "Claude, Codex
+or GitHub Copilot": a sentence naming a door a Windows teacher cannot open.
+The older "Claude or Codex" is the true sentence on Windows until #884 lands.
+
+**Three new areas** in `NamedGapLedger.cs`, each in an existing shape:
+
+| Area | Shape | Read by |
+|---|---|---|
+| `OutsideDoors` (`outsideAgents.agents`, by key) | collected; a door is "here" when `SubjectMenuRules.ReviseTarget` or `CourseActivity.ReviseItem` has it (`OutsideDoorsHeld`) | `TheOutsideDoorsPassWhatTheContractSays`, `TheOutsideAgentsMenuTitles_AreTheContracts`, `PiecesAndBoundsAreTheContracts` (`fixWith.buttons`), `SubjectMenusContractTests.Situation` (`reviseBlocked`), `TheReviseCasesAreTheContracts` (a case's `item`; the held door's mac-only window note must still name `WindowHoldWording.AvailableOnceTheAssistantCloses`) |
+| `SubjectMenuSituationKeys` | collected; a case whose situation names a held key is not run (the key is no `Situation` property, which the closed-check makes sure of); at least 21 cases still run | both `SubjectMenusContractTests` case facts, `SidebarDeleteKeyContractTests.TheMinusButton_FollowsTheMenusRemoval` |
+| `TrailLineSaidDifferently` (`activityTrail.mustRecord`, by event) | held must still DIFFER | `DoorCourseHoldTests.TheTrailLineIsTheContracts` |
+
+The two constants among the nine (`AvailableOnceYouFinishRevisingWithClaude`,
+`FinishTheClaudeSessionFirst`) are now asked through `SaidAsTheContract` by
+hand, and the value walk of `AssistWording_MatchesContract` leaves a held key
+to that call.
+
+**Proved** by mutation over the hooked tests (220 tests, about 10 s each
+round): `codex` in `OutsideDoors`, `hasFolder` in `SubjectMenuSituationKeys`
+and the product line made equal to the contract's each failed with the
+closed message (8 tests); `gemini`, `noSuchKey` and "no such event" each
+failed with the withdrawn message (8 tests); taking out every entry this
+piece added brought back all twelve C# reds. A trap met doing it: restoring
+a file with `Copy-Item` keeps the copy's OLD modified time, so MSBuild's
+incremental build skips the project and the next run tests the mutated
+assembly; restore by writing the bytes (or touch the file) instead.
+
+**A difference a teacher may meet today** (#885, not measured here): what
+`plantoir-mcp.exe` answers a call that leaves out `section` or `howMany` is
+the MCP SDK's binding of a non-nullable `int`; #885 says to measure it first.
 
 ### Shared Python tests that must run on Windows (step 0 of v2.0.0)
 
