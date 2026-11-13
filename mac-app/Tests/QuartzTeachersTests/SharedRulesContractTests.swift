@@ -509,10 +509,16 @@ final class SharedRulesContractTests: XCTestCase {
             if testCase["assembledFrom"] != nil {
                 assembledCount += 1
                 XCTAssertNotEqual(input, template, "a case with assembledFrom whose input has nothing to fill")
-                XCTAssertNotEqual(LogRedactor.redacting(input), input, "the assembled credential was left in")
+                let carriesASecret: Bool = template.contains("{password}") || template.contains("{basic}")
+                if carriesASecret {
+                    XCTAssertNotEqual(LogRedactor.redacting(input), input, "the assembled credential was left in")
+                }
             }
         }
-        XCTAssertEqual(assembledCount, 2, "the Basic header case and the address with a username and password in it")
+        XCTAssertEqual(
+            assembledCount, 3,
+            "the Basic header case, the address with a username and password in it, and the tripwire that only a filled template passes"
+        )
 
         // The header really is the base64 of the pair, so the Basic case is
         // what a browser sends, not a word that only looks like it. Decoded

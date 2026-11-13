@@ -48,15 +48,28 @@ from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 
-# Folders that are never part of what ships: build output, vendored downloads
-# fetched by the Vendor scripts, caches. Used only when git cannot list files.
-SKIPPED_FOLDERS = {".git", "node_modules", "Vendor", "bin", "obj", "__pycache__", "DerivedData", "site"}
+# Folders that are never part of what ships: build output and caches. Used
+# only when git cannot list files. A `Vendor` folder's own files (the fetch
+# scripts) are tracked and scanned; its subfolders are the downloads those
+# scripts fetch, and are not.
+SKIPPED_FOLDERS = {".git", "node_modules", "bin", "obj", "__pycache__", "DerivedData"}
+DOWNLOADS_FOLDER = "Vendor"
 
+# Reserved by RFC 2606 and RFC 6761. Each with its leading dot, so that
+# notexample.com is not taken for example.com; the bare names are below.
 RESERVED_HOST_SUFFIXES = (".example", ".invalid", ".test", ".localhost",
-                          "example.com", "example.net", "example.org")
+                          ".example.com", ".example.net", ".example.org")
+RESERVED_HOSTS = {"localhost", "example.com", "example.net", "example.org"}
 
-URL_USERINFO = re.compile(r"\b[a-z][a-z0-9+.\-]*://([^\s/:@\"'<>`\\]+):([^\s/@\"'<>`\\]+)@([A-Za-z0-9.\-]+)")
-BASIC_HEADER = re.compile(r"\bBasic\s+([A-Za-z0-9+/]{4,}={0,2})(?![A-Za-z0-9+/=])")
+# Case-insensitive, as LogRedactor's own rules are: HTTPS:// and
+# `authorization: basic` are the same thing to a scanner and to a reader.
+URL_USERINFO = re.compile(r"\b[a-z][a-z0-9+.\-]*://([^\s/:@\"'<>`\\]+):([^\s/@\"'<>`\\]+)@([A-Za-z0-9.\-]+)",
+                          re.IGNORECASE)
+# A known false positive, kept rather than worked round: a dictionary word after
+# "Basic" can happen to be base64 for something with a colon in it ("Basic
+# Oily" decodes to one). None is in the tree. If one arrives, it goes on
+# ALLOWED by its SHA-256 with where it is and why, like any other.
+BASIC_HEADER = re.compile(r"\bBasic\s+([A-Za-z0-9+/]{4,}={0,2})(?![A-Za-z0-9+/=])", re.IGNORECASE)
 PREFIXED_TOKENS = [
     ("netlifyToken", re.compile(r"\bnfp_[A-Za-z0-9]{16,}")),
     ("githubToken", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}")),
@@ -85,7 +98,7 @@ def fingerprint(value):
 
 def is_reserved_host(host):
     host = host.lower().rstrip(".")
-    if host == "localhost":
+    if host in RESERVED_HOSTS:
         return True
     return host.endswith(RESERVED_HOST_SUFFIXES)
 
@@ -132,6 +145,8 @@ def listed_files(root):
     files = []
     for folder, subfolders, names in os.walk(root):
         kept = []
+        if Path(folder).name == DOWNLOADS_FOLDER:
+            subfolders[:] = []
         for subfolder in subfolders:
             if subfolder in SKIPPED_FOLDERS or subfolder.startswith(".build") or subfolder.endswith(".xcodeproj"):
                 continue
@@ -164,6 +179,17 @@ def findings(root):
     return found, seen_allowed
 
 
+_REPOSITORY_FINDINGS = None
+
+
+def repository_findings():
+    """findings(REPOSITORY), worked out once for both tests that read it."""
+    global _REPOSITORY_FINDINGS
+    if _REPOSITORY_FINDINGS is None:
+        _REPOSITORY_FINDINGS = findings(REPOSITORY)
+    return _REPOSITORY_FINDINGS
+
+
 def masked(value):
     return f"<{len(value)} characters, starting {value[:4]!r}>"
 
@@ -181,9 +207,20 @@ class TheShapesAreRecognised(unittest.TestCase):
         self.assertEqual([kind for _, kind, _ in findings_in_text(line)], ["urlUserinfo"])
 
     def test_a_reserved_example_host_is_left_alone(self):
-        for host in ("plans.example", "site.invalid", "a.test", "localhost", "www.example.com"):
+        for host in ("plans.example", "site.invalid", "a.test", "localhost", "www.example.com", "example.org"):
             line = "https" + "://someone:" + "invented-words" + "@" + host + "/"
             self.assertEqual(findings_in_text(line), [], host)
+
+    def test_a_host_that_only_ends_in_an_example_name_is_found(self):
+        line = "https" + "://someone:" + "invented-words" + "@notexample.com/"
+        self.assertEqual([kind for _, kind, _ in findings_in_text(line)], ["urlUserinfo"])
+
+    def test_case_does_not_hide_either_shape(self):
+        line = "HTTPS" + "://someone:" + "invented-words" + "@plans-2026.pages.dev/"
+        self.assertEqual([kind for _, kind, _ in findings_in_text(line)], ["urlUserinfo"])
+        encoded = base64.b64encode(("someone" + ":" + "invented-words").encode()).decode()
+        line = "authorization: basic " + encoded
+        self.assertEqual([kind for _, kind, _ in findings_in_text(line)], ["basicAuthHeader"])
 
     def test_the_contract_templates_are_left_alone(self):
         self.assertEqual(findings_in_text("Opening https://{user}:{password}@plans.example/"), [])
@@ -204,7 +241,7 @@ class TheShapesAreRecognised(unittest.TestCase):
 class NoFileStoresACredential(unittest.TestCase):
 
     def test_no_tracked_file_holds_a_credential_shaped_literal(self):
-        found, _ = findings(REPOSITORY)
+        found, _ = repository_findings()
         lines = [f"{path}:{number}  {kind} {masked(value)}" for path, number, kind, value in found]
         self.assertEqual(
             lines, [],
@@ -214,7 +251,7 @@ class NoFileStoresACredential(unittest.TestCase):
             "with where it is and why:\n  " + "\n  ".join(lines))
 
     def test_every_allowed_value_is_still_there(self):
-        _, seen = findings(REPOSITORY)
+        _, seen = repository_findings()
         stale = []
         for key, why in ALLOWED.items():
             if key not in seen:

@@ -3117,6 +3117,12 @@
         "why": "#709: a username and password written into an address. Before the email rule, which would otherwise take the password and the host for an address and leave the username behind: plans.example is an address to that rule, so the order is still proved. The rule does not read the host, so a reserved example name stands in for a pages.dev one (#844)."
       },
       {
+        "assembledFrom": { "password": "example-password", "user": "example-user" },
+        "expect": "Signed in as example-user",
+        "input": "Signed in as {user}",
+        "why": "#844 review M1, a tripwire with no credential in it: only a reader that fills the template passes. Read unfilled, the two cases above still redact to their `expect`, and once both rules exist an unfilled reader stays green even with urlUserinfo moved after the email rule (measured). This one fails it on every platform. A username on its own is not redacted, so the filled line comes back as it went in."
+      },
+      {
         "expect": "Shared Basic French unit plans and Basic Skills.",
         "input": "Shared Basic French unit plans and Basic Skills.",
         "why": "#709 review L4: a rule for 'Basic' that is not anchored on Authorization: mangles a course called Basic French."

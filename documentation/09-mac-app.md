@@ -12976,7 +12976,10 @@ real one teaches people to dismiss the next. From then on:
   `https://example-user:[removed: email address]/`, which is the ordering
   against the email rule that the case exists to prove. Read unfilled, the
   template still fails without either rule but no longer proves that
-  ordering, so a reader must fill it.
+  ordering: with `urlUserinfo` moved after the email rule, an unfilled
+  reader stays green (measured by the review). So a third assembled case,
+  `Signed in as {user}` expecting `Signed in as example-user`, holds no
+  credential and fails any reader that does not fill the template.
 - **An address in a fixture uses a reserved example host** (`plans.example`)
   unless the rule under test reads the host. `urlUserinfo` does not.
 - **A prefixed token** (`nfp_`, `ghp_`, `github_pat_`, `AKIA`, `xox?-`, a
