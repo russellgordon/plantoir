@@ -38,7 +38,11 @@ When it has to wait, a notice says that Plantoir will finish updating once that 
 
 {{say:shared-rules#appUpdates.wording.heldExplanation}}
 
-Press {{control:ok}} and carry on.
+Once the new version has begun to install, the notice says this instead:
+
+{{say:shared-rules#appUpdates.wording.heldExplanationOnceInstalling}}
+
+Press {{control:updateNoticeOk}} and carry on.
 
 ## If an administrator is needed
 

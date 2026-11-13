@@ -35,7 +35,7 @@ A course kept for reference is locked and is never deployed. [Keep a copy of a c
 alt: The Import courses for reference sheet, listing the courses found, each with a tick box and a School year pop-up.
 
 5. Press {{control:importForReferenceSheetImportButton}}. Plantoir copies the courses and shows how far it has got.
-6. Read the list under {{control:importForReferenceSheetImportedTitle}}, which has one line for each course. Press {{control:ok}}.
+6. Read the list under {{control:importForReferenceSheetImportedTitle}}, which has one line for each course. Press {{control:importForReferenceSheetDoneButton}}.
 
 The sheet says where the courses now are:
 

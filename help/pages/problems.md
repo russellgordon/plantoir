@@ -25,7 +25,7 @@ keywords:
 - file too large
 description: The Problems tab lists what a section's last preview or deploy found wrong and names the page of each problem. Two kinds have a repair button.
 ---
-A section's {{control:problemsTab}} tab lists what its last preview or deploy found wrong. It names the page of each problem and says what to change.
+A section's {{control:problemsTab}} tab lists what its last preview or deploy found wrong. It names the page of each problem and says what to change. The tab is in the section's window only while that last preview or deploy found at least one problem.
 
 ## The warning beside a section
 
@@ -67,7 +67,7 @@ Each row is one problem. The columns are:
 Click a column's heading to sort by it.
 
 {{assistant}}
-The ticks in {{control:problemsTabColumnInclude}} choose the rows that are handed to an assistant with the Fix with buttons under the table. See [Fix a problem with Claude or Codex](page:fix-with).
+The ticks in {{control:problemsTabColumnInclude}} choose the rows that are handed to an assistant with the Fix with buttons under the table. There is one button for each of Claude Code, Codex and GitHub Copilot that is installed. See [Fix a problem with Claude or Codex](page:fix-with).
 {{/assistant}}
 
 ## Two kinds Plantoir can repair
@@ -112,5 +112,5 @@ Two kinds have more to say:
   {{say:shared-rules#sectionProblems.words.fixedInTheSource}}
   The problem was put right, and another section's preview or deploy found that. Preview or deploy this section too. Until then the row and the warning symbol stay.
 - **You changed the page and the row is still there.** Preview or deploy the section again. A row is checked only then.
-- **There is no {{control:problemsTab}} tab.** The window shows no tabs when {{control:websiteTab}} would be the only one.
+- **There is no {{control:problemsTab}} tab.** The section's last preview or deploy found no problem, so there is nothing to list. The tab comes back when a preview or deploy finds one. The window shows no tabs at all when {{control:websiteTab}} would be the only one.
 - **A row has no repair button.** Only the two kinds above have one, and only while the problem is current. A course kept for reference never has one.

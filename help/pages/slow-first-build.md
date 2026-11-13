@@ -58,7 +58,7 @@ The link {{control:progressViewWhyMightThisTakeAWhileLink}} is in the window whe
   {{say:app-rules#builderWarmUp.wording.statusLine}}
   You can carry on working. If you preview before that has finished, the preview waits for it. If the Mac was offline, the work is done at the first preview instead.
 - **After an update.** The first preview after Plantoir updates can be slow again, once.
-- **A course with Swift programs students can run.** The first time, Plantoir downloads what it needs to make them. That is about 1.3 GB, takes a few minutes and needs the internet. See [Code students can run](page:code).
+- **A course with Swift programs students can run.** The first time, Plantoir downloads what it needs to make them. The download is large. It takes a few minutes and needs the internet. See [Code students can run](page:code).
 - **A working folder that was only now opened.** A notice says Plantoir is getting the folder ready, and that Preview and Deploy will work in a moment.
 
 ## If it does not work

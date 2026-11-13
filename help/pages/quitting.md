@@ -35,7 +35,7 @@ It also asks while it is sharing a course's unit plans, changing the password fo
 
 ## What the question says
 
-The question says that Plantoir is still at work and names the work, for example deploying a section, with the section and the course named. When more than one thing is under way, it names each.
+The question says that Plantoir is still at work and names the work, for example deploying a section, with the section and the course named. When several deploys are under way, it names each. A deploy is named ahead of a preview or a copy. With a deploy and a preview both under way, the question names the deploy alone.
 
 Under that, it says what quitting now could leave unfinished.
 
@@ -47,7 +47,7 @@ Under that, it says what quitting now could leave unfinished.
 alt: The question Plantoir asks when you quit during a deploy, with the buttons Keep Working and Quit Anyway.
 
 {{assistant}}
-For unit plans, the message names what each kind of work could leave:
+Work on unit plans is named together with deploys. For unit plans, the message names what each kind of work could leave:
 
 - Sharing the plans: the plans could be left part way shared. Share them again, or stop sharing them, to settle it.
 - Changing the password: the new password may not be saved yet. Nothing is sent, so the shared plans do not change.
