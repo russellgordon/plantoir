@@ -37,7 +37,7 @@ The {{control:courseDetailPlanningTab}} tab shows only while one of the three as
 1. In the sidebar, select the course itself, then click the {{control:courseDetailPlanningTab}} tab, beside {{control:courseDetailSettingsTab}}.
 2. Read the empty tab. Before the course has a plan, the tab is titled {{control:planningTabNoUnitPlansYetTitle}} and says:
    {{say:shared-rules#unitPlanning.tab.words.emptyDescription}}
-3. Press a button under it: {{control:planAUnitWithClaudeButton}} or {{control:planAUnitWithCodexButton}} or {{control:planAUnitWithGitHubCopilotButton}} There is one button for each assistant installed.
+3. Press a button under it: {{control:planAUnitWithClaudeButton}}, {{control:planAUnitWithCodexButton}} or {{control:planAUnitWithGitHubCopilotButton}}. There is one button for each assistant installed.
 4. Wait for the window. A terminal window opens in your working folder with the assistant started, as it does for Revise With. An opening message has been sent, in your own words.
 5. Answer the assistant's questions. It has been told to list the course's sections and read your How I Teach page. Then it asks which unit you want to plan, which sections the plan covers, and whether a colleague teaches the unit on other dates.
 6. Agree the plan in conversation. The assistant has been told to build nothing until you say go.
@@ -55,8 +55,8 @@ alt: The Planning tab of a course showing one unit's plan, with the Unit pop-up 
 {{picture:plan-a-unit-2}}
 alt: The Planning tab with All Plans chosen in the Unit pop-up.
 
-3. Move through the plan with {{control:planningTabBackButton}}, {{control:planningTabForwardButton}} and {{control:planningTabReloadButton}}.
-4. Press {{control:planningTabOpenInBrowserButton}} to read the page in your web browser, or to print it from there.
+3. Move through the plan with {{control:planningTabBackButton}}, {{control:planningTabForwardButton}} and {{control:planningTabReloadButton}}. These are buttons without words in the bar above the plan: two arrows and a circular arrow. Hold the pointer over one to read its name.
+4. Press {{control:planningTabOpenInBrowserButton}}, the compass in the same bar, to read the page in your web browser, or to print it from there.
 
 ## Plan another unit
 

@@ -32,7 +32,7 @@ The Fix with buttons hand problems from a section's {{control:problemsTab}} tab 
 
 1. In the sidebar, select the section, then click {{control:problemsTab}} at the top of its window.
 2. In the {{control:problemsTabColumnInclude}} column, see that the problems you want fixed are ticked. Only ticked rows are handed over.
-3. Press one of the buttons under the table: {{control:fixWithClaudeButton}} or {{control:fixWithCodexButton}} or {{control:fixWithGitHubCopilotButton}} Each button shows only while that program is installed on this Mac.
+3. Press one of the buttons under the table: {{control:fixWithClaudeButton}}, {{control:fixWithCodexButton}} or {{control:fixWithGitHubCopilotButton}}. Each button shows only while that program is installed on this Mac.
 
 {{picture:fix-with-1}}
 alt: The Problems tab with rows ticked, and the Fix with buttons under the table.

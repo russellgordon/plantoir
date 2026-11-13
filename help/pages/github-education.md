@@ -48,7 +48,7 @@ Its instructions for applying list what you need:
 - a personal account on GitHub.
 
 > [!note]
-> GitHub's pages do not say whether a teacher at a secondary school qualifies. The pages read for this page do not name secondary schools, high schools or K-12 schools, either to include them or to leave them out. GitHub's documentation does speak of "teachers of all levels". Its page for teachers also gives this reason for a refusal:
+> GitHub's pages do not say whether a teacher at a secondary school qualifies. The pages read for this page do not name secondary schools, high schools or K-12 schools, either to include them or to leave them out. Its page for teachers gives this reason for a refusal:
 >
 > "If your application was not approved, it may be due to insufficient proof of current academic employment or affiliation with a non-degree granting institution."
 >

@@ -35,7 +35,7 @@ You install the tool and sign in to it yourself, with your own GitHub account. P
 
 Once GitHub's program is installed, GitHub Copilot is listed after Claude and Codex in three places.
 
-- **Revise With.** {{menu:courseReviseWithGitHubCopilot}} in the menu bar, and {{menu:sectionReviseWithGitHubCopilot}} for a section. See [Revise a course with Claude or Codex](page:revise-with).
+- **Revise With.** {{menu:courseReviseWithCopilot}} in the menu bar, and {{menu:sectionReviseWithCopilot}} for a section. See [Revise a course with Claude or Codex](page:revise-with).
 - **The {{control:problemsTab}} tab of a section.** {{control:fixWithGitHubCopilotButton}} is under the table. See [Fix a problem with Claude or Codex](page:fix-with).
 - **The {{control:courseDetailPlanningTab}} tab of a course.** {{control:planAUnitWithGitHubCopilotButton}} is there until the course has a plan. See [Plan a unit](page:plan-a-unit).
 
@@ -57,14 +57,12 @@ Plantoir gives GitHub Copilot no permissions of any kind. So it asks you, in its
 
 - before each change it makes through Plantoir;
 - before it deploys a section;
-- before each command that making a printed handout needs.
+- before each command it runs on this Mac, such as the one that makes a handout's PDF.
 
 {{picture:copilot-2}}
 alt: GitHub Copilot asking in its window whether it may run a command, with its own answers to choose from.
 
-A printed handout needs three commands, and GitHub Copilot asks about each of them. The handout is made only when all three are allowed.
-
-You can answer that it need not ask again in this folder. If you have told GitHub Copilot it need not ask, it will not. A school's settings for GitHub Copilot can also let it act without asking. Plantoir cannot see either.
+You can tell it not to ask again. If you have told GitHub Copilot it need not ask, it will not. A school's settings for GitHub Copilot can also let it act without asking. Plantoir cannot see either.
 
 ## Plantoir uses only GitHub's own program
 
@@ -74,7 +72,8 @@ A program that is not GitHub's is passed over, and Plantoir shows no message abo
 
 ## If it does not work
 
-- **There is no GitHub Copilot item.** GitHub's program was not found on this Mac. Check that the program you installed is GitHub's own. If you installed it while Plantoir was open, quit Plantoir and open it again.
+- **There is no GitHub Copilot item.** GitHub's program was not found on this Mac. Check that the program you installed is GitHub's own. One case is known: Homebrew has two packages that install a program named `copilot` in the same place. The package named `copilot` is another company's tool. GitHub's package is `copilot-cli`.
+- **You have only now installed it.** Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
 - **The window says that GitHub Copilot stopped.** It reads:
   {{say:app-rules#outsideAgents.agents[2].stoppedAtOnce.sentence}}
   To open it on its own, start GitHub Copilot yourself, outside Plantoir.

@@ -41,7 +41,7 @@ You install the assistant and sign in to it yourself. [About the assistants (opt
 ## Open the assistant on a course
 
 1. In the sidebar, select the course.
-2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithGitHubCopilot}} instead. Each item shows only when that program is installed on this Mac.
+2. Choose {{menu:courseReviseWithClaude}} from the menu bar. For another assistant, choose {{menu:courseReviseWithCodex}} or {{menu:courseReviseWithCopilot}} instead. Each item shows only when that program is installed on this Mac.
 
 {{picture:revise-with-1}}
 alt: The Course menu with Revise With open and the item for Claude marked.
@@ -52,7 +52,7 @@ alt: The Course menu with Revise With open and the item for Claude marked.
 6. Read the plan it shows you, and agree or say what to change.
 7. End the session when you are done. Type `/exit`, or close the window.
 
-With a section selected, use the Section menu instead. Its items are {{menu:sectionReviseWithClaude}} and {{menu:sectionReviseWithCodex}} and {{menu:sectionReviseWithGitHubCopilot}} They open the same session, on that section's course. The same items are under Revise With in the menu that opens when you right-click a course's row or a section's row.
+With a section selected, use the Section menu instead. Its items are {{menu:sectionReviseWithClaude}}, {{menu:sectionReviseWithCodex}} and {{menu:sectionReviseWithCopilot}}. They open the same session, on that section's course. The same items are under Revise With in the menu that opens when you right-click a course's row or a section's row.
 
 ## What the assistant has been told
 
@@ -68,7 +68,7 @@ The opening message is the same for all three assistants. You see it in the wind
 
 ## What the assistant asks you
 
-Plantoir gives the assistant no permissions. The assistant asks you in its window before each change it makes through Plantoir, and before it deploys a section. You can tell it not to ask again in this folder. If you have told your assistant it need not ask, it will not.
+Plantoir gives the assistant no permissions. The assistant asks you in its window before each change it makes through Plantoir, and before it deploys a section. You can tell it not to ask again. If you have told your assistant it need not ask, it will not.
 
 ## Tell it how you teach
 
@@ -82,7 +82,8 @@ alt: A course's How I Teach page open in Obsidian, at the top of the course.
 Plantoir holds the course while a session opened from Plantoir is open on it. Meanwhile:
 
 - **Every item under Revise With is greyed for that course.** A line under the items says they are available once you finish revising, and names the assistant at work.
-- **{{menu:courseRename}}, {{menu:addSection}} and {{menu:courseRestoreFromBackup}} wait.** Plantoir says that a session of the named assistant is working on the course, and asks you to finish that session first.
+- **{{menu:courseRename}} and {{menu:addSection}} are greyed.** A line under the first says it is available once you finish revising, and names the assistant.
+- **{{menu:courseRestoreFromBackup}} is not greyed, but waits.** When you choose it, Plantoir says that a session of the named assistant is working on the course. It asks you to finish that session first.
 - **A backup the session made is kept.** It cannot be deleted until the session ends.
 
 Everything else goes ahead as usual: a preview, a deploy, a scheduled deploy, removing a section or the course, and quitting Plantoir.
@@ -105,8 +106,8 @@ If you already have a file of your own by one of those names, Plantoir asks befo
 
 ## If it does not work
 
-- **Revise With lacks the assistant you want.** That program was not found on this Mac. Plantoir does not install it. If you installed it while Plantoir was open, quit Plantoir and open it again.
-- **The items are greyed.** A session is already open on the course, or the course is kept for reference, which no assistant is opened on. In the Course menu the items are also greyed while a section's row is selected: use the Section menu.
+- **Revise With lacks the assistant you want.** That program was not found on this Mac. Plantoir does not install it. Plantoir looks again each time you come back to it from another app, so a program installed a moment ago shows without quitting Plantoir.
+- **The items are greyed.** A session is already open on the course, or the course is kept for reference, which no assistant is opened on. They are also greyed while the assistant that runs on this Mac has its window open on the course. A line under them says to close that window first. In the Course menu the items are also greyed while a section's row is selected: use the Section menu.
 - **The item for the Local AI Assistant is greyed in the Course menu.** It always is. See [The local assistant](page:local-assistant).
 - **Plantoir says the course is already being revised.** A session is open on it. Finish that session, then start again.
 - **An alert titled {{control:outsideAssistantClaudeDidNotOpenTitle}} appears.** Plantoir could not start the session. If the assistant was updated or moved recently, quitting Plantoir and opening it again may be enough. The alerts for the other two are titled {{control:outsideAssistantCodexDidNotOpenTitle}} and {{control:outsideAssistantGitHubCopilotDidNotOpenTitle}}.

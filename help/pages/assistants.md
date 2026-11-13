@@ -72,7 +72,7 @@ Plantoir gives an outside assistant no permissions of its own. The assistant ask
 
 You can tell the assistant not to ask again. If you have told your assistant it need not ask, it will not. A school's own settings for the assistant can do the same. Plantoir cannot see those settings.
 
-Plantoir saves a backup of a course before an assistant changes it. See [Back up a course and restore it](page:backups).
+Plantoir saves a backup of a course before the first change an assistant makes through Plantoir in a session. A page file the assistant changes itself is not backed up first. See [Back up a course and restore it](page:backups).
 
 ## The assistant that runs on this Mac
 
