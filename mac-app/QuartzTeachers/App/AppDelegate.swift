@@ -225,6 +225,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // "keep working" must leave the update exactly as it was.
         let updateAtQuit: UpdateGate.QuitAction = AppUpdates.shared.decideAtQuit()
 
+        // A Coverage tab refresh still waiting for an old preview to stop
+        // must start nothing once the quit goes ahead, whether it ends now
+        // or waits on a set-aside update (#793, the 793b fix review's LOW 2).
+        SectionCoverage.shared.abandonEveryRefresh()
         AppDelegate.letEverythingGo()
 
         if updateAtQuit == .setAside {

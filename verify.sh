@@ -696,6 +696,20 @@ else
   cat /tmp/verify_assessment_kit_test.log
 fi
 
+# Marking tests from scanned papers (#750, 750a). Each runs the skill's own
+# scripts as subprocesses with invented names only, and skips a case, saying
+# so, where Poppler or tectonic is missing. Redaction: the nine kinds of scan
+# the plan review measured and three everyday ones, each stopped with CHECK
+# or blanked with no name ink left, against the committed blank tests.
+for marking_test in redact names guard sheets; do
+  if (cd scripts && python3 -B "test_marking_${marking_test}.py") >"/tmp/verify_marking_${marking_test}_test.log" 2>&1; then
+    pass "marking: scripts/test_marking_${marking_test}.py (#750, 750a)"
+  else
+    fail "marking: scripts/test_marking_${marking_test}.py (#750, 750a)"
+    cat "/tmp/verify_marking_${marking_test}_test.log"
+  fi
+done
+
 if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
   pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
 else

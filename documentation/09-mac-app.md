@@ -761,11 +761,17 @@ WHOLE, because one section's record decides what another's rows say.
 **The tabs: Website | Problems.** `Views/Section/DetailTabs.swift`, a
 segmented control in a thin bar above the section's content, shown only while
 the section's own record has rows; with none, the section looks as it always
-has, and the tab falls back to Website. The Problems tab (`ProblemsTableView`)
-is drawn OVER the console and the site as a top layer of the existing stack.
-**Rejected: a `TabView`** — the site is a live `WKWebView` scrolled to where the
-teacher left it, and moving it between containers is how that is thrown away
-(the comment on the cover layer). **Rejected: the toolbar's principal slot**
+has, and the tab falls back to Website. Since #793 the bar can also carry
+Coverage (Website | Coverage | Problems, "A section's Coverage tab (#793)"
+below), and the Problems tab (`ProblemsTableView`) is drawn INSTEAD of the
+console and the site, not over them as it was from #717 to #793: only the
+chosen tab's content is in the window (`SectionTabContent`), so the hidden
+preview can take no key and no browser command. **Rejected: a `TabView`**, a
+different control that decides for itself what each tab keeps. Leaving the
+window does not throw the preview's page away: `WebPreviewController` owns the
+web view, and the coverage plan review measured a detached and re-added
+`WKWebView` keeping its scroll and its typed text (`SectionDetailStructureTests`
+proves the same instance comes back with its page). **Rejected: the toolbar's principal slot**
 (the plan's place) — the section's toolbar keeps every item ALWAYS present,
 because inserting one conditionally makes macOS rebuild the toolbar and
 mis-lay-out the title (the comment on `.toolbar`), and the switch exists only
@@ -1045,6 +1051,311 @@ surviving the shell to a stub `claude` with a backslash, `$`, a backtick and an
 apostrophe in it, the trail line against the contract's, a source scan of
 the view, and the disabled buttons' hint in both states with both buttons
 carrying it (#776).
+
+## A section's Coverage tab (#793)
+
+Every build of a section writes, beside the built site, its curriculum
+coverage map as it would be if every existing page were published (793a, doc
+05 → "The Coverage tab's map (#793)"). The section's page shows it on a
+Coverage tab, with no browser and no assistant. The rules are
+`contracts/shared-rules.json` → `coverageTab.tab`, every one a case both apps
+run (`CoverageTabTests` here); this section says why they are what they are.
+
+**When the tab is there.** `SectionTabs.shown`: Website, then Coverage, then
+Problems, and no bar when Website would be alone. Coverage is in the bar when
+the course has a curriculum folder holding an expectation page
+(`CurriculumFolderRule.resolvedFolders`, the build's own rule), or when the
+section's last map names at least one map (a curriculum folder inside a
+section folder, which the course root does not show). It is there whatever the
+section's WEBSITE says about its coverage map (Russell, 2026-11-12: that
+setting decides what students see, not the teacher's planning view). A course
+with neither has no Coverage tab and no line about it, which is #708's
+"absent, never disabled". The tab that comes and goes most (Problems) is last,
+so Coverage does not move under the pointer, and a chosen tab that leaves the
+bar falls back to Website, never to a neighbour.
+
+**Only the chosen tab is in the window** (the coverage plan review's H1).
+`SectionTabContent` draws the Website layers, the Coverage tab or the Problems
+tab, never one over another, the shape the course page ended with in #708.
+The reason is the one #708's fix review measured: SwiftUI's `.disabled` does
+not take the keyboard from an `NSView`, so a layered tab left the preview's web
+view first responder under it, and the browser commands reach the preview
+through `.focusedSceneValue(\.previewController, …)` whatever is drawn on top.
+So the focused value is now nil unless Website shows, the toolbar's Back,
+Forward and Reload are disabled off Website (they stay in the toolbar, which
+keeps every item always present), and Section ▸ Preview, Deploy… and Open in
+Browser stay, since they name the section, not the hidden page. The preview's
+web view leaves the window and comes back intact because its controller owns
+it (`WebPreviewView.makeNSView` returns `controller.webView`, and
+`loadIfNeeded` does not reload the same address). `SectionDetailStructureTests`
+draws the real `SectionTabContent` with the real `WebPreviewView` offscreen and
+proves: with Coverage or Problems showing the preview's own `WKWebView` is not
+in the tree and does not keep the keyboard; back on Website the same instance
+is there with its page. Measured on the layered shape (a `ZStack` in
+`SectionTabContent.body`): 5 failures in those tests. State that must survive a
+switch lives in `SectionCoverage` (per section, keyed like `SectionProblems`):
+the map's web view, the record read last and a refresh under way.
+
+**What the tab shows.** `CoverageTabDisplay.display` turns a handful of facts
+into one of three faces (`stateCases`): the map with lines above it, an empty
+state, or "the map can't be shown". The record is read as content this app did
+not write (`CoverageTab.read`, the 793a review's items 1 and 2): no record, an
+unreadable one, a page name that is not a plain file name, or a named page not
+there is no map; a version other than 1 is no map, said in its own words; page
+null is "the last build found no curriculum to map". The map is this build's
+only when `about.json`'s `buildId` equals the section's `.build-id`
+(`coverageTab.mapOfThisBuild`, whose cases `CoverageTabTests` runs as the
+Python does); ids are compared for equality only. The first line is the
+map's own date, said only as far as it is true (the 793b review's M1): "made
+when this section was last built" only when the map IS the latest build's;
+"made by an earlier build … the latest build made no map" when it is
+another build's and nothing is making the map, but only "made by an earlier
+build" while a build is making it, because a build writes `.build-id` as it
+starts and the record reads as another build's until its map is written (the
+fix review's M3); and a form with no date, read from the record's own start
+rather than from the walk (LOW 4), when the record has none, because
+the review measured an empty date rendering as "…last built, .". The last
+line is the click hint, or, with
+Obsidian not installed, the sentence saying a click opens nothing. The hint is
+said by the app above the page, never on the page, because it is false without
+Obsidian and on Windows until its tab is wired (the plan review's L1).
+
+**Never a map that looks current and is not.** "Changed since" is #768's own
+rule, not a second one (the plan review's M1): `BuildFreshness.changedSince`
+was factored out of `whyRebuild`, and the tab asks it of the moment the MAP's
+build started (`startedNs`), off the main actor. That reference differs on
+purpose from the site's (the earlier of `.build-started` and `index.html`):
+the map is written mid-build, so its own start is its reference. `.clock` (the
+start is still later than now) and a null `startedNs` both say the map may be
+out of date. A first build after a class date moves writes dates back into
+pages after it starts, so the map it makes reads "changed since" at once: true,
+and errs safe. A map that is another build's, with nothing building, says it
+could not be made again and shows its own date. A deploy that reuses the last
+build (#768) runs no Python, so the map and its date are left exactly as they
+were, which is true.
+
+**Make the Map (Again)** (Russell's rulings, 2026-11-12; the plan review's H2).
+It runs the section's ordinary preview build in the background, with no
+map-only run: a preview already running is stopped and waited for (a second
+cannot have its port, as a repair's rebuild found), then `startPreview()`, the
+way in every caller but the Preview button uses, so the question about today's
+class is never asked. The teacher stays on the tab: no switch to Website, no
+browser, no focus taken. The refresh is a state in `SectionCoverage`, driven by
+events and never by a clock:
+
+- starting AT the press, with a token, before anything is awaited (the 793b
+  review's H1, below);
+- pending once the old preview has stopped, with the record's build id as it
+  was;
+- made again when a reading finds the record this build's with another id; the
+  map updates in place, before Quartz has finished, because the map is written
+  before the build's `PLANTOIR_PROBLEMS:` line and a reading follows that line;
+- did not finish when this window's own build printed that line and the map is
+  not its own (its map step failed), or when the wait for its site ended (the
+  run ended, was stopped or cancelled) before a map, or when the view went away
+  (a switch of section stops its build, through `stopPreview`, which settles
+  the refresh from what is on disk);
+- refused, with the preview's own sentence, when it could not start.
+
+**Why the refresh stops a serving preview at all** (asked by the 793b fix
+review, measured by reading the shared Python and the launchers on
+2026-11-12). A serving preview does not run the build again when pages
+change: `build_site.py` runs once, then Quartz serves with its own watcher
+over the builder's copy, so the serve never writes a new map. A
+`preview.sh --build-only` beside a serve does not leave it running either:
+`build_site.py` stops the section's serving preview first
+(`stop_preview_serving`, which closed a race that published a preview), so a
+build-only refresh would end the teacher's preview AND leave the window's
+Website tab with nothing to show. So every path that makes the map again stops
+the serve; stopping it and serving again (the ordinary Preview) is the one
+that leaves the teacher a live preview afterwards, at the page they were last
+reading.
+Rejected: a build-only refresh, for that reason; a map-only run, ruled out by
+Russell.
+
+**The press is recorded at once** (the 793b review's H1). The first version
+recorded it only after the old preview had stopped, seconds later: the tab
+said nothing, the button could be pressed again, and a second press ended the
+RUNNING build's wait (#232's record of a build in progress), reported "could
+not be made again" while the map was being made, and raised a false "Cannot
+Preview Yet" later; a switch of section during the stop started a preview from
+a view that had gone, which nothing then stopped, so the section read as
+previewed in another window. Now `SectionCoverage.makeAgain` records
+`starting` with a token before it awaits anything; the tab says the map is
+being made and the button is unavailable from that instant; a second press
+does nothing; the old run's end during the stop settles nothing; and the start
+goes ahead only if the token survives the stop. Leaving the section, the course
+or the window (`onDisappear` → `letTheCoverageTabGo`) and quitting
+(`finishTerminating`, before previews are let go, which covers a quit that
+waits on a set-aside update; and `willTerminateNotification`) clear it. Only
+the pressing view counts: the press carries the view's own id, so another
+window on the same section leaving, or stopping its own preview, settles
+nothing of it (the fix review's LOW 1).
+
+**No reading moves a press out of starting** (the 793b fix review's H1). The
+first version of the token was wiped by the very next reading of the record,
+because `settle` read any state but pending as an older "could not": the old
+run's end during the stop always brings a reading (`isBusy` changes), so in
+the ordinary case, a preview serving, the press flashed "making", stopped the
+preview and started nothing. The hand-picked sequence cases had no reading in
+them. Now `settle` leaves `starting` alone, and
+`coverageTab.tab.sequenceInterleavings` is GENERATED: every combination of
+one event at each of three points (during the stop, after the build's start,
+after its map; readings, readings after a problems line, the run ending,
+another window leaving, a Preview the teacher starts), 80 runs
+(`CoverageTabTests.testEveryInterleaving`). `CoverageRefreshInThePageTests`
+drives the real section page offscreen with a stand-in `preview.sh` whose
+stop takes a second, so the old run's end and the page's own readings land
+inside the stop: the press starts its build and the map is made again in
+place. With the guard removed, that test fails and 32 of the 80 interleavings
+fail: the 32 with a reading during the stop. The other 48 take no reading
+there, so they pass on the old code too (the fix review 2's LOW 6).
+`CoverageRefreshInThePageTests`' stand-in serves the site over HTTP, so the
+press is made with the preview really showing and the button checked enabled
+first.
+
+**The old run's end, waited for.** The stop's own wait ends when the stop
+process does; the old run may end a moment after. `makeAgain` then waits for
+that run's end (`ScriptRunner.waitUntilFinished`, an event) before asking
+whether a build is running, so the old run is never taken for a new one and
+the tab never stays on "Making…" (the fix review 2's LOW 1;
+`sequenceCases` → oldRunEndsLate). And a start whose lease is no longer its
+own after waiting for stops to finish (its view went away, or it was stopped)
+runs nothing (LOW 2): the guard is in `startPreview`, so it covers every way
+in, the refresh's and the toolbar's alike.
+
+**The teacher's place, and what they are told** (the fix review 2's M1). A
+preview that was showing starts again at the page last viewed, the Preview
+button's own rule (`previewStartPage`, `.lastViewed`; it falls back to the
+front page when that page is gone), not at the front page. The tab says
+before the press that making the map again starts the preview again
+(`previewRestarts`), and while it builds that it will (`makingWithThePreview`).
+A browser tab the teacher opened on the preview (Open in Browser, or a link
+the preview handed to the browser) keeps its old page and stops reloading by
+itself, because Quartz's live-reload client does not reconnect; it works again
+after one reload once the build is done. That is something the teacher must
+act on, so the tab says it (`browserReload`), only when this window had handed
+the preview to the browser.
+
+**Another window's build.** While another window's preview of the section
+builds, it has moved `.build-id` before its map, so this window's tab no
+longer says the latest build made no map: the older map is "made by an
+earlier build", with the line that the section is being previewed in another
+window (LOW 4).
+
+**A late refusal that waited on Coverage** goes to the section's next page
+when the teacher leaves the section from Coverage, through `SectionCoverage`,
+and is raised there (LOW 3).
+
+**A Preview pressed during the stop is the build** (the fix review's M1).
+After the stop, `makeAgain` asks whether a build is already running (the
+teacher's own Preview, the assistant's); if so the refresh starts nothing, so
+that build keeps its wait and ⌘Q still knows about it, and its map settles
+the refresh. `CoverageTabTests.testEverySequenceCase`
+runs `coverageTab.tab.sequenceCases` through the real steps with a stop the
+test holds open, no window and no delay. A repair's Preview Again
+(`rebuildAfterRepair`) has the same stop-then-start shape and is a follow-up.
+A preview serving when the refresh is pressed starts again at the page last
+viewed (below).
+
+The wait's end is noticed on `isWaitingForServer` turning false, asked again
+inside the callback, because the stop that a refresh makes first ends the OLD
+wait, and that change can arrive after the refresh's own wait has begun. Quitting
+leaves nothing half-recorded: the state is memory only and the build writes the
+map's files whole. The button is disabled while the map is being made, while
+this window's build runs, while the section deploys, while another program
+builds the course, and while another window holds the section's preview, each
+with its line; and while the folder is being copied or made ready, with that
+reason as its help.
+
+**Builds someone else started.** A deploy of this section says so
+(`deploying`) and shows "being made again" once its build has moved the
+section's `.build-id`. Another program building the course (a scheduled deploy,
+an outside assistant) is read from `WorkLeaseRegistry` on each reading, and the
+app coming to the front reads the record again. A scheduled deploy that
+finishes while Plantoir is already in front shows the older map with its own
+older date until the next reading: stale, but honestly dated (the plan
+review's LOW).
+
+**Nothing pops up over the tab** (Russell, 2026-11-12). While Coverage shows,
+`SectionTabs.alertsWait` holds what a build can raise: the Problems alert stays
+due in its store, the links checklist waits as `pendingLinksChecklist`, and a
+late "the preview did not appear" (`showALateRefusal`, which arrives long
+after any press) is held until the teacher leaves the tab. The refusal of the
+tab's own START is said in the tab instead, and only that: it is taken only
+while the start's own synchronous call runs (`SectionTabs.refusalIsTheTabs`,
+`ownStartRunning`), so a refusal of anybody else's press, in this window or
+another, during the stop or while the build runs, reaches whoever pressed
+(the fix review's M1 and M2). The Problems tab
+still appears in the bar. When the teacher next shows Website or Problems,
+what waited is raised one at a time, the way it would have been
+(`raiseWhatWaitedForCoverage`). The Preview and Deploy buttons themselves are
+untouched: pressing one is the teacher's own act, and its question and
+refusals are its own, shown at once whichever tab is chosen. (The first
+version held every refusal while Coverage showed, so a teacher's own press
+was answered minutes later, or not at all after a switch of section: the
+793b review's M2, where the code was wrong and this paragraph right.)
+
+**Web views.** One map web view per section on screen, kept across a switch
+of tab so the map keeps its scroll, and released when no window shows the
+section (`noteShown` / `noteGone`; the 793b review's LOW 2). A new map's
+"changed since" is not known until its own walk is back, and says nothing
+meanwhile (`notKnownYet`; LOW 1).
+
+**The viewer.** The map comes from course content, so it is shown by the
+Planning tab's web view, parameterised rather than copied
+(`PlanWebController.forCoverage`): the same three guards as "What stops a plan
+page reading other files" (#708, above), with the `.coverage-tab` folder,
+every link on the way followed, as the only folder the page may read; a rule
+list compiled from the same text under its own name
+(`PlantoirCoverageTabLocalFilesOnly`), so neither tab compiles over the
+other's; scripts off; nothing stored. `CoverageWebViewGuardTests` runs it with
+no window: the rules compile, the page reaches nothing on the network, runs no
+script and cannot show the built site's picture beside its folder. Rejected: a
+second web view class, which would let a fix to the network block reach one
+tab and not the other.
+
+**A click on a code** (`navigationCases`, `linkCases`, `itemCases`; the 793a
+review's items 3 and 4). `CoverageNavigation.decide` lets the page load itself
+and files in its folder, hands a CLICK on a link of exactly the
+`plantoir-coverage:open/<buildId>/<map>/<code>` form to the app, and refuses
+everything else, the web and email included (the page has none). Measured: a
+`<meta http-equiv="refresh">` to a code reaches the delegate as a navigation
+that is not a click, and only the click test refuses it (with that test
+removed, `CoverageWebViewGuardTests` sees it handed over). The app reads the
+link exactly (four parts, decoded once, a code of letters, digits, dots and
+hyphens), reads the record AGAIN, and `CoverageItem.resolve` looks the code up
+in it: a build id other than the record's is a click on an older page, so
+nothing opens and the record's page is shown; the path is taken literally
+(never decoded: folders may be NAMED `%2e%2e`), refused with an empty, `.` or
+`..` part or a leading `/`, joined to the course folder, resolved through
+every link, and must be inside the course folder resolved the same way, end
+`.md` and be a plain file. Then it opens through Open in Obsidian's own route,
+`WorkspaceModel.openExpectationInObsidian`, which shares `pressOpenInObsidian`
+with the toolbar, so a reference course's locked-pages note, the add-ons offer
+and registering a course Obsidian has never seen as a vault happen exactly as
+they do for the button. Rejected: calling `obsidianOpening.openPage` from the
+tab, which skips all three. A page gone since the build, or one that is not
+inside the course, is said above the map.
+
+**The trail.** "looked at a section's curriculum coverage" once per appearance
+(counts and the map's date, or why there is none), and once when the map
+cannot be shown; "asked to make a section's coverage map again" at the press
+and once more when it settles; a click writes "page opened in Obsidian", the
+event every section press writes, with the code and the page's place, or why
+nothing opened. A click that goes ahead says Obsidian was ASKED to open the
+page, not that it opened: the route cannot confirm it (#721), and the tab adds
+no silent success of its own. No trail word names the computer, so both apps
+write the same line; the two sentences on the tab that do (`noObsidian`,
+`cannotShowDescription`) carry `{machine}` and are recorded in
+`specialNames.platformWording.machine.usedIn`. Never an expectation's words or a page's words
+(`coverageTab.tab.trailWords`).
+
+**Not done.** The tab has no Print (not asked for; with the focused preview nil
+the preview's own cannot be reached from it). VoiceOver on the map's cells, a
+cell's tooltip, dark mode and a preview rebuilt while Coverage shows appearing
+on return are hand tests at the cut. Windows owes the tab; it inherits the map
+from the shared Python (the `windows` issue for #793).
 
 ## One folder, however it is spelled
 
@@ -3731,8 +4042,8 @@ rejected:
   draw.
 - **Where a course's handouts live: `courses/<CODE>/.internal/handouts/handouts.json`**
   (`{folder, teacherSaid, recorded}`), read and written by the assistant
-  only. (Since #707 it is one of two places under a dot folder an
-  assistant writes; the other is `.internal/planning/`: "Unit planning (#707)" below.) It sits inside the course so it travels with a backup, an archive
+  only. (Since #707 it is one of the places under a dot folder an
+  assistant writes; the others are `.internal/planning/`: "Unit planning (#707)" below, and since #750 `.internal/marking/marking.json`: "Tests, marking and report comments" below.) It sits inside the course so it travels with a backup, an archive
   and a restore, as `.internal/timetable/` does; a reference import keeps
   `.internal` minus `activity`. It never reaches a site: discovery skips
   dot-named folders (`_is_hidden` in `build_site.py`), so nothing under
@@ -4308,6 +4619,14 @@ guards, each with one job (`unitPlanning.tab.whatAPageMayRead`):
    the page reaches the network. The list is compiled before the first page
    loads; if it cannot be, no page is ever loaded.
 
+Since #793 the same controller also shows a section's Coverage tab map,
+parameterised rather than copied: `PlanWebController.forCoverage` names its
+own rule list identifier, the map's folder and `CoverageNavigation.decide` in
+place of guard 2 ("A section's Coverage tab (#793)" above), and keeps guards 1
+and 3 as they are, so a fix to either reaches both tabs.
+`PlanNavigation.Decision` gained `handToTheApp` for the map's clicks; a plan
+never gets it.
+
 MEASURED, in a standalone harness that compiled `PlanningTab.swift`,
 `UnitPlans.swift` and `CalendarDay.swift` from this branch with four
 retyped stubs (macOS 26.6, swiftc 6): the 65 cases of `tabCases`,
@@ -4645,6 +4964,362 @@ first fix's checker, the eight new person-key cases and the swapped
 part-score case fail. NOT MEASURED: a trial with an outside
 assistant actually writing a test from this skill (the plan's two trials),
 deferred to the director.
+
+**The marking skill (#750, piece 750a: a test from scanned papers).** The
+ninth skill, `plantoir-marking`. It marks a test or quiz written on paper
+and scanned, onto a feedback sheet per student, from the kit #751 writes.
+Coding assignments (750b) and results documents (750c) are later pieces;
+until they land the skill says it does not describe marking anything else.
+The contract is `assessment.agentGuidance.markingSkill`, `folders`,
+`identifiers`, `scriptPrivacy`, `redaction` and `namedCopies`, and its
+sentences are pinned in `mustSay`. The app does nothing new and records no
+trail event: what an assistant does with student files is never written on
+the trail, because it would be student data.
+
+- **The privacy points are true, and said first (750 plan review H1 and
+  R2).** Four points before any student work is opened: whatever is read
+  goes to the AI service (with where to turn model training off, and the
+  school's policy); identifiers only; a script boxes the name line of each
+  page whose blank test has a name blank and puts the boxed papers in one
+  file, and the teacher looks through every page of it before the
+  assistant reads anything, which the assistant never opens, and the yes
+  is recorded and checked (since the third fixes round below; before it, a
+  check sheet of page tops, and before that a "name box check" and a
+  skim); a name written anywhere else is not
+  boxed and is seen; a name seen is never repeated (the identifier and page only,
+  `NAME VISIBLE page N` in `checks`); the files written stay on the
+  computer. REJECTED: v1's "scans are redacted ... what I write stays on
+  this computer", which claimed more than the redaction does, and "what I
+  write" (L7: the assistant's replies go to the service too).
+- **Two folders, outside the working folder (Russell, 2026-11-12).** The
+  marking folder is the assistant's; the teacher-only folder beside it
+  holds the mapping table, the originals, the check files, the named copies
+  and the runner's quarantine, and only scripts write there. One folder
+  with the names inside was REJECTED because a recursive listing of it
+  shows named file names. A marking folder inside the working folder is
+  refused, because it could be built into a site or copied with a course.
+  A folder kept in sync by a service is said ONCE and recorded
+  (`syncAccepted` in `courses/<CODE>/.internal/marking/marking.json`, paths
+  only, one entry per synced folder's path so a new folder is asked about
+  again, 750a review L4), because a Mac's Desktop and Documents can be in
+  iCloud with ordinary-looking paths (review M5): the assistant asks rather
+  than infers. Since the 750a review (L5) every script also refuses a
+  folder inside a working folder (one with `courses/` and `.toolchain/`
+  above it), so the refusal is not the skill's words alone. No rule about Documents; the offered default is `~/Marking/<CODE>/`.
+- **The redaction checks each page against the BLANK test (review R2).**
+  The plan's prototype checked that the box's pixels were black, which
+  proves the painter and nothing about coverage: run on nine kinds of scan
+  it printed OK on four where the name survived (shifted 0.30 in, scaled
+  94 percent, a duplex page upside down, an A4 page). `redact_scans.py`
+  now reads the box from the blank test's own PDF (the label a writing
+  line follows, case and punctuation ignored, review L1: `Quiz.tex`'s
+  "School Name" sits at the same height), then for every page compares its
+  size with the blank's and lines it up: one-dimensional ink profiles
+  (rows and columns) of the top left and of each half of the foot, slid
+  against the blank's, give three shifts, and from them the place the
+  blank's name box lands. More than 0.1 in at any corner, or more than 2
+  percent of scale, stops the file with `CHECK` and a reason; a page that
+  lines up only turned half a turn is turned upright and blanked (its
+  tiles are placed with a half-turn matrix, so nothing is re-encoded). The
+  written file is read back: the box all black, no text, the page count,
+  and every page lined up and upright. Each page is the four tiles AROUND
+  the box rendered by `pdftoppm` as JPEG, the box filled black, so its
+  pixels are never in the file (REJECTED: a black box drawn over the page,
+  which leaves the original under it). Poppler and the standard library
+  only (REJECTED: Pillow and ImageMagick, which the kit's tool needs and a
+  teacher's computer does not have). The line says what was measured, `box
+  placed; header matches your blank test`, never OK. REJECTED: moving the
+  box to follow a shifted page, since a CHECK the teacher sees is safer
+  than a guess.
+  MEASURED (2026-11-12, Apple M4 Pro, macOS 26.6, Poppler 25.09.1): the
+  box from the blank letter and legal tests is `3.44,0.20,5.33,0.89` in on
+  both; twelve of the thirteen scan cases (`redaction.scanCases`) built from the blank
+  with an invented name in the Name blank of every page give upright,
+  shifted 0.05 in, scaled 99 percent, grey and speckled, and page 2 upside
+  down (turned upright) written with no name ink outside the box, and the
+  other seven stopped. Two thresholds were found by measurement: a phone
+  scan's specks made the profiles match too weakly to trust (0.51), so a
+  pixel counts as ink only with two ink neighbours, and the profiles are
+  smoothed over 0.04 in either way, which raised the clean page's weakest
+  match from 0.65 to 0.90 and the speckled one's to 0.71. Time: about 0.33 s a page with every check (five two-page papers in
+  3.20 s, five speckled ones in 3.32 s). Must-fail, by
+  copy and restore: with the registration removed, three cases leave name
+  ink (2,450, 2,146 and 1,408 pixels of it); with the size check removed
+  as well, four, the A4 page among them (3,176): the four the review
+  measured.
+  **Writing past the box (review L2).** Lining a page up says the box is
+  where the blank's name box is; it does not say the NAME is inside it. A
+  name typed longer than the Name line in the trial fixture showed past a
+  box that was in place, and the line said the header matched. So the ink
+  within 0.25 in around the box is compared with the blank's (at 100 dpi,
+  the blank's print widened by a pixel, the last pixels of the lining up
+  found by a search of 3 pixels either way, lone specks dropped), and more
+  than 10 pixels of ink the blank does not have stops the file. MEASURED:
+  0 such pixels on every scan case the generator makes that must be
+  written (the speckled one included), 237 on a name written 0.3 in past
+  the box, and 18 to 35 on four typed names that touched the Date label
+  (the visible part of each a letter's tail); before the search was added
+  (3 pixels of widening alone) those four read 5 to 15 and slipped under,
+  because the name's ink over the printed Date counted as the blank's.
+  The case "a name written past the box" goes red without the check.
+  **The 750a review's fixes (2026-11-12; superseded by Russell's ruling
+  below, which made this check a warning).** H1: at 80 levels darker than
+  the paper the ring missed a light pencil name (pixel about 178) past the
+  box, which was written with 2,124 name pixels visible; at 40 it was
+  caught, and at 30 so is the trial fixture's light-pencil name that runs
+  over the printed Date label (6 pixels at 40, 14 at 30, the limit 10).
+  So that paper marks are not writing, a THIN straight line 0.5 in long
+  (a ruled line, a fold) is left out of the ring and of the lining up, and
+  the left 0.6 in (punched holes, a staple) is left out of the lining up.
+  MEASURED on the review's 50 invented scans: every one that must be
+  written still is, with 0 name pixels outside the box; scale 101 percent
+  is now stopped (writing past the box), a nuisance in the safe direction.
+  M1: the written page was lined up again with its black box in it, so a
+  page shifted right 0.04 in or turned 0.5 degrees lined up against solid
+  black and was stopped; the box is masked out first, and both are cases.
+  The tolerances moved into "What must not change", because loosening one
+  to clear a CHECK lets a name through, and the skill says so.
+  H2: what the box covers is said exactly, in the skill, point 2 and the
+  run's last line: the name box of each page whose blank test has one, and
+  writing within 0.25 in of it. A surname after a gap, a name on the Date
+  line (MEASURED: 1,010 pixels survive, written), a name on a page with no
+  name blank, and a name in the body are NOT caught, and the name box check
+  file is put first in what the teacher looks at, since it shows the
+  original header with the box drawn. REJECTED: making the script look for
+  names anywhere on a page, which it cannot do (ink on the Date line cannot
+  be told from a date). Found while fixing it: on a blank whose Name blank
+  is on page 1 only, page 2's "School Name" was taken for the label and a
+  box drawn over the school's name. (That fix required a writing line after
+  the label, and the fix review, H1, found it left a Name blank drawn as
+  underscores, dots, a table cell or a frame unboxed, with the line saying
+  the page had no name box: since the ruling below, every label is a name
+  blank except one with another word just before it.)
+  A limit, said in the skill: a rotation of 1.5 degrees is stopped
+  although no ink survived it, since 0.1 in at the box's corners is about
+  one degree.
+- **Russell's ruling, 2026-11-12: the teacher's eyes are the proof** (the
+  second fixes round; its registration gate, check sheet and warning were
+  then removed by the third, below).
+  Two rounds of review kept finding names that survived while the script
+  reported success (faint pencil, yellow highlighter, a surname after a
+  gap, a Name blank drawn as underscores), and the fix review measured that
+  an ink check low enough to catch the faint and coloured names stopped 5
+  of 20 clean scans. So coverage is no longer proved by measuring ink:
+  - **The box** is generous, as the teacher's own tool is: on every page of
+    the blank test that has a name blank (the label, whatever the blank
+    after it is drawn as; never a label with another word just before it,
+    such as "School Name"), the whole line, margin to margin (0.3 in from
+    each side), from 0.15 in below the top to 18 pt below the label.
+    MEASURED: the six styles of `scripts/fixtures/marking/blank-name-styles.pdf`
+    (a rule, underscores, dots, a table cell, a frame, underscores at the
+    left margin) are all boxed, and a name written in each is inside; the
+    fix review's four page-2 styles are boxed with no name pixel outside;
+    of its 43 faint and coloured names, 40 are written with no name pixel
+    outside the box and 3 (on a lighting gradient) are stopped.
+  - **Registration is the gate**, as before, by the header row outside the
+    writing area (the school's name) or, where nothing else is printed on
+    it, the band below the box, and the foot; inch-long straight lines are
+    left out of it as well as the left margin. No false CHECK at 0.04 in or
+    0.5 degrees; of the fix review's 20 clean scans one is stopped (a coffee
+    ring through the header band), where three were.
+  - **ONE check sheet**, `Check sheet.pdf` in the teacher-only check folder:
+    the top 1.6 in of every page as it was boxed, captioned by identifier
+    and page; a page with no box or with writing beside the box captioned
+    and outlined in red; a stopped file's pages shown as scanned. The skill
+    makes the teacher's look a STOP: the assistant asks, reads no paper
+    until the teacher says yes, and never opens the sheet (a name the box
+    missed would be on it). MEASURED: 30 papers of 4 pages, 120 pages, 51 s
+    on an M4 Pro, a 20-page sheet of 1.19 MB. REJECTED: a PNG contact sheet
+    (one PDF pages through in Preview), and keeping the skim file (one sheet
+    is what the teacher is asked to look at; the skill says plainly that a
+    name elsewhere on a page is not boxed and would be seen).
+  - **The words**: the run says pages boxed, pages with no name blank,
+    pages with writing beside the box and files stopped, and that the check
+    sheet waits for the teacher's look; never that a name is covered; that a
+    name anywhere else is not boxed; that every page read goes to the
+    assistant's service. A test fails any run line that claims coverage.
+  - **The ink beside the box is a warning**: ink 0.25 in above and below
+    the box, in each pixel's darkest colour channel (so yellow is seen, fix
+    review H2), at 18 levels, adds a line and a red caption and never stops
+    a file. MEASURED: of the fix review's 20 clean scans, 5 warn (lined
+    paper, holes, two folds, a staple with grain), and of the branch's own
+    written cases scaled 99 percent, turned 0.5 degrees and the paper marks
+    warn; a name written under the name line warns, as it must.
+- **The redaction step, simple (the third fixes round; Russell,
+  2026-11-12, on #750: "script runs, teacher checks the papers, confirms
+  names are redacted, then agent based marking begins. Simple." and
+  "Teacher confirms full redacted papers.").** The review of the second
+  round MEASURED that registration by ink profile stopped 8 of 8 papers
+  with answers written to the foot of a page, with false reasons ("shrunk
+  by about 13 percent"), and that the read-back line-up stopped clean
+  house-style papers; every clever check had failed on papers unlike its
+  fixtures. So `redact_scans.py` went from 1,221 lines to 809 and does
+  three things:
+  - **The box comes from the blank test only**: its own text and drawing,
+    a label (Name, Student Name, Nom, any case; not "School Name" or
+    "Partner Name") followed by a place to write (a rule, underscores,
+    dots typed as one word or many, a table cell, a frame); a sentence
+    starting with Name is an instruction, not a blank; no blank anywhere,
+    or two on a page, stops and asks. The whole line, margin to margin,
+    from 0.35 in above the label to 18 pt below, on every page that
+    corresponds, in proportion to the scanned page's size. MEASURED: the
+    six drawn styles and the five label cases of the fixtures box as the
+    contract's `boxCases` say.
+  - **Only checks that need no judgement**: the page count is whole copies
+    of the blank's, and each page is the same way round and within 6
+    percent of its blank page's shape. A shifted, shrunk or upside-down
+    page is NOT detected, and the skill says so: on papers with answers to
+    the foot of every page, upright, speckled and 0.15 in shifts keep the
+    name in the box on both fixture blanks, while a 0.40 in shift, a 94
+    percent shrink and an upside-down page leave it showing, which is what
+    the teacher's look is for.
+  - **One file and a recorded yes**: the last batch is cleared; the boxed
+    papers and `Redacted papers to look through.pdf` (each paper after a
+    page naming it) are written in a holding folder on the teacher's side
+    and moved into place only when all are written, so a failure leaves no
+    paper where the assistant reads (MEASURED with a failing `pdfunite`).
+    The teacher looks through every page; `--confirm` records the yes
+    against the files' SHA-256 only when the combined file exists, so an
+    advance yes cannot be recorded; `--verify` is run before any paper is
+    read in any session and fails on a new batch, a changed file or a
+    record left from another batch.
+  REJECTED: registration, the read-back line-up, the ink warning and the
+  check sheet of page tops (the full papers are what the teacher looks
+  through). The runner now never passes a two- or three-letter surname
+  that appears on its own (750a fix review 2, M4): such a line is withheld
+  and such a file moved, counted, with exit 1.
+- **The last round (750a fix review 3: 0 HIGH).** The step held on realistic
+  papers; what followed tightened what it promises:
+  - **The limit, said plainly:** the script cannot know who looked. The
+    record proves that someone ran `--confirm` after exactly these files
+    and the combined file existed, which shuts out an advance yes, a stale
+    batch and a swapped file; it does not prove the teacher looked. So the
+    skill has the assistant run `--confirm` only straight after the
+    teacher's own yes in the conversation, never on its own judgement, and
+    the script's line says "Recorded the teacher's yes", not that anyone
+    looked (M2). REJECTED, for now: a code printed on the combined file's
+    first page that the teacher reads back, which would prove the file was
+    opened; it is a small addition if wanted later.
+  - **Every entry is gated (M1):** `--verify` lists every file, link and
+    folder in `Redacted/`, whatever its name or case, and fails on anything
+    the record does not list; MEASURED before, an unboxed original copied
+    in as `Student Q.PDF`, or a `.png`, passed. A run clears everything
+    there, and the record, FIRST, before any other check (L1).
+  - **The briefs begin with `--verify` (M3)**, so a marker started from a
+    saved brief in a later session reads nothing unconfirmed.
+  - **The ask names what the script cannot see (M5):** an upside-down page
+    (its name line at the foot), a shifted or shrunk page (part of the name
+    just below the box), and a name anywhere else.
+  - **A form cell (M6):** where the label sits in a cell or frame with the
+    room to write under it, the box runs to the cell's lower border, found
+    in the blank's own drawing. MEASURED: a name written low in such a cell
+    showed 76 pixels below the old box; now none.
+  - **Smaller:** fixed lines avoid two-letter words a short surname could
+    match ("No" withheld `--check-table`'s only line); a scanned blank is
+    told to use `--box`, and `--box-from` shows a given box; the combined
+    file follows class-list order (Student B before Student AA); a missing
+    `--check-dir` is said plainly.
+  - **The trial** now ends on a true yes: the teacher says no on the
+    upside-down page, a rescan is put in place, the boxing runs again, and
+    only then the yes.
+- **A whole class in one scan (review M4).** `--stack` splits it with
+  Poppler into `Paper 01.pdf ...` in the teacher-only folder and writes
+  `Papers to name.pdf`; the teacher fills a `paper` column in the mapping
+  table, and `--name-papers`, run through the runner, renames them from
+  the `section`, `paper` and `identifier` columns only. A class-list
+  importer was left for a later release.
+- **Scripts are starting points, and one runner is not (Russell,
+  2026-11-12; review R3).** Every script opens with "What you may change
+  for this teacher" and "What must not change" and has a `--self-test`;
+  the skill has the assistant copy it into the marking folder's `Scripts/`,
+  adapt it and self-test it. But the self-test is adapted with the script,
+  so it proves nothing about the adaptation. `run_with_names.py` is never
+  adapted (the skill folder is put back when Plantoir next refreshes the working folder): it reads the
+  mapping table, builds every form a name could take, runs the script with
+  its output captured, withholds any line holding one, and moves any new
+  file in the marking folder holding one (its text, a PDF's text, or its
+  path) to `Quarantine/`, counting both. Since the 750a review (H3) it
+  tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
+  a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
+  and XMP; it reports read and clean, moved, and NOT checked by kind, and
+  exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
+  file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
+  name were "checked, 0 held a name", and a folder named by a name stayed
+  behind; each is now a case. It compares without accents (M4), runs the
+  script in the marking folder so a relative path is watched (M5), and
+  looks at everything before passing anything on. The skill names its
+  SHA-256 and has the assistant check it before use, because it can be
+  edited in place until Plantoir next refreshes the working folder (L6).
+  The fix review (H3, M1 to M3, M5) found what still slipped: a link (to
+  the mapping table, or to the teacher-only folder) counted "read and
+  clean" because the path it points to was read; a broken PDF and
+  big-endian UTF-16 with no mark counted clean; short names ("Ho, Ed")
+  withheld honest lines ("finished") and an untouched folder named "June
+  Exam" was moved. Now a link is moved as a link, never followed; a PDF
+  Poppler cannot read (broken or locked) is not checked, and its raw bytes
+  are still searched; UTF-16 is read both ways; every file it could not
+  read is moved to the quarantine unread, so the assistant cannot open it
+  (and the skill says never to); a name part of two or three letters counts
+  only beside another part of the same name, a form shorter than six
+  letters only as a whole word; only a folder the run made or wrote into
+  is moved; and the file is checked out with LF everywhere
+  (`.gitattributes`), so the hash the skill pins holds on a Windows checkout.
+  It is a net, not a lock: it cannot
+  stop a script run without it or writing elsewhere, or know a name the
+  table does not hold, and it says so every run. A name that is also a
+  common word (May, Will) withholds every line with that word too: the safe
+  direction. Must-fails: a runner that passes every line, or passes
+  stderr through, lets the invented names out (`test_marking_guard.py`).
+- **The named step (review H2, M3).** `make_named_copies.py` is the only
+  script that puts a name into anything: the TeX-escaped name into each
+  sheet's one `\studentline{}`, compiled in a temporary folder outside both
+  folders with its output captured and thrown away, never `--keep-logs`,
+  the PDF alone moved into `Named/`. MEASURED (tectonic 0.17.0): a failed
+  compile's message holds the line with the name, so a copy that forwards
+  tectonic's output prints it (the must-fail); a copy without the escaping
+  fails to compile `Pupil_Seven & Co`; a name in Chinese characters
+  compiles with exit 0 and a blank where the name should be, so a copy is
+  failed on "Missing character" OR when `pdftotext` does not find the name:
+  with only the first check dropped the second still catches it, with both
+  dropped the case writes a sheet with no name on it. 750a review M2: a
+  name with an apostrophe or with ff, fi or ffi was failed as "could not be
+  set", because `pdftotext` returns a typeset apostrophe and ligatures; the
+  comparison now reads NFKC with the apostrophe as typed, and both are
+  cases. `--check-table` answers "is my table right?" in counts only (L1).
+- **The sheet.** `build_test_sheet.py` is Russell's `build_sheets.py` with
+  everything test-specific read from the kit (points and meanings, each
+  question's skill, the strength concepts, categories, parts, topics), the
+  kit and record checked first by #751's `check_kit.py` (a copy that skips
+  it lets every refused kit case through to a different error), and the
+  student line one `\studentline{}`. Its footer reads "Test: Feedback ·
+  COURSE" (it printed two hyphens, L9), and the teacher-decides sentence is
+  in "What must not change" (L8). The layout is the default for every
+  teacher (summary, strengths, issues by question, areas to focus on,
+  overall comments, the marks last, because students read marks first and
+  stop); his colours, the orange item's shape and "never the fix" are in
+  `reference/template.md`, OFFERED with the named template (review M1:
+  descriptive feedback with next steps is common practice, so the default
+  assumes neither). A half mark is refused unless `Marking Settings.md`
+  records the teacher's yes; a lost mark with no `studentNote` is refused.
+  MEASURED: the worked example's sheet is two letter pages (the closing and
+  the marks kept together on the second), the teacher's sheet one.
+- **Rulings (Russell, 2026-11-12; review M2).** The teacher's How I Teach
+  page first, then a few questions recorded in `Marking Settings.md`. His
+  rulings are offered with the template to a teacher who shows the
+  interest it bridges; any other teacher is asked the open question, and a
+  template ruling is mentioned only when they ask for a suggestion. A
+  ruling that changes a mark applies only after the teacher's yes, and is
+  then swept across every paper and recorded, numbered.
+- **How a teacher finds out.** The honest answer when asked what it can
+  help with, and the one-time offers: #751's skill mentions marking when a
+  kit is finished, only when this skill is present (that sentence now
+  reads true); this skill mentions report comments once when the marks are
+  final, only when `plantoir-report-comments` is present (#752). No
+  greeting sentence here (piece G), nothing on plantoir.app, no new app text.
+
+NOT MEASURED in this piece: a trial with a real assistant (Claude Code and
+Codex) marking invented scanned papers, which the plan makes the gate that
+matters; it needs the screen-free Mac and is written up for the director.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

@@ -1963,8 +1963,9 @@ alike, also writes that section's curriculum coverage map as it would be **if
 every existing page were published**, beside the built website, for the app
 to show on the section's Coverage tab. 793a (this section) is the map and the
 record, in the shared Python, so Windows has it the moment its runtime carries
-this `build_site.py`. 793b is the tab in the app, and
-`documentation/09-mac-app.md` will carry it. The rules are
+this `build_site.py`. 793b is the tab in the app:
+`documentation/09-mac-app.md` → "A section's Coverage tab (#793)", whose
+rules are `coverageTab.tab`. The map's rules are
 `contracts/shared-rules.json` → `coverageTab` and `contracts/file-formats.json`
 → `coverageTabMap`; `scripts/test_coverage_tab.py` runs both.
 
@@ -2021,8 +2022,8 @@ ruling, 2026-11-12): its `lightMode` as CSS variables on `:root` and its
 `quartz-standard`, what a site with no choice wears. The coverage fills are the
 site's fixed scale. No script, no event attribute, no external reference, no
 font: a system font stack, and a Content-Security-Policy meta of
-`default-src 'none'; style-src 'unsafe-inline'`, which 793b's viewer does not
-rely on alone. Every cell and chip says its state in words (`aria-label` and
+`default-src 'none'; style-src 'unsafe-inline'`, which 793b's viewer (the
+Planning tab's, parameterised) does not rely on alone. Every cell and chip says its state in words (`aria-label` and
 the same `title=`), so a colour or a ring is never the only signal; on the site
 a chip is still colour and code only. Everything from the course (the course
 code a teacher reads, a folder's name and the title made from it) goes through
@@ -2126,7 +2127,9 @@ since the older site began, so both are true of the same pages. The seam for
 793b is marked in the code (`# SEAM (#768, for 793b and the merge)` above
 `COVERAGE_TAB_FOLDER`): the tab compares `startedNs` with #768's change walk,
 clock rule included (the plan review's M1), and never with
-`public/index.html` or `.build-started`, which describe the site.
+`public/index.html` or `.build-started`, which describe the site. 793b does
+exactly that through `BuildFreshness.changedSince`, factored out of
+`whyRebuild` so the two cannot drift.
 
 **What clears it.** Every build replaces it. The launchers' clearing of a
 course's built output (`link_course_build_output`: no link, a wrong link,
@@ -2156,8 +2159,9 @@ when the tab opens (a second build path and a wait, ruled out); the site's
 "What counts" and "Reading it honestly" notes, which say only published pages
 count. The full list is `coverageTab.rejected`.
 
-**Trail.** None from 793a: the build already records itself, and 793a shows
-a teacher nothing. The line for looking at the tab is 793b's.
+**Trail.** None from the build: it already records itself. The tab's lines
+(looking at it, asking for the map again, a click on a code) are 793b's,
+`coverageTab.tab.trail`.
 
 
 ## Which toolchain built a site (#746)

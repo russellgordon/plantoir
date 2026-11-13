@@ -836,6 +836,18 @@ read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
 (selection followed focus on the last run; one earlier run moved the focus
 only, so the UI test accepts either and says which).
 
+**Coverage, owed (#793).** The mac's section page gained a Coverage tab
+(Website | Coverage | Problems) in v1.10.0, and with it a change Windows owes
+here too: the mac now draws only the chosen tab's content, never one over
+another, because a layered tab left the preview able to take keys and browser
+commands. Windows' collapse of the covered layers already keeps them out of the
+Tab order and the UI Automation tree; whether its browser commands (Back,
+Forward, Reload) still reach the covered `WebView2` is the thing to check.
+Windows inherits the map itself from the shared Python. What it owes, case by
+case, is `contracts/shared-rules.json` → `coverageTab.tab`; the reasons are doc
+09's "A section's Coverage tab (#793)"; the work is the `windows` issue for
+#793.
+
 **The table.** Include (a box; ticked means included, every row starts ticked,
 for the session), Kind, Page (or Whole section / Whole course), Problem (the
 row's item, or `fixedInTheSource` in secondary text; the whole sentence and
@@ -2712,11 +2724,19 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   and "Tables, the scaffold, cards and the remembered folder (#715)"),
   `plantoir-unit-planning` (#707, a `template` folder of pages, two
   stylesheets and 19 `.woff2` fonts pinned by SHA-256,
-  `unitPlanning.agentGuidance`, 09 → "Unit planning (#707)") and
+  `unitPlanning.agentGuidance`, 09 → "Unit planning (#707)"),
   `plantoir-test-authoring` (#751, templates for a unit test's marking
   guide and marking kit, and `scripts/check_kit.py`, which an assistant
   runs and the app never does; `assessment.agentGuidance.testAuthoringSkill`,
-  09 → "Tests, marking and report comments"). The
+  09 → "Tests, marking and report comments") and `plantoir-marking` (#750
+  piece 750a, four Python scripts in `scripts/` that an assistant runs
+  against a teacher's scans and the app never does, four templates and two
+  references; `assessment.agentGuidance.markingSkill`, 09 → "Tests,
+  marking and report comments"). A Windows teacher marking scans needs
+  Python, Poppler (`pdftoppm`, `pdfinfo`, `pdftotext`, `pdfunite`,
+  `pdfseparate`) and tectonic on PATH; which installs work, and how a
+  teacher gets them, is NOT MEASURED here yet and is the `windows` issue
+  for 750a's to measure and write down in this section. The
   handouts skill has an assistant write ONE file inside a course,
   `courses/<CODE>/.internal/handouts/handouts.json` (where that course's
   handouts are kept), and the unit-planning skill a folder,
@@ -2724,7 +2744,9 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   reads for the Revise doors' greeting (Windows owes that reader: the
   `windows` issue for #707) and shows on the course page's Planning tab
   (Windows owes the tab: the `windows` issue for #708, and 09 → "The course
-  page's Planning tab (#708)"); the app neither reads handouts.json nor needs to, and a backup,
+  page's Planning tab (#708)"), and the marking skill one more,
+  `courses/<CODE>/.internal/marking/marking.json` (the two marking folders'
+  paths, never a name); the app neither reads handouts.json or marking.json nor needs to, and a backup,
   archive, restore or reference import should carry it as it carries the
   rest of `.internal`. `AgentGuidance.Write` enumerates the folder, so a
   new skill reaches a Windows working folder with no code. What the quizzes

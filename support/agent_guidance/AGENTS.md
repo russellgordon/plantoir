@@ -35,6 +35,10 @@ that matches the task before writing:
   `.agents/skills/plantoir-test-authoring/SKILL.md` (the same file is at
   `.claude/skills/plantoir-test-authoring/SKILL.md`). It uses the
   `plantoir-handouts` house style for the paper.
+- **Marking a test or quiz from scanned papers, and its feedback sheets**:
+  read `.agents/skills/plantoir-marking/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-marking/SKILL.md`) before opening any student
+  work: it keeps students' names on this computer.
 - **Graphs, diagrams and GeoGebra sketches** - a graph of a function (a
   parabola beside its parent, two lines meeting), a geometry or
   similar-triangles figure, a number line, a probability tree, a circuit,

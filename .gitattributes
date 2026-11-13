@@ -79,3 +79,10 @@ website/updates/*.xml.signature  -text
 # The unit-plan template's fonts (#707): woff2, pinned by SHA-256 in
 # contracts/shared-rules.json -> unitPlanning.agentGuidance.fonts.
 *.woff2   binary
+
+# The marking skill's runner (#750, 750a) is pinned by SHA-256 in its SKILL.md, and the assistant checks
+# the file against that hash before every session's first use. A Windows checkout under core.autocrlf
+# would give it CRLF and a different hash, and the skill would then refuse to run it. So this one file
+# is checked out with LF everywhere: the bytes on disk are the bytes git stores, which are the ones the
+# hash was taken from (750a fix review M5). scripts/test_marking_sheets.py checks the file has no CR.
+support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf

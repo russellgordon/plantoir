@@ -323,8 +323,10 @@ final class SectionProblemsTests: XCTestCase {
 
     /// The view's half, read from its source: the alert is raised from the
     /// record's marker and the store, never from a run's findings; the old
-    /// per-build dialog's queue is gone; the Problems tab is drawn OVER the
-    /// site rather than instead of it; and the sidebar shows ONE warning.
+    /// per-build dialog's queue is gone; no `TabView` (since #793 the Problems
+    /// tab is drawn instead of the site, not over it, and
+    /// `SectionDetailStructureTests` proves the site keeps its page); and the
+    /// sidebar shows ONE warning.
     func testTheViewRaisesOneAlertFromTheRecord() throws {
         let view: String = try readSource("QuartzTeachers/Views/Section/SectionDetailView.swift")
         XCTAssertFalse(view.contains("heldHealthFindings"), "the per-build dialog's queue is gone")

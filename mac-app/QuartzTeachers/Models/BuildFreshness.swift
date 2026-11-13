@@ -8,7 +8,7 @@ enum BuildFreshness {
     /// reasons `contracts/app-rules.json` → `buildFreshness.reuseTheLastBuild.reasons`
     /// names, and the trail's words are keyed by them
     /// (`BuiltBeforeDeployingReport`), so the line says what the reason WAS.
-    enum RebuildReason: String, CaseIterable, Sendable {
+    nonisolated enum RebuildReason: String, CaseIterable, Sendable {
         /// There is no built site yet.
         case neverBuilt
         /// The site's front page cannot be read, so it is rebuilt rather
@@ -70,14 +70,26 @@ enum BuildFreshness {
             of: buildStartedMarkerURL(course: course, sectionNumber: sectionNumber)
         )
         let reference: Date = referenceDate(builtDate: builtDate, buildStartedDate: startedDate)
-        // While the build is still dated later than now, a clock that was
-        // ahead when the site was built would otherwise hide a change made
-        // since (the #768 plan review's M1). Once real time passes the build's
-        // date this no longer fires: `reuseTheLastBuild.knownLimits`.
+        return changedSince(reference: reference, courseFolder: course.directoryURL, now: now)
+    }
+
+    /// The half of `whyRebuild` that asks whether the course changed after
+    /// a moment: `.clock` while that moment is still later than now, `.pages`
+    /// when something in the course changed after it (`newestChangeDate`),
+    /// nil otherwise. Factored out for the Coverage tab (#793, the plan
+    /// review's M1), which asks it of the moment its map's build STARTED, so
+    /// there is one rule for "changed since" and not two.
+    ///
+    /// The clock half: while the reference is still dated later than now, a
+    /// clock that was ahead when the build ran would otherwise hide a change
+    /// made since (the #768 plan review's M1). Once real time passes it this
+    /// no longer fires: `reuseTheLastBuild.knownLimits`. Off the main actor,
+    /// because the walk reads the whole course.
+    nonisolated static func changedSince(reference: Date, courseFolder: URL, now: Date) -> RebuildReason? {
         if reference > now {
             return .clock
         }
-        guard let changeDate = newestChangeDate(course: course) else {
+        guard let changeDate = newestChangeDate(courseFolder: courseFolder) else {
             // No readable content: nothing to rebuild for.
             return nil
         }
@@ -309,6 +321,11 @@ enum BuildFreshness {
     /// arrives as that flag), while the launchers and the scheduled shell
     /// read such a page.
     static func newestChangeDate(course: Course) -> Date? {
+        return newestChangeDate(courseFolder: course.directoryURL)
+    }
+
+    /// `newestChangeDate(course:)` for a course folder, off the main actor.
+    nonisolated static func newestChangeDate(courseFolder courseDirectory: URL) -> Date? {
         let fileManager: FileManager = FileManager.default
         let keys: [URLResourceKey] = [
             .contentModificationDateKey, .attributeModificationDateKey, .isDirectoryKey, .isSymbolicLinkKey,
@@ -318,7 +335,7 @@ enum BuildFreshness {
         // read now. Used for the walk only, so the spelling it ends up with
         // (FolderIdentity's concern) matters to nothing else.
         let courseFolder: URL = URL(
-            fileURLWithPath: course.directoryURL.resolvingSymlinksInPath().path, isDirectory: true
+            fileURLWithPath: courseDirectory.resolvingSymlinksInPath().path, isDirectory: true
         )
         guard let enumerator = fileManager.enumerator(
             at: courseFolder,
@@ -333,7 +350,7 @@ enum BuildFreshness {
         // through the unresolved path. Pointing the link at another folder
         // made before the build changes nothing behind it, only the link (the
         // #768 fix review's M1). For a real folder it is the same folder.
-        let asNamed: URL = URL(fileURLWithPath: course.directoryURL.path, isDirectory: false)
+        let asNamed: URL = URL(fileURLWithPath: courseDirectory.path, isDirectory: false)
         if let linkDate = latestChangeDate(of: asNamed), newestDate == nil || linkDate > newestDate! {
             newestDate = linkDate
         }
@@ -360,7 +377,7 @@ enum BuildFreshness {
     }
 
     /// The later of an entry's modification time and its change time.
-    private static func latestChangeDate(of url: URL) -> Date? {
+    nonisolated private static func latestChangeDate(of url: URL) -> Date? {
         let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .attributeModificationDateKey])
         let modified: Date? = values?.contentModificationDate
         let changed: Date? = values?.attributeModificationDate

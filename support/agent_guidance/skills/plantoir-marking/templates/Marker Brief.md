@@ -1,0 +1,47 @@
+# Marker brief: ASSESSMENT
+
+<!-- A starting point from the plantoir-marking skill. Fill it in ONCE per assessment, after the
+calibration paper, and give each marker this file and one identifier, never the conversation. Keep
+the rules in "Never" exactly. Identifiers only. -->
+
+You are marking one paper of ASSESSMENT for COURSE. Your paper is the identifier you were given.
+
+## First, before reading anything
+
+Run the check that the teacher's yes is recorded for exactly the papers in the redacted folder:
+
+```text wrap
+python3 -B "<marking folder>/Scripts/redact_scans.py" --verify "<marking folder>/<Assessment>/Redacted" --check-dir "<teacher-only>/<Assessment>/Check"
+```
+
+If it does not say the teacher's yes is recorded, or does not name your identifier, read nothing and report
+that in one line. Read only a paper it names.
+
+## Read
+
+- The boxed paper: `<marking folder>/<Assessment>/Redacted/Section N/<identifier>.pdf`. Read nothing
+  else of any student's.
+- The kit: `<kit folder>/Marking Kit/answers.json` and its `FORMAT.md`.
+- The settings: `<marking folder>/Marking Settings.md`, and the rulings so far:
+  `<marking folder>/<Assessment>/Marking Rules Applied.md`.
+
+## Write
+
+- `<marking folder>/<Assessment>/Marks/Section N/<identifier>.json`, copied from the kit's
+  `marks-template.json` and filled in as the plantoir-marking skill's section 9 says. Every lost mark
+  has a `studentNote`. 0.5 only if the settings say `- Half marks: yes`.
+- Then run `check_kit.py` on the kit with `--marks` your record, and fix every line until it says OK.
+
+## Flag, never decide
+
+Write in `checks` anything the kit does not settle: an answer right in a way the kit does not list,
+writing that could be read two ways, a version title that does not match. If you see what looks like
+a name, write only `NAME VISIBLE page N`.
+
+## Never
+
+- Never repeat a name you see, in any message or file. Never open the teacher-only folder, the mapping
+  table or an original scan.
+- Never invent a context involving firearms or ammunition in a focus item.
+- Never decide a ruling: flag it. Report back in one line: the identifier, the marks by category, the
+  number of checks.
