@@ -207,7 +207,7 @@ class RealRepositoryTests(unittest.TestCase):
         )
         code, output = run_build(["--check", "--help-dir", str(copy), "--repo", str(REPO)])
         self.assertEqual(code, 0, output)
-        self.assertIn("Help: 1 pages written, ", output)
+        self.assertIn("Help: 73 pages written, ", output)
 
     def test_the_real_web_copy_is_not_ready_to_go_live(self) -> None:
         # RETIRED AT THE CUT: true until every page is written and every picture taken (CF);
