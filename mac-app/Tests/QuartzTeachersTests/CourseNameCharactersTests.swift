@@ -217,6 +217,84 @@ final class CourseNameCharactersTests: XCTestCase {
         XCTAssertEqual(scalars(of: written), scalars(of: "Physics 11"))
     }
 
+    // MARK: - The short label and the section labels (#822)
+
+    /// Every `labelCases` row read through `CourseConfiguration`: the short
+    /// label reads cleaned and untrimmed, and a section's label reads
+    /// cleaned before it is read as one emoji. No code point the rule
+    /// cleans survives in either.
+    func testEveryLabelCaseReadsCleaned() throws {
+        let cases: [[String: Any]] = try XCTUnwrap(rule["labelCases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 9)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let config: [String: Any] = try XCTUnwrap(testCase["config"] as? [String: Any], name)
+            let section: Int = try XCTUnwrap(testCase["section"] as? Int, name)
+            let fileURL: URL = scratchFolderURL.appendingPathComponent("course_config.json")
+            try JSONSerialization.data(withJSONObject: config).write(to: fileURL)
+            let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+
+            let rawShort: String = config["custom_short_name"] as? String ?? ""
+            XCTAssertEqual(scalars(of: configuration.customShortName), scalars(of: OneLineText.cleaned(rawShort)), name)
+            let label: String = configuration.emoji(forSection: section)
+            for scalar in (configuration.customShortName + label).unicodeScalars {
+                XCTAssertFalse(OneLineText.isSpacedOut(scalar), String(format: "%@: U+%04X", name, scalar.value))
+                XCTAssertFalse(OneLineText.isRemoved(scalar), String(format: "%@: U+%04X", name, scalar.value))
+            }
+            let sections: [String: Any] = (config["emojis"] as? [String: Any])?["sections"] as? [String: Any] ?? [:]
+            if sections["section\(section)"] != nil, let expect = testCase["expectSectionLabel"] as? String {
+                // The mac's field settles on one emoji and leaves letters as
+                // they are; for these rows that is the build's label too,
+                // except a label that is only controls, which reads as spaces
+                // here and as the book in the build.
+                if !OneLineText.cleaned(sections["section\(section)"] as? String ?? "")
+                    .trimmingCharacters(in: .whitespaces).isEmpty {
+                    XCTAssertEqual(scalars(of: label), scalars(of: expect), name)
+                }
+            }
+        }
+    }
+
+    /// Setting either label stores it cleaned, and any Save heals both in a
+    /// file a script or a hand edit left them dirty in.
+    func testTheLabelsAreSetAndSavedCleaned() throws {
+        let fileURL: URL = scratchFolderURL.appendingPathComponent("course_config.json")
+        let json: String = #"{"course_code": "CODING", "custom_short_name": "Code\nClub‮", "emojis": {"sections": {"section1": "\u0000📚\n", "section2": "🔬"}}, "footer_html": ""}"#
+        try Data(json.utf8).write(to: fileURL)
+        let configuration: CourseConfiguration = try CourseConfiguration(contentsOf: fileURL)
+        configuration.values["footer_html"] = "<p>Room 204</p>"
+        try configuration.write(to: fileURL)
+        let written: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: fileURL)) as? [String: Any]
+        )
+        XCTAssertEqual(scalars(of: try XCTUnwrap(written["custom_short_name"] as? String)), scalars(of: "Code Club"))
+        let emojis: [String: Any] = try XCTUnwrap(written["emojis"] as? [String: Any])
+        let sections: [String: Any] = try XCTUnwrap(emojis["sections"] as? [String: Any])
+        XCTAssertEqual(scalars(of: try XCTUnwrap(sections["section1"] as? String)), scalars(of: " 📚 "))
+        XCTAssertEqual(sections["section2"] as? String, "🔬")
+
+        configuration.customShortName = "A\u{0}B\n"
+        XCTAssertEqual(scalars(of: try XCTUnwrap(configuration.values["custom_short_name"] as? String)), scalars(of: "A B "))
+        configuration.setEmoji("🎨\u{202E}", forSection: 3)
+        XCTAssertEqual(configuration.emoji(forSection: 3), "🎨")
+    }
+
+    /// The New Course window writes the short label and the section labels
+    /// cleaned, the short label trimmed after cleaning, and a course that is
+    /// not a club writes no short label.
+    func testTheNewCourseWindowWritesTheLabelsCleaned() {
+        XCTAssertEqual(
+            scalars(of: NewCourseWizardView.shortLabelToWrite(typed: "Code\nClub\u{0}", isClub: true)),
+            scalars(of: "Code Club")
+        )
+        XCTAssertEqual(NewCourseWizardView.shortLabelToWrite(typed: "\u{202E}\n", isClub: true), "")
+        XCTAssertEqual(NewCourseWizardView.shortLabelToWrite(typed: "Code Club", isClub: false), "")
+        XCTAssertEqual(
+            scalars(of: NewCourseWizardView.sectionLabelToWrite(chosen: "📚\u{202E}")),
+            scalars(of: "📚")
+        )
+    }
+
     /// #707's unit-plan names collapse white space after the same rule, so a
     /// NUL or an override in a plan's name is gone from the greeting too.
     func testAUnitPlanNameMeetsTheSameRule() {

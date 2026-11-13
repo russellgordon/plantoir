@@ -829,13 +829,17 @@ def resolve_section_emoji(config: dict, section_number: int) -> str:
         emojis = config.get("emojis", {})
         if isinstance(emojis, dict):
             sec_map = emojis.get("sections") or {}
+            # Each label is cleaned by the course name's rule before it is
+            # used (#822, shared-rules.json -> courseNameCharacters): it goes
+            # into quartz.config.ts's pageTitle line, where a line feed
+            # breaks the line.
             sec_emo = sec_map.get(f"section{section_number}")
-            if isinstance(sec_emo, str) and sec_emo.strip():
-                return sec_emo.strip()
+            if isinstance(sec_emo, str) and course_names.cleaned(sec_emo).strip():
+                return course_names.cleaned(sec_emo).strip()
             # Back-compat: if older configs stored a course-level "default", use it as a fallback
             legacy_default = emojis.get("default")
-            if isinstance(legacy_default, str) and legacy_default.strip():
-                return legacy_default.strip()
+            if isinstance(legacy_default, str) and course_names.cleaned(legacy_default).strip():
+                return course_names.cleaned(legacy_default).strip()
     except Exception:
         pass
     return "📚"
@@ -885,8 +889,10 @@ def resolve_header_label(config: dict, course_code: str) -> str:
     if grade_label:
         return course_code.upper()
     # Club or otherwise non-standard code: the teacher's own short name if
-    # they set one, and otherwise the code itself — in capitals.
-    custom = (config.get("custom_short_name") or "").strip()
+    # they set one, and otherwise the code itself — in capitals. Cleaned by
+    # the course name's rule first (#822): it is written into the pageTitle
+    # line of quartz.config.ts, where a line feed breaks the line.
+    custom = course_names.cleaned(str(config.get("custom_short_name") or "")).strip()
     if custom:
         return custom
     return course_code.upper()

@@ -41062,12 +41062,69 @@
     ],
     "noTrimming": "A control at the end becomes a trailing space and the space is kept. The mac's Course Settings field reads and writes the name through this rule on every keystroke, so a rule that trimmed would eat the space a teacher types before \"11\" one keystroke at a time. A reader that wants the ends trimmed trims AFTER cleaning: `build_site.computed_landing_title` does, and the New Course window does before it decides whether the name is empty.",
     "whereItIsApplied": {
-      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule.",
-      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780.",
-      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it.",
+      "mac": "`CourseConfiguration.courseName`, getter AND setter, and `CourseConfiguration.write(to:)`, so every Save writes the name cleaned (every other reader of the name goes through it: the sidebar's search, the window's subtitle, Course Settings, the reference course summary, the section settings' sample headline, the outside doors' greetings from Revise, Fix and Plan a Unit, the assistant's `list_courses` reply and a repaired front page's title); `ReferenceImportSource`, the one direct read of the key; the New Course window, before it trims; and the two older-layout importers (`OlderCourseLayout`, `QuartzCheckoutLayout`) where they write the key. The rule is `OneLineText.cleaned`, called through `CourseName.cleaned` at every course-name site. `UnitPlans.oneLine` (#707) runs it before collapsing white space, so a plan's name and a course's name meet in one rule. Since #822 (Russell, 2026-11-13: 'fix both labels') the same rule cleans the two other teacher-typed labels where the app reads them: `CourseConfiguration.customShortName` (a club's short label, getter AND setter) and `emoji(forSection:)` / `setEmoji(_:forSection:)` (each section's label beside the title, cleaned before it is read as one emoji), `CourseConfiguration.write(to:)` through `cleanLabels(in:)`, so every Save writes both cleaned, and the New Course window's short label and section labels before it writes them.",
+      "windows": "`CourseConfiguration.CourseName`, getter and setter, every Save of the settings, and the New Course window's typed name. Owed: the `windows` issue for #780. Owed for #822: `CourseConfiguration.CustomShortName` and the section labels, where Windows reads and writes them, planned by Windows under #822 itself.",
+      "sharedPython": "`scripts/course_names.py` -> `cleaned`, called by `build_site.computed_landing_title` (the front page heading, the page title and so a printed page's footer), `social_card.generate_card` (the sharing card's title), both falling back to the course code when the cleaned name is empty, and `setup_course.setup_course` (the saved or looked-up name before the prompt shows it, and the answer, before it is written into `course_config.json`, the page templates and each section's front page title; `prompt_with_default` and `prompt_select_multiple` also SHOW every default and listed folder cleaned). These reach Windows with no Windows change. `deploy.py`'s site names are made from the course CODE and do not read the name, and no launcher reads it. Since #822, also `build_site.resolve_header_label` (the short label, then trimmed, falling back to the code when nothing is left) and `build_site.resolve_section_emoji` (each section's label and the legacy course-wide `emojis.default`, then trimmed, falling back to the book emoji), both written into the `pageTitle` line of `quartz.config.ts` where a line feed breaks the line; `social_card.generate_card` (the section's label on the card); and `setup_course.setup_course` and `select_header_emojis_for_sections` (the saved short label and section labels before they are offered again, and a typed short label before it is written). Cases: `labelCases`.",
       "notHere": "Windows' `OutsideDoor.Clean` (#736) stays as it is: it also cleans the page names and the working folder an outside door carries, which are not course names, and it is the last layer before `cmd`. The file is not rewritten when a bad name is read: the next Save of ANY setting writes the cleaned name (the mac's `CourseConfiguration.write(to:)` cleans the key whatever was edited; a per-key merge would otherwise keep the raw name from the file)."
     },
     "idempotent": true,
+    "labelCasesHow": "Each case is a course_config.json (config) and a section. expectHeaderLabel is what build_site.resolve_header_label gives for it and expectSectionLabel what build_site.resolve_section_emoji gives, both written into the pageTitle line; a key that is absent is not checked. On the mac, CourseConfiguration.customShortName reads the short label cleaned and untrimmed, and emoji(forSection:) reads the section label cleaned (the legacy emojis.default is not read there).",
+    "labelCases": [
+      {
+        "name": "a short label with a line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "Code\nClub"},
+        "section": 1,
+        "expectHeaderLabel": "Code Club"
+      },
+      {
+        "name": "a short label with an override, a NUL and a trailing line feed",
+        "config": {"course_code": "CODING", "custom_short_name": "\u202eRobots\u0000\n"},
+        "section": 1,
+        "expectHeaderLabel": "Robots"
+      },
+      {
+        "name": "a short label that is only controls falls back to the code",
+        "config": {"course_code": "CODING", "custom_short_name": "\n\u0000\u2066"},
+        "section": 1,
+        "expectHeaderLabel": "CODING"
+      },
+      {
+        "name": "an ordinary course code never shows the short label",
+        "config": {"course_code": "ICS3U", "custom_short_name": "X\nY"},
+        "section": 1,
+        "expectHeaderLabel": "ICS3U"
+      },
+      {
+        "name": "a section label with a line feed",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "📚\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "a section label of letters with an override inside",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section2": "C\u202eS"}}},
+        "section": 2,
+        "expectSectionLabel": "CS"
+      },
+      {
+        "name": "the teacher emoji keeps its joiner",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "👩\u200d🏫"}}},
+        "section": 1,
+        "expectSectionLabel": "👩\u200d🏫"
+      },
+      {
+        "name": "a section label that is only controls gets the book",
+        "config": {"course_code": "ICS3U", "emojis": {"sections": {"section1": "\u0000\r\n"}}},
+        "section": 1,
+        "expectSectionLabel": "📚"
+      },
+      {
+        "name": "the legacy course-wide label is cleaned too",
+        "config": {"course_code": "ICS3U", "emojis": {"default": "\u001b🔬"}},
+        "section": 3,
+        "expectSectionLabel": "🔬"
+      }
+    ],
     "cases": [
       { "name": "French with accents", "raw": "Français, 11e année", "expect": "Français, 11e année" },
       { "name": "an en dash", "raw": "Physics – Grade 11", "expect": "Physics – Grade 11" },
@@ -41149,7 +41206,7 @@
       "Normalising the name to NFC at the same time. A different question, two spellings of one accented letter, with its own risks for comparisons (#189 is about folder names).",
       "Trimming. It would eat the space a teacher types in Course Settings.",
       "Either single order on the trail: redacting and then cleaning (the plan) writes a secret a control was hiding, and cleaning and then redacting (the first implementation) writes the tail of a secret with a control inside it; see `trailLines.order`.",
-      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue."
+      "Cleaning `custom_short_name` and the section labels in this piece. The same class of fault, but the ruling is about the course name; drafted as a follow-up issue. (That follow-up is #822, ruled by Russell on 2026-11-13: both labels are cleaned by this rule, and not the wider every-one-line-label option; see `whereItIsApplied` and `labelCases`.)"
     ]
   },
   "scheduledRunGetsItsFolderReady": {
