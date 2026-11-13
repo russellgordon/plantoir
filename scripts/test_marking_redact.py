@@ -517,6 +517,37 @@ class BoxAndRefusalTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("not a whole number of papers", result.stdout)
 
+    def test_nothing_is_written_inside_a_working_folder(self):
+        with tempfile.TemporaryDirectory() as root:
+            build_scans(BLANK_LETTER, Path(root) / "Originals", {"upright"})
+            working = Path(root) / "Working"
+            (working / "courses").mkdir(parents=True)
+            (working / ".toolchain").mkdir()
+            result = run_script(SCRIPT, Path(root) / "Originals", working / "Marking" / "Redacted", "--blank", BLANK_LETTER,
+                                "--check-dir", Path(root) / "Check")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("inside the Plantoir working folder", result.stdout)
+            self.assertFalse((working / "Marking").exists())
+
+    def test_a_page_with_no_name_box_on_the_blank_is_said(self):
+        # 750a review H2: a page whose blank test has no Name blank gets no box, and the line says so.
+        blank = FIXTURES / "blank-quiz-letter-name-on-page-1.pdf"
+        boxes = run_script(SCRIPT, "--box-from", blank)
+        self.assertIn("page 1: box in inches 3.44,0.20,5.33,0.89", boxes.stdout)
+        self.assertIn("page 2: no 'Name' label with a writing line, so no box", boxes.stdout,
+                      "the starter's School Name is not a name blank")
+        with tempfile.TemporaryDirectory() as root:
+            pages = [render(blank, 1), render(blank, 2)]
+            paint(pages[0], NAME_STROKES, 15)
+            (Path(root) / "Originals").mkdir()
+            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", pages)
+            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
+                                "--check-dir", Path(root) / "Check")
+            self.assertIn("Student A.pdf: 2 pages, box placed on 1; header matches your blank test; page 2 has no name box "
+                          "on your blank test, so nothing there was blanked", result.stdout)
+            self.assertIn("whose blank test has one", result.stdout)
+            self.assertNotIn("each page and", result.stdout)
+
     def test_its_own_self_test_passes(self):
         result = run_script(SCRIPT, "--self-test")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

@@ -115,6 +115,32 @@ class NamedCopyTests(unittest.TestCase):
         for character in named_copies()["escaped"]:
             self.assertIn('("' + character.replace("\\", "\\\\") + '", ', source, character)
 
+    def test_check_table_says_counts_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            table = Path(folder) / "Name Mapping Table.csv"
+            table.write_text("section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Student B,Pupileight Samplefamily\n"
+                             "2,Student A,Pupilnine Examplefamily\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--check-table", "--table", str(table)],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("The mapping table has 3 rows, in section 1 (2), section 2 (1)", result.stdout)
+            for word in ("Pupilseven", "Testfamily", "Pupileight", "Samplefamily", "Pupilnine", "Examplefamily"):
+                self.assertNotIn(word, result.stdout + result.stderr)
+
+    def test_named_copies_are_never_written_inside_a_working_folder(self):
+        with tempfile.TemporaryDirectory() as folder:
+            working = Path(folder) / "Working"
+            (working / "courses").mkdir(parents=True)
+            (working / ".toolchain").mkdir()
+            case = dict(named_copies()["cases"][0])
+            result, out, _before, _after = run_case(SCRIPT, case, Path(folder))
+            refused = subprocess.run([sys.executable, "-B", str(SCRIPT), "--table", str(Path(folder) / "Marking - Teacher Only" / "Name Mapping Table.csv"),
+                                      "--sheets", str(Path(folder) / "Marking" / "Test" / "Sheets"), "--out", str(working / "Named")],
+                                     capture_output=True, text=True)
+            self.assertEqual(refused.returncode, 1)
+            self.assertIn("outside the Plantoir working folder", refused.stdout)
+            self.assertFalse((working / "Named").exists())
+
     def test_its_own_self_test_passes(self):
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--self-test"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

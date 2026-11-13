@@ -273,8 +273,12 @@ def rule_follows(image, dpi, word):
     return False
 
 
-def box_for_page(blank, page, label, page_width_pt, folder):
-    """The name box in inches (x0, y0, x1, y1) from the top-left of this page of the blank, or None."""
+def box_for_page(blank, page, label, page_width_pt, folder, needs_a_line=False):
+    """The name box in inches (x0, y0, x1, y1) from the top-left of this page of the blank, or None.
+
+    The label a writing line follows is chosen over another word equal to it (the starter's "School Name").
+    With needs_a_line, a page whose label has no writing line after it gets no box: on a test whose name
+    blank has a line, the same word with no line (the school's name) is not a name blank."""
     words = words_near_top(blank, page)
     wanted = normalised(label)
     candidates = []
@@ -288,6 +292,8 @@ def box_for_page(blank, page, label, page_width_pt, folder):
     for word in candidates:
         if rule_follows(image, 100, word):
             ruled.append(word)
+    if not ruled and needs_a_line:
+        return None
     chosen = ruled[-1] if ruled else candidates[-1]
     following = []
     for word in words:
@@ -305,7 +311,13 @@ def boxes_from_blank(blank, label, given_box, folder):
         return [given_box] * len(sizes)   # the teacher said where the name is: every page gets the box
     boxes = []
     for number, (width_pt, _height) in enumerate(sizes, start=1):
-        boxes.append(box_for_page(blank, number, label, width_pt, folder))
+        boxes.append(box_for_page(blank, number, label, width_pt, folder, needs_a_line=True))
+    if all(box_in is None for box_in in boxes):
+        # No label on any page has a writing line after it (a name blank typed as underscores, say):
+        # fall back to the label itself, page by page.
+        boxes = []
+        for number, (width_pt, _height) in enumerate(sizes, start=1):
+            boxes.append(box_for_page(blank, number, label, width_pt, folder))
     if boxes[0] is None:
         raise Refusal(f"there is no '{label}' label at the top of page 1 of your blank test. "
                       "Give the label another word with --label (such as Nom), or the box in inches with --box.")
@@ -1112,7 +1124,7 @@ def main(arguments):
             boxes = boxes_from_blank(option(arguments, "--box-from"), label, None, folder)
         for number, box_in in enumerate(boxes, start=1):
             if box_in is None:
-                print(f"page {number}: no '{label}' label, so no box")
+                print(f"page {number}: no '{label}' label with a writing line, so no box")
             else:
                 print(f"page {number}: box in inches " + ",".join(f"{value:.2f}" for value in box_in))
         return 0

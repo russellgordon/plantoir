@@ -5,7 +5,8 @@ blank-quiz-letter.pdf and blank-quiz-legal.pdf are plantoir-handouts' starters/Q
 compiled on letter and on legal paper, with one more page (a second question page) so a test can carry a
 name written in the body of page 2. They hold no student data and no name: a blank test is what the
 marking skill reads the name box from. Run from anywhere; needs tectonic. The tests never run this:
-they read the committed PDFs, so they need no TeX.
+they read the committed PDFs, so they need no TeX. blank-quiz-letter-name-on-page-1.pdf is the letter one
+with the Name blank on page 1 only, for a page whose blank has no name box.
 """
 import shutil
 import subprocess
@@ -27,8 +28,14 @@ def main():
     source = STARTER.read_text(encoding="utf-8")
     if source.count("\\end{questions}") != 1:
         sys.exit("the starter has changed shape: look at it and update this script")
-    for paper in ("letter", "legal"):
-        text = source.replace("\\end{questions}\n", SECOND_PAGE, 1)
+    for paper in ("letter", "legal", "letter-name-on-page-1"):
+        second = SECOND_PAGE
+        if paper == "letter-name-on-page-1":
+            # A test whose Name blank is on page 1 only: page 2 keeps the school's name and the footer.
+            second = SECOND_PAGE.replace("\\clearpage\n", "\\clearpage\n\\thispagestyle{later}\n", 1)
+        text = source.replace("\\end{questions}\n", second, 1)
+        if paper == "letter-name-on-page-1":
+            text = text.replace("\\begin{document}", "\\fancypagestyle{later}{\\fancyhead[R]{}}\n\\begin{document}", 1)
         if paper == "legal":
             text = text.replace("letterpaper", "legalpaper", 1)
         with tempfile.TemporaryDirectory() as folder:
