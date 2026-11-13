@@ -4764,6 +4764,21 @@ two blocks of CSS came from Russell's example; its lessons, its file names and
 its people did not. Every component of the example is a commented PATTERN in
 the template pages, so an assistant writes each component the same way.
 
+**The reference-courses sentence in the same greeting (#856).** A live
+course whose code has courses kept for reference tells the session they are
+there to read and build on (decision (s), since v1.3.0). The sentence had no
+contract key, so Windows' greeting lacked it and no test noticed. It is now
+`app-rules.json` → `outsideAgents.greetingReferenceCourses`: the template with
+`{course}` and `{courses}`, the separator, how each listed course is made
+(`referenceCoursesToMention`: same code, folder and school year, sorted), where
+it goes, and four cases, run by
+`AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
+`ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
+`referenceCoursesSentence(courseCode:referenceCourses:)`. The mac's greeting
+did not move by a byte (the old and new code compiled side by side and compared
+on four inputs), and the greeting is not shown to the local model, whose
+digest is unchanged.
+
 **The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
 gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
 reference-courses sentence, so the opening instructions keep their order.

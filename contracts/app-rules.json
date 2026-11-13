@@ -3971,8 +3971,60 @@
       "that the session should start by listing the course's sections",
       "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
       "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)",
+      "when courses with the same code are kept for reference, that they are there to read and build on and are never deployed or changed (greetingReferenceCourses, verbatim)",
       "on a Revise door, last: that in its first reply the assistant says in one sentence that it can help plan a unit, or reminds the teacher which units have a plan and that they are on the course's Planning tab, without describing them (greetingUnitPlans)"
     ],
+    "greetingReferenceCourses" : {
+      "cases" : [
+        {
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "expectSentence" : null,
+          "name" : "no course is kept for reference",
+          "referenceCourses" : [
+
+          ],
+          "why" : "The overwhelming majority of courses: no sentence, and the greeting is the one every course gets."
+        },
+        {
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "expectSentence" : "I also keep earlier ICS3U courses for reference: ICS3U-2025 (2025–26). You can read them and build on what is there; they are never deployed, and nothing in them can be changed.",
+          "name" : "one earlier course with the same code",
+          "referenceCourses" : [
+            "ICS3U-2025 (2025–26)"
+          ],
+          "why" : "The moment the sentence exists for: the session can tell the teacher last year's material is there to build on."
+        },
+        {
+          "course" : "ICS3U",
+          "courseName" : "Grade 11 Computer Science",
+          "expectSentence" : "I also keep earlier ICS3U courses for reference: ICS3U-2024 (2024–25), ICS3U-2025 (2025–26). You can read them and build on what is there; they are never deployed, and nothing in them can be changed.",
+          "name" : "two earlier courses, in the order given",
+          "referenceCourses" : [
+            "ICS3U-2024 (2024–25)",
+            "ICS3U-2025 (2025–26)"
+          ],
+          "why" : "Joined by separator. The order is the list's own (eachCourse says how it is made and sorted); the greeting does not reorder it."
+        },
+        {
+          "course" : "MCV4U",
+          "courseName" : "Grade 12 Calculus and Vectors",
+          "expectSentence" : "I also keep earlier MCV4U courses for reference: MCV4U-OLD (Other). You can read them and build on what is there; they are never deployed, and nothing in them can be changed.",
+          "name" : "a course kept with no school year",
+          "referenceCourses" : [
+            "MCV4U-OLD (Other)"
+          ],
+          "why" : "A reference course with no school year is listed with the Other group's name, as the sidebar groups it."
+        }
+      ],
+      "casesHow" : "Each case is the plain greeting of a Revise door for course and courseName, told about referenceCourses (already made as eachCourse says). expectSentence null: the greeting is exactly the one with no reference courses. Otherwise the greeting is the one with no reference courses, then one space, then expectSentence exactly, and nothing else (no unit-plans sentence is asked for in these cases).",
+      "eachCourse" : "'{folder} ({year})': the reference course's folder name, then its school year as the sidebar labels it ('2025–26', with an en dash), or 'Other' when it has none. Same code only: a course kept for reference whose displayed code is this course's, compared without regard to case. Sorted by that text, code point by code point. Never said on a course kept for reference, where no door opens.",
+      "separator" : ", ",
+      "sentence" : "I also keep earlier {course} courses for reference: {courses}. You can read them and build on what is there; they are never deployed, and nothing in them can be changed.",
+      "where" : "After the sentence that asks for the plan tool and agreement (it ends 'wait for me to agree.'), with one space before it, and before greetingUnitPlans' sentence when that is said. {course} is the course's code as the greeting names it; {courses} the list joined by separator. The whole greeting's double quotes become apostrophes as greetingCarriesNoDoubleQuotes says.",
+      "why" : "GitHub #856. The mac has said this since v1.3.0 (decision (s): the Revise doors are not offered on a course kept for reference, and a live course's session is told they exist instead), but no contract carried it, so the Windows greeting lacked the sentence and no test on either side noticed. Written here as the mac says it, byte for byte: the greeting reaches an outside assistant, not the local model, and nothing the local model is shown moved (scripts/test_tool_surface_digest.py). It promises nothing Plantoir does: the session reads the courses with its own file tools and the read tools it already has."
+    },
     "greetingUnitPlans" : {
       "joinedAs" : "One name alone; two as 'A and B'; three to mostUnitsNamed as 'A, B and C'; past mostUnitsNamed, the first mostUnitsNamed joined by ', ' and then more, with {n} the rest.",
       "more" : ", and {n} more",

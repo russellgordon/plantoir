@@ -306,16 +306,38 @@ nonisolated enum ClaudeCodeLauncher {
         // own file tools and with the read tools it already has. In v1.3.0
         // there is no copy feature, and a sentence pointing at one would be
         // pointing at #207.
-        if !referenceCourses.isEmpty {
-            let listed: String = referenceCourses.joined(separator: ", ")
-            text.append(" I also keep earlier \(courseCode) courses for reference: \(listed). ")
-            text.append("You can read them and build on what is there; they are never deployed, ")
-            text.append("and nothing in them can be changed.")
+        if let sentence = referenceCoursesSentence(courseCode: courseCode, referenceCourses: referenceCourses) {
+            text.append(" " + sentence)
         }
         if let unitPlans {
             text.append(" " + UnitPlans.greetingSentence(unitPlans, courseCode: courseCode))
         }
         return text.replacingOccurrences(of: "\"", with: "'")
+    }
+
+    /// The sentence naming the same-code courses kept for reference, as
+    /// `contracts/app-rules.json` → `outsideAgents.greetingReferenceCourses`
+    /// writes it (#856), or nil when there are none. `{course}` is the
+    /// course's code and `{courses}` the list `referenceCoursesToMention`
+    /// gives, joined by `referenceCoursesSeparator`.
+    static let referenceCoursesSentenceTemplate: String =
+        "I also keep earlier {course} courses for reference: {courses}. "
+        + "You can read them and build on what is there; they are never deployed, "
+        + "and nothing in them can be changed."
+
+    /// What goes between two of the listed courses.
+    static let referenceCoursesSeparator: String = ", "
+
+    /// The reference-courses sentence for `courseCode`, filled, or nil for
+    /// an empty list, which says nothing at all.
+    static func referenceCoursesSentence(courseCode: String, referenceCourses: [String]) -> String? {
+        if referenceCourses.isEmpty {
+            return nil
+        }
+        let listed: String = referenceCourses.joined(separator: referenceCoursesSeparator)
+        return referenceCoursesSentenceTemplate
+            .replacingOccurrences(of: "{course}", with: courseCode)
+            .replacingOccurrences(of: "{courses}", with: listed)
     }
 
     /// The reference courses a session on `course` should be told about:

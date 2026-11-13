@@ -895,6 +895,44 @@ final class AppRulesContractTests: XCTestCase {
 
     // MARK: - The outside doors
 
+    /// `outsideAgents.greetingReferenceCourses` (#856): the sentence naming
+    /// the same-code courses kept for reference is the contract's, placed
+    /// where the contract says, and absent when there are none. The template
+    /// and the separator are compared with the named constants, and every
+    /// case runs through the greeting both doors send.
+    func testTheReferenceCoursesSentenceIsTheContracts() throws {
+        let rules: [String: Any] = try AppRulesContractTests.readRules()
+        let section: [String: Any] = try XCTUnwrap(rules["outsideAgents"] as? [String: Any])
+        let block: [String: Any] = try XCTUnwrap(section["greetingReferenceCourses"] as? [String: Any])
+        XCTAssertEqual(block["sentence"] as? String, ClaudeCodeLauncher.referenceCoursesSentenceTemplate)
+        XCTAssertEqual(block["separator"] as? String, ClaudeCodeLauncher.referenceCoursesSeparator)
+
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let course: String = try XCTUnwrap(testCase["course"] as? String, name)
+            let courseName: String = try XCTUnwrap(testCase["courseName"] as? String, name)
+            let referenceCourses: [String] = try XCTUnwrap(testCase["referenceCourses"] as? [String], name)
+            let expectSentence: String? = testCase["expectSentence"] as? String
+
+            let plain: String = ClaudeCodeLauncher.greeting(courseCode: course, courseName: courseName)
+            let told: String = ClaudeCodeLauncher.greeting(
+                courseCode: course, courseName: courseName, referenceCourses: referenceCourses
+            )
+            XCTAssertEqual(
+                ClaudeCodeLauncher.referenceCoursesSentence(courseCode: course, referenceCourses: referenceCourses),
+                expectSentence,
+                name
+            )
+            if let expectSentence {
+                XCTAssertEqual(told, plain + " " + expectSentence, name)
+            } else {
+                XCTAssertEqual(told, plain, name)
+            }
+        }
+    }
+
     /// Runs `outsideAgents` — the two menu items that hand one course to a
     /// command-line assistant the teacher already has, "Revise with Claude…"
     /// and "Revise with Codex…".

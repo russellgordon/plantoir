@@ -1890,6 +1890,8 @@ Re-taken at the merge of `origin/dev` 3aea4d94b (which read **531**, `mustRecord
 After 750c's implementation review: still **534** (no list added; `results.cases` 16 → 36, `namedCopies.gradeCases` 7 → 9, `documentCases` 4 → 5); `mustRecord` **177**.
 After 750c's fix review: still **534** (no list added; `results.cases` 36 → 40, `kitFormat.cases` 56 → 61, `identifiers.cases` 6 → 8); `mustRecord` **177**.
 
+**Re-taken 2026-11-13 for #863 and #856**, on `issue/863-contract-sentences-windows-waits-on` off `origin/dev` 99ec0e143, which read **547**: **549**. Two lists added, both AUTHORED: `shared-rules.json` → `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared.cases` (3, #863), run on the mac by `QuitConfirmationTests`, and `app-rules.json` → `outsideAgents.greetingReferenceCourses.cases` (4, #856), run on the mac by `AppRulesContractTests`. Both are owed on Windows by the issues that asked for them (Windows' share piece #824, and #856). `activityTrail.mustRecord` unchanged: neither adds an event (the quit during a share writes the existing "quit asked about work under way").
+
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
 objects only*: an array inside a case is a FIELD of that case (each
