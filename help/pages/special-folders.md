@@ -28,9 +28,9 @@ Most of a course is yours to arrange as you like. A few folders and pages have a
 The list is different for each course, because it names that course's own folders.
 
 1. In the sidebar, select the course. Its settings show.
-2. In the {{control:courseSettingsMarksPart}} part, click {{control:specialFoldersLink}} A sheet titled {{control:specialFoldersSheetTitle}} opens.
+2. In the {{control:courseSettingsMarksPart}} part, click {{control:specialFoldersLink}}. A sheet titled {{control:specialFoldersSheetTitle}} opens.
 3. Read the rows. Each names a folder or page of this course and says what it is for.
-4. Press {{control:done}}.
+4. Press {{control:specialFoldersDone}}.
 
 {{picture:special-folders-1}}
 alt: The Folders Plantoir uses sheet for one course, with a row for each special folder, naming the folder and saying what it is for.

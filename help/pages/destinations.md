@@ -38,7 +38,7 @@ A course's sections can deploy to Cloudflare Pages, to Netlify, or to a folder o
 1. In the sidebar, select the course. Its settings show.
 2. Find the {{control:deployingPart}} part, and open {{control:deployingPartDeployTo}}.
 3. Choose {{control:deployToCloudflarePages}}, {{control:deployToNetlify}} or {{control:deployToAFolderOnThisMac}}. What the choice needs appears under it:
-   - For Cloudflare Pages, your {{control:plantoirSettingsCloudflareAccountID}}, or the words {{control:deployingPartAccountIDNotSetYet}} and an {{control:openSettings}} button.
+   - For Cloudflare Pages, your {{control:plantoirSettingsCloudflareAccountID}}, or the words {{control:deployingPartAccountIDNotSetYet}}. An {{control:openSettings}} button is beside it either way.
    - For Netlify, a note about its free plan.
    - For a folder, a {{control:deployingPartFolderField}} field and a {{control:deployingPartChooseFolderButton}} button.
 
@@ -75,7 +75,7 @@ After the section's next deploy, the link to the live website uses your domain. 
 
 ## If it does not work
 
-- **{{control:courseSettingsSaveButton}} is refused for Cloudflare Pages.** No Cloudflare Account ID is saved in Plantoir's settings. See [Put your site online with Cloudflare Pages](page:cloudflare).
+- **{{control:courseSettingsSaveButton}} is greyed after you chose Cloudflare Pages.** The reason shows beside the button: no Cloudflare Account ID is saved in Plantoir's settings, or the one saved is not a valid one. See [Put your site online with Cloudflare Pages](page:cloudflare). A course that deployed to Cloudflare Pages already can still be saved without the ID. It is stopped when you deploy instead.
 - **Orange text under the domain says it does not look like a domain.** It has a space in it, or no dot. Plantoir still accepts what you typed, so correct it before you save.
 - **A course says Netlify and you never chose it.** A course made before these choices existed, and the example course, deploy to Netlify until you choose another place.
 - **The website does not open at your domain.** Plantoir only uses the domain in its links. The domain must be set up in Cloudflare or Netlify.

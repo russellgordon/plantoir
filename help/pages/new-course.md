@@ -43,7 +43,7 @@ Fill in {{control:newCourseSheetBasicsPart}} first. Everything below it stays gr
 - **{{control:newCourseSheetCourseName}}**: for example Chemistry. For a code Plantoir knows, two buttons offer a short name and a formal one.
 - **{{control:newCourseSheetThisIsAClub}}**: see [Make a club](page:club).
 - **{{control:newCourseSheetTimetableSectionNumbers}}**: the numbers of the sections you teach, with commas between them, such as 1,3.
-- **{{control:newCourseSheetKeepThisCourseForReference}}**: see [Bring in last year's courses](page:import-for-reference).
+- **{{control:newCourseSheetKeepThisCourseForReference}}**: shown for a code that has a ready-made course. With it turned on, the sheet has no {{control:newCourseSheetDeployingPart}} part, and its last button is {{control:newCourseSheetCreateReferenceCourseButton}}. See [Bring in last year's courses](page:import-for-reference).
 
 {{picture:new-course-1}}
 alt: The New Course or Club sheet with Basics filled in: the province, the course code and the timetable section numbers.
@@ -90,9 +90,9 @@ The two switches for the map are {{control:includeTheCurriculumCoverageMap}} and
 
 The sheet says of {{control:newCourseSheetStructurePart}} that the defaults are fine for most courses. When you take a ready-made course, the example content chooses this part.
 
-- **{{control:newCourseSheetFoldersAndFiles}}** folds down to four lists: the folders and files every section shares, and the folders and files each section has for itself. See [Shared folders and section folders in Course Settings](page:course-folders).
+- **{{control:newCourseSheetFoldersAndFiles}}** folds down to four lists: the folders and files every section shares, and the folders and files each section has for itself. A fifth list, {{control:curriculumFolders}}, shows when the code has a folder of curriculum expectations to offer. See [Shared folders and section folders in Course Settings](page:course-folders).
 - **{{control:foldersWhoseWorkCountsForMarks}}** names the folders that hold marked work. See [The folders Plantoir treats specially](page:special-folders).
-- **{{control:newCourseSheetUseLCSSpecificTerminology}}** is an option for one school. It uses that school's own terms, such as Grove Time in place of Extra Help, and adds a College Board Curriculum folder.
+- **{{control:newCourseSheetUseLCSSpecificTerminology}}** is an option for one school. It uses that school's own terms, with pages named Grove Time and SIC Drop-In Sessions in place of Extra Help. It also adds a College Board Curriculum folder.
 
 ## Footer and Advanced
 

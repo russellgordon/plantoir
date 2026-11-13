@@ -211,6 +211,10 @@
   "courseReviseWithCodex": {
    "mac": "Course \u25b8 Revise With \u25b8 Codex\u2026",
    "windows": null
+  },
+  "courseReviseWithCopilot": {
+   "mac": "Course \u25b8 Revise With \u25b8 GitHub Copilot\u2026",
+   "windows": null
   }
  }
 }

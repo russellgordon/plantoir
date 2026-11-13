@@ -56,13 +56,17 @@ To bring it back, choose {{menu:restoreFromArchive}}. [Bring back a removed cour
 
 1. In the sidebar, select the section.
 2. Choose {{menu:removeSection}}.
-3. An alert asks whether to remove that section, and says that nothing is deleted. Confirm, and the section moves to {{control:sidebarArchived}}.
+3. An alert asks whether to remove that section, and says that nothing is deleted. Press {{control:removeCourseAlertRemoveButton}}, and the section moves to {{control:sidebarArchived}}.
 
 If the section is the only one the course has, the alert asks about the whole course instead, and the whole course moves to {{control:sidebarArchived}}.
 
 ## If it does not work
 
-- **{{menu:courseRename}} is greyed.** The course is kept for reference, or another change to the course has to finish first.
+- **{{menu:courseRename}} is greyed.** The course is kept for reference, or it is being previewed or deployed. Stop the preview, or wait for the deploy to finish.
 - **Text under the field says the code cannot be used.** It says why. Type a different code.
 - **An alert titled {{control:renameCourseCouldNotRename}} appears.** It gives the reason. One reason is that the working folder already has something with that code.
 - **An alert says a scheduled deploy may still run.** Plantoir could not turn off a deploy that was scheduled under the old code. It may still try to deploy under that code.
+
+{{assistant}}
+{{menu:courseRename}} is also greyed while Claude, Codex or GitHub Copilot is open on the course from Plantoir. Finish with the assistant first.
+{{/assistant}}

@@ -35,7 +35,7 @@ A course's settings are one long form. This page says how to open it, what each 
 alt: A course's settings at the top of the form, with the Course name field, and the Save button at the bottom of the form.
 
 {{assistant}}
-When Claude or Codex is installed on this Mac, a bar with two tabs shows above the form: {{control:courseDetailSettingsTab}} and {{control:courseDetailPlanningTab}}. The settings are on the first.
+A bar with two tabs shows above the form when Claude Code, Codex or GitHub Copilot is installed on this Mac. The tabs are {{control:courseDetailSettingsTab}} and {{control:courseDetailPlanningTab}}. The settings are on the first.
 {{/assistant}}
 
 ## The parts of the form
@@ -73,6 +73,13 @@ These pages cover the parts in detail:
 {{assistant}}
 {{control:courseSettingsOverallPart}} also holds the two switches for the curriculum map, {{control:includeTheCurriculumCoverageMap}} and {{control:explainTheMapOnThePage}}. The second is greyed unless the first is on.
 {{/assistant}}
+
+## What Hide and Expandable do
+
+The two tick boxes in the {{control:courseSettingsSidebarVisibilityPart}} table change the sidebar of the class website, and nothing else.
+
+- **{{control:sidebarVisibilityHideColumn}}** keeps the folder or file out of the website's sidebar. Its pages are still on the website. Students can follow a link to them and can find them by searching, and a published page stays published. A tick here does not keep a page from students. To do that, hide the page: see [Show or hide pages for a section](page:publish-pages).
+- **{{control:sidebarVisibilityExpandableColumn}}** makes a folder open in the sidebar, with its pages listed under it. A folder without the tick shows as its name alone, and clicking the name opens the folder's own page.
 
 ## Change the course's name
 

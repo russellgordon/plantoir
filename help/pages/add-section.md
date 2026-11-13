@@ -14,9 +14,9 @@ keywords:
 - new block
 - same course twice
 - section number
-description: Add a section to a course when you teach it to another class. The new section starts as a copy of the lowest-numbered one.
+description: Add a section to a course when you teach it to another class. The new section starts with a copy of the lowest-numbered section's pages.
 ---
-When you pick up another class of a subject you already teach, add a section to its course. The new section gets a website of its own, and starts as a copy of the section with the lowest number.
+When you pick up another class of a subject you already teach, add a section to its course. The new section gets a website of its own, and starts with a copy of the pages of the section with the lowest number.
 
 ## Steps
 
@@ -31,15 +31,16 @@ alt: The sheet that adds a section, with the Section number field and the Add Se
 
 ## What the new section starts with
 
-The new section is a copy of the lowest-numbered section the course has:
+The new section's pages are copied from the lowest-numbered section the course has:
 
 - its class pages and its notes;
-- which pages are published and which are hidden;
-- its display settings.
+- which pages are published and which are hidden.
 
-Each shared page also gets a date and a published or hidden setting for the new section, copied from the same section.
+Each shared page also gets a published or hidden setting for the new section, copied from the same section. Its date for the new section is the day you add the section.
 
-So the new section's website starts out showing what that section's shows, and you do not need to publish its pages again. Nothing that is already on this Mac is written over.
+So the new section's website starts out showing the pages that section's shows, and you do not need to publish them again. Nothing that is already on this Mac is written over.
+
+The look of the website is not copied. The new section's emoji, colour scheme, fonts and title switches start at their defaults, whatever the other section uses. Set them in the new section's part of the course's settings: see [Change how a section's site looks](page:section-look).
 
 ## What to do next
 
@@ -50,6 +51,10 @@ So the new section's website starts out showing what that section's shows, and y
 
 ## If it does not work
 
-- **{{menu:addSection}} is greyed.** The course is kept for reference, or another change to the course has to finish first.
+- **{{menu:addSection}} is greyed.** The course is kept for reference, or it is being previewed or deployed. Stop the preview, or wait for the deploy to finish.
 - **Orange text says the section already exists.** Choose a number the course does not have.
 - **Orange text says a folder for that section is already on this Mac.** Plantoir will not write over it, because it may hold work you want to keep. Move that folder aside first, then add the section.
+
+{{assistant}}
+{{menu:addSection}} is also greyed while Claude, Codex or GitHub Copilot is open on the course from Plantoir. Finish with the assistant first.
+{{/assistant}}

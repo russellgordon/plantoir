@@ -27,7 +27,7 @@ Class pages are named with the course's word for a unit, as in Unit 1, Day 1. If
 
 1. In the sidebar, select the course. Its settings show.
 2. In the first part of the form, the row {{control:unitWordField}} shows the word the course uses now. Press the {{control:unitWordRename}} button beside it. A sheet opens, with the present word in its title.
-3. Type the new word. If you leave the field empty, the word is Unit.
+3. Type the new word. The grey word in an empty field is only a prompt, and an empty field is refused. To go back to Unit, type Unit.
 4. Wait a moment while Plantoir looks over the pages. The sheet then says how many class pages would be renamed, in which sections, and how many links would be changed to match.
 
 {{picture:unit-word-1}}
@@ -67,4 +67,4 @@ Rename the word again, back to what it was. The backup Plantoir saved first is a
 - **A page is in the way.** A section already has a page with one of the new names, and nothing is renamed. Move or rename that page first.
 - **A page could not be read.** Nothing is renamed. If the course is kept in iCloud Drive, wait for it to finish downloading and try again.
 - **The rename stopped part way.** Plantoir recognises this. Open the sheet again, type the same new word, and press {{control:unitWordRenameSheetRenameButton}} to finish.
-- **The word is refused.** A word with a digit or a comma in it cannot be used.
+- **The word is refused.** A word with a digit or a comma in it cannot be used. Neither can an empty field, or the word the course already uses.

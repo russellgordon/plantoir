@@ -25,17 +25,18 @@ A club gets a website the same way a course does, from the {{control:newCourseOr
 
 1. Choose {{menu:newCourse}} to open the {{control:newCourseOrClub}} sheet.
 2. In the {{control:newCourseSheetCourseCode}} field, type a short code for the club, such as CODING. A club's name typed there is accepted.
-3. Turn on {{control:newCourseSheetThisIsAClub}}. The fields are now labelled {{control:newCourseSheetClubCode}} and {{control:newCourseSheetClubName}}, and a {{control:newCourseSheetClubShortLabel}} field appears. The short label is shown beside the club's emoji, and holds 12 characters at most.
+3. Check that {{control:newCourseSheetThisIsAClub}} is on. Plantoir turns it on already for a code that is not a course code, such as CODING. The fields are then labelled {{control:newCourseSheetClubCode}} and {{control:newCourseSheetClubName}}.
+4. Fill in the {{control:newCourseSheetClubShortLabel}} field. It shows for a code that is not shaped like a course code, whichever way the switch is set. The short label is shown beside the club's emoji, and holds 12 characters at most.
 
 {{picture:club-1}}
 alt: The New Course or Club sheet with This is a club turned on, and the Meetings part with the club's words.
 
-4. Fill in the {{control:newCourseSheetMeetingsPart}} part, which a club has in place of {{control:newCourseSheetUnitsPart}}:
+5. Fill in the {{control:newCourseSheetMeetingsPart}} part, which a club has in place of {{control:newCourseSheetUnitsPart}}:
    - {{control:newCourseSheetFolderForMeetingPages}}: the folder that holds a page for each meeting.
    - {{control:newCourseSheetFrontPageHeading}}: the heading on the front page, in your own words. A club starts with Most Recent Meeting.
    - {{control:newCourseSheetPagesAreNamed}}: the word in each page's name. With Week, the pages are named Week 1, Week 2 and so on.
-5. Fill in the other parts as you would for a course. [Make a new course](page:new-course) describes them.
-6. Press {{control:newCourseSheetCreateClub}}. When the sheet has finished, close it. The club is in the sidebar.
+6. Fill in the other parts as you would for a course. [Make a new course](page:new-course) describes them.
+7. Press {{control:newCourseSheetCreateClub}}. When the sheet has finished, close it. The club is in the sidebar.
 
 {{assistant}}
 The {{control:newCourseSheetMeetingsPart}} part has one more choice, which sets whether an assistant calls one of the club's pages a class or a meeting.

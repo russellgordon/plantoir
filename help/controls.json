@@ -2604,6 +2604,27 @@
     "say": "app-rules#credentialRequests.requests[8].title"
    },
    "windows": null
+  },
+  "specialFoldersDone": {
+   "label": "Done",
+   "mac": {
+    "say": "shared-rules#specialFoldersHelp.dismissedBy"
+   },
+   "windows": null
+  },
+  "importForReferenceSheetDoneButton": {
+   "label": "Done",
+   "mac": {
+    "file": "mac-app/QuartzTeachers/Views/Wizard/ImportCoursesForReferenceSheet.swift"
+   },
+   "windows": null
+  },
+  "updateNoticeOk": {
+   "label": "OK",
+   "mac": {
+    "say": "shared-rules#appUpdates.wording.okButton"
+   },
+   "windows": null
   }
  },
  "keys": {}
