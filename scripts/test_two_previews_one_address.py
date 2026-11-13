@@ -25,6 +25,7 @@ import json
 import multiprocessing
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,27 @@ class OneAddressOnePreview(unittest.TestCase):
 
     def claim_file(self, port: int) -> Path:
         return self.folder / f"plantoir-preview-address-{port}.claim"
+
+    def a_claim(self, port: int, pid: int, course: str, section: int, started=None):
+        """A claim as a run writes it: `started` is the process's own start
+        unless the test gives another (a claim left by an earlier process)."""
+        if started is None:
+            started = build_site._when_a_process_started(pid)
+        self.claim_file(port).write_text(json.dumps({"pid": pid, "started": started, "course": course,
+                                                     "section": section}), encoding="utf-8")
+
+    def a_live_stranger(self) -> subprocess.Popen:
+        """A live process that is not any preview, ended by tearDown."""
+        stranger = subprocess.Popen(["sleep", "60"], start_new_session=True)
+        self.addCleanup(self.end_the_stranger, stranger)
+        return stranger
+
+    def end_the_stranger(self, stranger: subprocess.Popen):
+        try:
+            os.killpg(stranger.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        stranger.wait(timeout=30)
 
     def test_two_sections_claiming_one_address_at_once_get_it_once(self):
         context = multiprocessing.get_context("spawn")
@@ -135,8 +157,7 @@ class OneAddressOnePreview(unittest.TestCase):
         self.assertEqual(out.decode("utf-8").strip(), "None")
 
     def test_the_same_section_started_again_takes_its_address_back(self):
-        self.claim_file(8081).write_text(json.dumps({"pid": os.getppid(), "course": "EXC2O", "section": 1}),
-                                         encoding="utf-8")
+        self.a_claim(8081, os.getppid(), "EXC2O", 1)
         self.assertIsNone(build_site.claim_the_preview_address(8081, "EXC2O", 1))
 
     def test_a_claim_whose_build_has_gone_counts_for_nothing(self):
@@ -147,17 +168,67 @@ class OneAddressOnePreview(unittest.TestCase):
         self.assertIsNone(build_site.claim_the_preview_address(8082, "EXC2O", 2))
 
     def test_another_course_on_the_address_is_another_preview(self):
-        self.claim_file(8083).write_text(json.dumps({"pid": os.getppid(), "course": "ICS3U", "section": 1}),
-                                         encoding="utf-8")
+        self.a_claim(8083, os.getppid(), "ICS3U", 1)
         self.assertEqual(build_site.claim_the_preview_address(8083, "EXC2O", 1), "ICS3U section 1")
+        self.assertIsNone(build_site.a_claim_that_proves_nothing(8083, "EXC2O", 1), "a proven claim is not left over")
+
+    # --- A claim proves its holder (#835 review H1) -----------------------
+
+    def test_a_live_process_that_did_not_write_the_claim_proves_nothing(self):
+        # The builder after a restart: the claim's process id is alive again,
+        # but it is some other program's. Before H1 this refused (exit 75)
+        # for a preview that did not exist.
+        stranger = self.a_live_stranger()
+        self.a_claim(8082, stranger.pid, "ICS3U", 2, started="ps:a moment long before this process began")
+        self.assertEqual(build_site.a_claim_that_proves_nothing(8082, "MPM2D", 2), "ICS3U section 2")
+        self.assertIsNone(build_site.claim_the_preview_address(8082, "MPM2D", 2))
+        self.assertEqual(json.loads(self.claim_file(8082).read_text(encoding="utf-8"))["course"], "MPM2D")
+
+    def test_a_claim_without_a_start_proves_nothing(self):
+        stranger = self.a_live_stranger()
+        self.claim_file(8084).write_text(json.dumps({"pid": stranger.pid, "course": "ICS3U", "section": 1}),
+                                         encoding="utf-8")
+        self.assertIsNone(build_site.claim_the_preview_address(8084, "EXC2O", 1))
+
+    def test_after_a_restart_a_preview_is_not_refused_for_one_that_does_not_exist(self):
+        # The review's reproduction as a run: a claim naming a live process
+        # that is not a preview, and a second course's preview asking for
+        # the same address, which must build rather than exit 75.
+        stranger = self.a_live_stranger()
+        self.a_claim(8082, stranger.pid, "ICS3U", 2, started="proc:an-earlier-boot:12345")
+        program = ("import sys; sys.path.insert(0, %r); import build_site; "
+                   "build_site.refuse_when_the_preview_address_is_another_previews(8082, 'MPM2D', 2); "
+                   "print('WENT AHEAD')") % str(SCRIPTS)
+        result = subprocess.run([sys.executable, "-B", "-c", program], capture_output=True, timeout=120,
+                                env=dict(os.environ, PLANTOIR_PREVIEW_CLAIMS_DIR=str(self.folder)))
+        said = result.stdout.decode("utf-8")
+        self.assertEqual(result.returncode, 0, said)
+        self.assertIn("WENT AHEAD", said)
+        self.assertNotIn("cannot be previewed", said)
+
+    def test_a_stopped_preview_gives_its_address_back(self):
+        # SIGTERM is what a stop sends first, SIGHUP what a closed terminal
+        # sends, SIGINT is Stop in the app: each gives the claim back.
+        program = ("import sys, time; sys.path.insert(0, %r); import build_site; "
+                   "build_site.claim_the_preview_address(8081, 'EXC2O', 1); print('CLAIMED', flush=True); "
+                   "time.sleep(60)") % str(SCRIPTS)
+        for stopped_by in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+            with self.subTest(stopped_by.name):
+                run = subprocess.Popen([sys.executable, "-B", "-c", program], stdout=subprocess.PIPE,
+                                       start_new_session=True,
+                                       env=dict(os.environ, PLANTOIR_PREVIEW_CLAIMS_DIR=str(self.folder)))
+                self.assertEqual(run.stdout.readline().decode("utf-8").strip(), "CLAIMED")
+                self.assertTrue(self.claim_file(8081).exists())
+                run.send_signal(stopped_by)
+                run.communicate(timeout=30)
+                self.assertFalse(self.claim_file(8081).exists(), f"{stopped_by.name} left the claim")
 
     def test_an_unreadable_claim_counts_for_nothing(self):
         self.claim_file(8084).write_text("{not json", encoding="utf-8")
         self.assertIsNone(build_site.claim_the_preview_address(8084, "EXC2O", 1))
 
     def test_a_refused_run_says_the_contracts_words_and_exits_75(self):
-        self.claim_file(8081).write_text(json.dumps({"pid": os.getpid(), "course": "EXC2O", "section": 1}),
-                                         encoding="utf-8")
+        self.a_claim(8081, os.getpid(), "EXC2O", 1)
         program = ("import sys; sys.path.insert(0, %r); import build_site; "
                    "build_site.refuse_when_the_preview_address_is_another_previews(8081, 'EXC2O', 2)") % str(SCRIPTS)
         result = subprocess.run([sys.executable, "-B", "-c", program], capture_output=True, timeout=120,
@@ -172,6 +243,66 @@ class OneAddressOnePreview(unittest.TestCase):
         self.assertEqual(printed[-2:], expected)
         held = json.loads(self.claim_file(8081).read_text(encoding="utf-8"))
         self.assertEqual(held["section"], 1, "the refused run leaves the other's claim alone")
+
+
+# The review's reproduction in a REAL website builder, when asked for: a
+# preview killed outright leaves its claim; the builder restarts and hands
+# the same process id to an unrelated program; a preview of another course
+# asks for that address. Opt-in (needs Docker and an image): give the tag in
+# PLANTOIR_PREVIEW_CLAIM_IMAGE. A container of its own, removed after.
+REAL_IMAGE = os.environ.get("PLANTOIR_PREVIEW_CLAIM_IMAGE", "")
+
+
+@unittest.skipUnless(REAL_IMAGE and shutil.which("docker") and sys.platform == "darwin",
+                     "set PLANTOIR_PREVIEW_CLAIM_IMAGE to run it in a real website builder")
+class AfterARestartInARealBuilder(unittest.TestCase):
+
+    def setUp(self):
+        self.container = f"plantoir-preview-claim-{os.getpid()}"
+        subprocess.run(["docker", "run", "-d", "--name", self.container, "--entrypoint", "tail",
+                        "--mount", f"type=bind,src={SCRIPTS},dst=/opt/test-scripts,readonly",
+                        REAL_IMAGE, "-f", "/dev/null"], check=True, capture_output=True, timeout=120)
+
+    def tearDown(self):
+        subprocess.run(["docker", "rm", "-f", self.container], capture_output=True, timeout=60)
+
+    def inside(self, script: str, *arguments) -> subprocess.CompletedProcess:
+        return subprocess.run(["docker", "exec", self.container, "sh", "-c", script, "sh"] + list(arguments),
+                              capture_output=True, timeout=120)
+
+    def test_a_left_claim_whose_id_came_back_does_not_refuse(self):
+        claim = ("cd /opt/test-scripts && exec python3 -B -c 'import sys, os, time; import build_site; "
+                 "build_site.claim_the_preview_address(8082, \"ICS3U\", 2); print(os.getpid(), flush=True); "
+                 "time.sleep(600)'")
+        first = subprocess.Popen(["docker", "exec", self.container, "sh", "-c", claim],
+                                 stdout=subprocess.PIPE)
+        pid = int(first.stdout.readline().decode("utf-8").strip())
+        self.inside("kill -9 \"$1\"", str(pid))
+        first.wait(timeout=60)
+        subprocess.run(["docker", "restart", "-t", "0", self.container], check=True, capture_output=True,
+                       timeout=120)
+        # Start unrelated programs until the claim's process id is alive again,
+        # as it is after a restart (the review: pid 19, three of three).
+        # The look is by what the process IS ("sleep 600"), because the
+        # process doing the looking can itself be handed that id.
+        alive = False
+        for _ in range(60):
+            subprocess.run(["docker", "exec", "-d", self.container, "sleep", "600"], capture_output=True,
+                           timeout=60)
+            looked = self.inside("tr '\\0' ' ' < /proc/$1/cmdline 2>/dev/null", str(pid)).stdout
+            if looked.strip() == b"sleep 600":
+                alive = True
+                break
+        if not alive:
+            self.skipTest(f"the builder did not hand out process id {pid} again")
+        left = self.inside("cat /tmp/plantoir-preview-address-8082.claim")
+        self.assertIn(b"ICS3U", left.stdout, "the claim outlived the restart")
+        asked = self.inside("cd /opt/test-scripts && python3 -B -c 'import build_site; "
+                            "build_site.refuse_when_the_preview_address_is_another_previews(8082, \"MPM2D\", 2); "
+                            "print(\"WENT AHEAD\")'")
+        said = asked.stdout.decode("utf-8")
+        self.assertEqual(asked.returncode, 0, said + asked.stderr.decode("utf-8"))
+        self.assertIn("WENT AHEAD", said)
 
 
 class TheServingRunClaimsFirst(unittest.TestCase):
@@ -196,6 +327,18 @@ class TheServingRunClaimsFirst(unittest.TestCase):
             "{section}", "${SECTION}")
         self.assertIn(f'note_on_the_trail "{line}"', text)
         self.assertIn('if [[ "${_build_rc:-0}" -eq ' + str(the_rule()["exitCode"]) + " ]]; then", text)
+
+    def test_preview_sh_writes_the_trail_line_for_a_left_claim(self):
+        text = (SCRIPTS.parent / "preview.sh").read_text(encoding="utf-8")
+        rules = json.loads((SCRIPTS.parent / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+        entry = None
+        for candidate in rules["activityTrail"]["mustRecord"]:
+            if candidate["event"] == "preview address held by another account":
+                entry = candidate
+        line = entry["launcherLineWhenALeftClaimIsTakenOver"].replace("{course}", "${COURSE}").replace(
+            "{section}", "${SECTION}").replace("{other}", "${_left_claim}")
+        self.assertIn(f'note_on_the_trail "{line}"', text)
+        self.assertIn("build_site.a_claim_that_proves_nothing(", text)
 
     def test_the_sentences_name_no_machinery(self):
         for line in the_rule()["sentences"]["launcher"]:

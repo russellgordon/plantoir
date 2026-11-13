@@ -3358,13 +3358,25 @@ builder class. Now the `TOKEN HAND-OFF BLOCK` in `deploy.sh`:
   `sh -lc`) refuses any name the block did not make, reads the token, and
   removes the folder before it does anything else;
 - removes the folder from the EXIT trap when the run ends before the reading
-  step (an error, Stop, SIGTERM, SIGINT, SIGHUP: all measured), and stops in
-  words ("could not hand the sign-in to the website builder") if the hand-off
-  itself fails.
+  step, and stops in words ("could not hand the sign-in to the website
+  builder") if the hand-off itself fails. SIGINT, SIGTERM and SIGHUP are each
+  trapped as an ordinary exit (130, 143, 129) so that the EXIT trap runs:
+  macOS's `/bin/bash` 3.2 skips the EXIT trap when a FOREGROUND command dies
+  of a signal sent to the whole group, which is what Stop in the app does,
+  and the #835 implementation review measured the folder left that way. The
+  first version of this section said SIGINT was measured clean; that was
+  measured only with a command in the background (`sleep & wait`), a shape
+  `deploy.sh` does not have. `test_deploy_token_handoff.py` now sends each
+  signal to the group while a foreground command runs, under `/bin/bash`
+  (the old block: SIGINT left the folder; the new: none of the three does).
+  Nothing in the EXIT trap may fail: under `set -e` a failing command there
+  becomes the run's exit status (`test_deploy_sh_plans.py` met it).
 
 The secret is never in an argument list, a `docker exec -e`, the console or
 the trail; `test_deploy_token_handoff.py` feeds made-up tokens and searches
-all four. Inside the builder the token still reaches `deploy.py` as
+all four. What this protects against is two deploys crossing, and no more:
+every `docker exec` in the builder runs as root, so any process inside it
+can list and read `/tmp/deploy_pat.*` while a deploy holds one. Inside the builder the token still reaches `deploy.py` as
 `NETLIFY_AUTH_TOKEN` or `CLOUDFLARE_API_TOKEN` in the environment of that one
 command, as before: wrangler reads it from there. A run killed with SIGKILL
 between the hand-off and the reading step leaves its 0700 folder in the
@@ -3387,8 +3399,23 @@ one `flock` for the builder, for as long as its build runs; a run whose address
 another live preview claimed exits 75 before it builds anything, with
 `shared-rules.json` → `twoPreviewsOneAddress.sentences.launcher`, and
 `preview.sh` writes `launcherLineWhenItsAddressIsAnotherPreviews` on the trail.
-The same course and section started again takes its claim over, and a claim
-whose process has gone counts for nothing. Rejected: moving the second preview
+The same course and section started again takes its claim over. A claim
+counts only when it PROVES its holder: the process id is alive AND that
+process started when the claim recorded (the kernel's boot id and field 22
+of `/proc/<pid>/stat` in the builder). The id alone proved nothing: the
+builder's `/tmp` outlives a restart and the builder hands out the same ids
+again after one (pid 19 three times of three), so the first version refused
+a preview, with exit 75, for one that did not exist (the #835 implementation
+review's reproduction; `test_two_previews_one_address.py` →
+`AfterARestartInARealBuilder` repeats it in a real builder when
+`PLANTOIR_PREVIEW_CLAIM_IMAGE` names an image: the first version failed it
+two runs of three, the third skipped because the id did not come back; the
+new code passed three of three). A claim that proves nothing is taken over,
+and `preview.sh` asks `a_claim_that_proves_nothing` before the build so the
+trail says so (`launcherLineWhenALeftClaimIsTakenOver`). The claim is given
+back when its build ends, by Stop's SIGINT, or by SIGTERM (what a stop sends
+first) or SIGHUP (a closed terminal), each made an ordinary exit; SIGKILL
+leaves it for the next run to take over. Rejected: moving the second preview
 to a free address, because `preview.sh` announces the address before the build
 and the app opens that one. #835's per-section leases name each preview's
 address, so the app avoids a taken one and this refusal stays rare.

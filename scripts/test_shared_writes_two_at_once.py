@@ -126,7 +126,35 @@ class TheConfigSurvivesTwoWriters(unittest.TestCase):
             if entry.name.endswith(".tmp"):
                 left.append(entry.name)
         self.assertEqual(left, [], "no temporary file is left beside the config")
-        self.assertEqual(stat.S_IMODE(self.config.stat().st_mode), 0o644, "the config keeps its permissions")
+        if os.name == "nt":
+            # Windows has no 0644: a writable file reads 0o666 there (#835
+            # review M2). What the code promises there is a whole file a
+            # reader can open, which the reads above have checked.
+            self.assertTrue(os.access(self.config, os.R_OK | os.W_OK))
+        else:
+            self.assertEqual(stat.S_IMODE(self.config.stat().st_mode), 0o644, "the config keeps its permissions")
+
+    def test_a_temporary_left_by_a_killed_writer_is_removed_by_the_next(self):
+        import time
+        stale = self.course / ".course_config.abc123.tmp"
+        stale_backup = self.course / ".course_config.backup.def456.tmp"
+        fresh = self.course / ".course_config.ghi789.tmp"
+        someone_elses = self.course / ".notes.old.tmp"
+        teachers = self.course / "course_config notes.tmp"
+        for path in (stale, stale_backup, fresh, someone_elses, teachers):
+            path.write_text("left", encoding="utf-8")
+        an_hour_ago = time.time() - 3600
+        for path in (stale, stale_backup, someone_elses, teachers):
+            os.utime(path, (an_hour_ago, an_hour_ago))
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            build_site._atomic_write_json_with_backup(self.config, {"course_code": "EXC2O"})
+        self.assertFalse(stale.exists())
+        self.assertFalse(stale_backup.exists())
+        self.assertTrue(fresh.exists(), "a write in progress elsewhere is never touched")
+        self.assertTrue(someone_elses.exists(), "a name this writer does not make is never touched")
+        self.assertTrue(teachers.exists())
 
     def test_the_temporary_is_hidden_and_named_for_nobody_else(self):
         made = build_site._a_private_temporary_beside(self.config, ".course_config.")

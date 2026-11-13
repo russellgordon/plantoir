@@ -61,6 +61,7 @@ import atexit
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -506,9 +507,12 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
                 # Stands in for docker: every `-e NAME=value` pair is passed on,
                 # so the script sees TARGET and takes the Cloudflare branch.
                 # The hand-off block's own execs say `sh -c`, the command `sh -lc`.
-                'docker() { local envs=(); while [ "$1" != "-lc" ] && [ "$1" != "-c" ]; do '
+                # Bounded by the arguments it has: a shape it does not know
+                # ends the stand-in instead of looping for ever (#835 review
+                # L1: an earlier draft's unbounded loop ran at 100% for an hour).
+                'docker() { local envs=(); while [ $# -gt 0 ] && [ "$1" != "-lc" ] && [ "$1" != "-c" ]; do '
                 'if [ "$1" = "-e" ]; then envs+=("$2"); shift; fi; shift; done; shift; '
-                'env ${envs[@]+"${envs[@]}"} sh -c "$@"; }',
+                '[ $# -gt 0 ] || return 99; env ${envs[@]+"${envs[@]}"} sh -c "$@"; }',
                 '_EXEC_TTY="-i"; CONTAINER_NAME="teaching-quartz-0000abcd"; PLANS_MODE="false"',
                 'give_back_the_ready_turn() { :; }',
                 'COURSE_CODE="AP CALC"; SECTION_NUM="1"; TARGET="' + target + '"',
@@ -521,8 +525,21 @@ class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
             ])
             environment = dict(os.environ)
             environment["PATH"] = str(bin_folder) + ":/usr/bin:/bin"
-            result = subprocess.run(["bash", "-c", program], capture_output=True, env=environment, timeout=30)
-            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+            # A group of its own, ended whatever happens, and nothing of it
+            # may be left running (#835 review L1).
+            run = subprocess.Popen(["bash", "-c", program], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   env=environment, start_new_session=True)
+            try:
+                out, err = run.communicate(timeout=30)
+            finally:
+                try:
+                    os.killpg(run.pid, signal.SIGKILL)
+                    still_running = True
+                except ProcessLookupError:
+                    still_running = False
+                run.wait(timeout=30)
+            self.assertFalse(still_running, "the stand-in left a process running")
+            self.assertEqual(run.returncode, 0, err.decode("utf-8", "replace"))
             return (Path(scratch) / "words").read_text(encoding="utf-8").splitlines()
 
     def test_netlify_and_cloudflare_both_get_the_course_whole(self):

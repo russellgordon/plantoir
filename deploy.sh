@@ -4930,6 +4930,14 @@ hand_the_token_to_the_builder() {
   # Nothing in the trap may fail: under `set -e` a failing command there
   # becomes the run's exit status.
   trap 'forget_the_token_file || true; if declare -F give_back_the_ready_turn >/dev/null; then give_back_the_ready_turn || true; fi' EXIT
+  # bash 3.2 (macOS's /bin/bash) does not run the EXIT trap when a
+  # FOREGROUND command dies of a signal sent to the whole group, which is
+  # what Stop in the app does (^C to the terminal): measured, the folder was
+  # left (#835 review M1). Each of the three is made an ordinary exit with
+  # the status the signal would have given, so the one EXIT trap removes it.
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
 }
 # <<< TOKEN HAND-OFF BLOCK <<<
 if [[ "$TARGET" == "cloudflare" ]]; then

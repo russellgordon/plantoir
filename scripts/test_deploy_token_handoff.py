@@ -109,16 +109,29 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
         self.trail = self.scratch / "trail"
         self.trail.mkdir()
         self.block = the_block()
+        self.groups: list = []
 
     def tearDown(self):
+        # Nothing this test started outlives it (#835 review L1: two stub
+        # loops from an earlier draft ran at 100% for an hour).
+        left: list = []
+        for group in self.groups:
+            try:
+                os.killpg(group, signal.SIGKILL)
+                left.append(group)
+            except ProcessLookupError:
+                pass
+            except PermissionError:
+                pass
         # Anything a failing run left behind, removed by its exact name.
         for where in self.scratch.glob("where-*"):
-            left = where.read_text(encoding="utf-8").strip()
-            if left.startswith("/tmp/deploy_pat.") and left.endswith("/pat"):
-                shutil.rmtree(os.path.dirname(left), ignore_errors=True)
+            handed = where.read_text(encoding="utf-8").strip()
+            if handed.startswith("/tmp/deploy_pat.") and handed.endswith("/pat"):
+                shutil.rmtree(os.path.dirname(handed), ignore_errors=True)
         shutil.rmtree(self.scratch, ignore_errors=True)
+        self.assertEqual(left, [], "a process group this test started was still running")
 
-    def start(self, name: str, token: str, ending: str, extra=None) -> subprocess.Popen:
+    def start(self, name: str, token: str, ending: str, extra=None, shell: str = "bash") -> subprocess.Popen:
         environment = dict(os.environ,
                            ARGV_LOG=str(self.argv_log),
                            GO=str(self.scratch / "go"),
@@ -127,8 +140,13 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
                            TOKEN_FOR_THIS_TEST=token,
                            PLANTOIR_TRAIL_DIR=str(self.trail))
         environment.update(extra or {})
-        return subprocess.Popen(["bash", "-c", a_deploy(self.block, ending)],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
+        # A group of its own, so a signal can go to it the way a terminal's
+        # does, and tearDown can end everything it started.
+        process = subprocess.Popen([shell, "-c", a_deploy(self.block, ending)],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment,
+                                   start_new_session=True)
+        self.groups.append(process.pid)
+        return process
 
     def where(self, name: str) -> str:
         path = self.scratch / f"where-{name}"
@@ -219,21 +237,34 @@ class EachDeployGetsItsOwnToken(unittest.TestCase):
         self.assertEqual(self.got("trap"), "made-up-token-trap")
 
     def test_a_deploy_stopped_before_the_reading_step_leaves_nothing(self):
-        for stopped_by in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-            with self.subTest(stopped_by.name):
-                name = f"stopped-{stopped_by.name}"
-                process = self.start(name, "made-up-token-stopped", "sleep 30 >/dev/null 2>&1 & wait")
-                (self.scratch / "go").write_text("go", encoding="utf-8")
-                deadline = time.time() + 20
-                while self.where(name) == "" and time.time() < deadline:
-                    time.sleep(0.05)
-                left = self.where(name)
-                self.assertTrue(os.path.exists(left), "the hand-off was made")
-                process.send_signal(stopped_by)
-                self.finish(process)
-                self.assertFalse(os.path.exists(os.path.dirname(left)),
-                                 f"{stopped_by.name} left the hand-off folder behind")
-                (self.scratch / "go").unlink()
+        # Stop in the app types ^C into the terminal, so the signal reaches
+        # the whole group while a command runs in the FOREGROUND. macOS's
+        # /bin/bash (3.2) skips the EXIT trap in that shape unless the signal
+        # is trapped (#835 review M1), so it is run here under /bin/bash and
+        # under the bash on PATH, each signal sent to the group.
+        shells: list = ["/bin/bash"]
+        on_path = shutil.which("bash")
+        if on_path and os.path.realpath(on_path) != os.path.realpath("/bin/bash"):
+            shells.append(on_path)
+        for shell in shells:
+            for stopped_by in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+                with self.subTest(shell=shell, signal=stopped_by.name):
+                    name = f"stopped-{os.path.basename(shell)}-{stopped_by.name}"
+                    process = self.start(name, "made-up-token-stopped", "sleep 30", shell=shell)
+                    (self.scratch / "go").write_text("go", encoding="utf-8")
+                    deadline = time.time() + 20
+                    while self.where(name) == "" and time.time() < deadline:
+                        time.sleep(0.05)
+                    left = self.where(name)
+                    self.assertTrue(os.path.exists(left), "the hand-off was made")
+                    time.sleep(0.2)
+                    os.killpg(process.pid, stopped_by)
+                    code, console = self.finish(process)
+                    self.assertFalse(os.path.exists(os.path.dirname(left)),
+                                     f"{stopped_by.name} to the group left the hand-off folder behind")
+                    self.assertEqual(code, {signal.SIGINT: 130, signal.SIGTERM: 143, signal.SIGHUP: 129}[stopped_by],
+                                     console)
+                    (self.scratch / "go").unlink()
 
     def test_the_reading_step_removes_only_a_hand_off_folder(self):
         keep = self.scratch / "keep" / "pat"

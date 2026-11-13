@@ -3747,7 +3747,11 @@ writes each, 224 and 301 reads met a file that was not JSON, and one trial
 ENDED that way (2026-11-13). Each write now makes its own temporary
 (`tempfile.mkstemp`, `.course_config.<random>.tmp`) and renames it, keeping the
 config's permissions; the backup is copied to a temporary of its own and
-renamed too, so a reader never meets a half-copied backup.
+renamed too, so a reader never meets a half-copied backup. A writer killed
+mid-write leaves its hidden temporary behind (one per kill, the #835
+implementation review); the next write removes temporaries of its own two
+name patterns that are older than a minute, and nothing else in the course
+folder.
 `scripts/test_shared_writes_two_at_once.py`: dev's code 80 to 122 bad reads of
 the config and about a thousand of the backup in five trials; the new code 0.
 Both apps' own writers already used a unique temporary (`Data.write(options:

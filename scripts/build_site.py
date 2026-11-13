@@ -1182,8 +1182,18 @@ def stop_preview_serving(output_dir: Path) -> int:
 # the builder, and a run whose address another live preview has claimed
 # stops in words before it builds, rather than stopping that preview. A
 # claim is a small file in the builder's temporary folder naming the
-# claiming build's process and its course and section; it is released when
-# that build ends, and a claim whose process has gone counts for nothing.
+# claiming build's process, WHEN that process started, and its course and
+# section. It is released when that build ends (normally, by Stop's SIGINT,
+# or by SIGTERM or SIGHUP, which are turned into an ordinary exit).
+#
+# A claim counts only when it PROVES its holder is still that run: the
+# process id is alive AND started at the moment the claim recorded. The id
+# alone proves nothing: the builder's /tmp outlives a restart, and after one
+# the builder hands out the same ids again (pid 19 three times of three, the
+# #835 implementation review), so a claim left by a killed preview named a
+# process that was now some other program's, and a preview was refused for
+# one that did not exist. A claim that proves nothing is taken over, and
+# preview.sh writes that on the trail before the build.
 # contracts/shared-rules.json -> twoPreviewsOneAddress; tested by
 # scripts/test_two_previews_one_address.py.
 PREVIEW_ADDRESS_TAKEN_EXIT = 75
@@ -1193,19 +1203,86 @@ def _the_preview_claims_folder() -> Path:
     return Path(os.environ.get("PLANTOIR_PREVIEW_CLAIMS_DIR") or tempfile.gettempdir())
 
 
-def _a_live_build_process(pid: int) -> bool:
-    """Whether the claiming build is still running. A builder's process ids
-    count up from its start and are not reused until they wrap, so a live id
-    is the claimant itself."""
+def _when_a_process_started(pid: int) -> str:
+    """Something that is the same for one process for its whole life and
+    different for any later process given the same id: the kernel's boot id
+    and the process's start time (field 22 of /proc/<pid>/stat) inside the
+    builder; `ps -o lstart=` where there is no /proc (a Mac, under the tests).
+    "" when it cannot be read, which proves nothing."""
     if pid <= 0:
-        return False
+        return ""
+    stat = Path(f"/proc/{pid}/stat")
+    if Path("/proc/self/stat").exists():
+        try:
+            fields = stat.read_text(encoding="utf-8", errors="replace").rsplit(")", 1)[1].split()
+            started = fields[19]
+        except (OSError, IndexError):
+            return ""
+        try:
+            boot = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+        except OSError:
+            boot = ""
+        return f"proc:{boot}:{started}"
     try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
+        said = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True,
+                              text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return f"ps:{said}" if said else ""
+
+
+def _the_claim_proves_its_holder(held: dict) -> bool:
+    """True only when the claim's process is alive AND is the one that wrote
+    the claim (it started when the claim says it did)."""
+    pid = held.get("pid") if isinstance(held.get("pid"), int) else 0
+    started = held.get("started") if isinstance(held.get("started"), str) else ""
+    if pid <= 0 or started == "":
         return False
-    except PermissionError:
-        return True
-    return True
+    return _when_a_process_started(pid) == started
+
+
+def _the_claim_on(port: int) -> Path:
+    return _the_preview_claims_folder() / f"plantoir-preview-address-{int(port)}.claim"
+
+
+def _read_the_claim(claim: Path):
+    try:
+        held = json.loads(claim.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return held if isinstance(held, dict) else None
+
+
+def a_claim_that_proves_nothing(port: int, course_code: str, section_number: int) -> str | None:
+    """'<course> section <n>' when `port` carries another preview's claim
+    that does not prove its holder (so this run will take it over), else
+    None. preview.sh asks this before the build, for its trail line; the
+    take-over itself is claim_the_preview_address's."""
+    held = _read_the_claim(_the_claim_on(port))
+    if held is None:
+        return None
+    if held.get("course") == course_code and held.get("section") == int(section_number):
+        return None
+    if _the_claim_proves_its_holder(held):
+        return None
+    return f"{held.get('course')} section {held.get('section')}"
+
+
+def _end_normally_when_stopped():
+    """SIGTERM (what a stop sends first) and SIGHUP (a closed terminal)
+    become an ordinary exit, so the claim is given back by atexit. SIGINT
+    already is one (KeyboardInterrupt)."""
+    def _stopped(number, frame):
+        raise SystemExit(128 + number)
+    for name in ("SIGTERM", "SIGHUP"):
+        number = getattr(signal, name, None)
+        if number is None:
+            continue
+        try:
+            if signal.getsignal(number) in (signal.SIG_DFL, None):
+                signal.signal(number, _stopped)
+        except (OSError, ValueError):
+            pass
 
 
 def claim_the_preview_address(port: int, course_code: str, section_number: int) -> str | None:
@@ -1217,18 +1294,15 @@ def claim_the_preview_address(port: int, course_code: str, section_number: int) 
         return None
     import atexit
     folder = _the_preview_claims_folder()
-    mine = {"pid": os.getpid(), "course": course_code, "section": int(section_number)}
-    claim = folder / f"plantoir-preview-address-{int(port)}.claim"
+    mine = {"pid": os.getpid(), "started": _when_a_process_started(os.getpid()),
+            "course": course_code, "section": int(section_number)}
+    claim = _the_claim_on(port)
     with open(folder / "plantoir-preview-addresses.lock", "a") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-        try:
-            held = json.loads(claim.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            held = None
-        if isinstance(held, dict):
+        held = _read_the_claim(claim)
+        if held is not None:
             same = held.get("course") == course_code and held.get("section") == int(section_number)
-            pid = held.get("pid") if isinstance(held.get("pid"), int) else 0
-            if not same and pid != os.getpid() and _a_live_build_process(pid):
+            if not same and held.get("pid") != os.getpid() and _the_claim_proves_its_holder(held):
                 return f"{held.get('course')} section {held.get('section')}"
         writing = _a_private_temporary_beside(claim, ".plantoir-preview-address.")
         writing.write_text(json.dumps(mine), encoding="utf-8")
@@ -1238,15 +1312,14 @@ def claim_the_preview_address(port: int, course_code: str, section_number: int) 
         try:
             with open(folder / "plantoir-preview-addresses.lock", "a") as lock:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-                try:
-                    if json.loads(claim.read_text(encoding="utf-8")).get("pid") == os.getpid():
-                        claim.unlink()
-                except (OSError, ValueError, AttributeError):
-                    pass
+                now = _read_the_claim(claim)
+                if now is not None and now.get("pid") == os.getpid() and now.get("started") == mine["started"]:
+                    claim.unlink()
         except OSError:
             pass
 
     atexit.register(_give_the_address_back)
+    _end_normally_when_stopped()
     return None
 
 
@@ -7527,6 +7600,42 @@ def _replace_with_the_mode_of(temporary: Path, path: Path):
     os.replace(temporary, path)
 
 
+# The two prefixes only _atomic_write_json_with_backup uses for its own
+# temporaries, and how old one must be before a later write may remove it.
+_CONFIG_TEMPORARY_PREFIXES = (".course_config.backup.", ".course_config.")
+_A_STALE_CONFIG_TEMPORARY_SECONDS = 60
+
+
+def _remove_stale_config_temporaries(path: Path):
+    """A writer killed mid-write leaves its hidden temporary beside the
+    config, one per kill (#835 review L2). The next write removes those: only
+    names this writer alone makes (`.course_config.<random>.tmp` and
+    `.course_config.backup.<random>.tmp`), and only when older than a minute,
+    so another build's write in progress is never touched. Nothing else in
+    the course folder is looked at twice."""
+    import time
+    now = time.time()
+    try:
+        entries = list(path.parent.iterdir())
+    except OSError:
+        return
+    for entry in entries:
+        name = entry.name
+        if not name.endswith(".tmp"):
+            continue
+        ours = False
+        for prefix in _CONFIG_TEMPORARY_PREFIXES:
+            if name.startswith(prefix):
+                ours = True
+        if not ours:
+            continue
+        try:
+            if now - entry.lstat().st_mtime > _A_STALE_CONFIG_TEMPORARY_SECONDS and entry.is_file():
+                entry.unlink()
+        except OSError:
+            pass
+
+
 def _atomic_write_json_with_backup(path: Path, data: dict):
     """Write JSON atomically and back up original.
 
@@ -7538,6 +7647,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
     was not JSON, and one trial ENDED that way (2026-11-13). The backup is
     made the same way, copied to a temporary and renamed, so a reader never
     meets a half-copied backup either."""
+    _remove_stale_config_temporaries(path)
     try:
         if path.exists():
             backup = path.with_suffix(".backup.json")

@@ -4030,6 +4030,17 @@ else
   _EXEC_TTY="-i";  _PY_UNBUFFERED="-u"
 fi
 
+# A serving run whose address carries a claim left by a preview that is no
+# longer running takes the claim over (#835 review H1; build_site.py ->
+# claim_the_preview_address). Asked here, before the build, only so the
+# trail can say so: the take-over itself is build_site.py's, under its lock.
+if [[ -z "$BUILD_ONLY" ]]; then
+  _left_claim="$(docker exec "$CONTAINER_NAME" python3 -B -c 'import sys; sys.path.insert(0, "/opt/scripts"); import build_site; print(build_site.a_claim_that_proves_nothing(int(sys.argv[1]), sys.argv[2], int(sys.argv[3])) or "")' "$PREVIEW_PORT" "$COURSE" "$SECTION" 2>/dev/null | tail -n 1 || true)"
+  if [[ -n "$_left_claim" ]]; then
+    note_on_the_trail "${COURSE}/${SECTION} · a preview of ${_left_claim} that is no longer running had left its claim on this preview's address, so the claim was taken over"
+  fi
+fi
+
 docker exec $_EXEC_TTY "$CONTAINER_NAME" python3 $_PY_UNBUFFERED /opt/scripts/build_site.py \
   --host-os "$_PREVIEW_HOST_OS" \
   --course="$COURSE" \
