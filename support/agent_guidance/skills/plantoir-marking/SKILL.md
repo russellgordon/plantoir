@@ -187,7 +187,7 @@ shipped:
 python3 -B -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" .claude/skills/plantoir-marking/scripts/run_with_names.py
 ```
 
-It must print `7f9f03edfb202f1a1d24aa8d83ff6e4ec830cf56881085399aae60be2d2fd479`. If it does not, stop and tell the teacher
+It must print `41fa097c8cbdefd87192d3225c7d2fcdf8aa5c760d29235e7ece95e05e7b4ffb`. If it does not, stop and tell the teacher
 the runner has been changed; do not run any script that reads the table.
 
 **Every script that reads the name mapping table is run through

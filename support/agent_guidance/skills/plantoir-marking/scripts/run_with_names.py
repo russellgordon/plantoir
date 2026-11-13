@@ -24,7 +24,7 @@ passes anything on:
     counted by kind as NOT checked and moved to the quarantine folder unread, so it is not opened; a link is
     moved as a link, never followed;
   - a printed line that holds any form of a name is withheld, and counted.
-It then prints the lines that hold none, and three counts: read with no word from the table found in them, holding a word from the table
+It then prints the lines that hold none, and three counts: read and holding none of the forms of the table's names, holding a form
 and moved, and not checked and moved unread. Only folders it made, or wrote into, are moved. It exits 1 if anything was withheld, moved or left unchecked, and otherwise with the
 command's own exit code.
 
@@ -53,17 +53,21 @@ from pathlib import Path
 #   This file is never adapted. It never prints, logs or writes any value read from the table; it never
 #   prints a withheld line or the path of a quarantined file; it prints counts only about what it caught.
 
+# >>> The name comparison. ONE copy of the rules, carried byte for byte in run_with_names.py and in
+# make_named_copies.py (752 fix review H1: the runner, --check-file and --comments gave different answers on
+# 7 of 22 lines); scripts/test_marking_comments.py fails if the two copies differ, and runs all three over one
+# corpus. A form of a name counts when it is in the text: every part of a name of two letters or more as a
+# whole word (a short part on its own too: a missed name is worse than a false alarm), and every form of six
+# letters or more anywhere, inside another word as well. Whole words are found three ways at once: as \w+
+# (so an e-mail's local part such as an77 is one word), as runs of letters (so Ivo2, Ivo_notes and
+# Mark_feedback give Ivo and Mark), and split where a small letter meets a capital (so AnaLi gives Ana and Li).
 NAME_COLUMNS = ("name", "first name", "preferred name", "last name", "surname")
 EMAIL_COLUMNS = ("email", "e-mail")
 HANDLE_COLUMNS = ("handles", "handle", "username", "github")
 REPOSITORY_COLUMNS = ("repository", "repo")
 MINIMUM_LENGTH = 2
-SHORT_LENGTH = 4                 # a name part shorter than this counts only beside another part of its name
+SHORT_LENGTH = 4                 # a name part shorter than this is counted on its own as "short": it may be a word
 ANYWHERE_LENGTH = 6              # a form this long is matched inside other words, too
-
-
-class Refusal(Exception):
-    """A reason to stop, worded for the teacher, holding no value from the table."""
 
 
 def without_accents(text):
@@ -72,37 +76,19 @@ def without_accents(text):
 
 
 def folded(text):
-    """Case and accents taken off, so Zoë, ZOE and zoe are one word."""
+    """Case and accents taken off, so Qoë, QOE and qoe are one word."""
     return without_accents(unicodedata.normalize("NFC", text)).casefold()
-
-
-def read_rows(path):
-    try:
-        with open(path, newline="", encoding="utf-8-sig") as handle:
-            first_line = handle.readline()
-            handle.seek(0)
-            reader = csv.DictReader(handle, dialect="excel-tab" if "\t" in first_line else "excel")
-            rows = []
-            for row in reader:
-                cleaned = {}
-                for key in row:
-                    if key is not None:
-                        cleaned[key.strip().casefold()] = (row[key] or "").strip()
-                rows.append(cleaned)
-            return rows
-    except (OSError, UnicodeDecodeError, csv.Error):
-        raise Refusal("the mapping table could not be read")
 
 
 def tokens_from(rows):
     """Every form a name in the table could take, case and accents taken off, as (words, anywhere, short):
 
-    words     name parts of four letters or more, matched as whole words;
-    anywhere  forms of six letters or more (the whole name, the parts run together, an e-mail address,
-              a handle), matched anywhere, so a bundle id or a slug is caught;
-    short     name parts of two or three letters (Ho, Ed, Le, Ana), each with the other parts of the same
-              name: a short part counts only when another part of its name is there too, so an everyday
-              word such as "ale" or "hed" is not a name (750a fix review M3)."""
+    words     name parts of four letters or more, and short forms built from them, matched as whole words;
+    anywhere  forms of six letters or more (every such part, the whole name, the parts run together, an e-mail
+              address, a handle), matched anywhere, so a bundle id, a slug or a file name is caught;
+    short     name parts of two or three letters (Ho, Ed, Le, Ana), each with the other parts of its name. A
+              short part on its own counts (short_part_alone), and is reported apart, since it may be an
+              everyday word (750a fix review 2, M4)."""
     words = set()
     anywhere = set()
     short = {}
@@ -129,6 +115,8 @@ def tokens_from(rows):
         for part in parts:
             if len(folded(part)) >= SHORT_LENGTH:
                 words.add(folded(part))
+                if len(folded(part)) >= ANYWHERE_LENGTH:
+                    anywhere.add(folded(part))
             else:
                 partners = short.setdefault(folded(part), set())
                 for other in parts:
@@ -162,13 +150,25 @@ def tokens_from(rows):
     return words, anywhere, short
 
 
+def words_in(text):
+    """The whole words of a text, folded, found three ways (see the block's opening comment)."""
+    found = set()
+    for token in re.findall(r"\w+", text):
+        found.add(folded(token))
+        for run in re.findall(r"[^\W\d_]+", token):
+            found.add(folded(run))
+            for piece in re.findall(r"[^\W\d_][^\W\d_A-Z]*", run):
+                found.add(folded(piece))
+    return found
+
+
 def holds_a_name(text, names):
     words, anywhere, short = names
-    text = folded(text)
+    flat = folded(text)
     for token in anywhere:
-        if token in text:
+        if token in flat:
             return True
-    found = set(re.findall(r"\w+", text))
+    found = words_in(text)
     if found & words:
         return True
     for part, partners in short.items():
@@ -179,11 +179,41 @@ def holds_a_name(text, names):
 
 def short_part_alone(text, names):
     """True when a name part of two or three letters (Ng, Li, Ho) is in the text as a whole word without the rest
-    of its name. It cannot be told from an everyday word, so it is never passed on as clean (750a fix review 2, M4):
-    a line holding one is withheld, and a file is moved, each counted on its own."""
+    of its name. It cannot be told from an everyday word, so it is counted, never passed (750a fix review 2, M4)."""
     _words, _anywhere, short = names
-    found = set(re.findall(r"\w+", folded(text)))
-    return any(part in found for part in short)
+    found = words_in(text)
+    for part in short:
+        if part in found:
+            return True
+    return False
+
+
+def holds_any_form(text, names):
+    """The one answer all three give: does the text hold any form of a name the table holds?"""
+    return holds_a_name(text, names) or short_part_alone(text, names)
+# <<< The name comparison.
+
+
+class Refusal(Exception):
+    """A reason to stop, worded for the teacher, holding no value from the table."""
+
+
+def read_rows(path):
+    try:
+        with open(path, newline="", encoding="utf-8-sig") as handle:
+            first_line = handle.readline()
+            handle.seek(0)
+            reader = csv.DictReader(handle, dialect="excel-tab" if "\t" in first_line else "excel")
+            rows = []
+            for row in reader:
+                cleaned = {}
+                for key in row:
+                    if key is not None:
+                        cleaned[key.strip().casefold()] = (row[key] or "").strip()
+                rows.append(cleaned)
+            return rows
+    except (OSError, UnicodeDecodeError, csv.Error):
+        raise Refusal("the mapping table could not be read")
 
 
 def snapshot(folder):
@@ -423,7 +453,7 @@ def main(arguments):
         print(line)
     unread_total = len(unread_paths)
     print(f"run_with_names: {withheld} printed lines were withheld, each holding a word from your table.")
-    print(f"Files new or changed in the marking folder: {clean} read, and no word from your table found in them; "
+    print(f"Files new or changed in the marking folder: {clean} read, holding none of the forms of the names in your table; "
           f"{held_files} files and {held_folders} folders held a word from your table and were moved to the quarantine "
           f"folder; {unread_total} could not be read, so were NOT checked and were moved there unread" +
           (" (" + "; ".join(f"{count} {kind}" for kind, count in sorted(unread.items())) + ")" if unread else "") + ".")
@@ -444,7 +474,8 @@ def main(arguments):
         print("Not fully checked: do not open the files moved unread; the teacher can look at them in the "
               "quarantine folder, or the script can be changed to write text.")
     print("This is a safety net, not a guarantee: it catches the names in your table, in what the script printed "
-          "and what it wrote in the marking folder, and nothing else.")
+          "and what it wrote in the marking folder, and nothing else. A nickname, or a name that is not in your "
+          "table, cannot be seen.")
     if withheld or held_files or held_folders or unread_total or short_lines or short_files:
         return 1
     return result.returncode

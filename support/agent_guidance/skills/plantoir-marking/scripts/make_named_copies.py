@@ -83,17 +83,166 @@ FIRST_NAME_PLACEHOLDER = "first name"
 PRONOUN_PLACEHOLDERS = ("they", "them", "their", "theirs")
 PRONOUN_SETS = {"she/her": ("she", "her", "her", "hers"), "he/him": ("he", "him", "his", "his"),
                 "they/them": ("they", "them", "their", "theirs")}
-SHORT_PART = 4          # a SURNAME part shorter than this counts in a draft only beside another part of its name
-ANYWHERE_PART = 6       # a name part this long counts inside another word too (as run_with_names.py does)
-# A first name counts as a whole word at ANY length of two letters or more (Ixo, Qo), in a draft and in a
-# file: a short first name alone is still a child's name (752 review H1). --check-file, which decides what
-# the assistant may READ, counts every short part alone, surnames too, as run_with_names.py does.
-CHANGING_VERB = re.compile(r"\{[Tt]hey\}(?:'|\u2019|\s+(?:is|was|are|were|has|have|does|do|isn't|wasn't|aren't|weren't|"
-                           r"hasn't|haven't|doesn't|don't|isn\u2019t|wasn\u2019t|aren\u2019t|weren\u2019t|hasn\u2019t|"
-                           r"haven\u2019t|doesn\u2019t|don\u2019t)\b)", re.IGNORECASE)
+# After {they} or {They}, only a verb that reads the same for she, he and they is accepted: an ALLOW-list,
+# because a deny-list of auxiliaries let "They explains" through (752 fix review M2). Adverbs before it are
+# skipped; anything else (a present-tense verb, a contraction, "and", the end of the comment) is refused.
+UNCHANGING_AFTER_THEY = {"can", "could", "will", "would", "should", "might", "must", "may", "did", "had"}
+PAST_TENSE_IRREGULAR = {"made", "wrote", "took", "gave", "found", "knew", "showed", "chose", "drew", "got", "kept", "led",
+                        "left", "met", "put", "ran", "read", "said", "saw", "set", "spent", "stood", "thought", "told",
+                        "understood", "won", "built", "brought", "began", "came", "went", "grew", "caught", "taught",
+                        "held", "sought", "felt", "heard", "lost", "meant", "paid", "sent", "sat", "spoke", "threw",
+                        "wore", "worked", "did", "had", "drove", "flew", "forgot", "rose", "sang", "swam", "tried",
+                        "applied", "replied", "studied", "copied"}
+PRESENT_ENDING_IN_ED = {"need", "proceed", "succeed", "exceed", "feed", "bleed", "breed", "heed", "speed", "seed", "weed",
+                        "embed", "shred", "wed"}
+SKIPPED_BEFORE_THE_VERB = {"also", "always", "often", "still", "never", "now", "even", "again", "then", "first", "each",
+                           "both", "all", "already", "usually", "sometimes", "consistently", "clearly", "carefully"}
+THEY_PLACEHOLDER = re.compile(r"\{[Tt]hey\}")
+
 
 ESCAPES = [("\\", "\\textbackslash{}"), ("&", "\\&"), ("%", "\\%"), ("$", "\\$"), ("#", "\\#"), ("_", "\\_"),
            ("{", "\\{"), ("}", "\\}"), ("~", "\\textasciitilde{}"), ("^", "\\textasciicircum{}")]
+
+
+# >>> The name comparison. ONE copy of the rules, carried byte for byte in run_with_names.py and in
+# make_named_copies.py (752 fix review H1: the runner, --check-file and --comments gave different answers on
+# 7 of 22 lines); scripts/test_marking_comments.py fails if the two copies differ, and runs all three over one
+# corpus. A form of a name counts when it is in the text: every part of a name of two letters or more as a
+# whole word (a short part on its own too: a missed name is worse than a false alarm), and every form of six
+# letters or more anywhere, inside another word as well. Whole words are found three ways at once: as \w+
+# (so an e-mail's local part such as an77 is one word), as runs of letters (so Ivo2, Ivo_notes and
+# Mark_feedback give Ivo and Mark), and split where a small letter meets a capital (so AnaLi gives Ana and Li).
+NAME_COLUMNS = ("name", "first name", "preferred name", "last name", "surname")
+EMAIL_COLUMNS = ("email", "e-mail")
+HANDLE_COLUMNS = ("handles", "handle", "username", "github")
+REPOSITORY_COLUMNS = ("repository", "repo")
+MINIMUM_LENGTH = 2
+SHORT_LENGTH = 4                 # a name part shorter than this is counted on its own as "short": it may be a word
+ANYWHERE_LENGTH = 6              # a form this long is matched inside other words, too
+
+
+def without_accents(text):
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(character for character in decomposed if not unicodedata.combining(character))
+
+
+def folded(text):
+    """Case and accents taken off, so Qoë, QOE and qoe are one word."""
+    return without_accents(unicodedata.normalize("NFC", text)).casefold()
+
+
+def tokens_from(rows):
+    """Every form a name in the table could take, case and accents taken off, as (words, anywhere, short):
+
+    words     name parts of four letters or more, and short forms built from them, matched as whole words;
+    anywhere  forms of six letters or more (every such part, the whole name, the parts run together, an e-mail
+              address, a handle), matched anywhere, so a bundle id, a slug or a file name is caught;
+    short     name parts of two or three letters (Ho, Ed, Le, Ana), each with the other parts of its name. A
+              short part on its own counts (short_part_alone), and is reported apart, since it may be an
+              everyday word (750a fix review 2, M4)."""
+    words = set()
+    anywhere = set()
+    short = {}
+
+    def add_anywhere(form):
+        form = folded(form)
+        if len(form) >= ANYWHERE_LENGTH:
+            anywhere.add(form)
+        elif len(form) >= MINIMUM_LENGTH:
+            words.add(form)
+
+    for row in rows:
+        parts = []
+        for column in NAME_COLUMNS:
+            value = row.get(column, "")
+            if not value:
+                continue
+            add_anywhere(value)
+            for part in re.split(r"[\s,]+", value):
+                part = part.strip(".'\"()")
+                for piece in [part] + re.split(r"[-'’]", part):
+                    if len(piece) >= MINIMUM_LENGTH and folded(piece) not in [folded(seen) for seen in parts]:
+                        parts.append(piece)
+        for part in parts:
+            if len(folded(part)) >= SHORT_LENGTH:
+                words.add(folded(part))
+                if len(folded(part)) >= ANYWHERE_LENGTH:
+                    anywhere.add(folded(part))
+            else:
+                partners = short.setdefault(folded(part), set())
+                for other in parts:
+                    if folded(other) != folded(part):
+                        partners.add(folded(other))
+        for first in parts:
+            for second in parts:
+                if folded(first) != folded(second):
+                    add_anywhere(first + second)
+                    add_anywhere(first[0] + second)
+                    for joiner in (".", "-", "_"):
+                        add_anywhere(first + joiner + second)
+        for column in EMAIL_COLUMNS:
+            value = row.get(column, "")
+            if "@" in value:
+                add_anywhere(value)
+                local = value.split("@")[0]
+                add_anywhere(local)
+                add_anywhere(local.split("+")[-1])
+        for column in HANDLE_COLUMNS:
+            for handle in re.split(r"[\s,;]+", row.get(column, "")):
+                add_anywhere(handle.strip("@"))
+        for column in REPOSITORY_COLUMNS:
+            address = row.get(column, "")
+            match = re.search(r"(?:github\.com|gitlab\.com|bitbucket\.org)[/:]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", address)
+            if match:
+                for piece in match.groups():
+                    add_anywhere(piece)
+            elif address:
+                add_anywhere(address)
+    return words, anywhere, short
+
+
+def words_in(text):
+    """The whole words of a text, folded, found three ways (see the block's opening comment)."""
+    found = set()
+    for token in re.findall(r"\w+", text):
+        found.add(folded(token))
+        for run in re.findall(r"[^\W\d_]+", token):
+            found.add(folded(run))
+            for piece in re.findall(r"[^\W\d_][^\W\d_A-Z]*", run):
+                found.add(folded(piece))
+    return found
+
+
+def holds_a_name(text, names):
+    words, anywhere, short = names
+    flat = folded(text)
+    for token in anywhere:
+        if token in flat:
+            return True
+    found = words_in(text)
+    if found & words:
+        return True
+    for part, partners in short.items():
+        if part in found and (found & partners or not partners):
+            return True
+    return False
+
+
+def short_part_alone(text, names):
+    """True when a name part of two or three letters (Ng, Li, Ho) is in the text as a whole word without the rest
+    of its name. It cannot be told from an everyday word, so it is counted, never passed (750a fix review 2, M4)."""
+    _words, _anywhere, short = names
+    found = words_in(text)
+    for part in short:
+        if part in found:
+            return True
+    return False
+
+
+def holds_any_form(text, names):
+    """The one answer all three give: does the text hold any form of a name the table holds?"""
+    return holds_a_name(text, names) or short_part_alone(text, names)
+# <<< The name comparison.
 
 
 class Refusal(Exception):
@@ -226,20 +375,6 @@ def check_table(table):
 
 # MARK: - Report card comments (#752)
 
-def folded(text):
-    """Case and accents taken off, so Qoë, QOE and qoe are one word (as run_with_names.py compares)."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    kept = []
-    for character in decomposed:
-        if not unicodedata.combining(character):
-            kept.append(character)
-    return "".join(kept).casefold()
-
-
-def letter_runs(text):
-    return re.findall(r"[^\W\d_]+", folded(text))
-
-
 def first_name_of(row):
     """The first name column, else the part after the comma of a name written "Last, First", else None."""
     given = row.get(FIRST_NAME_COLUMN, "")
@@ -269,65 +404,30 @@ def pronouns_of(row):
     return None
 
 
-def name_parts_of(rows):
-    """For every row, (the parts of its name and first name, the parts of its first name), folded. With no
-    first name to be read, every part of the name counts as a first name's would."""
-    everyone = []
-    for row in rows.values():
-        parts = []
-        for column in (NAME_COLUMN, FIRST_NAME_COLUMN):
-            for run in letter_runs(row.get(column, "")):
-                if len(run) >= 2 and run not in parts:
-                    parts.append(run)
-        first = first_name_of(row)
-        firsts = []
-        for run in letter_runs(first if first is not None else row.get(NAME_COLUMN, "")):
-            if len(run) >= 2 and run not in firsts:
-                firsts.append(run)
-        everyone.append((parts, firsts))
-    return everyone
+def names_in(rows):
+    """The table's forms of every name, as the runner builds them (the shared block above)."""
+    return tokens_from(list(rows.values()))
 
 
-def words_from_the_table(text, everyone, every_short_part_alone=False):
-    """1-based positions of the words in text that hold a part of a name in the table, counting each
-    placeholder as one word. Never the word itself. A first name's part counts as a whole word at any length;
-    a surname's part of two or three letters only beside another part of its name, unless
-    every_short_part_alone (--check-file), when it counts on its own as well, as in run_with_names.py."""
-    words = PLACEHOLDER.sub("\x00", text).split()
-    runs_by_word = []
-    for word in words:
-        runs_by_word.append(letter_runs(word.replace("\x00", " ")))
+def words_from_the_table(text, names):
+    """1-based positions of the words in text that hold a form of a name in the table, counting each
+    placeholder as one word, by the one comparison the runner makes. Never the word itself. A text that holds
+    a form across words (none is known today) gives position 0."""
+    plain = PLACEHOLDER.sub("\x00", text)
+    if not holds_any_form(plain.replace("\x00", " "), names):
+        return []
     positions = []
-    for index, runs in enumerate(runs_by_word):
-        beside = []
-        if index > 0:
-            beside.extend(runs_by_word[index - 1])
-        if index + 1 < len(runs_by_word):
-            beside.extend(runs_by_word[index + 1])
-        found = False
-        for parts, firsts in everyone:
-            for part in parts:
-                if len(part) >= ANYWHERE_PART:
-                    for run in runs:
-                        if part in run:
-                            found = True
-                elif len(part) >= SHORT_PART or part in firsts or every_short_part_alone:
-                    if part in runs:
-                        found = True
-                elif part in runs:
-                    for other in parts:
-                        if other != part and (other in beside or other in runs):
-                            found = True
-        if found:
-            positions.append(index + 1)
-    return positions
+    for index, word in enumerate(plain.split(), start=1):
+        if holds_any_form(word.replace("\x00", " "), names):
+            positions.append(index)
+    return positions or [0]
 
 
-def lines_from_the_table(text, everyone, every_short_part_alone=False):
-    """1-based line numbers of the lines in text that hold a part of a name in the table."""
+def lines_from_the_table(text, names):
+    """1-based line numbers of the lines in text that hold a form of a name in the table."""
     numbers = []
     for number, line in enumerate(text.splitlines(), start=1):
-        if words_from_the_table(line, everyone, every_short_part_alone):
+        if holds_any_form(line, names):
             numbers.append(number)
     return numbers
 
@@ -464,14 +564,17 @@ def check_file(table, path):
         text = Path(path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         raise Refusal("the file could not be read as text; it was not checked, so do not open it")
-    numbers = lines_from_the_table(text, name_parts_of(rows), every_short_part_alone=True)
+    numbers = lines_from_the_table(text, names_in(rows))
     if numbers:
         print("A word from your mapping table is on " + plural(len(numbers), "line") + " of the file (line "
-              + ", ".join(str(number) for number in numbers) + "). Do not open it until the teacher has changed it.")
+              + ", ".join(str(number) for number in numbers) + "). It could be a name, or an everyday word that is "
+              "also a name in your table. Do not open the file: ask the teacher to read that line, and to change it, "
+              "or, if it is not about a student, to tell you to go on, naming the line.")
         return 1
-    print(f"Looked for every part of every name in your mapping table in {plural(len(text.splitlines()), 'line')} "
-          "of the file, and found none. This cannot see a nickname, initials, or a name that is not in your table: "
-          "the teacher reads the file once for those before it is opened.")
+    print(f"Looked for the forms of the {plural(len(rows), 'name')} in your mapping table in "
+          f"{plural(len(text.splitlines()), 'line')} of the file, and found none of them. A nickname, initials, or a "
+          "name that is not in your table cannot be seen by this check: the teacher reads the file once for those "
+          "before it is opened.")
     return 0
 
 
@@ -495,14 +598,51 @@ def set_earlier_run_aside(out):
     return renamed
 
 
-def is_own_cite(cite, section, identifier):
-    """A cite is this student's own marks record (ends Section N/<identifier>.json) or the teacher's notes."""
-    text = cite.replace("\\", "/")
-    for own in (f"Section {section}/{identifier}.json", "Teacher Notes.md"):
-        if text == own or text.endswith("/" + own):
-            return True
-    return False
+def changing_verb_after_they(option):
+    """1-based word positions (each placeholder one word) of a word after {they} that may change with the
+    pronoun: everything but a modal, did, had, or a past tense, once adverbs are skipped."""
+    plain = PLACEHOLDER.sub(lambda found: "\x00they\x00" if found.group(1) in ("they", "They") else "\x00", option)
+    words = plain.split()
+    positions = []
+    for index, word in enumerate(words):
+        if word != "\x00they\x00" and not word.startswith("\x00they\x00"):
+            continue
+        if word != "\x00they\x00":           # glued to it: {they}'s, {they}'re, {They},
+            positions.append(index + 1)
+            continue
+        verdict = index + 1
+        for later in range(index + 1, len(words)):
+            bare = re.sub(r"[^A-Za-z'\u2019]", "", words[later]).lower()
+            if bare in SKIPPED_BEFORE_THE_VERB or (bare.endswith("ly") and len(bare) > 4):
+                continue
+            accepted = (bare in UNCHANGING_AFTER_THEY or bare in PAST_TENSE_IRREGULAR or
+                        (bare.endswith("ed") and bare not in PRESENT_ENDING_IN_ED))
+            verdict = None if accepted else later + 1
+            break
+        if verdict is not None:
+            positions.append(verdict)
+    return positions
 
+
+def own_record(cite, section, identifier, marking_folder, comments_folder):
+    """True only for this student's own marks record, a file inside this marking folder at
+    <Assessment>/Marks/Section N/<identifier>.json: a relative path with no "..", not absolute, not in the
+    comments folder, and there (752 fix review L1)."""
+    text = cite.replace("\\", "/")
+    if not text or text.startswith("/") or re.match(r"^[A-Za-z]:", text):
+        return False
+    parts = text.split("/")
+    if ".." in parts or "." in parts or "" in parts or len(parts) != 4:
+        return False
+    assessment, marks, section_folder, file_name = parts
+    if marks != "Marks" or section_folder != f"Section {section}" or file_name != f"{identifier}.json":
+        return False
+    if assessment.startswith(".") or (marking_folder / assessment).resolve() == comments_folder.resolve():
+        return False
+    path = (marking_folder / text).resolve()
+    if marking_folder.resolve() not in path.parents:
+        return False
+    return path.is_file()
 
 def make_comments(table, comments, out, limit, count):
     comments = Path(comments).resolve()
@@ -525,7 +665,7 @@ def make_comments(table, comments, out, limit, count):
         raise Refusal("--limit is a whole number of characters; nothing was written")
     columns, rows = read_table_rows(table)
     has_pronouns_column = PRONOUNS_COLUMN in columns
-    everyone = name_parts_of(rows)
+    everyone = names_in(rows)
     students = read_drafts(comments)
     problems = []
     written = []
@@ -549,9 +689,10 @@ def make_comments(table, comments, out, limit, count):
         if not isinstance(cites, list):
             cites = [cites]
         for cite in cites:
-            if not isinstance(cite, str) or not is_own_cite(cite, section, identifier):
-                problems.append(f"{label}: cites a record that is not this student's own (each record it cites must "
-                                f"end Section {section}/{identifier}.json)")
+            if not isinstance(cite, str) or not own_record(cite, section, identifier, marking_folder, comments.parent):
+                problems.append(f"{label}: cites something that is not this student's own marks record in this marking "
+                                f"folder (each cite is <Assessment>/Marks/Section {section}/{identifier}.json, and that "
+                                "file must be there)")
                 break
         if not options:
             not_drafted.append(label)
@@ -563,11 +704,14 @@ def make_comments(table, comments, out, limit, count):
             positions = words_from_the_table(option, everyone)
             if positions:
                 problems.append(f"{label} option {number}: word " + ", ".join(str(place) for place in positions) +
-                                " holds a word from your mapping table before the names went in")
+                                " holds a word from your mapping table before the names went in (it could be a name, "
+                                "or an everyday word that is also a name in your table: rewrite this option without it)")
                 continue
-            if CHANGING_VERB.search(option):
-                problems.append(f"{label} option {number}: a verb after {{they}} changes with the pronoun (they were, "
-                                "she was): write one that does not, such as a verb in the past tense other than was")
+            verbs = changing_verb_after_they(option)
+            if verbs:
+                problems.append(f"{label} option {number}: word " + ", ".join(str(place) for place in verbs) +
+                                " after {they} may change with the pronoun (they were, she was; they explain, she "
+                                "explains): write a past tense other than was or were, or can or would")
                 continue
             text, why = filled(option, row, has_pronouns_column)
             if text is None:
@@ -586,7 +730,8 @@ def make_comments(table, comments, out, limit, count):
         numbers = lines_from_the_table(drafts_text, everyone)
         if numbers:
             problems.append(f"{DRAFTS_PAGE}: a word from your mapping table is on {plural(len(numbers), 'line')} (line "
-                            + ", ".join(str(number) for number in numbers) + ")")
+                            + ", ".join(str(number) for number in numbers) + "; it could be a name, or an everyday word "
+                            "that is also a name in your table: rewrite that line without it)")
     if problems:
         for problem in problems:
             print(problem)
@@ -647,7 +792,7 @@ def make_comments(table, comments, out, limit, count):
               "names in: rewrite each one named above and run this again.")
     else:
         print(f"Every comment written is within the limit of {plural(limit, unit)}, counted with the first names in.")
-    print("The named comments are in your teacher-only folder. I have not opened them, and will not.")
+    print("The named comments are in your teacher-only folder. I have not opened them, and I do not open them.")
     return 1 if over_the_limit else 0
 
 
@@ -703,7 +848,7 @@ def make_copies(table, sheets, out):
         failures += len(failed) + len(missing)
     if left_alone:
         print(f"{left_alone} files or folders not named like a sheet were left alone")
-    print("Named copies are in your teacher-only folder. I have not opened them, and will not.")
+    print("Named copies are in your teacher-only folder. I have not opened them, and I do not open them.")
     return 0 if failures == 0 else 1
 
 

@@ -76,6 +76,16 @@ def set_up(case, root):
     teacher.mkdir(parents=True, exist_ok=True)
     table = teacher / "Name Mapping Table.csv"
     table.write_text(case["table"], encoding="utf-8")
+    if not case.get("recordsNotWritten"):
+        # Each cite is written as a record in the marking folder, so the script's "and that file must be there"
+        # is what decides; a cite that leaves the folder is never written.
+        for entry in case["students"]:
+            for cite in entry.get("cites", []):
+                parts = cite.split("/")
+                if not cite.startswith("/") and ".." not in parts:
+                    record = marking / cite
+                    record.parent.mkdir(parents=True, exist_ok=True)
+                    record.write_text("{}", encoding="utf-8")
     if case.get("out") == "marking":
         out = marking / "Term 1 Comments" / "Named"
     elif case.get("out") == "elsewhere":
@@ -107,6 +117,24 @@ def written_rows(out):
             rows.append({"section": int(row["section"]), "identifier": row["identifier"], "option": int(row["option"]),
                          "comment": row["comment"], "size": int(row[unit]), "over": int(row["over the limit by"])})
     return rows
+
+
+# The 752 fix review's corpus (h1.py), and more: a name in every shape a teacher or a script might write one,
+# and lines that hold none. Invented names; Max, May, Will, Mark and Ed are the everyday-word names the review
+# asked about, held as a false alarm on purpose (a missed name is worse than a false alarm).
+CORPUS = [
+    "Ixo led the group project well.", "Ixo's answers were neat.", "IxoNg compared answers.", "AnaLi worked on B2.",
+    "ana.li worked on B2.", "Ixo2 was absent.", "Ixo_notes were filed.", "See Mark_feedback.pdf for detail.",
+    "Bix was helpful in class.", "Contact an77 about the retest.", "Max marks for part B.", "Full marks in May.",
+    "The mark scheme was followed.", "Mark scheme applied to every question.", "She showed the will to keep going.",
+    "Will check the units next time.", "Ed. note: question 4 was re-marked.", "Li is the symbol for lithium.",
+    "An answer was missing in part C.", "Ana answered every part.", "The ratio is ng per mL.", "Ng worked hard.",
+    "Testpart2.txt was written.", "TestpartFeedback.txt was written.", "Quillfamilynotes were filed.",
+    "IXO finished first.", "ixo.testfamily@example.org wrote in.", "Section_2.txt was written.",
+    "Every part was complete.", "The units were right in part B.", "Balanced equations throughout.",
+]
+CORPUS_WITHOUT_A_NAME = {"An answer was missing in part C.", "Section_2.txt was written.", "Every part was complete.",
+                         "The units were right in part B.", "Balanced equations throughout."}
 
 
 class CommentNameCaseTests(unittest.TestCase):
@@ -182,9 +210,59 @@ class CommentNameCaseTests(unittest.TestCase):
                     self.assertEqual(result.returncode, case["exit"], said)
                     for line in case["says"]:
                         self.assertIn(line, said)
-                    self.assertNotIn("clean", result.stdout.split("run_with_names:")[0])
+                    self.assertNotIn("clean", said.casefold())
                     for word in table_words(case["table"]):
                         self.assertIsNone(re.search(r"\b" + re.escape(word) + r"\b", said.casefold()), "a name was printed")
+
+    def test_the_runner_and_this_script_carry_one_name_comparison(self):
+        # 752 fix review H1: one set of rules, carried byte for byte in both files.
+        def block(path):
+            text = path.read_text(encoding="utf-8")
+            start = text.index("# >>> The name comparison.")
+            return text[start:text.index("# <<< The name comparison.", start)]
+        self.assertEqual(block(RUNNER), block(SCRIPT))
+
+    def test_the_runner_check_file_and_comments_agree_on_every_line(self):
+        # 752 fix review H1: one corpus, three ways; ANY disagreement fails.
+        table_text = ("section,identifier,name,first name,preferred name,email\n"
+                      '1,Student A,"Testfamily, Ixo",Ixo,,ixo.testfamily@example.org\n'
+                      '1,Student B,"Ng, Alphaname",Alphaname,,an77@example.org\n'
+                      '1,Student C,"Quillfamily, Max",Max,,\n'
+                      '1,Student D,"Plumfamily, May",May,,\n'
+                      '1,Student E,"Zedfamily, Mark",Mark,Bix,\n'
+                      '1,Student F,"Li, Ana",Ana,,\n'
+                      '1,Student G,"Testpart, Will",Will,,\n'
+                      '1,Student H,"Qorvath, Ed",Ed,,\n')
+        disagreements = []
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            marking, teacher = folders(root)
+            (marking / "Term 1 Comments").mkdir(parents=True)
+            teacher.mkdir()
+            table = teacher / "Name Mapping Table.csv"
+            table.write_text(table_text, encoding="utf-8")
+            for line in CORPUS:
+                notes = marking / "Term 1 Comments" / "Teacher Notes.md"
+                notes.write_text("Student A: fine.\n" + line + "\n", encoding="utf-8")
+                checked = subprocess.run([sys.executable, "-B", str(SCRIPT), "--check-file", str(notes), "--table", str(table)],
+                                         capture_output=True, text=True, encoding="utf-8")
+                notes.unlink()
+                ran = subprocess.run([sys.executable, "-B", str(RUNNER), "--table", str(table), "--watch", str(marking),
+                                      "--quarantine", str(teacher / "Quarantine"), "--", sys.executable, "-c",
+                                      "import sys; print(sys.argv[1])", line], capture_output=True, text=True, encoding="utf-8")
+                drafts = marking / "Term 1 Comments" / "Comments.json"
+                drafts.write_text(json.dumps({"students": [{"section": 1, "identifier": "Student C", "cites": [],
+                                                            "options": [line, "Good work.", "Fine."]}]}), encoding="utf-8")
+                drafted = subprocess.run([sys.executable, "-B", str(SCRIPT), "--comments", str(drafts), "--table", str(table),
+                                          "--out", str(teacher / "Named"), "--limit", "2000"],
+                                         capture_output=True, text=True, encoding="utf-8")
+                drafts.unlink()
+                answers = (checked.returncode == 1, ("\n" + line + "\n") not in ("\n" + ran.stdout),
+                           "option 1: word" in drafted.stdout and "holds a word from your mapping table" in drafted.stdout)
+                if len(set(answers)) != 1 or answers[0] != (line not in CORPUS_WITHOUT_A_NAME):
+                    disagreements.append(f"check-file={int(answers[0])} runner={int(answers[1])} "
+                                         f"comments={int(answers[2])}: line {CORPUS.index(line) + 1}")
+        self.assertEqual(disagreements, [])
 
     def test_a_refused_run_renames_the_earlier_named_comments(self):
         # 752 implementation review L2: a refused run left the last run's comments looking current.
@@ -238,7 +316,7 @@ class CommentNameCaseTests(unittest.TestCase):
                                    capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(clean.returncode, 0, clean.stdout)
             self.assertIn("and found none", clean.stdout)
-            self.assertIn("cannot see a nickname", clean.stdout, "the line must say what it cannot see")
+            self.assertIn("cannot be seen by this check", clean.stdout, "the line must say what it cannot see")
 
     def test_its_own_self_test_passes(self):
         result = subprocess.run([sys.executable, "-B", str(SCRIPT), "--self-test"], capture_output=True, text=True)
@@ -303,20 +381,22 @@ class SkillFileTests(unittest.TestCase):
             self.assertIsNone(re.search(r"\b(he|she|his|her|him|hers)\b", example, re.IGNORECASE), example)
             self.assertLessEqual(len(example.replace("{first name}", "Bartholomewina")), 450, example)
 
-    def test_the_shipped_scripts_keep_to_what_python_3_9_has(self):
-        # 752 implementation review H2: Path.write_text(newline=) is 3.10+, and macOS's own python3 is 3.9, so
-        # --comments crashed there and the self-test, which the marking skill makes a gate, failed.
-        for skill in ("plantoir-marking", "plantoir-report-comments", "plantoir-test-authoring"):
-            for path in sorted((SKILLS / skill).rglob("*.py")):
-                source = path.read_text(encoding="utf-8")
-                self.assertIsNone(re.search(r"\.(write_text|read_text)\([^)]*newline=", source), str(path))
-                self.assertIsNone(re.search(r"zip\([^)]*strict=", source), str(path))
-                self.assertIsNone(re.search(r"^\s*match \S.*:\s*$", source, re.MULTILINE), str(path))
-
     @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no /usr/bin/python3 here (macOS's own Python)")
-    def test_the_self_test_passes_on_the_systems_own_python(self):
-        result = subprocess.run(["/usr/bin/python3", "-B", str(SCRIPT), "--self-test"], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+    def test_every_shipped_script_compiles_and_self_tests_on_the_systems_own_python(self):
+        # 752 implementation review H2 and fix review L2: macOS's own python3 is 3.9, and a regex guard for
+        # 3.10-only features missed most of them. The honest check is to run the files there.
+        checker = SKILLS / "plantoir-test-authoring" / "scripts" / "check_kit.py"
+        for path in sorted(SKILLS.rglob("*.py")):
+            compiled = subprocess.run(["/usr/bin/python3", "-B", "-c",
+                                       "import sys; compile(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1], 'exec')",
+                                       str(path)], capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, f"{path.relative_to(SKILLS)}: {compiled.stderr[-300:]}")
+            source = path.read_text(encoding="utf-8")
+            if "--self-test" in source and path.name != "run_with_names.py":
+                result = subprocess.run(["/usr/bin/python3", "-B", str(path), "--self-test", "--checker", str(checker)],
+                                        capture_output=True, text=True, cwd=tempfile.gettempdir())
+                self.assertEqual(result.returncode, 0, f"{path.relative_to(SKILLS)}: {(result.stdout + result.stderr)[-300:]}")
+                self.assertIn("self-test passed", result.stdout, str(path.relative_to(SKILLS)))
 
     def test_no_file_carries_a_firearms_context(self):
         for path in sorted(SKILL.rglob("*")):

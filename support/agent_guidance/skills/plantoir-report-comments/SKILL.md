@@ -170,7 +170,10 @@ first.
   ```
 
   If it names lines, tell the teacher the line numbers and do not open
-  the file until they have changed them. Cite the notes as the teacher's.
+  the file until they have changed them, or have told you, naming the
+  line, that it is not about a student (a name in the table can also be an
+  everyday word). Say in the comment's entry that it draws on the notes
+  (`"teacherNotes": true`); `cites` holds marks records only.
 
 ## 6. How the name appears
 
@@ -187,9 +190,11 @@ column (the teacher fills it; you never see it), you may write `{they}`,
 column (`she/her`, `he/him`, `they/them`, the same with a third word such
 as `she/her/hers`, or four words such as `xe/xem/xyr/xyrs`). "They" takes
 "were" where "she" takes "was", so after a pronoun placeholder write only a
-verb that does not change ("{They} explained", never "{They} was" or
-"{They} is"): the script refuses a draft with is, was, are, were, has,
-have, does or do after `{they}`, whatever the table holds. It refuses any
+verb that does not change ("{They} explained", never "{They} was",
+"{They} is" or "{They} explains"): after `{they}` the script accepts
+only can, could, will, would, should, might, must, may, did, had or a past
+tense, with adverbs skipped, and refuses anything else, whatever the table
+holds. It refuses any
 other placeholder too, and a pronoun placeholder the table cannot fill.
 
 ## 7. Length is checked after the names go in
@@ -229,8 +234,9 @@ script that reads the name mapping table is run through
    when any draft needs fixing, and says which: a placeholder it does not
    know or cannot fill, a student it cannot find, a cite that is not that
    student's own record, or a draft that already holds a word from the
-   mapping table (any part of a first name, however short), which it names
-   by option and word number, never the word. That last may be a name you
+   mapping table (any part of any name in it, however short, a preferred
+   name and an e-mail address too, compared exactly as the runner
+   compares), which it names by option and word number, never the word. That last may be a name you
    were not meant to
    see, or an everyday word that is also someone's name (May, Will, Stone):
    either way, rewrite that option without the word, and do not repeat it.
@@ -255,9 +261,11 @@ Write the drafts as `<Term> Comments/Comments.json`:
 {"term": "Term 1", "students": [{"section": 1, "identifier": "Student A", "cites": ["Unit 2 Test/Marks/Section 1/Student A.json"], "options": ["{first name} ...", "...", "..."]}]}
 ```
 
-`cites` lists the records each student's options draw on: only that
-student's own (`Section N/Student A.json` for Section N's Student A), and
-the teacher's `Teacher Notes.md`; the script refuses any other. A student with
+`cites` lists the marks records each student's options draw on: only that
+student's own, as paths inside the marking folder
+(`<Assessment>/Marks/Section N/Student A.json` for Section N's Student A),
+each of which must be there; the script refuses any other, a path with
+`..` or a full path included. A student with
 nothing to draft from has `"options": []`. Then write `Comments -
 Drafts.md` beside it for the teacher: the sentence from section 1 under
 its title, then each identifier with its three options and each one's

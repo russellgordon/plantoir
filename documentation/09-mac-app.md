@@ -5275,8 +5275,10 @@ the trail, because it would be student data.
   path) to `Quarantine/`, counting both. Since the 750a review (H3) it
   tries not to say "checked" of a file it could not read: it reads UTF-16, gzip,
   a zip's members (xlsx, docx), a PNG's text chunks and a PDF's metadata
-  and XMP; it reports read with no word from the table found (it said "read
-  and clean" until the 752 review, H1), moved, and NOT checked by kind, and
+  and XMP; it reports read and holding none of the forms of the table's
+  names (it said "read and clean" until the 752 review, H1; its last line
+  says a nickname or a name not in the table cannot be seen), moved, and
+  NOT checked by kind, and
   exits 1 when anything was not checked. MEASURED before: an xlsx, a gzip
   file, UTF-16 text, a PNG's zTXt chunk and a PDF's title each holding a
   name were "checked, 0 held a name", and a folder named by a name stayed
@@ -5409,12 +5411,17 @@ script, because two copies of the name step drift.
   `{them}`, `{their}`, `{theirs}` (capitalised at a sentence's start),
   filled from that column (`she/her`, `he/him`, `they/them`, the same with a
   third word such as `she/her/hers`, or four words); a pronoun placeholder
-  with no column, or with an empty value, refuses the run. A verb that
-  changes with the pronoun (is, was, are, were, has, have, does, do, their
-  negatives, a contraction) straight after `{they}` is REFUSED at the draft,
-  whatever the table holds. MEASURED by the review (M2): with they/them the
-  first version wrote "They was proud of their work, and they is
-  improving.", which is the misgendering the rule exists to avoid.
+  with no column, or with an empty value, refuses the run. After `{they}`
+  or `{They}` only an ALLOW-list is accepted: can, could, will, would,
+  should, might, must, may, did, had, a past tense in -ed (need, proceed
+  and their like excluded) or a short list of irregular past forms, with
+  adverbs skipped; anything else, or anything glued to the placeholder, is
+  REFUSED at the draft, by word number, whatever the table holds. MEASURED
+  by the reviews: with they/them the first version wrote "They was proud of
+  their work, and they is improving." (M2), and the deny-list of auxiliaries
+  that fixed it still wrote "They explains" and "They always was careful"
+  (fix review M2); under a present-tense convention every verb after
+  `{they}` changes, so the skill steers such a teacher to `{first name}`.
   REJECTED: conjugating the verb at the fill, because a refusal can be
   proved by cases and a conjugator for every verb cannot. The first name is the `first name` column, else the part after the
   comma of "Last, First", and otherwise refused, never guessed from a name
@@ -5423,19 +5430,46 @@ script, because two copies of the name step drift.
   nothing, when a draft already holds a word from the table before the
   names go in: in an option (named by option and word number, never the
   word), in another field of the student's entry such as `cites`, or on a
-  line of `Comments - Drafts.md` beside it. It compares case and accents
-  off, with every part of a first name as a whole word at ANY length of two
-  letters or more (review H1: "{first name} and Ixo compared answers" was
-  written into another child's comment, because a short part counted only
-  beside another part of its name), any part of six letters or more inside a
-  word, and a surname's part of four or more as a whole word and of two or
-  three only beside another part of its name, so a surname such as To does
-  not refuse every comment. It also refuses a `cites` entry that is not that
-  student's own record (`Section N/<identifier>.json`, or the teacher's
-  notes): MEASURED by the review (M1), Student A's comment citing Student
-  AA's record, or Section 2's Student A drafted under Section 1, was written
-  with exit 0, and the reviewer given "the records they cite" would have
-  checked it against the wrong child. This is what catches a comment that quotes a student's work
+  line of `Comments - Drafts.md` beside it. **The comparison is ONE block of
+  code** ("The name comparison", between `# >>>` and `# <<<` markers),
+  carried byte for byte in `run_with_names.py` and `make_named_copies.py`,
+  so the runner, `--check-file` and `--comments` give the same answer on
+  every line; `scripts/test_marking_comments.py` fails if the two copies
+  differ, and runs all three over one corpus of 31 lines, failing on any
+  disagreement. MEASURED by the fix review (H1): before, they disagreed on
+  7 of 22 lines in both directions (the runner passed `Ixo2`, `Ixo_notes`
+  and `Mark_feedback.pdf`, because `\w+` counts `_` and digits as letters;
+  the scripts passed a preferred name and a first name run into a surname,
+  because they read two columns where the runner reads five), and the
+  runner left `Ixo_feedback.txt` and `TestpartFeedback.txt` in the marking
+  folder while saying no word was found. The block reads the name, first
+  name, preferred name, last name, surname, e-mail, handle and repository
+  columns, compares case and accents off, counts every part of two letters
+  or more as a whole word (a short part on its own too), every form of six
+  letters or more anywhere, and finds whole words three ways: as `\w+`, as
+  runs of letters, and split where a small letter meets a capital
+  (`AnaLi`). REJECTED: a short part counted only beside another part of its
+  name, which let "{first name} and Ixo compared answers" into another
+  child's comment (review H1); a missed name is worse than a false alarm.
+  So an everyday word that is also a name (May, Will, Mark) is refused, and
+  every refusal says it may be one: a draft is rewritten without it, and a
+  teacher's note is read by the teacher, who changes the line or says to go
+  on by its number. Measured by the fix review on a table of fourteen such
+  names against eighteen ordinary sentences: 10 of 18 refused; a real class
+  holds one to three. No line says or implies that no name is present:
+  `--check-file`'s line when it finds nothing says it looked for the forms
+  of the N names in the table and found none of THEM, and that a nickname,
+  initials or a name not in the table cannot be seen. A printed line holding
+  an everyday word that is a name in the table is withheld by the runner,
+  so the scripts' own lines avoid them ("could", not "may"; "I do not open
+  them", not "will not"). It also refuses a `cites` entry that is not that
+  student's own marks record inside this marking folder: relative, no `..`,
+  exactly `<Assessment>/Marks/Section N/<identifier>.json`, and there.
+  MEASURED by the reviews: Student A's comment citing Student AA's record,
+  or Section 2's Student A drafted under Section 1, was written with exit 0
+  (M1), and then another course's record through `..`, a full path, and any
+  file called `Teacher Notes.md` were accepted (fix review L1). A comment
+  drawn from the teacher's notes says so with `"teacherNotes": true`. This is what catches a comment that quotes a student's work
   holding their own or a classmate's name. The runner cannot, because the
   drafts existed before the run and it looks only at what a run writes in
   the marking folder. An everyday word that is also a name (May, Will) is
@@ -5448,7 +5482,7 @@ script, because two copies of the name step drift.
   `--count bytes`, because report systems differ and a system that counts
   bytes counts an accented letter as two (a web form counting UTF-16 units
   counts some emoji as two, and a line break is one or two: the skill names
-  both when it asks). MEASURED (`commentNames.cases`, 30, every comment
+  both when it asks). MEASURED (`commentNames.cases`, 42, and `checkFileCases`, 6, every comment
   typed and counted by hand; the invented names are made-up words such as
   Qoë and Ixo, so the name check before a merge does not meet a real given
   name): `Qoë` is 3 characters and 4 bytes; a table that holds it decomposed (e and a combining diaeresis)
@@ -5472,8 +5506,9 @@ script, because two copies of the name step drift.
   crashed there and the self-test, which the marking skill makes a gate,
   failed, blocking 750a's named sheets too. The file is now written with
   `open(..., newline="")`; every `--self-test` of both skills, and every
-  marking test, passes on 3.9.6 and 3.14.4, and a test guards the shipped
-  scripts against `write_text(newline=)`, `zip(strict=)` and `match`.
+  marking test, passes on 3.9.6 and 3.14.4, and a test compiles every
+  shipped `.py` of every skill under `/usr/bin/python3` and runs each
+  `--self-test` there (it skips where that Python is not installed).
 - **Tests.** `scripts/test_marking_comments.py` runs every case directly and
   through the runner (which must withhold no line and move nothing), checks
   that no word of the table is printed and nothing new is in the marking
@@ -5485,7 +5520,18 @@ script, because two copies of the name step drift.
   because each covers the other), a pronoun filled with no column, the
   drafts page not looked at, an over-limit line carrying the name (directly
   and through the runner), the marking skill without
-  `make_named_copies.py`, and a pinned sentence taken out. After the
+  `make_named_copies.py`, and a pinned sentence taken out. After the fix
+  review, each red too: the runner's copy of the block changed alone (the
+  one-block test and the agreement test), both copies back to `\w+` words
+  only, both without the preferred name column, both without long parts
+  matched inside a word, a deny-list in place of the allow-list, a cite
+  accepted when its record is not there or when it climbs out through
+  `..`, the everyday-word sentence dropped from `--check-file`, a "clean"
+  line, and `write_text(newline=)` under `/usr/bin/python3`. The narrow
+  regex guard for 3.10-only features is gone: a test compiles every shipped
+  `.py` of every skill under `/usr/bin/python3` and runs each `--self-test`
+  there (the fix review found the guard missed `int | None`, `except*`,
+  `itertools.pairwise` and more). After the
   implementation review, each red as well: the beside rule for every short
   part (the two classmate cases, and three of the four `checkFileCases`),
   a short surname alone not counted by `--check-file`, the old "clean"
