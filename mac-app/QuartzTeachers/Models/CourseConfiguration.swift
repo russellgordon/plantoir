@@ -26,9 +26,19 @@ class CourseConfiguration {
         return stringValue(forKey: "course_code")
     }
 
+    /// The course's name, cleaned where it is read and where it is set
+    /// (#780): a control character becomes a space and a bidirectional
+    /// control is removed, so a name holding a NUL, a line break or an
+    /// override that a script or a hand edit put in the file never reaches a
+    /// label, the assistant's course list or an outside door's greeting.
+    /// Nothing is trimmed, so the Course Settings field keeps the space a
+    /// teacher types. The file itself is left as it is until the next Save
+    /// of any setting, which writes the cleaned name (`write(to:)`).
+    /// `contracts/shared-rules.json` →
+    /// `courseNameCharacters`.
     var courseName: String {
-        get { return stringValue(forKey: "course_name") }
-        set { values["course_name"] = newValue }
+        get { return CourseName.cleaned(stringValue(forKey: "course_name")) }
+        set { values["course_name"] = CourseName.cleaned(newValue) }
     }
 
     /// Where deploys go: "cloudflare_pages", "netlify", or "local_folder" —
@@ -1438,6 +1448,15 @@ class CourseConfiguration {
                 if let base, let onDisk {
                     toWrite = CourseConfiguration.merged(mine: values, base: base, onDisk: onDisk, result: &result)
                 }
+            }
+            // Every Save writes the course's name cleaned (#780), whichever
+            // setting the teacher changed, so a name a script or a hand edit
+            // put a control character in is healed by the next Save of
+            // anything. Done here and not when the file is read: a read that
+            // wrote would surprise Obsidian and the other app, and Save is
+            // already writing the file.
+            if let storedName = toWrite["course_name"] as? String {
+                toWrite["course_name"] = CourseName.cleaned(storedName)
             }
             var data: Data = try JSONSerialization.data(withJSONObject: toWrite, options: options)
             data.append(contentsOf: [0x0A])

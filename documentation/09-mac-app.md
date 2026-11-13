@@ -4413,7 +4413,9 @@ past most recent first (`greetingUnitPlans.order`), so a full-year course, or
 one carrying last year's plans, names what matters now (707a review M2).
 Each name is put on one line first (`UnitPlans.oneLine`: a line break or a
 tab is one space), because Windows' `cmd /k` door cannot carry a line break
-(review M1); #780's clean of course names should meet it in one function.
+(review M1). Since #780 it runs the course name's rule first
+(`OneLineText.cleaned`), so a NUL or an override in a plan's name is a space
+or gone before the white space is collapsed; no #707 case changed.
 `UnitPlans.read` never throws: a plan file that is not JSON,
 or breaks `planFile.rules`, is left out and counted. The trail's
 "assistant opened" line gains " · told about unit planning", " · reminded of
@@ -4551,13 +4553,11 @@ Settings.
 **The popup.** "All Plans" (the folder's own `index.html`) when there is
 one, then each plan whose folder has an `index.html`, in `UnitPlans.read`'s
 order; each is labelled by `UnitPlans.nameInTheGreeting`. It starts on the
-first of the offered plans in `UnitPlans.namedFirst` order for today (the
-plan covering today, then the next to start, then the last to end), which is
-the greeting's own ordering, so there is one ordering and not two; a course
-whose plans have no dates starts on All Plans (`choiceCases`, 14). A plan
-without a page is not offered, because choosing it would show nothing.
-Back, Forward (bound to the web view's `canGoBack` and `canGoForward`, plus
-the two-finger swipe) and Reload sit on the right of the bar.
+plan covering today, and on All Plans when no plan does (#803, below;
+`choiceCases`, 21). A plan without a page is not offered, because choosing
+it would show nothing. Back, Forward (bound to the web view's `canGoBack`
+and `canGoForward`, plus the two-finger swipe), Reload and Open in Browser
+(#803, below) sit on the right of the bar.
 
 **When it looks again**: when the tab appears, when the window becomes key
 (`controlActiveState`, the pattern `CourseSettingsView` uses: the teacher
@@ -4714,6 +4714,143 @@ each unit in the popup (the page shows its dates, and a date in a menu would
 need its own rule on both platforms); JavaScript on (the template needs
 none); a copyable sample prompt in the empty tab (#708's first idea: the
 buttons do it in one click, Russell's ruling 5).
+
+### The Planning tab opens a plan in the browser, and starts on All Plans (#803)
+
+Two changes to #708's tab, agreed with Russell on 2026-11-12. The issue's
+second item, dates beside each unit in the popup, was dropped by his ruling
+the same day; the popup lists titles only, as #708 shipped it.
+
+**Where the tab starts.** `PlanningTab.startingChoice` starts on the offered
+plan that covers today, and otherwise on All Plans. #708 started on the
+first plan in the greeting's order, which between units meant the next to
+begin, before the first unit the first, and after the last the last to end.
+Each of those is a guess at which unit the teacher meant, and the list of
+every unit is a better place to land when no unit is current. "Covers" is
+one function, `UnitPlans.covers` (first class on or before today, last class
+on or after, both days included; a plan with one date is that one day; a
+plan with no date covers nothing), and `UnitPlans.namedFirst` now asks it
+too, so the greeting's order and the tab cannot disagree about which unit is
+current. With no All Plans page (the template always writes one, so this is
+a course built by hand) it still falls back to the greeting's order. The day
+is handed in (`CalendarDay.today()` in the view), never read in a test.
+`choiceCases` holds the first day, the last day, both sides of a gap, no
+units, one undated unit, two units overlapping today, a unit with only a
+last class, and the two no-course-page fallbacks; five of #708's cases changed
+their expected start to All Plans (the old rule fails six cases, the five
+and the new day-after case).
+
+**Open in Browser.** A button beside Reload (`planningOpenInBrowser`,
+the `safari` symbol, icon only like its neighbours) hands the page now
+showing to the teacher's default browser as a `file:` address. The planning
+folder is hidden in Finder (`.internal`), so this is how a teacher reaches a
+plan outside Plantoir, to print it, keep it open beside something else, or
+read it with Plantoir closed. The rule is `PlanInTheBrowser.pageToOpen`
+(`unitPlanning.tab.openInBrowser`, 23 cases):
+
+- It follows the page the web view is ON, not the popup: after a link to the
+  correlation page or a PDF the teacher means what they are looking at. The
+  page is handed over without its `#` and `?` parts and opens at its top:
+  an anchor handed to a browser as an open-document event was never shown
+  to survive, so none is promised (implementation review L1). The popup's
+  page is used only
+  before any page has loaded. A page on screen that has since been deleted
+  is refused, never swapped silently for the popup's page.
+- Only a `file:` address inside the course's planning folder opens, judged by
+  `PlanNavigation.isInside`, the same check that guards the web view's
+  navigation (`..` taken out, every link followed, compared folder by
+  folder). Anything else is refused before the browser is asked:
+  `PlanningTabTests.testOpenInBrowserHandsTheBrowserOnlyAPageOfThePlan`
+  hands the action a recording browser and proves the course's own
+  `course_config.json`, a web address and a `.command` script never reach
+  it. A `file:` address naming a host other than `localhost` is refused too
+  (review L4).
+- Only pages and PDFs open (`html`, `htm`, `pdf`, in any case), judged as
+  the address is written and again as it resolves through links, so a link
+  named like a page cannot lead to a script. Anything else, a `.command`,
+  an `.app`, a `.sh`, a `.webloc` or a file with no extension, is refused
+  as `notAPage` (review L3). The planning folder is written by an outside
+  assistant, so the rule fails closed: a browser can hand a file it does
+  not show on to another app, and nothing a plan is made of needs that.
+- Dimmed while refused, with the reason as its help
+  (`words.openInBrowserNothingToOpen`, `openInBrowserOutsideThePlan`,
+  `openInBrowserPageIsGone`, `openInBrowserNotAPage`); otherwise
+  `words.openInBrowserHelp`. The rule
+  runs again at the click with the web view's address at that moment, and a
+  refusal then, or a Mac that could not open the page, is an alert
+  (`openInBrowserCouldNotOpenTitle`), never a click that does nothing.
+- `PlanBrowserOpener` asks for the DEFAULT BROWSER by name (the app that
+  opens an `https:` address) and opens the file with it. With no browser set
+  it opens NOTHING, and the alert says `words.openInBrowserNoBrowser`. It
+  never falls back to the Mac's own app for the file's type, which for a
+  `.command` would run it in Terminal (review L3).
+- The trail writes "opened a unit plan in the browser" once the browser has
+  answered: the course and the kind of page (the list of plans, a unit's
+  plan, its correlation page, a file from a unit's plan), or that the Mac
+  could not open it. Never the page's name or its unit's folder, which is
+  made from the unit's title, the teacher's own words. A refusal writes
+  nothing: the button already says why.
+
+The web view's three guards (above) do not travel with the page: the browser
+shows it as it shows any local file. That is acceptable because the page is
+the teacher's own plan, opened by the teacher, and the template's pages
+carry no `<script>` and no address on the internet
+(`scripts/test_unit_plan_template.py` checks the second).
+
+MEASURED (2026-11-12, macOS 26.6 on Apple silicon, headless, muted): a plan
+made from the shipped template (`template/` copied whole, the unit's Files
+row written out as the template's PATTERN comment shows it, and its two
+PDFs made), opened from `file:` addresses with no web server and Plantoir
+playing no part, in Chromium 153.0.8010.12, WebKit 26.6 and Firefox 155.0
+(playwright-core 1.63, the browsers cached in `~/Library/Caches/ms-playwright`,
+the script kept in the scratchpad). On each of All Plans, the unit's plan
+and its correlation page: the stylesheet applied; all 19 `@font-face` faces
+loaded when each was asked to load (the unit pages' fonts sit in
+`../assets/fonts`, outside the page's own folder, which Firefox's file
+origin rules could have refused, and did not); the body set in IBM Plex
+Sans and the titles in IBM Plex Serif; every request a `file:` one (Chromium
+and WebKit report them; Firefox reports none for `file:`); and every link
+between pages, followed by a real click, arrived with its stylesheet
+applied. Each PDF link resolved: WebKit opened it in a new page, and headless
+Chromium and Firefox, which have no PDF viewer, downloaded it under its real
+name. Nothing in the template or in what writes a plan needed changing. The
+implementation review rebuilt this measurement on its own and got the same,
+with the plan under parents named with a space, an accent, `#`, `?` and a
+decomposed `é`.
+
+NOT MEASURED: Safari itself (Playwright's WebKit is Safari's engine, not the
+sandboxed app), and Chrome and Firefox with a window, which may ask for
+Desktop access the first time; a teacher's working folder is often under
+`~/Desktop`, which macOS protects. Russell's hand test checks it: from a
+course inside `~/Desktop`, Open in Browser in Safari on a unit's plan shows
+the plan's fonts and stylesheet, and its links to the correlation page and
+to a PDF work.
+
+MEASURED, the rules in a standalone harness (this branch's
+`PlanningTab.swift`, `UnitPlans.swift` and `CalendarDay.swift` with four
+stubs, swiftc 6): the 21 `choiceCases`, 23 `openInBrowser` cases and 7
+`followsThePage` cases held, and the action passed only the plan's page to a
+recording browser. `UnitPlans.namedFirst` gave the same order as before the
+change for 84,000 random pairs of plans and days. Made to fail: #708's
+`startingChoice` put back failed 6 `choiceCases`; the inside-the-folder check
+taken out failed 3 cases and let the course's settings reach the browser;
+falling back to the popup's page when the page on screen is gone failed the
+deleted-page case; the rule as it stood before the review's fixes failed 10
+of the 23, every new case among them (the script, app, shell script, web
+shortcut, no extension, link to a script and other-host cases, and the three
+it now answers differently: a stylesheet, the planning folder, an anchor).
+
+REJECTED: starting on the next unit to begin when none covers today (#708's
+behaviour; Russell, 2026-11-12); opening the file with whatever app opens its
+type (`NSWorkspace.open` alone: an `.html` file can belong to a text editor,
+a PDF to Preview, and the button says Browser), and that as the fallback
+with no browser set (it would run a `.command`); handing the browser any
+file in the folder rather than pages and PDFs only; promising the page's
+`#` anchor; opening the popup's unit
+rather than the page on screen; serving the plan over a local web server for
+the browser (measured unnecessary, and a server would have to be running for
+the page to open); the trail naming the unit or the page; dates beside each
+unit in the popup (Russell, 2026-11-12, as #708 also rejected).
 
 ### Tests, marking and report comments (#751, #750, #752)
 
@@ -11538,6 +11675,91 @@ sharing violation, as the issue says — a guessed delay that still drops the
 line after its last retry. **To KNOW:** if Windows ever trims, the trim must
 run under this same mutex, because a trim is the one write that replaces the
 file, which is exactly how the mac lost lines.
+
+### One line per entry: the trail is cleaned and redacted (#780)
+
+Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780)).
+`ProblemReportStore.appendActivityLine` passes every line through
+`ProblemReportStore.safeTrailLine` before the append described above, which
+cleans it with `OneLineText.cleaned` (the course name's rule,
+`contracts/shared-rules.json` → `courseNameCharacters`) and redacts it with
+`LogRedactor.redacting`. Until then nothing removed a control character, so a
+line break in ANY recorded string (a course name, a page title, a folder
+name) split one entry into two and the second read as a line of its own, and
+an escape sequence was written raw for whoever later read the file with `cat`.
+Cleaning the writer, rather than auditing every caller, is what makes "the
+trail never records one" true without a list of call sites to keep. It is the
+only place in the app that both cleans and redacts: the problem report's
+other files and the console are redacted and not cleaned, so there is no
+second order to keep in step.
+
+**The order: redact, clean, redact again, when the clean changes anything**
+(`trailLines.order`). Each single order leaks a different shape of secret,
+and it took two reviews to see both:
+
+- **Redact, then clean** (the plan's order) misses a secret a control is
+  HIDING: a NUL after `Bearer`, an isolate inside `CLOUDFLARE_API_TOKEN` and
+  an override before the `@` of an email address each keep the redactor's
+  rules from matching, because they look for white space and for words that
+  stay joined. The plan review measured it (H4).
+- **Clean, then redact** (the branch's first order) misses the tail of a
+  secret with a control INSIDE it: `\S+` and the home-folder rule read a NUL,
+  an ESC or a DEL as part of the value, but once cleaned it is a space, the
+  match stops there, and `Bearer abc123` NUL `SECRETTAIL` was written
+  `Bearer [removed: token] SECRETTAIL`. Version 1.9.3, which did not clean,
+  took the whole value, so this was a regression; the implementation review
+  measured it (H1).
+
+Both passes together leak neither for a control the redactor reads as part
+of a value (NUL, ESC, DEL and the other controls that are not white space),
+measured with the real `LogRedactor.swift` and `OneLineText.swift`: `trailLines.cases` holds the three
+hidden secrets and eight with a control inside (`Bearer` with a NUL, an ESC
+and a DEL, a labelled secret with an ESC, a value after a colon with a DEL,
+one wrapped in terminal colour codes, and a Mac and a Windows account name
+with a NUL). A line with nothing to clean is redacted once, as it always was.
+
+Redacting twice needed one change to `LogRedactor`: `labelledSecret` and
+`bearerHeader` no longer take a value that is already a placeholder
+(`(?!\[removed: )`), so a second pass changes nothing
+(`problemReportRedaction.redactedAgainCases`). Without it the second pass
+wrote `[removed: token] token]`, and that had been happening since before
+#780 wherever a caller redacted a line and handed it to the trail writer,
+which redacts again (`ScriptRunner`'s "started …" line). Rejected: taking a
+control OUT of the line for the redaction pass rather than spacing it. It
+would join a value a control had split, but it would also join two words a
+NUL stood between, and the line written would no longer be the line recorded.
+
+**What no order catches** (`trailLines.knownLimits`): a rule that matches a
+run of particular characters, the email address, the `nfp_` token, the three
+account-ID rules and the 40-character run, is cut short by a control in the
+middle of the value in every order, as it was in v1.9.3. So are
+`labelledSecret` and `bearerHeader` when the control inside the value is white
+space to the redactor (a tab, LF, CR, VT, FF, NEL, U+2028 or U+2029): `Bearer
+abc` LF `SECRETTAIL` is written `Bearer [removed: token] SECRETTAIL`, the tail
+v1.9.3 wrote after its own line break. No case pins these.
+
+**The one record that keeps its line breaks** is the assistant's turn
+record, `ActivityTrail.note(… wholeLine: true)`, which passes
+`keepingLineBreaks: true`: U+000A is kept there and every other code point is
+cleaned, a carriage return included. Two things inside it are put on one line
+first, because a line break there would otherwise survive:
+`AssistTurnRecord.askedLines` cleans the teacher's sentence before it goes
+behind `promptMarker`, and `AssistTurnRecord.lines` cleans the whole turn
+line (the argument names come from the model's own JSON). The first was a
+real leak, found while writing this: the assistant's field grows to several
+lines (`axis: .vertical`), so a sentence on two lines put its second line on
+the trail with no marker, and a report sent with the prompts left out still
+carried it. `trailLines.promptCases` pins it.
+
+**Not cleaned:** the launchers' `note_on_the_trail` and the quit script's
+`note` append with `printf` and go around this writer; they carry course
+codes and fixed words. Lines already on disk are not cleaned again when a
+report reads them back (the section below), because cleaning on the way out
+would need a second redaction to be safe. No new trail event: this changes
+how every line is written, not what is recorded. Tests:
+`CourseNameCharactersTests` (`testEveryTrailLineCaseIsWrittenAsTheContractSays`,
+`testRedactingTwiceChangesNothing`, `testOnlyAWholeLineRecordKeepsItsLineBreaks`,
+`testATurnRecordIsOneLine`, `testTheTeachersSentenceStaysBehindItsMarker`).
 
 ### When the trail holds characters that cannot be read
 

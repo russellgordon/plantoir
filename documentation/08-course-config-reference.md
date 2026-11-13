@@ -49,7 +49,7 @@ A representative example:
 | Key | Type | Written by | Consumed by | Meaning |
 |---|---|---|---|---|
 | `course_code` | string | setup | build | Uppercased code, e.g. `ICS3U`. The 4th character, if a digit, encodes grade (1→9 … 4→12) and selects "course mode"; a non-digit (e.g. `CODING`) selects "club mode". |
-| `course_name` | string | setup | setup (starting titles) + build (computed landing title, every build) | Human name. The build recomputes each section's landing title from it every time, so renames reach the site. |
+| `course_name` | string | setup | setup (starting titles) + build (computed landing title, every build) | Human name. The build recomputes each section's landing title from it every time, so renames reach the site. **Cleaned where it is read** (#780): a control character becomes a space and a bidirectional control is removed, by both apps and the shared Python; see "Control characters in `course_name`" below. |
 | `custom_short_name` | string | setup (club mode only) | build | ≤ 12-char label shown beside the header emoji instead of the course code. Empty → fall back to title-cased code. |
 | `locale` | string | setup | build → `quartz.config.ts` | One of Quartz's 27 locale codes; drives UI strings ([teacher-customized](06-quartz-customizations.md#d-locale-files-replaced-at-build-time)) and date formats. |
 | `emojis.sections.section<N>` | string | setup | build (page title) | Single emoji per section, e.g. `"📚"`. Legacy `emojis.default` is honoured as a fallback. |
@@ -92,6 +92,84 @@ A representative example:
 | `print_blanks` | string[] of `name`, `date`, `class_number` (absent or `null` = `["name","date"]`, `[]` = none) | Course Settings → Printing | build | The lines a student fills in, top right on every page, always in the order Name, Date, Class #. Unknown values are ignored, not refused, and are left in the file until the teacher changes the setting. `null` is read as absent because that is what the build prints (`print_settings._blanks`); the corners case "blanks of null are the default" says so, and Windows tests it (#496, 2026-10-15); the mac read it as none until #537 (2026-10-16), and now reads null as absent and runs every corners case through Course Settings' sketch (`PrintablePagesTests.testEveryCornersCaseHoldsAsTheContractSays`), with `freshOpenCases` → "a print_blanks of null opens clean" proving the reading writes nothing. KNOWN, not covered: a list holding a non-string (`["name", 3]`) reads as none on the mac (`as? [String]` fails) but Name in the build; no app writes one, so no case was added. |
 | `print_school_name_at` | `header_left` \| `footer_left` \| `none` (absent or unknown = `header_left`) | Course Settings → Printing | build | Which corner the school name prints in. Sharing a corner with the course code reads "School · CODE". |
 | `print_course_code_at` | `header_left` \| `footer_left` \| `none` (absent or unknown = `footer_left`) | Course Settings → Printing | build | Which corner the course code prints in — the code a teacher reads (`course_code` for a reference course), in capitals. Cases: `shared-rules.json` → `printablePages.corners`. |
+
+### Control characters in `course_name` (#780)
+
+Since v1.10.0 ([#780](https://github.com/russellgordon/plantoir/issues/780),
+ruled by Russell on 2026-11-12: no control character is legitimate in a
+course's name). `course_name` is a JSON string, and JSON can carry any code
+point as an escape, so a script, a hand edit or another tool can put a NUL, a
+line break or a right-to-left override in it. Both decoders keep them:
+measured, `JSONSerialization` decodes `"Phys\u0000ics\n‮"` with the NUL,
+the line feed and the override intact, and Windows' Newtonsoft does the same
+(#736's finding). Each one did harm somewhere: a NUL ended a Windows door's
+command line, a line break forged a line on the breadcrumb trail and in the
+assistant's `list_courses` reply, ESC started a terminal escape sequence, and
+U+202E made a label read differently from what is stored.
+
+**The rule** is `contracts/shared-rules.json` → `courseNameCharacters`, on
+code points: C0 (tab and line breaks included), DEL, C1, U+2028 and U+2029
+each become one space; the bidirectional embeddings, overrides and isolates
+(U+202A to U+202E, U+2066 to U+2069) are removed; everything else is kept,
+the zero-width joiner and non-joiner and the directional marks included,
+because emoji, Persian, Hebrew and Arabic need them. Nothing is trimmed:
+Course Settings reads and writes the name through the rule on every
+keystroke, and a trimming rule would eat the space typed before "11". The set
+was posted on the issue before any code and is what was built.
+
+**Where it is applied.** On the mac, `CourseConfiguration.courseName`'s
+getter AND setter (`CourseName.cleaned`, which is `OneLineText.cleaned`), so
+every reader of the name is covered at once; `write(to:)`, so a Save of ANY
+setting writes the cleaned name, not only a Save that edited it (the
+implementation review's M2: the per-key merge kept the file's raw name for a
+key this copy had not changed); `ReferenceImportSource`, the one direct read of the key; the New Course
+window, before it trims; and the two older-layout importers. In the shared
+Python, `scripts/course_names.py`, called by `build_site.computed_landing_title`
+(the front page heading, the page title and a printed page's footer),
+`social_card.py` (the card's title) and `setup_course.py` (the saved,
+looked-up or typed name, before it is written anywhere). `deploy.py`'s site
+names come from the course code, and no launcher reads the name. Windows owes
+`CourseConfiguration.CourseName` and its New Course window (the `windows`
+issue for #780); the Python reaches it with no change. The file on disk is
+NOT rewritten when a bad name is read: a read that writes would surprise
+Obsidian and the other app, and the next Save of any setting heals it.
+
+**The breadcrumb trail is cleaned by the same rule**, line by line, and
+redacted both before and after the clean whenever the clean changes the line,
+because each single order lets a different shape of secret through; see
+[09 → "One line per entry"](09-mac-app.md) and
+`courseNameCharacters.trailLines.order`.
+
+**`setup_course.py` shows the saved name cleaned** as its prompt's default,
+and `prompt_with_default` and `prompt_select_multiple` show every default and
+every listed folder cleaned, so an ESC or a line break in a saved value never
+reaches the terminal of whoever runs `./setup.sh` again (the implementation
+review's M1). What those two return is the value itself: cleaning a stored
+value other than the name is each reader's decision. No launcher prints a
+value read from `course_config.json`. A name that is nothing but control
+characters, or only spaces, falls back to the course code on the front page
+and the sharing card, as an absent one does (review L2).
+
+**What was measured.** The plan's 24 cases in Python and in Swift, all
+passing and idempotent; the plan review added French with U+202F (one code
+point after the removed range, the off-by-one case), Arabic plain, with its
+letter mark and with vowel marks, the family emoji with skin tones, a keycap,
+England's flag (tag characters in plane 14), the word joiner and three more,
+all untouched. That made 41 contract cases. One RECORDED change: an Arabic
+name that wraps a Latin course code in isolates (or an embedding) loses them;
+the letters survive, and only spaces, punctuation and numbers beside the code
+can sit differently on screen. Two cases name it.
+
+**What was rejected**, each with its reason in `courseNameCharacters.rejected`:
+refusing the name at entry (the character is invisible), cleaning only at the
+doors and the trail (every reader would need its own copy), rewriting the
+file on read, all of Unicode category Cf (breaks emoji and three scripts),
+normalising to NFC at the same time (a different question), trimming, and
+either single order of cleaning and redacting a trail line.
+
+**Not in this piece:** `custom_short_name` and the section labels can carry
+the same characters; that is a drafted follow-up, because the ruling is about
+the course name.
 
 ### Publishing destination
 

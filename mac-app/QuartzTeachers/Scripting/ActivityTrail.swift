@@ -307,6 +307,13 @@ nonisolated enum ActivityTrail {
         /// date. Never a plan's title or anything in it. Once per appearance,
         /// so a report of "the Planning tab is blank" has a line to start from.
         case lookedAtUnitPlans = "looked at a course's unit plans"
+        /// Open in Browser on a course's Planning tab handed a page of the
+        /// plan to the default browser (#803, `PlanInTheBrowser`): the course
+        /// and which kind of page (the list of plans, a unit's plan, its
+        /// correlation page, another file), never its name or anything on
+        /// it; or, as a line of the same event, that the Mac could not open
+        /// it. Written once the browser has answered.
+        case openedAUnitPlanInTheBrowser = "opened a unit plan in the browser"
         /// A section's Coverage tab appeared (#793, `CoverageTabTrail`): how
         /// many maps, expectations and not yet addressed, when the map was
         /// made and whether pages changed since; or that there was no map,
@@ -1401,7 +1408,9 @@ nonisolated enum ActivityTrail {
     /// says what happened in words rather than naming a function: "started
     /// building the preview", not "runScript(preview.sh)".
     /// `wholeLine` is for an entry that already carries its own timestamp and
-    /// shape — the assistant's turn record — so it is not stamped twice.
+    /// shape — the assistant's turn record — so it is not stamped twice. It
+    /// is the one entry allowed to keep its line breaks (#780); every other
+    /// `what` is written as one line, whatever it holds.
     static func note(
         _ event: Event,
         _ what: String,
@@ -1409,7 +1418,7 @@ nonisolated enum ActivityTrail {
         wholeLine: Bool = false
     ) {
         if wholeLine {
-            store.appendActivityLine(what)
+            store.appendActivityLine(what, keepingLineBreaks: true)
             return
         }
         store.appendActivityLine(line(what, at: moment))

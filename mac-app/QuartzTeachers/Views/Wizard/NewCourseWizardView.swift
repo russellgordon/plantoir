@@ -1554,6 +1554,18 @@ struct NewCourseWizardView: View {
     /// command line's rule, pinned by `gradedFolders.reconcilingAChosenPool`
     /// (#152); this stays as the name the call sites and their tests already
     /// use.
+    /// The course's name as the window writes it: cleaned before it is
+    /// trimmed (#780), so a pasted name that ends in a line break loses it,
+    /// and a name that is only a line break, or only spaces, gets the
+    /// default name.
+    static func nameToWrite(typed: String, isClub: Bool) -> String {
+        let name: String = CourseName.cleaned(typed).trimmingCharacters(in: .whitespaces)
+        if name.isEmpty {
+            return WizardWording.panelWords(isClub: isClub).defaultSiteName
+        }
+        return name
+    }
+
     static func reconciledGradedFolders(from gradedFolders: [String], validChoices: [String]) -> [String] {
         return GradedFolderRule.reconciled(gradedFolders, toFolders: validChoices)
     }
@@ -1748,10 +1760,7 @@ struct NewCourseWizardView: View {
             }
         }
 
-        var name: String = courseName.trimmingCharacters(in: .whitespaces)
-        if name.isEmpty {
-            name = WizardWording.panelWords(isClub: isClubCourse).defaultSiteName
-        }
+        let name: String = NewCourseWizardView.nameToWrite(typed: courseName, isClub: isClubCourse)
 
         // What is being made, said while it is made (#368).
         progressTitle = WizardWording.panelWords(isClub: isClubCourse).creatingTitle
@@ -1867,7 +1876,7 @@ struct NewCourseWizardView: View {
 
         var config: [String: Any] = [
             "course_code": code,
-            "course_name": name,
+            "course_name": CourseName.cleaned(name),
             "custom_short_name": isClubCode ? customShortName.trimmingCharacters(in: .whitespaces) : "",
             "locale": locale,
             "emojis": ["sections": emojiMap],

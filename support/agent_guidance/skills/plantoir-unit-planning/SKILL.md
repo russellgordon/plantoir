@@ -28,11 +28,13 @@ and a file written here is lost). Copy from it instead.
   them; it applies to the class website.
 - **Seeing it.** Plantoir shows the plans on the course's Planning tab,
   beside the course's Settings, with a menu of units and the page each one
-  opens; it opens on the unit being taught today. The plan also opens in a
-  web browser from `courses/<CODE>/.internal/planning/index.html` (in
-  Finder a folder whose name starts with a dot is hidden; Command-Shift-.
-  shows it). When you finish, tell the teacher to look on the course's
-  Planning tab, and give the full path as well.
+  opens; it opens on the unit being taught today, or on the list of every
+  unit when no unit is being taught. The tab's Open in Browser button opens
+  the page on screen in the teacher's web browser; the plan also opens there
+  from `courses/<CODE>/.internal/planning/index.html` (in Finder a folder
+  whose name starts with a dot is hidden; Command-Shift-. shows it). When
+  you finish, tell the teacher to look on the course's Planning tab, and
+  give the full path as well.
 - **You never upload it.** Do not deploy, upload or send the plan site
   anywhere, and do not put it in the course's pages.
 - **Plantoir shares it, never you.** The teacher shares the plans with

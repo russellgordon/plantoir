@@ -26,7 +26,7 @@ final class PlanningTabModel {
 
 /// The course page's Planning tab (#708): the course's unit plans, shown
 /// from `courses/<CODE>/.internal/planning/` on this Mac, with a popup of
-/// units, Back, Forward and Reload; or, while there are none, an offer to
+/// units, Back, Forward, Reload and Open in Browser; or, while there are none, an offer to
 /// plan one with Claude or Codex.
 ///
 /// Drawn OVER the course's settings by `CourseDetailView`, never instead of
@@ -68,6 +68,9 @@ struct PlanningTabView: View {
     /// again and again writes it once (708 implementation review M1).
     @State var lookFailureNoted: Bool = false
 
+    /// Why Open in Browser opened nothing at the click (#803), for its alert.
+    @State var browserProblem: String?
+
     // MARK: - Computed properties
 
     var presence: OutsideAssistantPresence {
@@ -76,6 +79,23 @@ struct PlanningTabView: View {
 
     var planningFolder: URL {
         return course.directoryURL.appendingPathComponent(UnitPlans.folderPath, isDirectory: true)
+    }
+
+    /// The page the popup has chosen, before the web view has one of its own.
+    var chosenPage: URL? {
+        guard let choice = model.choice else {
+            return nil
+        }
+        return PlanningTab.page(for: choice, planningFolder: planningFolder)
+    }
+
+    /// What Open in Browser would open now (#803): the page the plan is on,
+    /// as the web view last reported it, so the button follows a link
+    /// clicked inside the plan; its dimming and help are drawn from this.
+    var browserAnswer: PlanInTheBrowser.Answer {
+        return PlanInTheBrowser.pageToOpen(
+            onScreen: model.controller?.currentPage, chosen: chosenPage, planningFolder: planningFolder
+        )
     }
 
     /// The popup's selection, writing through to the model.
@@ -182,9 +202,27 @@ struct PlanningTabView: View {
         } message: {
             Text(reviseRefusal?.message ?? "")
         }
+        .alert(
+            PlanInTheBrowser.couldNotOpenTitle,
+            isPresented: Binding(
+                get: { browserProblem != nil },
+                set: { (showing: Bool) in
+                    if !showing {
+                        browserProblem = nil
+                    }
+                }
+            )
+        ) {
+            Button("OK") {
+                browserProblem = nil
+            }
+        } message: {
+            Text(browserProblem ?? "")
+        }
     }
 
-    /// The thin bar above the plan: the unit popup, Back, Forward, Reload.
+    /// The thin bar above the plan: the unit popup, Back, Forward, Reload
+    /// and Open in Browser (#803).
     var planBar: some View {
         HStack(spacing: 8) {
             Picker(PlanningWording.unitPopup, selection: choiceBinding) {
@@ -216,6 +254,13 @@ struct PlanningTabView: View {
             .labelStyle(.iconOnly)
             .help(PlanningWording.reload)
             .accessibilityIdentifier("planningReload")
+            Button(PlanInTheBrowser.buttonTitle, systemImage: "safari") {
+                openInBrowser()
+            }
+            .labelStyle(.iconOnly)
+            .help(PlanInTheBrowser.helpText(for: browserAnswer))
+            .disabled(browserAnswer.page == nil)
+            .accessibilityIdentifier("planningOpenInBrowser")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -286,6 +331,36 @@ struct PlanningTabView: View {
         model.choice = starting
         if let starting {
             show(starting)
+        }
+    }
+
+    /// Open in Browser (#803): the page the web view is on at this moment
+    /// (its own address, not the last one reported), or the chosen page
+    /// before one has loaded, handed to the default browser when
+    /// `PlanInTheBrowser` allows it. A refusal at the click, or a Mac that
+    /// could not open it, says so in an alert rather than doing nothing.
+    func openInBrowser() {
+        let answer: PlanInTheBrowser.Answer = PlanInTheBrowser.open(
+            onScreen: model.controller?.webView.url,
+            chosen: chosenPage,
+            planningFolder: planningFolder,
+            courseCode: course.code,
+            opener: { (page: URL, done: @escaping @MainActor (PlanInTheBrowser.Opening) -> Void) in
+                PlanBrowserOpener.openInTheDefaultBrowser(page, done: done)
+            },
+            finished: { (opening: PlanInTheBrowser.Opening) in
+                switch opening {
+                case .opened:
+                    break
+                case .couldNotOpen:
+                    browserProblem = PlanInTheBrowser.couldNotOpen
+                case .noBrowser:
+                    browserProblem = PlanInTheBrowser.noBrowser
+                }
+            }
+        )
+        if let refusal = answer.refusal {
+            browserProblem = PlanInTheBrowser.sentence(for: refusal)
         }
     }
 
