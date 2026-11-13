@@ -10,6 +10,7 @@ public static class FailureExplainer
     public static string? Explanation(string output) =>
         ReferenceCourseExplanation(output)
         ?? SectionIsBeingDeployedExplanation(output)
+        ?? AddressIsAnotherPreviewsExplanation(output)
         ?? SectionDeployRefusalOf(output)?.Sentence
         ?? FolderCopyExplanation(output)
         ?? SetupExplanation(output)
@@ -87,6 +88,31 @@ public static class FailureExplainer
             string line = raw.Trim();
             if (!line.EndsWith(sign, StringComparison.Ordinal)) continue;
             return line.TrimStart('❌', ' ');
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The mac's builder refused a preview whose address another preview's
+    /// live claim holds (#835, shared-rules.json -> twoPreviewsOneAddress;
+    /// Windows #868). Windows' own launchers never print it, but the window
+    /// lifts it as the contract says: the first line with the cross taken off,
+    /// then the second without "Nothing was changed.", which the window says
+    /// in its own way.
+    /// </summary>
+    private static string? AddressIsAnotherPreviewsExplanation(string output)
+    {
+        const string sign = "is using the same address, and starting this one would stop it.";
+        string[] lines = output.Replace("\r", "").Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index].Trim();
+            if (!line.EndsWith(sign, StringComparison.Ordinal) || !line.Contains("cannot be previewed right now: a preview of", StringComparison.Ordinal)) continue;
+            int start = 0;
+            while (start < line.Length && !char.IsAsciiLetterOrDigit(line[start])) start++;
+            string sentence = line[start..];
+            string next = index + 1 < lines.Length ? lines[index + 1].Trim().Replace("Nothing was changed.", "").Trim() : "";
+            return next.Length > 0 ? sentence + " " + next : sentence;
         }
         return null;
     }

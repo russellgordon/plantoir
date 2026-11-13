@@ -441,9 +441,14 @@ class CourseConfiguration {
         values.removeValue(forKey: "custom_domains")
     }
 
+    /// A club's short label beside the emoji, cleaned where it is read and
+    /// where it is set by the course name's rule (#822, `OneLineText.cleaned`,
+    /// `contracts/shared-rules.json` → `courseNameCharacters`): the build
+    /// writes it into the site's title line, where a line feed breaks the
+    /// line. Nothing is trimmed, so the field keeps the space a teacher types.
     var customShortName: String {
-        get { return stringValue(forKey: "custom_short_name") }
-        set { values["custom_short_name"] = newValue }
+        get { return OneLineText.cleaned(stringValue(forKey: "custom_short_name")) }
+        set { values["custom_short_name"] = OneLineText.cleaned(newValue) }
     }
 
     var locale: String {
@@ -1147,10 +1152,13 @@ class CourseConfiguration {
         values["num_sections"] = sortedNumbers.count
     }
 
-    /// The emoji shown beside the site title for a given section.
+    /// The emoji shown beside the site title for a given section: the
+    /// section's own label, cleaned by the course name's rule before it is
+    /// read as one emoji (#822).
     func emoji(forSection sectionNumber: Int) -> String {
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "emojis", childKey: "sections")
-        if let stored = sectionsMap["section\(sectionNumber)"] as? String {
+        if let raw = sectionsMap["section\(sectionNumber)"] as? String {
+            let stored: String = OneLineText.cleaned(raw)
             if !stored.isEmpty {
                 return CourseConfiguration.oneEmoji(from: stored)
             }
@@ -1176,7 +1184,9 @@ class CourseConfiguration {
     }
 
     func setEmoji(_ emoji: String, forSection sectionNumber: Int) {
-        setNestedValue(emoji, forKey: "emojis", childKey: "sections", entryKey: "section\(sectionNumber)")
+        setNestedValue(
+            OneLineText.cleaned(emoji), forKey: "emojis", childKey: "sections", entryKey: "section\(sectionNumber)"
+        )
     }
 
     /// The teacher's own domain for ONE DESTINATION of a section's
@@ -1434,6 +1444,30 @@ class CourseConfiguration {
     /// Afterwards the in-memory copy IS the file, so a form that is open
     /// shows what was really saved, and every other window's copy of this
     /// course is brought up to date (`WorkspaceModel.followWrite`).
+    /// `custom_short_name` and every `emojis.sections.section<N>` in
+    /// `dictionary`, cleaned by `OneLineText.cleaned` (#822). Keys that are
+    /// absent, or not strings, are left as they are.
+    static func cleanLabels(in dictionary: inout [String: Any]) {
+        if let shortName = dictionary["custom_short_name"] as? String {
+            dictionary["custom_short_name"] = OneLineText.cleaned(shortName)
+        }
+        guard var emojis = dictionary["emojis"] as? [String: Any],
+              var sections = emojis["sections"] as? [String: Any] else {
+            return
+        }
+        var keys: [String] = []
+        for key in sections.keys {
+            keys.append(key)
+        }
+        for key in keys {
+            if let label = sections[key] as? String {
+                sections[key] = OneLineText.cleaned(label)
+            }
+        }
+        emojis["sections"] = sections
+        dictionary["emojis"] = emojis
+    }
+
     @discardableResult
     func write(to url: URL) throws -> WriteResult {
         let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -1458,6 +1492,9 @@ class CourseConfiguration {
             if let storedName = toWrite["course_name"] as? String {
                 toWrite["course_name"] = CourseName.cleaned(storedName)
             }
+            // The short label and each section's label too (#822), by the
+            // same rule and for the same reason.
+            CourseConfiguration.cleanLabels(in: &toWrite)
             var data: Data = try JSONSerialization.data(withJSONObject: toWrite, options: options)
             data.append(contentsOf: [0x0A])
 

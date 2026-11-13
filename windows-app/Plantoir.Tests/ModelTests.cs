@@ -460,6 +460,54 @@ public class CourseBackupTests
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
     }
 
+    /// <summary>
+    /// "course restored from a backup" (step 0 of v2.0.0, the mac's #572):
+    /// the line carries the code shown and the folder, the zip's file name,
+    /// what became of the course as it was (the archive made first, or that
+    /// there was none; a restore from Archived uses its archive up, unless
+    /// the delete failed), and whether the course is kept for reference as
+    /// its settings say after the restore. No page's words, no path.
+    /// </summary>
+    [Fact]
+    public void AWholeCourseRestoreSaysWhatCameBackAndFromWhere()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            var course = MakeCourse(coursesDir, "ICS3U");
+            string zipPath = CourseArchiver.BackUpCourse(course, coursesDir);
+            var backup = BackupItem.From(zipPath, "ICS3U")!;
+            string archived = CourseArchiver.ArchiveCourseWithoutRemoving(course, coursesDir);
+            CourseRestorer.RestoreBackup(backup, coursesDir);
+
+            string line = CourseRestorer.RestoredTrailLine(backup, archived, coursesDir);
+            Assert.Equal($"restored ICS3U (ICS3U) from {Path.GetFileName(zipPath)} — the course as it was is in Archived as " +
+                         $"{Path.GetFileName(archived)}; a course you teach", line);
+            Assert.DoesNotContain(root, line, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("original goals", line);
+            Assert.EndsWith("there was no course in that folder to archive first; a course you teach",
+                            CourseRestorer.RestoredTrailLine(backup, null, coursesDir));
+
+            // From Archived: the archive is used up by the restore.
+            var item = ArchivedItem.From(archived, "ICS3U")!;
+            File.Delete(archived);
+            Assert.Equal($"restored ICS3U (ICS3U) from Archived, {Path.GetFileName(archived)} — that archive is used up; a course you teach",
+                         CourseRestorer.RestoredFromArchivedTrailLine(item, coursesDir));
+            File.WriteAllText(archived, "still here");
+            Assert.Contains("that archive could not be removed and is still listed", CourseRestorer.RestoredFromArchivedTrailLine(item, coursesDir));
+
+            // Kept for reference: the code the teacher reads, then the folder.
+            string reference = Path.Combine(coursesDir, "ICS3U-2025");
+            Directory.CreateDirectory(reference);
+            File.WriteAllText(Path.Combine(reference, "course_config.json"), """{"course_code":"ICS3U","kept_for_reference":true}""");
+            var referenceBackup = BackupItem.From(Path.Combine(root, "ICS3U-2025_backup_2026-11-13_101500.zip"), "ICS3U-2025")!;
+            Assert.Equal("restored ICS3U (ICS3U-2025) from ICS3U-2025_backup_2026-11-13_101500.zip — there was no course in that folder " +
+                         "to archive first; kept for reference", CourseRestorer.RestoredTrailLine(referenceBackup, null, coursesDir));
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
     [Fact]
     public void RestoreSurvivesReadonlyFilesAndUntraversableLinks()
     {
