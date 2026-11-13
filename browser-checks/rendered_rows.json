@@ -1,0 +1,79 @@
+{
+  "note": "The rendered check's rows and the sabotages that prove each one sees (#597, #807). Read by browser-checks/rendered_features.mjs, which runs the rows, and by browser-checks/lib/sabotage.py, which breaks a copy of the site one way at a time. Both platforms call the same two files, so the rows live here once. Deliberately NOT in contracts/: nothing here is a sentence a teacher reads or a rule the product follows; it is a test both platforms run (the #597 plan, section 4). The product rule that a site asks nothing of any other host becomes a contract with #566.",
+  "folder": "Rendered Check",
+  "pages": {
+    "Diagrams": "Rendered-Check/Diagrams",
+    "Graphs": "Rendered-Check/Graphs",
+    "Python": "Rendered-Check/Python",
+    "Swift": "Rendered-Check/Swift",
+    "Quiz": "Rendered-Check/Quiz",
+    "Tasks": "Rendered-Check/Tasks",
+    "Sketch": "Rendered-Check/Sketch",
+    "Embeds": "Rendered-Check/Embeds",
+    "Handout": "Rendered-Check/Handout",
+    "Wrapped Text": "Rendered-Check/Wrapped-Text",
+    "Anchor": "Rendered-Check/Anchor"
+  },
+  "thirdPartyHostsToday": {
+    "hosts": ["fonts.googleapis.com", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
+    "why": "What a built site asks of other hosts on Quartz 4.5.0 (measured 2026-11-13 on every fixture page, both engines): the theme's Google Fonts stylesheet and its faces, and Mermaid's engine from cdnjs on a page with a diagram. #566 empties this list. A request to any other host fails the own-host row, so a NEW third party is red already."
+  },
+  "expectedConsole": [
+    {
+      "hosts": ["netlify"],
+      "pattern": "Refused to (load|execute)[^\\n]*(netlify|about:srcdoc)",
+      "why": "Netlify injects its ad badge into every page; the site's policy refuses its script inside an about:srcdoc frame, by design, 700 to 850 ms after first paint, in both engines (settled on #625; documentation/07, Suppressing Netlify's own ad badge)."
+    }
+  ],
+  "engines": {
+    "chromium": "Chrome for Testing, the copy documentation/06 F7 installs (PLANTOIR_CHROME or --chrome), driven through Playwright's executablePath so it is the same binary as every other browser check.",
+    "webkit": "Playwright's WebKit build, the one playwright-core 1.63.0 pins (webkit-2359, WebKit 26.6 on this Mac), from browser-checks/fetch-browsers.sh's cache."
+  },
+  "rows": [
+    { "name": "mermaid", "page": "Diagrams", "needsNetwork": "cdnjs", "passes": "every code.mermaid ends with a drawn svg holding text, and again after the site's own dark-mode button is pressed" },
+    { "name": "katex", "page": "Diagrams", "passes": "formulas set (.katex, no .katex-error) and, after document.fonts.load, a KaTeX_Main face whose status is loaded; never document.fonts.check(), which answers true for a family that does not exist and, in WebKit, for a face whose file failed" },
+    { "name": "tikz", "page": "Diagrams", "passes": "the drawing's svg is on the page with a width and a height" },
+    { "name": "graph", "page": "Graphs", "passes": "a path.line whose d has more than one segment" },
+    { "name": "python", "page": "Python", "passes": "Run pressed for real prints 42; then a program that reads a line takes a typed World (live, in its answer field, where the host isolates the page; in its box otherwise) and prints Hello, World" },
+    { "name": "swift", "page": "Swift", "passes": "Run pressed for real prints 42" },
+    { "name": "quiz", "page": "Quiz", "passes": "a wrong choice then the right one, each checked by a real press and answered in the contract's words (quizCallouts.words.site notRight, then right)" },
+    { "name": "tasks", "page": "Tasks", "passes": "a box ticked by a real press is still ticked after a reload" },
+    { "name": "progress", "page": "Tasks", "passes": "My Progress, opened after that tick, reads 1 / 2 on the Tasks page's row" },
+    { "name": "geogebra", "page": "Sketch", "passes": "the file sketch opens on a real press: its canvas, from the site's own engine" },
+    { "name": "geogebra drag", "page": "Sketch", "passes": "point A dragged with real pointer events moves (#755)" },
+    { "name": "geogebra reset", "page": "Sketch", "passes": "GeoGebra's reset icon, pressed for real where geogebraFences.reset.icon puts it, puts A back where the sketch opened it (#792)" },
+    { "name": "geogebra keys", "page": "Sketch", "passes": "Shift+Tab and Space pressed again and again while the 150-line sketch's lines run leave all 150 points, and a press on its reset icon brings back all 150 (#792 item 12)" },
+    { "name": "embeds", "page": "Embeds", "hosts": ["netlify", "cloudflare", "github"], "passes": "each YouTube, Vimeo, geogebra.org and PhET frame navigated to a document that answered 2xx (the frame's own response, never only a load event, which also fires on an error page). Deployed sites only: the embeds need the network and nothing in them is the site's" },
+    { "name": "pdf", "page": "Handout", "passes": "the handout's PDF link answers 200 with application/pdf" },
+    { "name": "print", "page": "Handout", "passes": "Print pressed for real and a way of printing chosen: the print layout laid out at least one page, the diagram drawn on it, and the handout's Latin Modern face loaded (judged by its FontFace status)" },
+    { "name": "copy", "page": "Wrapped Text", "passes": "the text block's copy button, pressed by a real pointer at its centre, is what the pointer hits and writes the block's text (#759; WebKit is where it was found). Read through a spy on navigator.clipboard.writeText, since WebKit refuses readText and has no clipboard permission to grant" },
+    { "name": "heading anchor", "page": "Anchor", "passes": "loaded with #test-of-success under eight runnable blocks: once they and the page's height have settled, the window is moved 400 px by a script (as the sidebar's own scroll to its entry moves it, #604) and 1,500 px more arrive above the heading (as a late diagram, picture or editor does over a real network). On this Mac every piece arrives before the page is shown, and WebKit keeps a fragment in view by itself until a script scrolls, so without these nothing would move and the row would pass with the site's landing gone (measured 2026-11-13). Then the heading must be in the top third of the window. WebKit has no scroll anchoring of its own; Chromium's is switched off, the imitation heading_anchor.mjs has always used" },
+    { "name": "fonts", "page": "*", "needsNetwork": "google", "passes": "the first family of each of the theme's three font settings that is not one of the device's own has at least one face whose status is loaded (not every face: display=swap loads only the weights the text uses)" },
+    { "name": "clean page", "page": "*", "passes": "no console error and no page error but the expected lines for the host, no request refused by a policy (Chromium: a blocked request; WebKit: its Refused to line), no mixed content" },
+    { "name": "own host", "page": "*", "except": ["Embeds"], "passes": "every request any frame or worker made, seen through the context's own router (WebKit hands a worker's requests to no page or context listener; #597 review H1), went to the site's host or to one of thirdPartyHostsToday" },
+    { "name": "cold visit", "page": "Python", "engines": ["webkit"], "passes": "five cold visits to the isolated Python page, each in a new context: fails when two or more take over 3 s to first contentful paint or the median does; one slow sample earns one counted retry (#625; read from performance paint entries, never a screenshot, which stays blank in headless WebKit until load)" }
+  ],
+  "sabotages": [
+    { "name": "mermaid policy", "aims": "mermaid", "page": "Diagrams", "reason": "stayed as source text", "alsoRed": ["clean page"], "does": "the site's ad-badge policy line without cdnjs, the #594 shape: the engine's import is refused, which is also a refusal the clean-page row must see" },
+    { "name": "katex faces", "aims": "katex", "page": "Diagrams", "reason": "no KaTeX_Main face loaded", "alsoRed": ["clean page"], "does": "every KaTeX_Main font file removed (the #494 shape); the 404s are console errors too" },
+    { "name": "tikz size", "aims": "tikz", "page": "Diagrams", "reason": "has no size", "alsoRed": [], "does": "a stylesheet rule on the page giving the drawing's svg no width and no height" },
+    { "name": "graph engine", "aims": "graph", "page": "Graphs", "reason": "no curve drawn", "alsoRed": ["clean page"], "does": "static/function-plot/ removed" },
+    { "name": "python wasm type", "aims": "python", "page": "Python", "reason": "did not print 42", "alsoRed": [], "does": "pyodide.asm.wasm sent as application/octet-stream (the #455 S1 shape)" },
+    { "name": "swift program", "aims": "swift", "page": "Swift", "reason": "did not print 42", "alsoRed": ["clean page"], "does": "every compiled program removed from static/swift-wasm/" },
+    { "name": "quiz answers", "aims": "quiz", "page": "Quiz", "reason": "did not answer", "alsoRed": [], "does": "the quiz's answer marks (data-quiz) stripped from the page" },
+    { "name": "task key", "aims": "tasks", "page": "Tasks", "reason": "did not survive a reload", "alsoRed": ["progress"], "does": "a script on the page makes each box's key new on every load, so a tick is written under a key no later load reads; My Progress reads the real key, so it is red too" },
+    { "name": "progress manifest", "aims": "progress", "page": "Tasks", "reason": "My Progress did not read", "alsoRed": ["clean page"], "does": "progress-manifest.json removed" },
+    { "name": "geogebra file", "aims": "geogebra", "page": "Sketch", "reason": "did not open", "alsoRed": ["geogebra drag", "geogebra reset"], "does": "the sketch's .ggb cut to half its length; the drag and the reset need that sketch open; the 150-line sketch is made from lines and must still pass" },
+    { "name": "geogebra dialog", "aims": "geogebra drag", "page": "Sketch", "reason": "did not move", "alsoRed": ["geogebra reset", "clean page"], "does": "a script that removes one of GeoGebra's dialogs from the open file sketch the way the loader did before #755 (dialog and shade removed, never closed), which leaves the applet ignoring a pointer; the reset row drags first, so it is red too, and GeoGebra itself throws when its dialog is gone (measured: a page error in both engines), which the clean-page row must see" },
+    { "name": "geogebra keys", "aims": "geogebra keys", "page": "Sketch", "gate": false, "reason": "points", "alsoRed": [], "does": "a script that stops the loader holding back Space and Enter while a sketch's lines run, the state before #792 review M1", "whyNotEveryGate": "Not run by --expect-red all, only by name: it does not turn the row red reliably. Measured 2026-11-13: with the hold dropped the presses do reset the construction while its lines run (Chromium: 0 to 3 of 150 objects through 400 presses), but the loader's other half of #792, the hidden marker that tells it a reset got in, then rebuilds all 150; WebKit was left with 114 of 150 once in four runs and all 150 in the other three, Chromium all 150 every time. A sabotage that only sometimes fails would fail the gate at random. The row's must-fail is geogebra_applet.mjs item 12's, against the first version of #792 (82 and 75 of 150, Chromium)." },
+    { "name": "pdf file", "aims": "pdf", "page": "Handout", "reason": "answered 404", "alsoRed": [], "does": "the handout's PDF removed" },
+    { "name": "print layout", "aims": "print", "page": "Handout", "reason": "print layout", "alsoRed": ["clean page"], "does": "static/pagedjs/ removed, so Print falls back to the browser laying the handout out itself" },
+    { "name": "copy stacking", "aims": "copy", "page": "Wrapped Text", "reason": "copy button", "alsoRed": [], "does": "a stylesheet rule on the page putting the copy button back behind the text, as before #759 (the pre not isolated, the button at z-index auto)" },
+    { "name": "heading anchor", "aims": "heading anchor", "page": "Anchor", "reason": "not in the top third", "alsoRed": [], "does": "a script that makes scrollIntoView do nothing on the page, so the site's own landing (headingAnchor.inline.ts) cannot bring the heading back" },
+    { "name": "fonts", "aims": "fonts", "page": "Diagrams", "reason": "no face of", "alsoRed": ["clean page"], "does": "the page's Google Fonts stylesheet asked for a family that does not exist instead of the code font; Google answers 400, a console error too" },
+    { "name": "clean page", "aims": "clean page", "page": "Graphs", "reason": "page error", "alsoRed": [], "does": "a script of the site's own that throws" },
+    { "name": "own host picture", "aims": "own host", "page": "Quiz", "reason": "example.com", "alsoRed": [], "does": "a picture asked of example.com (the check refuses the request itself, so nothing leaves this Mac)" },
+    { "name": "own host worker", "aims": "own host", "page": "Tasks", "reason": "example.com", "alsoRed": [], "does": "a worker that asks example.com for a file (#597 review H1: WebKit hands a worker's requests to no page or context listener; only the router sees them)" },
+    { "name": "cold visit", "aims": "cold visit", "page": "Python", "reason": "first contentful paint", "alsoRed": [], "does": "the site's stylesheet held for 8 s by the local server, so the page cannot paint" }
+  ]
+}

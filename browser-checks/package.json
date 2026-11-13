@@ -1,0 +1,9 @@
+{
+  "name": "plantoir-browser-checks",
+  "private": true,
+  "description": "The one package the rendered check (rendered_features.mjs, #597) needs: Playwright's driver, pinned exactly, so the pin also names the WebKit build. Installed outside the repository by fetch-browsers.sh.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

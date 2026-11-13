@@ -6080,6 +6080,101 @@ else
   RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them, graphs drawn under a heading named Math (#502), Mermaid diagrams under the Netlify ad-badge policy (#594), the sidebar's page dot (#515), maths offline and print after a page change (#494), runnable code in a browser (#455), self-check quizzes in a browser (#563), task boxes in a browser (#519), My Progress in a browser (#545), a link to a heading landing on it (#604), pictures laid out before their bytes arrive and before they are scrolled to (#612, #609), and Print's fallback put back only once the print has happened (#576): no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
+
+# ---- 6h-r. The rendered check, in Chrome and in Safari's engine (#597, #807) ----
+# Every kind of diagram, sketch, graph, formula, quiz, task box and runnable
+# program on browser-checks/fixtures/rendered/, pressed for real in Chrome
+# for Testing AND in Playwright's WebKit (browser-checks/rendered_features.mjs,
+# rows in browser-checks/rendered_rows.json), with every request any frame
+# or worker made judged against the site's own host. Then every row proven
+# to SEE: a copy of the site broken one way at a time (lib/sabotage.py), and
+# each time the row aimed at must fail for its own reason while the page's
+# other rows still pass.
+#
+# Built in a working folder of its own, from the pristine Example Course
+# with only the rendered pages planted: the fixtures above change what this
+# site carries (its Python pages, its quizzes, its sketches), and a dozen
+# checks below count those. Its own container and builds folder too,
+# removed before and after (6e's pattern). The site is served by
+# browser-checks/lib/site_server.mjs with the _headers a Netlify publish
+# writes, so the policy and live input's isolation are both in force.
+#
+# An engine that is not on this Mac is a SKIP by name (fetch it with
+# ./browser-checks/fetch-browsers.sh), never a pass; with
+# PLANTOIR_REQUIRE_ENGINES=chromium,webkit it is a FAILURE.
+RENDERED_DIR="$HOME/.plantoir-verify-rendered"
+RENDERED_ID="$(mkdir -p "$RENDERED_DIR" && cd "$RENDERED_DIR" && /bin/pwd -P | shasum -a 256 | cut -c1-8)"
+RENDERED_CONTAINER="teaching-quartz-${RENDERED_ID}"
+RENDERED_BUILDS="${HOME%/}/Library/Application Support/Plantoir/builds/${RENDERED_ID}"
+RENDERED_SITE="/tmp/plantoir-verify-rendered-site"
+rendered_cleanup() {
+  docker rm -f "$RENDERED_CONTAINER" >/dev/null 2>&1 || true
+  rm -rf "$RENDERED_DIR" "$RENDERED_BUILDS" "$RENDERED_SITE"
+}
+rendered_lines() {
+  # The checker's own lines of one kind, each as a verify.sh result.
+  # Read through a redirect, not a pipe, so fail() sets FAILED in THIS shell.
+  local kind="$1" log="$2" verb="$3" line
+  while IFS= read -r line; do
+    "$verb" "rendered check: ${line#"${kind}: "}"
+  done < <(grep "^${kind}: " "$log")
+}
+echo ""
+echo "🚦 The rendered check, in Chrome and in Safari's engine (#597)…"
+rendered_cleanup
+RENDERED_STARTED=$SECONDS
+mkdir -p "$RENDERED_DIR/courses"
+cp setup.sh preview.sh deploy.sh "$RENDERED_DIR/"
+cp -R support/example_course/EXC2O "$RENDERED_DIR/courses/EXC2O"
+if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' >/dev/null 2>&1; then
+  skip "the rendered check in Chrome and Safari's engine (#597): no Node 22 or later on this Mac"
+elif ! python3 browser-checks/lib/plant_rendered.py plant "$RENDERED_DIR/courses/EXC2O" >/tmp/verify_rendered_build.log 2>&1 \
+     || ! (cd "$RENDERED_DIR" && ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only) >>/tmp/verify_rendered_build.log 2>&1 \
+     || [[ ! -f "$RENDERED_BUILDS/EXC2O/section1/public/Rendered-Check/Diagrams.html" ]]; then
+  # A build that failed is a failure, never a skip: the rows never ran.
+  fail "the rendered check (#597): its fixture site did not build"
+  tail -20 /tmp/verify_rendered_build.log
+else
+  mkdir -p "$RENDERED_SITE"
+  cp -Rc "$RENDERED_BUILDS/EXC2O/section1/public/." "$RENDERED_SITE/" 2>/dev/null || cp -R "$RENDERED_BUILDS/EXC2O/section1/public/." "$RENDERED_SITE/"
+  rm -f "$RENDERED_SITE/_headers"
+  # The publish's own two writers, in deploy.py's order (isolation, then the
+  # badge policy), with the contract they read.
+  if ! (cd scripts && PLANTOIR_CONTRACTS_DIR=../contracts python3 -c 'import sys; from pathlib import Path; import isolation_headers, netlify_badge; site = Path(sys.argv[1]); isolation_headers.publish_headers(site, "netlify", printer=lambda line: None); netlify_badge.write_netlify_headers_file(site)' "$RENDERED_SITE") >>/tmp/verify_rendered_build.log 2>&1; then
+    fail "the rendered check (#597): the Netlify _headers could not be written for its site"
+    tail -5 /tmp/verify_rendered_build.log
+  else
+    RENDERED_STATUS=0
+    node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} \
+      >/tmp/verify_rendered_features.log 2>&1 || RENDERED_STATUS=$?
+    RENDERED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_features.log | tail -1 | sed 's/^DONE: //')"
+    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
+      pass "the rendered check, every row in every engine on this Mac: $(grep -c '^OK: ' /tmp/verify_rendered_features.log) rows passed - $RENDERED_DONE (browser-checks/rendered_features.mjs, #597, #807)"
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    else
+      fail "the rendered check: a row failed in a browser ($RENDERED_DONE; browser-checks/rendered_features.mjs, #597)"
+      rendered_lines FAIL /tmp/verify_rendered_features.log fail
+      rendered_lines SKIPPED /tmp/verify_rendered_features.log skip
+    fi
+    # Proven red: only when the rows ran green, since a row already red
+    # proves nothing by failing again.
+    if [[ "$RENDERED_STATUS" == "0" || "$RENDERED_STATUS" == "3" ]]; then
+      RED_STATUS=0
+      node browser-checks/rendered_features.mjs --site "$RENDERED_SITE" ${PRINT_CHROME:+--chrome "$PRINT_CHROME"} --expect-red all \
+        >/tmp/verify_rendered_red.log 2>&1 || RED_STATUS=$?
+      RED_DONE="$(grep '^DONE: ' /tmp/verify_rendered_red.log | tail -1 | sed 's/^DONE: //')"
+      if [[ "$RED_STATUS" == "0" || "$RED_STATUS" == "3" ]]; then
+        pass "the rendered check sees: each of $(grep -c '^OK: sabotage ' /tmp/verify_rendered_red.log) sabotages, one engine at a time, turned its own row red for its own reason and left the page's other rows green - $RED_DONE (browser-checks/lib/sabotage.py, #597 review H4)"
+        rendered_lines SKIPPED /tmp/verify_rendered_red.log skip
+      else
+        fail "the rendered check did not see a sabotage, or saw it for the wrong reason ($RED_DONE; browser-checks/lib/sabotage.py, #597)"
+        rendered_lines FAIL /tmp/verify_rendered_red.log fail
+      fi
+    fi
+  fi
+fi
+echo "   (the rendered check took $((SECONDS - RENDERED_STARTED)) s, its build included)"
+rendered_cleanup
 # Two builds of one page are not byte-identical even in Quartz alone: the
 # sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
 # class="explorer-ul overflow">`), so does a table of contents (`<ul id="…"
