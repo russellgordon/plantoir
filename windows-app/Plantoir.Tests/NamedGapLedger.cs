@@ -315,6 +315,11 @@ internal static class NamedGapLedger
         // ---- step 0: specialNames.platformWording.machine.usedIn (#811)
         Owed(MachineWordUsedIn, 811, V200, Reason811,
              "shared-rules.json:coverageTab.tab.words.cannotShowDescription", "shared-rules.json:coverageTab.tab.words.noObsidian"),
+        // The unit-plan username request's explanation took {machine} on the
+        // mac (#863, dev 5df8602dc); the request itself is held for #824 above,
+        // and is said filled when that piece adds it.
+        Owed(MachineWordUsedIn, 824, V200, Reason824,
+             "app-rules.json:credentialRequests.requests[7].explanation"),
 
         // ---- activityTrail.mustRecord. #514's two events ("preview started
         // at the page last viewed", "preview start page chosen in Settings")
