@@ -23,11 +23,13 @@ import windows_feed  # noqa: E402
 
 
 def expected_pin(site_version: str, platform_version: str):
-    """The version a download card is pinned to, or None (#500).
+    """The version a download card is pinned to, or None (#500, #861).
 
-    A platform whose bundle is at (or, mid-cut, above) the site's version line
-    has its asset in the newest release; one below it does not, and its card
-    points at its own version, the last release its installer joined."""
+    ``platform_version`` is the newest release in that platform's update
+    feed. A platform whose feed is at (or, mid-cut, above) the site's version
+    line has its asset in the newest release; one below it does not, and its
+    card points at the feed's newest release, the last one its installer
+    joined."""
     if windows_feed.version_key(platform_version) >= windows_feed.version_key(site_version):
         return None
     return platform_version
@@ -195,15 +197,15 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
-    def test_the_expected_pin_follows_the_platform_version(self):
-        # #500: the rule, without the real files. A platform whose bundle
-        # carries the site's version ships in the newest release, so its card
-        # is unpinned; one that lags is pinned to its own version, which is
-        # the last release its installer joined.
+    def test_the_expected_pin_follows_the_newest_release_in_the_feed(self):
+        # #500, #861: the rule, without the real files. A platform whose feed
+        # offers the site's version shipped in the newest release, so its
+        # card is unpinned; one whose feed lags is pinned to the feed's
+        # newest release, the last one its installer joined.
         self.assertIsNone(expected_pin("1.9.3", "1.9.3"))
         self.assertEqual(expected_pin("1.9.3", "1.9.0"), "1.9.0")
-        self.assertEqual(expected_pin("1.10.0", "1.9.3"), "1.9.3")
-        # A bundle raised ahead of the site's version line is a cut in
+        self.assertEqual(expected_pin("2.0.0", "1.9.3"), "1.9.3")
+        # A feed rebuilt ahead of the site's version line is a cut in
         # progress for that platform: it is shipping, so it is not pinned.
         self.assertIsNone(expected_pin("1.9.3", "1.9.4"))
 
@@ -211,24 +213,23 @@ class DownloadTests(unittest.TestCase):
         # #500: this test used to compare the Windows pin with a literal
         # ("1.4.5", then "1.7.1", ... "1.9.0") that had to be edited at every
         # mac-only cut and every Windows catch-up, and failed in between. The
-        # expectation now comes from the data a cut already moves:
-        #   - each platform's version (<Version> in Plantoir.csproj,
-        #     MARKETING_VERSION in mac-app/project.yml), raised only in the
-        #     cut that attaches that platform's asset (RELEASING.md, "Two
-        #     platforms, one version series");
-        #   - the update feeds, whose items name the release each installer
-        #     was uploaded to — the proof that a pinned card points at a
-        #     release that HAS the asset, rather than at a 404.
-        # The history of which card was pinned when is in site.json's
-        # downloads_note.
+        # expectation now comes from the data a cut already moves: the update
+        # feeds, whose newest item is the last release each platform's
+        # installer joined, and whose items name the release each was
+        # uploaded to (the proof that a pinned card points at a release that
+        # HAS the asset, rather than at a 404). Until #861 it read each
+        # platform's project version instead; since #861 that number names
+        # the release being BUILT, raised on `dev` when work starts, so it
+        # says nothing about what shipped. The history of which card was
+        # pinned when is in site.json's downloads_note.
         site = build.read_json(build.WEBSITE / "site.json")
-        versions = {
-            "Windows": windows_feed.csproj_version(),
-            "macOS": update_feeds.marketing_version(build.REPO / "mac-app" / "project.yml"),
-        }
         feeds = {
             "Windows": build.WEBSITE / "updates" / "windows.xml",
             "macOS": build.WEBSITE / "updates" / "macos.xml",
+        }
+        versions = {
+            "Windows": windows_feed.newest_item(feeds["Windows"].read_bytes())["version"],
+            "macOS": update_feeds.newest_version(feeds["macOS"]),
         }
         seen: set = set()
         for entry in site["downloads"]:
@@ -238,7 +239,7 @@ class DownloadTests(unittest.TestCase):
                 self.assertIsNotNone(versions[platform])
                 pin = entry.get("pinned")
                 self.assertEqual(pin, expected_pin(site["version"], versions[platform]),
-                                 f"{platform} is at {versions[platform]} and the site at {site['version']}")
+                                 f"{platform}'s feed is at {versions[platform]} and the site at {site['version']}")
                 if pin is None:
                     continue
                 self.assertLess(windows_feed.version_key(pin), windows_feed.version_key(site["version"]))

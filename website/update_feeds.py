@@ -15,8 +15,9 @@ signed. This module is the one place that knows that:
   formed, it is signed, every download is the platform's own asset under its
   own version's release, and nothing names the other platform's asset — so a
   feed that would offer a Windows installer to a Mac cannot pass.
-- ``newest_version`` is what ``build.py --deploy`` compares with
-  ``MARKETING_VERSION`` before publishing.
+- ``newest_version`` is what ``build.py --deploy`` compares with the
+  release ``site.json`` says the mac shipped in, before publishing (#861:
+  ``MARKETING_VERSION`` names the release being built and may be ahead).
 - ``verify_live`` is what a deploy checks afterwards: the live feed is these
   bytes, and its newest download actually exists — the check for a feed that
   points at nothing (deployed before its release was published).

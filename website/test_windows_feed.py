@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -172,19 +173,34 @@ class CheckerTests(unittest.TestCase):
             feed = folder.write(_feed(_item("1.4.3")), signed=False)
             self.assertTrue(any("no windows.xml.signature" in p for p in windows_feed.problems_with(feed, PUBLIC)))
 
-    def test_the_feed_must_offer_the_version_in_the_csproj(self):
+    def test_the_feed_must_offer_the_release_windows_shipped_in(self):
+        # #861: held to the release site.json says Windows shipped in
+        # (build.shipped_version), not to <Version>, which names the release
+        # being built and runs ahead of the feed between cuts.
         with _Folder() as folder:
             feed = folder.write(_feed(_item("1.4.2"), _item("1.4.3")))
             csproj = folder.path / "Plantoir.csproj"
             csproj.write_text("<Project><PropertyGroup><Version>1.4.3</Version></PropertyGroup></Project>")
-            self.assertIsNone(windows_feed.version_refusal(feed, csproj))
-            csproj.write_text("<Project><PropertyGroup><Version>1.4.4</Version></PropertyGroup></Project>")
-            refusal = windows_feed.version_refusal(feed, csproj)
+            self.assertIsNone(windows_feed.version_refusal(feed, "1.4.3", csproj))
+            refusal = windows_feed.version_refusal(feed, "1.4.4", csproj)
             self.assertIn("offers 1.4.3", refusal)
-            self.assertIn("says 1.4.4", refusal)
+            self.assertIn("shipped in 1.4.4", refusal)
 
-    def test_the_committed_feed_agrees_with_the_committed_csproj(self):
-        self.assertIsNone(windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml"))
+    def test_a_csproj_raised_for_the_release_being_built_is_accepted(self):
+        # #861: a mac-only cut leaves Windows pinned to its last release
+        # while <Version> already names the next one.
+        with _Folder() as folder:
+            feed = folder.write(_feed(_item("1.4.2"), _item("1.4.3")))
+            csproj = folder.path / "Plantoir.csproj"
+            csproj.write_text("<Project><PropertyGroup><Version>2.0.0</Version></PropertyGroup></Project>")
+            self.assertIsNone(windows_feed.version_refusal(feed, "1.4.3", csproj))
+            csproj.write_text("<Project><PropertyGroup><Version>1.4.2</Version></PropertyGroup></Project>")
+            self.assertIn("which is older", windows_feed.version_refusal(feed, "1.4.3", csproj))
+
+    def test_the_committed_feed_agrees_with_the_committed_site(self):
+        site = json.loads((WEBSITE / "site.json").read_text(encoding="utf-8"))
+        self.assertIsNone(windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml",
+                                                       build.shipped_version(site, "Windows")))
 
 
 class LiveCheckTests(unittest.TestCase):

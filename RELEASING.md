@@ -5,9 +5,11 @@ assets.** The product version lives in ONE place — `<Version>` in
 `windows-app/Plantoir/Plantoir.csproj` — and `MARKETING_VERSION` in
 `mac-app/project.yml` must say the same number once both platforms have
 shipped it. The About panels read them, and every platform whose asset a cut
-attaches must match the tag; a platform that ships nothing in a cut keeps its
-lower number until it passes that version's contracts ("Two platforms, one
-version series", below).
+attaches must match the tag; a platform that ships nothing in a cut ships no
+bundle under that tag until it passes that version's contracts ("Two
+platforms, one version series", below). On `dev` each file names the release
+being BUILT, raised when work on it starts, so a test build says the release
+it is heading for ("When the number is raised", below, #861).
 
 > **Which repository?** plantoir.app's download links resolve against
 > `github.com/russellgordon/plantoir`, which matches `origin`. Pass
@@ -99,6 +101,64 @@ Found while qualifying the mac for v1.1.0. The Windows bundle should adopt
 the same number as its version's fourth field when convenient (its trail
 currently prints the patch digit, which conflates two ideas).
 
+## When the number is raised (#861)
+
+Ruled by Russell on 2026-11-13, after he asked why test builds did not say
+2.0.0. **The number in each platform's project file is raised when work on a
+release starts, and the cut CHECKS it rather than raising it.**
+
+- **When.** Right after the previous cut's merge of `main` back into `dev`,
+  raise `MARKETING_VERSION` in `mac-app/project.yml` (and `<Version>` in
+  `windows-app/Plantoir/Plantoir.csproj`, on that side) to the number of the
+  next release's milestone, in a commit of its own on `dev`, then re-run
+  `xcodegen generate`. From then on every build from `dev`, Debug included,
+  says the release it is heading for in About, on the trail and in a problem
+  report. Before #861 the number moved as a step of the cut, so for the whole
+  of a release's development every test build carried the last RELEASED
+  number, and a build under test could not be told from the installed copy.
+- **At the cut.** Every platform whose asset is attached must ALREADY read
+  the tag's number (checklist step 1, the `cut-release` skill's step 5). A
+  lower number is a stop and a question: the start-of-work raise was missed.
+  Raise it and rebuild only after the platform's gate has run at that number.
+- **A platform that ships nothing in a cut** leaves its number where it is:
+  usually at or above the tag, because it names the release that platform is
+  working toward. Nothing reads that number to decide what shipped. The
+  download cards and the feed checks read `website/site.json` and the feeds
+  (below), never a project file.
+- **A hotfix cut from `main` keeps its own number.** `main` carries the
+  number it last shipped; the hotfix raises it there (say 2.0.0 to 2.0.1)
+  and is cut from `main`. When `main` is merged back into `dev`, `dev` KEEPS
+  its own, higher number: resolve the `project.yml` (and csproj) conflict to
+  `dev`'s side.
+- **`website/site.json`'s `version` does not move early.** It is the
+  RELEASED version line plantoir.app prints, and it moves at the cut, when
+  the release is public.
+
+**What reads the number, measured on 2026-11-13 with `MARKETING_VERSION` at
+2.0.0 on `dev`:** the About panel, `AppUpdates.runningVersion` (the trail's
+version text) and the problem report read the built bundle's
+`CFBundleShortVersionString`; `publish.sh` reads it for a rehearsal's
+version; `update_feed.py` reads it out of the DMG it is given. No Swift test
+or contract case pins it. Two website checks read the project files, and
+both had to change: `build.py`'s `feed_version_refusal` (and its Windows twin
+`windows_feed.version_refusal`) refused any deploy whose feed's newest
+version was not the project's number, which with the number raised early
+refuses every deploy after a cut that skips a platform; and
+`test_build_data.py`'s pin test computed each card's expected pin from the
+project's number. Both now read the release a platform last SHIPPED in: the
+feed's newest item, held against `site.json`'s version line or that
+platform's pin (`build.shipped_version`). A project number BELOW its feed is
+still refused, since only a number moved backwards can cause it. A Debug
+build still carries no update feed (`SUFeedURL` is empty). macOS's Help cache
+files a book by the app's version (#839), so a Debug build at 2.0.0 no longer
+shares an entry with an installed 1.9.3; Debug builds still share one with
+each other, as before.
+
+**Rejected:** raising it at the cut, as before (the test builds lie for the
+whole of a release); deriving it from the milestone at build time (a build
+would then depend on the network and on GitHub's state); and raising
+`site.json` with it (plantoir.app would announce a release that is not out).
+
 ## Landed since v1.9.3 — ships in the next release
 
 Features that are **complete, merged to `dev`, and waiting only for a tag**.
@@ -159,12 +219,13 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    to look for and what to do.
 2. **Check the version** in `windows-app/Plantoir/Plantoir.csproj` and
    `mac-app/project.yml`: **every platform whose asset this cut attaches must
-   read the tag's number**, set BEFORE its bundle is built; a platform that
-   ships nothing in this cut keeps its lower number (see "Two platforms, one
-   version series" above, and the `cut-release` skill's step 5). For v1.4.0,
-   a mac-only cut: `MARKETING_VERSION` goes to 1.4.0 before `publish.sh
-   -Sign`, and the csproj stays at 1.1.0. (The csproj went to 1.4.2 on
-   2026-10-03, when the Windows installer joined that release.) **When the
+   already read the tag's number**, raised on `dev` when work on the release
+   started ("When the number is raised", above); a lower number is a stop.
+   A platform that ships nothing in this cut leaves its number alone (see
+   "Two platforms, one version series" above, and the `cut-release` skill's
+   step 5). Until #861 (2026-11-13) this step RAISED the number: for v1.4.0,
+   a mac-only cut, `MARKETING_VERSION` went to 1.4.0 before `publish.sh
+   -Sign` and the csproj stayed at 1.1.0. **When the
    csproj's version changes, run `dotnet test` in `windows-app/` AGAIN** —
    `NamedGapLedgerTests` compares every ledger entry's milestone with that
    `<Version>`, and the run in step 1 compared it with the OLD number, so it
@@ -249,8 +310,12 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 ## The checklist, with the reasons
 
 1. **Version.** `<Version>` in `windows-app/Plantoir/Plantoir.csproj` and
-   `MARKETING_VERSION` in `mac-app/project.yml`. `project.yml` is the source on
-   the mac side, so re-run `xcodegen generate` after changing it.
+   `MARKETING_VERSION` in `mac-app/project.yml`, CHECKED against the tag for
+   every platform this cut ships: they were raised when work on the release
+   started ("When the number is raised", #861). `project.yml` is the source on
+   the mac side, so re-run `xcodegen generate` after changing it. After the
+   cut's merge of `main` back into `dev`, raise both on `dev` to the next
+   release's number.
 1a. **Cloudflare Pages vs Workers — every minor release (x.y.0), skip for
    patches.** Plantoir publishes to Cloudflare **Pages** (the default
    destination for new courses since #668). Cloudflare steers new projects
@@ -738,8 +803,10 @@ the release side.
   From v1.4.1 on, the rule applies as written.
 - **A Windows-only cut leaves `macos.xml` alone**, and so does any cut that
   attaches no mac DMG. `build.py --deploy` refuses when the feed's newest
-  version is not `MARKETING_VERSION` — after a mac cut the two agree, and a
-  Windows-only cut moves neither.
+  version is not the release `site.json` says the mac shipped in (the version
+  line, or the mac card's pin), and when `MARKETING_VERSION` is below the
+  feed. Until #861 it compared the feed with `MARKETING_VERSION` itself, which
+  since that change names the release being built and runs ahead of the feed.
 - **After deploying**, `--deploy` (and `--verify-deploy`) fetch the live feed,
   compare its SHA-256 with `site/`, and follow its newest download to a 200 of
   the right length. **Do not report a mac release complete until that line is ✅.**
@@ -876,9 +943,10 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   Before uploading anything, `build.py --deploy` also refuses a working copy
   whose feed files are not byte for byte the committed ones.
 - **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card
-  — and the deploy is REFUSED if `<Version>` in `Plantoir.csproj` was raised
-  without its feed (`windows_feed.version_refusal`): raise it only in the
-  Windows cut that also rebuilds `windows.xml`.
+  — and the deploy is REFUSED if the feed's newest version is not that pin
+  (`windows_feed.version_refusal`, given `build.shipped_version`), or if
+  `<Version>` in `Plantoir.csproj` is below the feed. `<Version>` itself may
+  be ahead: since #861 it is raised when work on a release starts.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)
 

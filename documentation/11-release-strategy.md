@@ -106,7 +106,11 @@ newest published release — and 404s when the newest release does not carry it.
 name"; it does not, which is why a platform that lags a release has its card
 PINNED to `releases/download/v<version>/<filename>` by setting `pinned` in
 `site.json`, and un-pinned when it catches up. Windows was pinned to 1.1.0
-from v1.2.0 until its installer joined v1.4.2 on 2026-10-03.)
+from v1.2.0 until its installer joined v1.4.2 on 2026-10-03.) The pin is
+checked against the update feeds, never against a project file: since #861
+each project file names the release being BUILT, raised on `dev` when work
+starts (`RELEASING.md` → "When the number is raised"), so it says nothing
+about which release a platform's installer last joined.
 
 **The names are frozen, and renaming one breaks the site's download button
 silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`
@@ -424,7 +428,7 @@ in [`09-mac-app.md`](09-mac-app.md) → "Updating itself".
                                  │
                                  ▼
                     [Step 1: Release Preflight]
-                    - Confirm version matches across csproj, project.yml, site.json
+                    - Confirm each shipping platform already reads the tag (#861)
                     - Verify signatures and compute SHA-256 hashes
                                  │
                                  ▼

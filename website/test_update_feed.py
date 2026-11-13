@@ -351,13 +351,37 @@ class UpdateFeedTests(unittest.TestCase):
         self.assertEqual((destination / "macos.xml").read_bytes(), feed.read_bytes())
 
     def test_deploy_refuses_a_feed_for_another_version(self) -> None:
+        # #861: the feed is held to the release site.json says the mac
+        # shipped in, not to MARKETING_VERSION, which names the release
+        # being built and runs ahead of the feed between cuts.
         feed = self.cut("1.3.2", self.dmg_one, "- Something.")
         project = self.updates / "project.yml"
-        project.write_text('        MARKETING_VERSION: "1.3.3"\n')
-        self.assertIsNotNone(build.feed_version_refusal(feed, project))
         project.write_text('        MARKETING_VERSION: "1.3.2"\n')
-        self.assertIsNone(build.feed_version_refusal(feed, project))
-        self.assertIsNone(build.feed_version_refusal(self.updates / "absent.xml", project))
+        shipped_here = {"version": "1.3.2", "downloads": [{"platform": "macOS"}]}
+        self.assertIsNone(build.feed_version_refusal(feed, project, shipped_here))
+        # The site's version line moved for a mac cut whose feed was not rebuilt.
+        not_rebuilt = {"version": "1.3.3", "downloads": [{"platform": "macOS"}]}
+        self.assertIn("shipped in 1.3.3", build.feed_version_refusal(feed, project, not_rebuilt))
+        self.assertIsNone(build.feed_version_refusal(self.updates / "absent.xml", project, not_rebuilt))
+
+    def test_deploy_accepts_a_number_raised_for_the_release_being_built(self) -> None:
+        # #861: between cuts, and after a cut that attaches no DMG, the
+        # number in project.yml is ahead of the feed. That is the design.
+        feed = self.cut("1.3.2", self.dmg_one, "- Something.")
+        project = self.updates / "project.yml"
+        project.write_text('        MARKETING_VERSION: "2.0.0"\n')
+        between_cuts = {"version": "1.3.2", "downloads": [{"platform": "macOS"}]}
+        self.assertIsNone(build.feed_version_refusal(feed, project, between_cuts))
+        windows_only_cut = {"version": "1.3.3", "downloads": [{"platform": "macOS", "pinned": "1.3.2"}]}
+        self.assertIsNone(build.feed_version_refusal(feed, project, windows_only_cut))
+        # A number moved BELOW the feed is still refused.
+        project.write_text('        MARKETING_VERSION: "1.3.1"\n')
+        self.assertIn("which is older", build.feed_version_refusal(feed, project, between_cuts))
+
+    def test_the_committed_feed_agrees_with_the_committed_site(self) -> None:
+        site = build.read_json(build.WEBSITE / "site.json")
+        self.assertIsNone(build.feed_version_refusal(build.WEBSITE / "updates" / "macos.xml",
+                                                     build.REPO / "mac-app" / "project.yml", site))
 
     def test_the_live_check_catches_a_changed_feed_and_a_missing_download(self) -> None:
         feed = self.cut("1.3.2", self.dmg_one, "- Something.")

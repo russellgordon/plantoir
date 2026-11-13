@@ -246,22 +246,31 @@ def problems_with(feed: Path, key: str | None = None) -> list[str]:
     return problems
 
 
-def version_refusal(feed: Path, csproj: Path = CSPROJ) -> str | None:
+def version_refusal(feed: Path, shipped: str | None, csproj: Path = CSPROJ) -> str | None:
     """Why the Windows feed must not be deployed with this site, or None —
-    the Windows twin of ``build.feed_version_refusal``.
+    the Windows twin of ``build.feed_version_refusal`` (#861).
 
-    Deploys run from ``main``, where the feed's newest version and
-    ``<Version>`` agree after a Windows cut, and still agree after a mac-only
-    cut, which leaves both alone."""
+    ``shipped`` is the release site.json says Windows last shipped an
+    installer in (``build.shipped_version``): the version line after a
+    Windows cut, the Windows card's pin after a cut that attaches no
+    installer. The feed's newest item must be that release. ``<Version>`` is
+    not compared for equality, because since #861 it names the release being
+    built and is raised on ``dev`` when work on a release starts; it is still
+    refused when it is BELOW the feed, which only a number moved backwards
+    can cause."""
     if not feed.is_file():
         return None
     newest = newest_item(feed.read_bytes())
-    ours = csproj_version(csproj)
     newest_version = newest["version"] if newest else None
-    if newest_version is None or ours is None or version_key(newest_version) != version_key(ours):
-        return (f"Not deploying: updates/{feed.name} offers {newest_version}, but "
-                f"windows-app/Plantoir/Plantoir.csproj says {ours}. Rebuild the feed at the cut "
+    if newest_version is None or shipped is None or version_key(newest_version) != version_key(shipped):
+        return (f"Not deploying: updates/{feed.name} offers {newest_version}, but site.json says "
+                f"Windows shipped in {shipped}. Rebuild the feed at the cut "
                 f"(RELEASING.md → \"The update feed (Windows)\").")
+    ours = csproj_version(csproj)
+    if ours is None or version_key(ours) < version_key(newest_version):
+        return (f"Not deploying: updates/{feed.name} offers {newest_version}, but "
+                f"windows-app/Plantoir/Plantoir.csproj says {ours}, which is older. The number in "
+                f"the csproj is only ever raised (RELEASING.md → \"When the number is raised\").")
     return None
 
 

@@ -30,7 +30,9 @@ right and this file is corrected.
   first, always: a force-push, a history rewrite, `git branch -D`. A cut, a
   tag, a merge into `main`, signing and a website deploy happen only when
   Russell asks for that cut or that deploy; after a cut, `main` is merged
-  back into `dev` in the same session.
+  back into `dev` in the same session, and the version number on `dev` is
+  then raised to the next release's (`RELEASING.md` → "When the number is
+  raised", #861).
 - **If this harness cannot run Fable as the main session, you are not a
   Fable director**: rule 6's ordinary rule applies, and each merge into
   `dev` is Russell's. Where the model names differ, use the strongest model
@@ -43,6 +45,9 @@ right and this file is corrected.
 1. Read `CLAUDE.md`, your platform's bootstrap file, the milestone's
    description (it is the brief for the run) and every issue in the
    milestone, body and comments. Rulings are comments on the issues.
+   Check that the project file's version on `dev` already names this
+   milestone's release (`MARKETING_VERSION` on the Mac, `<Version>` on
+   Windows); if it does not, raising it is the run's first commit (#861).
 2. Tell Russell briefly: the order you propose and why, what can overlap, an
    estimate in agent-hours and clock time, and each decision that is his.
 3. Wait until he agrees the order. On Windows this is `WINDOWS-BOOTSTRAP.md`

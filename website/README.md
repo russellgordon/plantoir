@@ -58,9 +58,11 @@ written first, every item's download signed and under its own release, and
 `windows.xml.signature` VERIFIED against the feed's bytes with
 `AppUpdates.PublicKey` — pure-stdlib Ed25519, so it runs with plain `python`
 on either machine). `--deploy` refuses when any `updates/*.xml` or
-`*.signature` is not byte for byte `git show HEAD:<path>`, when the mac
-feed's newest version is not `MARKETING_VERSION`, and when the Windows feed's
-is not `<Version>` in `Plantoir.csproj`; afterwards — like `--verify-deploy`
+`*.signature` is not byte for byte `git show HEAD:<path>`, and when either
+feed's newest version is not the release `site.json` says that platform
+shipped in (its card's pin, else the version line, `build.shipped_version`)
+or is above `MARKETING_VERSION` / `<Version>` in `Plantoir.csproj`, which
+since #861 name the release being built and may be ahead; afterwards — like `--verify-deploy`
 — it fetches each live feed, compares it with `site/`, and follows its newest
 download to a 200 of the right length: the check for a feed deployed before
 its release was published. For the Windows feed it also verifies the live

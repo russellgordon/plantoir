@@ -102,36 +102,46 @@ picture cannot show.
      s["version"]="<version>"; print(build.release_readiness_refusal(s,
      json.load(open("shots.json"))))'` must print `None`. (On 2026-09-27,
      before v1.4.0, it named eight shots.)
-4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
-   the intended tag, and that the working tree is clean. Confirm you are on
+4. Confirm the version of every platform this cut ships matches the
+   intended tag (step 5 says how), and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
    and the website commit both land on `main` (CLAUDE.md rule 6). After the
    website push, merge `main` back into `dev` so the branches do not drift.
-5. Check `MARKETING_VERSION` in `mac-app/project.yml` against `<Version>` in
-   the csproj. **A mismatch is a QUESTION, not automatically a stop** —
-   corrected 2026-08-20, when this step still said the two move in lockstep.
-   `RELEASING.md`'s "Two platforms, one version series" replaced that: the
-   version names which CONTRACTS a build passes, so a platform that has not
-   passed the new contracts keeps its old number until it does.
+5. Check `MARKETING_VERSION` in `mac-app/project.yml` and `<Version>` in
+   the csproj against the tag. **This step CHECKS the number; it does not
+   raise it** (#861, 2026-11-13). Each number was raised on `dev` when work
+   on the release started, right after the previous cut's merge back into
+   `dev` (`RELEASING.md` → "When the number is raised"), so test builds say
+   the release they are heading for. A mismatch between the two files is a
+   QUESTION, not automatically a stop: the version names which CONTRACTS a
+   build passes, and a platform that ships nothing in this cut ships no
+   bundle under this tag.
 
    **Decide it from the ASSETS this cut attaches, never from what the two
    files say.** The list you gathered in step 3 is the whole input; do not
-   ask which platforms are "involved", ask which binaries are going up. Then
-   exactly one of these holds:
+   ask which platforms are "involved", ask which binaries are going up. Then:
 
-   - **Every platform whose asset is attached must read the tag's number.**
-     No exceptions and no judgement — an asset labelled anything else is a
-     stop. This is the check that catches the real mistake: a signed bundle
-     built before the bump.
-   - **A mismatch is acceptable ONLY for a platform shipping no asset in
-     this cut.** Its number is correct where it is, and lower. Do not "fix"
-     it to match the tag — re-badging a binary that never ran the new
-     contracts is the precise thing the policy forbids — and do not raise it
-     "so the files agree", because the files disagreeing IS the record of
-     which platform still owes its gate.
-   - **A lagging number that is HIGHER than the tag is always a stop**,
-     whether or not that platform ships. It means the bump landed without
-     the release, and the next cut will silently reuse a number.
+   - **Every platform whose asset is attached must ALREADY read the tag's
+     number.** No exceptions and no judgement. A LOWER number is a stop and
+     a question for Russell: the start-of-work raise was missed, and the
+     platform's gate ran at the old number. Raise it, re-run that gate, and
+     only then build the bundle. A HIGHER number is a stop too: it names a
+     later release, and a bundle built from it would be mislabelled.
+   - **A platform shipping no asset leaves its number where it is**, at,
+     above or below the tag. Below means it has not started on a newer
+     release; at or above means it is working toward one. Do not move it
+     "so the files agree". Nothing reads it to decide what shipped: the
+     download cards and `build.py --deploy`'s feed checks read `site.json`
+     and the feeds (`build.shipped_version`).
+   - **A hotfix cut from `main` keeps its own number.** It is raised on
+     `main` for the hotfix; when `main` is merged back into `dev`, `dev`
+     keeps its own, higher number (resolve the conflict to `dev`'s side).
+
+   **After the cut**, once `main` is merged back into `dev` (step 4), raise
+   both numbers on `dev` to the next release's milestone number in a commit
+   of their own, and re-run `xcodegen generate`. `website/site.json`'s
+   `version` is NOT raised then: it is the released version line, and it
+   moves in this cut's website step.
 
    **The catch-up cut has its own rule, and it is the one people get wrong.**
    When the lagging platform later joins a tag that already exists, it is
@@ -293,7 +303,9 @@ gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
 
    **If this cut carries one platform only, pin that platform's download card
    in `website/site.json` → `downloads` in the same commit** — set its
-   `pinned` to the last version that has the asset (since v1.4.0 the cards are
+   `pinned` to the last version that has the asset, which is the newest item
+   in that platform's update feed and never its project file's number (that
+   names the release being built, #861) (since v1.4.0 the cards are
    drawn from that list; `index.html` holds only `{{download_cards}}`). The cards use GitHub's
    evergreen `releases/latest/download/<asset-name>` URL, which starts
    resolving to the NEW release the moment it publishes — and the release has
