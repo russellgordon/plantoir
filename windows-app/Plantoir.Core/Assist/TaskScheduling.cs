@@ -689,7 +689,11 @@ public static class TaskScheduling
                 "# the site being deployed, and stays. --build-only, when it runs, also",
                 "# stops any preview still serving this section; a preview's site always",
                 "# answers 'preview', so it is never reused.",
-                $"$sectionDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolder), courseCode, "section" + section))}",
+                // Where the launchers build, as Enter-NativeRuntime computes it: the REAL
+                // LOCALAPPDATA at run time, never AppDataRoot (#664: the launchers are not
+                // told about --state-dir), so the question reads the site deploy.ps1 sends.
+                $"$buildsRoot = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolder)))}",
+                $"$sectionDir = Join-Path $buildsRoot {PsQuote(Path.Combine(courseCode, "section" + section))}",
                 "$buildReason = 'toolchain'",
                 "if (-not (Test-Path -LiteralPath (Join-Path $sectionDir 'public\\index.html'))) {",
                 $"  $buildReason = {PsQuote(BuildFreshness.ReasonNeverBuilt)}",
@@ -713,7 +717,7 @@ public static class TaskScheduling
                 "    $env:PLANTOIR_SUPPORT_DIR = Join-Path $askBase 'support'",
                 "    $env:PLANTOIR_CONTRACTS_DIR = Join-Path $askBase 'contracts'",
                 "    $env:PLANTOIR_QUARTZ_DIR = Join-Path $nativeRuntime 'quartz'",
-                $"    $env:PLANTOIR_BUILD_ROOT = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "builds", FolderContainers.FolderIdentifier(workingFolder)))}",
+                "    $env:PLANTOIR_BUILD_ROOT = $buildsRoot",
                 "    $env:PYTHONUTF8 = '1'",
                 "    $global:LASTEXITCODE = 1",
                 $"    $whyAnswer = (& $pythonExe -c $whyCheck $scriptsDir {PsQuote(courseDirectory)} $sectionDir) -join ''",
