@@ -2427,7 +2427,7 @@ destinations before #665. Windows measured 0–1 s typically and under two minut
 the 1.8.5 cut; a run that waits 0 s on every leg still justifies the wait,
 because the cut proved minutes are possible.
 
-**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740, the retry below) in about 25 s,
+**`./verify-deploy.sh --self-test`** proves the wait offline (and, since #740 and #869, the retries below) in about 75 s,
 with no credentials, no Docker and nothing borrowed from any folder: a stub
 server on 127.0.0.1 serves the OLD bytes for the first K requests to a path
 and the NEW after (`VERIFY_DEPLOY_CF_POLL=1`, `VERIFY_DEPLOY_CF_WAIT=8`, the
@@ -2473,8 +2473,9 @@ every 5 s from the moment the site answered got 24 of 24 HTTP 200, with the
 right type and COEP, in the same minute. The plain run against the long-lived
 sites was 174/0/0. That is a site seconds old whose edges do not yet agree,
 not the build. (The 2026-10-31 first-publish run's one failure, a 404 on a
-page link, was the same thing. `check_page_links` is not retried, because its
-fetches run inside the Python program that Windows reads out of this script.)
+page link, was the same thing. Until #869, below, `check_page_links` was not
+retried, because its fetches run inside the Python program that Windows reads
+out of this script.)
 
 Rejected: *a fixed sleep after the site is made*, which is a guessed duration
 for a race. Also, the edges disagree file by file, so "long enough" for one
@@ -2498,6 +2499,95 @@ called from `Check-Engine` for the same fetches, with the same five
 retry taken out, 4 of the 5 fail there too (`documentation/12-windows-app.md`
 → "wrangler 4.156.0, a brand-new site's files asked again, and the loopback
 guard").
+
+**A brand-new site's pages, asked again too (#869, 2026-11-13).** #740 covered
+the per-file fetches only. Measured at #835 part 2's gate (2026-11-13, two
+`--first-publish` runs): both runs failed the same two checks, "page of
+runnable code answered HTTP … or carries no runnable block" and "… carries
+no Swift program". Run 1 got a 404 from the new Netlify site and run 2 a 522
+from the new Cloudflare project, seconds after each went live. The same page
+passed on the next leg of the same run, and in run 2 a file one line earlier
+needed #740's retry and got it. The Swift-program check reads the page that
+the first check fetched, so one bad answer failed both.
+
+Every fetch in first-publish mode that judged a brand-new site on one answer
+now goes through `fetch_headers`, which gained three wants that follow
+redirects: `page` (final answer 200), `runner` (that, with the body carrying
+`class="plantoir-runner"`) and `isolated` (that, with COOP `same-origin` and
+COEP `require-corp`). They are listed here because each one was found by
+reading every fetch in the script:
+
+- the page of runnable code, wanting its runnable block (the two failed checks);
+- the same page's COOP and COEP: proved one-answer by the self-test on
+  `origin/dev`'s code, where it failed alongside the two above;
+- the front page's "no COEP" check and the page's "CSP names no CDN" check.
+  Both check that a header is ABSENT, so a 404 or a 522 used to pass them
+  without the page ever being read. Now the header is judged on a 200
+  whenever one comes within the deadline, and since #869's review an answer
+  that is not 200 is a FAILURE that says the header could not be judged, on
+  every run, plain ones included: a negative check passes only on a real
+  answer;
+- in `check_page_links`, the two pages it starts from (retried until they
+  load) and every link (retried while it answers 404, a 5xx or nothing; a
+  redirect is a settled answer that the check judges by its class, so
+  Netlify's expected `/index` and `%2C` redirects are never asked again).
+  The Cloudflare control, a lower-case address that is meant to fail, is
+  asked once. The Python carries the same rule as `asked_again`, writing the
+  same `↻` line and the same four-column log. The Result block gains one
+  line per call, "<site>, a brand-new site's page links (#869): N page(s)
+  or link(s) needed asking again, …", and `check_engine`'s line now reads
+  "files and pages (#740, #869)".
+
+**One deadline per call as well (#869 review).** NS_WAIT is per fetch, so a
+genuinely broken new site would cost 60 s for every fetch that never
+settles: the test course's 18 same-site links alone would be 18 minutes a
+`check_page_links` call, and a first-publish run makes six such calls. Each
+`check_engine` and each `check_page_links` call therefore also has one
+deadline, `NS_CALL_WAIT` (180 s, `VERIFY_DEPLOY_NS_CALL_WAIT`), after which a
+fetch that does not settle is asked once and judged. A broken call so takes
+at most about 180 s plus one answer for each fetch left (each `curl` is
+capped at 30 s), and a healthy one is unaffected. The page-links program
+takes it as its seventh argument, optional like the rest.
+
+Already asked again, and left alone: `check_url` (40 tries 5 s apart, every
+run), the Cloudflare production wait and the new-address wait above, and the
+unit-plans leg's `plans_expect` (15 tries 2 s apart, every run). That leg's
+`plan_header` and `robots.txt` fetches are single answers on a project that
+is new on every run, plain runs included. They are outside first-publish
+mode, so they were not changed. The local preview is never asked again.
+
+**Windows' two arguments.** `verify-deploy.ps1` reads `check_page_links`' program
+out of this file (`Get-PageLinksProgram`) and runs it with the base address
+and the host kind only. The four new arguments (first publish, poll, wait,
+retry log) are therefore optional, and without them the program asks once, as
+before. A self-test case extracts the program with the `.ps1`'s own regular
+expression and runs it with two arguments, so a change that breaks Windows
+fails here first.
+
+`check_engine` and `check_page_links` moved above `run_self_test` (a move, no
+change of their own beyond the above), so the self-test runs the real checks
+against a whole stub site on 127.0.0.1 (`whole.py`). That stub serves every
+engine file at its type with COEP, the page with its block, program and
+isolation, and a front page with one more link. Twelve cases: a control that
+passes every check at once; the page answering 404, 522 or a placeholder
+without its block twice, then passing, with the count in the Result block;
+a page that never comes (still both checks' failure, judged on the last
+answer, at least 12 s for its three fetches, measured 12 to 28 s); the front
+page and a link answering 404 at first; the program as Windows reads it; a front page that never answers failing
+the no-COEP check, and a page that never answers failing the CSP check,
+rather than passing them; the call deadline in `check_engine` (of the page's
+three fetches only the first is asked again) and in `check_page_links` (the
+link fetched after the deadline is asked once); and a plain run judging the
+page and a link once. Measured: 25 passed, 0 failed, in about 75 s, three
+runs in a row. The four review cases and the new page-links wording fail on
+247be1336's functions (20 passed, 5 failed). Proved must-fail with the new self-test
+over `origin/dev`'s `fetch_headers`, `check_engine`, `check_page_links` and
+`measure_new_site_retries`: 5 of the 8 fail; the control, the two-argument
+case and the plain run pass either way. Rejected: retrying in the caller with a loop of its own (a
+second rule to keep in step with #740's), and a single long wait before
+`check_engine` (a guessed duration; the two runs show the edges disagree
+request by request). **Windows owes the same** for `verify-deploy.ps1
+-FirstPublish` (#743's counterpart): the windows issue says what.
 
 **This checkout's recipe, mirrored first (#665).** The checks read the
 CHECKOUT's `contracts/` (`check_engine_folder`'s `toolchain.json`), but the

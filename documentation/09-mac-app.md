@@ -4764,6 +4764,25 @@ two blocks of CSS came from Russell's example; its lessons, its file names and
 its people did not. Every component of the example is a commented PATTERN in
 the template pages, so an assistant writes each component the same way.
 
+**The reference-courses sentence in the same greeting (#856).** A live
+course whose code has courses kept for reference tells the session they are
+there to read and build on (decision (s), since v1.3.0). The sentence had no
+contract key, so Windows' greeting lacked it and no test noticed. It is now
+`app-rules.json` → `outsideAgents.greetingReferenceCourses`: the template with
+`{course}` and `{courses}`, the separator, how each listed course is made
+(`referenceCoursesToMention`: same code, folder and school year, sorted), where
+it goes, and four cases, run by
+`AppRulesContractTests.testTheReferenceCoursesSentenceIsTheContracts` against
+`ClaudeCodeLauncher.referenceCoursesSentenceTemplate` and
+`referenceCoursesSentence(courseCode:referenceCourses:)`; and seven
+`listCases` (the review's finding), which give a course and its shelf and
+expect the list, run through `referenceCoursesToMention` by
+`testTheReferenceCoursesListIsMadeAsTheContractSays`, so Windows runs how the
+list is made rather than working it out from `eachCourse`. The mac's greeting
+did not move by a byte (the old and new code compiled side by side and compared
+on four inputs), and the greeting is not shown to the local model, whose
+digest is unchanged.
+
 **The reminder in the Revise doors' greeting.** `ClaudeCodeLauncher.greeting`
 gains `unitPlans: [UnitPlans.Plan]?`, and its sentence goes LAST, after the
 reference-courses sentence, so the opening instructions keep their order.
@@ -7031,7 +7050,8 @@ it (#627, 2026-10-23): Obsidian does the same here, on 1.13.7 and 1.14.4, and
 **Where the files come from.** Carried, never downloaded on the yes:
 `mac-app/Vendor/fetch-obsidian-addons.sh` reads every id, version, size,
 SHA-256 and address from `obsidianAddOnsForFigures.addOns` with
-`/usr/bin/plutil` (21 ms on the 1.7 MB contract) and carries no pin of its own
+`/usr/bin/jq` (see "Why the fetch reads the contract with jq (#864)" below)
+and carries no pin of its own
 (`ObsidianFigureAddOnsTests.testTheFetchScriptCarriesNoPinOfItsOwn`); a
 mismatch installs nothing; its cache is outside the repository like
 fetch-helpers.sh's. `project.yml` carries `Vendor/obsidian-addons` as
@@ -7044,6 +7064,50 @@ JavaScript and CSS, so nothing to sign beyond the app's seal. Not in
 `support/`: everything there is hashed into the image tag and mirrored into
 `.toolchain/`. At install time the app hashes the files it is about to write
 against the pins (5–8 ms for all seven) and writes nothing on a mismatch.
+
+**Why the fetch reads the contract with jq (#864).** The script read the
+contract with `/usr/bin/plutil -extract` until 2026-11-13. plutil refuses a
+whole JSON file that holds an escaped NUL anywhere in it ("Unsupported
+escaped (unicode) null"), and #780's cases put eight `\u0000` escapes into
+`shared-rules.json` on 2026-11-12, where they stay because they are what
+those cases test. From then on the script read nothing, said the contract
+had no `obsidianAddOnsForFigures.addOns`, and exited 1. That stopped a fresh
+clone or worktree (no `Vendor/obsidian-addons`, so `xcodegen generate`
+fails) and also every machine that already had the folder, because the
+"already in place" check reads the pins first: `publish.sh` runs the script
+under `set -e` before it generates the project, so a release build stopped
+there too. No suite ran the script, so no suite saw it. Measured on macOS
+26.6: of the ten contract files, `plutil -convert json` refuses only
+`shared-rules.json`. Both plutil and jq refuse a lone surrogate escape
+(`\ud800`), which no contract holds; the test below would catch one.
+
+The reader is now `/usr/bin/jq` (jq-1.7.1-apple, in the system volume),
+which macOS has shipped since macOS 15; the Xcode this project builds with
+(26 or later, `mac-app/README.md`) needs macOS 15.6 or later. It reads the escaped NUL as JSON says, 29 ms a
+read on the contract against plutil's 21 ms; all seven pins in about one
+second. `--print-pins` runs the reading step alone and prints what it read,
+one tab-separated line per file, fetching and installing nothing.
+`scripts/test_fetch_obsidian_addons.py` runs it against the real contract
+and compares every line with Python's own reading of the file, so the next
+character a reader refuses fails a suite rather than a new machine; it
+skips where there is no `/usr/bin/jq`, Windows included. Rejected:
+
+- **`sed 's/\\u0000/\\u0001/g' | plutil … -`** works on any macOS and keeps
+  the JSON valid whatever the escapes stand next to, but it edits the text
+  before reading it, fixes only the one character met so far, and leaves a
+  reader that is not reading the file as written.
+- **`/usr/bin/python3`** is only a stub until the developer tools are
+  installed, and the script's rule is that nothing but macOS is needed.
+- **`perl -MJSON::PP`** is on every Mac and reads the file, but at 0.67 s a
+  read it would take most of a minute across the script's reads.
+- **`osascript -l JavaScript`** was ruled out before measuring: osascript
+  is not run on this machine during unattended work.
+
+Windows' `fetch-obsidian-addons.ps1` reads the same file with
+`ConvertFrom-Json` (PowerShell 7) or `JavaScriptSerializer` (5.1). Neither
+was run here, since this Mac has no PowerShell. Both are documented to
+decode `\u0000` into a character rather than refuse it, so no Windows issue
+was opened; a Windows run of the script on the current contract confirms it.
 
 **The sequence** (`obsidianAddOnsForFigures.sequence`, the route
 `WorkspaceModel.openInObsidian(course:sectionNumber:)` in
@@ -16045,13 +16109,51 @@ this is the app's half.
   the Cloudflare token and the plans' username and password are asked the way
   a section's deploy asks (`CredentialRequest.unitPlanUsername`,
   `unitPlanPassword`). No argument ever carries a username or a password.
+  The username's explanation names the computer, so since #863 it is built by
+  `CredentialRequest.unitPlanUsername(machine:)` and the contract's readout
+  (`app-rules.json` → `credentialRequests`) is written with `{machine}`
+  (`specialNames.platformWording.machine.usedIn`); this app fills in "Mac", so
+  the sentence a teacher reads here did not change. REJECTED: "on this
+  computer", as the token explanations say, which would have changed the mac's
+  sentence for no reader's benefit when the placeholder keeps both.
 - **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
   under section 0 (`PlanSharing.leaseSection`), which no section has: a
   section's own deploy is never refused by it, while the course reads as busy
   to Quit, Rename, Back Up, Start of Year and Archive, and an outside
   assistant's deploy waits, as review M7 asked. Quit names it "sharing the
   unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
-  a share builds no section. A new lease kind was rejected: `publish` already
+  a share builds no section. **Since #863 a run of the plans' launcher has
+  its own words on quit** (Russell, 2026-11-13), in the contract so Windows
+  says the same ones: `quittingWhileWorkIsUnderWay.whileUnitPlansAreShared`,
+  `words` and fourteen cases run by
+  `QuitConfirmationTests.testSharingUnitPlansIsAskedAboutInTheContractsWords`,
+  with every fragment pinned key by key by
+  `testEveryShareFragmentIsTheContractsKeyByKey`. The lease is the same for
+  a share, a Change Password and a Stop Sharing, so `PlanShareRunner.start`
+  records what the run was started to do beside it
+  (`CourseActivity.beginPlanWork`, `PlanWork.of(choice)`), and removes it with
+  the lease. `QuitConfirmation.Kinds` sorts the publishes into deploys, shares,
+  password changes and stops; the question names each part ("sharing the unit
+  plans of <CODE>", "changing the password for the unit plans of <CODE>",
+  "stopping the sharing of the unit plans of <CODE>", or "of N courses"), deploys
+  first, joined "A and B" or "A, B and C". The message is
+  `messageOne`/`messageSeveral` with one clause per part: the class website
+  part way updated, the plans part way shared, the new password not saved
+  yet, the plans' address still working. No clause carries its remedy: the
+  share bar already offers Share Again and Stop Sharing, and a remedy in each
+  clause made a two- or three-clause message misparse (the second fix
+  review). A Change Password's console is titled "Changing the password for
+  the … unit plans", not "Sharing". Each clause was read off what that run leaves
+  when it stops early (`interruptionCases`, `changePasswordCases`,
+  `stopSharing`); deploys alone read exactly as before. The update banner
+  borrows the same phrase (`UpdateGate.workUnderWay`). REJECTED, each in the
+  block's `rejected`: the deploy's message for a share (the first commit's
+  recording of the mac's old words); "anyone with the address could still
+  open the plans" (the first fix round), untrue for protected plans re-shared
+  with their password, a first share stopped before anything was sent, a
+  Change Password and a Stop Sharing; calling the latter two "sharing"
+  because they share a lease; and one fixed sentence per combination, which
+  would be ten sentences for these fourteen cases. A new lease kind was rejected: `publish` already
   means sending something somewhere to every reader of a lease.
 - **The trail** is written from the markers by `PlanShareReport`, which every
   launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):

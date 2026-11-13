@@ -53,6 +53,37 @@ enum CourseActivity {
         let displayCode: String
     }
 
+    /// What a run of the unit plans' launcher is doing (#863): sharing,
+    /// changing the plans' password, or stopping sharing. All three hold the
+    /// same lease, a publish under `PlanSharing.leaseSection`, so the quit
+    /// question reads this to name the one that is under way.
+    enum PlanWork: String, Equatable {
+        case sharing
+        case changingPassword
+        case stopping
+
+        // MARK: - Functions
+
+        /// The work a choice on the Planning tab's share bar starts.
+        static func of(_ choice: PlanSharing.Choice) -> PlanWork {
+            switch choice {
+            case .changePassword:
+                return .changingPassword
+            case .stop:
+                return .stopping
+            case .shareOpen, .shareProtected, .shareAgain, .removePassword, .addPassword:
+                return .sharing
+            }
+        }
+    }
+
+    /// One course's unit plans being shared, re-passworded or stopped.
+    struct PlanWorkRecord: Equatable {
+        let folderPath: String
+        let courseCode: String
+        let work: PlanWork
+    }
+
     /// The backing store is observable for the same reason as
     /// `PreviewLeases.Store`: views reading `courseIsBusy` must
     /// re-render the moment a publish begins or ends.
@@ -61,6 +92,7 @@ enum CourseActivity {
         var activePublishes: [PublishRecord] = []
         var activePreviewBuilds: [PreviewBuildRecord] = []
         var activeCopies: [CopyRecord] = []
+        var activePlanWork: [PlanWorkRecord] = []
     }
 
     // MARK: - Stored properties
@@ -90,7 +122,32 @@ enum CourseActivity {
         return store.activeCopies
     }
 
+    /// What each run of the unit plans' launcher is doing (#863).
+    static var activePlanWork: [PlanWorkRecord] {
+        return store.activePlanWork
+    }
+
     // MARK: - Functions
+
+    /// Records what a run of the unit plans' launcher is doing, beside the
+    /// lease it holds (#863).
+    static func beginPlanWork(folderPath: String, courseCode: String, work: PlanWork) {
+        store.activePlanWork.append(PlanWorkRecord(folderPath: folderPath, courseCode: courseCode, work: work))
+    }
+
+    /// Records that a run of the unit plans' launcher has ended.
+    static func endPlanWork(folderPath: String, courseCode: String) {
+        var remaining: [PlanWorkRecord] = []
+        var didRemoveOne: Bool = false
+        for existing in activePlanWork {
+            if existing.folderPath == folderPath && existing.courseCode == courseCode && !didRemoveOne {
+                didRemoveOne = true
+                continue
+            }
+            remaining.append(existing)
+        }
+        store.activePlanWork = remaining
+    }
 
     /// Records that a course's folder has started being zipped (#351). One
     /// record per zip, so two at once of one course end one at a time.
@@ -405,6 +462,7 @@ enum CourseActivity {
         store.activePublishes = []
         store.activePreviewBuilds = []
         store.activeCopies = []
+        store.activePlanWork = []
         WorkLeaseRegistry.reconcile()
     }
 }
