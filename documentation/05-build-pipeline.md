@@ -2804,6 +2804,16 @@ see the reason for.
   when there is no front page, and writes the trail line itself. A night
   that reuses runs no build, so it captures no folder findings: the record
   the last build left still describes the site being deployed, and stays.
+  **Measured for real** (#799's review asked): the generated wrapper run
+  three times by hand against a scratch working folder, the real launchers,
+  the runtime's Python and NO `PLANTOIR_TOOLCHAIN_ID`, as in production, one
+  folder destination, nothing registered with Task Scheduler. Night 1 built
+  (`neverBuilt`, 120 s), night 2 built ONCE MORE for the pages (34 s),
+  because night 1's folder deploy made `.publish_state` at the course's top,
+  and night 3 reused (6 s, no trail line). Each build left one trail line,
+  and `deploy.ps1` after the wrapper never built. So the wrapper names the
+  same toolchain as `deploy.ps1`, and a course's second night pays the
+  `.publish_state` build once, as "Known extra builds, each once" says.
   REJECTED for the wrapper: `BuildFreshness` (the app is closed while it
   runs) and leaving the build to each `deploy.ps1` leg (the wrapper's build
   is where the folder findings and the "needed an answer" outcome are
