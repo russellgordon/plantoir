@@ -89,6 +89,19 @@ enum PreviewLeases {
                 takenPorts.append(existing.port)
             }
         }
+        // And the ports ANOTHER program's live previews in this folder are
+        // served on (#835): two copies of Plantoir share the folder's one
+        // website builder, and each chose its port knowing only its own
+        // previews, so both were handed 8081 and the second ended the first
+        // (measured 3 of 3, `S/plans/835-measured.md` run G). A lease that
+        // names no port (Windows, an older Plantoir) cannot be avoided here;
+        // the builder's own claim on the address refuses that second preview
+        // in words (`twoPreviewsOneAddress`, #835b).
+        for port in PreviewLeases.portsServedByOtherPrograms(folderPath: folderPath) {
+            if !takenPorts.contains(port) {
+                takenPorts.append(port)
+            }
+        }
         for port in availablePorts {
             if !takenPorts.contains(port) {
                 let lease: Lease = Lease(
@@ -103,6 +116,31 @@ enum PreviewLeases {
             }
         }
         throw Problem.allPortsBusy
+    }
+
+    /// The container ports other live programs' preview leases in this
+    /// working folder name, on any course (#835). The folder's leases are
+    /// read with the same liveness rule every reader uses, so a preview
+    /// whose program has gone leaves no port taken.
+    static func portsServedByOtherPrograms(
+        folderPath: String,
+        ownPID: Int32 = getpid(),
+        ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
+    ) -> [Int] {
+        let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
+            .appendingPathComponent("courses", isDirectory: true)
+        let held: [(course: String, holding: WorkLeaseFiles.Holding)] = WorkLeaseFiles.everyLeaseHeldElsewhere(
+            coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
+        )
+        var ports: [Int] = []
+        for entry in held where entry.holding.kind.lowercased() == WorkLeaseFiles.previewKind {
+            for section in entry.holding.sections ?? [] {
+                if let port = section.port, !ports.contains(port) {
+                    ports.append(port)
+                }
+            }
+        }
+        return ports
     }
 
     /// Returns a lease when its preview stops, whatever the reason.

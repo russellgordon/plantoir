@@ -265,6 +265,281 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertEqual(block["clock"] as? String, "wall")
     }
 
+    /// `workLeases.declining.sections.cases` (#835): the asked section, the
+    /// sections each lease names, and the claim, through the real rule. A
+    /// case's `sectionsLine` is a literal sixth line read by the real reader.
+    func testTheSectionRuleIsTheContracts() throws {
+        let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["workLeases", "declining", "sections"])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 14, "Cases went missing from the contract.")
+        var ran: Int = 0
+        for item in cases {
+            let name: String = item["name"] as? String ?? "?"
+            let askerWord: String = try XCTUnwrap(item["asker"] as? String, name)
+            var asker: WorkLeaseFiles.Asker = .aBuild
+            switch askerWord {
+            case "aBuild":
+                asker = .aBuild
+            case "aScheduledPublish":
+                asker = .aScheduledPublish
+            case "anOutsideDeploy":
+                asker = .anOutsideDeploy
+            default:
+                XCTFail("Unknown asker '\(askerWord)' in: \(name)")
+                continue
+            }
+            let me: [String: Any] = try XCTUnwrap(item["me"] as? [String: Any], name)
+            let myPID: Int32 = Int32(try XCTUnwrap(me["pid"] as? Int, name))
+            XCTAssertTrue(me.keys.contains("section"), "No section (a number or null) in: \(name)")
+            let section: Int? = me["section"] as? Int
+            var claim: WorkLeaseFiles.Claim? = nil
+            if let claimed = me["claim"] as? [String: Any] {
+                claim = WorkLeaseFiles.Claim(
+                    moment: try XCTUnwrap(claimed["moment"] as? String, name),
+                    pid: Int32(try XCTUnwrap(claimed["pid"] as? Int, name))
+                )
+            }
+            var holdings: [WorkLeaseFiles.Holding] = []
+            for entry in try XCTUnwrap(item["others"] as? [[String: Any]], name) {
+                let pid: Int32 = Int32(try XCTUnwrap(entry["pid"] as? Int, name))
+                let alive: Bool = try XCTUnwrap(entry["alive"] as? Bool, name)
+                let courseCode: String = try XCTUnwrap(entry["course"] as? String, name)
+                if courseCode.lowercased() != "ics3u" || pid == myPID || !alive {
+                    continue
+                }
+                let kind: String = try XCTUnwrap(entry["kind"] as? String, name)
+                let moment: String? = entry["moment"] as? String
+                var sections: [WorkLeaseFiles.SectionEntry]? = nil
+                if let line = entry["sectionsLine"] as? String {
+                    let body: String = "\(pid)\nsleep\n\(moment ?? "")\n\n\n\(line)\n"
+                    sections = WorkLeaseFiles.sections(ofALeaseOfKind: kind, text: body)
+                } else if let named = entry["sections"] as? [[String: Any]] {
+                    var read: [WorkLeaseFiles.SectionEntry] = []
+                    for one in named {
+                        read.append(WorkLeaseFiles.SectionEntry(
+                            section: try XCTUnwrap(one["section"] as? Int, name),
+                            moment: try XCTUnwrap(one["moment"] as? String, name)
+                        ))
+                    }
+                    sections = read
+                }
+                holdings.append(WorkLeaseFiles.Holding(kind: kind, pid: pid, moment: moment, sections: sections))
+            }
+            let expect: String = try XCTUnwrap(item["expect"] as? String, name)
+            let blocking: WorkLeaseFiles.Holding? = WorkLeaseFiles.blocking(
+                among: holdings, asker: asker, claim: claim, section: section
+            )
+            XCTAssertEqual(blocking == nil ? "allowed" : "declined", expect, name)
+            ran += 1
+        }
+        XCTAssertEqual(ran, cases.count, "A case was not run.")
+    }
+
+    /// Two sections in one program keep ONE file per kind with an entry
+    /// each, adding Section 2 keeps Section 1's moment and line 3, and each
+    /// section's claim is its own moment (#835). A rewrite that restamped
+    /// the file, or one moment per file, fails here.
+    func testTwoSectionsInOneProgramShareAFileAndKeepTheirMoments() throws {
+        let build: URL = leaseURL(kind: "build")
+        CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let first: String = String(decoding: try Data(contentsOf: build), as: UTF8.self)
+        let firstEntries: [WorkLeaseFiles.SectionEntry] = try XCTUnwrap(
+            WorkLeaseFiles.sections(ofALeaseOfKind: "build", text: first)
+        )
+        XCTAssertEqual(firstEntries.count, 1)
+        // A different millisecond for Section 2's moment.
+        Thread.sleep(forTimeInterval: 0.01)
+        CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
+        let second: String = String(decoding: try Data(contentsOf: build), as: UTF8.self)
+        let entries: [WorkLeaseFiles.SectionEntry] = try XCTUnwrap(
+            WorkLeaseFiles.sections(ofALeaseOfKind: "build", text: second)
+        )
+        XCTAssertEqual(entries.count, 2, "One file, two entries.")
+        XCTAssertEqual(entries[0], firstEntries[0], "Adding Section 2 keeps Section 1's moment.")
+        XCTAssertEqual(WorkLeaseFiles.momentLine(in: second), WorkLeaseFiles.momentLine(in: first), "Line 3 is written once.")
+        XCTAssertGreaterThan(entries[1].moment, entries[0].moment, "Section 2 is stamped when it was taken.")
+        XCTAssertEqual(
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: 2)?.moment,
+            entries[1].moment, "Section 2's claim is its own moment, not line 3."
+        )
+        XCTAssertEqual(
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: 1)?.moment,
+            entries[0].moment
+        )
+        XCTAssertNil(
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: 3),
+            "No claim for a section this program does not hold: its look counts every lease."
+        )
+
+        CourseActivity.endPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        let third: String = String(decoding: try Data(contentsOf: build), as: UTF8.self)
+        let left: [WorkLeaseFiles.SectionEntry] = try XCTUnwrap(WorkLeaseFiles.sections(ofALeaseOfKind: "build", text: third))
+        XCTAssertEqual(left, [entries[1]], "Ending Section 1 drops its entry and keeps Section 2's moment.")
+        XCTAssertEqual(WorkLeaseFiles.momentLine(in: third), WorkLeaseFiles.momentLine(in: first))
+
+        // Another program's question about Section 1 is now clear; about 2 is not.
+        let mine: WorkLeaseFiles.Holding = WorkLeaseFiles.Holding(
+            kind: "build", pid: getpid(), moment: WorkLeaseFiles.momentLine(in: third), sections: left
+        )
+        XCTAssertNil(WorkLeaseFiles.blocking(among: [mine], asker: .aBuild, claim: nil, section: 1))
+        XCTAssertNotNil(WorkLeaseFiles.blocking(among: [mine], asker: .aBuild, claim: nil, section: 2))
+    }
+
+    /// Plan sharing publishes under `PlanSharing.leaseSection` (0): course-
+    /// wide work, so the lease names no sections while it runs and holds
+    /// every section, and the sections come back when it ends (#835).
+    func testCourseWideWorkMakesTheLeaseHoldTheWholeCourse() throws {
+        CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
+        XCTAssertNotNil(WorkLeaseRegistry.sectionsOnDisk(folderPath: root.path, courseCode: "ICS3U", kind: "build"))
+        CourseActivity.beginPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: PlanSharing.leaseSection)
+        let text: String = String(decoding: try Data(contentsOf: leaseURL(kind: "build")), as: UTF8.self)
+        XCTAssertNil(WorkLeaseFiles.sections(ofALeaseOfKind: "build", text: text), "Course-wide: no sixth line.")
+        XCTAssertNil(WorkLeaseFiles.sections(
+            ofALeaseOfKind: "publish",
+            text: String(decoding: try Data(contentsOf: leaseURL(kind: "publish")), as: UTF8.self)
+        ))
+        XCTAssertNotNil(
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: nil),
+            "The course-wide claim is the moment course-wide work began."
+        )
+        CourseActivity.endPublish(folderPath: root.path, courseCode: "ICS3U", sectionNumber: PlanSharing.leaseSection)
+        let after: String = String(decoding: try Data(contentsOf: leaseURL(kind: "build")), as: UTF8.self)
+        XCTAssertEqual(WorkLeaseFiles.sections(ofALeaseOfKind: "build", text: after)?.count, 1)
+        XCTAssertNil(WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: nil))
+    }
+
+    /// Another program building a SIBLING section leaves this section's
+    /// build free, and the trail names the section when the lease does
+    /// (#835). A lease that names no section still declines every section.
+    func testASiblingBuiltElsewhereLeavesThisSectionFree() throws {
+        let pid: Int32 = try startTheOtherProgram()
+        let url: URL = try writeOthersLease(kind: "build", pid: pid)
+        var text: String = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        let moment: String = try XCTUnwrap(WorkLeaseFiles.momentLine(in: text))
+        text += "\nsections 2=\(moment)\n"
+        try Data(text.utf8).write(to: url, options: .atomic)
+
+        XCTAssertNil(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: false, section: 1
+        ))
+        let held: WorkLeaseFiles.Holding = try XCTUnwrap(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: false, section: 2
+        ))
+        XCTAssertNotNil(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: false
+        ), "A course-wide question is held by any lease of the course.")
+        XCTAssertEqual(
+            WorkLeaseRegistry.declinedLine(act: "Preview", sectionNumber: 2, holding: held),
+            "declined Preview — Section 2 of the course is being built by process \(pid) somewhere else on this Mac"
+        )
+        XCTAssertFalse(WorkLeaseRegistry.anotherProgramIsBuilding(folderPath: root.path, courseCode: "ICS3U", section: 1))
+        XCTAssertTrue(WorkLeaseRegistry.anotherProgramIsBuilding(folderPath: root.path, courseCode: "ICS3U", section: 2))
+
+        // The same lease with no sixth line: every section.
+        try writeOthersLease(kind: "build", pid: pid)
+        let wide: WorkLeaseFiles.Holding = try XCTUnwrap(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: false, section: 1
+        ))
+        XCTAssertEqual(
+            WorkLeaseRegistry.declinedLine(act: "Preview", sectionNumber: 1, holding: wide),
+            "declined Preview — the course is being built by process \(pid) somewhere else on this Mac"
+        )
+    }
+
+    /// A scheduled deploy waits only for its own section, and its leases
+    /// name its section (#835, Q1).
+    func testAScheduledPublishWaitsOnlyForItsOwnSection() throws {
+        let sibling: WorkLeaseFiles.Holding = WorkLeaseFiles.Holding(
+            kind: "build", pid: 4321, moment: "2026-11-13T12:00:00.1000000Z",
+            sections: [WorkLeaseFiles.SectionEntry(section: 1, moment: "2026-11-13T12:00:00.1000000Z")]
+        )
+        var looks: Int = 0
+        var pauses: Int = 0
+        var firstClock: Date = Date()
+        let answer: ScheduledDeploy.CourseWait = ScheduledDeploy.waitForTheCourse(
+            courseCode: "ICS3U", coursesDirectory: coursesURL, section: 2,
+            now: { return firstClock },
+            // A pretend clock, so a wrong answer stands down at once rather
+            // than spinning for ten real minutes.
+            pause: { seconds in
+                pauses += 1
+                firstClock = firstClock.addingTimeInterval(seconds)
+            },
+            heldElsewhere: {
+                looks += 1
+                return [sibling]
+            }
+        )
+        XCTAssertEqual(pauses, 0, "A sibling's build must not make it wait.")
+        guard case .goAhead(let leases, _, let waitedFor) = answer else {
+            return XCTFail("Expected to go ahead, got \(answer)")
+        }
+        XCTAssertNil(waitedFor)
+        XCTAssertEqual(looks, 2, "Looked, took, looked again.")
+        XCTAssertEqual(leases.count, 2)
+        for url in leases {
+            let text: String = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+            let named: [WorkLeaseFiles.SectionEntry] = try XCTUnwrap(
+                WorkLeaseFiles.sections(ofALeaseOfKind: url.lastPathComponent.contains(".build.") ? "build" : "publish", text: text)
+            )
+            XCTAssertEqual(named.count, 1)
+            XCTAssertEqual(named[0].section, 2)
+            XCTAssertEqual(named[0].moment, WorkLeaseFiles.momentLine(in: text), "One moment, one claim.")
+            WorkLeaseFiles.remove(at: url)
+        }
+
+        var waits: Int = 0
+        let own: WorkLeaseFiles.Holding = WorkLeaseFiles.Holding(
+            kind: "build", pid: 4321, moment: "2026-11-13T12:00:00.1000000Z",
+            sections: [WorkLeaseFiles.SectionEntry(section: 2, moment: "2026-11-13T12:00:00.1000000Z")]
+        )
+        var clock: Date = Date()
+        let stood: ScheduledDeploy.CourseWait = ScheduledDeploy.waitForTheCourse(
+            courseCode: "ICS3U", coursesDirectory: coursesURL, section: 2,
+            now: { return clock },
+            pause: { seconds in
+                waits += 1
+                clock = clock.addingTimeInterval(seconds)
+            },
+            heldElsewhere: { return [own] }
+        )
+        guard case .standDown = stood else {
+            return XCTFail("Its own section held for ten minutes: it stands down, got \(stood)")
+        }
+        XCTAssertGreaterThan(waits, 0)
+    }
+
+    /// The window hands out an address another program's live preview in
+    /// this folder is NOT serving (#835): two copies of Plantoir were both
+    /// handed 8081, and the second ended the first (measured 3 of 3).
+    func testAPreviewSkipsAnAddressAnotherProgramServes() throws {
+        let pid: Int32 = try startTheOtherProgram()
+        let url: URL = try writeOthersLease(kind: "preview", pid: pid)
+        var text: String = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        let moment: String = try XCTUnwrap(WorkLeaseFiles.momentLine(in: text))
+        text += "\nsections 1=\(moment)@8081 3=\(moment)@8083\n"
+        try Data(text.utf8).write(to: url, options: .atomic)
+
+        XCTAssertEqual(PreviewLeases.portsServedByOtherPrograms(folderPath: root.path), [8081, 8083])
+        let lease: PreviewLeases.Lease = try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 2)
+        XCTAssertEqual(lease.port, 8082)
+        let next: PreviewLeases.Lease = try PreviewLeases.lease(folderPath: root.path, courseCode: "MPM2D", sectionNumber: 1)
+        XCTAssertEqual(next.port, 8084, "Another course in the folder shares the builder's addresses too.")
+        let mine: String = String(decoding: try Data(contentsOf: leaseURL(kind: "preview")), as: UTF8.self)
+        XCTAssertEqual(
+            WorkLeaseFiles.sections(ofALeaseOfKind: "preview", text: mine)?.first?.port, 8082,
+            "This program's preview lease names its address, so the other program avoids it in turn."
+        )
+        XCTAssertThrowsError(try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 4))
+        PreviewLeases.release(lease)
+        PreviewLeases.release(next)
+
+        // Gone: its addresses are free again.
+        other?.terminate()
+        other?.waitUntilExit()
+        XCTAssertEqual(PreviewLeases.portsServedByOtherPrograms(folderPath: root.path), [])
+    }
+
     func testEveryKindItBlocksOnIsOneTheFormatNames() throws {
         let format: [String: Any] = try WorkLeaseLivenessTests.contract("file-formats.json", ["workLease"])
         let kinds: [String: Any] = try XCTUnwrap(format["kinds"] as? [String: Any])
@@ -291,7 +566,11 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("\n"), "The last line ends in a line feed too.")
         XCTAssertFalse(text.contains("\r"))
         let lines: [Substring] = text.split(separator: "\n", omittingEmptySubsequences: false)
-        XCTAssertEqual(lines.count, 5, "Four lines and the empty remainder after the last line feed.")
+        // Six lines since #835 (line 5 empty, the sections on line 6), and
+        // the empty remainder after the last line feed.
+        XCTAssertEqual(lines.count, 7, "Six lines and the empty remainder after the last line feed.")
+        XCTAssertEqual(String(lines[4]), "", "Line 5 is empty: a build lease carries no door key.")
+        XCTAssertEqual(String(lines[5]), "sections 1=\(lines[2])", "Line 6 names the section, taken at line 3's moment.")
         XCTAssertEqual(String(lines[0]), String(getpid()))
         guard case .found(let tableName, _, let startTime) = ProcessLiveness.askTheProcessTable(pid: getpid()) else {
             return XCTFail("The table could not be asked about this process.")
@@ -427,21 +706,21 @@ final class WorkLeaseDecliningTests: XCTestCase {
         let pid: Int32 = try startTheOtherProgram()
         CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
         let mine: WorkLeaseFiles.Claim = try XCTUnwrap(
-            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U")
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: 1)
         )
 
         try writeOthersLease(kind: "build", pid: pid, moment: "2000-01-01T00:00:00.0000000Z")
         XCTAssertNotNil(
-            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: true),
+            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: true, section: 1),
             "An earlier lease wins."
         )
         try writeOthersLease(kind: "build", pid: pid, moment: "2999-01-01T00:00:00.0000000Z")
         XCTAssertNil(
-            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: true),
+            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: true, section: 1),
             "A later lease is the other program's to back off from (mine: \(mine.moment))."
         )
         XCTAssertNotNil(
-            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: false),
+            WorkLeaseRegistry.whatBlocksABuild(folderPath: root.path, courseCode: "ICS3U", afterTaking: false, section: 1),
             "The early look, before anything is taken, counts every lease."
         )
     }
@@ -455,7 +734,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
         // The window's press, in the order `startPreview` takes it.
         CourseActivity.beginPreviewBuild(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
         let windowsBuild: WorkLeaseFiles.Claim = try XCTUnwrap(
-            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U")
+            WorkLeaseRegistry.buildClaim(folderPath: root.path, courseCode: "ICS3U", section: 1)
         )
         // The outside build lands a millisecond after the window's build…
         let outsideMoment: String = try WorkLeaseDecliningTests.moment(windowsBuild.moment, plusMilliseconds: 1)
@@ -464,7 +743,7 @@ final class WorkLeaseDecliningTests: XCTestCase {
         _ = try PreviewLeases.lease(folderPath: root.path, courseCode: "ICS3U", sectionNumber: 1)
 
         let windowGoesAhead: Bool = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: root.path, courseCode: "ICS3U", afterTaking: true
+            folderPath: root.path, courseCode: "ICS3U", afterTaking: true, section: 1
         ) == nil
 
         // What the outside program sees: the window's two lease files, read
@@ -473,12 +752,13 @@ final class WorkLeaseDecliningTests: XCTestCase {
         for kind in ["build", "preview"] {
             let text: String = try String(contentsOf: leaseURL(kind: kind), encoding: .utf8)
             windowsLeases.append(WorkLeaseFiles.Holding(
-                kind: kind, pid: getpid(), moment: WorkLeaseFiles.momentLine(in: text)
+                kind: kind, pid: getpid(), moment: WorkLeaseFiles.momentLine(in: text),
+                sections: WorkLeaseFiles.sections(ofALeaseOfKind: kind, text: text)
             ))
         }
         let outsideGoesAhead: Bool = WorkLeaseFiles.blocking(
             among: windowsLeases, asker: .aBuild,
-            claim: WorkLeaseFiles.Claim(moment: outsideMoment, pid: pid)
+            claim: WorkLeaseFiles.Claim(moment: outsideMoment, pid: pid), section: 1
         ) == nil
 
         XCTAssertTrue(windowGoesAhead, "The window's build was first.")

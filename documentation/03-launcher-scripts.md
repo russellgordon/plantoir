@@ -3374,8 +3374,11 @@ builder class. Now the `TOKEN HAND-OFF BLOCK` in `deploy.sh`:
   reaches the whole group as SIGINT only while no `docker exec -it` holds the
   terminal. While one does (the deploy's and the plan share's own steps), its
   raw mode passes the ^C into the builder, to the command running there, and
-  bash sees no signal at all: that command ends, the exec returns its status,
-  and `set -e` ends the run through the EXIT trap.
+  bash sees no signal at all: that command ends and the exec returns its
+  status. In a deploy, `set -e` then ends the run through the EXIT trap; in a
+  plan share, `share_plan "${_plan_opts[@]}" || _share_rc=$?` keeps the status
+  (the `||` turns `set -e` off for that call), the run writes its result
+  marker, and `exit "$_share_rc"` ends it through the same trap.
 
   SIGTERM and SIGHUP are deliberately NOT trapped. The fix round traps them
   too, and the fix review (N1) measured the cost: a trapped signal waits for
@@ -3445,13 +3448,26 @@ two runs of three, the third skipped because the id did not come back; the
 new code passed three of three). A claim that proves nothing is taken over,
 and `preview.sh` asks `a_claim_that_proves_nothing` before the build so the
 trail says so (`launcherLineWhenALeftClaimIsTakenOver`). The claim is given
-back when its build ends, by Stop's SIGINT, or by SIGTERM (what a stop sends
-first) or SIGHUP (a closed terminal), each made an ordinary exit; SIGKILL
-leaves it for the next run to take over. Rejected: moving the second preview
-to a free address, because `preview.sh` announces the address before the build
-and the app opens that one. #835's per-section leases name each preview's
-address, so the app avoids a taken one and this refusal stays rare.
+back when its build ends, on SIGINT (what Cancel's ^C sends to the group), or
+on SIGTERM (what Stop sends, to bash alone) or SIGHUP (a closed terminal),
+each made an ordinary exit; SIGKILL leaves it for the next run to take over.
+Rejected: moving the second preview to a free address, because `preview.sh`
+announces the address before the build and the app opens that one.
 `scripts/test_two_previews_one_address.py`.
+
+**The app avoids an address another program serves (#835's third piece).**
+Since then a preview lease's sixth line names each section's address
+(`file-formats.json` → `workLease.lines`, `1=<moment>@8081`), and the mac's
+`PreviewLeases.lease` skips every address another live program's preview
+lease in the same working folder names, on any course
+(`PreviewLeases.portsServedByOtherPrograms`;
+`WorkLeaseDecliningTests.testAPreviewSkipsAnAddressAnotherProgramServes`). That
+makes the refusal above rare rather than replacing it, and it is still met in
+two shapes: two programs choosing at the same instant (each reads the other's
+lease before either is written), and a program that writes no sixth line
+(Windows, an older Plantoir). Measured by the test only: two copies of
+Plantoir were not run side by side, because the app may not be launched in
+this run.
 
 ## A course kept for reference is refused in the launcher, early
 

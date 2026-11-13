@@ -4673,8 +4673,11 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   for the `.mcp` runner). The deploy ends that section's serving preview the
   way the window's own Deploy does, and no restart is added; the success
   sentence is followed by `deployClosedAnOpenPreview` — "If a preview of …
-  was open in Plantoir, deploying closed it" — "if" because a lease names the
-  course, not the section, and a preview of another section is left alone.
+  was open in Plantoir, deploying closed it" — "if" because a lease that names
+  no section (Windows, an older Plantoir) holds the whole course, and a
+  preview of another section is left alone. Since #835 the served-preview
+  look is of the deploy's own section, so a preview of a sibling named in its
+  lease no longer adds the sentence.
   The window shows that end as "Closed for a deploy", not as a failure
   (#433's stack review, item 6, traced: the killed server made the Python
   parent raise, `preview.sh` exited 1, and the console said "Something went
@@ -4688,9 +4691,10 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   counts, the app's own build never counts). Everything else is a failure as
   before. The output stays one click away, the run record says "Closed for a
   deploy", and the trail writes `preview closed for a deploy`. The residual,
-  accepted: a lease names the course, so a deploy of Section 2 elsewhere
-  coinciding with Section 1's server being SIGKILLed for another reason reads
-  as closed. A deploy set for later ends a preview the same way and is shown
+  accepted: a lease that names no section holds the whole course, so a deploy
+  of Section 2 by Windows or an older Plantoir coinciding with Section 1's
+  server being SIGKILLed for another reason reads as closed. Since #835 a
+  lease that names Section 2 does not count for Section 1's preview. A deploy set for later ends a preview the same way and is shown
   the same way.
 - **The residual, in `outsideChanges.rule`**: an outside change looks once and
   takes no lease, so a window Deploy pressed during a multi-page outside write
