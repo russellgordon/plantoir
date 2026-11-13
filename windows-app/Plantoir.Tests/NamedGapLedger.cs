@@ -223,7 +223,6 @@ internal static class NamedGapLedger
     // brought, each owned by the open `windows` issue that builds it later in
     // the same run. Each piece deletes its own entries as it lands, and the
     // ledger fails, naming the entry, the moment a held thing exists here.
-    private const string Reason799 = "a deploy that builds the site again only when something changed is #799's piece of v2.0.0, not built here yet";
     private const string Reason801 = "the course's Planning tab, its unit plans and Plan a Unit are #801's piece of v2.0.0, not built here yet";
     private const string Reason811 = "a section's Coverage tab is #811's piece of v2.0.0, not built here yet";
     private const string Reason820 = "Open in Browser on a unit plan is #820's piece of v2.0.0, not built here yet";
@@ -244,7 +243,8 @@ internal static class NamedGapLedger
     private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- step 0 of v2.0.0: activityTrail.mustRecord (22; "course
-        // restored from a backup" is built in step 0 itself, ruling F3).
+        // restored from a backup" is built in step 0 itself, ruling F3;
+        // #799's "site built again before deploying" went when #799 landed).
         Owed(ActivityTrailEvents, 823, V200, Reason823,
              "course created for reference", "course could not be created for reference", "zip could not be read for reference"),
         Owed(ActivityTrailEvents, 826, V200, Reason826,
@@ -252,7 +252,6 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 827, V200, Reason827,
              "reference group made", "reference group renamed", "reference group removed", "reference course moved to a group",
              "reference groups not changed", "reference groups started again"),
-        Owed(ActivityTrailEvents, 799, V200, Reason799, "site built again before deploying"),
         Owed(ActivityTrailEvents, 801, V200, Reason801, "looked at a course's unit plans", "asked an assistant to plan a unit"),
         Owed(ActivityTrailEvents, 820, V200, Reason820, "opened a unit plan in the browser"),
         Owed(ActivityTrailEvents, 811, V200, Reason811,
