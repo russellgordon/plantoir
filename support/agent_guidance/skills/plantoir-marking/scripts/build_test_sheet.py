@@ -340,8 +340,8 @@ def part_row(part, continued=False):
 
 def feedback_tex(sheet, school):
     kit = sheet.kit
-    title = kit["test"] + ": Feedback"
-    tex = preamble(kit["test"] + ": Feedback", kit["course"], school)
+    title = kit["test"] + " · Feedback"
+    tex = preamble(kit["test"] + " · Feedback", kit["course"], school)
     tex += "{\\LARGE\\bfseries\\sffamily " + esc(title) + "}\\par\\vspace{2pt}\n"
     tex += "\\studentline{" + esc(sheet.identifier) + "}\n"
     tex += inline(sheet.marks.get("summary", "")) + "\\par\\vspace{6pt}\n"
@@ -423,8 +423,8 @@ def teacher_tex(sheet, school):
     kit = sheet.kit
     marks_line = " $\\cdot$ ".join(f"{esc(category['key'])} {number(earned)}/{out_of}"
                                    for category, earned, out_of in sheet.category_marks())
-    tex = preamble(kit["test"] + ": Marks by question (teacher only)", kit["course"], school)
-    tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"]) + ": Marks by question}\\par\\vspace{2pt}\n"
+    tex = preamble(kit["test"] + " · Marks by question (teacher only)", kit["course"], school)
+    tex += "{\\Large\\bfseries\\sffamily " + esc(kit["test"]) + " · Marks by question}\\par\\vspace{2pt}\n"
     tex += "{\\large\\bfseries\\sffamily " + marks_line + "}\\par\\vspace{2pt}\n"
     tex += "\\studentline{" + esc(sheet.identifier) + "}\n"
     tex += ("{\\small\\sffamily Section " + esc(sheet.marks.get("section", "")) + " $\\cdot$ Version "

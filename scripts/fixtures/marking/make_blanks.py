@@ -24,6 +24,43 @@ SECOND_PAGE = (
 )
 
 
+STYLES = r"""\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=0.75in,top=0.6in]{geometry}
+\usepackage[T1]{fontenc}\usepackage{lmodern}\usepackage{array}
+\setlength{\parindent}{0pt}\usepackage{fancyhdr}\pagestyle{fancy}\fancyhf{}\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[L]{A Test About Dice $\cdot$ COURSE}\fancyfoot[R]{Page \thepage\ of 6}\setlength{\footskip}{0.4in}
+\newcommand{\question}[1]{{\Large\bfseries A Test About Dice}\par\bigskip #1\par\vfill\hfill Turn over\clearpage}
+\begin{document}
+Dice Academy\hspace{1.2in}Name \rule[-0.1em]{2.2in}{0.4pt}\hfill Date \rule[-0.1em]{0.8in}{0.4pt}\par\bigskip
+\question{1. Roll two dice. How many outcomes are there?}
+Dice Academy\hspace{1.2in}Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\hfill Date\par\bigskip
+\question{2. What is the chance of a double six?}
+Dice Academy\hspace{1.2in}Name: \makebox[2.2in]{\dotfill}\hfill Date\par\bigskip
+\question{3. What is the chance of a total of seven?}
+Dice Academy\hspace{1.2in}\begin{tabular}[b]{|l|p{2.2in}|}\hline Name & \\ \hline\end{tabular}\hfill Date\par\bigskip
+\question{4. Which total is most likely?}
+Dice Academy\hspace{1.2in}Name: \framebox[2.2in]{\strut}\hfill Date\par\bigskip
+\question{5. Explain your answer to question 4.}
+Name: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\hfill Dice Academy\par\bigskip
+{\Large\bfseries A Test About Dice}\par\bigskip 6. Draw the table of outcomes.\par\vfill\hfill End
+\end{document}
+"""
+
+
+def make_styles():
+    """blank-name-styles.pdf: six pages, each with its Name blank drawn another way (a rule, underscores,
+    dots, a table cell, a frame, and underscores at the left margin): every one is a name blank to box
+    (750a fix review H1 and M4)."""
+    with tempfile.TemporaryDirectory() as folder:
+        tex = Path(folder) / "styles.tex"
+        tex.write_text(STYLES, encoding="utf-8")
+        result = subprocess.run(["tectonic", "-c", "minimal", str(tex)], capture_output=True, cwd=folder)
+        if result.returncode != 0:
+            sys.exit("the styles blank did not compile")
+        shutil.copyfile(Path(folder) / "styles.pdf", HERE / "blank-name-styles.pdf")
+    print("blank-name-styles.pdf written")
+
+
 def main():
     source = STARTER.read_text(encoding="utf-8")
     if source.count("\\end{questions}") != 1:
@@ -49,4 +86,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--styles"]:
+        make_styles()
+    else:
+        main()
+        make_styles()

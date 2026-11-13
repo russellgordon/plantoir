@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Blank the name box at the top of every scanned page, after checking each page against the BLANK test.
+"""Box the name line at the top of every scanned page that has a name blank, after checking each page
+against the BLANK test; then write ONE check sheet for the teacher to look at before any paper is read.
 
 Part of the plantoir-marking skill. A STARTING POINT: copy it into the marking folder's Scripts/ folder,
 adjust it to this teacher's header (see the two MARK blocks below), run --self-test, and only then use it.
@@ -14,23 +15,24 @@ adjust it to this teacher's header (see the two MARK blocks below), run --self-t
 ORIGINALS holds one PDF per student named by identifier (Student A.pdf), directly or in "Section N"
 folders; REDACTED gets the same layout. BLANK is the test as printed, with nothing written on it (the
 kit's Version A.pdf, say): it holds no student data, so reading it is safe. CHECK is in the TEACHER-ONLY
-folder: it gets "Name box check.pdf" (the top of every original page with the box outlined) and
-"Blanked papers to skim.pdf" (every blanked page, one file). The assistant never opens either.
+folder: it gets "Check sheet.pdf", the top of every page as it was boxed, captioned by identifier and
+page. The TEACHER looks at it before the assistant reads any paper; the assistant never opens it (a name
+the box missed would be on it). Russell, 2026-11-12: the teacher's eyes are the proof, not a measurement.
 
-How a page is checked before it is blanked, and why (a box that misses its header says nothing):
-  - its size against the blank test's page;
-  - where its header and footer are against the blank test's: one-dimensional ink profiles (rows and
-    columns) of the top left of the page and of the foot, each slid against the blank's to find the
-    shift. From three shifts the script works out where the blank's name box lands on this page. If any
-    corner of it lands more than 0.1 in from where the box will be painted, or the page is scaled by
-    more than 2 percent, the file is NOT written and the line says CHECK and why;
-  - a page that lines up only when turned half a turn is upside down: it is turned upright, blanked,
-    and said so;
-  - ink just around the box (0.25 in) that the blank test does not have there, once the page is lined
-    up, is writing that runs past the box: a name written longer than the line, or above or below it.
-    More than a speck of it stops the file with CHECK.
-The success line says what was measured: "box placed; header matches your blank test". It never says
-OK about coverage it did not measure. A name written anywhere other than the name box is NOT blanked.
+What the script does, and does not claim:
+  - The box: on every page of the blank test that has a name blank (the label, NAME: or Name:____ or a
+    label in a table cell or beside a frame; never a label with another word just before it, such as
+    "School Name"), the whole line the blank sits on, margin to margin, and the room above it.
+  - Registration is the gate: each page's size against the blank's, then where its header and foot are,
+    by one-dimensional ink profiles slid against the blank's (the box's own area left out). A page that
+    lines up only when turned half a turn is turned upright first. Any other page that does not match
+    (shifted more than 0.1 in, scaled more than 2 percent, crooked, another size, sideways) stops the
+    file with CHECK and a plain reason, and it is not written.
+  - Writing found just around the box is a WARNING, never a stop: the line and the check sheet say to look
+    at that page first.
+  - It never says a name is covered or removed: it says how many pages were boxed, how many had no name
+    blank, how many files were stopped and why, and that the check sheet waits for the teacher's look.
+    A name written anywhere else on a page is not boxed.
 
 Needs Poppler (pdftoppm, pdfinfo, pdftotext, pdfunite, pdfseparate) and the Python standard library.
 """
@@ -44,14 +46,14 @@ import zlib
 from pathlib import Path
 
 # MARK: - What you may change for this teacher
-#   the header label (--label, LABEL), the box margins below (larger, never smaller), the regions used
+#   the header label (--label, LABEL), the box below (never shrink it), the regions used
 #   to line a page up (HEADER_DEPTH_IN, FOOTER_DEPTH_IN), the identifier pattern, the folder names, the
 #   wording of the lines it prints (never claiming more than was measured), and the resolution.
 LABEL = "Name"
-BOX_LEFT_MARGIN_PT = 11          # the box starts this far left of the label
-BOX_TOP_IN = 0.20                # and this far from the top of the page
-BOX_BELOW_LABEL_PT = 12          # and ends this far below the label (handwriting rises and falls)
-BOX_BEFORE_NEXT_PT = 3           # and stops this far before the next word on the line (Date)
+BOX_SIDE_IN = 0.3                # the box runs margin to margin: this far in from each side
+BOX_TOP_IN = 0.15                # from this far below the top of the page (room for handwriting above)
+BOX_BELOW_LABEL_PT = 18          # to this far below the label (handwriting falls below the line)
+WRITING_LEFT_PT = 11             # the writing area, left out of lining up, starts this far left of the label
 LABEL_SEARCH_DEPTH_IN = 1.5      # the label is looked for in the top of the page only
 HEADER_DEPTH_IN = 1.6            # the band at the top used to line a page up
 FOOTER_DEPTH_IN = 1.2            # the band at the foot used to line a page up
@@ -59,8 +61,7 @@ DPI = 150                        # pixels per inch for the blanked pages
 JPEG_QUALITY = 75
 IDENTIFIER = r"^Student [A-Z]{1,2}$"
 SECTION = r"^Section \d+$"
-NAME_BOX_CHECK = "Name box check.pdf"
-SKIM_FILE = "Blanked papers to skim.pdf"
+CHECK_SHEET = "Check sheet.pdf"
 PAPERS_TO_NAME = "Papers to name.pdf"
 
 # MARK: - What must not change
@@ -80,12 +81,13 @@ PROFILE_DPI = 50                 # pixels per inch for lining up
 INK_NEIGHBOURS = 2               # ink has at least this many ink neighbours; a lone speck has none
 SMOOTHING = 2                    # profile values averaged this many either way (0.04 in at 50 dpi)
 INK_STEP = 40                    # how much darker than the paper a pixel must be to count as ink
-RING_IN = 0.25                   # how far around the box writing past it is looked for
+# The look beside the box gives a WARNING only (Russell, 2026-11-12): the teacher's look is the proof.
+RING_IN = 0.25                   # how far above and below the box writing is looked for
 RING_DPI = 100                   # pixels per inch for that look
-RING_STEP = 30                   # how much darker than the paper a pixel must be there to count as writing
-RING_SLACK = 1                   # pixels either way the blank's own print may sit after lining up
-RING_SEARCH = 3                  # pixels either way the last of the lining up is looked for
-RING_LIMIT = 10                  # pixels of writing past the box that stop the file (0.001 square inches)
+RING_STEP = 18                   # how much darker than the paper, in its darkest colour channel, counts as writing
+RING_SLACK = 2                   # pixels either way the blank's own print may sit after lining up
+RING_SEARCH = 5                  # pixels either way the last of the lining up is looked for
+RING_LIMIT = 10                  # pixels of writing beside the box that give the warning (0.001 square inches)
 RING_RULED = 0.5                 # a thin straight line at least this long (inches) is the paper's, not writing
 EDGE_SKIP_IN = 0.6               # the left margin, where holes and staples are, is left out of lining up
 MIN_MATCH = 0.55                 # how well a profile must match the blank test's to be trusted
@@ -160,6 +162,25 @@ def render_gray(pdf, page, dpi, folder, crop=None):
     image = read_pgm(base + ".pgm")
     os.remove(base + ".pgm")
     return image
+
+
+def render_darkest(pdf, page, dpi, folder, crop):
+    """(width, height, bytes) of a pixel rectangle, each pixel its darkest colour channel, so yellow
+    highlighter and coloured ink read as dark as they look (750a fix review H2: grey hid a yellow name)."""
+    base = os.path.join(folder, "colour")
+    run(["pdftoppm", "-r", str(dpi), "-f", str(page), "-l", str(page), "-singlefile", "-x", str(crop[0]),
+         "-y", str(crop[1]), "-W", str(crop[2]), "-H", str(crop[3]), str(pdf), base])
+    data = Path(base + ".ppm").read_bytes()
+    os.remove(base + ".ppm")
+    match = re.match(rb"P6\s+(\d+)\s+(\d+)\s+(\d+)\s", data)
+    if match is None:
+        raise Refusal("a page could not be read")
+    width, height = int(match.group(1)), int(match.group(2))
+    rgb = data[match.end():match.end() + width * height * 3]
+    darkest = bytearray(width * height)
+    for index in range(width * height):
+        darkest[index] = min(rgb[3 * index], rgb[3 * index + 1], rgb[3 * index + 2])
+    return width, height, bytes(darkest)
 
 
 def render_jpeg(pdf, page, dpi, folder, crop):
@@ -240,7 +261,8 @@ def pdf_text(text):
 
 
 def normalised(word):
-    return re.sub(r"[^\w#]", "", word).casefold()
+    """The word without punctuation, underscores or dots, whatever its case: Name, NAME:, Name:____ are one."""
+    return re.sub(r"[\W_]", "", word).casefold()
 
 
 def words_near_top(blank, page):
@@ -273,53 +295,49 @@ def rule_follows(image, dpi, word):
     return False
 
 
-def box_for_page(blank, page, label, page_width_pt, folder, needs_a_line=False):
+def box_for_page(blank, page, label, page_width_pt, folder):
     """The name box in inches (x0, y0, x1, y1) from the top-left of this page of the blank, or None.
 
-    The label a writing line follows is chosen over another word equal to it (the starter's "School Name").
-    With needs_a_line, a page whose label has no writing line after it gets no box: on a test whose name
-    blank has a line, the same word with no line (the school's name) is not a name blank."""
+    Every word equal to the label (Name, NAME:, Name:____) is a name blank, whatever follows it (a line,
+    underscores, dots, a table cell, a frame), EXCEPT one with another word just before it on the same line
+    ("School Name"). Where several remain, the one a writing line follows is chosen. The box is generous,
+    as the teacher's own tool is: the whole line the blank sits on, margin to margin, and the room above it
+    for handwriting."""
     words = words_near_top(blank, page)
     wanted = normalised(label)
     candidates = []
     for word in words:
-        if normalised(word[4]) == wanted:
+        if normalised(word[4]) != wanted:
+            continue
+        joined = False
+        for other in words:
+            same_line = abs(other[1] - word[1]) < 2
+            if same_line and other is not word and 0 <= word[0] - other[2] < 8 and normalised(other[4]):
+                joined = True   # "School Name": a word just before it makes it part of a longer name
+        if not joined:
             candidates.append(word)
     if not candidates:
         return None
-    image = render_gray(blank, page, 100, folder)
-    ruled = []
-    for word in candidates:
-        if rule_follows(image, 100, word):
-            ruled.append(word)
-    if not ruled and needs_a_line:
-        return None
-    chosen = ruled[-1] if ruled else candidates[-1]
-    following = []
-    for word in words:
-        if abs(word[1] - chosen[1]) < 2 and word[0] > chosen[2]:
-            following.append(word)
-    following.sort()
-    right = following[0][0] - BOX_BEFORE_NEXT_PT if following else page_width_pt - 54
-    return ((chosen[0] - BOX_LEFT_MARGIN_PT) / 72, BOX_TOP_IN, right / 72, (chosen[3] + BOX_BELOW_LABEL_PT) / 72)
+    chosen = candidates[-1]
+    if len(candidates) > 1:
+        image = render_gray(blank, page, 100, folder)
+        for word in candidates:
+            if rule_follows(image, 100, word):
+                chosen = word
+    return (BOX_SIDE_IN, BOX_TOP_IN, page_width_pt / 72 - BOX_SIDE_IN, (chosen[3] + BOX_BELOW_LABEL_PT) / 72,
+            (chosen[0] - WRITING_LEFT_PT) / 72)
 
 
 def boxes_from_blank(blank, label, given_box, folder):
     """One entry per page of the blank: the box in inches, or None for a page with no name label."""
     sizes = page_sizes(blank)
     if given_box is not None:
-        return [given_box] * len(sizes)   # the teacher said where the name is: every page gets the box
+        return [tuple(given_box) + (given_box[0],)] * len(sizes)   # the teacher said where: every page gets it
     boxes = []
     for number, (width_pt, _height) in enumerate(sizes, start=1):
-        boxes.append(box_for_page(blank, number, label, width_pt, folder, needs_a_line=True))
+        boxes.append(box_for_page(blank, number, label, width_pt, folder))
     if all(box_in is None for box_in in boxes):
-        # No label on any page has a writing line after it (a name blank typed as underscores, say):
-        # fall back to the label itself, page by page.
-        boxes = []
-        for number, (width_pt, _height) in enumerate(sizes, start=1):
-            boxes.append(box_for_page(blank, number, label, width_pt, folder))
-    if boxes[0] is None:
-        raise Refusal(f"there is no '{label}' label at the top of page 1 of your blank test. "
+        raise Refusal(f"there is no '{label}' label at the top of any page of your blank test. "
                       "Give the label another word with --label (such as Nom), or the box in inches with --box.")
     return boxes
 
@@ -379,7 +397,8 @@ def drop_thin_lines(width, height, darkness, long_run):
             elif not here and run_start is not None:
                 if column - run_start >= long_run:
                     for ruled in range(run_start, column):
-                        if not inked(ruled, row - 2) and not inked(ruled, row + 2):
+                        thin = not inked(ruled, row - 2) and not inked(ruled, row + 2)
+                        if thin or column - run_start >= 2 * long_run:   # a line an inch long is never writing
                             clear.append(row * width + ruled)
                 run_start = None
     for column in range(width):
@@ -391,7 +410,8 @@ def drop_thin_lines(width, height, darkness, long_run):
             elif not here and run_start is not None:
                 if row - run_start >= long_run:
                     for ruled in range(run_start, row):
-                        if not inked(column - 2, ruled) and not inked(column + 2, ruled):
+                        thin = not inked(column - 2, ruled) and not inked(column + 2, ruled)
+                        if thin or row - run_start >= 2 * long_run:
                             clear.append(ruled * width + column)
                 run_start = None
     for position in clear:
@@ -449,8 +469,10 @@ def correlation(first, second):
 
 def best_shift(blank_image, scan_image, columns, rows, axis, search):
     """(shift in pixels, match) sliding the scan's profile of a region against the blank's."""
+    if columns[1] - columns[0] < 2 or rows[1] - rows[0] < 2:
+        return None
     reference = darkness_profile(blank_image, columns, rows, axis)
-    if max(reference) - min(reference) < 100:   # no print in this region of the blank test
+    if not reference or max(reference) - min(reference) < 100:   # no print in this region of the blank test
         return None
     if axis == "rows":
         wide = darkness_profile(scan_image, columns, (rows[0] - search, rows[1] + search), axis)
@@ -491,10 +513,16 @@ def line_up(blank_image, scan_image, box_in):
     search = int(SEARCH_IN * dpi)
     head = (0, int(HEADER_DEPTH_IN * dpi))
     foot = (height - int(FOOTER_DEPTH_IN * dpi), height)
-    box_left = int(box_in[0] * dpi)
     margin = int(EDGE_SKIP_IN * dpi)   # punched holes and a staple's shadow sit in the left margin
+    # The header row first (the school's name, and whatever else is printed beside the writing area);
+    # where it has no print outside the writing area (a Name blank at the left margin), the band below it.
+    header_row = (0, int(box_in[3] * dpi) + 2)
+    if best_shift(blank_image, blank_image, (margin, width - margin // 2), header_row, "rows", 1) is None:
+        head = (int(box_in[3] * dpi) + 2, int(HEADER_DEPTH_IN * dpi))
+    else:
+        head = header_row
     regions = [
-        ("head", (margin, box_left), head),
+        ("head", (margin, width - margin // 2), head),
         ("foot left", (margin, width // 2), foot),
         ("foot right", (width // 2, width), foot),
     ]
@@ -540,10 +568,29 @@ def line_up(blank_image, scan_image, box_in):
     return worst, scale_error, weakest, shift
 
 
-def compare_with_blank(blank_image, scan_image, box_in):
-    """('upright' | 'upside down', None, shift in inches at the box) when the page lines up, or (None, reason, None)."""
-    upright = line_up(blank_image, scan_image, box_in)
-    turned = line_up(blank_image, rotate_half_turn(scan_image), box_in)
+def without_the_box(image, box_in):
+    """The ink with the writing area cleared (from just left of the label to the right of the box): it
+    holds a student's writing on a scan and black on a blanked page, so it is never what a page is lined
+    up by. What is printed left of the label (the school's name) stays, and is."""
+    if box_in is None:
+        return image
+    width, height, ink = image
+    ink = bytearray(ink)
+    left = box_in[4] if len(box_in) > 4 else box_in[0]
+    for row in range(max(0, int(box_in[1] * PROFILE_DPI) - 2), min(height, int(box_in[3] * PROFILE_DPI) + 3)):
+        for column in range(max(0, int(left * PROFILE_DPI) - 2), width):
+            ink[row * width + column] = 0
+    return width, height, bytes(ink)
+
+
+def compare_with_blank(blank_image, scan_image, box_in, mask_in=None):
+    """('upright' | 'upside down', None, shift in inches at the box) when the page lines up, or (None, reason, None).
+
+    box_in is where the page is measured (the corners that must land within the tolerance); mask_in is the
+    page's own name box, cleared from both images before lining up."""
+    blank_image = without_the_box(blank_image, mask_in)
+    upright = line_up(blank_image, without_the_box(scan_image, mask_in), box_in)
+    turned = line_up(blank_image, without_the_box(rotate_half_turn(scan_image), mask_in), box_in)
 
     def fits(result):
         return (result is not None and result[2] >= MIN_MATCH and result[0] <= SHIFT_TOLERANCE_IN
@@ -571,15 +618,16 @@ def writing_past_the_box(source, page, blank_page_image, box_in, shift_in, upsid
     after the page is lined up with the blank (the shift found at the box) and lone specks are dropped."""
     width = round(size_pt[0] / 72 * RING_DPI)
     height = round(size_pt[1] / 72 * RING_DPI)
-    x0 = max(0, round((box_in[0] - RING_IN) * RING_DPI))
+    # Above and below the box only: beside it are the page's margins, where holes and staples are.
+    x0 = max(0, round(box_in[0] * RING_DPI))
     y0 = max(0, round((box_in[1] - RING_IN) * RING_DPI))
-    x1 = min(width, round((box_in[2] + RING_IN) * RING_DPI))
+    x1 = min(width, round(box_in[2] * RING_DPI))
     y1 = min(height, round((box_in[3] + RING_IN) * RING_DPI))
     if upside_down:
         crop = (width - x1, height - y1, x1 - x0, y1 - y0)
     else:
         crop = (x0, y0, x1 - x0, y1 - y0)
-    crop_width, crop_height, crop_pixels = render_gray(source, page, RING_DPI, folder, crop)
+    crop_width, crop_height, crop_pixels = render_darkest(source, page, RING_DPI, folder, crop)
     if upside_down:
         crop_pixels = bytes(reversed(crop_pixels))
     sample = sorted(crop_pixels[::3])
@@ -643,7 +691,7 @@ def writing_past_the_box(source, page, blank_page_image, box_in, shift_in, upsid
     printed = set()
     for blank_y in range(max(0, y0 - reach), min(blank_height, y1 + reach)):
         for blank_x in range(max(0, x0 - reach), min(blank_width, x1 + reach)):
-            if blank_pixels[blank_y * blank_width + blank_x] < 200:
+            if blank_pixels[blank_y * blank_width + blank_x] < 255 - RING_STEP:   # any of the blank's print
                 for near_y in range(blank_y - RING_SLACK, blank_y + RING_SLACK + 1):
                     for near_x in range(blank_x - RING_SLACK, blank_x + RING_SLACK + 1):
                         printed.add((near_x, near_y))
@@ -709,6 +757,14 @@ def blank_page(writer, source, page, size_pt, box_in, upside_down, folder):
     writer.page(width_pt, height_pt, images, content)
 
 
+def measured_box(boxes):
+    """The box whose corners a page's lining up is measured at: the first page's that has one."""
+    for box_in in boxes:
+        if box_in is not None:
+            return box_in
+    return None
+
+
 def verify_blanked(path, boxes, blank, blank_images, folder):
     """Read the written file back: every box pixel black, no text, every page lined up and upright."""
     sizes = page_sizes(path)
@@ -725,16 +781,10 @@ def verify_blanked(path, boxes, blank, blank_images, folder):
                 if max(pixels[row * width + x0 + 1: row * width + x1 - 1]) != 0:
                     return f"page {number}: the box is not black all through"
         scan_image = ink_of(render_gray(path, number, PROFILE_DPI, folder))
-        if box_in is not None:
-            # The black box is the script's own ink, not the page's: left in, a page shifted right by
-            # 0.04 in lined up against solid black and was stopped (750a review M1).
-            width, height, ink = scan_image
-            ink = bytearray(ink)
-            for row in range(max(0, int(box_in[1] * PROFILE_DPI) - 1), min(height, int(box_in[3] * PROFILE_DPI) + 2)):
-                for column in range(max(0, int(box_in[0] * PROFILE_DPI) - 1), min(width, int(box_in[2] * PROFILE_DPI) + 2)):
-                    ink[row * width + column] = 0
-            scan_image = (width, height, bytes(ink))
-        way, _reason, _shift = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
+        # The black box is the script's own ink, margin to margin: all of it is cleared from both (750a
+        # review M1), so the written page is lined up by its foot and the band below the box.
+        whole_box = None if box_in is None else tuple(box_in[:4]) + (box_in[0],)
+        way, _reason, _shift = compare_with_blank(blank_images[number - 1], scan_image, measured_box(boxes), whole_box)
         if way != "upright":
             return f"page {number}: the blanked page does not line up with your blank test"
     return None
@@ -762,8 +812,8 @@ def identifier_files(originals, identifier):
     return found, left_alone
 
 
-def header_strip(writer, source, page, size_pt, box_in, upside_down, label, folder, slot, page_content):
-    """One strip of the name box check: the top of a page as the box will see it, the box outlined in red."""
+def header_strip(writer, source, page, size_pt, box_in, upside_down, label, folder, slot, page_content, flagged):
+    """One strip of the check sheet: the top of a page, captioned; a flagged strip is outlined in red."""
     width_pt, height_pt = size_pt
     strip_in = min(HEADER_DEPTH_IN, height_pt / 72)
     width = round(width_pt / 72 * 100)
@@ -785,25 +835,34 @@ def header_strip(writer, source, page, size_pt, box_in, upside_down, label, fold
     else:
         page_content.append(b"q %.3f 0 0 %.3f %.3f %.3f cm /%s Do Q\n" % (
             drawn_width, drawn_height, left, bottom, name.encode("ascii")))
-    if box_in is not None:
+    if box_in is not None and flagged == "check":
         page_content.append(b"q 1 0 0 RG 1.5 w %.3f %.3f %.3f %.3f re S Q\n" % (
             left + box_in[0] * 72 * scale, top - box_in[3] * 72 * scale,
             (box_in[2] - box_in[0]) * 72 * scale, (box_in[3] - box_in[1]) * 72 * scale))
-    page_content.append(b"BT /F1 9 Tf %.3f %.3f Td (%s) Tj ET\n" % (left, top + 6, pdf_text(label)))
+    if flagged:
+        page_content.append(b"q 1 0 0 RG 3 w %.3f %.3f %.3f %.3f re S Q\n" % (left, bottom, drawn_width, drawn_height))
+        page_content.append(b"q BT 0.8 0 0 rg /F1 9 Tf %.3f %.3f Td (%s) Tj ET Q\n" % (left, top + 6, pdf_text(label)))
+    else:
+        page_content.append(b"q BT 0 g /F1 9 Tf %.3f %.3f Td (%s) Tj ET Q\n" % (left, top + 6, pdf_text(label)))
+    page_content.append(b"q 0.6 g 0.5 w %.3f %.3f %.3f %.3f re S Q\n" % (left, bottom, drawn_width, drawn_height))
     return name, number
 
 
-def write_check_file(entries, path, folder):
-    """entries: [(label, source, page, size, box, upside_down)], six strips to a letter page."""
+def write_check_sheet(entries, path, folder):
+    """entries: [(caption, source, page, size, box, upside_down, flagged)], six strips to a letter page.
+    flagged is "", "warning" (writing beside the box) or "check" (a file that was stopped)."""
     writer = PdfWriter()
     for start in range(0, len(entries), 6):
         images = {}
         content = []
         for slot, entry in enumerate(entries[start:start + 6]):
-            label, source, page, size_pt, box_in, upside_down = entry
-            name, number = header_strip(writer, source, page, size_pt, box_in, upside_down, label, folder, slot, content)
+            caption, source, page, size_pt, box_in, upside_down, flagged = entry
+            name, number = header_strip(writer, source, page, size_pt, box_in, upside_down, caption, folder, slot,
+                                        content, flagged)
             images[name] = number
         writer.page(612, 792, images, b"".join(content), with_font=True)
+    if Path(path).exists():
+        Path(path).unlink()
     if writer.pages:
         writer.write(path)
 
@@ -832,11 +891,11 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
             raise Refusal(f"{what} is not there; nothing was read")
     Path(redacted).mkdir(parents=True, exist_ok=True)
     Path(check_dir).mkdir(parents=True, exist_ok=True)
-    blanked_paths = []
     check_entries = []
-    totals = {"written": 0, "check": 0, "turned": 0}
+    totals = {"files": 0, "check": 0, "boxed": 0, "unboxed": 0, "warned": 0}
     with tempfile.TemporaryDirectory() as folder:
         boxes = boxes_from_blank(blank, label, given_box, folder)
+        measured = measured_box(boxes)
         blank_sizes = page_sizes(blank)
         blank_images = []
         for number in range(1, len(blank_sizes) + 1):
@@ -846,6 +905,7 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
         for label_text, source in found:
             reason = None
             ways = []
+            warnings = []
             try:
                 sizes = page_sizes(source)
             except Refusal:
@@ -865,19 +925,19 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
                         reason = f"page {number} is a different size from your blank test"
                     break
                 scan_image = ink_of(render_gray(source, number, PROFILE_DPI, folder))
-                way, why, shift = compare_with_blank(blank_images[number - 1], scan_image, boxes[0])
+                page_box = boxes[number - 1]
+                way, why, shift = compare_with_blank(blank_images[number - 1], scan_image, measured, page_box)
                 if way is None:
                     reason = f"page {number}: {why}"
                     break
-                page_box = boxes[number - 1]
                 if page_box is not None:
+                    # A warning only (Russell, 2026-11-12: the teacher's look at the check sheet is the proof).
                     if number not in ring_blanks:
                         ring_blanks[number] = render_gray(blank, number, RING_DPI, folder)
                     past = writing_past_the_box(source, number, ring_blanks[number], page_box, shift,
                                                 way == "upside down", size_pt, folder)
                     if past > RING_LIMIT:
-                        reason = f"page {number}: writing runs past the name box, so part of it would show"
-                        break
+                        warnings.append(number)
                 ways.append(way)
             target = Path(redacted) / (label_text + ".pdf")
             if reason is None:
@@ -890,50 +950,50 @@ def redact_folder(originals, redacted, blank, check_dir, label, given_box, ident
                 if problem is not None:
                     target.unlink()
                     reason = problem
-            for number, size_pt in enumerate(sizes, start=1):
-                upside_down = reason is None and ways[number - 1] == "upside down"
-                page_box = boxes[number - 1] if number <= len(boxes) else boxes[0]
-                note = " (turned upright)" if upside_down else ""
-                if reason is not None:
-                    note = " (CHECK: this file was not blanked)"
-                check_entries.append((f"{label_text}, page {number}{note}", source, number, size_pt, page_box, upside_down))
             if reason is not None:
                 if target.exists():
                     target.unlink()
                 totals["check"] += 1
+                for number, size_pt in enumerate(sizes, start=1):
+                    check_entries.append((f"{label_text}, page {number}: CHECK, not boxed and not to be read",
+                                          source, number, size_pt, boxes[number - 1], False, "check"))
                 print(f"{label_text}.pdf: CHECK ({reason}); not written")
                 continue
-            turned = []
-            for number, way in enumerate(ways, start=1):
-                if way == "upside down":
-                    turned.append(str(number))
-            boxed = sum(1 for box_in in boxes if box_in is not None)
-            note = ""
+            notes = []
+            turned = [str(number) for number, way in enumerate(ways, start=1) if way == "upside down"]
             if turned:
-                totals["turned"] += 1
-                note = "; page" + ("s " if len(turned) > 1 else " ") + ", ".join(turned) + " turned upright"
+                notes.append("page" + ("s " if len(turned) > 1 else " ") + ", ".join(turned) + " turned upright first")
             unboxed = [str(number) for number, box_in in enumerate(boxes, start=1) if box_in is None]
             if unboxed:
-                note += ("; pages " if len(unboxed) > 1 else "; page ") + ", ".join(unboxed) + \
-                    (" have" if len(unboxed) > 1 else " has") + " no name box on your blank test, so nothing there was blanked"
-            totals["written"] += 1
-            blanked_paths.append(str(target))
-            print(f"{label_text}.pdf: {len(sizes)} pages, box placed on {boxed}; header matches your blank test{note}")
-        write_check_file(check_entries, Path(check_dir) / NAME_BOX_CHECK, folder)
-    skim = Path(check_dir) / SKIM_FILE
-    if skim.exists():
-        skim.unlink()
-    if len(blanked_paths) == 1:
-        shutil.copyfile(blanked_paths[0], skim)
-    elif blanked_paths:
-        run(["pdfunite"] + blanked_paths + [str(skim)])
+                notes.append(("pages " if len(unboxed) > 1 else "page ") + ", ".join(unboxed) +
+                             (" have" if len(unboxed) > 1 else " has") + " no name blank on your blank test, so no box")
+            for number in warnings:
+                notes.append(f"page {number} has writing beside the name box: look at it first on the check sheet")
+            for number, size_pt in enumerate(sizes, start=1):
+                box_in = boxes[number - 1]
+                caption = f"{label_text}, page {number}"
+                if box_in is None:
+                    caption += ": no name blank on the blank test, so no box"
+                if number in warnings:
+                    caption += ": writing beside the name box, look at it first"
+                check_entries.append((caption, target, number, size_pt, box_in, False,
+                                      "warning" if number in warnings else ""))
+            boxed = sum(1 for box_in in boxes if box_in is not None)
+            totals["files"] += 1
+            totals["boxed"] += boxed
+            totals["unboxed"] += len(sizes) - boxed
+            totals["warned"] += len(warnings)
+            print(f"{label_text}.pdf: {len(sizes)} pages, {boxed} boxed; header matches your blank test" +
+                  "".join("; " + note for note in notes))
+        write_check_sheet(check_entries, Path(check_dir) / CHECK_SHEET, folder)
     if left_alone:
         print(f"{left_alone} files or folders not named like an identifier were left alone")
-    print(f"{totals['written']} files blanked, {totals['check']} to CHECK; {totals['turned']} had a page turned upright. "
-          "The box covers the name box at the top of each page whose blank test has one, and writing that runs on "
-          "within a quarter inch of it stops the file. A name anywhere else on a page is not blanked. Please open "
-          f"'{NAME_BOX_CHECK}' in your check folder first (the top of every page with the box drawn in red), then skim "
-          f"'{SKIM_FILE}', before any paper is read.")
+    print(f"{totals['files']} files written: {totals['boxed']} pages boxed, {totals['unboxed']} pages with no name "
+          f"blank on the blank test (not boxed), {totals['warned']} pages with writing beside the box; "
+          f"{totals['check']} files stopped with CHECK. The check sheet '{CHECK_SHEET}' in the check folder shows the "
+          "top of every page as it was boxed, and is waiting for the teacher's look: no paper is read until the "
+          "teacher has looked at it and said yes, and the assistant never opens it. A name written anywhere else on "
+          "a page is not boxed, and every page that is read goes to the assistant's service.")
     return 0 if totals["check"] == 0 else 1
 
 
@@ -963,7 +1023,7 @@ def split_stack(stack, pages_per_paper, into, check_dir):
                 run(["pdfunite"] + pages + [str(target)])
             entries.append((label, target, 1, sizes[paper * pages_per_paper], None, False))
         Path(check_dir).mkdir(parents=True, exist_ok=True)
-        write_check_file(entries, Path(check_dir) / PAPERS_TO_NAME, folder)
+        write_check_sheet([entry + ("",) for entry in entries], Path(check_dir) / PAPERS_TO_NAME, folder)
     print(f"{papers} papers of {pages_per_paper} pages written, Paper 01 to Paper {papers:02d}. "
           f"'{PAPERS_TO_NAME}' in your check folder shows the top of each, for you to fill in the paper column "
           "of your name mapping table.")
@@ -1070,7 +1130,7 @@ def self_test():
         for token in invented:
             if token.casefold() in said.casefold():
                 problems.append("an invented name reached the output")
-        if "Section 1/Student A.pdf: 1 pages, box placed on 1; header matches your blank test" not in said:
+        if "Section 1/Student A.pdf: 1 pages, 1 boxed; header matches your blank test" not in said:
             problems.append("the upright paper was not blanked")
         if "Section 1/Student B.pdf: CHECK" not in said:
             problems.append("the paper scanned 0.3 in low was not stopped")
@@ -1084,7 +1144,7 @@ def self_test():
         if problems:
             print("self-test FAILED: " + "; ".join(problems))
             return 1
-    print("self-test passed: an upright invented paper blanked, one scanned 0.3 in low stopped, "
+    print("self-test passed: an upright invented paper boxed, one scanned 0.3 in low stopped, "
           "a file not named like an identifier counted and never named. "
           "This checks the paths the test knows; it is no guarantee about changes it does not reach.")
     return 0
@@ -1124,9 +1184,9 @@ def main(arguments):
             boxes = boxes_from_blank(option(arguments, "--box-from"), label, None, folder)
         for number, box_in in enumerate(boxes, start=1):
             if box_in is None:
-                print(f"page {number}: no '{label}' label with a writing line, so no box")
+                print(f"page {number}: no '{label}' label on your blank test, so no box; its top is on the check sheet")
             else:
-                print(f"page {number}: box in inches " + ",".join(f"{value:.2f}" for value in box_in))
+                print(f"page {number}: box in inches " + ",".join(f"{value:.2f}" for value in box_in[:4]))
         return 0
     if option(arguments, "--stack") is not None:
         return split_stack(option(arguments, "--stack"), int(option(arguments, "--pages-per-paper", "0")),

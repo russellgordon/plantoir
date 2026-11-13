@@ -20,11 +20,12 @@ passes anything on:
     such as an xlsx or docx, a PNG's text chunks, and a PDF's text and metadata through Poppler). One that
     holds a name, or a folder named by one, is moved to the quarantine folder on the teacher's side, a
     folder whole;
-  - a file it cannot read (what a picture shows, a PDF without Poppler, anything else) is counted by kind
-    as NOT checked;
+  - a file it cannot read (what a picture shows, a PDF Poppler cannot read, a link, anything else) is
+    counted by kind as NOT checked and moved to the quarantine folder unread, so it is not opened; a link is
+    moved as a link, never followed;
   - a printed line that holds any form of a name is withheld, and counted.
-It then prints the lines that hold none, and three counts: read and clean, holding a name and moved, and
-not checked. It exits 1 if anything was withheld, moved or left unchecked, and otherwise with the
+It then prints the lines that hold none, and three counts: read and clean, holding a word from the table
+and moved, and not checked and moved unread. Only folders it made, or wrote into, are moved. It exits 1 if anything was withheld, moved or left unchecked, and otherwise with the
 command's own exit code.
 
 It is a safety net, not a guarantee. It catches the names in the table, and only in what the command
@@ -55,6 +56,8 @@ EMAIL_COLUMNS = ("email", "e-mail")
 HANDLE_COLUMNS = ("handles", "handle", "username", "github")
 REPOSITORY_COLUMNS = ("repository", "repo")
 MINIMUM_LENGTH = 2
+SHORT_LENGTH = 4                 # a name part shorter than this counts only beside another part of its name
+ANYWHERE_LENGTH = 6              # a form this long is matched inside other words, too
 
 
 class Refusal(Exception):
@@ -90,67 +93,84 @@ def read_rows(path):
 
 
 def tokens_from(rows):
-    """(whole-word tokens, anywhere tokens): every form a name in the table could take, case-folded."""
+    """Every form a name in the table could take, case and accents taken off, as (words, anywhere, short):
+
+    words     name parts of four letters or more, matched as whole words;
+    anywhere  forms of six letters or more (the whole name, the parts run together, an e-mail address,
+              a handle), matched anywhere, so a bundle id or a slug is caught;
+    short     name parts of two or three letters (Ho, Ed, Le, Ana), each with the other parts of the same
+              name: a short part counts only when another part of its name is there too, so an everyday
+              word such as "ale" or "hed" is not a name (750a fix review M3)."""
     words = set()
     anywhere = set()
+    short = {}
+
+    def add_anywhere(form):
+        form = folded(form)
+        if len(form) >= ANYWHERE_LENGTH:
+            anywhere.add(form)
+        elif len(form) >= MINIMUM_LENGTH:
+            words.add(form)
+
     for row in rows:
         parts = []
         for column in NAME_COLUMNS:
             value = row.get(column, "")
             if not value:
                 continue
-            anywhere.add(folded(value))
+            add_anywhere(value)
             for part in re.split(r"[\s,]+", value):
                 part = part.strip(".'\"()")
-                if len(part) >= MINIMUM_LENGTH:
-                    parts.append(part)
-                    words.add(folded(part))
-                    for piece in re.split(r"[-']", part):
-                        if len(piece) >= MINIMUM_LENGTH:
-                            words.add(folded(piece))
-        unique = []
+                for piece in [part] + re.split(r"[-'’]", part):
+                    if len(piece) >= MINIMUM_LENGTH and folded(piece) not in [folded(seen) for seen in parts]:
+                        parts.append(piece)
         for part in parts:
-            if folded(part) not in [folded(seen) for seen in unique]:
-                unique.append(part)
-        for first in unique:
-            for second in unique:
-                if first != second:
-                    anywhere.add(folded(first + second))
-                    anywhere.add(folded(first[0] + second))
+            if len(folded(part)) >= SHORT_LENGTH:
+                words.add(folded(part))
+            else:
+                partners = short.setdefault(folded(part), set())
+                for other in parts:
+                    if folded(other) != folded(part):
+                        partners.add(folded(other))
+        for first in parts:
+            for second in parts:
+                if folded(first) != folded(second):
+                    add_anywhere(first + second)
+                    add_anywhere(first[0] + second)
                     for joiner in (".", "-", "_"):
-                        anywhere.add(folded(first + joiner + second))
+                        add_anywhere(first + joiner + second)
         for column in EMAIL_COLUMNS:
             value = row.get(column, "")
             if "@" in value:
-                anywhere.add(folded(value))
+                add_anywhere(value)
                 local = value.split("@")[0]
-                if len(local) >= 3:
-                    anywhere.add(folded(local))
-                    anywhere.add(folded(local.split("+")[-1]))
+                add_anywhere(local)
+                add_anywhere(local.split("+")[-1])
         for column in HANDLE_COLUMNS:
             for handle in re.split(r"[\s,;]+", row.get(column, "")):
-                handle = handle.strip("@")
-                if len(handle) >= 3:
-                    anywhere.add(folded(handle))
+                add_anywhere(handle.strip("@"))
         for column in REPOSITORY_COLUMNS:
             address = row.get(column, "")
             match = re.search(r"(?:github\.com|gitlab\.com|bitbucket\.org)[/:]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$", address)
             if match:
                 for piece in match.groups():
-                    if len(piece) >= 3:
-                        anywhere.add(folded(piece))
+                    add_anywhere(piece)
             elif address:
-                anywhere.add(folded(address))
-    return words, anywhere
+                add_anywhere(address)
+    return words, anywhere, short
 
 
-def holds_a_name(text, words, anywhere):
+def holds_a_name(text, names):
+    words, anywhere, short = names
     text = folded(text)
     for token in anywhere:
-        if token and token in text:
+        if token in text:
             return True
-    for word in re.findall(r"\w+", text):
-        if word in words:
+    found = set(re.findall(r"\w+", text))
+    if found & words:
+        return True
+    for part, partners in short.items():
+        if part in found and (found & partners or not partners):
             return True
     return False
 
@@ -240,13 +260,14 @@ def text_of(data, name, depth=0):
                     pass
             return text, [kind + ": what it shows"]
     if data[:5] == b"%PDF-":
-        return "", ["PDF"]   # read by pdf_text, from the file on disk
+        return data.decode("latin-1"), ["PDF"]   # its raw bytes now; its text through Poppler in look_at
     if data[:2] in (b"\xff\xfe", b"\xfe\xff") or (len(data) >= 4 and data.count(b"\x00") > len(data) // 4):
+        # UTF-16 with or without its mark, either byte order: search every reading, and the bytes with
+        # the NULs taken out (750a fix review M1: big-endian with no mark was read as little-endian).
+        readings = [data.replace(b"\x00", b"").decode("latin-1")]
         for encoding in ("utf-16", "utf-16-le", "utf-16-be"):
-            try:
-                return data.decode(encoding), []
-            except UnicodeDecodeError:
-                continue
+            readings.append(data.decode(encoding, "replace"))
+        return "\n".join(readings), []
     try:
         return data.decode("utf-8"), []
     except UnicodeDecodeError:
@@ -254,12 +275,15 @@ def text_of(data, name, depth=0):
 
 
 def pdf_text(path):
-    """A PDF's text, its metadata and its XMP, through Poppler; None when Poppler is not here."""
+    """A PDF's text, its metadata and its XMP, through Poppler; None when Poppler is not here or cannot read
+    it (broken, or locked by a password): an empty answer is never taken for "nothing in it"."""
     if shutil.which("pdftotext") is None or shutil.which("pdfinfo") is None:
         return None
     pieces = []
     for command in (["pdftotext", str(path), "-"], ["pdfinfo", str(path)], ["pdfinfo", "-meta", str(path)]):
         result = subprocess.run(command, capture_output=True)
+        if result.returncode != 0:
+            return None
         pieces.append(result.stdout.decode("utf-8", "replace"))
     return "\n".join(pieces)
 
@@ -269,10 +293,7 @@ def look_at(path, kind):
     if kind == "folder":
         return "", []
     if kind == "link":
-        try:
-            return os.readlink(path), []
-        except OSError:
-            return "", ["a link that could not be read"]
+        return "", ["a link (where it points was not read)"]
     try:
         data = path.read_bytes()
     except OSError:
@@ -282,7 +303,7 @@ def look_at(path, kind):
         unread.remove("PDF")
         found = pdf_text(path)
         if found is None:
-            unread.append("a PDF (Poppler is not installed, so its text could not be read)")
+            unread.append("a PDF Poppler could not read (not installed, broken or locked)")
         else:
             text += "\n" + found
     return text, unread
@@ -325,8 +346,8 @@ def main(arguments):
         raise Refusal("the quarantine folder must be on the teacher's side, outside the marking folder")
     if in_a_working_folder(watch) or in_a_working_folder(quarantine):
         raise Refusal("a folder given is inside the Plantoir working folder; marking is kept outside it")
-    words, anywhere = tokens_from(read_rows(table))
-    if not words and not anywhere:
+    names = tokens_from(read_rows(table))
+    if not names[0] and not names[1] and not names[2]:
         raise Refusal("the mapping table holds no names; nothing was run")
     before = snapshot(watch)
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
@@ -336,64 +357,65 @@ def main(arguments):
     after = snapshot(watch)
     changed = [path for path, state in sorted(after.items()) if before.get(path) != state]
     named_folders = []
-    for path in changed:
-        if after[path][0] == "folder" and holds_a_name(path.name, words, anywhere):
-            if not any(folder in path.parents for folder in named_folders):
-                named_folders.append(path)
     for path, state in sorted(after.items()):
-        if state[0] == "folder" and holds_a_name(path.name, words, anywhere) and path not in named_folders:
-            if not any(folder in path.parents for folder in named_folders):
-                named_folders.append(path)   # an old folder named by a name, given a new file
+        if state[0] != "folder" or not holds_a_name(path.name, names):
+            continue
+        touched = path in changed or any(path in other.parents for other in changed)
+        if touched and not any(folder in path.parents for folder in named_folders):
+            # a new folder named by a word from the table, or an old one this run wrote into; an old folder
+            # the script left alone stays where it is (750a fix review M3: "June Exam")
+            named_folders.append(path)
     clean = 0
     moving = list(named_folders)
+    unread_paths = []
     unread = {}
     for path in changed:
         if after[path][0] == "folder" or any(folder in path.parents for folder in named_folders):
             continue
         text, kinds = look_at(path, after[path][0])
         relative = str(path.relative_to(Path(watch)))
-        if holds_a_name(relative, words, anywhere) or holds_a_name(text, words, anywhere):
+        if holds_a_name(relative, names) or holds_a_name(text, names):
             moving.append(path)
             continue
         if kinds:
             for kind in kinds:
                 unread[kind] = unread.get(kind, 0) + 1
+            unread_paths.append(path)
             continue
         clean += 1
     held_files = 0
     held_folders = 0
-    for path in moving:
+    for path in moving + unread_paths:
         target = Path(quarantine) / path.relative_to(Path(watch))
         target.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_dir() and not path.is_symlink():
-            held_folders += 1
-        else:
-            held_files += 1
-        shutil.move(str(path), str(target))
+        if path in moving:
+            if path.is_dir() and not path.is_symlink():
+                held_folders += 1
+            else:
+                held_files += 1
+        shutil.move(str(path), str(target))   # a link is moved as a link, never followed
     withheld = 0
     passed = []
     for line in output.splitlines():
-        if holds_a_name(line, words, anywhere):
+        if holds_a_name(line, names):
             withheld += 1
         else:
             passed.append(line)
     for line in passed:
         print(line)
-    unread_total = sum(unread.values())
+    unread_total = len(unread_paths)
     print(f"run_with_names: {withheld} printed lines were withheld, each holding a word from your table.")
     print(f"Files new or changed in the marking folder: {clean} read and clean; "
-          f"{held_files} files and {held_folders} folders held a name and were moved to the quarantine folder; "
-          f"{unread_total} could not be read, so were NOT checked" +
+          f"{held_files} files and {held_folders} folders held a word from your table and were moved to the quarantine "
+          f"folder; {unread_total} could not be read, so were NOT checked and were moved there unread" +
           (" (" + "; ".join(f"{count} {kind}" for kind, count in sorted(unread.items())) + ")" if unread else "") + ".")
-    if withheld:
-        print("A withheld line held a word from your table. If that word is also an everyday word (a name such as "
-              "May or Will), this is a false alarm; otherwise the script needs fixing before it is used again.")
-    if held_files or held_folders:
-        print("The script wrote a name into the marking folder and needs fixing before it is used again. "
-              "What was moved is not shown here.")
+    if withheld or held_files or held_folders:
+        print("Something held a word from your table: a name, or an everyday word that is also a name (such as May "
+              "or Will). If it was a name, the script needs fixing before it is used again; what was held back is "
+              "not shown here.")
     if unread_total:
-        print("Not fully checked: the files that could not be read were left where they are. Ask the teacher to "
-              "look at them, or change the script so it writes text.")
+        print("Not fully checked: do not open the files moved unread; the teacher can look at them in the "
+              "quarantine folder, or the script can be changed to write text.")
     print("This is a safety net, not a guarantee: it catches the names in your table, in what the script printed "
           "and what it wrote in the marking folder, and nothing else.")
     if withheld or held_files or held_folders or unread_total:

@@ -94,7 +94,10 @@ def read_table(path):
         key = (int(row["section"]), row["identifier"])
         if key in names:
             repeated += 1
-        names[key] = unicodedata.normalize("NFC", row[NAME_COLUMN])
+        name = unicodedata.normalize("NFC", row[NAME_COLUMN])
+        for curly, straight in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", '"'), ("\u201d", '"')):
+            name = name.replace(curly, straight)   # a spreadsheet's typographic quotes, as typed (750a fix review L3)
+        names[key] = name
     if wrong:
         raise Refusal(f"{wrong} rows in the mapping table are not like section 1, Student A, a name; nothing was written")
     if repeated:

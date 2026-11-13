@@ -208,6 +208,11 @@ class SkillFileTests(unittest.TestCase):
         runner = SKILL / self.guidance()["runner"]
         digest = hashlib.sha256(runner.read_bytes()).hexdigest()
         self.assertIn("It must print `" + digest + "`", (SKILL / "SKILL.md").read_text(encoding="utf-8"))
+        # 750a fix review M5: the pin is of LF bytes, and .gitattributes checks this one file out with LF on
+        # every platform, so a Windows checkout under core.autocrlf hashes the same.
+        self.assertNotIn(b"\r", runner.read_bytes())
+        attributes = (REPOSITORY / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn("support/agent_guidance/skills/plantoir-marking/scripts/run_with_names.py text eol=lf", attributes)
 
     def test_the_offered_templates_name_is_the_handouts_skills(self):
         name = contract()["printablePages"]["agentGuidance"]["handoutsSkill"]["offeredTemplate"]["name"]

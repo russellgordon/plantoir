@@ -46,7 +46,7 @@ TOOLS = ("pdftoppm", "pdfinfo", "pdftotext", "pdfunite", "pdfseparate")
 MISSING = [tool for tool in TOOLS if shutil.which(tool) is None]
 SKIP_REASON = "Poppler is not installed here (" + ", ".join(MISSING) + " not found); the redaction cases need it"
 SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
-BOX = (3.44, 0.20, 5.33, 0.89)
+BOX = (0.30, 0.15, 8.20, 0.98)
 DPI = 100
 INVENTED = ("Testpupil", "Alphaname")
 
@@ -212,6 +212,12 @@ def variants(width, height):
                     out[row * width_now + column] = 40
         return page
 
+    def under_the_line(image, fill):
+        width_now, height_now, pixels = image
+        out = (width_now, height_now, bytearray(pixels))
+        paint(out, [(3.0, 1.02, 4.6, 1.16)], 15 if fill == 255 else 255)
+        return out
+
     def written_past_the_box(image, fill):
         width_now, height_now, pixels = image
         out = (width_now, height_now, bytearray(pixels))
@@ -242,6 +248,8 @@ def variants(width, height):
         "rotated 0.5 degrees": (rotate(0.5), (1, 2)),
         # Paper and its marks near the header that are not writing (750a review H1, the other direction).
         "paper grain, a ruled line, a staple and a punched hole": (paper_marks, (1, 2)),
+        # A name written under the name line, outside the box: written, with the warning (Russell, 2026-11-12).
+        "a name written under the name line": (under_the_line, (1,)),
     }
 
 
@@ -362,13 +370,17 @@ class RedactionTests(unittest.TestCase):
             self.assertNotEqual(case["expect"], "CHECK", f"{case['variant']} must be stopped: {line}")
             self.assertIn("header matches your blank test", line, case["variant"])
             self.assertNotIn(" OK", line, "the line says what was measured, never OK")
+            warned = "has writing beside the name box" in line
+            if case.get("warns"):
+                self.assertTrue(warned, f"{case['variant']} must warn: {line}")
             left = ink_left_outside_the_box(blanked, masks, turned_pages(line))
-            report.append(f"{case['variant']}: written, {left} name pixels left")
-            self.assertEqual(left, 0, f"{case['variant']}: name ink is visible in a written file")
+            report.append(f"{case['variant']}: written{', warned' if warned else ''}, {left} name pixels left")
+            if not case.get("warns"):
+                self.assertEqual(left, 0, f"{case['variant']}: name ink is visible in a written file")
         print("\n" + "\n".join(report) + f"\n({self.seconds:.1f} s for {2 * len(self.made)} pages)")
 
     def test_the_duplex_paper_has_its_page_turned_upright(self):
-        self.assertIn("box placed on 2; header matches your blank test", self.line_for("Student A"))
+        self.assertIn("2 pages, 2 boxed; header matches your blank test", self.line_for("Student A"))
         self.assertIn("page 2 turned upright", self.line_for("Student G"))
 
     def test_the_box_is_black_and_nothing_sits_under_it(self):
@@ -398,7 +410,7 @@ class RedactionTests(unittest.TestCase):
             for column in range(int(x0 * DPI) + 2, int(x1 * DPI) - 2):
                 if pixels[row * width + column] < 100:
                     dark += 1
-        self.assertGreater(dark, 100, "a name written in the body is not blanked: that is what the skim is for")
+        self.assertGreater(dark, 100, "a name written in the body is not boxed, and the skill says so")
 
     def test_a_file_not_named_like_an_identifier_is_counted_and_never_named(self):
         said = self.outcome.stdout + self.outcome.stderr
@@ -409,14 +421,26 @@ class RedactionTests(unittest.TestCase):
         for name in written:
             self.assertRegex(name, r"^Student [A-Z]{1,2}\.pdf$")
 
-    def test_the_check_files_are_written_on_the_teachers_side(self):
+    def test_one_check_sheet_shows_the_top_of_every_page(self):
+        # Russell, 2026-11-12: the teacher's look at ONE check sheet is the proof; it shows every page.
         check = self.root / "Teacher only" / "Check"
-        self.assertTrue((check / "Name box check.pdf").exists())
-        skim = check / "Blanked papers to skim.pdf"
-        written = list((self.root / "Redacted").rglob("*.pdf"))
-        self.assertEqual(page_count(skim), 2 * len(written))
-        self.assertEqual(page_count(check / "Name box check.pdf"), math.ceil(2 * len(self.made) / 6))
+        self.assertEqual(sorted(path.name for path in check.iterdir()), ["Check sheet.pdf"])
+        sheet = check / "Check sheet.pdf"
+        self.assertEqual(page_count(sheet), math.ceil(2 * len(self.made) / 6))
+        text = subprocess.run(["pdftotext", str(sheet), "-"], capture_output=True, text=True).stdout
+        for identifier in self.made:
+            for page in (1, 2):
+                self.assertIn(f"Section 1/{identifier}, page {page}", text, "every page of every paper is on the sheet")
         self.assertNotEqual(self.outcome.returncode, 0, "a run with any CHECK exits 1")
+
+    def test_nothing_it_says_claims_a_name_is_covered(self):
+        said = (self.outcome.stdout + self.outcome.stderr).casefold()
+        for claim in ("covered", "covers", "removed", "names are", "no names", " ok", "blanked the name", "safe to read"):
+            self.assertNotIn(claim, said, f"the run must not claim '{claim}'")
+        last = self.outcome.stdout.strip().splitlines()[-1]
+        self.assertIn("is waiting for the teacher's look", last)
+        self.assertIn("A name written anywhere else on a page is not boxed", last)
+        self.assertIn("goes to the assistant's service", last)
 
 
 @unittest.skipIf(MISSING, SKIP_REASON)
@@ -454,7 +478,7 @@ class BoxAndRefusalTests(unittest.TestCase):
             for case in cases:
                 stem = case["file"][:-4]
                 if case["isAPaper"]:
-                    self.assertIn(f"{stem}.pdf: 2 pages, box placed on 2", result.stdout, case["file"])
+                    self.assertIn(f"{stem}.pdf: 2 pages, 2 boxed", result.stdout, case["file"])
                 else:
                     self.assertNotIn(stem, result.stdout, f"{case['file']} must be counted, never named")
             self.assertIn(f"{len(cases) - len(papers)} files or folders not named like an identifier were left alone", result.stdout)
@@ -477,7 +501,7 @@ class BoxAndRefusalTests(unittest.TestCase):
             made = build_scans(BLANK_LEGAL, Path(root) / "Originals", {"upright"})
             result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", BLANK_LEGAL,
                                 "--check-dir", Path(root) / "Check")
-            self.assertIn("Section 1/Student A.pdf: 2 pages, box placed on 2; header matches your blank test", result.stdout)
+            self.assertIn("Section 1/Student A.pdf: 2 pages, 2 boxed; header matches your blank test", result.stdout)
             self.assertEqual(ink_left_outside_the_box(Path(root) / "Redacted" / "Section 1" / "Student A.pdf",
                                                       made["Student A"][1], set()), 0)
 
@@ -530,12 +554,12 @@ class BoxAndRefusalTests(unittest.TestCase):
             self.assertFalse((working / "Marking").exists())
 
     def test_a_page_with_no_name_box_on_the_blank_is_said(self):
-        # 750a review H2: a page whose blank test has no Name blank gets no box, and the line says so.
+        # A page whose blank test has no Name label gets no box, and the line and the check sheet say so;
+        # the starter's "School Name" is not a name blank.
         blank = FIXTURES / "blank-quiz-letter-name-on-page-1.pdf"
         boxes = run_script(SCRIPT, "--box-from", blank)
-        self.assertIn("page 1: box in inches 3.44,0.20,5.33,0.89", boxes.stdout)
-        self.assertIn("page 2: no 'Name' label with a writing line, so no box", boxes.stdout,
-                      "the starter's School Name is not a name blank")
+        self.assertIn("page 1: box in inches 0.30,0.15,8.20,0.98", boxes.stdout)
+        self.assertIn("page 2: no 'Name' label on your blank test, so no box", boxes.stdout)
         with tempfile.TemporaryDirectory() as root:
             pages = [render(blank, 1), render(blank, 2)]
             paint(pages[0], NAME_STROKES, 15)
@@ -543,10 +567,41 @@ class BoxAndRefusalTests(unittest.TestCase):
             write_image_pdf(Path(root) / "Originals" / "Student A.pdf", pages)
             result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
                                 "--check-dir", Path(root) / "Check")
-            self.assertIn("Student A.pdf: 2 pages, box placed on 1; header matches your blank test; page 2 has no name box "
-                          "on your blank test, so nothing there was blanked", result.stdout)
-            self.assertIn("whose blank test has one", result.stdout)
-            self.assertNotIn("each page and", result.stdout)
+            self.assertIn("Student A.pdf: 2 pages, 1 boxed; header matches your blank test; page 2 has no name blank "
+                          "on your blank test, so no box", result.stdout)
+            self.assertIn("1 pages with no name blank on the blank test (not boxed)", result.stdout)
+            sheet = subprocess.run(["pdftotext", str(Path(root) / "Check" / "Check sheet.pdf"), "-"],
+                                   capture_output=True, text=True).stdout
+            self.assertIn("Student A, page 2: no name blank on the blank test, so no box", sheet)
+
+    def test_every_style_of_name_blank_is_boxed(self):
+        # 750a fix review H1 and M4: a rule, underscores, dots, a table cell, a frame, and underscores at the
+        # left margin are each a name blank; a name written in each is inside the box.
+        blank = FIXTURES / "blank-name-styles.pdf"
+        boxes = run_script(SCRIPT, "--box-from", blank)
+        self.assertEqual(boxes.returncode, 0, boxes.stdout)
+        self.assertEqual(boxes.stdout.count("box in inches 0.30,0.15,8.20,"), page_count(blank), boxes.stdout)
+        xml = subprocess.run(["pdftotext", "-bbox", str(blank), "-"], capture_output=True, text=True).stdout
+        labels = re.findall(r'xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">Name:?<', xml)
+        self.assertEqual(len(labels), page_count(blank))
+        with tempfile.TemporaryDirectory() as root:
+            pages = []
+            masks = []
+            for number, (x0, y0, x1, y1) in enumerate(labels, start=1):
+                image = render(blank, number)
+                stroke = [(float(x1) / 72 + 0.1, float(y0) / 72 - 0.03, float(x1) / 72 + 1.9, float(y1) / 72 + 0.03)]
+                paint(image, stroke, 15)
+                mask = (image[0], image[1], bytearray(image[0] * image[1]))
+                paint(mask, stroke, 255)
+                spots = {(position % mask[0], position // mask[0]) for position, value in enumerate(mask[2]) if value}
+                pages.append(image)
+                masks.append((spots, (mask[0], mask[1]), False))
+            (Path(root) / "Originals").mkdir()
+            write_image_pdf(Path(root) / "Originals" / "Student A.pdf", pages)
+            result = run_script(SCRIPT, Path(root) / "Originals", Path(root) / "Redacted", "--blank", blank,
+                                "--check-dir", Path(root) / "Check")
+            self.assertIn(f"Student A.pdf: {len(pages)} pages, {len(pages)} boxed; header matches your blank test", result.stdout)
+            self.assertEqual(ink_left_outside_the_box(Path(root) / "Redacted" / "Student A.pdf", masks, set()), 0)
 
     def test_its_own_self_test_passes(self):
         result = run_script(SCRIPT, "--self-test")

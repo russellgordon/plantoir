@@ -81,7 +81,9 @@ def run(runner, root, script_text, extra=()):
     script.write_text(script_text, encoding="utf-8")
     command = [sys.executable, "-B", str(runner), "--table", str(table), "--watch", str(marking), "--quarantine",
                str(teacher / "Quarantine"), *extra, "--", sys.executable, "-B", str(script), str(table), str(marking)]
-    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8"), marking, teacher
+    # Run from the temporary folder, so even a runner that does not run the script in the marking folder
+    # cannot leave a file in this repository (750a fix review L1: a debug.log was committed that way).
+    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8", cwd=root), marking, teacher
 
 
 def every_text_under(folder):
@@ -105,7 +107,7 @@ class RunnerTests(unittest.TestCase):
             self.assertIn("Section 1: 2 sheets made", said)
             self.assertIn("Student B done", said)
             self.assertIn("printed lines were withheld, each holding a word from your table", said)
-            self.assertIn("2 files and 0 folders held a name and were moved to the quarantine folder", said)
+            self.assertIn("2 files and 0 folders held a word from your table and were moved to the quarantine folder", said)
             self.assertEqual(result.returncode, 1)
             self.assertEqual(sorted(path.name for path in marking.iterdir()), ["clean.txt"])
             self.assertEqual(len(list((teacher / "Quarantine").iterdir())), 2)
@@ -115,7 +117,7 @@ class RunnerTests(unittest.TestCase):
             result, _marking, _teacher = run(RUNNER, Path(folder), CLEAN)
             self.assertIn("Section 1: 2 sheets made\nStudent B: not in the mapping table\n", result.stdout)
             self.assertIn("0 printed lines were withheld", result.stdout)
-            self.assertIn("0 read and clean; 0 files and 0 folders held a name", result.stdout)
+            self.assertIn("0 read and clean; 0 files and 0 folders held a word from your table", result.stdout)
             self.assertEqual(result.returncode, 3)
 
     def test_it_says_it_is_a_net_and_not_a_lock(self):
@@ -142,7 +144,7 @@ class RunnerTests(unittest.TestCase):
     def test_a_pdf_holding_a_name_is_moved(self):
         with tempfile.TemporaryDirectory() as folder:
             result, marking, teacher = run(RUNNER, Path(folder), PDF_WRITER)
-            self.assertIn("1 files and 0 folders held a name and were moved to the quarantine folder", result.stdout)
+            self.assertIn("1 files and 0 folders held a word from your table and were moved to the quarantine folder", result.stdout)
             self.assertFalse((marking / "sheet.pdf").exists())
             self.assertTrue((teacher / "Quarantine" / "sheet.pdf").exists())
 
@@ -213,6 +215,26 @@ from pathlib import Path
 print("made Zoe Nandufamily")
 (Path(sys.argv[2]) / "slug.txt").write_text("zoe-nandufamily", encoding="utf-8")
 """,
+    "a link to the mapping table": r"""
+import os, sys
+from pathlib import Path
+os.symlink(sys.argv[1], Path(sys.argv[2]) / "rows.csv")
+""",
+    "a link to the teacher-only folder": r"""
+import os, sys
+from pathlib import Path
+os.symlink(str(Path(sys.argv[1]).parent), Path(sys.argv[2]) / "lookup")
+""",
+    "a broken PDF holding a name in its bytes": r"""
+import sys
+from pathlib import Path
+(Path(sys.argv[2]) / "draft.pdf").write_bytes(b"%PDF-1.4\n% Pupilseven Testfamily\nnot a real pdf\n")
+""",
+    "UTF-16 big-endian with no mark": r"""
+import sys
+from pathlib import Path
+(Path(sys.argv[2]) / "notes.txt").write_bytes("for Pupileight".encode("utf-16-be"))
+""",
     "a file written by a relative path": r"""
 from pathlib import Path
 Path("debug.log").write_text("Pupilseven", encoding="utf-8")
@@ -242,7 +264,7 @@ class RunnerLeakTests(unittest.TestCase):
         script.write_text(script_text, encoding="utf-8")
         result = subprocess.run([sys.executable, "-B", str(RUNNER), "--table", str(table), "--watch", str(marking),
                                  "--quarantine", str(teacher / "Quarantine"), "--", sys.executable, "-B", str(script),
-                                 str(table), str(marking)], capture_output=True, text=True, encoding="utf-8")
+                                 str(table), str(marking)], capture_output=True, text=True, encoding="utf-8", cwd=folder)
         return result, marking, teacher
 
     def test_every_leak_is_moved_and_nothing_says_clean(self):
@@ -261,6 +283,7 @@ class RunnerLeakTests(unittest.TestCase):
                     for token in tokens:
                         self.assertNotIn(token.casefold(), path.casefold(), f"{name}: a path named by a name stayed")
                 self.assertEqual(left, [] if name != "a file inside a folder named by a name" else ["Named"], name)
+                self.assertNotIn("1 read and clean", said, f"{name}: nothing here is read and clean")
                 self.assertTrue((teacher / "Quarantine").exists() or "withheld" in said, name)
                 self.assertEqual(result.returncode, 1, f"{name}: {said}")
                 self.assertIn("0 read and clean", said, name)
@@ -268,10 +291,66 @@ class RunnerLeakTests(unittest.TestCase):
     def test_a_file_it_cannot_read_is_counted_as_not_checked(self):
         result, marking, _teacher = self.run_leak(UNREADABLE)
         self.assertIn("Student A done", result.stdout)
-        self.assertIn("1 could not be read, so were NOT checked (1 a file that is not text (.bin))", result.stdout)
-        self.assertIn("Not fully checked", result.stdout)
+        self.assertIn("1 could not be read, so were NOT checked and were moved there unread (1 a file that is not text (.bin))",
+                      result.stdout)
+        self.assertIn("do not open the files moved unread", result.stdout)
         self.assertEqual(result.returncode, 1)
-        self.assertTrue((marking / "blob.bin").exists(), "a file it cannot read is left where it is, and said")
+        self.assertFalse((marking / "blob.bin").exists(), "a file it cannot read is moved unread, so it is not opened")
+
+SHORT_TABLE = ('section,identifier,name,first name\n1,Student A,"Ho, Ed",Ed\n1,Student B,"Le, Ana",Ana\n'
+               '1,Student C,"Testfamily, June",June\n')
+HONEST = r"""
+import sys
+from pathlib import Path
+print("3 sheets finished")
+print("the scale is levels 1 to 4; matched every point")
+(Path(sys.argv[2]) / "summary.txt").write_text("3 sheets published", encoding="utf-8")
+"""
+NAMED_PAIR = r"""
+print("made Ed Ho")
+"""
+
+
+class FalseAlarmTests(unittest.TestCase):
+    """750a fix review M3: short surnames and everyday words must not withhold honest lines or move
+    untouched folders; a short name with its other part is still caught."""
+
+    def run_with(self, script_text, prepare=None):
+        folder = tempfile.mkdtemp(prefix="marking-alarm-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        root = Path(folder)
+        marking = root / "Marking"
+        teacher = root / "Marking - Teacher Only"
+        marking.mkdir()
+        teacher.mkdir()
+        if prepare:
+            prepare(marking)
+        table = teacher / "Name Mapping Table.csv"
+        table.write_text(SHORT_TABLE, encoding="utf-8")
+        script = root / "adapted.py"
+        script.write_text(script_text, encoding="utf-8")
+        result = subprocess.run([sys.executable, "-B", str(RUNNER), "--table", str(table), "--watch", str(marking),
+                                 "--quarantine", str(teacher / "Quarantine"), "--", sys.executable, "-B", str(script),
+                                 str(table), str(marking)], capture_output=True, text=True, encoding="utf-8", cwd=folder)
+        return result, marking
+
+    def test_an_honest_script_is_not_held_back(self):
+        def old_folder(marking):
+            (marking / "June Exam").mkdir()
+            (marking / "June Exam" / "Student A.pdf").write_bytes(b"%PDF-1.4 old")
+        result, marking = self.run_with(HONEST, old_folder)
+        self.assertIn("3 sheets finished", result.stdout)
+        self.assertIn("matched every point", result.stdout)
+        self.assertIn("0 printed lines were withheld", result.stdout)
+        self.assertIn("1 read and clean; 0 files and 0 folders", result.stdout)
+        self.assertTrue((marking / "June Exam" / "Student A.pdf").exists(), "an untouched folder stays")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_a_short_name_with_its_other_part_is_caught(self):
+        result, _marking = self.run_with(NAMED_PAIR)
+        self.assertNotIn("Ed Ho", result.stdout)
+        self.assertIn("1 printed lines were withheld", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
