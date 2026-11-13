@@ -26358,7 +26358,8 @@
           "If you cannot tell whether they have shown that interest, do not offer it.",
           "then any question that changed goes back to the reviewer",
           "An assessment (a quiz or test) never does.",
-          "Contexts you invent never involve firearms or ammunition"
+          "Contexts you invent never involve firearms or ammunition",
+          "except anything in a teacher-only folder"
         ],
         "plantoir-test-authoring": [
           "Please read and decide on all of it before it reaches a student; I draft, you decide.",
@@ -26378,6 +26379,46 @@
         ],
         "plantoir-unit-planning": [
           "you can also write the unit's test from the plan",
+          "Do not raise it again in this session if they do not take it up."
+        ],
+        "plantoir-marking": [
+          "Every mark, level and comment I draft is a suggestion.",
+          "I draft; you decide.",
+          "Before we start, four things about your students' privacy",
+          "Whatever I read is sent to the AI service I run on",
+          "Please look through every page of it before I read anything: your look is what confirms the names are redacted, and I never open that file.",
+          "A name written anywhere else (in a margin, inside an answer, on a page with no name blank) is not boxed, and I would see it.",
+          "I will not repeat it in any message or file",
+          "The files I write stay on this computer",
+          "**Never set up a marking folder inside the working folder**",
+          "say once, in plain words, that the papers and the name table will be stored by that service as well",
+          "do not raise it again for that folder",
+          "copy the script into the marking folder's `Scripts/` folder",
+          "It is a safety net, not a guarantee",
+          "**Every script that reads the name mapping table is run through `run_with_names.py`, never directly.**",
+          "**Never open a file the runner could not read**",
+          "do not run any script that reads the table",
+          "Never guess.",
+          "It does NOT detect a page scanned upside down or shifted: the teacher sees that when looking through the papers.",
+          "Any line that starts `Stopped:` means stop: nothing may be read",
+          "**Read no paper until the teacher has looked through the redacted papers and said yes.**",
+          "You never open that file yourself: a name the box missed would be in it.",
+          "a yes given before the papers were boxed does not count",
+          "**Before reading any paper, in any session, run the check**",
+          "The script cannot know who looked: it records that the teacher said yes.",
+          "**Run `--confirm` only straight after the teacher's own yes in this conversation, in reply to the ask, and never on your own judgement.**",
+          "on a page scanned upside down the name line is at the foot, and on a page scanned shifted or shrunk part of the name can show just below the black box",
+          "Both briefs begin by running `--verify`; a marker or reviewer whose check does not name its paper reads nothing.",
+          "read only the files `--verify` names, never any other file in that folder",
+          "never say a name is covered, removed or safe",
+          "**If the script cannot run, stop.**",
+          "Never read an original, and never box a page any other way.",
+          "A ruling that changes a mark applies only once you have said yes to it",
+          "If you cannot tell whether they have shown that interest, do not offer it.",
+          "nothing in the teacher-only folder is opened, rendered or listed",
+          "never involve firearms or ammunition",
+          "Only if it is there, when the sheets are handed over and the marks are final",
+          "draft report card comments from these records",
           "Do not raise it again in this session if they do not take it up."
         ]
       },
@@ -27418,11 +27459,12 @@
       "rule": "Under the policy a Netlify publish sends (scripts/netlify_badge.py: script-src 'self' 'unsafe-eval' <hashes>) the stock engine never loads; the six replacements of geogebra_engine.py make it load with that policy unchanged. Every browser check serves on [::1], never 127.0.0.1 or localhost: GeoGebra's loader runs its main file as inline text on those two hosts (and apps-builds.), which would test a path no class site takes. browser-checks/geogebra_applet.mjs proves it on a clone of a built site with the publish's own _headers: zero refusals by the policy, zero requests off the site."
     },
     "words": {
-      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes.",
+      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {file} is the name as the fence gives it, {name} a setting's name, {value} what it was given, {line} a line of the fence, {said} GeoGebra's own words, {author} a geogebra.org author, {id} a sketch's id, {megabytes} and {limit} sizes. While a sketch opens, `site.loading` and under it `site.loadingFirstTime` show INSIDE the sketch's own box, where the student tapped, in one polite live region said once (#756); they go when the sketch draws, and on failure `site.couldNotLoad` is said below the box instead. \"Up to a minute\" is the loader's own bound (GIVE_UP_MS, 60 s), after which a student is told it did not open; \"the first time\" because the engine is then kept by the browser and opens quickly.",
       "site": {
         "openSketch": "Open the sketch ({size})",
         "sketchSize": "about {megabytes} MB",
         "loading": "Opening the sketch…",
+        "loadingFirstTime": "The first time, this can take up to a minute.",
         "couldNotLoad": "This sketch couldn't be opened. Check the connection, then try again.",
         "lineCouldNotRun": "Line {line} couldn't run: {said}",
         "commandsSummary": "What this sketch is made from",
@@ -31719,7 +31761,7 @@
       {
         "step": 6,
         "when": "the answer is notAsked",
-        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian. Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
+        "then": "show the offer BEFORE Obsidian opens - with wording.offerWhileOpen added when the course is open in Obsidian, or wording.offerWhileObsidianIsOpen instead when Plantoir cannot tell (openStateCases). Add Them: the answer becomes yes, and the add-ons are added (when the course is open in Obsidian: Obsidian is closed first and reopened after, as in step 8). Not Now: no question again until Plantoir next starts. Not Now with Don't ask again: the answer becomes no. Obsidian opens after every answer"
       },
       {
         "step": 7,
@@ -31782,7 +31824,7 @@
       ]
     },
     "offerCases": {
-      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
+      "note": "Open in Obsidian's decision (sequence), as data. `courseOpenInObsidian` means Obsidian is RUNNING and its registry marks the course open (or cannot be read while it runs - it is rewritten in place - which counts as open for what Plantoir does and is said as wording.offerWhileObsidianIsOpen; openStateCases) - however many of its windows are on screen: a hidden, minimised, full-screen or other-Space Obsidian still holds the course's add-on list in memory (implementation review B1, measured on a hidden Obsidian with 16 vault windows and none on screen). Over-reporting is the safe direction. `scans` is whether the course is scanned at all; `decision` is one of justOpen, notTheVault, offer, offerWhileOpen, installThenOpen, askReopen.",
       "cases": [
         {
           "name": "a reference course is never scanned",
@@ -32681,6 +32723,7 @@
       "offerTitle": "Show diagrams and graphs in Obsidian too?",
       "offerMessage": "{course} has diagrams or graphs that your class website draws. Plantoir can add the Obsidian add-ons that draw them, so you see the same pictures while you write. Your answer applies to every course that has them.\n\nThe first time each course opens with them, Obsidian asks whether you trust the author of its pages — that is you. Click “Trust author and enable plugins”: pressing Return chooses the other button. Obsidian then opens its settings in a window of its own, showing the add-ons switched on; close that window and carry on.",
       "offerWhileOpen": "{course} is open in Obsidian now, so Obsidian closes and opens it again to show them. What you've written is kept.",
+      "offerWhileObsidianIsOpen": "Obsidian is open now, so it closes and opens again to show them. What you've written is kept.",
       "offerAdd": "Add Them",
       "offerNotNow": "Not Now",
       "dontAskAgain": "Don't ask again",
@@ -32748,7 +32791,9 @@
       "A page the cloud has not downloaded is not read, so a course whose only figure page is still in the cloud is offered nothing until the page is downloaded.",
       "Obsidian Sync carries about 12.9 MB per course to other devices if the teacher turned on its add-on categories; the add-ons say they run on iPad too (isDesktopOnly false), which was not tried.",
       "If Obsidian updates TikZJax, Plantoir leaves the newer copy alone, and Obsidian may then draw a diagram differently from the site, whose engine stays the one TikZJax 0.5.2 carries.",
-      "A restored backup has the list and not the folders; the next pass on a computer whose answer is yes adds them back - switched on, even if the teacher had switched one off before the backup."
+      "A restored backup has the list and not the folders; the next pass on a computer whose answer is yes adds them back - switched on, even if the teacher had switched one off before the backup.",
+      "A course Obsidian marked open and then closed can still read as open, because Obsidian does not always clear the mark (FolderActions' own measurement); the offer then says the course is open and Add Them closes and reopens Obsidian.",
+      "When Plantoir cannot tell (openStateCases: cannotTell), Add Them closes Obsidian whatever it had open, and the list of what was open could not be read, so Plantoir opens only this course again; any other course comes back only if Obsidian restores it itself."
     ],
     "rejected": [
       "Writing Obsidian's trust answer (enable-plugin-<appId>) into its LevelDB storage: Obsidian-internal, unsafe while Obsidian runs, and it removes a security question the teacher should answer.",
@@ -32758,8 +32803,127 @@
       "Asking at course creation, in Course Settings, after a preview, or through an assistant: Open in Obsidian is the moment the question means something, and asking before Obsidian opens means no reopen in the common case. No assistant tool or schema changes.",
       "A marker printed by the build saying which kinds a course uses: the build sees one section's student-visible pages, the vault is the whole course; a scan works at Open in Obsidian with no preview ever run.",
       "Writing into a course while it is open in Obsidian: Obsidian writes its in-memory list back on every add-on switch and drops the new id, and the marker would then read as the teacher switching it off - so the preview pass waits and Open in Obsidian asks to reopen.",
-      "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated."
-    ]
+      "Re-enabling an add-on the teacher switched off, writing over the teacher's own copy, or downgrading one Obsidian updated.",
+      "Saying a course is open in Obsidian when Plantoir cannot tell (#742): the sentence offerWhileOpen stated as a fact what the code did not know. The hedge \"If {course} is open in Obsidian now, Obsidian closes...\" was rejected too (#742 plan review H2): Add Them closes Obsidian whether or not the course is open in it, so the closing is not conditional.",
+      "Re-reading the registry to settle cannotTell (#742): a second read with no wait can land in the same write, and a timed wait to let it settle is a guess."
+    ],
+    "openStateCases": {
+      "note": "Whether the course is open in Obsidian, as far as Plantoir can tell (#742). `running` is whether Obsidian is running; `registryText` is the whole text of Obsidian's list of vaults (obsidian.json), or null when there is no such file; `course` is the course folder's path. `expect` is open, closed or cannotTell. The match is on the WHOLE folder path, exactly as the registry writes it, never on the course's code or a vault's name. What the app does treats cannotTell as open (no write into the course; Add Them goes the reopen way); only the words differ: open adds wording.offerWhileOpen to the offer, cannotTell adds wording.offerWhileObsidianIsOpen, closed adds neither. No list at all is closed by Russell's ruling on #742 (2026-11-12): Obsidian writes the list when a vault opens, so with no list none is open. A list that is there but is not JSON or is cut off is a read that landed mid-write, and a complete list that holds no vaults object is not trusted either way; both are cannotTell. An open-marked path that is ANOTHER SPELLING of the course's folder (a link, other letter case, a trailing slash, /private/tmp for /tmp) is open too (#742 review M2): it is asked only of the vaults marked open and only after the exact compare misses, so it can only turn closed into open. Cases with `platform: mac` need real folders: the test makes `folders` and `links` (link: target) inside a temporary folder and puts its path, as Foundation spells it (under /var), for {temp}, and the same with /private in front for {privateTemp}; Windows' own SamePath already folds case and separators, and these cases are skipped there.",
+      "cases": [
+        {
+          "name": "Obsidian is not running, whatever its list says",
+          "running": false,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "Obsidian is running and has no list of vaults at all",
+          "running": true,
+          "registryText": null,
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "The list is an empty file",
+          "running": true,
+          "registryText": "",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The list is cut off mid-write",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/cou",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The list has no vaults object",
+          "running": true,
+          "registryText": "{\"frame\":\"hidden\"}",
+          "course": "/w/courses/ADA1O",
+          "expect": "cannotTell"
+        },
+        {
+          "name": "The course's own folder is marked open",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course is registered but not marked open",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/w/courses/ADA1O\",\"ts\":1}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "A vault with the same name is open at another folder (the #742 sighting's shape)",
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"/elsewhere/Teaching/ADA1O\",\"ts\":1,\"open\":true},\"a2\":{\"path\":\"/w/courses/ADA1O\",\"ts\":2}}}",
+          "course": "/w/courses/ADA1O",
+          "expect": "closed"
+        },
+        {
+          "name": "The course's folder is marked open with a trailing slash",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O/\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open in other letter case",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/courses/ada1o\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open through a link to it",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "links": {"Shortcut": "Courses/ADA1O"},
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Shortcut\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "The course is given through a link, its real folder marked open",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "links": {"Shortcut": "Courses/ADA1O"},
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Shortcut",
+          "expect": "open"
+        },
+        {
+          "name": "The course's folder is marked open with /private in front",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{privateTemp}/Courses/ADA1O\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "open"
+        },
+        {
+          "name": "Another real folder whose name starts the same is marked open",
+          "platform": "mac",
+          "folders": ["Courses/ADA1O", "Courses/ADA1O-old"],
+          "running": true,
+          "registryText": "{\"vaults\":{\"a1\":{\"path\":\"{temp}/Courses/ADA1O-old\",\"ts\":1,\"open\":true}}}",
+          "course": "{temp}/Courses/ADA1O",
+          "expect": "closed"
+        }
+      ]
+    }
   },
   "taskBoxes": {
     "note": "Task boxes students tick (#519, v1.8.1). A Markdown task item (`- [ ] Bring a pencil`) is drawn by Quartz as a disabled checkbox; on a class site every such box outside a self-check quiz can be ticked by a student, and the tick is kept in that student's own browser. The teacher's page never changes: a tick on the site is the student's, not the page's. Implemented once, in support/quartz (plugins/transformers/taskRules.ts and plantoirTasks.ts, components/scripts/tasks.inline.ts, components/styles/tasks.scss), so Windows inherits it with the build; run by scripts/check_task_rules_against_the_site.py, verify.sh 6l and browser-checks/task_boxes.mjs. documentation/06-quartz-customizations.md -> K.",
@@ -36755,7 +36919,144 @@
           "folding the kit into plantoir-handouts: a kit is a different job with different triggers, so each skill names the other",
           "a page on plantoir.app, or new text in the app: Russell, 2026-11-12, Plantoir is not to read as an app that needs an assistant"
         ]
+      },
+      "markingSkill": {
+        "rule": "The skill `plantoir-marking` (#750, piece 750a: a test or quiz written on paper and scanned) sits beside the others in support/agent_guidance/skills and reaches a working folder the same way, so it needs no code on either platform. It tells an assistant: the teacher decides (a sentence in the first reply and under the title of every document written for the teacher); the four privacy points before any student work is opened, which are TRUE (750 plan review H1 and R2: whatever is read goes to the AI service; a script boxes the name line of each page whose blank test has a name blank and puts the boxed papers in one file, and the TEACHER looks through every page of it before any paper is read, which the assistant never opens, and the yes is recorded against exactly those files and checked before any paper is read in any session (Russell, 2026-11-12: \"Teacher confirms full redacted papers.\"); a name written anywhere else is not boxed and is seen; a name seen is never repeated; the files written stay on the computer); never to open the name mapping table, a class list, a school marks export, or anything in the teacher-only folder, even when asked, offering the script instead; never a marking folder inside the working folder (Russell, 2026-11-12), and a folder kept in sync by a service said ONCE and not again for that folder once the teacher says that is fine; the scripts are STARTING POINTS (Russell, 2026-11-12) copied into the marking folder's Scripts/, adapted, and self-tested, except `runner` and the test-authoring skill's check_kit.py, which are run from their skill folders and never changed; every script that reads the mapping table is run through `runner`; the teacher's How I Teach page first, then a few plain questions recorded in Marking Settings.md; the handouts skill's named template (handoutsSkill.offeredTemplate.name) and reference/template.md's rulings OFFERED only to a teacher who shows the interest it bridges, an open question for anyone else, and a ruling that changes a mark applied only after the teacher's yes; one marker per paper from a brief, calibration first, a reviewer, every ruling numbered and swept across every paper; the default sheet layout (marks last); named copies only at the end, on the teacher's word, by script; invented contexts never involve firearms or ammunition, a teacher's own test marked as it is; report comments mentioned once at the moment of need and only when the plantoir-report-comments skill is in the working folder. Neither app reads or writes anything it makes. #750's later pieces (coding assignments, results) add their own files and sentences.",
+        "skill": "plantoir-marking",
+        "scripts": [
+          "scripts/redact_scans.py",
+          "scripts/make_named_copies.py",
+          "scripts/build_test_sheet.py",
+          "scripts/run_with_names.py"
+        ],
+        "templates": [
+          "templates/Marking Settings.md",
+          "templates/Marker Brief.md",
+          "templates/Reviewer Brief.md",
+          "templates/Marking Rules Applied.md"
+        ],
+        "references": [
+          "reference/test-sheets.md",
+          "reference/template.md"
+        ],
+        "runner": "scripts/run_with_names.py",
+        "mentionedBy": [
+          "plantoir-test-authoring",
+          "plantoir-handouts",
+          "plantoir-page-authoring"
+        ],
+        "rejected": [
+          "a page on plantoir.app, or new text in the app: Russell, 2026-11-12",
+          "opening the mapping table when the teacher asks: the script route always exists, and the teacher may not know a name read is sent to the provider",
+          "one marking folder with the names inside it: a recursive listing of it would show named file names",
+          "the self-test as the guarantee for an adapted script: it is adapted with the script (750 plan review R3), so one never-adapted runner filters what reaches the assistant, and says it is a net, not a lock",
+          "a greeting sentence: how a teacher finds out is the honest answer when asked and the one-time offer at the moment of need (Russell, 2026-11-12); piece G owns the greeting"
+        ]
       }
+    },
+    "folders": {
+      "rule": "Where marking lives (#750, 750a). Two folders per course, both chosen by the teacher and both outside the working folder: the marking folder (the assistant's: settings, adapted scripts, blanked papers, marks records, identifier sheets) and the teacher-only folder beside it (the mapping table, the originals, the check files, the named copies, the runner's quarantine), which only scripts write and the assistant never opens, lists or renders. The pointer `pointerFile.path` holds paths only and travels with the course (a backup, an archive, a restore) inside .internal, which is never built into a site. A marking folder inside the working folder is refused (Russell, 2026-11-12: it could be built into a site or copied with a course), by the skill's words and, since the 750a review (L5), by every script, which stops when a folder it is given has a courses/ and a .toolchain/ above it. A folder kept in sync by a service is said once and its path recorded in the list syncAccepted once the teacher says that is fine, so a new folder is asked about again (750a review L4); the assistant ASKS rather than infers, because a Mac's Desktop and Documents folders can be in iCloud with ordinary-looking paths (750 plan review M5). No rule about Documents (Russell, 2026-11-12).",
+      "offered": {
+        "marking": "~/Marking/<CODE>/",
+        "teacherOnly": "~/Marking/<CODE> - Teacher Only/"
+      },
+      "pointerFile": {
+        "path": "courses/<CODE>/.internal/marking/marking.json",
+        "keys": ["folder", "teacherOnlyFolder", "syncAccepted", "teacherSaid", "recorded"]
+      },
+      "neverInside": "the working folder",
+      "neverOpenedByTheAssistant": ["the teacher-only folder", "the name mapping table", "a class list", "a marks export from the school's system", "an original scan"],
+      "mappingTable": {
+        "file": "Name Mapping Table.csv",
+        "columns": ["section", "identifier", "name"],
+        "optionalColumns": ["first name", "paper", "email", "handles", "repository"]
+      },
+      "why": "A recursive listing of one folder (find, ls -R, Glob) shows every file name under it, so names must live in a folder the assistant's folder does not contain (750 plan M6, generalised)."
+    },
+    "identifiers": {
+      "rule": "A paper is a PDF named by its identifier, in a `Section N` folder or directly in the originals folder. Anything else is counted, never named (redact_scans.py: 'N files or folders not named like an identifier were left alone'). The teacher may set another pattern in Marking Settings.md (--identifiers).",
+      "pattern": "^Student [A-Z]{1,2}$",
+      "cases": [
+        {"file": "Student A.pdf", "isAPaper": true},
+        {"file": "Student AB.pdf", "isAPaper": true},
+        {"file": "Student b.pdf", "isAPaper": false},
+        {"file": "Testpupil Alpha.pdf", "isAPaper": false},
+        {"file": "Student A (2).pdf", "isAPaper": false},
+        {"file": "scan0001.pdf", "isAPaper": false}
+      ]
+    },
+    "scriptPrivacy": {
+      "rule": "Every shipped script but the runner opens with two blocks (redact_scans.py's shape tolerance, which guards where the box is placed on a page, the teacher-decides sentence of build_test_sheet.py and the refusal of a working folder are in the second: 750a review M1, L8), '# MARK: - What you may change for this teacher' and '# MARK: - What must not change', and has a --self-test; the skill has the assistant copy it into the marking folder's Scripts/, adapt it, run --self-test, and only then use it (Russell, 2026-11-12: scripts are starting points). The runner has only the second block and is never adapted. What must not change, in every script: never print, log or write outside the teacher-only folder any value read from a name mapping table; never print a file name that is not an identifier; capture every program's output and print only counts and identifiers; refuse (exit 1, identifier-only message) when anything is unexpected. A script never prints a traceback (it could carry a path holding a name).",
+      "mayChangeMark": "# MARK: - What you may change for this teacher",
+      "mustNotChangeMark": "# MARK: - What must not change",
+      "selfTest": "--self-test",
+      "notAStartingPoint": ["scripts/run_with_names.py", "plantoir-test-authoring: scripts/check_kit.py"],
+      "runner": {
+        "rule": "run_with_names.py reads the mapping table itself and builds every form a name could take (each name part of two letters or more as a whole word; the whole name, the parts run together with and without . - _, first initial and last name, e-mail addresses and their local part, handles, a repository address's user and repository, anywhere), compares without regard to case or accents (750a review M4), runs the command IN the watched folder so a relative path is watched (M5), and BEFORE it passes anything on looks at every new or changed file, folder and link there (not following links): its name, and what the standard library can read of it (UTF-8 and UTF-16 text, gzip, a zip's members such as an xlsx or docx, a PNG's text chunks, a PDF's text, metadata and XMP through Poppler). One holding a name, or a folder named by one, is moved whole to the teacher-only Quarantine/. It reports THREE counts, never one: read and clean, held a word from the table and moved, and could not be read so NOT checked and moved unread, by kind (a link, which is moved as a link and never followed; what a picture shows; a PDF Poppler cannot read, broken or locked, whose raw bytes are still searched; any other file that is not text), so the assistant cannot open an unread file, and the skill says never to (750a fix review H3, M1, M2: a link to the mapping table was 'read and clean', as were a broken PDF and big-endian UTF-16 with no mark); UTF-16 is read both ways; a name part of two or three letters counts only beside another part of the same name, a form of fewer than six letters only as a whole word, and only a folder the run made or wrote into is moved (M3: 'Ho, Ed' withheld 'finished', and an untouched 'June Exam' folder was moved); and it exits 1 when anything was withheld, moved or not checked (750a review H3: the first runner said 'checked, 0 held a name' of an xlsx, a gzip file, UTF-16 text, a PNG's text chunk and a PDF's title that each held one, and left folders named by a name behind). The skill names the runner's SHA-256 and has the assistant check it before use, since it can be edited in place until Plantoir next refreshes the folder (L6). It refuses a table or a quarantine folder inside the watched folder. It is a safety net, not a guarantee: it cannot know a name the table does not hold, see what a picture shows, or stop a script run without it or writing elsewhere (750 plan review R3). A name part that is also an ordinary word (May, Will) withholds every line holding that word too, which is the safe direction, and the runner says it may be a false alarm (L3).",
+        "says": "This is a safety net, not a guarantee"
+      }
+    },
+    "redaction": {
+      "rule": "redact_scans.py (#750, 750a). Russell, 2026-11-12, on #750: \"script runs, teacher checks the papers, confirms names are redacted, then agent based marking begins. Simple.\" and \"Teacher confirms full redacted papers.\" Three rounds of review found every clever check wrong on papers unlike its fixtures (the last: registration by ink profile stopped 8 of 8 papers with answers written to the foot, with a false reason, and the read-back check stopped clean house-style papers), so the script does three things and claims nothing more. (1) THE BOX comes from the BLANK test's own text and drawing, never from a scan: on each page, a label (`labels`: Name, Student Name, Nom, any case; a two-word label matched as a whole; a 'Name' with another word just before it from `otherNames`, such as School or Partner, is not the student's) FOLLOWED by a place to write (underscores or a dotted leader typed after it, in one word or many, or a drawn line within 0.7 in after it near its height: a rule, a table cell's border, a frame's edge); a label followed by a word ('Name and date go on every page') is an instruction, not a blank. The box is that whole line, margin to margin (0.3 in from each side), from 0.35 in above the label to 18 pt below it or, when the label sits in a form cell or frame with the room to write under it, to 4 pt below the cell's lower border (the first drawn line within 0.6 in under the label; 750a fix review 3, M6), placed on every scanned page that corresponds to a blank page with one, in proportion to the scanned page's size. A blank with no name blank anywhere, or two on one page, stops the run and asks (--label, --box); it never guesses. (2) THE ONLY CHECKS need no judgement about handwriting: the page count is a whole number of copies of the blank's, and each page is the same way round (portrait or landscape) as its blank page and within `shapeTolerance` of its shape; anything else stops that paper with a plain reason. A page scanned upside down or shifted is NOT detected; the teacher sees it, and the skill says so. (3) ONE FILE for the teacher: the last batch's boxed papers and records are cleared first; the papers and the combined 'Redacted papers to look through.pdf' (each paper after a page naming its identifier) are written in a holding folder on the teacher's side and moved into place only when all are written; on a failure no paper is left where the assistant reads, and the run says none may be read. Each page is the four tiles AROUND the box rendered by pdftoppm, the box filled black, so its pixels are never in the file. (4) THE TEACHER'S YES: --confirm records it (every entry in Redacted/, whatever its name, case or type, with each file's SHA-256, and the date) only when the combined file exists and the folder holds exactly what the combined file was made from, so a yes given before the boxing cannot be recorded; --verify exits 0 only when the record matches exactly every entry now in Redacted/ (750a fix review 3, M1: an unboxed Student Q.PDF or a .png passed when only *.pdf was listed) and names the papers that may be read; a run clears everything in Redacted/ and the record FIRST, before any other check, so a run that stops leaves nothing confirmed to read (L1). THE LIMIT, said plainly: the script cannot know who looked. It records that the teacher said yes, after these files were written; the skill has the assistant run --confirm only straight after the teacher's own yes in the conversation, never on its own judgement, and the record line says 'Recorded the teacher's yes', not that anyone looked (M2). Both briefs begin with --verify (M3), and the ask tells the teacher what the script cannot see: an upside-down, shifted or shrunk page, and a name anywhere else (M5). (5) WHAT IT SAYS: papers and pages boxed, papers stopped and why, where the combined file is, and that the teacher's look is what confirms the names are redacted; never that a name is covered, removed or safe; that a name anywhere else on a page is not boxed and would be seen; that every page read goes to the assistant's service. Poppler and the standard library only.",
+      "boxUnits": "inches from the top-left of the upright page",
+      "shapeTolerance": 0.06,
+      "labels": ["Student Name", "Name", "Nom"],
+      "otherNames": ["School", "Teacher", "Partner", "Course", "Parent"],
+      "boxCases": [
+        {"name": "the house style's Quiz, letter", "blank": "blank-quiz-letter.pdf", "pages": [[0.30, 0.25, 8.20, 0.98], [0.30, 0.25, 8.20, 0.98]]},
+        {"name": "the house style's Quiz, legal", "blank": "blank-quiz-legal.pdf", "pages": [[0.30, 0.25, 8.20, 0.98], [0.30, 0.25, 8.20, 0.98]]},
+        {"name": "a label given another way", "blank": "blank-quiz-letter.pdf", "label": "NAME:", "pages": [[0.30, 0.25, 8.20, 0.98], [0.30, 0.25, 8.20, 0.98]]},
+        {"name": "a label the blank does not have", "blank": "blank-quiz-letter.pdf", "label": "Nom", "refused": "I could not find a name blank on your blank test"},
+        {"name": "a name blank on page 1 only (School Name is not one)", "blank": "blank-quiz-letter-name-on-page-1.pdf", "pages": [[0.30, 0.25, 8.20, 0.98], null]},
+        {"name": "a rule, underscores, dots, a table cell, a frame, and underscores at the left margin", "blank": "blank-name-styles.pdf", "pages": [[0.30, 0.30, 8.20, 1.03], [0.30, 0.30, 8.20, 1.03], [0.30, 0.30, 8.20, 1.03], [0.30, 0.28, 8.20, 1.02], [0.30, 0.32, 8.20, 1.06], [0.30, 0.30, 8.20, 1.03]]},
+        {"name": "Student Name; an instruction line that starts with Name; a Partner Name line; NAME in bold sans; no name blank", "blank": "blank-label-cases.pdf", "pages": [[0.30, 0.30, 8.20, 1.03], [0.30, 0.30, 8.20, 1.03], [0.30, 0.30, 8.20, 1.03], [0.30, 0.30, 8.20, 1.03], null]},
+        {"name": "two name blanks on one page", "blank": "blank-two-name-blanks.pdf", "refused": "has 2 name blanks, and I will not guess which"},
+        {"name": "a form cell with Name in its corner and the room to write under it: the box takes the whole cell", "blank": "blank-name-in-a-cell.pdf", "pages": [[0.30, 0.45, 8.20, 1.35]]}
+      ],
+      "scanCases": {
+        "rule": "Papers with ANSWERS written down every page to the foot (handwriting-like strokes every half inch from 1.3 in to 10.3 in) and an invented name on each page's name line, built by scripts/test_marking_redact.py on two blanks, the house style's Quiz (the title just under the name line) and a plain one with its name blank drawn six ways, and run in every way listed. `expect` is written or stopped. Where `nameInsideTheBox` is true, no pixel of the name's ink shows outside the box; where it is false, the script does not detect the fault, and the teacher's look through the papers finds it (`why`). MEASURED 2026-11-12: upright, grey and speckled and shifted 0.15 in keep the name inside the box on both blanks; shifted 0.40 in, scaled 94 percent and an upside-down last page leave it showing (house 3,958, 1,348 and 1,699 pixels; plain 12,775, 3,790 and 1,955), which is what the teacher's look is for; A4 and a landscape page are stopped.",
+        "cases": [
+          {"variant": "upright, answers on every page", "expect": "written", "nameInsideTheBox": true},
+          {"variant": "grey and speckled", "expect": "written", "nameInsideTheBox": true},
+          {"variant": "shifted down 0.15 in", "expect": "written", "nameInsideTheBox": true},
+          {"variant": "shifted down 0.40 in", "expect": "written", "nameInsideTheBox": false, "why": "Not detected by the script: the teacher sees it in the papers."},
+          {"variant": "scaled 94% (fit to page)", "expect": "written", "nameInsideTheBox": false, "why": "Not detected by the script: the teacher sees it in the papers."},
+          {"variant": "the last page upside down", "expect": "written", "nameInsideTheBox": false, "why": "Not detected by the script: the teacher sees it in the papers."},
+          {"variant": "A4, letter test centred", "expect": "stopped"},
+          {"variant": "the last page landscape", "expect": "stopped"}
+        ]
+      },
+      "teacherFiles": ["Redacted papers to look through.pdf", "Batch.json", "Teacher confirmed.json", "Papers to name.pdf"],
+      "rejected": [
+        "a full-width band (750 plan v1): measured, it either blanks the test's title or leaves no room for a shifted scan",
+        "fractions of the page (the kit's tool): the box moves on legal paper",
+        "a black box drawn over the page: the original stays underneath, extractable",
+        "a check of the painted pixels alone, printing OK: it passed four scans where the name survived (750 plan review R2)",
+        "proving coverage by measuring ink beside the box: two rounds of review found faint, coloured and gapped names it let through, and a threshold low enough to catch them stopped 5 of 20 clean scans (750a fix review H2); as a warning it was wrong a quarter of the time (750a fix review 2, R4)",
+        "registration by one-dimensional ink profiles of the header and foot, and a read-back that lined the written page up again: answers written to the foot of a page stopped 8 of 8 papers with a false reason, and the read-back stopped clean house-style papers (750a fix review 2, H1, H2); Russell, 2026-11-12, ruled the teacher's look through the full redacted papers the proof",
+        "a box only as wide as the name blank: a surname after a gap or on the Date line survived it (750a review H2); the box runs margin to margin, as the teacher's own tool's generous box does",
+        "a check sheet of page tops: the teacher looks through the full papers instead (Russell, 2026-11-12); one file to look through is simpler than two",
+        "Pillow, ImageMagick, PyMuPDF: not on a teacher's computer; Poppler and the standard library suffice"
+      ]
+    },
+    "namedCopies": {
+      "rule": "make_named_copies.py (#750, 750a) is the only script that puts a name into anything. It reads the mapping table itself (refusing the run, counts only, when a row is not like `section, Student A, a name`, or a section and identifier repeat), puts the TeX-escaped name into each identifier sheet's one \\studentline{...}, compiles it with tectonic in a temporary folder outside both folders with its output captured and discarded (never --keep-logs or --print: tectonic prints the line holding a name on a failed compile, measured on 0.17), fails a copy whose output says Missing character or whose PDF text does not hold the name, both read with the font's ligatures as their letters and a typeset apostrophe as a typed one (750 plan review M3: a name the font cannot set compiled with exit 0 and a blank where the name should be; 750a review M2: O'Testpupil and a name with ffi were failed as unsettable), and moves only the PDF into the teacher-only Named/Section N/. It never writes in the marking folder and refuses an --out inside it. It prints counts and identifiers only. Each case's `table` is the mapping table, `sheets` the identifier sheets to make (`plain`, or `broken`: an undefined macro on the student line's line, so the failed compile's message holds the name), `out` is `teacherOnly` unless it says `marking`; `says` are lines the output must hold; `written` the named PDFs; and after every case no value of the table is in the output, and no .tex, .log or .aux is in Named.",
+      "script": "scripts/make_named_copies.py",
+      "slot": "\\studentline{...}",
+      "escaped": ["\\", "&", "%", "$", "#", "_", "{", "}", "~", "^"],
+      "neverPassed": ["--keep-logs", "--print"],
+      "cases": [
+        {"name": "a name holding TeX's special characters", "table": "section,identifier,name\n1,Student A,Pupil_Seven & Co\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/Pupil_Seven & Co - Feedback.pdf"]},
+        {"name": "a sheet that does not compile", "table": "section,identifier,name\n1,Student C,Pupilseven Testfamily\n", "sheets": {"Section 1/Student C - Feedback": "broken"}, "exit": 1, "says": ["Section 1: 0 named sheets written; 1 not written (Student C Feedback: the named sheet did not compile)"], "written": []},
+        {"name": "an identifier not in the table", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain", "Section 1/Student D - Feedback": "plain"}, "exit": 1, "says": ["Section 1: 1 named sheets written", "Section 1/Student D: not in the mapping table"], "written": ["Section 1/Pupilseven Testfamily - Feedback.pdf"]},
+        {"name": "a row not like Student A", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Testpupil Alpha,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table are not like section 1, Student A, a name; nothing was written"], "written": []},
+        {"name": "a section and identifier twice", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n1,Student A,Pupileight Samplefamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["1 rows in the mapping table repeat a section and identifier; nothing was written"], "written": []},
+        {"name": "a name the sheet's font cannot set", "table": "section,identifier,name\n1,Student A,\u8bd5\u9a8c Pupilseven\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 1, "says": ["Section 1: 0 named sheets written; 1 not written (Student A Feedback: the name could not be set in this sheet's font)"], "written": []},
+        {"name": "a name with an apostrophe", "table": "section,identifier,name\n1,Student A,O'Testpupil Alphaname\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/O'Testpupil Alphaname - Feedback.pdf"]},
+        {"name": "a name typed with a typographic apostrophe", "table": "section,identifier,name\n1,Student A,D\u2019Testfamily Alphaname\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/D'Testfamily Alphaname - Feedback.pdf"]},
+        {"name": "a name the font sets with ff, fi and ffi ligatures", "table": "section,identifier,name\n1,Student A,Ffinlaygh Offingtree\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "exit": 0, "says": ["Section 1: 1 named sheets written"], "written": ["Section 1/Ffinlaygh Offingtree - Feedback.pdf"]},
+        {"name": "named copies asked for inside the marking folder", "table": "section,identifier,name\n1,Student A,Pupilseven Testfamily\n", "sheets": {"Section 1/Student A - Feedback": "plain"}, "out": "marking", "exit": 1, "says": ["the named copies must go in the teacher-only folder, never in the marking folder; nothing was written"], "written": []}
+      ]
     },
     "kitFormat": {
       "rule": "A test's marking kit (#751), read by plantoir-marking (#750): `answers.json` in this format (`version`), described in words in the skill's templates/Marking Kit/FORMAT.md and checked by its scripts/check_kit.py. It is Russell's own marks schema (point IDs such as B1.2, one mark each, shared by every version; a marks record's seen, note, studentNote, voided, checks, summary, byQuestion, strengths, focus, closing and feedback) with what his sheet builder hard-coded (the points and their meanings, each question's skill, the strength concepts, the categories and parts) moved INTO the kit, so the marking skill is course-neutral. Every point is one mark and a category is out of the number of its points; every point names an existing question and category and every question an existing part, with at least one point; a followThrough lists EARLIER points of the SAME question; every version answers every point and nothing else; topics and strengths name only what the kit has. No key of the kit or of a marks record looks like it holds a person (personWords, personWholeKeys, personKeysWhy), and no key the format does not define is accepted (unknownKeys): a marks record names its paper by `identifier`, which Russell's schema called `student`, renamed so nobody reads it as a place for a name; a category's label is `title`, not `name`. Keys that start with an underscore are notes. A marks record's `earned` is null, 0, 0.5 or 1; whether 0.5 may be used is the teacher's marking settings (#750), not the kit. `cases` apply `remove` (paths to delete) and `set` (path and value; an index one past a list's end appends) to `base` (file kit) or `baseMarks` (file marks, a marks record checked against `base`), or `replace` (the first occurrence of one text by another) to `basePaper` (file paper, checked as `--paper <version>` against `base`) or `baseGuide` (file guide); `expect` is accepted or refused, a refused case names the `rule` check_kit.py prints in square brackets, and `says` is the whole OK line where a case pins it. scripts/test_assessment_kit.py runs every case through check_kit.py and checks the skill's own worked example passes.",

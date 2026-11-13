@@ -8,6 +8,11 @@
 
   .pl-geogebra-card {
     position: relative;
+    // Its border inside the sketch's shape, so the card is exactly the
+    // applet's box in size: before #756 it was 2 px taller and wider, and
+    // the page jumped 2 px when the sketch arrived (measured in Chromium
+    // and WebKit: figure 435.58 px with the card, 433.58 px with the box).
+    box-sizing: border-box;
     max-width: min(100%, var(--pl-geogebra-width, 800px));
     aspect-ratio: var(--pl-geogebra-ratio, 8 / 5);
     margin: 0 auto;
@@ -81,6 +86,103 @@
     display: none;
   }
 
+  // The card's live region (#756): empty, and so of no size, until a tap.
+  // Centred by its margins across the card's whole width: a left of 50%
+  // would leave it only half the card to wrap in (measured: 178 px wide in
+  // a 358 px card at a 390 px window).
+  .pl-geogebra-loading {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    width: max-content;
+    max-width: calc(100% - 1rem);
+    margin: 0 auto;
+    transform: translateY(-50%);
+    text-align: center;
+  }
+
+  // While the sketch opens (#756, showOpening in geogebra.inline.ts): the
+  // card stays where the student tapped, saying the sketch is on its way,
+  // and the applet's box is laid out UNDER it, at the card's place and
+  // size. GeoGebra measures the box's width when it is made, so the box has
+  // to be laid out while it draws; laid out below the card, as before #756,
+  // it pushed everything under the sketch down by one sketch height (393.6
+  // px on the fixture page, Chromium and WebKit) until the sketch arrived.
+  // When it arrives the card goes and the box takes its place in the same
+  // layout (pl-geogebra-loaded and this class change together), so nothing
+  // below it moves.
+  &.pl-geogebra-opening {
+    position: relative;
+
+    .pl-geogebra-card {
+      z-index: 1;
+    }
+
+    // z-index 0 makes the box a stacking context of its own: GeoGebra's
+    // white preview inside it has z-index 90, which drew over the card
+    // (measured in Chromium) until the box held it. contain: size keeps the
+    // box at the card's size: positioned like this, WebKit sized its height
+    // from GeoGebra's unscaled content (360 px under a 201 px card at a
+    // 390 px window, 500 under 224 for an 800 x 500 sketch), so the white
+    // box hung below the card over the caption until the sketch drew
+    // (#756 review H1). Chromium kept the ratio either way.
+    .pl-geogebra-applet {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 0;
+      contain: size;
+    }
+
+    .pl-geogebra-thumbnail {
+      opacity: 0.35;
+    }
+
+    // The words take the button's place.
+    .pl-geogebra-open {
+      visibility: hidden;
+    }
+
+    .pl-geogebra-loading {
+      padding: 0.5rem 0.9rem;
+      border: 1px solid var(--lightgray);
+      border-radius: 6px;
+      background: var(--light);
+      color: var(--dark);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  .pl-geogebra-loading-line {
+    display: block;
+
+    & + .pl-geogebra-loading-line {
+      margin-top: 0.15rem;
+      font-size: 0.9em;
+      color: var(--darkgray);
+    }
+  }
+
+  // A quiet turning ring beside the first line; still for a reader who
+  // asks for less motion, where the words carry it.
+  .pl-geogebra-spinner {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    margin-right: 0.45em;
+    vertical-align: -0.1em;
+    border: 2px solid var(--lightgray);
+    border-top-color: var(--secondary);
+    border-radius: 50%;
+    animation: pl-geogebra-spin 0.9s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
   .pl-geogebra-message {
     margin: 0.5rem 0 0;
     color: var(--gray);
@@ -141,6 +243,7 @@
 @media print {
   .pl-figure.pl-geogebra {
     .pl-geogebra-open,
+    .pl-geogebra-loading,
     .pl-geogebra-message,
     .pl-geogebra-lines,
     .pl-geogebra-attribution,
@@ -193,6 +296,14 @@
       display: block;
       font-size: 7pt;
     }
+  }
+}
+
+// The spinner's turn (#756). A keyframes rule has no selector to sit under;
+// its name is the only thing it adds to a page.
+@keyframes pl-geogebra-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

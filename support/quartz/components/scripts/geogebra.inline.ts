@@ -11,7 +11,8 @@
 //
 // * A tap loads deployggb.js once, fetches the sketch (same origin), and
 //   makes the applet from it (ggbBase64) with the web3d codebase, offline,
-//   in English, scaled down to the page (scaleContainerClass).
+//   in English, scaled down to the page (scaleContainerClass). Until it
+//   draws, the sketch's own box says it is on its way (#756, showOpening).
 // * Quartz's page change (geogebraFences.spa): each applet is removed
 //   (api.remove) when the page changes, which also takes GeoGebra's own
 //   styles and libraries out of <head> - the next tap puts them back. What
@@ -40,6 +41,7 @@ type Spec = {
   algebra: boolean
   root: string
   loading: string
+  loadingFirstTime: string
   couldNotLoad: string
   lineCouldNotRun: string
   endOfLine: string
@@ -127,6 +129,50 @@ async function sketchAsBase64(url: string): Promise<string> {
     binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(start, start + 32768)))
   }
   return btoa(binary)
+}
+
+// While a sketch opens (#756): the two lines inside its card, where the
+// student tapped, in the card's own live region (the transformer puts it
+// there empty, so a screen reader hears the words once, when they are put
+// in). pl-geogebra-opening lays the applet's box under the card, so GeoGebra
+// measures and draws it at its real width while the card stays on top, and
+// nothing below the sketch moves when it arrives (geogebra.scss).
+function showOpening(figure: HTMLElement, spec: Spec) {
+  const card = figure.querySelector<HTMLElement>(":scope > .pl-geogebra-card")
+  if (card === null) {
+    return
+  }
+  let region = card.querySelector<HTMLElement>(":scope > .pl-geogebra-loading")
+  if (region === null) {
+    region = document.createElement("div")
+    region.className = "pl-geogebra-loading"
+    region.setAttribute("role", "status")
+    region.setAttribute("aria-live", "polite")
+    card.appendChild(region)
+  }
+  const lines: HTMLElement[] = []
+  for (const words of [spec.loading, spec.loadingFirstTime ?? ""]) {
+    if (words === "") {
+      continue
+    }
+    const line = document.createElement("span")
+    line.className = "pl-geogebra-loading-line"
+    line.textContent = words
+    lines.push(line)
+  }
+  const spinner = document.createElement("span")
+  spinner.className = "pl-geogebra-spinner"
+  spinner.setAttribute("aria-hidden", "true")
+  lines[0]?.prepend(spinner)
+  figure.classList.add("pl-geogebra-opening")
+  region.replaceChildren(...lines)
+}
+
+// The sketch has drawn, or did not open: the lines go, and the box is laid
+// out in its own place again.
+function endOpening(figure: HTMLElement) {
+  figure.classList.remove("pl-geogebra-opening")
+  figure.querySelector(":scope > .pl-geogebra-card > .pl-geogebra-loading")?.replaceChildren()
 }
 
 function say(figure: HTMLElement, words: string) {
@@ -246,12 +292,13 @@ async function runCommands(api: Api, box: HTMLElement, spec: Spec): Promise<Ran>
   }
   const watcher = new MutationObserver(take)
   watcher.observe(box, { childList: true, subtree: true })
-  // The student's first touch inside the sketch, once lines are over.
+  // Stops watching for GeoGebra's dialogs and for that touch.
   const letGo = () => {
     watcher.disconnect()
     box.removeEventListener("pointerdown", touched, true)
     box.removeEventListener("keydown", touched, true)
   }
+  // The student's first touch inside the sketch, once lines are over.
   const touched = () => letGo()
   const giveUpAt = performance.now() + LINES_GIVE_UP_MS
   try {
@@ -511,7 +558,10 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
   const samePage = () => tappedOnPage === pageChanges && figure.isConnected
   figure.dataset.geogebraOpening = "yes"
   button.disabled = true
-  say(figure, spec.loading)
+  // A "could not open" from an earlier tap goes; the words that it is on
+  // its way are said inside the box, not here (#756).
+  say(figure, "")
+  showOpening(figure, spec)
   let settled = false
   // True once the sketch has opened: a later appletOnLoad is its reset.
   let opened = false
@@ -526,6 +576,7 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
       return
     }
     delete figure.dataset.geogebraOpening
+    endOpening(figure)
     button.disabled = false
     box.hidden = true
     box.replaceChildren()
@@ -634,7 +685,10 @@ async function openSketch(figure: HTMLElement, button: HTMLButtonElement) {
         delete figure.dataset.geogebraOpening
         open.set(figure, api)
         current = api
+        // In one go, so the card goes and the box takes its place in the
+        // same layout: nothing below the sketch moves (#756).
         figure.classList.add("pl-geogebra-loaded")
+        endOpening(figure)
         say(figure, "")
         if (spec.commands.length === 0) {
           void runCommands(api, box, spec).then(() => {

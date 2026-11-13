@@ -570,10 +570,11 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
     }
 
     /// Fixes review N1: while Obsidian runs, a registry that cannot be read
-    /// (caught mid-write) counts as open — no write.
+    /// (caught mid-write) counts as open — no write. No registry at all is
+    /// closed (Russell's ruling on #742).
     func testAnUnreadableRegistryWhileRunningCountsAsOpen() async throws {
         XCTAssertTrue(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: Data("{\"vaults\": {\"a".utf8)))
-        XCTAssertTrue(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: nil))
+        XCTAssertFalse(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: nil))
         XCTAssertFalse(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: false, registryData: nil))
         XCTAssertFalse(ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: "/w/MPM2D", obsidianRunning: true, registryData: try ObsidianFigureAddOnsTests.registry(vaults: ["/w/ICS3U"], open: true)))
         let made: Driven = try drive(answer: .yes)
@@ -583,6 +584,128 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         await made.workspace.obsidianAddOnsWork?.value
         XCTAssertFalse(FileManager.default.fileExists(atPath: made.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
                        "written while the registry could not be read")
+    }
+
+    /// #742: every `openStateCases` case, against the one function.
+    func testEveryOpenStateCase() throws {
+        let rules: [String: Any] = try XCTUnwrap(try ObsidianFigureAddOnsTests.rules()["openStateCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(rules["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 14)
+        // The folder the `platform: mac` cases make their folders in, as
+        // Foundation spells it (under /var, which is a link to /private/var).
+        let temp: String = rootURL.path
+        XCTAssertTrue(temp.hasPrefix("/var/"), "the /private case needs a temporary folder under /var, not \(temp)")
+        var madeFolders: Int = 0
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let running: Bool = try XCTUnwrap(testCase["running"] as? Bool, name)
+            let expect: String = try XCTUnwrap(testCase["expect"] as? String, name)
+            let caseFolder: URL = rootURL.appendingPathComponent("case-\(madeFolders)")
+            madeFolders += 1
+            let folders: [String] = testCase["folders"] as? [String] ?? []
+            for folder in folders {
+                try FileManager.default.createDirectory(at: caseFolder.appendingPathComponent(folder), withIntermediateDirectories: true)
+            }
+            let links: [String: String] = testCase["links"] as? [String: String] ?? [:]
+            for (link, target) in links {
+                try FileManager.default.createSymbolicLink(
+                    at: caseFolder.appendingPathComponent(link), withDestinationURL: caseFolder.appendingPathComponent(target)
+                )
+            }
+            let filled = { (text: String) -> String in
+                return text
+                    .replacingOccurrences(of: "{privateTemp}", with: "/private" + caseFolder.path)
+                    .replacingOccurrences(of: "{temp}", with: caseFolder.path)
+            }
+            let course: String = filled(try XCTUnwrap(testCase["course"] as? String, name))
+            var registryData: Data? = nil
+            if let registryText = testCase["registryText"] as? String {
+                registryData = Data(filled(registryText).utf8)
+            }
+            let state: ObsidianFigureAddOnsOffer.CourseOpenState = ObsidianFigureAddOnsOffer.courseOpenState(
+                coursePath: course, obsidianRunning: running, registryData: registryData
+            )
+            XCTAssertEqual(state.rawValue, expect, name)
+            XCTAssertEqual(
+                ObsidianFigureAddOnsOffer.courseIsOpen(coursePath: course, obsidianRunning: running, registryData: registryData),
+                expect != "closed", name + ": what the app does counts cannotTell as open"
+            )
+        }
+    }
+
+    /// #742: the offer names the course as open only when it knows; when it
+    /// cannot tell it says what is true either way, and closed says neither.
+    func testTheOfferSaysOnlyWhatIsKnown() throws {
+        let message: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerMessage, course: "ADA1O")
+        let certain: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: "ADA1O")
+        let known: String = ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen, course: "ADA1O")
+        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .open), message + "\n\n" + certain)
+        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .cannotTell), message + "\n\n" + known)
+        XCTAssertEqual(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .closed), message)
+        XCTAssertFalse(ObsidianFigureAddOnsWording.offerText(course: "ADA1O", openState: .cannotTell).contains(certain))
+    }
+
+    /// #742, through the route: the request carries what Plantoir could
+    /// tell — no list at all is a plain offer, a list it cannot read is
+    /// cannot-tell (and still goes the reopen way), and only the course's
+    /// own folder marked open is open.
+    func testTheOfferRequestCarriesWhatPlantoirCouldTell() async throws {
+        let absent: Driven = try drive(answer: .notAsked)
+        absent.log.running = true
+        absent.log.noRegistry = true
+        absent.workspace.openInObsidian(course: absent.course, sectionNumber: nil)
+        await absent.workspace.obsidianAddOnsWork?.value
+        XCTAssertEqual(try XCTUnwrap(absent.workspace.obsidianAddOnsOfferRequest).openState, .closed)
+
+        ObsidianFigureAddOnsThisRun.forget()
+        let unreadable: Driven = try drive(answer: .notAsked)
+        unreadable.log.running = true
+        unreadable.log.registry = Data("{\"vaults\": {\"a".utf8)
+        unreadable.log.quitCloses = false
+        unreadable.workspace.openInObsidian(course: unreadable.course, sectionNumber: nil)
+        await unreadable.workspace.obsidianAddOnsWork?.value
+        let request: ObsidianAddOnsRequest = try XCTUnwrap(unreadable.workspace.obsidianAddOnsOfferRequest)
+        XCTAssertEqual(request.openState, .cannotTell)
+        XCTAssertTrue(request.courseIsOpen)
+        await unreadable.workspace.answerObsidianAddOnsOffer(request, .addThem)
+        XCTAssertEqual(unreadable.log.quits, 1, "cannot tell still goes the reopen way")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unreadable.course.directoryURL.appendingPathComponent(".obsidian/plugins").path),
+                       "written while Plantoir could not tell")
+
+        ObsidianFigureAddOnsThisRun.forget()
+        let sameName: Driven = try drive(answer: .notAsked)
+        sameName.log.running = true
+        sameName.log.openVaults = ["/elsewhere/Teaching/" + sameName.course.directoryURL.lastPathComponent]
+        sameName.workspace.openInObsidian(course: sameName.course, sectionNumber: nil)
+        await sameName.workspace.obsidianAddOnsWork?.value
+        XCTAssertEqual(try XCTUnwrap(sameName.workspace.obsidianAddOnsOfferRequest).openState, .closed, "a same-named vault elsewhere is not the course")
+
+        ObsidianFigureAddOnsThisRun.forget()
+        let open: Driven = try drive(answer: .notAsked)
+        open.log.running = true
+        open.log.openVaults = [open.course.directoryURL.path]
+        open.workspace.openInObsidian(course: open.course, sectionNumber: nil)
+        await open.workspace.obsidianAddOnsWork?.value
+        XCTAssertEqual(try XCTUnwrap(open.workspace.obsidianAddOnsOfferRequest).openState, .open)
+    }
+
+    /// #742: the real registry read gives nil only for a file that is not
+    /// there, and empty data for one that is there but cannot be read.
+    func testTheRegistryReadTellsAbsentFromUnreadable() throws {
+        let registryURL: URL = rootURL.appendingPathComponent("obsidian.json")
+        XCTAssertNil(ObsidianOpening.readRegistry(at: registryURL))
+        try Data("{\"vaults\":{}}".utf8).write(to: registryURL)
+        XCTAssertEqual(ObsidianOpening.readRegistry(at: registryURL), Data("{\"vaults\":{}}".utf8))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: registryURL.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: registryURL.path)
+        }
+        let unreadable: Data? = ObsidianOpening.readRegistry(at: registryURL)
+        XCTAssertEqual(unreadable, Data())
+        XCTAssertEqual(
+            ObsidianFigureAddOnsOffer.courseOpenState(coursePath: "/w/ADA1O", obsidianRunning: true, registryData: unreadable),
+            .cannotTell
+        )
     }
 
     /// Fixes review N2: the course opened in Obsidian WHILE the offer was up —
@@ -698,7 +821,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             XCTAssertNotNil(ours[key], "windowsWording.\(key) names a sentence the app does not have")
         }
         XCTAssertEqual(
-            ObsidianFigureAddOnsWording.offerText(course: "MPM2D", courseIsOpen: true),
+            ObsidianFigureAddOnsWording.offerText(course: "MPM2D", openState: .open),
             ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerMessage, course: "MPM2D") + "\n\n"
                 + ObsidianFigureAddOnsWording.filling(ObsidianFigureAddOnsWording.offerWhileOpen, course: "MPM2D")
         )
@@ -842,6 +965,8 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         var reopened: [[String]] = []
         var openVaults: [String] = []
         var registry: Data?
+        /// Obsidian has no list of vaults at all (#742).
+        var noRegistry: Bool = false
     }
 
     struct Driven {
@@ -878,6 +1003,9 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
         opening.isInstalled = { return true }
         opening.isRunning = { return log.running }
         opening.registryData = {
+            if log.noRegistry {
+                return nil
+            }
             if let registry = log.registry {
                 return registry
             }
@@ -1094,6 +1222,7 @@ final class ObsidianFigureAddOnsTests: XCTestCase {
             "offerTitle": ObsidianFigureAddOnsWording.offerTitle,
             "offerMessage": ObsidianFigureAddOnsWording.offerMessage,
             "offerWhileOpen": ObsidianFigureAddOnsWording.offerWhileOpen,
+            "offerWhileObsidianIsOpen": ObsidianFigureAddOnsWording.offerWhileObsidianIsOpen,
             "offerAdd": ObsidianFigureAddOnsWording.offerAdd,
             "offerNotNow": ObsidianFigureAddOnsWording.offerNotNow,
             "dontAskAgain": ObsidianFigureAddOnsWording.dontAskAgain,

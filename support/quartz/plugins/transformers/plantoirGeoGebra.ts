@@ -211,6 +211,7 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
             algebra: entry.algebra,
             root,
             loading: words.loading,
+            loadingFirstTime: words.loadingFirstTime,
             couldNotLoad: words.couldNotLoad,
             lineCouldNotRun: words.lineCouldNotRun,
             endOfLine: known.endOfLine,
@@ -240,6 +241,10 @@ export const PlantoirGeoGebra: QuartzTransformerPlugin = () => ({
               text(filled(words.openSketch, { size: entry.size })),
             ]),
           )
+          // Where the card says the sketch is on its way (#756): empty until
+          // a tap, so a screen reader hears the words once, when the loader
+          // puts them in.
+          card.push(element("div", { className: ["pl-geogebra-loading"], role: "status", ariaLive: "polite" }, []))
           const children: ElementContent[] = [
             element("div", { className: ["pl-geogebra-card"] }, card),
             element("div", { className: ["pl-geogebra-applet"], hidden: true }, []),
