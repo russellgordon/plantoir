@@ -154,6 +154,14 @@ class TheListItself(unittest.TestCase):
                     self.assertEqual(handle.read(4), b"\x00\x01\x00\x00",
                                      f"{file_name} is not plain TrueType, so it may reach the Brotli decoder")
 
+    def test_no_two_listed_names_differ_only_by_case(self):
+        # Matching is exact; that is only safe while no name could be meant
+        # for another one written in a different case.
+        lowered = []
+        for name in the_rules()["fonts"]:
+            self.assertNotIn(name.lower(), lowered, name)
+            lowered.append(name.lower())
+
     def test_the_mac_apps_offered_names_are_listed(self):
         text = (REPOSITORY_ROOT / "mac-app" / "QuartzTeachers" / "Catalogs" / "FontCatalog.swift").read_text(encoding="utf-8")
         self.assert_all_known(quoted_names_in(text[text.index("static let pairings"):text.index("// MARK: - Functions")]),

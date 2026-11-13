@@ -2216,6 +2216,12 @@ for entry in json.load(open("contracts/toolchain.json"))["pins"]:
 if pin is None or not pin.get("carriesBrotli"):
     print("PROBLEMS the pillow pin names no carriesBrotli")
     sys.exit(0)
+# What to do, said with every failure: the check exists so that a Pillow
+# move is noticed, and the person who meets it needs the next step.
+next_step = (". Pillow's Brotli has changed, so measure it again and set pins -> pillow -> carriesBrotli "
+             "to the version found, and update documentation/02-docker-image.md -> \"Pillow's Brotli (#766)\". "
+             "Once it is " + pin.get("brotliFixedFrom", "the fixed version") + " or later, close the follow-up "
+             "\"Move Pillow to the first release whose Brotli is 1.2.1 or later\", which says what can then change.")
 inside = (
     "import glob, os, PIL\n"
     "site = os.path.dirname(os.path.dirname(PIL.__file__))\n"
@@ -2227,11 +2233,13 @@ run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", ins
 found = run.stdout.split()
 names = found[1::2]
 if not names:
-    print("PROBLEMS the image carries no pillow.libs/libbrotlidec-*: " + (run.stderr.strip()[-200:] or "no output"))
+    print("PROBLEMS the image carries no pillow.libs/libbrotlidec-*: " + (run.stderr.strip()[-200:] or "no output")
+          + ". If Pillow now links Brotli in statically, read the version from the wheel's "
+          ".github/dependencies.json at its release tag, and change this check to match" + next_step)
 elif len(names) == 1 and names[0].endswith(".so." + pin["carriesBrotli"]):
     print(f"OK Pillow {found[0]} carries {names[0]}, Brotli {pin['carriesBrotli']} as the pin says")
 else:
-    print(f"PROBLEMS Pillow {found[0]} carries {', '.join(names)}, and the pin says Brotli {pin['carriesBrotli']}")
+    print(f"PROBLEMS Pillow {found[0]} carries {', '.join(names)}, and the pin says Brotli {pin['carriesBrotli']}" + next_step)
 BROTLIPY
 )"
 if [[ "$PILLOW_BROTLI_REPORT" == OK* ]]; then

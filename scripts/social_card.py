@@ -82,20 +82,30 @@ def _font_rules():
     return contracts.section("shared-rules", "socialCardFonts")
 
 
+def _trimmed(font_name):
+    """Text with the spaces at either end taken off; anything else as it is.
+    Taking spaces off the ends can never make a path."""
+    if isinstance(font_name, str):
+        return font_name.strip()
+    return font_name
+
+
 def _is_offered(font_name):
-    """True when the name is one of the fonts Plantoir offers, exactly as
-    the apps write it, so it may open that font's file (#766)."""
-    if not isinstance(font_name, str):
+    """True when the name, trimmed, is one of the fonts Plantoir offers,
+    exactly as the apps write it, so it may open that font's file (#766)."""
+    name = _trimmed(font_name)
+    if not isinstance(name, str):
         return False
-    return font_name in _font_rules()["fonts"]
+    return name in _font_rules()["fonts"]
 
 
 def _is_silent(font_name):
     """An empty or missing name, or the system pairing ("Helvetica,
     Arial", which has no file of its own): Inter, and nothing to say."""
-    if font_name is None:
+    name = _trimmed(font_name)
+    if name is None:
         return True
-    return isinstance(font_name, str) and font_name in _font_rules()["silentNames"]
+    return isinstance(name, str) and name in _font_rules()["silentNames"]
 
 
 def _font_file(font_name):
@@ -115,7 +125,7 @@ def _font_file(font_name):
     rules = _font_rules()
     fonts_dir = support / "fonts"
     if _is_offered(font_name):
-        candidate = fonts_dir / rules["fonts"][font_name]
+        candidate = fonts_dir / rules["fonts"][_trimmed(font_name)]
         if candidate.is_file():
             return candidate
     fallback = fonts_dir / rules["fallbackFile"]
@@ -151,7 +161,7 @@ def fonts_not_used(header_font_name, body_font_name):
     for font_name in [header_font_name, body_font_name]:
         if _is_offered(font_name) or _is_silent(font_name):
             continue
-        shown = _shown_name(font_name)
+        shown = _shown_name(_trimmed(font_name))
         if shown not in not_used:
             not_used.append(shown)
     return not_used

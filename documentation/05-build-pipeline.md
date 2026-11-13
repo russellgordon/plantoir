@@ -3803,12 +3803,14 @@ own.
 **What it does now.** `contracts/shared-rules.json` → `socialCardFonts` is
 the rule and its cases. A name is used only when it is one of `fonts` (the
 18 families Plantoir bundles, each mapped to its file), exactly as the apps
-write it. An empty name and the system pairing `Helvetica, Arial` use Inter
+write it once the spaces at either end are taken off (no two of the 18
+differ only by case, and a test keeps it so). An empty name and the system pairing `Helvetica, Arial` use Inter
 and say nothing, as before. Anything else (a font Plantoir does not offer,
 `PlayfairDisplay` without its space, a path) is never joined into a path:
 the card is drawn in Inter, and the build prints
 `socialCardFonts.wording.unknownFontName` once per name, header first,
-after the card is drawn. The name is shown with control, format and
+after the card is drawn. The sentence ends by saying what to do: choose one
+of the fonts listed in Course Settings. The name is shown with control, format and
 line-separator characters removed and cut at 60 characters
 (`shownName`), so it cannot start a console line of its own. The card
 never fails the build over a name. `scripts/test_social_card_fonts.py`
@@ -3824,8 +3826,17 @@ card's other build lines, and nothing new is done in the app.
 
 **Rejected.** *Checking that the joined path stays inside `support/fonts/`*:
 it still opens any file that later lands in that folder, and tells the
-teacher nothing. *Matching without case or spaces*: neither app writes those
+teacher nothing. *Matching without case or inner spaces*: neither app writes those
 forms, and one exact list is what the three catalogs are pinned to.
+
+**Where else a name comes from.** Neither app writes a name off the list,
+but `setup.sh` does: its font menu's option 8 takes any custom pair, which
+the website loads from Google Fonts and the card has never been able to
+draw (before #766 it fell back to Inter silently). Such a course is told on
+each build, which is correct: the card does not match its website. The
+option stays, because the website does use the font, and since #766 it says
+when the pair is chosen that the card will use Inter for it.
+`test_setup_course_offers_only_listed_names` pins the numbered menu only.
 *Moving Pillow to 13.0.0*: it carries the same Brotli 1.2.0.
 
 ## Stage 5: Dependencies and the actual Quartz build
