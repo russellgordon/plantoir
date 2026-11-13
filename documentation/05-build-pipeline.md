@@ -3758,6 +3758,27 @@ Both apps' own writers already used a unique temporary (`Data.write(options:
 .atomic)` on the mac), so only the Python changed. In real paired builds the
 write landed once in ten trials and never collided; the fault is rare and real.
 
+**On Windows the rename itself can be refused (#874, step 0 of the Windows
+v2.0.0 run, 2026-11-13).** `os.replace` there cannot replace a file another
+process has open without `FILE_SHARE_DELETE` — a reader's `open()`, the other
+writer's copy of the config into its backup, .NET's `File.ReadAllBytes` — and
+raises `PermissionError` (WinError 5) for that moment; the writer printed
+"Failed to write" and the build carried on as if it had written. Measured on
+Windows 11 Pro 26200 (Lenovo 20QES70500, i5-8365U, 16 GB), Python 3.14.10,
+two writers × 200 writes × 5 trials with a reader beside: **1,136 of 2,000
+writes lost** with one try. `_replace_retrying_on_windows` asks again on
+`PermissionError` on `os.name == "nt"` only, waiting 2 ms longer each time,
+up to `_WINDOWS_REPLACE_TRIES` (see the measurement in that comment); on the
+mac and in the container `os.replace` is called once, as before. The writer
+now also RETURNS whether it wrote (`True`/`False`); the build's own caller
+does not read it, so a build behaves as before, and the test counts lost
+writes with it. A reader on Windows still meets a few refused opens per run
+(the file being swapped in), so the test's reader asks again there. **Left
+for #874:** the app's own readers of `course_config.json`
+(`CourseConfiguration.Load` and `Write`'s merge read use `File.ReadAllBytes`
+with no retry, and an access-denied open arrives as
+`UnauthorizedAccessException`).
+
 **The date pass (F3).** Two sections dating one shared page each write their
 own `createdSection<N>` (`_replace_the_page_safely`). Its last look at the page
 and its rename were two steps, so both could see the page unchanged and the

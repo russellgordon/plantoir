@@ -7597,7 +7597,39 @@ def _replace_with_the_mode_of(temporary: Path, path: Path):
         os.chmod(temporary, path.stat().st_mode & 0o7777)
     except OSError:
         pass
-    os.replace(temporary, path)
+    _replace_retrying_on_windows(temporary, path)
+
+
+# Windows only (#874): os.replace there cannot replace a file another process
+# has open without FILE_SHARE_DELETE (a reader's open(), the other writer's
+# copy of the config into its backup) and raises PermissionError (WinError 5)
+# for that moment. With two writers and a reader, 1141 to 1159 of 2,000 writes
+# were lost that way, each one printed and carried on from (measured
+# 2026-11-13, Windows 11 Pro 26200, Python 3.14.10). The replace is asked
+# again, up to _WINDOWS_REPLACE_TRIES times, waiting 2 ms longer each time
+# (at most about 1.6 s of waiting in all). Measured in the same stand-in,
+# writes lost of 2,000: 1 try 1,136; 5 tries 772; 10, 20, 30 and 40 tries 0
+# in every run (1, 2, 3 and 3 runs) — but the slowest write took 1,135 ms
+# at 30 and 973 ms at 40, close to 30's 0.87 s of waiting, so 40 is kept for
+# the margin. A write that still fails is printed and returned as False, as
+# before. On the mac and in the container os.replace is called once, exactly
+# as before.
+_WINDOWS_REPLACE_TRIES = 40
+
+
+def _replace_retrying_on_windows(source: Path, target: Path):
+    if os.name != "nt":
+        os.replace(source, target)
+        return
+    import time
+    for attempt in range(1, _WINDOWS_REPLACE_TRIES + 1):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == _WINDOWS_REPLACE_TRIES:
+                raise
+            time.sleep(0.002 * attempt)
 
 
 # The two prefixes only _atomic_write_json_with_backup uses for its own
@@ -7646,7 +7678,12 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
     stand-in of two writers, 224 and 301 reads of the config met a file that
     was not JSON, and one trial ENDED that way (2026-11-13). The backup is
     made the same way, copied to a temporary and renamed, so a reader never
-    meets a half-copied backup either."""
+    meets a half-copied backup either.
+
+    Returns True when the config was written and False when it was not (the
+    failure is printed, as before). The build's own caller does not read it,
+    so nothing changes for a build; it is what lets a test count a lost
+    write (#874)."""
     _remove_stale_config_temporaries(path)
     try:
         if path.exists():
@@ -7654,7 +7691,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
             copying = _a_private_temporary_beside(path, ".course_config.backup.")
             try:
                 shutil.copy2(path, copying)
-                os.replace(copying, backup)
+                _replace_retrying_on_windows(copying, backup)
             finally:
                 if copying.exists():
                     copying.unlink()
@@ -7669,6 +7706,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
             f.write("\n")
         _replace_with_the_mode_of(tmp, path)
         print("✅ Updated course_config.json with discovered items.")
+        return True
     except Exception as e:
         print(f"❌ Failed to write updated course_config.json: {e}")
         try:
@@ -7676,6 +7714,7 @@ def _atomic_write_json_with_backup(path: Path, data: dict):
                 tmp.unlink()
         except Exception:
             pass
+        return False
 
 def _dropping_excluded_items(cfg: dict) -> dict:
     """

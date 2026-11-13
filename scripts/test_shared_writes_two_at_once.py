@@ -68,14 +68,23 @@ def a_course(root: Path) -> Path:
 
 # --- F2 ----------------------------------------------------------------------
 
-def write_the_config(path: str, tag: str, writes: int, start):
+def write_the_config(path: str, tag: str, writes: int, start, lost_writes):
     import contextlib
     import io
     start.wait()
+    lost = 0
     for number in range(writes):
         data = {"course_code": "EXC2O", "writer": tag, "write": number, "pad": ["x" * 40] * 400}
-        with contextlib.redirect_stdout(io.StringIO()):
-            build_site._atomic_write_json_with_backup(Path(path), data)
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            written = build_site._atomic_write_json_with_backup(Path(path), data)
+        # The writer prints a failure and carries on, so a write it lost is
+        # seen only here, by what it returns or what it said (#874: on
+        # Windows, before the replace was asked again, 1,136 of 2,000 were
+        # lost this way with a reader beside).
+        if written is False or "Failed to write" in said.getvalue():
+            lost += 1
+    lost_writes.put(lost)
 
 
 class TheConfigSurvivesTwoWriters(unittest.TestCase):
@@ -93,9 +102,12 @@ class TheConfigSurvivesTwoWriters(unittest.TestCase):
         reads: int = 0
         not_json: int = 0
         backups_not_json: int = 0
+        lost: int = 0
         for trial in range(CONFIG_TRIALS):
             start = context.Event()
-            writers = [context.Process(target=write_the_config, args=(str(self.config), tag, CONFIG_WRITES, start))
+            lost_writes = context.Queue()
+            writers = [context.Process(target=write_the_config,
+                                       args=(str(self.config), tag, CONFIG_WRITES, start, lost_writes))
                        for tag in ("s1", "s2")]
             for writer in writers:
                 writer.start()
@@ -106,6 +118,14 @@ class TheConfigSurvivesTwoWriters(unittest.TestCase):
                         text = path.read_text(encoding="utf-8")
                     except FileNotFoundError:
                         continue
+                    except PermissionError:
+                        # Windows only (#874): a file being replaced cannot be
+                        # opened for that moment (a sharing violation, Errno
+                        # 13), and a reader there must ask again; this loop
+                        # does. Anywhere else it is a real failure.
+                        if os.name == "nt":
+                            continue
+                        raise
                     reads += 1
                     try:
                         json.loads(text)
@@ -115,10 +135,13 @@ class TheConfigSurvivesTwoWriters(unittest.TestCase):
                         else:
                             backups_not_json += 1
             for writer in writers:
+                lost += lost_writes.get(timeout=120)
+            for writer in writers:
                 writer.join()
                 self.assertEqual(writer.exitcode, 0)
             json.loads(self.config.read_text(encoding="utf-8"))
         self.assertGreater(reads, 0)
+        self.assertEqual(lost, 0, f"{lost} of {2 * CONFIG_TRIALS * CONFIG_WRITES} writes were lost")
         self.assertEqual((not_json, backups_not_json), (0, 0),
                          f"of {reads} reads {not_json} met a config and {backups_not_json} a backup that was not JSON")
         left: list = []
