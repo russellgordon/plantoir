@@ -129,6 +129,11 @@ enum CourseRestorer {
             if fileManager.fileExists(atPath: courseURL.path) {
                 throw Problem.courseAlreadyPresent(item.courseCode)
             }
+            // A removed course comes back by its school year, like every
+            // other arrival on the shelf (#572 plan review H2).
+            ReferenceShelfStore.recordArrival(
+                of: item.courseCode, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
+            )
             try extract(item.fileURL, named: item.courseCode, into: coursesDirectoryURL)
         }
 
@@ -160,6 +165,12 @@ enum CourseRestorer {
         defer { lockIfKeptForReference(courseAt: destination) }
 
         if !fileManager.fileExists(atPath: destination.path) {
+            // The course is not there, so this is an arrival: by its school
+            // year (#572 plan review H2). A restore IN PLACE, below, keeps the
+            // course and its group.
+            ReferenceShelfStore.recordArrival(
+                of: item.courseCode, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
+            )
             try extract(item.fileURL, named: item.courseCode, into: coursesDirectoryURL)
             return
         }

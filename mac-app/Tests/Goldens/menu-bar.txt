@@ -40,6 +40,7 @@ menus: Plantoir · File · Edit · View · Course · Section · Window · Help
   ----
   Rename
   Set School Year…
+  Move to Group
   Keep a Copy for Reference…
   ----
   Back Up Now

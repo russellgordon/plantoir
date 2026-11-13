@@ -827,6 +827,15 @@ enum ReferenceImporter {
         world: ReferenceReplacer.World
     ) async throws {
         guard let replacing else {
+            // An import lands by its school year: no placement, written
+            // before it is visible, so a folder name freed by an earlier
+            // removal carries no stranger's group (#572 plan review H2). A
+            // replace keeps the replaced course's folder name, and its group.
+            ReferenceShelfStore.recordArrival(
+                of: destinationURL.lastPathComponent,
+                inMadeGroup: nil,
+                coursesDirectoryURL: destinationURL.deletingLastPathComponent()
+            )
             try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
             return
         }

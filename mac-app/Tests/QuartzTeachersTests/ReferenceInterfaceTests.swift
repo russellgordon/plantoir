@@ -113,7 +113,7 @@ final class ReferenceInterfaceTests: XCTestCase {
             (folder: "ICS3U-2024", code: "ICS3U", year: 2024),
             (folder: "ADA1O-REF", code: "ADA1O", year: nil),
         ])
-        let groups: [WorkspaceModel.ReferenceYearGroup] = workspace.referenceYearGroups(on: today)
+        let groups: [ReferenceShelfGroup] = workspace.referenceShelfGroups(on: today)
         var titles: [String] = []
         for group in groups {
             titles.append(group.title)
@@ -128,7 +128,7 @@ final class ReferenceInterfaceTests: XCTestCase {
         workspace.filterText = "ADA"
         XCTAssertEqual(workspace.teachingCourses.count, 0)
         XCTAssertEqual(workspace.referenceCourses.count, 1)
-        XCTAssertEqual(workspace.referenceYearGroups(on: today).count, 1)
+        XCTAssertEqual(workspace.referenceShelfGroups(on: today).count, 1)
     }
 
     /// The uniqueness rule is asked of EVERY reference course, not of the

@@ -9892,6 +9892,10 @@ wizard and the import already did (L4): if another window re-filed the old
 course meanwhile, `wording.notTheCourseInTheWay` is said and nothing is
 made or backed up.
 
+The replacement takes the replaced course's folder name and so keeps its
+group, a group the teacher made included (#572's third piece; "Groups on the
+reference shelf" below), and the warning names that group.
+
 Trail: "reference course replaced", "reference course could not be
 replaced", "unfinished replace of a reference course put right", "course
 restored from a backup". The door's own line ("created … for reference",
@@ -9915,6 +9919,205 @@ restored from a backup". The door's own line ("created … for reference",
   lose anything.
 - **Checking the backup by unpacking it.** Twice the time, and the listing
   answers the question asked.
+
+### Groups on the reference shelf (#572)
+
+> **On Windows:** owed, as the `windows` issue for #572's third piece says. Every rule is a case in `contracts/shared-rules.json` → `referenceCourses.groups` and the file is `contracts/file-formats.json` → `referenceShelf`; nothing here is shared code.
+
+A teacher can make groups of their own on the Reference Courses shelf
+("From colleagues", "Exemplars"), move a reference course into one, rename
+one, and remove one. Russell's ruling of 2026-11-12: **groups are flat; year
+groups keep their names; "Other" and groups the teacher makes can be
+renamed.**
+
+**Three kinds of group, one list** (`ReferenceShelf.groups`, pure, which the
+sidebar calls):
+
+- **Year groups**, derived from `reference_school_year` as before, named by the
+  year, never stored, never renamed, not drawn when empty.
+- **The no-year group**, derived the same way and not drawn when empty, whose
+  NAME is stored: "Other" until the teacher renames it.
+- **Made groups**, stored with an id and a name, drawn even when empty (the
+  teacher just made it), except while the filter field narrows the list.
+
+The order is years newest first, then made groups A to Z (Finder's comparison,
+so "Unit 2" comes before "Unit 10"), then the no-year group last. A course is
+in a made group only when the file places it there and that group exists;
+otherwise it is where its school year puts it. **So with no file the shelf is
+exactly the shelf before groups, and that is the whole migration.**
+`ReferenceShelfTests.testWithNoFileTheShelfIsTheShelfBeforeGroups` holds the
+new function to a copy of the one it replaced (`referenceYearGroups`), title
+for title and course for course, and from an empty or an unreadable file too.
+
+**Groups are a view.** No group act renames, moves, removes or writes into a
+course folder, and the move and remove tests compare every file under
+`courses/` byte for byte before and after. Remove Group never removes a
+course: its courses go back to their year groups or the no-year group. An
+empty group goes at once ("Remove Group", no question, since nothing is lost);
+one that holds courses is asked about first ("Remove Group…", saying where
+they go), and the removal is refused with `removeWouldClash` when one of its
+courses would land beside another course of the same code.
+
+**Where it is stored, and why there.** `courses/.internal/reference-shelf.json`
+(`ReferenceShelfStore`), beside `profile.json`, `timetable/` and `activity/`.
+The arrangement belongs to the working folder: a second Mac on the same folder
+in iCloud Drive sees the same groups. Not in each course's
+`course_config.json`, because a group exists with no course in it; not in the
+app's preferences, because two machines would then disagree about where every
+course is. It does NOT travel with a course's backup or archive, deliberately:
+those hold one course, and a group is the folder's. A backup restored where
+its course still is keeps the folder name, and so the group.
+
+| Who | Sees |
+|---|---|
+| Any window on this Mac | the same groups (a change is announced, and another window on the folder reads the file again); fold state stays per window |
+| Another Mac on the folder, this version | the same groups |
+| An older Plantoir, or Windows before it implements this | the year layout: a course in a made group shows under its year or Other. Nothing breaks |
+| A course's backup or archive | not its group |
+| The assistant | nothing new: no tool, no description moved (`test_tool_surface_digest.py` green) |
+
+**The file is the teacher's arrangement, so it is never written over by an app
+that could not read it.** Missing: the year layout, and the first change
+writes it. Unreadable (half synced, cut short, hand-edited): the year layout,
+and EVERY change is refused with `couldNotReadGroups`, which names the way
+out rather than saying "try again", since waiting does not help a hand-edited
+copy (implementation review M2). **The way out is Start the Groups Again…**,
+on the Reference Courses heading's menu only while the arrangement cannot be
+read, asked first (Cancel the default). It MOVES the unreadable file aside to
+`reference-shelf.unreadable-<stamp>.json` beside it (`-2`, `-3`… when that
+name is taken; never deleted, never written over), and the shelf is the year
+layout with every control working. A NEWER version's file is never moved by
+an older app: the heading's menu says so and offers nothing. Written by a newer
+Plantoir (`version` above 1): what is understood is drawn, and every change
+is refused with `arrangedByANewerPlantoir`. A key or an entry this version
+does not understand is written back as it was. A change that moves nothing
+leaves the file byte for byte as it is. Every change is read, decided and
+written under one exclusive `flock` on `courses/.internal`, taken by every
+window and every process (the MCP server is the app, run again), with the
+file read FRESH inside the lock and written atomically. Measured: twenty
+groups made at once from twenty concurrent tasks all land; with the lock taken
+out, 2 of the 20 did. Two Macs at the same moment through iCloud: the later
+write wins, which costs one move or one rename.
+
+**Placements are explicit (plan review H2), and this is the heart of the
+piece.** A placement is keyed on the course's FOLDER, its identity, and folder
+names are reused: `ReferenceCourseRule.proposedFolderName` gives the first
+free `CODE-YYYY`, so the name a removal frees is the name the next course of
+that code and year is given. A placement that outlived its course would file
+that stranger in the old course's group, where the shelf rule never looked,
+and two ICS3Us would sit in one group. So:
+
+- every door that lands a course writes its placement at the moment it lands,
+  BEFORE the course is visible: the wizard's chosen group, or none
+  (`ReferenceShelfStore.recordArrival`, called by `ReferenceCreation.finish`,
+  `ReferenceImporter.land`, `ReferenceCopier`'s copy, and `CourseRestorer`'s
+  archive restore and its restore of a backup whose course is gone);
+- Remove Course… forgets the placement (`CourseArchiver.archiveAndRemoveCourse`);
+- a replace KEEPS it, because the replacement takes the replaced course's
+  folder name, and so its group (`ReferenceReplacer` writes no placement, and a
+  scan holds it to that); a backup restored in place keeps it too;
+- every write drops a placement whose folder is not there, unless the hidden
+  folder of a replace or an import of that name is (`.plantoir-replacing-…`,
+  `.plantoir-importing-…`), so a change made in another window at that moment
+  does not take the course out of its group.
+
+A folder with no file gets no file from any of this: an arrival that clears a
+placement that was never there writes nothing. The residual, said so nobody
+chases it: a course removed OUTSIDE Plantoir (in Finder, or by an app that
+does not know the file) and a new course given its name by such an app before
+any change here is written would inherit the group. Any change made here
+afterwards drops nothing in that case, because the folder is there; Move to
+Group puts it right.
+
+**The shelf rule is by group.** `ReferenceCourseRule.Shelved` carries the made
+group a course is in, and `trouble(placing:in:named:among:ignoring:)` asks the
+target group, of any kind. A course in a made group is in no year group, so an
+ICS3U in "From colleagues" never blocks an ICS3U from 2025–26. The year
+sentences are unchanged; a made group's is `codeAlreadyInThatGroup`. Every
+door that lands a course by its year asks `trouble(placing:inYear:…)`
+unchanged and gets the right answer, because the year means the year group.
+The replace warning names a made group as its group, and the replacement keeps
+it.
+
+**Where it is offered.** New Group… on the Reference Courses heading's menu
+and inside every Move to Group submenu (it makes the group and moves that
+course in). Rename Group… on a made group's row and the no-year group's.
+Remove Group on a made group's row. **Move to Group ▸** on a reference
+course's row and in the Course menu after Set School Year…, so the keyboard
+reaches it through menu search (`subjectMenus` item `moveToGroup`, live where
+Set School Year is): the course's own year group (or the no-year group by its
+name) first, then every made group, the current one with a checkmark. The
+**Group picker** is in the New Course wizard's reference mode only (plan
+review M8), drawn only when a made group exists, "Its school year" first.
+Every other door lands by year; Move to Group does the rest. Set School Year…
+for a course in a made group changes the year its summary shows and leaves it
+where it is. The read-only summary shows the made group a course is in, by
+name. The year pickers in the wizard and in Set School Year… name the no-year
+choice as the shelf does, so a renamed "Other" reads the same in both places.
+Fold state of a made group is remembered by its id under a key of its own
+(`referenceGroups`), so a window remembered before groups restores as it did.
+Every menu item is a text label, so VoiceOver reads it, and the disclosure
+rows are the sidebar's own.
+
+**The name rule** (`groups.nameRule`): cleaned first by the SAME rule as a
+course's name (#780's `CourseName.cleaned`, `courseNameCharacters`), so the
+zero-width joiner an emoji needs and the non-joiner a Persian word needs are
+kept and the bidirectional overrides removed; then white space collapsed and
+trimmed (a pasted line break is a space). Foundation's `controlCharacters`,
+used at first, holds those joiners, and spacing them split "👩‍🏫" into two
+(implementation review M1). Then refused when empty, longer than 40
+characters, shaped like a school year at all (four digits, a dash, the next
+year's last two digits, so next year's "2027–28" too and not only today's
+offered years: review L3), or a name already on the shelf, compared with
+case, accents and width folded and every dash read as an en dash.
+
+**The trail** (rule 5): "reference group made", "reference group renamed",
+"reference group removed", "reference course moved to a group", "reference
+groups started again" (with the name the unreadable copy was kept under), and
+"reference groups not changed" for a press that was refused. A group's name is the
+teacher's own words, like a course or folder name, and goes in quoted; it
+passes through `LogRedactor` like every line, so a 40-character name that
+looks like a token is taken out. "course created for reference" gains the
+group the wizard put it in.
+
+**Measured, by the must-fail proofs** (each by copying the file aside,
+breaking one line, running the test, and putting the file back): the lock
+taken out, 2 groups of 20 landed; the shelf rule comparing only the year,
+"the same code in a made group and in a year group" was refused; made groups
+inserted before the years, both order cases with made groups failed; an
+unreadable file read as no file, the half-written case read as absent and the
+next change OVERWROTE it; Remove Course… without forgetting, the freed name
+kept the group; a replace that recorded an arrival, the replacement lost its
+group. After the implementation review: the old cleaning rule, the emoji,
+Persian and override cases failed; Start the Groups Again deleting instead of
+moving, the kept copy was missing; moving a newer version's file, the newer
+case failed; the duplicate-id entry left in place, removing "Kept" brought
+"Twice" back; the year shape limited to today's years, "2027–28" was
+allowed; Cancel without the default key, the structure test failed; each of
+import, Keep a Copy and a backup restored where its course is gone without
+`recordArrival`, its real test kept the stale group.
+
+#### Rejected
+
+- **Converting today's layout into a stored list on first open.** It writes a
+  file into every working folder on upgrade, and year labels stored as names
+  drift from `reference_school_year` the first time a year is set.
+- **The group in each course's `course_config.json`.** A group must exist
+  with no course in it.
+- **Keeping placements when a course is removed**, so a restore brings it back
+  into its group (the plan's first answer): the freed folder name goes to the
+  next course of that code and year, which would inherit the group (H2). A
+  removed course comes back by its year, like every arrival.
+- **Withholding Remove Group while the group holds a course** (the plan's first
+  answer): the teacher would move every course out by hand to get rid of a
+  group, when sending them back to their years is what removing it means.
+- **The Group picker at every door** (M8), **renamable year groups**,
+  **nested groups**, **hand ordering** and **drag and drop** (Russell,
+  2026-11-12, and the plan).
+- **An assistant tool for groups.** Not asked for, and a routing change.
+- **Pruning on READ.** A reader that wrote would make every window that opens
+  a folder a writer, on every Mac sharing it; placements are pruned only by a
+  change the teacher made.
 
 ## Copying a page from one course into another
 

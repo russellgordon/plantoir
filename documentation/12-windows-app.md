@@ -5603,6 +5603,38 @@ issue for #572's second piece lists the work.
   `Directory.Move` of a folder whose files carry the DENY entries succeeds, as a rename of a locked
   tree does on APFS; the order depends on it.
 
+
+### Owed: groups on the reference shelf (#572, third piece)
+
+Not yet on Windows. The mac's write-up, with what was measured and rejected,
+is `09-mac-app.md` → "Groups on the reference shelf (#572)"; the rules are
+`shared-rules.json` → `referenceCourses.groups`, the file is
+`file-formats.json` → `referenceShelf`, and the `windows` issue for #572's
+third piece lists the work.
+
+- **Inherited free:** nothing in the shared Python. Until Windows reads
+  `courses/.internal/reference-shelf.json`, a folder arranged on a Mac shows
+  the year layout there: harmless, but the two machines disagree about where
+  a course is.
+- **Owed:** reading and writing the file as `referenceShelf` says (an
+  unreadable or newer file is never written; unknown keys and entries are
+  kept; one lock and an atomic write per change); `SidebarPane.Reference.cs`
+  drawing year groups, made groups A to Z and the renamable no-year group;
+  New Group…, Rename Group…, Remove Group (its courses go back to their
+  years) and Move to Group ▸ on the row and in the Course menu; the Group
+  picker in the wizard's reference mode only; the shelf rule by group; the
+  placement every arriving door writes and Remove Course… forgets
+  (`groups.arrivals`, plan review H2); the summary's group line; fold state
+  for made groups; Start the Groups Again… for an arrangement that cannot
+  be read (`referenceShelf.startingAgain`: moved aside, never deleted; a newer
+  version's file never moved); the name cleaned by `courseNameCharacters`,
+  #780's rule, before it is checked (`char.IsControl` alone is not it); six
+  trail events.
+- **To decide on Windows rather than copy:** the lock. The mac takes an
+  exclusive `flock` on `courses/.internal`; Windows needs its own exclusive
+  open (a lock file opened with `FileShare.None`, say), and it must be one
+  every Windows process takes, the MCP server included.
+
 ## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
 
 What a Windows implementer needs that the mac's write-up cannot give; the

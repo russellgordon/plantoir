@@ -264,6 +264,11 @@ enum ReferenceCopier {
         let staged: (made: Made, addOnsLeftBehind: ObsidianAddOns.Found) = try ReferenceCopier.stageTheCopy(
             of: course, into: stagingURL, schoolYear: schoolYear, at: moment
         )
+        // A copy lands by its school year: no placement, written before it
+        // is visible (#572 plan review H2).
+        ReferenceShelfStore.recordArrival(
+            of: folderName, inMadeGroup: nil, coursesDirectoryURL: coursesDirectoryURL
+        )
         do {
             // The one step that makes it visible, and the only one that has
             // to be atomic: a rename within `courses/`. Measured: a folder

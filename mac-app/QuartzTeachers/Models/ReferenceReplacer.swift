@@ -282,13 +282,13 @@ enum ReferenceReplacer {
     /// course sees it: discovery, the backups list, the launchers (which
     /// refuse a dotted name) and Windows (`Workspace.cs` skips any `courses/`
     /// entry beginning with `.`).
-    static let asidePrefix: String = ".plantoir-replacing-"
+    nonisolated static let asidePrefix: String = ".plantoir-replacing-"
 
 
     // MARK: - Functions
 
     /// `.plantoir-replacing-<FOLDER>`.
-    static func asideName(for folderName: String) -> String {
+    nonisolated static func asideName(for folderName: String) -> String {
         return ReferenceReplacer.asidePrefix + folderName
     }
 
@@ -318,12 +318,22 @@ enum ReferenceReplacer {
         return course
     }
 
-    /// The group a reference course sits in, as the shelf names it.
-    static func groupLabel(for course: Course, on day: CalendarDay = CalendarDay.today()) -> String {
-        guard let year = course.schoolYear(on: day) else {
-            return SchoolYear.otherGroupName
-        }
-        return SchoolYear.label(forStartingYear: year)
+    /// The group a reference course sits in, as the shelf names it: a group
+    /// the teacher made and put it in, the no-year group under the name the
+    /// teacher gave it, or its school year (#572, third piece). The
+    /// replacement keeps the old course's folder name, and so its group.
+    static func groupLabel(
+        for course: Course,
+        coursesDirectoryURL: URL,
+        on day: CalendarDay = CalendarDay.today()
+    ) -> String {
+        let arrangement: ReferenceShelf.Arrangement = ReferenceShelfStore.read(
+            inCoursesDirectory: coursesDirectoryURL
+        ).arrangement
+        let place: ReferenceShelf.Place = ReferenceShelf.place(
+            ofFolder: course.code, schoolYear: course.schoolYear(on: day), in: arrangement
+        )
+        return ReferenceShelf.title(of: place, in: arrangement)
     }
 
     /// Why that course cannot be replaced right now, or nil — asked by a
@@ -370,7 +380,7 @@ enum ReferenceReplacer {
             return .refused(ReferenceReplaceWording.notOnTheShelf(course: folderName))
         }
         let course: String = old.displayCode
-        let group: String = ReferenceReplacer.groupLabel(for: old)
+        let group: String = ReferenceReplacer.groupLabel(for: old, coursesDirectoryURL: coursesDirectoryURL)
         let counted: (files: Int, pages: Int, bytes: Int64) = await ReferenceReplacer.counting(
             courseDirectoryPath: old.directoryURL.path
         )
@@ -445,7 +455,7 @@ enum ReferenceReplacer {
             )
         }
         let course: String = old.displayCode
-        let group: String = ReferenceReplacer.groupLabel(for: old)
+        let group: String = ReferenceReplacer.groupLabel(for: old, coursesDirectoryURL: coursesDirectoryURL)
         if world.isBusy(workingFolderPath, folderName, true) {
             throw ReferenceReplacer.givingUp(
                 .busy(course: course), asked: asked, group: group, stagingURL: stagingURL, world: world

@@ -316,6 +316,7 @@ class WorkspaceModel {
                     backupsExpanded: model.isShowingBackups,
                     referenceExpanded: model.isShowingReferenceCourses,
                     expandedReferenceYears: Array(model.expandedReferenceYears),
+                    expandedReferenceGroups: model.expandedReferenceGroups.sorted(),
                     selection: model.selection?.storageValue ?? "",
                     bookmark: model.rememberedBookmark
                 ))
@@ -454,9 +455,43 @@ class WorkspaceModel {
     /// the folder, exactly as Archived and Backups are.
     var isShowingReferenceCourses: Bool = false
 
-    /// Which school-year sub-groups are folded open, by
-    /// `ReferenceYearGroup.id`. Remembered the same way.
+    /// Which school-year sub-groups are folded open, by starting year, with
+    /// the no-year group as `0` (`ReferenceShelfGroup.otherIdentifier`).
+    /// Remembered the same way. Kept as it was before teacher-made groups
+    /// (#572, third piece), so nobody's fold state moves on upgrade.
     var expandedReferenceYears: Set<Int> = []
+
+    /// Which groups the teacher MADE are folded open, by their id in the
+    /// shelf's arrangement. Remembered beside the years.
+    var expandedReferenceGroups: Set<String> = []
+
+    /// The shelf's arrangement as this window last read it: the groups the
+    /// teacher made, where they put courses, and what the no-year group is
+    /// called (#572, third piece). Read with the courses, and again after
+    /// every change any window makes (`ReferenceShelfStore.didChange`).
+    /// A click decides against the file as it is then, never against this.
+    var referenceShelf: ReferenceShelf.Reading = .absent
+
+    /// A group the teacher asked to rename, waiting for the sheet: a made
+    /// group or the no-year group. Nil when no sheet is up.
+    var renameGroupRequest: ReferenceShelfGroup?
+
+    /// True while the New Group sheet is up. `newGroupThenMove` is the
+    /// course to move into it once it is made, when New Group… was chosen
+    /// from inside a course's Move to Group submenu.
+    var isMakingAReferenceGroup: Bool = false
+    var newGroupThenMove: String?
+
+    /// A made group whose removal is waiting for the teacher's answer
+    /// (it holds courses), or nil.
+    var removeGroupRequest: ReferenceShelfGroup?
+
+    /// True while Start the Groups Again… is asking first.
+    var isAskingToStartReferenceGroupsAgain: Bool = false
+
+    /// A group change that did not happen, for the alert: its title and the
+    /// sentence.
+    var referenceGroupProblem: ReferenceGroupProblem?
 
     /// The backup a restore confirmation is being shown for, if any.
     var backupRestoreRequest: BackupItem?
@@ -663,76 +698,80 @@ class WorkspaceModel {
         return result
     }
 
-    /// One school year's shelf.
-    struct ReferenceYearGroup: Identifiable {
-
-        // MARK: - Stored properties
-
-        /// The starting calendar year, or nil for "Other".
-        let schoolYear: Int?
-
-        /// The courses in it, in the order the sidebar shows them.
-        let courses: [Course]
-
-        // MARK: - Computed properties
-
-        /// "2025–26", or "Other".
-        var title: String {
-            guard let schoolYear else {
-                return ReferenceWording.otherYearTitle
-            }
-            return SchoolYear.label(forStartingYear: schoolYear)
+    /// The reference courses as the shelf rule and the arrangement see them:
+    /// EVERY one, never only those the filter field shows.
+    func referenceShelfEntries(on day: CalendarDay = CalendarDay.today()) -> [ReferenceShelf.Entry] {
+        var result: [ReferenceShelf.Entry] = []
+        for course in courses where course.isKeptForReference {
+            result.append(ReferenceShelf.Entry(
+                folderName: course.code, displayCode: course.displayCode, schoolYear: course.schoolYear(on: day)
+            ))
         }
-
-        /// A stable identity for the fold state and for `ForEach`. A year
-        /// that is not a year is `0`, which is not one either.
-        var id: Int {
-            return schoolYear ?? ReferenceYearGroup.otherIdentifier
-        }
-
-        /// What "Other" is remembered as. Not a year, and never one: the
-        /// offered range starts at 2022.
-        static let otherIdentifier: Int = 0
+        return result
     }
 
-    /// The reference courses grouped by school year — **newest first, "Other"
-    /// last, and a group with nothing in it is not drawn at all.**
+    /// The groups the sidebar draws (#572, third piece): year groups newest
+    /// first, the teacher's own groups A to Z, the no-year group last — and
+    /// a year group with nothing in it is not drawn at all.
     ///
     /// An empty "2023–24" is a row that teaches a teacher to stop reading the
-    /// sidebar, so the groups are built from the courses that are there
-    /// rather than from the years that could be.
+    /// sidebar, so year groups are built from the courses that are there
+    /// rather than from the years that could be. A group the teacher made is
+    /// drawn even when empty, except while the filter field narrows the
+    /// list. With no arrangement this is exactly the shelf before groups.
     ///
     /// Takes the day rather than reading the clock, like everything else that
     /// touches a school year: which years are OFFERED grows with time, and a
-    /// stored year outside the offered range reads as "Other".
-    func referenceYearGroups(on day: CalendarDay = CalendarDay.today()) -> [ReferenceYearGroup] {
-        var byYear: [Int: [Course]] = [:]
-        var withNoYear: [Course] = []
+    /// stored year outside the offered range reads as the no-year group.
+    func referenceShelfGroups(on day: CalendarDay = CalendarDay.today()) -> [ReferenceShelfGroup] {
+        var entries: [ReferenceShelf.Entry] = []
+        var byFolder: [String: Course] = [:]
         for course in referenceCourses {
-            guard let year = course.schoolYear(on: day) else {
-                withNoYear.append(course)
-                continue
+            entries.append(ReferenceShelf.Entry(
+                folderName: course.code, displayCode: course.displayCode, schoolYear: course.schoolYear(on: day)
+            ))
+            byFolder[course.code] = course
+        }
+        let isFiltering: Bool = !filterText.trimmingCharacters(in: .whitespaces).isEmpty
+        let groups: [ReferenceShelf.Group] = ReferenceShelf.groups(
+            of: entries, arrangement: referenceShelf.arrangement, drawsEmptyMadeGroups: !isFiltering
+        )
+        var result: [ReferenceShelfGroup] = []
+        for group in groups {
+            var inIt: [Course] = []
+            for folderName in group.folderNames {
+                if let course = byFolder[folderName] {
+                    inIt.append(course)
+                }
             }
-            var inThatYear: [Course] = byYear[year] ?? []
-            inThatYear.append(course)
-            byYear[year] = inThatYear
+            result.append(ReferenceShelfGroup(group: group, courses: inIt))
         }
+        return result
+    }
 
-        var years: [Int] = []
-        for (year, _) in byYear {
-            years.append(year)
-        }
-        years.sort()
-        years.reverse()
+    /// Where a reference course sits on the shelf now.
+    func referenceShelfPlace(of course: Course, on day: CalendarDay = CalendarDay.today()) -> ReferenceShelf.Place {
+        return ReferenceShelf.place(
+            ofFolder: course.code, schoolYear: course.schoolYear(on: day), in: referenceShelf.arrangement
+        )
+    }
 
-        var groups: [ReferenceYearGroup] = []
-        for year in years {
-            groups.append(ReferenceYearGroup(schoolYear: year, courses: byYear[year] ?? []))
+    /// The name of the made group a course was put in, or nil when it sits
+    /// where its school year puts it — for the read-only summary.
+    func madeGroupName(of course: Course, on day: CalendarDay = CalendarDay.today()) -> String? {
+        if case .made(let id) = referenceShelfPlace(of: course, on: day) {
+            return referenceShelf.arrangement.group(withID: id)?.name
         }
-        if !withNoYear.isEmpty {
-            groups.append(ReferenceYearGroup(schoolYear: nil, courses: withNoYear))
+        return nil
+    }
+
+    /// Reads the shelf's arrangement again, after a change in any window.
+    func refreshReferenceShelf() {
+        guard let coursesDirectoryURL else {
+            referenceShelf = .absent
+            return
         }
-        return groups
+        referenceShelf = ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL)
     }
 
     /// Opens the groups a reference course sits in, so one that has just
@@ -740,34 +779,46 @@ class WorkspaceModel {
     /// triangles.
     ///
     /// Both levels, because there are two: the "Reference Courses" group and
-    /// the school year inside it. A course that lands in a shut group reads
-    /// as a course that did not land at all.
+    /// the group inside it. A course that lands in a shut group reads as a
+    /// course that did not land at all.
     func revealReferenceCourse(folderName: String, on day: CalendarDay = CalendarDay.today()) {
+        refreshReferenceShelf()
         for course in courses where course.code == folderName {
             guard course.isKeptForReference else {
                 continue
             }
             isShowingReferenceCourses = true
-            let group: Int = course.schoolYear(on: day) ?? ReferenceYearGroup.otherIdentifier
-            expandedReferenceYears.insert(group)
+            openReferenceGroup(referenceShelfPlace(of: course, on: day))
             WorkspaceModel.rememberOpenFolders()
+        }
+    }
+
+    /// Folds one group open.
+    func openReferenceGroup(_ place: ReferenceShelf.Place) {
+        switch place {
+        case .year(let year):
+            expandedReferenceYears.insert(year)
+        case .noYear:
+            expandedReferenceYears.insert(ReferenceShelfGroup.otherIdentifier)
+        case .made(let id):
+            expandedReferenceGroups.insert(id)
         }
     }
 
     /// What is already on the shelf, for the uniqueness rule.
     func shelvedReferenceCourses(on day: CalendarDay = CalendarDay.today()) -> [ReferenceCourseRule.Shelved] {
-        var result: [ReferenceCourseRule.Shelved] = []
         // Asked of EVERY course, not of `referenceCourses`, which is behind
         // the filter field: a code is taken whether or not the teacher
         // happens to be filtering the sidebar right now.
-        for course in courses where course.isKeptForReference {
-            result.append(ReferenceCourseRule.Shelved(
-                displayCode: course.displayCode,
-                schoolYear: course.schoolYear(on: day),
-                folderName: course.code
-            ))
+        //
+        // Each course's made group is read from the arrangement on disk NOW
+        // (#572, third piece): the rule is asked at a click, and another
+        // window may have moved a course since this one drew its shelf.
+        var arrangement: ReferenceShelf.Arrangement = referenceShelf.arrangement
+        if let coursesDirectoryURL {
+            arrangement = ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL).arrangement
         }
-        return result
+        return ReferenceShelfStore.shelved(referenceShelfEntries(on: day), in: arrangement)
     }
 
     /// The course object matching the sidebar selection, if any.
@@ -2111,6 +2162,7 @@ class WorkspaceModel {
         }
         let loadedCourses: [Course] = WorkspaceModel.courses(among: entryURLs)
         courses = loadedCourses
+        referenceShelf = ReferenceShelfStore.read(inCoursesDirectory: coursesDirectoryURL)
         // A reference course says it is frozen; this is what makes that still
         // true after a restore, after a second Mac has had the folder, or
         // after somebody marked a course by hand. Quiet and cheap when there
