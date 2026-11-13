@@ -18,7 +18,8 @@ the kit's two questions), with typed answers and an invented name typed in the N
 Student A upright; Student B with a second invented name written in the body of page 2; Student C with
 page 2 upside down (a duplex scan on the wrong flip); Student D with a name written longer than the
 Name blank, so it runs past the box and the script must stop it with CHECK; and one file named by an
-invented name instead of an identifier. Every name here is invented and cannot be a real student's.
+invented name instead of an identifier. Every name here is invented and cannot be a real student's, and no word of one appears in any file the
+skills ship, so the checker can look for each in the transcript.
 Needs tectonic and Poppler (pdftoppm). Standard library only otherwise.
 """
 import json
@@ -36,12 +37,12 @@ STARTER = GUIDANCE / "skills" / "plantoir-handouts" / "starters" / "Quiz.tex"
 SHARED_RULES = REPOSITORY / "contracts" / "shared-rules.json"
 DPI = 150
 PAPERS = [
-    ("Student A", "Zorp Testfam", {"A1": "c", "B1": "36 outcomes; 6/36 = 1/6"}, None, False),
-    ("Student B", "Quib Samplefam", {"A1": "b", "B1": "12 outcomes; 2/12"}, "Inventedfriend Madeupname", False),
-    ("Student C", "Vexa Examplefam", {"A1": "c", "B1": "36 outcomes; 1/6"}, None, True),
-    ("Student D", "Pupilten Fictionalnamelonger", {"A1": "a", "B1": "36; 6/36"}, None, False),
+    ("Student A", "Zorp Quandlefam", {"A1": "c", "B1": "36 outcomes; 6/36 = 1/6"}, None, False),
+    ("Student B", "Quib Brindlefam", {"A1": "b", "B1": "12 outcomes; 2/12"}, "Yonderfriend Plinkname", False),
+    ("Student C", "Vexa Morrowfam", {"A1": "c", "B1": "36 outcomes; 1/6"}, None, True),
+    ("Student D", "Pupilten Thistlefamlonger", {"A1": "a", "B1": "36; 6/36"}, None, False),
 ]
-MISLABELLED = ("Yarn Pretendfam", {"A1": "c", "B1": "36 outcomes; 1/6"})
+MISLABELLED = ("Yarnix Glimfam", {"A1": "c", "B1": "36 outcomes; 1/6"})
 
 
 def paper_tex(name, answers, body_name):
