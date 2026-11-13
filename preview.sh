@@ -145,12 +145,16 @@ toolchain_hash() {
   # the spawning alone took 35 seconds before anything appeared on screen.
   # xargs batches them into a handful of invocations: same lines, same
   # order, byte-identical hash, under a fifth of a second.
+  # Compiled Python is never part of the recipe (#747): a test run by hand
+  # writes __pycache__/*.pyc beside the scripts, and one stray file renamed
+  # the image, a full rebuild on every Mac for the same recipe. A context
+  # with none hashes exactly as it did before these two names were added.
   local context="$1"
   (cd "$context" && find . \
       \( -path './.git' -o -path './courses' -o -path './mac-app' \
          -o -name node_modules -o -name '.merged_output' \
-         -o -name '.verify-export.*' \) -prune \
-      -o -type f -not -name '.DS_Store' -print0 \
+         -o -name '.verify-export.*' -o -name '__pycache__' \) -prune \
+      -o -type f -not -name '.DS_Store' -not -name '*.pyc' -print0 \
     | LC_ALL=C sort -z \
     | xargs -0 shasum -a 256 \
     | shasum -a 256 | cut -c1-8)

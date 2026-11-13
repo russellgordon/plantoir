@@ -8,8 +8,9 @@ is involved. A working folder carries the build recipe in `.toolchain/`
 (kept current by the macOS app); a repository copy IS the recipe. The image
 tag is `teaching-quartz:src-<hash8>` where the hash covers ONLY the
 recipe's files (the `find` prunes `.git`, `courses`, `mac-app`,
-`node_modules`, `.merged_output`, and `.verify-export.*`, and skips
-`.DS_Store` — so build outputs never steer the tag), so an updated recipe
+`node_modules`, `.merged_output`, `.verify-export.*` and `__pycache__`, and
+skips `.DS_Store` and `*.pyc`, so build outputs and compiled Python never
+steer the tag: [03 → Compiled Python is not part of the recipe](03-launcher-scripts.md#compiled-python-is-not-part-of-the-recipe-github-747)), so an updated recipe
 produces a new tag, the launcher builds it,
 and the container is recreated to match — the whole chain keyed off one
 thing: the version of the app.

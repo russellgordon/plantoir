@@ -593,10 +593,79 @@ update refreshing `.toolchain/` — the full recipe folder the app mirrors
 into every working folder) means a new tag, a local rebuild on the next
 run, and a recreated container. The hash covers only recipe files: the
 `find` prunes `.git`, `courses`, `mac-app`, `node_modules`,
-`.merged_output`, and `.verify-export.*`, so build outputs never steer
-the tag (from the repository root they once did, at the cost of minutes
-of checksumming per run). The old pull-and-compare update machinery
-(`--update-image`, digest checks, the update prompt) is gone.
+`.merged_output`, `.verify-export.*` and `__pycache__`, and skips
+`.DS_Store` and `*.pyc`, so build outputs never steer the tag (from the
+repository root they once did, at the cost of minutes of checksumming per
+run). The old pull-and-compare update machinery (`--update-image`, digest
+checks, the update prompt) is gone.
+
+#### Compiled Python is not part of the recipe (GitHub #747)
+
+**What was wrong.** A test run by hand in the checkout
+(`python3 scripts/test_x.py`) writes `__pycache__/*.pyc` beside the module
+it imports. The four recipe folders are folder references in `project.yml`,
+which Xcode copies whole, so the cache went into the app bundle, into every
+working folder's `.toolchain/`, and into `toolchain_hash`. The 1.9.1 bundle
+carried `support/swift/__pycache__/*.pyc`. One stray file gives the same
+recipe a new image name, and every Mac builds the image again for nothing.
+
+**Measured (2026-11-11, the #747 plan).**
+
+- The shipped 1.9.3 bundle is clean: its launchers and four folders, and
+  `git archive v1.9.3` of the same paths, both hash to `d096a1f5` with the
+  same 12,942 files.
+- Debug builds were not: of 10 bundles under DerivedData, 4 carried
+  `scripts/__pycache__` and 1 carried `support/swift/__pycache__`.
+- One `.pyc` planted in each of `scripts/__pycache__` and
+  `support/swift/__pycache__` of that 1.9.3 copy moved the main tag
+  `d096a1f5` → `061efa9e` and the Swift image tag (`toolchain_hash
+  support/swift`) `747b0982` → `e664d791`.
+- #746's stamp does not ping-pong on a stray file: it compares against
+  `$IMAGE` computed from the same `.toolchain/` at build and at deploy, and
+  no host Python runs from `.toolchain/`. The cost was one extra image build
+  and one site rebuild per folder.
+
+**What it does now.** Three layers, each enough on its own:
+
+1. **The launchers skip it.** `toolchain_hash` (byte-identical in
+   `setup.sh`, `preview.sh` and `deploy.sh`) prunes `__pycache__` and skips
+   `*.pyc`. A context with neither hashes exactly as it did before: measured
+   `d096a1f5` on the 1.9.3 copy, before and after, and still `d096a1f5`
+   (`747b0982` for `support/swift`) with the strays planted. So the prune
+   renames no teacher's image by itself; the release that carries it does,
+   because the launcher text is in the context. `verify.sh` takes the Swift
+   gate's tag from `preview.sh`'s own function (an `eval` of it), so it
+   cannot disagree with the launchers.
+2. **The build phase removes it from the bundle.** `write_toolchain_hashes.py`
+   ([09 → Comparing without reading (#663)](09-mac-app.md#comparing-without-reading-663-2026-10-24))
+   deletes every `__pycache__` and `.pyc` under the bundle's four folders
+   before it fingerprints them, and says how many. The checkout is never
+   touched. Measured on this worktree's Debug build with 20 stray `.pyc` in
+   `scripts/__pycache__`: "removed 20 compiled Python files", and the bundle
+   held none afterwards.
+3. **publish.sh refuses a bundle that still has it.**
+   `release/check-no-bytecode.sh` reads the staged copy after the build, in
+   every mode, and names each file it finds. It should never fire after (2);
+   it is the release's own proof.
+
+`verify.sh` step 0.5 also fails when the checkout's `patches/`, `scripts/`,
+`support/` or `contracts/` holds bytecode (it looked in `scripts/` only
+before). Its own image is built from the working tree, and the
+Dockerfile's `COPY support/` and `COPY contracts/` would bake a stray cache
+in. Pinned by `scripts/test_toolchain_bytecode.py` (which Windows'
+`PythonToolchainTests` runs; its launcher half skips without a bash that
+has `shasum`) and `mac-app/release/test_release_signing.py` →
+`test_bytecode_in_the_bundle_is_refused`.
+
+**Rejected.**
+
+- *Refusing the build when the checkout has bytecode.* Every hand-run test
+  would break the next ⌘B. Stripping the bundle's copy costs nothing.
+- *Folder-reference excludes in `project.yml`.* XcodeGen's `excludes` do not
+  apply inside a `type: folder` reference.
+- *A `.dockerignore`.* A new file in the context (a renamed image), not in
+  the app's mirrored root-file list, and the tag is unchanged by it.
+- *Hashing with `git ls-files`.* A working folder's `.toolchain/` has no git.
 
 `verify.sh` guards the launchers themselves: among its checks, every
 helper function a launcher calls must be defined in that same launcher
