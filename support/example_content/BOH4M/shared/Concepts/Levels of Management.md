@@ -45,6 +45,21 @@ manager, and the reason is in that column, not in their character.
 > is not. When you sort decisions in class, sort them by the work, not by
 > the business card.
 
+## Check the idea
+
+Nothing you answer here is sent to anyone. It is for you.
+
+> [!quiz|shuffle] A team lead with no "manager" in her title spends Tuesday rebuilding this week's schedule after two people call in sick. What kind of work is that?
+> - [x] First-line management
+> - [ ] Middle management
+> - [ ] Top management
+> - [ ] Not management, because she is not a manager
+>
+> > [!explain]- Why
+> > Sort by the work, not by the business card. The schedule has to be
+> > right this week, for these people, and that time horizon is
+> > first-line management. Her title does not change what the work is.
+
 We use these levels constantly: when we ask *who would actually decide
 this?* in a [[Cases/index|case]], the answer is nearly always a level
 rather than a person.

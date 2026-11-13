@@ -45,6 +45,30 @@ case, and the perspective it flattered was the audience's.
 > **What did this image do after it was taken?** Published, filed, sold,
 > exhibited, or never seen — that history is part of the evidence.
 
+## A film to practise on
+
+Film is photographs at speed, and the same five questions apply. This one
+is four silent minutes from the City of Vancouver Archives. It records
+Queen Elizabeth's visit to Vancouver in 1959: children are arranged into
+the shape of a dogwood flower in Queen Elizabeth Park, and the Queen is
+shown watching them.
+
+![](https://www.youtube.com/watch?v=Bx5wri9LHpc)
+
+Watch it once straight through. Then watch it again with these in hand:
+
+- Which of the four kinds above is this, and what in the film tells you?
+- Who is posed, and who did the posing? Find the moment the arranging
+  shows.
+- What is outside the frame? Name two things that must have been there
+  and that the camera never turns to.
+- The archive's title is *Visit of Queen Elizabeth - dogwood -
+  playground*. It was probably written by an archivist, later. What does
+  it leave out?
+
+The film plays from YouTube, so it needs an internet connection. The
+archive published it under a Creative Commons Attribution licence.
+
 ## Where to find them, described honestly
 
 The Archives of Ontario has put more than 8,700 high-resolution images on

@@ -29,6 +29,13 @@ all.
    period yours, or it is a block with the fixing built into it. A
    judgement you have no time to act on is just a worry.
 
+Each task page closes with the same criteria as a list of boxes, under
+**Success criteria**. Tick a box only once you have written "yes" with
+evidence beside it. The site keeps your ticks in your own browser and
+counts them, task by task, on the **My Progress** page, which is first in
+Key Links. Nobody else sees them, they are not part of your mark, and on
+another computer the boxes start again.
+
 Steps 2 and 3 are the whole exercise. Naming your weakest line honestly
 is harder than any of the fixing, because it means writing down the
 thing you were hoping nobody would notice.
