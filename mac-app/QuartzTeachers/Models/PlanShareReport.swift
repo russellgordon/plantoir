@@ -37,6 +37,7 @@ nonisolated enum PlanShareReport {
         "cloudflareSaidNo": "Cloudflare did not take them",
         "referenceCourse": "the course is kept for reference",
         "stillSharing": "they were already being shared",
+        "notConfirmed": "the teacher chose not to share them after reading the lists of files",
     ]
 
     /// How a Stop Sharing ended, by the marker's word.
@@ -44,6 +45,7 @@ nonisolated enum PlanShareReport {
         "deleted": "deleted",
         "alreadyGone": "already gone",
         "failed": "failed, so the address still works",
+        "unconfirmed": "not confirmed, so the address may still work",
     ]
 
     // MARK: - Functions

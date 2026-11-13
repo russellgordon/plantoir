@@ -23,6 +23,7 @@ Stdlib only. Run with:
     python3 scripts/test_share_plan.py
 """
 import contextlib
+import re
 import io
 import json
 import os
@@ -61,6 +62,7 @@ class FakeCloudflare:
         self.delete_project_fails = False
         self.staged = []
         self.counter = 0
+        self.password = PASSWORD
 
     def api(self, method, path, token, payload=None):
         assert token == TOKEN
@@ -135,8 +137,9 @@ class FakeCloudflare:
         self.staged.append({"files": files, "cwd": os.getcwd(), "public": str(public)})
         self.counter += 1
         worker = files.get("_worker.js", b"")
+        found = re.search(rb'const SHARE = "([0-9a-f]*)";', worker)
         deployment = {"id": f"dep{self.counter}", "protected": b"const PROTECTED = true;" in worker,
-                      "worker": bool(worker)}
+                      "worker": bool(worker), "share": found.group(1).decode() if found else ""}
         self.projects[name]["deployments"].append(deployment)
         self.projects[name]["canonical"] = deployment["id"]
 
@@ -146,16 +149,21 @@ class FakeCloudflare:
             if url.startswith(base):
                 for deployment in project["deployments"]:
                     if deployment["id"] == project["canonical"]:
-                        if deployment["protected"]:
-                            right = unit_plan_site.credential_b64(USERNAME, PASSWORD)
-                            if credential != right:
-                                return 401, {"www-authenticate": 'Basic realm="x"'}
-                        if url != base:
-                            if deployment["worker"]:
-                                return 404, {"cache-control": "no-store"}
-                            return 404, {}
-                        return 200, {}
+                        return self.answer(deployment, url, base, credential)
         return None, {}
+
+    def answer(self, deployment, url, base, credential):
+        """What one deployment answers, as its worker would."""
+        share = {"x-plantoir-share": deployment["share"]} if deployment["worker"] else {}
+        if deployment["protected"]:
+            right = unit_plan_site.credential_b64(USERNAME, self.password)
+            if credential != right:
+                return 401, dict(share, **{"www-authenticate": 'Basic realm="x"'})
+        if url != base:
+            if deployment["worker"]:
+                return 404, dict(share, **{"cache-control": "no-store"})
+            return 404, {}
+        return 200, share
 
 
 class Clock:
@@ -211,12 +219,29 @@ class ShareTestCase(unittest.TestCase):
         self.addCleanup(os.environ.pop, "CLOUDFLARE_API_TOKEN", None)
         self.addCleanup(os.environ.pop, "CLOUDFLARE_ACCOUNT_ID", None)
         self.outputs = []
+        # None: run under --non-interactive, where the rule decides. A string:
+        # the teacher's answer to the open share's question.
+        self.answer_the_lists = None
+        original_input = share_plan.__builtins__["input"] if isinstance(share_plan.__builtins__, dict) else None
+        self.questions = []
+
+        def answering(question=""):
+            self.questions.append(question)
+            return self.answer_the_lists or ""
+
+        import builtins
+        original = builtins.input
+        builtins.input = answering
+        self.addCleanup(setattr, builtins, "input", original)
 
     def give_credential(self):
         self.cred_file.write_text(f"{USERNAME}:{PASSWORD}", encoding="utf-8")
 
     def run_share(self, *flags):
-        arguments = ["--host-os", "mac", "--course", "SNC2D", "--year", "2026"] + list(flags)
+        arguments = ["--host-os", "mac", "--course", "SNC2D", "--year", "2026",
+                     "--credential-file", str(self.cred_file)] + list(flags)
+        if self.answer_the_lists is None:
+            arguments.append("--non-interactive")
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             status = share_plan.main(arguments)
@@ -550,6 +575,241 @@ class MarkerTests(ShareTestCase):
                 protected = share_plan.decide_protected(marker, case["flag"] == "--protect",
                                                         case["flag"] == "--remove-password")
                 self.assertEqual(protected, case["protected"])
+
+
+def bar_for(marker):
+    """The share bar's reading of a marker (unitPlanning.share.barCases),
+    written out here so the interruption cases can say what a teacher sees."""
+    if not marker or not marker.get("address"):
+        return "notShared"
+    if marker.get("state") == "sending":
+        return "unfinished"
+    if marker.get("state") == "stopping":
+        return "stopping"
+    return "protected" if marker.get("protected") else "open"
+
+
+class Interrupted(BaseException):
+    """A Cancel or a crash: not an Exception, so nothing catches it on the way."""
+
+
+class InterruptionTests(ShareTestCase):
+    """unitPlanning.share.interruptionCases: a share stopped part way leaves a
+    marker that says no more than the site does (review H1)."""
+
+    def interrupt(self, point):
+        cloudflare = self.cloudflare
+        if point == "afterTheProject":
+            def stop_here(*arguments, **keywords):
+                raise Interrupted()
+            share_plan.wait_for_project = stop_here
+        elif point == "beforeTheUpload":
+            def stop_here(public, name, token, account):
+                raise Interrupted()
+            share_plan.deploy_to_cloudflare = stop_here
+        elif point == "afterTheUpload":
+            def stop_here(public, name, token, account):
+                cloudflare.deploy(public, name, token, account)
+                raise Interrupted()
+            share_plan.deploy_to_cloudflare = stop_here
+        elif point in ("duringTheProof", "duringStopSharing"):
+            def stop_here(url, credential=None):
+                raise Interrupted()
+            share_plan.fetch_address = stop_here
+        elif point == "duringTheDeletes":
+            real = cloudflare.api
+
+            def stop_here(method, path, token, payload=None):
+                if method == "DELETE" and "/deployments/" in path:
+                    raise Interrupted()
+                return real(method, path, token, payload)
+            share_plan.cloudflare_api = stop_here
+
+    def test_every_interruption_case(self):
+        original_wait = share_plan.wait_for_project
+        self.addCleanup(setattr, share_plan, "wait_for_project", original_wait)
+        for case in share_plan.share_words()["interruptionCases"]["cases"]:
+            with self.subTest(case=case["name"]):
+                self.setUp()
+                share_plan.wait_for_project = original_wait
+                if case["before"] == "protected":
+                    self.give_credential()
+                    self.assertEqual(self.run_share("--protect")[0], 0)
+                elif case["before"] == "open":
+                    self.assertEqual(self.run_share()[0], 0)
+                flags = {"shareOpen": [], "shareProtected": ["--protect"], "removePassword": ["--remove-password"],
+                         "stop": ["--stop"]}[case["choice"]]
+                if "--protect" in flags:
+                    self.give_credential()
+                self.interrupt(case["point"])
+                with self.assertRaises(Interrupted):
+                    self.run_share(*flags)
+                share_plan.wait_for_project = original_wait
+                marker = self.marker()
+                expect = case["marker"]
+                self.assertEqual((marker or {}).get("state"), expect["state"], marker)
+                self.assertEqual(bool((marker or {}).get("protected")), expect["protected"], marker)
+                self.assertEqual(bool((marker or {}).get("address")), expect["address"], marker)
+                if "oldCopies" in expect:
+                    self.assertEqual((marker or {}).get("oldCopies", 0) > 0, expect["oldCopies"], marker)
+                self.assertEqual(bar_for(marker), case["bar"], marker)
+                self.assertFalse(self.cred_file.exists(), "the credential file was left behind")
+
+
+class ThisSharesOwnDeploymentTests(ShareTestCase):
+
+    def test_the_proof_does_not_pass_on_the_previous_deployment(self):
+        self.run_share("--include-answer-keys")
+        name = self.marker()["name"]
+        project = self.cloudflare.projects[name]
+        previous = project["deployments"][-1]
+        cloudflare = self.cloudflare
+
+        def still_the_old_one(url, credential=None):
+            # The main address goes on answering the previous deployment,
+            # which answers exactly as the new one would, but for its own share.
+            return cloudflare.answer(previous, url, f"https://{project['subdomain']}/", credential)
+
+        share_plan.fetch_address = still_the_old_one
+        status, text = self.run_share()
+        self.assertEqual(status, 1, text)
+        self.assertIn("notAnsweringYet", text)
+        self.assertNotIn("PLANTOIR_PLAN_SHARED", text)
+        self.assertEqual(self.marker()["state"], "sending")
+
+
+class OpenShareListTests(ShareTestCase):
+
+    def test_an_open_share_shows_both_lists_and_goes_only_on_a_yes(self):
+        words = share_plan.share_words()["openShareLists"]
+        self.answer_the_lists = "n"
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertIn("PLANTOIR_PLAN_REFUSED: SNC2D notConfirmed", text)
+        self.assertEqual(self.cloudflare.calls, [])
+        self.assertEqual(self.cloudflare.staged, [])
+        self.assertIn(words["byName"], text)
+        shared = text.split(words["sharedHeading"])[1].split(words["leftOutHeading"])[0]
+        left_out = text.split(words["leftOutHeading"])[1]
+        self.assertIn("unit/pdfs/Quiz 1.pdf", shared)
+        self.assertNotIn("Solutions", shared)
+        self.assertIn("unit/pdfs/Quiz 1 - Solutions.pdf", left_out)
+        self.assertEqual(self.questions, [words["question"]])
+        self.answer_the_lists = "yes"
+        status, text = self.run_share()
+        self.assertEqual(status, 0, text)
+        self.assertIn("PLANTOIR_PLAN_SHARED", text)
+
+    def test_an_empty_answer_shares_nothing(self):
+        self.answer_the_lists = ""
+        status, text = self.run_share()
+        self.assertEqual(status, 0)
+        self.assertEqual(self.cloudflare.staged, [])
+
+    def test_a_protected_share_is_not_asked(self):
+        self.answer_the_lists = "n"
+        self.give_credential()
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 0, text)
+        self.assertEqual(self.questions, [])
+
+    def test_no_sentence_says_the_share_holds_no_answers(self):
+        for key, value in share_plan.share_words()["openShareLists"].items():
+            if key == "rule":
+                continue
+            self.assertNotIn("no answer", value.lower())
+
+
+class CredentialFileTests(ShareTestCase):
+
+    def private_file(self, text):
+        folder = Path(tempfile.mkdtemp(prefix="plan_cred.", dir=self.tmp))
+        os.chmod(folder, 0o700)
+        path = folder / "cred"
+        path.write_text(text, encoding="utf-8")
+        os.chmod(path, 0o600)
+        return path
+
+    def test_each_share_reads_its_own_file_and_deletes_it_and_its_folder(self):
+        first = self.private_file(f"{USERNAME}:{PASSWORD}")
+        second = self.private_file("someone:Another-password-9")
+        self.cred_file = first
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 0, text)
+        self.assertFalse(first.exists())
+        self.assertFalse(first.parent.exists())
+        self.assertTrue(second.exists(), "a share read another share's file")
+        self.cred_file = second
+        def failing(public, name, token, account):
+            raise RuntimeError("Cloudflare's deploy tool exited with code 1")
+        share_plan.deploy_to_cloudflare = failing
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 1)
+        self.assertFalse(second.parent.exists())
+
+    def test_the_file_goes_when_the_plan_is_refused_before_anything_is_sent(self):
+        path = self.private_file(f"{USERNAME}:{PASSWORD}")
+        self.cred_file = path
+        (self.course_dir / ".internal" / "planning" / "robots.txt").unlink()
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 1)
+        self.assertFalse(path.parent.exists())
+
+    def test_no_file_named_is_no_password(self):
+        self.cred_file = self.tmp / "never-written"
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 1)
+        self.assertIn("noPassword", text)
+
+    def test_a_password_is_used_exactly_as_typed(self):
+        self.cred_file = self.private_file(f"{USERNAME}:  {PASSWORD}  ")
+        self.cloudflare.password = f"  {PASSWORD}  "
+        status, text = self.run_share("--protect")
+        self.assertEqual(status, 0, text)
+        worker = self.cloudflare.staged[-1]["files"]["_worker.js"].decode()
+        salt = re.search(r'const SALT = "([0-9a-f]+)";', worker).group(1)
+        import hashlib
+        expected = hashlib.sha256((salt + unit_plan_site.credential_b64(USERNAME, f"  {PASSWORD}  ")).encode()).hexdigest()
+        self.assertIn(expected, worker)
+
+
+class VerifiedStopTests(ShareTestCase):
+
+    def test_a_stop_whose_address_still_answers_is_not_called_stopped(self):
+        self.run_share()
+        name = self.marker()["name"]
+        address = self.marker()["address"]
+        project = self.cloudflare.projects[name]
+        deployment = project["deployments"][-1]
+        cloudflare = self.cloudflare
+
+        def still_up(url, credential=None):
+            return cloudflare.answer(deployment, url, address, credential)
+
+        share_plan.fetch_address = still_up
+        status, text = self.run_share("--stop")
+        self.assertEqual(status, 1, text)
+        self.assertIn(" unconfirmed", text)
+        self.assertIn(share_plan.share_words()["words"]["stopUnconfirmed"], text)
+        self.assertEqual(self.marker()["state"], "stopping")
+        self.assertEqual(bar_for(self.marker()), "stopping")
+
+    def test_a_404_from_the_delete_alone_is_not_proof(self):
+        self.run_share()
+        address = self.marker()["address"]
+        name = self.marker()["name"]
+        deployment = self.cloudflare.projects[name]["deployments"][-1]
+        del self.cloudflare.projects[name]
+        cloudflare = self.cloudflare
+
+        def another_accounts_site(url, credential=None):
+            return cloudflare.answer(deployment, url, address, credential)
+
+        share_plan.fetch_address = another_accounts_site
+        status, text = self.run_share("--stop")
+        self.assertEqual(status, 1, text)
+        self.assertIn(" unconfirmed", text)
+        self.assertIsNotNone(self.marker())
 
 
 if __name__ == "__main__":

@@ -136,6 +136,32 @@ final class PlanSharingTests: XCTestCase {
 
     // MARK: - Tests: the markers
 
+    /// unitPlanning.share.barCases: the bar never says more than the site
+    /// does (review H1), and says when an older copy may still answer (M2).
+    func testEveryBarCase() throws {
+        for testCase in try PlanSharingTests.cases("barCases") {
+            var marker: PlanSharing.Marker?
+            if let object = testCase["marker"] as? [String: Any] {
+                let data: Data = try JSONSerialization.data(withJSONObject: object)
+                marker = PlanSharing.marker(from: data, year: 2026)
+            }
+            XCTAssertEqual(PlanSharing.barStatus(for: marker).rawValue, testCase["bar"] as? String, "\(testCase)")
+            XCTAssertEqual(PlanSharing.showsOldCopies(marker), testCase["oldCopiesLine"] as? Bool, "\(testCase)")
+        }
+    }
+
+    func testTheInterruptionCasesNameOnlyBarsTheBarKnows() throws {
+        for testCase in try PlanSharingTests.cases("interruptionCases") {
+            let bar: String = try XCTUnwrap(testCase["bar"] as? String)
+            XCTAssertNotNil(PlanSharing.BarStatus(rawValue: bar), bar)
+        }
+    }
+
+    func testTheOldCopySentenceIsTheContractsRefusal() throws {
+        let refusals: [String: Any] = try XCTUnwrap(try PlanSharingTests.share()["refusals"] as? [String: Any])
+        XCTAssertEqual(refusals["oldCopyStillThere"] as? String, PlanSharingWording.oldCopyStillThere)
+    }
+
     func testOnlyAYearsOwnMarkerIsRead() {
         XCTAssertEqual(PlanSharing.year(inMarkerName: "plans-2026.json"), 2026)
         XCTAssertNil(PlanSharing.year(inMarkerName: "plans-2026.previous-2026-11-12_101010.json"))
@@ -211,6 +237,7 @@ final class PlanSharingTests: XCTestCase {
         runner.receiveOutput("PLANTOIR_PLAN_SHARED: AP+CALC 2026 \(address) protected:no failClosed:yes answerKeys:out units:1 oldCopies:1\r\n")
         runner.receiveOutput("PLANTOIR_PLAN_REFUSED: SNC2D checkFound 4\r\n")
         runner.receiveOutput("PLANTOIR_PLAN_STOPPED: SNC2D 2025 \(address) failed\r\n")
+        runner.receiveOutput("PLANTOIR_PLAN_STOPPED: SNC2D 2024 \(address) unconfirmed\r\n")
         XCTAssertFalse(runner.transcript.displayText.contains("PLANTOIR_PLAN_"))
         let trail: String = trailText()
         XCTAssertFalse(trail.contains("k3x9qa8m"), "the address reached the trail")
@@ -223,6 +250,7 @@ final class PlanSharingTests: XCTestCase {
         ), trail)
         XCTAssertTrue(trail.contains("SNC2D · unit plans not shared: 4 thing(s) in them needed fixing first"), trail)
         XCTAssertTrue(trail.contains("SNC2D · stopped sharing the 2025-26 unit plans (failed, so the address still works)"), trail)
+        XCTAssertTrue(trail.contains("SNC2D · stopped sharing the 2024-25 unit plans (not confirmed, so the address may still work)"), trail)
     }
 
     func testALineThatIsNotAMarkersShapeReportsNothing() {

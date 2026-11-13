@@ -230,7 +230,7 @@ for (const c of cases) {
   const headers = {};
   if (auths[c.auth]) headers["Authorization"] = auths[c.auth];
   const answer = await worker.fetch(new Request("https://plans.example" + c.path, { headers }), env);
-  out.push({ status: answer.status, challenge: answer.headers.get("WWW-Authenticate"), robots: answer.headers.get("X-Robots-Tag"), cache: answer.headers.get("Cache-Control"), body: await answer.text() });
+  out.push({ status: answer.status, challenge: answer.headers.get("WWW-Authenticate"), robots: answer.headers.get("X-Robots-Tag"), cache: answer.headers.get("Cache-Control"), share: answer.headers.get("X-Plantoir-Share"), body: await answer.text() });
 }
 console.log(JSON.stringify(out));
 """
@@ -259,8 +259,10 @@ class WorkerTests(unittest.TestCase):
     def test_every_worker_case(self):
         credential = unit_plan_site.credential_b64(WORKER_USER, WORKER_PASSWORD)
         sources = {
-            "protected": unit_plan_site.worker_js(credential, unit_plan_site.realm_for("SNC2D"), SHARED_FILES),
-            "open": unit_plan_site.worker_js(None, unit_plan_site.realm_for("SNC2D"), SHARED_FILES),
+            "protected": unit_plan_site.worker_js(credential, unit_plan_site.realm_for("SNC2D"), SHARED_FILES,
+                                                  share_id="0123456789abcdef"),
+            "open": unit_plan_site.worker_js(None, unit_plan_site.realm_for("SNC2D"), SHARED_FILES,
+                                             share_id="0123456789abcdef"),
         }
         for mode, source in sources.items():
             cases = []
@@ -278,6 +280,8 @@ class WorkerTests(unittest.TestCase):
                         self.assertIsNone(result["challenge"])
                     self.assertEqual(result["robots"], "noindex, nofollow")
                     self.assertIn("no-store", result["cache"])
+                    # Every answer says which share sent it (review M1).
+                    self.assertEqual(result["share"], "0123456789abcdef")
                     if case["status"] == 200:
                         self.assertTrue(result["body"].startswith("asset "))
                     if case["status"] == 404:

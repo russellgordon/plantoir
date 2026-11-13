@@ -2522,13 +2522,16 @@ ask_for_the_plan_credential() {
   echo ""
   echo "Colleagues will be asked for this username and password before the plans open."
   echo "Choose ones made for them, not the password to your own accounts."
-  read -rp "Choose a username for these unit plans: " username
+  # Both without echo, so neither reaches the console the teacher is reading
+  # (review LOW), and with IFS= so a password is kept exactly as typed,
+  # spaces at either end included.
+  IFS= read -rsp "Choose a username for these unit plans: " username; echo
   while [[ ! "$username" =~ ^[A-Za-z0-9._-]{1,32}$ ]]; do
-    read -rp "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: " username
+    IFS= read -rsp "Please choose a username of 1 to 32 letters, digits, dots, dashes or underscores: " username; echo
   done
-  read -rsp "Choose a password for these unit plans (8 to 64 characters): " password; echo
+  IFS= read -rsp "Choose a password for these unit plans (8 to 64 characters): " password; echo
   while ! printf '%s' "$password" | LC_ALL=C grep -Eq '^[ -~]{8,64}$'; do
-    read -rsp "Please choose a password of 8 to 64 letters, digits, spaces or symbols: " password; echo
+    IFS= read -rsp "Please choose a password of 8 to 64 letters, digits, spaces or symbols: " password; echo
   done
   PLAN_CRED="${username}:${password}"
   set_plan_credential_keychain "$PLAN_CRED"
@@ -4811,12 +4814,23 @@ fi
 # --remove-password, and by --stop-sharing when no school year of the course
 # is still shared.
 if [[ "$PLANS_MODE" == "true" ]]; then
+  # A fresh file for each share, 0600 inside its own 0700 folder (review M4):
+  # one website builder serves the whole working folder, so two courses
+  # shared at once must never read each other's. Its NAME is handed to
+  # share_plan.py, never the secret; share_plan.py deletes both on every
+  # way out.
+  _plan_cred_file=""
   if [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then
-    printf %s "$PLAN_CRED" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; cat > /tmp/plan_cred'  # never shown to a teacher: piped into the website builder, never printed
+    _plan_cred_file="$(printf %s "$PLAN_CRED" | docker exec -i "$CONTAINER_NAME" sh -lc 'umask 077; d="$(mktemp -d /tmp/plan_cred.XXXXXX)" && cat > "$d/cred" && printf %s "$d/cred"')"  # never shown to a teacher: piped into the website builder, never printed
+    if [[ "$_plan_cred_file" != */plan_cred.*/cred ]]; then
+      echo "❌ Plantoir could not hand the username and password to the website builder, so nothing was shared."
+      exit 1
+    fi
   fi
   PLAN_CRED=""
   if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
   _plan_opts=(--year "$PLAN_YEAR")
+  if [[ -n "$_plan_cred_file" ]]; then _plan_opts+=(--credential-file "$_plan_cred_file"); fi
   if [[ "$PLAN_STOP" == "true" ]]; then
     _plan_opts+=(--stop)
   elif [[ "$PLAN_SHARE_PROTECTED" == "true" ]]; then

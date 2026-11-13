@@ -951,6 +951,10 @@
       {
         "expectRequest" : "unitPlanPassword",
         "prompt" : "Please choose a password of 8 to 64 letters, digits, spaces or symbols: "
+      },
+      {
+        "expectRequest" : "",
+        "prompt" : "Share these files with anyone who has the address? [y/N]: "
       }
     ],
     "everyRequest" : [

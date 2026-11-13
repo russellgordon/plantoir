@@ -42,6 +42,18 @@ nonisolated enum PlanSharing {
         case stop
     }
 
+    /// What the share bar shows for a school year (unitPlanning.share
+    /// .barCases). Never more than the site does (review H1).
+    enum BarStatus: String {
+        case notShared
+        /// The last share did not finish: the plans may be open.
+        case unfinished
+        /// A Stop Sharing that was not confirmed: the address may still work.
+        case stopping
+        case protected
+        case open
+    }
+
     /// One school year's marker, as `share_plan.py` wrote it.
     struct Marker: Equatable {
 
@@ -50,6 +62,9 @@ nonisolated enum PlanSharing {
         /// The year the school year began in.
         var year: Int
         var address: String
+        /// sending, shared or stopping; empty in a marker written before
+        /// the state was kept, which reads as shared.
+        var state: String
         /// What the teacher last asked for: "protected" or "open".
         var asked: String
         /// What the share proved. A protected share the address did not
@@ -155,6 +170,7 @@ nonisolated enum PlanSharing {
         return Marker(
             year: year,
             address: address,
+            state: object["state"] as? String ?? "",
             asked: object["asked"] as? String ?? ((object["protected"] as? Bool ?? false) ? "protected" : "open"),
             isProtected: object["protected"] as? Bool ?? false,
             failClosed: object["failClosed"] as? Bool ?? false,
@@ -164,6 +180,30 @@ nonisolated enum PlanSharing {
             units: object["units"] as? Int ?? 0,
             oldCopies: object["oldCopies"] as? Int ?? 0
         )
+    }
+
+    /// unitPlanning.share.barCases: what the bar shows for a school year's
+    /// marker, nil when there is none.
+    static func barStatus(for marker: Marker?) -> BarStatus {
+        guard let marker = marker else {
+            return .notShared
+        }
+        if marker.state == "sending" {
+            return .unfinished
+        }
+        if marker.state == "stopping" {
+            return .stopping
+        }
+        return marker.isProtected ? .protected : .open
+    }
+
+    /// Whether the bar says an older copy may still answer at its own
+    /// address (review M2), until a later share deletes it.
+    static func showsOldCopies(_ marker: Marker?) -> Bool {
+        guard let marker = marker else {
+            return false
+        }
+        return marker.oldCopies > 0
     }
 
     /// unitPlanning.share.modeCases: whether a share is protected, from what
@@ -325,6 +365,11 @@ nonisolated enum PlanSharingWording {
     static let stopFailed: String = "Plantoir could not stop sharing these plans, so the address still works. Try Stop Sharing again in a few minutes."
     static let notSharedHere: String = "This page is not shared at this address."
     static let earlierYear: String = "{year}: {address}"
+    static let lastShareUnfinished: String = "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing."
+    static let stopUnconfirmed: String = "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
+    /// unitPlanning.share.refusals.oldCopyStillThere, shown on the bar while
+    /// the marker's oldCopies is above 0 (review M2).
+    static let oldCopyStillThere: String = "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more."
     static let courseBusy: String = "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished."
     static let changePasswordNote: String = "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with."
 
@@ -361,6 +406,8 @@ nonisolated enum PlanSharingWording {
             "earlierYear": earlierYear,
             "changePasswordNote": changePasswordNote,
             "courseBusy": courseBusy,
+            "lastShareUnfinished": lastShareUnfinished,
+            "stopUnconfirmed": stopUnconfirmed,
         ]
     }
 }

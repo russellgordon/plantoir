@@ -1124,7 +1124,7 @@
       {
         "event": "unit plan sharing stopped",
         "carries": "the course, the school year, and how it ended: deleted, already gone, or failed with the address still working. Never the address.",
-        "line": "{course} · stopped sharing the {year} unit plans ({deleted | already gone | failed, so the address still works})",
+        "line": "{course} · stopped sharing the {year} unit plans ({deleted | already gone | failed, so the address still works | not confirmed, so the address may still work})",
         "why": "#709. 'I stopped sharing and my colleague can still open it' is answerable only if the trail says whether the delete worked."
       }
     ],
@@ -36411,17 +36411,26 @@
         "note": "unit/plan.json is in both lists of the third case on purpose: `copied` lists nothing that must be there for it, and a test reads notCopied first. Read it as: plan.json is never uploaded."
       },
       "answerKeys": {
-        "rule": "A .pdf is an answer key when its name without .pdf, compared without case, ends in one of `endings` or is one of `wholeNames`. These are the names the plantoir-handouts and plantoir-test-authoring skills give answer keys (Name - Answers.pdf, Version A - Solutions.pdf, Name - with Answers.pdf, Marking Guide.pdf). Nothing else is guessed at, so a teacher can predict the rule.",
-        "endings": [
-          " - Answers",
-          " - Solutions",
-          " - with Answers",
-          " - with Solutions"
+        "rule": "A file the rule applies to (appliesTo: a PDF, an image or a text file; never a page, a stylesheet or a font) is an answer key when its name without the extension, in lower case and with every character that is not a letter taken away, holds one of `anywhere`, or when one of `wholeWords` is a word of its own in it (the name split at every character that is not a letter and at a lower-case letter followed by a capital). So the case, a hyphen, an en dash, an em dash, an underscore and the spaces do not matter, and AnswerKey and answerkey count. Only the NAME is read, never the file.",
+        "appliesTo": [
+          ".pdf",
+          ".png",
+          ".jpg",
+          ".jpeg",
+          ".svg",
+          ".txt"
         ],
-        "wholeNames": [
-          "Marking Guide"
+        "anywhere": [
+          "answer",
+          "solution",
+          "markingguide",
+          "markingscheme"
         ],
-        "why": "Russell, 2026-11-12: a share with no password leaves out solutions and answer-key PDFs unless the teacher ticks Include Answer Keys; a protected share includes them.",
+        "wholeWords": [
+          "key",
+          "keys"
+        ],
+        "why": "Russell, 2026-11-12: a share with no password leaves out answer keys unless the teacher ticks Include Answer Keys. Widened by the director on the #709 review (M3): teachers drop their own PDFs into pdfs/ under their own names (Quiz 1 Answers.pdf, Answer Key.pdf, Quiz 1 – Solutions.pdf, Test KEY.pdf), so the rule errs toward LEAVING OUT, which costs a PDF the teacher can still include, while the other way costs an answer key a class can read. A false positive such as Dissolution Lab.pdf is the accepted price. A key written inside a plan page or a PDF named something else cannot be caught by any rule on names, which is why the teacher is shown both lists before an open share goes out (openShareLists).",
         "cases": [
           {
             "name": "Quiz 1 - Solutions.pdf",
@@ -36433,10 +36442,6 @@
           },
           {
             "name": "Review - with Answers.pdf",
-            "answerKey": true
-          },
-          {
-            "name": "Review - with Solutions.pdf",
             "answerKey": true
           },
           {
@@ -36452,15 +36457,115 @@
             "answerKey": true
           },
           {
-            "name": "Solutions Manual Notes.pdf",
-            "answerKey": false
+            "name": "Answers.pdf",
+            "answerKey": true
           },
           {
-            "name": "Answers.pdf",
-            "answerKey": false
+            "name": "Quiz 1 Answers.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Answer Key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 – Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 — Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1-Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz_1_Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 - Solution.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Guide.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Unit 1 Marking Scheme.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Test KEY.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "test-key.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "AnswerKey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "answerkey.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz1Solutions.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Solutions Manual Notes.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Lab Keys.pdf",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Answers.png",
+            "answerKey": true
+          },
+          {
+            "name": "Answers.txt",
+            "answerKey": true
+          },
+          {
+            "name": "Quiz 1 Solutions.jpg",
+            "answerKey": true
           },
           {
             "name": "Worksheet.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Quiz 1.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Keyboard Shortcuts.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Monkey Puzzle.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "Unit 1 Notes.pdf",
+            "answerKey": false
+          },
+          {
+            "name": "solutions.html",
+            "answerKey": false
+          },
+          {
+            "name": "answers.css",
             "answerKey": false
           },
           {
@@ -36468,13 +36573,217 @@
             "answerKey": false
           },
           {
-            "name": "Marking Guide - Draft.pdf",
+            "name": "Key Concepts.woff2",
             "answerKey": false
           }
         ]
       },
+      "openShareLists": {
+        "rule": "Before an OPEN share goes out (a first share without a password, Share Again of an open one, Remove Password), share_plan.py prints the PDFs it will share and every file it leaves out, by name, and asks `question`; the share goes only on y or yes (the director's ruling on the #709 review, M3: the teacher's look is the proof). In the app the question arrives in the share sheet as an ordinary question. Under --non-interactive nothing is asked: the rule decides, the lists are printed with `nonInteractive`, and the share goes. A no, an empty answer or no answer at all shares nothing: `declined`, the marker PLANTOIR_PLAN_REFUSED: <CODE+> notConfirmed, exit 0. A protected share is not asked: nobody reads it without the password. No sentence anywhere says a share holds no answers.",
+        "sharedHeading": "These PDFs will be shared with anyone who has the address:",
+        "leftOutHeading": "These files are left out:",
+        "none": "(none)",
+        "byName": "Both lists are by file name only. Plantoir has not read the files, so an answer written inside a page or a PDF is shared with it.",
+        "question": "Share these files with anyone who has the address? [y/N]: ",
+        "nonInteractive": "Shared as the lists say, because nobody is here to look at them.",
+        "declined": "Nothing was shared."
+      },
+      "interruptionCases": {
+        "rule": "A share or a Stop Sharing that stops part way (the console's Cancel, Quit, a crash) leaves a marker that says no MORE than the site does (review H1): the bar never shows protected, and never not shared, while the address may answer with the plans. share_plan.py writes the marker before the upload with `state` sending, the address, `protected` false, and the answer keys in when this share or the one before carried them; after the proof with `state` shared and `oldCopies` counted before the deletes; and before a Stop Sharing with `state` stopping. Each case interrupts at `point`, after the share before it (`before`: none, open or protected), and expects the marker's state, protected and address, what the bar shows (barCases), and what the next share does.",
+        "cases": [
+          {
+            "name": "a first share stopped after its project was made",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "afterTheProject",
+            "marker": {
+              "state": null,
+              "protected": false,
+              "address": false
+            },
+            "bar": "notShared",
+            "nextShare": "reuses the project's name; nothing was sent, so nothing can be open"
+          },
+          {
+            "name": "a first open share stopped before its upload",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "beforeTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "a first open share stopped during its proof",
+            "before": "none",
+            "choice": "shareOpen",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "an open share of the same project"
+          },
+          {
+            "name": "Remove Password stopped after its upload",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "afterTheUpload",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "Remove Password stopped during its proof",
+            "before": "protected",
+            "choice": "removePassword",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "open, as last asked"
+          },
+          {
+            "name": "a protected share stopped during its proof",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheProof",
+            "marker": {
+              "state": "sending",
+              "protected": false,
+              "address": true
+            },
+            "bar": "unfinished",
+            "nextShare": "protected, as last asked"
+          },
+          {
+            "name": "a protected share stopped during the deletes",
+            "before": "open",
+            "choice": "shareProtected",
+            "point": "duringTheDeletes",
+            "marker": {
+              "state": "shared",
+              "protected": true,
+              "address": true,
+              "oldCopies": true
+            },
+            "bar": "protected",
+            "nextShare": "protected, and it deletes the older copy"
+          },
+          {
+            "name": "Stop Sharing stopped after the delete",
+            "before": "open",
+            "choice": "stop",
+            "point": "duringStopSharing",
+            "marker": {
+              "state": "stopping",
+              "protected": false,
+              "address": true
+            },
+            "bar": "stopping",
+            "nextShare": "Stop Sharing again"
+          }
+        ]
+      },
+      "barCases": {
+        "rule": "What the share bar shows for a school year's marker (PlanSharing.barStatus): no marker, or one with no address, is notShared; state sending is unfinished (words.lastShareUnfinished, with Share Again and Stop Sharing); state stopping is stopping (words.stopUnconfirmed, with Stop Sharing); otherwise protected (words.withPassword) or open (words.openToAnyone). oldCopiesLine is true when the marker's oldCopies is above 0: refusals.oldCopyStillThere is shown under the status until a later share deletes the older copy (review M2).",
+        "cases": [
+          {
+            "marker": null,
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "name": "x",
+              "subdomain": "x.pages.dev",
+              "year": 2026
+            },
+            "bar": "notShared",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "sending",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 1
+            },
+            "bar": "unfinished",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "stopping",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "stopping",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "open",
+            "oldCopiesLine": false
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "state": "shared",
+              "protected": false,
+              "asked": "open",
+              "oldCopies": 2
+            },
+            "bar": "open",
+            "oldCopiesLine": true
+          },
+          {
+            "marker": {
+              "address": "https://x.pages.dev/",
+              "protected": true,
+              "asked": "protected",
+              "oldCopies": 0
+            },
+            "bar": "protected",
+            "oldCopiesLine": false
+          }
+        ]
+      },
       "worker": {
-        "rule": "EVERY share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged); every request reaches it first. It answers only the files the share staged (a list written into it; a path is shared when it, it plus .html, or it plus /index.html is listed, and a path ending in / when its index.html is), with 404, the staged 404.html and Cache-Control: no-store for anything else, /_worker.js included. A protected share's worker also keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once; and without the right Authorization answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\" for every path, robots.txt and a missing path included. Every answer carries X-Robots-Tag: noindex, nofollow and Cache-Control: no-store (private, no-store when protected).",
+        "rule": "EVERY share uploads _worker.js (Pages' Advanced mode, measured to deploy through deploy.py's deploy_to_cloudflare unchanged); every request reaches it first. It answers only the files the share staged (a list written into it; a path is shared when it, it plus .html, or it plus /index.html is listed, and a path ending in / when its index.html is), with 404, the staged 404.html and Cache-Control: no-store for anything else, /_worker.js included. A protected share's worker also keeps a fresh 16-byte salt and SHA-256(salt + the base64 of username:password), never the password; compares in constant time; remembers the one verified Authorization value per isolate, so a page and its PDFs hash once; and without the right Authorization answers 401 with WWW-Authenticate: Basic realm=\"<CODE> unit plans\", charset=\"UTF-8\" for every path, robots.txt and a missing path included. Every answer carries X-Robots-Tag: noindex, nofollow and Cache-Control: no-store (private, no-store when protected). Every answer, 401, 404 and 200 alike, carries X-Plantoir-Share: the share's own random id (proof).",
         "why": "Salted SHA-256 rather than a slow hash: the worker's source is readable only inside the teacher's Cloudflare account, and the password is one made for colleagues, not the teacher's own (the dialog says so). PBKDF2 at 100,000 iterations measured 16.1 ms against a 10 ms CPU limit; at about 10,000, 2.0 ms, the upgrade if that ever changes. Measured: the static file server answers /_worker.js with 404, not the source, so even a bypassed worker does not hand out the salt and hash."
       },
       "workerCases": {
@@ -36784,7 +37093,7 @@
         ]
       },
       "proof": {
-        "rule": "Nothing is called shared until the address answers as the share promises. Fetched without a password every 2 s for up to 60 s: a protected share needs 401 with a WWW-Authenticate: Basic header, then 200 with the password, and the project's canonical_deployment.uses_functions true; an open share needs 200. A protected share that fails any of these by 60 s is refusals.notProtectedYet, the marker records protected false, and the address is not shown as protected.",
+        "rule": "Nothing is called shared until the address answers as the share promises, and only an answer from THIS share's deployment counts: each share writes a fresh random id into its worker, which sends it as X-Plantoir-Share on every answer, and the proof requires it (review M1: when the old and the new deployment answer alike, the status codes cannot tell them apart). Fetched without a password every 2 s for up to 60 s: a protected share needs 401 with a WWW-Authenticate: Basic header, then 200 with the password, and the project's canonical_deployment.uses_functions true; an open share needs 200. A protected share that fails any of these by 60 s is refusals.notProtectedYet, the marker records protected false, and the address is not shown as protected.",
         "measured": "The main address answered the new deployment 0.2 to 2.2 s after wrangler returned, every time (2026-11-12); one open re-share still met the old protected deployment for 2.2 s."
       },
       "oldDeployments": {
@@ -36798,6 +37107,7 @@
           "subdomain",
           "address",
           "year",
+          "state",
           "asked",
           "protected",
           "failClosed",
@@ -36807,21 +37117,21 @@
           "units",
           "oldCopies"
         ],
-        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded."
+        "rule": "Written by share_plan.py (mode 600), first with name and subdomain as soon as the project exists, so a crash never leaves a project the next share cannot find; then whole after the share. `year` is the starting year; `asked` is the mode the teacher last asked for (protected or open), which a share with no flag keeps (modeCases); `protected` is what the proof showed, so a protected share the address did not prove asks for protection again next time and is not shown as protected meanwhile; `answerKeys` is in or out, and `answerKeysLeftOut` how many an open share left out; `lastShared` is an ISO date-time in UTC. No account id and no project id: every call is by name, and an account id is the one thing in it worth not keeping. Never a username or a password. Removed by a Stop Sharing that succeeded. `state` is sending (written before the upload: the share has not been proved, so the bar says it may be open), shared (proved), or stopping (a Stop Sharing that has not been confirmed); interruptionCases says what each leaves behind."
       },
       "credential": {
-        "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a file only the user can read (/tmp/plan_cred), which share_plan.py deletes as soon as it has read it. Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
+        "rule": "A protected share's username and password are kept in the macOS Keychain, service containerized-quartz-unit-plan, account <working-folder id>/<CODE>, secret username:password: one per course across school years, so a colleague keeps one password. Asked by deploy.sh with the prompts credentialPrompts names (unitPlanUsername, unitPlanPassword) when there is none or --change-password is given. A username is 1 to 32 of A-Z a-z 0-9 . _ -; a password is 8 to 64 printable characters. Handed to the website builder through a fresh file for each share, 0600 inside its own 0700 folder (/tmp/plan_cred.XXXXXX/cred, made by mktemp -d), named to share_plan.py by --credential-file (a path, never the secret); share_plan.py deletes the file and the folder as soon as it has read them and again on every way out, so two courses shared at once never read each other's (review M4). The password is used exactly as typed, spaces at either end included; neither the username nor the password is echoed into the console (both are read without echo). Never in argv beyond the Keychain store's instant, an environment variable, the trail, the console, the marker or a test fixture. Only --remove-password deletes it, after the share succeeded; --stop-sharing deletes it when no year of the course is still shared.",
         "usernamePattern": "^[A-Za-z0-9._-]{1,32}$",
         "passwordRule": "8 to 64 printable ASCII characters (space to ~)"
       },
       "stopSharing": {
-        "rule": "--plans --stop-sharing [--year YYYY] deletes the year's project (DELETE .../pages/projects/{name}); a 404 is alreadyGone. If the delete is refused, the deployments are deleted one by one and it is tried once more. Success removes the marker; failure keeps it and the teacher reads words.stopFailed.",
+        "rule": "--plans --stop-sharing [--year YYYY] marks the year's marker stopping, then deletes the year's project (DELETE .../pages/projects/{name}); if the delete is refused, the deployments are deleted one by one and it is tried once more, and a refusal puts the marker back (words.stopFailed). After a delete, or a 404, the address is fetched every 2 s for up to 30 s, and stopped is said only once it no longer answers with the plans (200, 401, or any answer carrying X-Plantoir-Share): a 404 from the delete alone proves nothing, since the token may now reach another account (review M5). Still answering at 30 s: words.stopUnconfirmed, the marker kept as stopping, the outcome unconfirmed, and the bar keeps the row with Stop Sharing.",
         "measured": "2026-11-12: a project holding 2 deployments deleted with 200 and nothing deleted first; the address answered 530 or 522 within 5 s, stopped resolving after about 100 s, and never answered 200 again in 3 minutes. A deleted project's *.pages.dev name could later be taken by another account; the suffix makes that a matter of chance, not of guessing (not measured: it needs a second account)."
       },
       "markers": {
         "shared": "PLANTOIR_PLAN_SHARED: <CODE+> <year> <address> protected:<yes|no> failClosed:<yes|no> answerKeys:<in|out> units:<n> oldCopies:<n>",
-        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>]",
-        "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed>",
+        "refused": "PLANTOIR_PLAN_REFUSED: <CODE+> <refusal key> [<count>] (notConfirmed when the teacher said no to the open share's lists)",
+        "stopped": "PLANTOIR_PLAN_STOPPED: <CODE+> <year> <address|none> <deleted|alreadyGone|failed|unconfirmed>",
         "rule": "Printed by share_plan.py for the app to read and keep out of the console (app-rules.json -> markerOrigins, origin shared-python). <CODE+> is the course with its one permitted space written +, as every other marker writes it."
       },
       "words": {
@@ -36852,20 +37162,23 @@
         "notSharedHere": "This page is not shared at this address.",
         "earlierYear": "{year}: {address}",
         "changePasswordNote": "A new password applies to this school year's plans once they are shared again; an earlier year keeps the password it was shared with.",
-        "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished."
+        "courseBusy": "Another program is working on this course right now, so the plans were not shared. Share them again once it has finished.",
+        "lastShareUnfinished": "The last share of these plans did not finish, so they may be open to anyone with the address. Share Again to finish it, or Stop Sharing.",
+        "stopUnconfirmed": "Plantoir asked Cloudflare to stop sharing these plans, but the address still answers, so they may still be open. Try Stop Sharing again in a few minutes."
       },
       "refusals": {
         "checkFound": "These plans were not shared, because {n} thing(s) in them need fixing first.",
         "tooLarge": "These plans were not shared, because a file in them is larger than the 25 MB Cloudflare Pages takes.",
         "noPassword": "These plans were not shared, because no username and password were given for them.",
-        "notProtectedYet": "These plans were sent, but Plantoir could not confirm that the address asks for the password, so they are not shown as protected. Share Again in a minute.",
+        "notProtectedYet": "These plans were sent, but Plantoir could not confirm that the address asks for the password, so they are not shown as protected and may be open to anyone with the address. Share Again in a minute.",
         "oldCopyStillThere": "These plans are shared as you asked, but an earlier copy could not be removed and may still open at its own address. Share Again to try once more.",
         "stillSharing": "These unit plans are already being shared, so they cannot be shared again until that has finished.",
         "notToAFolder": "Unit plans are shared through Cloudflare Pages, not to a folder.",
         "netlifyNever": "Unit plans are shared through Cloudflare Pages only, because Netlify's free plan cannot ask for a password.",
         "notAnsweringYet": "These plans were sent, but their address did not answer yet, so Plantoir cannot say they are shared. Share Again in a minute.",
         "cloudflareSaidNo": "Cloudflare did not take these plans, so they were not shared. The reason Cloudflare gave is above.",
-        "referenceCourse": "referenceCourses.refusal.sentence, unchanged"
+        "referenceCourse": "referenceCourses.refusal.sentence, unchanged",
+        "notConfirmed": "Nothing was shared."
       },
       "trail": {
         "rule": "Three events (activityTrail.mustRecord): unit plans shared, unit plan share refused, unit plan sharing stopped. Never the address (its suffix is a line of defence, and the trail goes into problem reports), never a username or a password. Cancel at the warning or the Stop Sharing alert writes nothing."

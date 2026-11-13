@@ -52,13 +52,19 @@ import unit_plan_site  # noqa: E402
 
 # Where the launcher leaves the username and password. A module value so the
 # tests can point it elsewhere.
-CRED_FILE = Path("/tmp/plan_cred")
+# The file the launcher left the username and password in, named by
+# --credential-file: a fresh one per share, 0600 inside its own 0700 folder
+# (the director's ruling on the #709 review, M4: two courses shared at once
+# from one website builder must never read each other's). None when no file
+# was named. A module value so the tests can point it elsewhere.
+CRED_FILE: Path | None = None
 
 SHARED_MARKER = "PLANTOIR_PLAN_SHARED:"
 REFUSED_MARKER = "PLANTOIR_PLAN_REFUSED:"
 STOPPED_MARKER = "PLANTOIR_PLAN_STOPPED:"
 
 PROOF_SECONDS = 60
+STOP_SECONDS = 30
 PROOF_EVERY = 2
 NEW_PROJECT_SECONDS = 60
 NAME_TRIES = 3
@@ -156,15 +162,20 @@ def decide_protected(marker: dict | None, protect: bool, remove_password: bool) 
 
 def read_credential() -> str | None:
     """The base64 of username:password from CRED_FILE, deleted at once.
-    None when it is missing or not one username:password line."""
+    None when it is missing or not one username:password line. The password
+    is used exactly as typed: spaces at either end are part of it."""
+    if CRED_FILE is None:
+        return None
     try:
         raw = CRED_FILE.read_text(encoding="utf-8")
     except OSError:
         return None
     finally:
         forget_credential()
-    line = raw.strip("\r\n")
-    if "\n" in line or ":" not in line:
+    line = raw
+    if line.endswith("\n"):
+        line = line[:-1]
+    if "\n" in line or "\r" in line or ":" not in line:
         return None
     username, _, password = line.partition(":")
     if not username or not password:
@@ -173,10 +184,19 @@ def read_credential() -> str | None:
 
 
 def forget_credential() -> None:
+    """Deletes the credential file and the private folder the launcher made
+    for it, on every way out."""
+    if CRED_FILE is None:
+        return
     try:
         CRED_FILE.unlink()
     except OSError:
         pass
+    if CRED_FILE.parent.name.startswith("plan_cred."):
+        try:
+            CRED_FILE.parent.rmdir()
+        except OSError:
+            pass
 
 
 def project_path(account: str, name: str) -> str:
@@ -240,7 +260,8 @@ def make_project(token: str, account: str, course: str, year: int) -> dict:
     raise RuntimeError(f"Cloudflare kept saying the name was taken: {last_error}")
 
 
-def prove(address: str, protected: bool, credential: str | None, token: str, account: str, name: str) -> bool:
+def prove(address: str, protected: bool, credential: str | None, token: str, account: str, name: str,
+          share_id: str) -> bool:
     """unitPlanning.share.proof: the address answers as this share promises,
     a path the share does not hold answers 404 from the worker, and the
     project says its current deployment runs the worker. Every check is
@@ -251,26 +272,34 @@ def prove(address: str, protected: bool, credential: str | None, token: str, acc
     the two apart."""
     start = now()
     while True:
-        if _proven_once(address, protected, credential, token, account, name):
+        if _proven_once(address, protected, credential, token, account, name, share_id):
             return True
         if now() - start >= PROOF_SECONDS:
             return False
         sleep(PROOF_EVERY)
 
 
-def _proven_once(address: str, protected: bool, credential: str | None, token: str, account: str, name: str) -> bool:
+def _proven_once(address: str, protected: bool, credential: str | None, token: str, account: str, name: str,
+                 share_id: str) -> bool:
+    # Only an answer from THIS share's deployment counts (review M1): the
+    # main address answers the previous one for a moment, and when the two
+    # answer alike only the share's own header tells them apart.
     status, headers = fetch_address(address)
+    if headers.get("x-plantoir-share", "") != share_id:
+        return False
     if protected:
         challenge = headers.get("www-authenticate", "")
         if status != 401 or not challenge.lower().startswith("basic"):
             return False
-        status, _ = fetch_address(address, credential)
-        if status != 200:
+        status, headers = fetch_address(address, credential)
+        if status != 200 or headers.get("x-plantoir-share", "") != share_id:
             return False
     elif status != 200:
         return False
     status, headers = fetch_address(address + "plantoir-not-shared-" + secrets.token_hex(4), credential)
     if status != 404 or headers.get("cache-control", "") != "no-store":
+        return False
+    if headers.get("x-plantoir-share", "") != share_id:
         return False
     try:
         project = cloudflare_api("GET", project_path(account, name), token)
@@ -314,6 +343,55 @@ def delete_older_deployments(token: str, account: str, name: str) -> int:
 
 # -------------------------------------------------------------------- share
 
+def utc_now_text() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def older_deployment_count(token: str, account: str, name: str) -> int:
+    """How many deployments are not the canonical one, before any is
+    deleted; 1 when that cannot be told, so the bar says an older copy may
+    still answer rather than nothing."""
+    try:
+        project = cloudflare_api("GET", project_path(account, name), token)
+        deployments = cloudflare_api("GET", project_path(account, name) + "/deployments", token)
+    except Exception:
+        return 1
+    canonical_id = ((project or {}).get("canonical_deployment") or {}).get("id")
+    count = 0
+    for deployment in deployments or []:
+        if deployment.get("id") and deployment.get("id") != canonical_id:
+            count += 1
+    return count
+
+
+def confirm_the_open_share(course: str, staged) -> bool:
+    """unitPlanning.share.openShareLists: before an open share goes out, the
+    PDFs it will share and every file it leaves out, by name, and the share
+    goes only on a yes (under --non-interactive, the rule decides and the
+    lists are printed)."""
+    words = share_words()["openShareLists"]
+    shared_pdfs, left_out = unit_plan_site.open_share_lists(staged)
+    print(words["sharedHeading"])
+    if not shared_pdfs:
+        print("   " + words["none"])
+    for place in shared_pdfs:
+        print(f"   • {place}")
+    print(words["leftOutHeading"])
+    if not left_out:
+        print("   " + words["none"])
+    for place in left_out:
+        print(f"   • {place}")
+    print(words["byName"], flush=True)
+    if deploy.NON_INTERACTIVE:
+        print(words["nonInteractive"], flush=True)
+        return True
+    try:
+        answer = input(words["question"])
+    except (EOFError, OSError):
+        answer = ""
+    return answer.strip().lower() in ("y", "yes")
+
+
 def share(course: str, course_dir: Path, year: int, protect: bool, remove_password: bool,
           include_answer_keys: bool, token: str, account: str) -> int:
     path = marker_path(course_dir, year)
@@ -344,31 +422,57 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
             say_refused(course, "checkFound", len(problems), n=len(problems))
         return 1
 
-    if marker and marker.get("name"):
-        name = marker["name"]
-        remade = deploy.remake_pages_project_if_gone(token, account, name)
-        project = remade or wait_for_project(token, account, name)
-    else:
-        project = make_project(token, account, course, year)
-        name = project.get("name")
-        write_marker(path, {"name": name, "subdomain": project.get("subdomain"), "year": year})
-        project = wait_for_project(token, account, name) or project
-    if not project:
-        print(f"❌ Cloudflare did not show the project {name}, so nothing was shared.")
-        return 1
-    subdomain = project.get("subdomain") or (marker or {}).get("subdomain")
-    if not subdomain:
-        print("❌ Cloudflare gave no address for these plans, so nothing was shared.")
-        return 1
-    address = f"https://{subdomain}/"
-
-    fail_closed = set_fail_closed(token, account, name)
     keys_in = protected or include_answer_keys
+    share_id = secrets.token_hex(8)
     staging_root = Path(tempfile.mkdtemp(prefix="plantoir-plans-"))
     old_cwd = os.getcwd()
     try:
         public = staging_root / "public"
         staged = unit_plan_site.stage(planning_dir, public, unit_plan_site.bundled_assets_dir(), keys_in)
+        if not protected and not confirm_the_open_share(course, staged):
+            print(share_words()["openShareLists"]["declined"])
+            print(f"{REFUSED_MARKER} {code_word(course)} notConfirmed", flush=True)
+            return 0
+
+        if marker and marker.get("name"):
+            name = marker["name"]
+            remade = deploy.remake_pages_project_if_gone(token, account, name)
+            project = remade or wait_for_project(token, account, name)
+        else:
+            project = make_project(token, account, course, year)
+            name = project.get("name")
+            write_marker(path, {"name": name, "subdomain": project.get("subdomain"), "year": year})
+            project = wait_for_project(token, account, name) or project
+        if not project:
+            print(f"❌ Cloudflare did not show the project {name}, so nothing was shared.")
+            return 1
+        subdomain = project.get("subdomain") or (marker or {}).get("subdomain")
+        if not subdomain:
+            print("❌ Cloudflare gave no address for these plans, so nothing was shared.")
+            return 1
+        address = f"https://{subdomain}/"
+
+        # Before anything is sent (review H1): the marker says the least this
+        # share can promise, so a Cancel or a crash at any later point leaves
+        # the bar saying no more than the site does: the address is on it, so
+        # Stop Sharing is offered; it is never protected until proven; and the
+        # answer keys are "in" when this share or the one before carried them.
+        # unitPlanning.share.interruptionCases.
+        before = marker or {}
+        write_marker(path, {
+            "name": name, "subdomain": subdomain, "address": address, "year": year,
+            "state": "sending",
+            "asked": "protected" if protected else "open",
+            "protected": False,
+            "failClosed": bool(before.get("failClosed", False)),
+            "answerKeys": "in" if (keys_in or before.get("answerKeys") == "in") else "out",
+            "answerKeysLeftOut": staged.answer_keys_left_out,
+            "lastShared": before.get("lastShared") or utc_now_text(),
+            "units": staged.units,
+            "oldCopies": max(int(before.get("oldCopies") or 0), 1 if before.get("address") else 0),
+        })
+
+        fail_closed = set_fail_closed(token, account, name)
         # Both kinds of share carry the worker: it answers only the files this
         # share holds, because Cloudflare's edge cache went on serving a file
         # a later share left out (measured 2026-11-12, unitPlanning.share
@@ -376,7 +480,8 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
         # static files would carry if the worker were ever passed by.
         (public / "_worker.js").write_text(
             unit_plan_site.worker_js(credential if protected else None,
-                                     unit_plan_site.realm_for(course), staged.files), encoding="utf-8")
+                                     unit_plan_site.realm_for(course), staged.files, share_id=share_id),
+            encoding="utf-8")
         if not protected:
             (public / "_headers").write_text(unit_plan_site.open_headers(), encoding="utf-8")
         # wrangler uploads a functions/ folder from the folder it runs in,
@@ -391,24 +496,29 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
         credential = None
         forget_credential()
 
-    proven = prove(address, protected, credential_kept, token, account, name)
+    proven = prove(address, protected, credential_kept, token, account, name, share_id)
     credential_kept = None
-    old_copies = delete_older_deployments(token, account, name)
     shown_protected = protected and proven
     record = {
         "name": name,
         "subdomain": subdomain,
         "address": address,
         "year": year,
+        "state": "shared" if proven else "sending",
         "asked": "protected" if protected else "open",
         "protected": shown_protected,
         "failClosed": fail_closed,
-        "answerKeys": "in" if keys_in else "out",
+        "answerKeys": "in" if (keys_in or not proven and (marker or {}).get("answerKeys") == "in") else "out",
         "answerKeysLeftOut": staged.answer_keys_left_out,
-        "lastShared": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "lastShared": utc_now_text(),
         "units": staged.units,
-        "oldCopies": old_copies,
+        # Counted before the deletes, so a Cancel during them leaves the bar
+        # saying an older copy may still answer (review M2).
+        "oldCopies": older_deployment_count(token, account, name),
     }
+    write_marker(path, record)
+    old_copies = delete_older_deployments(token, account, name)
+    record["oldCopies"] = old_copies
     write_marker(path, record)
     if not proven:
         if protected:
@@ -427,7 +537,20 @@ def share(course: str, course_dir: Path, year: int, protect: bool, remove_passwo
 
 # --------------------------------------------------------------------- stop
 
+def still_answering_with_the_plans(address: str) -> bool:
+    """Whether the address still answers as a plan site does: 200 or 401, or
+    any answer carrying the worker's share header."""
+    status, headers = fetch_address(address)
+    if headers.get("x-plantoir-share"):
+        return True
+    return status in (200, 401)
+
+
 def stop(course: str, course_dir: Path, year: int, token: str, account: str) -> int:
+    """unitPlanning.share.stopSharing: stopped is said only once the address
+    was fetched and no longer answers with the plans (review M5). A delete
+    Cloudflare answers with 404 proves nothing on its own: the token may now
+    reach another account, and the site in the first one is still up."""
     path = marker_path(course_dir, year)
     marker = unit_plan_site.read_json_file(path) if path.exists() else None
     if not marker or not marker.get("name"):
@@ -435,6 +558,10 @@ def stop(course: str, course_dir: Path, year: int, token: str, account: str) -> 
         return 0
     name = marker["name"]
     address = marker.get("address") or f"https://{marker.get('subdomain') or name + '.pages.dev'}/"
+    stopping = dict(marker)
+    stopping["state"] = "stopping"
+    stopping["address"] = address
+    write_marker(path, stopping)
     outcome = _delete_project(token, account, name)
     if outcome == "failed":
         try:
@@ -448,9 +575,18 @@ def stop(course: str, course_dir: Path, year: int, token: str, account: str) -> 
             pass
         outcome = _delete_project(token, account, name)
     if outcome == "failed":
+        # Cloudflare refused the delete: the site is up as it was.
+        write_marker(path, marker)
         print("❌ " + share_words()["words"]["stopFailed"])
         print(f"{STOPPED_MARKER} {code_word(course)} {year} {address} failed", flush=True)
         return 1
+    start = now()
+    while still_answering_with_the_plans(address):
+        if now() - start >= STOP_SECONDS:
+            print("❌ " + share_words()["words"]["stopUnconfirmed"])
+            print(f"{STOPPED_MARKER} {code_word(course)} {year} {address} unconfirmed", flush=True)
+            return 1
+        sleep(PROOF_EVERY)
     try:
         path.unlink()
     except OSError:
@@ -485,8 +621,12 @@ def main(argv=None) -> int:
     parser.add_argument("--year", type=int, default=None)
     parser.add_argument("--stop", action="store_true")
     parser.add_argument("--non-interactive", action="store_true")
+    parser.add_argument("--credential-file", default=None,
+                        help="The file the launcher left the username and password in (a path, never the secret).")
     args = parser.parse_args(argv)
     deploy.NON_INTERACTIVE = bool(args.non_interactive)
+    global CRED_FILE
+    CRED_FILE = Path(args.credential_file) if args.credential_file else None
 
     course = args.course
     course_dir = toolchain_paths.COURSES_DIR / course

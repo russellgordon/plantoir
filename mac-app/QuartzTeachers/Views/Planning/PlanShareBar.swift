@@ -227,8 +227,7 @@ struct PlanShareBar: View {
                 .accessibilityIdentifier("planShareCopyLink")
                 Spacer()
             }
-            Text(marker.isProtected ? PlanSharingWording.withPassword : PlanSharingWording.openToAnyone)
-                .font(.callout)
+            statusLines(marker)
             if let flood = PlanSharing.floodSentence(for: marker) {
                 Text(flood)
                     .font(.callout)
@@ -280,15 +279,53 @@ struct PlanShareBar: View {
         }
     }
 
+    /// What the share is, never more than the site does (barCases): a share
+    /// that did not finish may be open, and a Stop Sharing that was not
+    /// confirmed may still be answering.
+    @ViewBuilder
+    func statusLines(_ marker: PlanSharing.Marker) -> some View {
+        switch PlanSharing.barStatus(for: marker) {
+        case .unfinished:
+            Text(PlanSharingWording.lastShareUnfinished)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("planShareUnfinished")
+        case .stopping:
+            Text(PlanSharingWording.stopUnconfirmed)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("planShareStopping")
+        case .protected:
+            Text(PlanSharingWording.withPassword)
+                .font(.callout)
+        case .open, .notShared:
+            Text(PlanSharingWording.openToAnyone)
+                .font(.callout)
+        }
+        if PlanSharing.showsOldCopies(marker) {
+            Text(PlanSharingWording.oldCopyStillThere)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("planShareOldCopy")
+        }
+    }
+
     /// An earlier school year still shared.
     func earlierRow(_ marker: PlanSharing.Marker) -> some View {
         HStack(spacing: 8) {
-            Text(PlanSharingWording.earlierYear
-                .replacingOccurrences(of: "{year}", with: marker.yearLabel)
-                .replacingOccurrences(of: "{address}", with: marker.address))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(PlanSharingWording.earlierYear
+                    .replacingOccurrences(of: "{year}", with: marker.yearLabel)
+                    .replacingOccurrences(of: "{address}", with: marker.address))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                if PlanSharing.barStatus(for: marker) == .stopping || PlanSharing.barStatus(for: marker) == .unfinished
+                    || PlanSharing.showsOldCopies(marker) {
+                    statusLines(marker)
+                }
+            }
             Spacer()
             Button(PlanSharingWording.stopSharing) {
                 markerAwaitingStop = marker

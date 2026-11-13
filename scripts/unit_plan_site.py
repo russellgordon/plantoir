@@ -76,21 +76,31 @@ def bundled_assets_dir() -> Path:
 # ---------------------------------------------------------------- answer keys
 
 def is_answer_key(file_name: str) -> bool:
-    """A PDF named the way the handouts and test skills name an answer key:
-    its name without `.pdf`, ignoring case, ends in one of the contract's
-    endings (" - Answers", " - Solutions" ...) or is one of its whole names
-    ("Marking Guide"). Nothing is guessed from other words in a name, so a
-    teacher can predict the rule."""
+    """A file whose NAME looks like an answer key (unitPlanning.share
+    .answerKeys), erring toward leaving a file out (the director's ruling on
+    the #709 review, M3): any of the files the rule applies to (a PDF, an
+    image, a text file; never a page or a stylesheet) whose name, in any
+    letter case and with its spaces, dashes of any kind, underscores and
+    other marks taken away, holds "answer", "solution", "markingguide" or
+    "markingscheme", or has "key" or "keys" as a word of its own. Only the
+    name is read, never the file: a key written inside a page or a PDF named
+    something else cannot be caught, which is why the teacher is shown the
+    lists before an open share goes out."""
     rule = share_rules()["answerKeys"]
     name = Path(file_name).name
-    if not name.lower().endswith(".pdf"):
+    suffix = Path(name).suffix.lower()
+    if suffix not in rule["appliesTo"]:
         return False
-    stem = name[:-4].lower()
-    for ending in rule["endings"]:
-        if stem.endswith(ending.lower()):
+    stem = name[: len(name) - len(suffix)]
+    letters = re.sub(r"[^a-z]", "", stem.lower())
+    for part in rule["anywhere"]:
+        if part in letters:
             return True
-    for whole in rule["wholeNames"]:
-        if stem == whole.lower():
+    # Words: split at every mark and at a lower-to-upper step (AnswerKey).
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", stem)
+    words = re.split(r"[^a-z]+", spaced.lower())
+    for word in rule["wholeWords"]:
+        if word in words:
             return True
     return False
 
@@ -391,8 +401,26 @@ class Staged:
     files: list[str] = field(default_factory=list)
     left_out: list[str] = field(default_factory=list)
     answer_keys_left_out: int = 0
+    answer_keys_left_out_names: list[str] = field(default_factory=list)
     units: int = 0
     bytes: int = 0
+
+
+def open_share_lists(staged: Staged) -> tuple[list[str], list[str]]:
+    """What an open share shows the teacher before it goes out
+    (unitPlanning.share.openShareLists): the PDFs it will share, and every
+    file it leaves out, answer keys and files of other kinds alike, by name
+    and sorted. By name only: nothing here reads a file."""
+    shared_pdfs: list[str] = []
+    for place in staged.files:
+        if place.lower().endswith(".pdf"):
+            shared_pdfs.append(place)
+    left_out: list[str] = []
+    for place in staged.answer_keys_left_out_names:
+        left_out.append(place)
+    for place in staged.left_out:
+        left_out.append(place)
+    return sorted(shared_pdfs), sorted(left_out)
 
 
 def not_shared_here_page() -> str:
@@ -428,6 +456,7 @@ def stage(planning_dir: Path, out_dir: Path, bundled_assets: Path | None,
             continue
         if is_answer_key(relative.name) and not include_answer_keys:
             staged.answer_keys_left_out += 1
+            staged.answer_keys_left_out_names.append(place)
             continue
         target = out_dir / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -476,6 +505,10 @@ const PROTECTED = __PROTECTED__;
 const SALT = "__SALT__";
 const HASH = "__HASH__";
 const REALM = "__REALM__";
+// Which share this is, sent on every answer, so the share that sent it can
+// tell its own deployment from the one before (the main address answers the
+// old one for up to 2.2 s, measured).
+const SHARE = "__SHARE__";
 const FILES = new Set(__FILES__);
 let verified = null;
 function hex(buf) {
@@ -507,7 +540,7 @@ function shared(pathname) {
   if (path === "" || path.endsWith("/")) return FILES.has(path + "index.html");
   return FILES.has(path) || FILES.has(path + ".html") || FILES.has(path + "/index.html");
 }
-const HEADERS = { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" };
+const HEADERS = { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "X-Plantoir-Share": SHARE };
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -524,6 +557,7 @@ export default {
     const asset = await env.ASSETS.fetch(request);
     const answer = new Response(asset.body, asset);
     answer.headers.set("X-Robots-Tag", "noindex, nofollow");
+    answer.headers.set("X-Plantoir-Share", SHARE);
     answer.headers.set("Cache-Control", PROTECTED ? "private, no-store" : "no-store");
     return answer;
   }
@@ -531,7 +565,8 @@ export default {
 """
 
 
-def worker_js(credential: str | None, realm: str, files: list[str], salt: str | None = None) -> str:
+def worker_js(credential: str | None, realm: str, files: list[str], salt: str | None = None,
+              share_id: str = "") -> str:
     """The share's `_worker.js`, for an open share and a protected one alike.
 
     Protected (`credential` given): SHA-256 of a fresh 16-byte salt followed
@@ -560,6 +595,7 @@ def worker_js(credential: str | None, realm: str, files: list[str], salt: str | 
     text = text.replace("__SALT__", salt)
     text = text.replace("__HASH__", digest)
     text = text.replace("__REALM__", safe_realm)
+    text = text.replace("__SHARE__", re.sub(r"[^a-f0-9]", "", share_id))
     return text.replace("__FILES__", json.dumps(shared_files, ensure_ascii=True))
 
 

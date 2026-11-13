@@ -61,7 +61,10 @@ delete_cf_token_keychain() { :; }
 '''
 
 PLAN_STUBS = r'''
-get_plan_credential_keychain() { if [[ -f "$STUB/plan_item" ]]; then cat "$STUB/plan_item"; fi; }
+get_plan_credential_keychain() {
+  if [[ -f "$STUB/plan_item_${COURSE_CODE}" ]]; then cat "$STUB/plan_item_${COURSE_CODE}";
+  elif [[ -f "$STUB/plan_item" ]]; then cat "$STUB/plan_item"; fi
+}
 set_plan_credential_keychain() { printf '%s' "$1" > "$STUB/plan_item_set"; }
 delete_plan_credential_keychain() { : > "$STUB/plan_item_deleted"; }
 '''
@@ -70,6 +73,16 @@ DOCKER_STUB = r'''
 CONTAINER_NAME="teaching-quartz-test"
 docker() {
   printf 'ARGS %s\n' "$*" >> "$STUB/docker.log"
+  case "$*" in
+    *"mktemp -d /tmp/plan_cred."*)
+      # As the website builder does it: a fresh private folder per share.
+      local folder
+      folder="$(mktemp -d "$STUB/plan_cred.XXXXXX")"
+      cat > "$folder/cred"
+      cat "$folder/cred" >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin"
+      printf %s "$folder/cred"
+      return 0 ;;
+  esac
   case " $* " in
     *" -i "*) cat >> "$STUB/docker.stdin"; printf '\n--\n' >> "$STUB/docker.stdin" ;;
   esac
@@ -180,6 +193,7 @@ class PlansModeTests(unittest.TestCase):
             self.assertNotIn("--protect", docker_args(folder))
             self.assertIn(f"--year {the_school_year()}", docker_args(folder))
             self.assertNotIn("plan_cred", docker_args(folder))
+            self.assertNotIn("--credential-file", docker_args(folder))
 
     def test_a_protected_share_with_nothing_saved_refuses_under_non_interactive(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -199,10 +213,50 @@ class PlansModeTests(unittest.TestCase):
             arguments = docker_args(folder)
             self.assertNotIn(PASSWORD, arguments)
             self.assertNotIn(USERNAME, arguments)
-            self.assertIn("cat > /tmp/plan_cred", arguments)
+            self.assertIn("mktemp -d /tmp/plan_cred.", arguments)
+            self.assertRegex(arguments, r"--credential-file \S+/plan_cred\.[A-Za-z0-9]+/cred")
             self.assertIn("--protect", arguments)
             self.assertIn(f"{USERNAME}:{PASSWORD}\n--", docker_stdin(folder))
             self.assertNotIn(PASSWORD, out)
+
+    def test_two_courses_shared_at_once_each_hand_over_their_own_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            other = folder / "courses" / "ICS3U"
+            (other / ".internal" / "planning").mkdir(parents=True)
+            (other / "course_config.json").write_text('{"course_code": "ICS3U"}', encoding="utf-8")
+            (folder / "stub" / "plan_item_SNC2D").write_text("snc:Password-for-SNC2D")
+            (folder / "stub" / "plan_item_ICS3U").write_text("ics:Password-for-ICS3U")
+            environment = dict(os.environ, USER=NOBODY, STUB=str(folder / "stub"))
+            runs = []
+            for course in ("SNC2D", "ICS3U"):
+                runs.append(subprocess.Popen(
+                    ["bash", str(folder / "deploy.sh"), course, "--plans", "--image", "unused:tag",
+                     "--protect", "--non-interactive"],
+                    cwd=str(folder), env=environment, stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT))
+            for run in runs:
+                out = run.communicate(timeout=180)[0].decode("utf-8", "replace")
+                self.assertEqual(run.returncode, 0, out)
+            files = []
+            for line in docker_args(folder).splitlines():
+                if "share_plan.py" in line:
+                    files.append(line.split("--credential-file ")[1].split(" ")[0])
+            self.assertEqual(len(files), 2)
+            self.assertNotEqual(files[0], files[1])
+            contents = set()
+            for name in files:
+                contents.add(Path(name).read_text())
+            self.assertEqual(contents, {"snc:Password-for-SNC2D", "ics:Password-for-ICS3U"})
+            self.assertEqual(oct(Path(files[0]).parent.stat().st_mode & 0o777), oct(0o700))
+
+    def test_a_password_with_spaces_at_its_ends_is_kept_as_typed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = a_folder(tmp)
+            status, out = run(folder, ["--protect"], USERNAME + "\n  spaced password  \n")
+            self.assertEqual(status, 0, out)
+            self.assertEqual((folder / "stub" / "plan_item_set").read_text(), f"{USERNAME}:  spaced password  ")
+            self.assertNotIn(USERNAME, out, "the username was echoed into the console")
 
     def test_a_saved_credential_is_used_without_asking(self):
         with tempfile.TemporaryDirectory() as tmp:
