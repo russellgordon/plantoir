@@ -1120,6 +1120,11 @@ def prompt_font_pairing(previous_default: dict | None) -> tuple[str, str]:
                 hdr = prompt_with_default("Enter header font family", prev_header or "Schibsted Grotesk")
                 body = prompt_with_default("Enter body font family",   prev_body   or "Source Sans Pro")
                 print(f"✅ Selected: Header '{hdr}' with Body '{body}'")
+                # The website loads any Google Font by name; the social sharing
+                # card can draw only the bundled ones (#766), so say it once here
+                # rather than leave the build's warning as the first word.
+                print("ℹ️  Your website loads these fonts from Google Fonts. The social sharing card")
+                print("   can draw only the fonts numbered above, so it uses Inter for any other.")
                 return hdr, body
 
         print("Please choose a number between 1 and 8.")

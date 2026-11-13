@@ -91,7 +91,9 @@
       "value": "12.3.0",
       "dockerfileContains": "Pillow==12.3.0",
       "windowsRuntimeContains": "Pillow==12.3.0",
-      "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact."
+      "carriesBrotli": "1.2.0",
+      "brotliFixedFrom": "1.2.1",
+      "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact. Its FreeType decodes WOFF2 fonts with Brotli carriesBrotli (the image: pillow.libs/libbrotlidec-*.so.1.2.0, a shared library; Windows: linked into _imagingft, the wheel's LICENSE says brotli-1.2.0), which CVE-2026-111497 affects (1.0.3 to 1.2.0, fixed in brotliFixedFrom). Kept at 12.3.0 (#766, Russell 2026-11-12) because no Pillow release carries 1.2.1 yet (13.0.0 still has 1.2.0) and the decoder only reads the TrueType fonts shared-rules.json -> socialCardFonts lists. Move when a release's .github/dependencies.json says brotli 1.2.1 or later, and update carriesBrotli: verify.sh fails on the image the day the two disagree."
     },
     {
       "pin": "pagedjs",

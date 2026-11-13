@@ -763,6 +763,20 @@ else
   cat /tmp/verify_deploy_toolchain_stamp_test.log
 fi
 
+# The social sharing card opens only the fonts Plantoir offers (GitHub #766):
+# every socialCardFonts case through social_card.py's own functions, a real
+# file at an absolute path or beyond ../ never opened, and the apps' font
+# catalogs pinned to the list. Skips where the host Python has no Pillow
+# (Windows' PythonToolchainTests runs it on the runtime's). The card's half
+# runs again inside the image, against the baked script and contract, after
+# the image is built.
+if (cd scripts && python3 test_social_card_fonts.py) >/tmp/verify_social_card_fonts_test.log 2>&1; then
+  pass "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
+else
+  fail "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
+  cat /tmp/verify_social_card_fonts_test.log
+fi
+
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
 # #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
 # and deploy.sh's own question, and the real deploy.sh and deploy.py.
@@ -2188,6 +2202,64 @@ if [[ "$DEBIAN_FLOOR_REPORT" == OK* ]]; then
   pass "The image's Debian packages are at least their security floors (#714): ${DEBIAN_FLOOR_REPORT#OK }"
 else
   fail "The image's Debian packages do not meet contracts/toolchain.json's floors (#714): ${DEBIAN_FLOOR_REPORT#PROBLEMS }"
+fi
+
+# The card's font rule, inside the image (#766): the baked social_card.py, the
+# baked contract and the image's own Pillow, which is the one that decodes.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_social_card_fonts.py" /opt/scripts/test_social_card_fonts.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_social_card_fonts.py TheCardsFontRule >/tmp/verify_social_card_fonts_image_test.log 2>&1; then
+  pass "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
+else
+  fail "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
+  cat /tmp/verify_social_card_fonts_image_test.log
+fi
+
+# Pillow's Brotli (#766). Pillow's FreeType decodes WOFF2 fonts with the
+# Brotli its wheel carries, here a shared library in pillow.libs whose file
+# name ends in its version. contracts/toolchain.json -> pins -> pillow ->
+# carriesBrotli records which, because 1.2.0 is affected by CVE-2026-111497
+# and no Pillow release carries a fixed one yet. The day Pillow is moved this
+# goes red, so the field (and doc 02's record) is updated on purpose.
+PILLOW_BROTLI_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'BROTLIPY'
+import json, subprocess, sys
+pin = None
+for entry in json.load(open("contracts/toolchain.json"))["pins"]:
+    if entry.get("pin") == "pillow":
+        pin = entry
+if pin is None or not pin.get("carriesBrotli"):
+    print("PROBLEMS the pillow pin names no carriesBrotli")
+    sys.exit(0)
+# What to do, said with every failure: the check exists so that a Pillow
+# move is noticed, and the person who meets it needs the next step.
+next_step = (". Pillow's Brotli has changed, so measure it again and set pins -> pillow -> carriesBrotli "
+             "to the version found, and update documentation/02-docker-image.md -> \"Pillow's Brotli (#766)\". "
+             "Once it is " + pin.get("brotliFixedFrom", "the fixed version") + " or later, close the follow-up "
+             "\"Move Pillow to the first release whose Brotli is 1.2.1 or later\", which says what can then change.")
+inside = (
+    "import glob, os, PIL\n"
+    "site = os.path.dirname(os.path.dirname(PIL.__file__))\n"
+    "for path in sorted(glob.glob(os.path.join(site, 'pillow.libs', 'libbrotlidec-*'))):\n"
+    "    print(PIL.__version__, os.path.basename(path))\n"
+)
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside],
+                     capture_output=True, text=True)
+found = run.stdout.split()
+names = found[1::2]
+if not names:
+    print("PROBLEMS the image carries no pillow.libs/libbrotlidec-*: " + (run.stderr.strip()[-200:] or "no output")
+          + ". If Pillow now links Brotli in statically, read the version from the wheel's "
+          ".github/dependencies.json at its release tag, and change this check to match" + next_step)
+elif len(names) == 1 and names[0].endswith(".so." + pin["carriesBrotli"]):
+    print(f"OK Pillow {found[0]} carries {names[0]}, Brotli {pin['carriesBrotli']} as the pin says")
+else:
+    print(f"PROBLEMS Pillow {found[0]} carries {', '.join(names)}, and the pin says Brotli {pin['carriesBrotli']}" + next_step)
+BROTLIPY
+)"
+if [[ "$PILLOW_BROTLI_REPORT" == OK* ]]; then
+  pass "${PILLOW_BROTLI_REPORT#OK } (#766)"
+else
+  fail "Pillow's Brotli is not what contracts/toolchain.json -> pins -> pillow -> carriesBrotli says (#766): ${PILLOW_BROTLI_REPORT#PROBLEMS }"
 fi
 
 # Node, and the wrangler that runs on it (#640). The image's `node --version`
