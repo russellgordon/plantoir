@@ -28,8 +28,21 @@ class NewCourseCreator {
     /// that one is taken — so the app has to be told which it got.
     var installedExampleCode: String?
 
+    /// The folder a course made for reference was given, once it is on the
+    /// shelf (#572), so the wizard's Close can land the teacher on it.
+    var madeReferenceFolderName: String?
+
+    /// Why a course made for reference did not reach the shelf, once setup
+    /// has ended, in the sentence the teacher reads.
+    var finishingProblem: String?
+
     /// The course code being created, uppercased.
     private var courseCode: String = ""
+
+    /// True once the teacher has pressed Cancel during a run, so the course
+    /// being made for reference is tidied away as stopped rather than
+    /// reported as failed.
+    private var wasCancelled: Bool = false
 
     /// How much of the transcript the pump has already responded to.
     private var respondedLength: Int = 0
@@ -93,7 +106,86 @@ class NewCourseCreator {
 
         Task {
             await pumpAnswers()
+            isCreating = false
         }
+    }
+
+    /// Makes a course straight onto the Reference Courses shelf (#572), even
+    /// when a live course has its code: claims a hidden staging folder and
+    /// writes the settings there (`ReferenceCreation.prepare`), runs the real
+    /// setup INSIDE it with `--reference-staging-folder`, then finishes or
+    /// takes everything away (`ReferenceCreation.finish`). The tidy-up is
+    /// here rather than in the wizard so a Cancel, which dismisses the sheet,
+    /// still reaches it.
+    ///
+    /// No `courseCreated` line: it is written before setup runs and names the
+    /// code alone, which beside a live course of the same code would read as
+    /// that course. `ReferenceCreation` writes its own pair.
+    func createReferenceCourse(
+        configuration: [String: Any],
+        schoolYear: Int?,
+        workspaceURL: URL,
+        existingFolderNames: [String],
+        shelved: [ReferenceCourseRule.Shelved]
+    ) {
+        preparationProblem = nil
+        finishingProblem = nil
+        madeReferenceFolderName = nil
+        wasCancelled = false
+        if let reason = ToolchainReadiness.shared.reasonToWait(workspaceURL) {
+            preparationProblem = reason
+            return
+        }
+
+        let coursesDirectoryURL: URL = workspaceURL.appendingPathComponent("courses")
+        let prepared: ReferenceCreation.Prepared
+        do {
+            prepared = try ReferenceCreation.prepare(
+                configuration: configuration,
+                schoolYear: schoolYear,
+                coursesDirectoryURL: coursesDirectoryURL,
+                existingFolderNames: existingFolderNames,
+                shelved: shelved
+            )
+        } catch {
+            preparationProblem = error.localizedDescription
+            return
+        }
+        courseCode = prepared.displayCode
+
+        respondedLength = 0
+        responsesSent = 0
+        isCreating = true
+        runner.milestones = TaskMilestones.courseCreation
+        runner.run(
+            scriptNamed: "setup.sh",
+            arguments: ["--", "--reference-staging-folder", prepared.stagingName],
+            workingDirectory: workspaceURL
+        )
+
+        Task {
+            await pumpAnswers()
+            let succeeded: Bool = await runner.waitUntilFinished()
+            do {
+                let made: ReferenceCopier.Made = try ReferenceCreation.finish(
+                    prepared,
+                    setupSucceeded: succeeded,
+                    wasStopped: wasCancelled,
+                    transcript: runner.transcript.displayText
+                )
+                madeReferenceFolderName = made.folderName
+            } catch {
+                finishingProblem = error.localizedDescription
+            }
+            isCreating = false
+        }
+    }
+
+    /// The wizard's Cancel while a run is going: stops it, and a course being
+    /// made for reference is then tidied away as stopped.
+    func cancel() {
+        wasCancelled = true
+        runner.terminate()
     }
 
     /// Installs the example course. Nothing is asked of the teacher: the
@@ -268,7 +360,6 @@ class NewCourseCreator {
                 runner.send(line: "")
             }
         }
-        isCreating = false
     }
 
     /// The last non-empty line of output — the prompt currently waiting.

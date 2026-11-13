@@ -2016,7 +2016,15 @@ and it would add files to whatever syncs the course); keeping
   wall clock ([why this matters](05-build-pipeline.md#dates-drive-everything)).
 - If `--no-backup` is being passed through, demands explicit confirmation
   first.
-- Finally: `docker exec -it "teaching-quartz-${WORKDIR_ID}" python3 /opt/scripts/setup_course.py …`
+- Finally: `docker exec -it "teaching-quartz-${WORKDIR_ID}" python3 /opt/scripts/setup_course.py …`,
+  with every argument after a literal `--` passed through unchanged. The apps
+  pass two that way: `--install-example`, and since #572
+  `--reference-staging-folder .plantoir-importing-<FOLDER>`, which sets a
+  course up inside the hidden staging folder a reference course is built in
+  (`04-course-setup.md`). The course-argument dot refusal in `preview.sh` and
+  `deploy.sh` is untouched by it: `setup.sh` takes no course argument, and the
+  staging folder still cannot be previewed or deployed. `setup.ps1` forwards
+  the same way.
 
 ### `preview.sh`
 
