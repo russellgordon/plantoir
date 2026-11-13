@@ -3,8 +3,16 @@ import Observation
 import SwiftUI
 import WebKit
 
-/// Owns the Planning tab's web view (#708) and tells SwiftUI whether Back
-/// and Forward can go anywhere.
+/// Owns the Planning tab's web view (#708), and since #793 the Coverage
+/// tab's too, and tells SwiftUI whether Back and Forward can go anywhere.
+///
+/// One class for both, parameterised rather than copied (793b's brief): the
+/// rule list, its compile, the configuration and the delegate are shared, so
+/// a fix to the network block reaches both tabs. Each tab names its own rule
+/// list identifier, its own navigation rule (`PlanNavigation.decide` for a
+/// plan, `CoverageNavigation.decide` for the map) and the folder its page
+/// may read. `PlanWebController()` is the Planning tab's, as it always was;
+/// `PlanWebController.forCoverage` is the Coverage tab's.
 ///
 /// **A plan is content Plantoir did not write**: an outside assistant wrote
 /// it, so the view is set up to show local pages and nothing else. Three
@@ -73,14 +81,40 @@ final class PlanWebController {
 
     static let rulesIdentifier: String = "PlantoirPlanningTabLocalFilesOnly"
 
+    /// The Coverage tab's own identifier for the same list, so neither tab
+    /// compiles over the other's (#793).
+    static let coverageRulesIdentifier: String = "PlantoirCoverageTabLocalFilesOnly"
+
     /// The rule list this controller compiles: `localOnlyRules` in the app;
     /// a test may hand it another to prove what a broken one does.
     @ObservationIgnored private let rules: String
 
+    /// The name the list is kept under.
+    @ObservationIgnored private let identifier: String
+
     // MARK: - Initializer
 
-    init(rules: String = PlanWebController.localOnlyRules) {
+    /// The Planning tab's web view.
+    convenience init(rules: String = PlanWebController.localOnlyRules) {
+        self.init(
+            rules: rules,
+            rulesIdentifier: PlanWebController.rulesIdentifier,
+            accessibilityIdentifier: "planningWebViewNative",
+            decide: PlanNavigation.decide
+        )
+    }
+
+    /// A web view that shows local pages from one folder and nothing else,
+    /// deciding each navigation with `decide` (url, a new window, a click,
+    /// the folder).
+    init(
+        rules: String,
+        rulesIdentifier: String,
+        accessibilityIdentifier: String,
+        decide: @escaping (URL, Bool, Bool, URL) -> PlanNavigation.Decision
+    ) {
         self.rules = rules
+        self.identifier = rulesIdentifier
         let configuration: WKWebViewConfiguration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
         // Off: the template needs none, and guard 2's "a click only" holds
@@ -89,10 +123,11 @@ final class PlanWebController {
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let webView: WKWebView = WKWebView(frame: .zero, configuration: configuration)
         let navigationGuard: PlanNavigationGuard = PlanNavigationGuard()
+        navigationGuard.decide = decide
         webView.navigationDelegate = navigationGuard
         webView.uiDelegate = navigationGuard
         webView.allowsBackForwardNavigationGestures = true
-        webView.setAccessibilityIdentifier("planningWebViewNative")
+        webView.setAccessibilityIdentifier(accessibilityIdentifier)
         self.webView = webView
         self.navigationGuard = navigationGuard
 
@@ -133,14 +168,40 @@ final class PlanWebController {
 
     // MARK: - Functions
 
+    /// The Coverage tab's web view (#793): the same guards, the map's own
+    /// rule list identifier and navigation rule, and `handToTheApp` told of
+    /// every click on a code.
+    static func forCoverage(
+        rules: String = PlanWebController.localOnlyRules,
+        handToTheApp: @escaping (URL) -> Void
+    ) -> PlanWebController {
+        let controller: PlanWebController = PlanWebController(
+            rules: rules,
+            rulesIdentifier: PlanWebController.coverageRulesIdentifier,
+            accessibilityIdentifier: "coverageWebViewNative",
+            decide: { (url: URL, isNewWindow: Bool, byALinkClick: Bool, folder: URL) -> PlanNavigation.Decision in
+                return CoverageNavigation.decide(
+                    url: url, isNewWindow: isNewWindow, byALinkClick: byALinkClick, coverageFolder: folder
+                )
+            }
+        )
+        controller.navigationGuard.handToTheApp = handToTheApp
+        return controller
+    }
+
     /// Shows `page`, reading only inside `planningFolder`.
     func show(page: URL, planningFolder: URL) {
-        navigationGuard.planningFolder = planningFolder
+        show(page: page, readingOnlyInside: planningFolder)
+    }
+
+    /// Shows `page`, reading only inside `folder`.
+    func show(page: URL, readingOnlyInside folder: URL) {
+        navigationGuard.planningFolder = folder
         if !rulesAreInstalled {
             waitingPage = page
             return
         }
-        webView.loadFileURL(page, allowingReadAccessTo: planningFolder)
+        webView.loadFileURL(page, allowingReadAccessTo: folder)
     }
 
     /// Loads the page on screen again, as it is on disk now.
@@ -179,16 +240,16 @@ final class PlanWebController {
         do {
             guard let store,
                   let list = try await store.compileContentRuleList(
-                      forIdentifier: PlanWebController.rulesIdentifier,
+                      forIdentifier: identifier,
                       encodedContentRuleList: rules
                   ) else {
-                AppLog.interface.error("the Planning tab's local-only rule list could not be made")
+                AppLog.interface.error("the local-only rule list \(self.identifier, privacy: .public) could not be made")
                 giveUp()
                 return
             }
             webView.configuration.userContentController.add(list)
         } catch {
-            AppLog.interface.error("the Planning tab's local-only rule list could not be made: \(error.localizedDescription, privacy: .public)")
+            AppLog.interface.error("the local-only rule list \(self.identifier, privacy: .public) could not be made: \(error.localizedDescription, privacy: .public)")
             giveUp()
             return
         }
@@ -209,12 +270,21 @@ final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     // MARK: - Stored properties
 
-    /// The folder the plan's pages may read; nil refuses everything.
+    /// The folder the plan's pages may read; nil refuses everything. The
+    /// map's folder on the Coverage tab (#793).
     var planningFolder: URL?
+
+    /// The navigation rule: a plan's, or the map's.
+    var decide: (URL, Bool, Bool, URL) -> PlanNavigation.Decision = PlanNavigation.decide
 
     /// Opens a link outside Plantoir; replaceable so a test can watch.
     var openOutside: (URL) -> Void = { (url: URL) in
         NSWorkspace.shared.open(url)
+    }
+
+    /// Told of a navigation `decide` hands to the app (a click on a code in
+    /// the Coverage tab's map); a plan never reaches it.
+    var handToTheApp: (URL) -> Void = { (_: URL) in
     }
 
     // MARK: - Functions
@@ -235,6 +305,9 @@ final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
             return false
         case .refuse:
             return false
+        case .handToTheApp:
+            handToTheApp(url)
+            return false
         }
     }
 
@@ -242,11 +315,11 @@ final class PlanNavigationGuard: NSObject, WKNavigationDelegate, WKUIDelegate {
         guard let url = navigationAction.request.url, let planningFolder else {
             return .refuse
         }
-        return PlanNavigation.decide(
-            url: url,
-            isNewWindow: navigationAction.targetFrame == nil,
-            byALinkClick: navigationAction.navigationType == .linkActivated,
-            planningFolder: planningFolder
+        return decide(
+            url,
+            navigationAction.targetFrame == nil,
+            navigationAction.navigationType == .linkActivated,
+            planningFolder
         )
     }
 

@@ -262,13 +262,38 @@ extension WorkspaceModel {
         return .opened(answer)
     }
 
-    /// The route itself, shared by both callers above: what it did, and the
-    /// answer read at the press.
+    /// A click on a code on a section's Coverage tab (#793): the
+    /// expectation's page, which `CoverageItem.resolve` has already checked
+    /// is a page inside the course folder, opened through the SAME route as
+    /// Open in Obsidian, so the reference course's note, the add-ons offer
+    /// and registering a course Obsidian has never seen all come along
+    /// unchanged. `trailWords` is the click's line ("page opened in
+    /// Obsidian"), written once the press goes ahead, as every press's is.
+    @discardableResult
+    func openExpectationInObsidian(
+        course: Course,
+        sectionNumber: Int,
+        page: URL,
+        trailWords: String,
+        lockAgain: @MainActor (Course) -> Void = ReferenceLock.ensureLockedInBackground
+    ) -> OpenInObsidianPressed {
+        return pressOpenInObsidian(
+            course: course, sectionNumber: sectionNumber,
+            atThePreviewedPage: false, lockAgain: lockAgain,
+            chosen: (page: page, trailWords: trailWords)
+        )
+    }
+
+    /// The route itself, shared by every caller above: what it did, and the
+    /// answer read at the press. `chosen` is a page a caller has already
+    /// decided on (a Coverage tab click), with its trail line; nil for every
+    /// other press, which opens what it always did.
     private func pressOpenInObsidian(
         course: Course,
         sectionNumber: Int?,
         atThePreviewedPage: Bool,
-        lockAgain: @MainActor (Course) -> Void
+        lockAgain: @MainActor (Course) -> Void,
+        chosen: (page: URL, trailWords: String)? = nil
     ) -> OpenInObsidianPressed {
         let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
         // Read at the press (the page on screen now), but written to the
@@ -278,9 +303,20 @@ extension WorkspaceModel {
         if atThePreviewedPage, let sectionNumber {
             answer = previewedPageAnswer(course: course, sectionNumber: sectionNumber)
         }
-        let page: URL? = WorkspaceModel.pageToOpen(answer)
+        var pageChosen: URL? = WorkspaceModel.pageToOpen(answer)
+        if let chosen {
+            pageChosen = chosen.page
+        }
+        let page: URL? = pageChosen
+        let noteThePress: () -> Void = {
+            if let chosen, let sectionNumber {
+                ActivityTrail.note(.pageOpenedInObsidian, chosen.trailWords, course: course.code, section: sectionNumber)
+                return
+            }
+            self.notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
+        }
         if course.isKeptForReference {
-            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
+            noteThePress()
             lockAgain(course)
             if !LockedPagesNote.hasBeenShown(courseCode: course.code) {
                 lockedPagesNoteRequest = LockedPagesNoteRequest(course: course, folder: folder, page: page)
@@ -296,7 +332,7 @@ extension WorkspaceModel {
             answer: settings.obsidianFigureAddOns,
             suppressedThisRun: ObsidianFigureAddOnsThisRun.suppressed
         ) {
-            notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
+            noteThePress()
             openObsidian(folder, page: page, course: course)
             return OpenInObsidianPressed(opened: true, wentAhead: true, scanStarted: false, answer: answer)
         }
@@ -304,7 +340,7 @@ extension WorkspaceModel {
         if ObsidianFigureAddOnsThisRun.beingOpened.contains(coursePath) {
             return OpenInObsidianPressed(opened: false, wentAhead: false, scanStarted: false, answer: answer)
         }
-        notePreviewedPress(answer, course: course, sectionNumber: sectionNumber)
+        noteThePress()
         ObsidianFigureAddOnsThisRun.beingOpened.insert(coursePath)
         let scan = obsidianOpening.scan
         obsidianAddOnsWork = Task { @MainActor in

@@ -1,16 +1,17 @@
 import SwiftUI
 
 /// A detail view's tabs as one segmented control in a thin bar above its
-/// content (#717): Website | Problems on a section, and Settings | Planning
-/// on a course (#708, `CourseDetailView`, while Claude Code or Codex is
-/// installed). Built once so the second use added a tab rather than a
-/// second shell.
+/// content (#717): Website | Coverage | Problems on a section (Coverage
+/// since #793), and Settings | Planning on a course (#708,
+/// `CourseDetailView`, while Claude Code or Codex is installed). Built once
+/// so each later use added a tab rather than a second shell.
 ///
-/// **Not a `TabView`.** A section's site is a live `WKWebView` scrolled to
-/// where the teacher left it, and moving it between containers is how that
-/// gets thrown away (the comment on the section's cover layer). So the
-/// content underneath stays mounted whatever is chosen, and the other tab is
-/// drawn OVER it; this view is only the switch.
+/// **Not a `TabView`**, which decides for itself what each tab keeps. The
+/// page decides instead: since #708 (the course) and #793 (the section) only
+/// the chosen tab's content is drawn (`CourseDetailContent`,
+/// `SectionTabContent`), never one over another, so nothing hidden can take
+/// a key; a section's live `WKWebView` keeps its page and scroll because its
+/// controller owns it. This view is only the switch.
 ///
 /// **Not in the toolbar either**, though the window's principal slot is
 /// free: the section's toolbar keeps every item ALWAYS present, because

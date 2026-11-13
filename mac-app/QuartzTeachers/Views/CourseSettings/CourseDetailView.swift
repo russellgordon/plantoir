@@ -3,7 +3,7 @@ import SwiftUI
 /// A course's page (#708): its settings, as always, and while Claude Code or
 /// Codex is installed a Planning tab beside them, Settings | Planning in a
 /// thin bar (`DetailTabs`, the switch #717 built for a section's
-/// Website | Problems).
+/// Website | Problems, Website | Coverage | Problems since #793).
 ///
 /// **Only the chosen tab is in the window.** With Planning chosen the
 /// settings form is not drawn at all (`CourseDetailContent`), so nothing in

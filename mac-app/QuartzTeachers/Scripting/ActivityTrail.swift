@@ -307,6 +307,16 @@ nonisolated enum ActivityTrail {
         /// date. Never a plan's title or anything in it. Once per appearance,
         /// so a report of "the Planning tab is blank" has a line to start from.
         case lookedAtUnitPlans = "looked at a course's unit plans"
+        /// A section's Coverage tab appeared (#793, `CoverageTabTrail`): how
+        /// many maps, expectations and not yet addressed, when the map was
+        /// made and whether pages changed since; or that there was no map,
+        /// or one from another version, or that the map could not be shown.
+        /// Once per appearance. Counts only, never an expectation's words.
+        case lookedAtSectionCoverage = "looked at a section's curriculum coverage"
+        /// Make the Map Again on a section's Coverage tab (#793): that it was
+        /// asked for, and, as further lines, whether the map was made again,
+        /// or the build ended first, or the preview could not start.
+        case askedToMakeTheCoverageMapAgain = "asked to make a section's coverage map again"
         /// A folder a feature depends on was put back, at the teacher's
         /// request — or, since #584, something the build put right in the
         /// teacher's own files by itself (`BuildRepairReport`: a front page's

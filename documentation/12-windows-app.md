@@ -836,6 +836,18 @@ read `IsOffscreen`, not presence. The bar's own arrow keys change the tab
 (selection followed focus on the last run; one earlier run moved the focus
 only, so the UI test accepts either and says which).
 
+**Coverage, owed (#793).** The mac's section page gained a Coverage tab
+(Website | Coverage | Problems) in v1.10.0, and with it a change Windows owes
+here too: the mac now draws only the chosen tab's content, never one over
+another, because a layered tab left the preview able to take keys and browser
+commands. Windows' collapse of the covered layers already keeps them out of the
+Tab order and the UI Automation tree; whether its browser commands (Back,
+Forward, Reload) still reach the covered `WebView2` is the thing to check.
+Windows inherits the map itself from the shared Python. What it owes, case by
+case, is `contracts/shared-rules.json` → `coverageTab.tab`; the reasons are doc
+09's "A section's Coverage tab (#793)"; the work is the `windows` issue for
+#793.
+
 **The table.** Include (a box; ticked means included, every row starts ticked,
 for the session), Kind, Page (or Whole section / Whole course), Problem (the
 row's item, or `fixedInTheSource` in secondary text; the whole sentence and

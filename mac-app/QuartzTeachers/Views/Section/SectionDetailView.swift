@@ -136,6 +136,10 @@ struct SectionDetailView: View {
     /// — the assistant can start a preview then — shown once it has gone.
     @State var heldPreviewRefusal: PreviewAlert?
 
+    /// A refusal that arrived while the Coverage tab showed (#793), not the
+    /// tab's own refresh's: shown when the teacher leaves the tab.
+    @State var refusalHeldOnCoverage: PreviewAlert?
+
     /// Set by the question's answer, and acted on once the alert has GONE
     /// (`afterThePreviewAlert`): the preview starts then, never from inside
     /// the alert's own button, where a refusal it raised would be lost with
@@ -435,7 +439,8 @@ struct SectionDetailView: View {
         // A new modifier goes into the stage it belongs to, never back into
         // one long chain here.
         let layout: some View = sectionLayout
-        let watching: some View = watchingTheFolderAndTheWindow(layout)
+        let coverage: some View = watchingTheCoverageTab(layout)
+        let watching: some View = watchingTheFolderAndTheWindow(coverage)
         let withToolbar: some View = addingTheToolbarAndTheSectionMenu(watching)
         let registered: some View = registeringWhileItShows(withToolbar)
         let alerting: some View = presentingTheAlerts(registered)
@@ -479,88 +484,42 @@ struct SectionDetailView: View {
                 // whose it is.
                 UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
             }
-            // Website | Problems (#717), only while the section's last build
-            // found something: a section with no problems shows what it
-            // always has. Outside the stack, like the notices, so the site
-            // below never moves between containers.
-            if showsTheProblemsTab {
+            // Website | Coverage | Problems (#717, #793): Coverage while the
+            // course has curriculum expectations, Problems while the
+            // section's last build found something. A section with neither
+            // shows what it always has. Outside the content, like the
+            // notices.
+            if !shownTabs.isEmpty {
                 DetailTabs(
-                    tabs: [
-                        (tab: SectionProblems.Tab.website, title: SectionProblemsWording.tabWebsite),
-                        (tab: SectionProblems.Tab.problems, title: SectionProblemsWording.tabProblems),
-                    ],
+                    tabs: tabsInTheBar,
                     selection: selectedTabBinding,
                     identifier: "sectionTabs"
                 )
             }
-            ZStack {
-                // Base layer: always laid out in the normal, safe-area
-                // respecting flow. Keeping it mounted means its geometry is
-                // never inherited from the full-bleed web view above it —
-                // which is what dragged the progress header under the
-                // window's toolbar when a preview was restarted.
-                VStack(spacing: 0) {
-                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRun.isShown(hidingEnding: deployEndingHiddenHere) {
-                        consoleArea
-                    } else {
-                        // Fills the height it is offered, which is what keeps
-                        // the notice above it flush under the toolbar: a layer
-                        // that claims less than the stack offers is CENTRED by
-                        // it, and the notice floated mid-window. See the view's
-                        // own comment for the measurement.
-                        NoPreviewPlaceholderView(
-                            deploysToLocalFolder: course.configuration.deploysToLocalFolder,
-                            keptForReferenceCode: course.isKeptForReference ? course.displayCode : ""
-                        )
-                    }
-                }
-
-                // Cover layer: the site itself, full-bleed within whatever
-                // room the notice leaves. It stays in this one branch however
-                // the notice comes and goes — the web view is a live WKWebView
-                // with a page scrolled to where the teacher left it, and
-                // moving it between containers is how that gets thrown away.
-                if let previewURL {
-                    WebPreviewView(controller: previewController, url: previewURL)
-                        // The page the teacher navigated to, remembered for
-                        // "Preview at Last Viewed" (#504). Here, on the site
-                        // itself, so nothing is remembered while no site is
-                        // showing; and only the TEACHER's navigations move
-                        // the counter (`PreviewNavigationLedger`).
-                        .onChange(of: previewController.teacherNavigations) { _, _ in
-                            rememberWhereTheTeacherIs()
-                        }
-                        .task {
-                            // A task rather than an appearance block: the section's
-                            // registering appearance block is found by a source scan
-                            // (WorkingFolderSelectionTests) as the view's first one.
-                            notePagesHandedToTheBrowser()
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .accessibilityIdentifier("previewWebView")
-                }
-
-                // Top layer: the Problems tab (#717), drawn OVER the site and
-                // the console rather than instead of them, so the live web
-                // view underneath keeps its page and its scroll.
-                if selectedTab == .problems, let folder = workspace.workspaceURL, let record = problemsRecord {
-                    ProblemsTableView(
-                        course: course,
-                        sectionNumber: sectionNumber,
-                        folder: folder,
-                        record: record,
-                        others: SectionProblems.shared.otherRecords(folder: folder, course: course, sectionNumber: sectionNumber),
-                        repair: repairFromTheProblemsTab
-                    )
-                }
+            // Only the chosen tab's content is in the window (#793, the plan
+            // review's H1): the preview is not under the Coverage or the
+            // Problems tab, so no key can reach it. Its web view is owned by
+            // `previewController`, so leaving the window keeps its page and
+            // its scroll.
+            SectionTabContent(showing: selectedTab) {
+                websiteLayers
+            } coverage: {
+                coverageTab
+            } problems: {
+                problemsTab
             }
             // The build's word that this section's Problems record changed
             // (#717): mid-build, before Quartz, so the alert keeps the timing
             // the folder-problem dialog had (a missing front page stops the
             // preview finishing, #153). On the stack rather than the view's
             // own chain, which is at the type-checker's limit.
-            .onChange(of: previewRunner.problemsMarkers.count) { _, _ in
+            .onChange(of: previewRunner.problemsMarkers.count) { previous, now in
                 reloadTheProblems()
+                // The map is written before this line, so a refresh waiting
+                // on this run now finds its map or knows it made none (#793).
+                // Only when a line ARRIVED: the count also falls to nought as
+                // a run starts, which says nothing about its map.
+                reloadTheCoverage(afterThisRunsMarker: now > previous)
                 raiseTheProblemsAlertIfDue()
             }
             // Any other run in this app that printed one — the in-app
@@ -568,6 +527,7 @@ struct SectionDetailView: View {
             // review L5): the open section follows its record whoever built.
             .onChange(of: SectionProblems.shared.markersArrived) { _, _ in
                 reloadTheProblems()
+                reloadTheCoverage(afterThisRunsMarker: false)
                 raiseTheProblemsAlertIfDue()
             }
         }
@@ -638,21 +598,21 @@ struct SectionDetailView: View {
                     Button("Back", systemImage: "chevron.left") {
                         previewController.goBack()
                     }
-                    .disabled(previewURL == nil || !previewController.canGoBack)
+                    .disabled(previewURL == nil || !previewTakesCommands || !previewController.canGoBack)
                     .help("Go back a page")
                     .accessibilityIdentifier("previewBackButton")
 
                     Button("Forward", systemImage: "chevron.right") {
                         previewController.goForward()
                     }
-                    .disabled(previewURL == nil || !previewController.canGoForward)
+                    .disabled(previewURL == nil || !previewTakesCommands || !previewController.canGoForward)
                     .help("Go forward a page")
                     .accessibilityIdentifier("previewForwardButton")
 
                     Button("Reload", systemImage: "arrow.clockwise") {
                         previewController.reload()
                     }
-                    .disabled(previewURL == nil)
+                    .disabled(previewURL == nil || !previewTakesCommands)
                     .help("Reload this page")
                     .accessibilityIdentifier("previewReloadButton")
                 }
@@ -740,7 +700,10 @@ struct SectionDetailView: View {
 
                 }
             }
-            .focusedSceneValue(\.previewController, previewURL != nil ? previewController : nil)
+            // Only while the Website tab shows (#793, the plan review's H1):
+            // on Coverage or Problems the preview is not in the window, so
+            // ⌘R, ⌘[ and ⌘] must not reach it.
+            .focusedSceneValue(\.previewController, previewURL != nil && previewTakesCommands ? previewController : nil)
             // Section ▸ Preview, Deploy… and Open in Browser (#457): the
             // toolbar's own actions and predicates, so the menu item and the
             // button beside it cannot disagree.
@@ -1177,28 +1140,10 @@ struct SectionDetailView: View {
         return SectionProblems.shared.record(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
     }
 
-    /// Website | Problems is shown only while the record has rows.
+    /// Problems is in the section's bar only while the record has rows
+    /// (`SectionTabs.shown`, beside Coverage since #793).
     var showsTheProblemsTab: Bool {
         return SectionProblemsRules.markerShows(problemsRecord)
-    }
-
-    /// The tab showing: Website whenever there are no problems to show.
-    var selectedTab: SectionProblems.Tab {
-        guard let folder = workspace.workspaceURL else {
-            return .website
-        }
-        return SectionProblems.shared.tab(folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
-    }
-
-    var selectedTabBinding: Binding<SectionProblems.Tab> {
-        return Binding(
-            get: { selectedTab },
-            set: { chosen in
-                if let folder = workspace.workspaceURL {
-                    SectionProblems.shared.show(chosen, folder: folder, courseCode: course.code, sectionNumber: sectionNumber)
-                }
-            }
-        )
     }
 
     /// Reads this course's records again — every section's, because one
@@ -1218,6 +1163,11 @@ struct SectionDetailView: View {
     @discardableResult
     func raiseTheProblemsAlertIfDue() -> Bool {
         if healthDialog != nil || previewAlertIsUp {
+            return false
+        }
+        // Nothing pops up over the Coverage tab (#793): the alert stays due
+        // and is raised when the teacher leaves it.
+        if alertsWaitForCoverage {
             return false
         }
         if linksChecklist != nil || verbSheet != nil {
@@ -1274,6 +1224,11 @@ struct SectionDetailView: View {
     /// outcome goes first — it is the answer to something the teacher just
     /// pressed — and findings that arrived meanwhile follow.
     func showAnythingWaiting() {
+        // Everything here waits while the Coverage tab shows (#793), and is
+        // asked again when the teacher leaves it.
+        if alertsWaitForCoverage {
+            return
+        }
         if let waiting = pendingRepairOutcome {
             pendingRepairOutcome = nil
             repairOutcome = waiting
@@ -1526,6 +1481,11 @@ struct SectionDetailView: View {
             pendingLinksChecklist = model
             return
         }
+        // Not over the Coverage tab (#793): shown when the teacher leaves it.
+        if alertsWaitForCoverage {
+            pendingLinksChecklist = model
+            return
+        }
         // Behind the preview alert too (#397): the question about today's
         // class invites a look at the front page in Obsidian, and coming back
         // makes this window key, which offers the checklist — a sheet asked
@@ -1592,6 +1552,9 @@ struct SectionDetailView: View {
         if isBusy || linksChecklist != nil || pendingLinksChecklist != nil || heldLinksFinding != nil {
             return
         }
+        if alertsWaitForCoverage {
+            return
+        }
         guard let model = linksChecklistWaiting(occasion: .onOpening) else {
             return
         }
@@ -1647,6 +1610,11 @@ struct SectionDetailView: View {
     /// about today's class is up, so the question is not replaced under the
     /// teacher's pointer.
     func showPreviewRefusal(title: String, sentence: String) {
+        // Not over the Coverage tab (#793): said in the tab when it refuses
+        // the tab's own refresh, otherwise shown when the teacher leaves it.
+        if takeARefusalOnCoverage(title: title, sentence: sentence) {
+            return
+        }
         if previewAlertIsUp, case .todaysClass = previewAlert {
             heldPreviewRefusal = .refusal(title: title, sentence: sentence)
             return
@@ -2352,6 +2320,9 @@ struct SectionDetailView: View {
         // which is how a rebuilt site kept appearing unchanged.
         previewController.forgetLoadedPage()
         releasePreviewLease()
+        // A Coverage tab refresh this run was making is settled now (#793):
+        // a switch of section stops its build through here.
+        noteTheCoverageRunEnded()
     }
 
     /// Cancels the running preview from the progress view.
@@ -2369,6 +2340,7 @@ struct SectionDetailView: View {
         previewBuildWait.end()
         previewController.forgetLoadedPage()
         releasePreviewLease()
+        noteTheCoverageRunEnded()
     }
 
     /// Cancels the running deploy from the progress view.
