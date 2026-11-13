@@ -5329,6 +5329,14 @@ What the hold is, so it can be undone by reverting its one merge commit:
   skill folder carries no mark that says the app wrote it. No released
   version wrote them, so only development working folders have them, and
   they are deleted by hand.
+- **The Mac's own bundle drops them on an ordinary build.** MEASURED
+  (2026-11-13, Xcode 27.0, `-derivedDataPath` of its own): a Debug build
+  with the two folders put back under `support/agent_guidance/skills`
+  carried them; after they were removed, the next incremental build's
+  bundle held only the eight shipped skills. A Debug build in a
+  DerivedData folder made from `dev` before the hold therefore loses them
+  on its next build, with no clean needed. Windows differs (12: its
+  `PreserveNewest` copy keeps them until a clean build).
 
 MEASURED (2026-11-13): the new test fails against `origin/dev`'s
 `support/agent_guidance` (both skills written in both homes, both root
