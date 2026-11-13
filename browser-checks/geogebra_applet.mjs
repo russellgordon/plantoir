@@ -57,6 +57,23 @@
 //    drag must NOT move the slider; if it does, the drag proves nothing.
 //    A DOM count alone passed on the broken loader: each dialog that is
 //    removed rather than closed leaves the app ignoring pointer input.
+// 11. GeoGebra's reset icon (#792), pressed with real pointer events at the
+//    place it is painted on the canvas, on the commands sketch and on the
+//    file sketch, each after a real drag has moved something (slider a,
+//    point A): the construction read through the applet comes back to what
+//    it opened as (every object, a at 3, A where it was), with no shade over
+//    it and its canvas on top, and it takes a drag again. Before #792 the
+//    commands sketch came back with no object at all and the file sketch
+//    was removed (an empty box), which is how this item fails on the old
+//    loader. Chromium only here; WebKit was measured by hand
+//    (documentation/06, "The reset icon").
+// 12. Real key presses while a sketch's lines run (#792 review M1): the
+//    third sketch on page B, 150 lines that each make a point, is opened
+//    and Shift+Tab then Space are pressed again and again with the focus in
+//    it until its lines have run. Every point must be there, and again after
+//    a press on its reset icon. Before the fix a reset reached through the
+//    keyboard got in while the lines ran: a sketch left half built, and that
+//    half kept as its start.
 //
 // It prints a line starting "OK:" with the time from tap to sketch and the
 // bytes fetched, or "FAIL:" with what went wrong.
@@ -310,6 +327,125 @@ async function connect(chunk) {
     const after = await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); return window[box.id.replace(/-box$/, "")].getValue(${JSON.stringify(name)}) })()`)
     return { before: knob.before, after }
   }
+  // What the sketch at `index` holds, through the applet: its objects, the
+  // value of slider a and the place of point A (#792).
+  const construction = async (index) => await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; const read = (fn) => { try { return fn() } catch (error) { return "threw" } }; return { names: read(() => api.getAllObjectNames().join(",")), a: read(() => api.exists("a") ? api.getValue("a") : null), A: read(() => api.exists("A") ? [api.getXcoord("A"), api.getYcoord("A")] : null), canvas: !!box.querySelector("canvas") } })()`)
+  // Drags point `name` in the sketch at `index` two units up and to the
+  // right with real pointer events, found from the graphics view's own
+  // coordinate system in the applet's XML (#792).
+  const dragPoint = async (index, name) => {
+    const point = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; f.scrollIntoView({ block: "center", behavior: "instant" }); const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; if (!api || !api.exists(${JSON.stringify(name)})) return { why: "no such point" }; const system = /<coordSystem ([^>]*)\\/>/.exec(api.getXML() || ""); if (!system) return { why: "no coordinate system in the XML" }; const read = (key) => Number((new RegExp("\\\\b" + key + '="([^"]*)"').exec(system[1]) || [])[1]); let canvas = null; for (const each of Array.from(box.querySelectorAll("canvas"))) { if (canvas === null || each.width * each.height > canvas.width * canvas.height) canvas = each } if (canvas === null) return { why: "no canvas" }; const r = canvas.getBoundingClientRect(); const scale = r.width / canvas.offsetWidth; const at = (x, y) => [r.left + (read("xZero") + x * read("scale")) * scale, r.top + (read("yZero") - y * read("yscale")) * scale]; const x = api.getXcoord(${JSON.stringify(name)}), y = api.getYcoord(${JSON.stringify(name)}); const [fromX, fromY] = at(x, y); const [toX, toY] = at(x + 2, y + 2); return { fromX, fromY, toX, toY } })()`)
+    if (!point || point.why || point.thrown) return { why: point?.why ?? point?.thrown ?? "no answer" }
+    const mouse = (type, x, y, buttons) => send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 })
+    await mouse("mouseMoved", point.fromX, point.fromY, 0)
+    await pause(50)
+    await mouse("mousePressed", point.fromX, point.fromY, 1)
+    await pause(50)
+    for (let step = 1; step <= 10; step += 1) {
+      await mouse("mouseMoved", point.fromX + ((point.toX - point.fromX) * step) / 10, point.fromY + ((point.toY - point.fromY) * step) / 10, 1)
+      await pause(30)
+    }
+    await mouse("mouseReleased", point.toX, point.toY, 0)
+    await pause(100)
+    return { done: true }
+  }
+  // Presses GeoGebra's reset icon (showResetIcon: the two arrows in a circle)
+  // on the sketch at `index` with a real pointer: move, press, release at the
+  // icon, never a scripted click or the applet's own reset() (#761, #792).
+  // The icon is no element of the page: GeoGebra 5.4.933.1 paints it onto
+  // the graphics view's canvas, at geogebraFences.reset.icon (its centre,
+  // in from the view's right edge and down from its top, at the sketch's
+  // own size), scaled with the sketch. A press that misses it changes
+  // nothing, which the reads after it then report. Answers the place pressed.
+  const pressReset = async (index) => {
+    const icon = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; f.scrollIntoView({ block: "center", behavior: "instant" }); const box = f.querySelector(".pl-geogebra-applet"); let canvas = null; for (const each of Array.from(box.querySelectorAll("canvas"))) { if (canvas === null || each.width * each.height > canvas.width * canvas.height) canvas = each } if (canvas === null) return { why: "no canvas" }; const r = canvas.getBoundingClientRect(); const scale = r.width / canvas.offsetWidth; const x = r.right - ${contract.reset.icon.fromRight} * scale, y = r.top + ${contract.reset.icon.fromTop} * scale; const top = document.elementFromPoint(x, y); return { x, y, onCanvas: top === canvas } })()`)
+    if (!icon || icon.why || icon.thrown) return { why: icon?.why ?? icon?.thrown ?? "no answer" }
+    if (!icon.onCanvas) return { why: "the sketch's canvas is not what lies under its reset icon" }
+    const mouse = (type, buttons) => send("Input.dispatchMouseEvent", { type, x: icon.x, y: icon.y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 })
+    await mouse("mouseMoved", 0)
+    await pause(30)
+    await mouse("mousePressed", 1)
+    await pause(30)
+    await mouse("mouseReleased", 0)
+    return { x: Math.round(icon.x), y: Math.round(icon.y) }
+  }
+  // Waits for the sketch at `index` to hold `wanted` again after a reset:
+  // its own construction is what is waited on, never a clock; 10 s is only
+  // the bound past which it never will.
+  const constructionComesBack = async (index, wanted) => {
+    let now = null
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      now = await construction(index)
+      if (JSON.stringify(now) === JSON.stringify(wanted)) return { back: true, now }
+      await pause(250)
+    }
+    return { back: false, now }
+  }
+  // 11 (#792): GeoGebra's reset icon pressed for real on the sketch at
+  // `index`, after `change` has moved something a student can move. The
+  // construction must come back to `start` (every object, slider a at the
+  // value it opened with, point A where it was), with no shade over it and
+  // the canvas on top, and still take a drag.
+  const resetComesBack = async (phase, index, kind, start, change) => {
+    const moved = await change()
+    if (moved.why) return `${phase}: on the ${kind}, the drag before the reset could not run: ${moved.why}`
+    const changed = await construction(index)
+    if (JSON.stringify(changed) === JSON.stringify(start)) return `${phase}: on the ${kind}, the drag before the reset changed nothing, so the reset would prove nothing`
+    const pressed = await pressReset(index)
+    if (pressed.why) return `${phase}: on the ${kind}, the reset icon could not be pressed: ${pressed.why}`
+    const comes = await constructionComesBack(index, start)
+    if (!comes.back) return `${phase}: on the ${kind}, the press at (${pressed.x}, ${pressed.y}), where geogebraFences.reset.icon puts the reset icon, did not bring it back to what it opened as, ${JSON.stringify(start)}: it holds ${JSON.stringify(comes.now)}. Either the icon is no longer there to press (a sketch it misses is left as dragged), or reset did not put it back`
+    const usable = await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); const r = box.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { shades: document.querySelectorAll(".gwt-PopupPanelGlass").length, onTop: !!top && top.tagName === "CANVAS" && box.contains(top), top: top ? top.tagName + "." + top.className : null } })()`)
+    if (usable?.shades !== 0 || !usable?.onTop) return `${phase}: after a reset the ${kind} is shaded over: ${usable?.shades} shades, ${usable?.top} at its centre`
+    const again = await change()
+    if (again.why) return `${phase}: after a reset the ${kind} could not be dragged: ${again.why}`
+    const draggedAgain = await construction(index)
+    if (JSON.stringify(draggedAgain) === JSON.stringify(start)) return `${phase}: after a reset the ${kind} no longer takes a drag`
+    return ""
+  }
+  // 12 (#792 review M1): the sketch at `index` on this page is tapped open
+  // and, while its lines run, Shift+Tab and Space are pressed again and
+  // again with real key events (Input.dispatchKeyEvent) with the focus in
+  // it - which reaches GeoGebra's reset icon through its own keyboard
+  // cycle - until its lines have run. Every line makes one point, so all
+  // of them must be there once they have, and again after a real press on
+  // the reset icon: a reset that got in while they ran left a sketch half
+  // built, and kept that half as its start.
+  const keysWhileLinesRun = async (phase, index) => {
+    tapped = true
+    const ready = await waitFor(`document.querySelectorAll("figure.pl-geogebra .pl-geogebra-open").length > ${index}`, 40)
+    if (!ready) return { why: "no such sketch on the page" }
+    await evaluate(`(() => { document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-open").click(); return true })()`)
+    const loaded = await waitFor(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[${index}]; return !!f && f.classList.contains("pl-geogebra-loaded") && !!f.querySelector(".pl-geogebra-applet canvas") })()`, 240)
+    if (!loaded) return { why: "it did not open" }
+    const ran = `document.querySelectorAll("figure.pl-geogebra")[${index}].dataset.geogebraCommands === "ran"`
+    const key = async (type, key, code, keyCode, modifiers, text) => send("Input.dispatchKeyEvent", { type, key, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, modifiers, ...(text ? { text } : {}) })
+    let presses = 0
+    let pressedBeforeRan = false
+    while (presses < 400 && (await evaluate(ran)) !== true) {
+      await evaluate(`(() => { const box = document.querySelectorAll("figure.pl-geogebra")[${index}].querySelector(".pl-geogebra-applet"); if (!box.contains(document.activeElement)) { let canvas = null; for (const each of Array.from(box.querySelectorAll("canvas"))) { if (canvas === null || each.width * each.height > canvas.width * canvas.height) canvas = each } canvas.focus() } return true })()`)
+      await key("rawKeyDown", "Tab", "Tab", 9, 8)
+      await key("keyUp", "Tab", "Tab", 9, 8)
+      await key("keyDown", " ", "Space", 32, 0, " ")
+      await key("keyUp", " ", "Space", 32, 0)
+      presses += 1
+      pressedBeforeRan = true
+    }
+    if (!pressedBeforeRan) return { why: "its lines had run before a key could be pressed, so the keys prove nothing" }
+    if (!(await waitFor(ran, 120))) return { why: "its lines did not finish running" }
+    const wanted = await evaluate(`JSON.parse(document.querySelectorAll("figure.pl-geogebra")[${index}].dataset.geogebra).commands.length`)
+    const count = async () => { const now = await construction(index); return now.names === "threw" ? -1 : now.names === "" ? 0 : now.names.split(",").length }
+    const built = await count()
+    const pressed = await pressReset(index)
+    if (pressed.why) return { why: `its reset icon could not be pressed: ${pressed.why}` }
+    let afterReset = -1
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      afterReset = await count()
+      if (afterReset === wanted) break
+      await pause(250)
+    }
+    return { presses, wanted, built, afterReset }
+  }
   const change = async (page) => {
     const target = urlOf(page)
     const changed = await evaluate(`(() => { if (typeof window.spaNavigate !== "function") return false; window.spaNavigate(new URL(${JSON.stringify(target)})); return true })()`)
@@ -327,6 +463,8 @@ async function connect(chunk) {
     await send("Page.addScriptToEvaluateOnNewDocument", { source: WATCH })
     const said = []
     let dragSaid = ""
+    let resetSaid = ""
+    let keysSaid = ""
     if (copies.length !== 1) problems.push(`the site holds ${copies.length} files with the sketch's SHA-256 (${copies.join(", ")}), not exactly one`)
     for (const phase of ["policy", "isolated"]) {
       isolated = phase === "isolated"
@@ -345,6 +483,9 @@ async function connect(chunk) {
       if (!commands.opened) problems.push(`${phase}: the sketch made from commands on ${pageA} did not open (${commands.why})`)
       // 7: which of its lines GeoGebra refused, and in what words.
       const ran = await waitFor(`document.querySelectorAll("figure.pl-geogebra")[1].dataset.geogebraCommands === "ran"`, 80)
+      // What each sketch holds as it opened, for the reset (11, #792).
+      const fileAtStart = await construction(0)
+      const linesAtStart = await construction(1)
       const lines = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const spec = JSON.parse(f.dataset.geogebra); const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; return { commands: spec.commands, shown: Array.from(f.querySelectorAll(":scope > .pl-geogebra-lines li")).map((li) => li.textContent), a: api && typeof api.getValue === "function" ? api.getValue("a") : null, dialogs: f.querySelectorAll(".dialogComponent").length } })()`)
       const refusals = new Map(contract.commands.cases.map((item) => [item.text, item.said]))
       const wanted = []
@@ -368,6 +509,17 @@ async function connect(chunk) {
       const drag = await dragSlider(1, "a")
       if (drag.why) problems.push(`${phase}: the commands sketch's slider a could not be dragged: ${drag.why}`)
       else if (drag.after === drag.before) problems.push(`${phase}: a real drag on the commands sketch's slider a left it at ${drag.before} - GeoGebra is not taking pointer input`)
+      // 11 (#792): the reset icon, pressed for real, on the sketch written
+      // as lines and on the sketch from a file. Before #792 the first came
+      // back empty (only the axes) and the second was removed, an empty box.
+      const linesReset = await resetComesBack(phase, 1, "sketch written as lines", linesAtStart, async () => {
+        const dragged = await dragSlider(1, "a")
+        return dragged.why ? dragged : { done: true }
+      })
+      if (linesReset) problems.push(linesReset)
+      const fileReset = await resetComesBack(phase, 0, "sketch from a file", fileAtStart, async () => await dragPoint(0, "A"))
+      if (fileReset) problems.push(fileReset)
+      resetSaid = linesReset || fileReset ? "" : `, the reset icon pressed for real on both, each back as it opened (${(linesAtStart.names.match(/,/g) ?? []).length + 1} objects and a = ${linesAtStart.a}; ${fileAtStart.names}) and dragged again`
       const removedTheOldWay = await evaluate(`(async () => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; const box = f.querySelector(".pl-geogebra-applet"); const api = window[box.id.replace(/-box$/, "")]; const came = new Promise((resolve) => { const watcher = new MutationObserver(() => { const dialog = box.querySelector(".dialogComponent"); if (dialog === null) return; dialog.remove(); for (const shade of Array.from(document.querySelectorAll(".gwt-PopupPanelGlass"))) shade.remove(); watcher.disconnect(); resolve(true) }); watcher.observe(box, { childList: true, subtree: true }); setTimeout(() => { watcher.disconnect(); resolve(false) }, 10000) }); api.setErrorDialogsActive(true); api.evalCommand(${JSON.stringify(contract.commands.endOfLine)}); api.setErrorDialogsActive(false); return await came })()`)
       const mustFail = removedTheOldWay === true ? await dragSlider(1, "a") : { why: "no dialog came to remove" }
       if (mustFail.why) problems.push(`${phase}: the must-fail could not run: ${mustFail.why}`)
@@ -406,6 +558,11 @@ async function connect(chunk) {
       const credit = await evaluate(`(() => { const f = document.querySelectorAll("figure.pl-geogebra")[1]; return Array.from(f.querySelectorAll(".pl-geogebra-attribution a")).map((a) => a.getAttribute("href")) })()`)
       const wantedCredit = [contract.attribution.engineUrl, contract.attribution.materialUrl.replace("{id}", "plantoirvrfy578"), contract.attribution.licenceUrl]
       if (JSON.stringify(credit) !== JSON.stringify(wantedCredit)) problems.push(`${phase}: the geogebra.org sketch's links are ${JSON.stringify(credit)}, not ${JSON.stringify(wantedCredit)}`)
+      // 12 (#792 review M1): keys pressed while a long sketch's lines run.
+      const keyed = await keysWhileLinesRun(phase, 2)
+      if (keyed.why) problems.push(`${phase}: the long sketch on ${pageB}: ${keyed.why}`)
+      else if (keyed.built !== keyed.wanted || keyed.afterReset !== keyed.wanted) problems.push(`${phase}: with Shift+Tab and Space pressed ${keyed.presses} times while the long sketch's ${keyed.wanted} lines ran, it held ${keyed.built} of their ${keyed.wanted} points once they had run, and ${keyed.afterReset} after a press on its reset icon: a reset got in while the lines ran`)
+      else keysSaid = `, ${keyed.presses} presses of Shift+Tab and Space while a ${keyed.wanted}-line sketch ran left all ${keyed.wanted} of its points, and its reset brought back all ${keyed.afterReset}`
       const backToA = await change(pageA)
       if (!backToA.changed) problems.push(`${phase}: Quartz's page change back to ${pageA} did not happen`)
       const third = await tap(0)
@@ -468,7 +625,7 @@ async function connect(chunk) {
       for (const line of refusedInLog) problems.push(`${phase}: the browser said: ${line}`)
       for (const violation of violations) problems.push(`${phase}: securitypolicyviolation ${violation}`)
       for (const url of offSite) problems.push(`${phase}: a request left the site: ${url}`)
-      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
+      said.push(`${phase}: first sketch ${first.ms} ms and ${first.bytes.toLocaleString("en-CA")} bytes in ${first.requests} requests, ${first.compressed.toLocaleString("en-CA")} gzipped (its loader frame under <html>, kept across both page changes), from commands ${commands.ms} ms (${refusedLines} of its lines refused, as the contract says; ${dragSaid}${resetSaid}${keysSaid}), after a page change ${second.ms} ms, the geogebra.org sketch's saved copy ${material.ms} ms, back again ${third.ms} ms${quizSaid}, ${blocked.length + violations.length + refusedInLog.length} refusals, ${offSite.length} requests off the site, beforeprint ${fired ? "fired" : "not fired"} by printToPDF`)
     }
     clearTimeout(timer)
     if (problems.length > 0) return finish(1, "FAIL: " + problems.join("\n"))

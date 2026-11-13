@@ -1311,6 +1311,29 @@ else
   cat /tmp/verify_page_sources_test.log
 fi
 
+# ---- build_site.py: the map Plantoir shows on a section's Coverage tab (#793) ----
+# Every coverageTab counting case both ways (the site's count, and the count
+# if every page were published) through the build's own process_frontmatter,
+# which is why it runs in the image; the count lines, the links, the
+# escaping, the colours, the record and where it is written; and that no
+# deploy and no page of the site carries it. The three launchers are
+# mounted because the test reads deploy.sh's folder publish and runs each
+# one's clear of a course's built sites (#789), and the image carries no
+# launcher at /opt. The site's own map is test_coverage_maps.py, in step 0.
+echo ""
+echo "🔎 Checking the coverage map Plantoir shows for a section…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_coverage_tab.py" /opt/scripts/test_coverage_tab.py),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/deploy.sh" /opt/deploy.sh),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/preview.sh" /opt/preview.sh),readonly" \
+  --mount "$(bind_mount_argument "$(pwd)/setup.sh" /opt/setup.sh),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_coverage_tab.py >/tmp/verify_coverage_tab_test.log 2>&1; then
+  pass "build_site.py: the coverage map for a section's Coverage tab counts, says and sits where the contract says (scripts/test_coverage_tab.py, #793)"
+else
+  fail "build_site.py: the coverage map for a section's Coverage tab does not count, say or sit where the contract says (scripts/test_coverage_tab.py, #793)"
+  cat /tmp/verify_coverage_tab_test.log
+fi
+
 # ---- the published-pages record (#379) ----
 # The build's list of the pages it shows (beside public/, never inside it,
 # written only after the site was built), deploy.py's fragment after each
@@ -2574,6 +2597,7 @@ restore_hit_fixture() {
         "$HIT_COURSE/Task Fixture.md" "$HIT_COURSE/Task CRLF.md" "$HIT_COURSE/Task Host.md" \
         "$HIT_COURSE/Task Twin A.md" "$HIT_COURSE/Task Twin B.md" "$HIT_COURSE/Task Printable.md" \
         "$HIT_COURSE/Task Raw Box.md" "$HIT_COURSE/Task Loose.md" "$HIT_COURSE/Progress Fixture.md" \
+        "$HIT_COURSE/Discussions/Coverage Tab Hidden.md" \
         "$HIT_COURSE/Wrap Fixture.md" "$HIT_COURSE/Wrap Plain Twin.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
@@ -3395,6 +3419,15 @@ open(path, "w", encoding="utf-8").write(text)
 GGBCOMMANDS
 printf -- '---\ntitle: GeoGebra Second\n---\nThe same sketch, from another folder (plantoir-geogebra-second).\n\n```geogebra\nfile: Investigations/GeoGebra Fixture Lines.ggb\nalt: The planted sketch again (plantoir-alt-second).\n```\n\nA sketch from geogebra.org, kept from before:\n\n```geogebra\nmaterial_id: https://www.geogebra.org/m/plantoirvrfy578\nalt: A sketch from geogebra.org (plantoir-alt-material).\n```\n' \
   > "$HIT_COURSE/Discussions/GeoGebra Second.md"
+# #792 review M1: a long sketch written as lines, 150 points, so that its
+# lines run long enough for the browser check (item 12) to press keys while
+# they do. Every line makes one point: the check counts them.
+python3 - "$HIT_COURSE/Discussions/GeoGebra Second.md" <<'GGBLONG'
+import sys
+lines = "".join(f"P_{{{n}}} = ({n % 9 - 4}, {n % 7 - 3})\n" for n in range(150))
+with open(sys.argv[1], "a", encoding="utf-8") as page:
+    page.write("\nA long sketch written as lines:\n\n```geogebra\nalt: One hundred and fifty points (plantoir-alt-long).\n" + lines + "```\n")
+GGBLONG
 # Stage 4: that geogebra.org sketch's SAVED COPY, beside the course's built
 # sites under the fence's key, as an earlier build would have left it - so
 # this build must ask geogebra.org nothing (geogebraFences.cache). The id is
@@ -3955,6 +3988,16 @@ A page planted for the My Progress check (plantoir-progress-sentinel-545).
 PROGRESSFIXTURE
 printf '\n- [[Progress Fixture]]\n' >> "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
 
+# ---- #793: a hidden lesson for the map Plantoir shows on the Coverage tab ----
+# Not yet published, linked from the same class page (put back by
+# restore_hit_fixture with it), and transcluding Z1.1, #569's planted
+# expectation, which nothing else addresses: so the site's map shows Z1.1 as
+# not yet addressed while the map as if every page were published shows it
+# addressed once. The #333 finding names this link too, which is true.
+printf -- '---\ntitle: Coverage Tab Hidden\npublish: false\n---\nA lesson planted by verify.sh for #793, not yet published.\n\n![[Z1.1]]\n' \
+  > "$HIT_COURSE/Discussions/Coverage Tab Hidden.md"
+printf '\n- [[Coverage Tab Hidden]]\n' >> "$HIT_COURSE/section1/All Classes/Unit 1, Day 2.md"
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 # Whether the course had its link before this run: a brand-new working copy
 # has none, and that is the run where the launcher's clear used to take the
@@ -4180,6 +4223,57 @@ if [[ -f "$SITE_PUBLIC/Curriculum-Coverage.html" ]] \
   pass "A % in an expectation's file name builds, and the coverage map links the page Quartz serves (#569)"
 else
   fail "The coverage map's link to a page named with % is wrong, or the page is missing (#569): $SITE_PUBLIC/Curriculum-Coverage.html, $SITE_PUBLIC/Curriculum/Z1.-Planted-100-percent-Overall.html"
+fi
+
+# ---- 6h, continued: the map for the Coverage tab, beside the site (#793) ----
+# Read straight after the main build, before any later build replaces it.
+# The planted hidden lesson addresses Z1.1: the site's own map, unchanged,
+# shows it not yet addressed, and the map as if every page were published,
+# beside public/, shows it addressed once, links it, and is this build's.
+if python3 - "courses/EXC2O/.merged_output/section1" "$SITE_PUBLIC/Curriculum-Coverage.html" <<'COVERAGETABPY'
+import json, sys
+from pathlib import Path
+section, site_map = Path(sys.argv[1]), Path(sys.argv[2])
+problems = []
+folder = section / ".coverage-tab"
+try:
+    record = json.loads((folder / "about.json").read_text(encoding="utf-8"))
+except (OSError, ValueError) as error:
+    print(f"   no readable about.json beside the site: {type(error).__name__}")
+    sys.exit(1)
+owner = (section / ".build-id").read_text(encoding="utf-8").strip()
+if record.get("version") != 1 or record.get("buildId") != owner:
+    problems.append(f"the record is not this build's (buildId {record.get('buildId')!r}, .build-id {owner!r})")
+page = folder / str(record.get("page"))
+text = page.read_text(encoding="utf-8") if page.is_file() else ""
+if not text:
+    problems.append(f"the page about.json names is not there: {record.get('page')!r}")
+if 'aria-label="Z1.1, addressed once"' not in text:
+    problems.append("the tab's map does not show Z1.1 addressed once")
+if f'href="plantoir-coverage:open/{owner}/0/Z1.1"' not in text:
+    problems.append("the tab's map does not link Z1.1 as plantoir-coverage:open/<buildId>/0/Z1.1")
+if record.get("hiddenPagesCounted", 0) < 1:
+    problems.append("the record counts no page students cannot see yet")
+if "<script" in text.lower() or "https:" in text.lower():
+    problems.append("the tab's map carries a script or an outside reference")
+site = site_map.read_text(encoding="utf-8") if site_map.is_file() else ""
+if 'aria-label="Z1.1, not yet addressed"' not in site:
+    problems.append("the site's own map does not show Z1.1 not yet addressed: it counted a hidden page")
+public = section / "public"
+if list(public.rglob(".coverage-tab")):
+    problems.append("the site holds a .coverage-tab folder")
+for built in public.rglob("*.html"):
+    if "plantoir-coverage" in built.read_text(encoding="utf-8", errors="replace"):
+        problems.append(f"a page of the site names plantoir-coverage: {built.relative_to(public)}")
+        break
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+COVERAGETABPY
+then
+  pass "The map for the Coverage tab is beside the site, this build's, counts the hidden lesson the site's map does not, and is nowhere in the site (#793)"
+else
+  fail "The map for the Coverage tab is missing, wrong or inside the site (#793) - see the lines above"
 fi
 
 # ---- 6h, continued: a folder page's table of contents (#520) ----
@@ -5754,9 +5848,9 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   if node browser-checks/geogebra_applet.mjs "$PRINT_CHROME" "$GEOGEBRA_SITE" /Investigations/GeoGebra-Fixture.html \
        /Discussions/GeoGebra-Second.html "$HIT_COURSE/Investigations/GeoGebra Fixture Lines.ggb" \
        /Investigations/Quiz-GeoGebra.html >>/tmp/verify_geogebra_applet.log 2>&1; then
-    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, browser-checks/geogebra_applet.mjs)"
+    pass "GeoGebra sketches in a browser, under the policy a Netlify publish sends and again cross-origin isolated, served on [::1]: nothing fetched before a tap, a file sketch and one from commands opened, opened again after the site's own page change and back, a picture of each for paper with the printed attribution, the commands sketch's refused lines exactly the contract's in GeoGebra's own words and none of the working ones, then no shade of GeoGebra's left on the page, the sketch's own canvas at its centre and its slider moved by a real drag - and the must-fail, a dialog removed the way the loader did before #755, leaving the same drag unmoved (#755), GeoGebra's reset icon pressed for real on the commands sketch and the file sketch, each back as it opened and taking a drag again, and real Shift+Tab and Space while a 150-line sketch's lines ran leaving every point (#792), the geogebra.org sketch opened from the site's copy with its author and licence linked, on a quiz page nothing fetched until the explanation's sketch was shown and tapped and the shuffled question's sketch the same working applet after a print, no refusal by the policy, no request off the site, the sketch on the site once - $(grep '^OK: ' /tmp/verify_geogebra_applet.log | head -1 | sed 's/^OK: //') (#578, #755, #792, browser-checks/geogebra_applet.mjs)"
   else
-    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, were published twice, or once their lines had run were shaded over or would not take a drag (browser-checks/geogebra_applet.mjs, #578, #755)"
+    fail "GeoGebra sketches did not open under the Netlify policy, after a page change or cross-origin isolated, or were refused, left the site, were published twice, or once their lines had run were shaded over or would not take a drag, or did not come back as they opened after a press on the reset icon, or were left half built by keys pressed while their lines ran (browser-checks/geogebra_applet.mjs, #578, #755, #792)"
     cat /tmp/verify_geogebra_applet.log
   fi
   rm -rf "$GEOGEBRA_SITE"
@@ -6802,6 +6896,21 @@ if ! grep -q "🔁" /tmp/verify_reuse_again.log; then
 else
   fail "the deploy after a build built again, so every deploy would (#768)"
   tail -20 /tmp/verify_reuse_again.log
+fi
+# #793: after deploys to a folder, the last of them reusing the build, the
+# folder holds no map for the Coverage tab and names none, and the map beside
+# the site is still the one its build made: about.json's buildId is the
+# section's .build-id, and the page it names is there.
+TC_MAP_OWNER="$(tr -d '[:space:]' < "$TC_SECTION/.build-id" 2>/dev/null || true)"
+TC_MAP_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("buildId",""))' "$TC_SECTION/.coverage-tab/about.json" 2>/dev/null || true)"
+TC_MAP_PAGE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("page") or "")' "$TC_SECTION/.coverage-tab/about.json" 2>/dev/null || true)"
+if [[ -z "$(find "$TC_OUT" -name '.coverage-tab' 2>/dev/null)" ]] \
+   && ! grep -rqF "plantoir-coverage" "$TC_OUT" 2>/dev/null \
+   && [[ -n "$TC_MAP_OWNER" && "$TC_MAP_ID" == "$TC_MAP_OWNER" ]] \
+   && [[ -n "$TC_MAP_PAGE" && -f "$TC_SECTION/.coverage-tab/$TC_MAP_PAGE" ]]; then
+  pass "and the folder publish carries no map for the Coverage tab, while the map beside the reused build is still that build's (#793)"
+else
+  fail "a folder publish carries the Coverage tab's map, or after a reused build the map is not that build's (owner '${TC_MAP_OWNER:-none}', map '${TC_MAP_ID:-none}', page '${TC_MAP_PAGE:-none}') (#793)"
 fi
 rm -rf "$TC_OUT"
 # END the old-workspace and reuse checks (#746, #748, #768)
