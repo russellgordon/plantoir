@@ -37,4 +37,7 @@ record; the lead decides.
 
 ## Never
 
+- Never write a copy of a page, a paper or a sheet anywhere but `<marking folder>/<Assessment>/Work/`, never the
+  system's temporary folder: to see a page as a picture, use `Scripts/render_pages.py ... --into` that folder.
+
 - Never repeat a name you see; write `NAME VISIBLE page N`. Never look for, list or open the teacher-only folder.

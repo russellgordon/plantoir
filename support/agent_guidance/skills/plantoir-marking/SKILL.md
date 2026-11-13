@@ -31,9 +31,13 @@ Every mark, level and comment I draft is a suggestion. Grading is your professio
 
 Before any student's work is opened, and before any scan is boxed, say
 these four points to the teacher, in these words or very close to them.
-Say them even when the teacher says they have read them: the same four
-points are on the first page of the file of boxed papers they look
-through, but that comes later.
+Say them even when the teacher says they have read them. This is a
+request, and it is not what the teacher relies on: "Box the papers" shows
+the same four points, word for word, in its own window before it asks for
+the teacher-only folder, takes the teacher's yes to them and records it
+(`<Assessment>/Privacy points shown.json`), and `--verify` reads nothing
+as confirmed without that record. The cover of the file they look
+through carries them too.
 
 ```text wrap
 Before we start, four things about your students' privacy:
@@ -70,6 +74,15 @@ one line:
 - **Never write a name, or a student's work, into your memory, a note, a
   log, a brief, a summary, `.internal`, or anything under `courses/`.**
   Identifiers only, everywhere you write.
+- **Everything you make while marking goes in `<Assessment>/Work/` in the marking folder, and nowhere else.**
+  Pictures of pages, notes to yourself, drafts, a reviewer's files: there.
+  Never write a copy of a paper, a page or a sheet anywhere else, and
+  never into the system's temporary folder (`/tmp`, `/private/tmp`,
+  `$TMPDIR`, `/var/folders`, or Windows' `%TEMP%`): anyone on the computer
+  can read it, and nothing cleans it up. To look at a page as a picture,
+  use `scripts/render_pages.py` (section 11), which writes only there.
+  Before you call the marking finished, run `teacher_only.py --tidy`
+  (section 14).
 - **Never send anything anywhere**, and never decide a final mark.
 
 ## 3. If a name appears
@@ -149,6 +162,9 @@ Inside them, for one assessment (a test's name, such as `Unit 2 Test`):
   <Assessment>/Box the papers - what it said.txt   what the boxing printed, for you to read
   <Assessment>/Redacted/Section N/          boxed papers, Student A.pdf, there only after the teacher's yes
   <Assessment>/Teacher looked.json          what the teacher said yes to: identifiers and SHA-256
+  <Assessment>/Privacy points shown.json    the record that Box the papers showed the four points
+  <Assessment>/Work/                        everything you make while marking, pictures of pages included
+  Box the papers - last stop.txt            what a launcher said when it last stopped, for you to read
   <Assessment>/Marks/Section N/             marks records, Student A.json
   <Assessment>/Sheets/Section N/            identifier sheets, drafts and final
   <Assessment>/Briefs/                      the marker and reviewer briefs
@@ -363,6 +379,9 @@ where you read.
    files were left alone because they were not named like an identifier.
    Tell the teacher, by identifier and count. Any line that starts
    `Stopped:` means stop: nothing may be read, as when Poppler is missing.
+   When the teacher says a launcher stopped, read `Box the papers - last
+   stop.txt` (or `Put names on the sheets - last stop.txt`) in the marking
+   folder: it says what to put right, and holds no name.
 
    If the teacher says no (a name shows on Student C, page 2): they rescan
    that paper, or you move the box (`--box` in `Box request.json`), and
@@ -494,8 +513,17 @@ python3 -B "<marking folder>/Scripts/build_test_sheet.py" --kit "<kit>/answers.j
 It writes `Student A - Feedback.pdf` (for the student) and `Student A -
 Marks by Question.pdf` (for the teacher), identifiers only, and their
 `.tex`. `reference/test-sheets.md` says what the sheet holds and why. Render
-every page of every draft into a temporary folder outside the working
-folder (`pdftoppm -png -r 80`) and look at each one before handing over.
+every page of every draft into the assessment's `Work` folder, with
+`scripts/render_pages.py` copied into `Scripts/` and self-tested like the
+others, and look at each one before handing over:
+
+```text wrap
+python3 -B "<marking folder>/Scripts/render_pages.py" "<marking folder>/<Assessment>/Sheets/Section 1/Student A - Feedback.pdf" --into "<marking folder>/<Assessment>/Work"
+```
+
+The same command, given a boxed paper, is how you look at a page as a
+picture. It refuses any folder that is not called `Work`, and the
+system's temporary folders.
 
 **Links into the course site.** A focus item's `topics` name pages in the
 kit. Each page's address is the section's site address (the section's own
@@ -543,6 +571,21 @@ recipe. A student's own answers, a teacher's own test and the course's
 subject matter are quoted as they are.
 
 ## 14. When the marking is done
+
+Before you call the marking finished, look for copies of this
+assessment's papers, sheets or pictures of them outside the marking
+folder:
+
+```text wrap
+python3 -B .claude/skills/plantoir-marking/scripts/teacher_only.py --tidy "<marking folder>/<Assessment>"
+```
+
+It looks in the system's temporary folders for files named with the
+assessment's or the marking folder's name, or with the same bytes as a
+paper, a sheet, a marks record or a file in `Work`. **While it says "Not finished", the marking is not finished:** remove what it
+found (you made it) or ask the teacher to, and run it again. Say plainly
+what it cannot find: a picture named some other way, a copy anywhere else,
+and anything already sent to the AI service.
 
 Look for `.claude/skills/plantoir-report-comments/SKILL.md` (or
 `.agents/skills/plantoir-report-comments/SKILL.md`) in this working folder;

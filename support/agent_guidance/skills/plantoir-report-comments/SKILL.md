@@ -87,11 +87,12 @@ set anything up inside this working folder.
   <Assessment>/Marking Rules Applied.md        the rulings, which explain some marks
   <Term> Comments/Comments.json                your drafts, identifiers only
   <Term> Comments/Comments - Drafts.md         the same drafts, for the teacher and the reviewer to read
-  <Term> Comments/Teacher Notes.md             the teacher's own notes by identifier, only if they write some
+  <Term> Comments/Teacher Notes (checked).md   the teacher's notes, copied here only after the name check passed
   Names request.json                           the step that needs names, asked for (section 7)
   Put names on the sheets - what it said.txt   what that step printed, for you to read
 the teacher-only folder (you never see it):
   Name Mapping Table.csv                       never opened
+  <Term> Comments/Teacher Notes.md             the teacher's own notes by identifier, if they write some; never opened
   <Term> Comments/Named/Report Comments.csv    written by the script; never opened
   <Term> Comments/Named/Report Comments.md     the same, to read; never opened
 ```
@@ -171,18 +172,21 @@ first.
 - **Something no record holds** (a coding assignment, a project, class
   discussion): say plainly that there is no record of it. If the teacher
   wants it in the comments, ask them to write notes by identifier, never
-  with a name, in `<Term> Comments/Teacher Notes.md`. Before you read
-  them, have them checked (section 7, step 1, which checks them as it
-  finds the longest first name), and read them only if
-  it finds no word from the table. The check looks for every part of every
-  name in the table, a two-letter first name too, and cannot see a
-  nickname, initials or a name that is not in the table: ask the teacher to
-  read the notes once for those before you open them.
+  with a name, as `<Term> Comments/Teacher Notes.md` in their
+  TEACHER-ONLY folder (never in the marking folder: the launcher stops if
+  they are there). The notes reach you only as a checked copy, which
+  "Put names on the sheets" writes during the step in section 7 (step 1):
+  **Read only `<Term> Comments/Teacher Notes (checked).md` in the marking folder, and only when its first line is the record that begins `<!-- Checked by Put names on the sheets`.**
+  It exists only when no line of the notes held a word from the name
+  table. Never ask the teacher to paste their notes into the chat or to
+  put them anywhere else. The check looks for every part of every name in
+  the table, a two-letter first name too, and cannot see a nickname,
+  initials or a name that is not in the table: ask the teacher to read the
+  notes once for those.
 
-  If it names lines, tell the teacher the line numbers and do not open
-  the file until they have changed them, or have told you, naming the
-  line, that it is not about a student (a name in the table can also be an
-  everyday word). Say in the comment's entry that it draws on the notes
+  If the step names lines instead, tell the teacher the line numbers; no
+  copy is made until they have changed them (a name in the table can also
+  be an everyday word, so the teacher may reword the line). Say in the comment's entry that it draws on the notes
   (`"teacherNotes": true`); `cites` holds marks records only.
 
 ## 6. How the name appears
@@ -231,8 +235,8 @@ in the marking folder. You never run a step that reads the table yourself,
 because you never know where the table is.
 
 1. **Before drafting**, have the longest first name's length found, as a
-   number (never the name), and the teacher's notes checked if there are
-   any:
+   number (never the name), and the teacher's notes checked and copied to
+   you if there are any:
 
    ```json
    {"do": "comment-facts", "term": "Term 1"}

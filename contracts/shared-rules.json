@@ -28023,6 +28023,10 @@
           "you need not know its name or where it is",
           "Never suggest a name or a place for it",
           "**What the teacher is trusting**",
+          "**Everything you make while marking goes in `<Assessment>/Work/` in the marking folder, and nowhere else.**",
+          "never into the system's temporary folder",
+          "**While it says \"Not finished\", the marking is not finished:**",
+          "This is a request, and it is not what the teacher relies on",
           "and never the teacher-only folder's path",
           "A listing of the marking folder's parent folder, or of any folder above it, can show the names of files the teacher keeps",
           "A pin finds a well-meant change, such as an adapted copy; it would not catch someone who changed a file and every pin together.",
@@ -28085,7 +28089,8 @@
           "**three options per student**",
           "**Evidence from the records only.**",
           "say plainly that there is no record of it",
-          "read them only if it finds no word from the table",
+          "**Read only `<Term> Comments/Teacher Notes (checked).md` in the marking folder, and only when its first line is the record that begins `<!-- Checked by Put names on the sheets`.**",
+          "Never ask the teacher to paste their notes into the chat",
           "written so that no pronoun is needed",
           "**Length is checked after the names go in.**",
           "**Every script that reads the name mapping table is run through `run_with_names.py`, never directly.**",
@@ -39389,7 +39394,8 @@
           "scripts/build_test_sheet.py",
           "scripts/run_with_names.py",
           "scripts/class_results.py",
-          "scripts/teacher_only.py"
+          "scripts/teacher_only.py",
+          "scripts/render_pages.py"
         ],
         "launchers": [
           "launchers/Box the papers.command",
