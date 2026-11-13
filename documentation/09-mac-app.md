@@ -10067,6 +10067,25 @@ twelve thousand files and changed none wrote no line.
     inputs it hashed all 12,912 files and wrote the same manifest byte for
     byte. So the inputs are declared, the output is declared, and sandboxing
     is not turned off.
+  - **Compiled Python first (#747).** Before it fingerprints anything, the
+    phase deletes every `__pycache__` folder and `.pyc` or `.pyo` file under
+    the bundle's four folders, never through a link (a linked recipe folder
+    fails the build), and prints `removed N compiled Python files`, so
+    no cache a hand-run test left in the checkout reaches the app, a
+    working folder or the image tag
+    ([03 → Compiled Python is not part of the recipe](03-launcher-scripts.md#compiled-python-is-not-part-of-the-recipe-github-747)).
+    Measured 2026-11-12 (Xcode 27.0, 27A266a): at the default (NO) a Debug
+    build of a checkout with 20 stray `.pyc` removed all 20 and listed none,
+    twice. **Under YES the sandbox refuses the delete** (`deny(1)
+    file-read-data …/Resources/scripts/__pycache__`, `Operation not
+    permitted`), and it still refused with the four folders declared as
+    outputs as well. Xcode's generated profile (the `.sb` beside the phase's
+    script) allows each declared input and output as a `literal` path; why
+    it lets the phase read the files in those folders and not open
+    `__pycache__` was not established. Under YES the phase therefore FAILS
+    the build with a sentence naming #747 that says to remove the
+    checkout's caches, rather than shipping them. The folders are not
+    declared as outputs, since that bought nothing.
 - **Each working folder gets an index**: the manifest last applied to it,
   with each copy's own length and time read back from the disk. It lives at
   `<RealHome.forFiles>/Library/Application Support/Plantoir/toolchain-index/<BuildOutputLocation.folderIdentifier>.hashes`,

@@ -297,6 +297,13 @@ else
   cat /tmp/verify_recipe_folders_test.log
 fi
 
+if (cd scripts && python3 test_toolchain_bytecode.py) >/tmp/verify_toolchain_bytecode_test.log 2>&1; then
+  pass "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+else
+  fail "compiled Python never reaches the bundle or renames the image (scripts/test_toolchain_bytecode.py, #747)"
+  cat /tmp/verify_toolchain_bytecode_test.log
+fi
+
 if (cd scripts && python3 test_starting_content_prompts.py) >/tmp/verify_starting_content_test.log 2>&1; then
   pass "setup_course.py: what a teacher who declined the ready-made pages is told, and what lands in the course (scripts/test_starting_content_prompts.py)"
 else
@@ -756,6 +763,20 @@ else
   cat /tmp/verify_deploy_toolchain_stamp_test.log
 fi
 
+# The social sharing card opens only the fonts Plantoir offers (GitHub #766):
+# every socialCardFonts case through social_card.py's own functions, a real
+# file at an absolute path or beyond ../ never opened, and the apps' font
+# catalogs pinned to the list. Skips where the host Python has no Pillow
+# (Windows' PythonToolchainTests runs it on the runtime's). The card's half
+# runs again inside the image, against the baked script and contract, after
+# the image is built.
+if (cd scripts && python3 test_social_card_fonts.py) >/tmp/verify_social_card_fonts_test.log 2>&1; then
+  pass "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
+else
+  fail "the social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py, #766)"
+  cat /tmp/verify_social_card_fonts_test.log
+fi
+
 # A deploy reuses the last build only when nothing has changed (GitHub #768,
 # #741): every buildFreshness.reuseTheLastBuild case through toolchain_paths
 # and deploy.sh's own question, and the real deploy.sh and deploy.py.
@@ -1056,25 +1077,32 @@ else
 fi
 
 # Nothing may have left bytecode behind. PYTHONDONTWRITEBYTECODE above stops
-# the runs in THIS script, but `scripts/` is a folder reference in the app's
-# project — whatever sits in it is copied into the bundle, mirrored into every
-# working folder's `.toolchain/`, and hashed into the image tag. A `.pyc` there
-# hands teachers a rebuild for nothing, and `.gitignore` hides it from `git
+# the runs in THIS script, but `patches/`, `scripts/`, `support/` and
+# `contracts/` are folder references in the app's project: whatever sits in them
+# is copied into the bundle, mirrored into every working folder's
+# `.toolchain/`, and (before #747) hashed into the image tag. A `.pyc` there
+# handed teachers a rebuild for nothing, and `.gitignore` hides it from `git
 # status`, so a hand-run test that littered would never be noticed. Ten of them
 # were found in a working folder's `.toolchain/` on 2026-09-09, mirrored from a
 # bundle that had been carrying them for some time. The app's own
 # `copyToolchainFiles` removes extraneous files, so a clean bundle heals a
-# folder on the next touch; this keeps the bundle clean.
-if [ -z "$(find scripts -name '__pycache__' -print -quit 2>/dev/null)" ]; then
-  pass "no bytecode left in scripts/, which ships inside the app"
+# folder on the next touch. Since #747 the build phase removes bytecode from
+# the bundle (mac-app/BuildScripts/write_toolchain_hashes.py), the launchers'
+# toolchain_hash skips it, and publish.sh refuses a bundle that still has it.
+# This check stays for the checkout: this script's own image is built from the
+# working tree, whose `COPY support/` and `COPY contracts/` would bake a stray
+# cache in, and the line below names the hand run that wrote it.
+_bytecode_found="$(find patches scripts support contracts \( -name '__pycache__' -o -name '*.pyc' -o -name '*.pyo' \) -print 2>/dev/null)"
+if [ -z "$_bytecode_found" ]; then
+  pass "no bytecode left in patches/, scripts/, support/ or contracts/, which ship inside the app"
 else
-  fail "scripts/__pycache__ exists — it would be copied into the app bundle, mirrored into every working folder's .toolchain/, and change the image tag"
-  find scripts -name '__pycache__' -print
-  echo "   Remove it and run again:  rm -rf scripts/__pycache__"
-  echo "   It gets there from running a test file BY HAND — this script exports"
+  fail "compiled Python is in the folders the app carries (patches/, scripts/, support/, contracts/)"
+  echo "$_bytecode_found"
+  echo "   Remove it and run again:"
+  echo "     find patches scripts support contracts -name __pycache__ -prune -exec rm -rf {} +"
+  echo "   It gets there from running a test file BY HAND. This script exports"
   echo "   PYTHONDONTWRITEBYTECODE, a bare 'python3 scripts/test_x.py' does not,"
   echo "   and importing the module under test is what writes the .pyc."
-
 fi
 
 export PLANTOIR_TRAIL_DIR="$VERIFY_TRAIL_DIR"
@@ -2174,6 +2202,64 @@ if [[ "$DEBIAN_FLOOR_REPORT" == OK* ]]; then
   pass "The image's Debian packages are at least their security floors (#714): ${DEBIAN_FLOOR_REPORT#OK }"
 else
   fail "The image's Debian packages do not meet contracts/toolchain.json's floors (#714): ${DEBIAN_FLOOR_REPORT#PROBLEMS }"
+fi
+
+# The card's font rule, inside the image (#766): the baked social_card.py, the
+# baked contract and the image's own Pillow, which is the one that decodes.
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/test_social_card_fonts.py" /opt/scripts/test_social_card_fonts.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/test_social_card_fonts.py TheCardsFontRule >/tmp/verify_social_card_fonts_image_test.log 2>&1; then
+  pass "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
+else
+  fail "the image's social sharing card opens only the fonts Plantoir offers (scripts/test_social_card_fonts.py TheCardsFontRule, #766)"
+  cat /tmp/verify_social_card_fonts_image_test.log
+fi
+
+# Pillow's Brotli (#766). Pillow's FreeType decodes WOFF2 fonts with the
+# Brotli its wheel carries, here a shared library in pillow.libs whose file
+# name ends in its version. contracts/toolchain.json -> pins -> pillow ->
+# carriesBrotli records which, because 1.2.0 is affected by CVE-2026-111497
+# and no Pillow release carries a fixed one yet. The day Pillow is moved this
+# goes red, so the field (and doc 02's record) is updated on purpose.
+PILLOW_BROTLI_REPORT="$(python3 - "$DEV_TEST_IMAGE" <<'BROTLIPY'
+import json, subprocess, sys
+pin = None
+for entry in json.load(open("contracts/toolchain.json"))["pins"]:
+    if entry.get("pin") == "pillow":
+        pin = entry
+if pin is None or not pin.get("carriesBrotli"):
+    print("PROBLEMS the pillow pin names no carriesBrotli")
+    sys.exit(0)
+# What to do, said with every failure: the check exists so that a Pillow
+# move is noticed, and the person who meets it needs the next step.
+next_step = (". Pillow's Brotli has changed, so measure it again and set pins -> pillow -> carriesBrotli "
+             "to the version found, and update documentation/02-docker-image.md -> \"Pillow's Brotli (#766)\". "
+             "Once it is " + pin.get("brotliFixedFrom", "the fixed version") + " or later, close the follow-up "
+             "\"Move Pillow to the first release whose Brotli is 1.2.1 or later\", which says what can then change.")
+inside = (
+    "import glob, os, PIL\n"
+    "site = os.path.dirname(os.path.dirname(PIL.__file__))\n"
+    "for path in sorted(glob.glob(os.path.join(site, 'pillow.libs', 'libbrotlidec-*'))):\n"
+    "    print(PIL.__version__, os.path.basename(path))\n"
+)
+run = subprocess.run(["docker", "run", "--rm", sys.argv[1], "python3", "-c", inside],
+                     capture_output=True, text=True)
+found = run.stdout.split()
+names = found[1::2]
+if not names:
+    print("PROBLEMS the image carries no pillow.libs/libbrotlidec-*: " + (run.stderr.strip()[-200:] or "no output")
+          + ". If Pillow now links Brotli in statically, read the version from the wheel's "
+          ".github/dependencies.json at its release tag, and change this check to match" + next_step)
+elif len(names) == 1 and names[0].endswith(".so." + pin["carriesBrotli"]):
+    print(f"OK Pillow {found[0]} carries {names[0]}, Brotli {pin['carriesBrotli']} as the pin says")
+else:
+    print(f"PROBLEMS Pillow {found[0]} carries {', '.join(names)}, and the pin says Brotli {pin['carriesBrotli']}" + next_step)
+BROTLIPY
+)"
+if [[ "$PILLOW_BROTLI_REPORT" == OK* ]]; then
+  pass "${PILLOW_BROTLI_REPORT#OK } (#766)"
+else
+  fail "Pillow's Brotli is not what contracts/toolchain.json -> pins -> pillow -> carriesBrotli says (#766): ${PILLOW_BROTLI_REPORT#PROBLEMS }"
 fi
 
 # Node, and the wrangler that runs on it (#640). The image's `node --version`
