@@ -2766,7 +2766,16 @@ managed section in `AGENTS.md` and `CLAUDE.md`. Where it runs and why:
   HOLDS"). There is no `sandbox-exec` on Windows, so a boxing script that
   writes outside both folders cannot be seen there; anything it writes into
   either folder outside the one it was given is still moved to the
-  teacher's Quarantine and the step stops (09 → "WHAT THE TEACHER TRUSTS"). They are checked out with
+  teacher's Quarantine and the step stops (09 → "WHAT THE TEACHER TRUSTS"). Since the second trial (09 → "The second trial of the
+  teacher-run design"): Box the papers shows the four privacy points in its
+  window and takes a yes to them before the folder; the report-comments
+  notes are kept in the teacher-only folder and reach the marking folder
+  only as `Teacher Notes (checked).md`; `scripts/render_pages.py` writes
+  pages only into an assessment's `Work` folder, and `teacher_only.py
+  --tidy` looks for copies in `tempfile.gettempdir()` and `%TEMP%`'s
+  equivalent (`TMPDIR` where set). All three are plain Python and run on
+  Windows unchanged; that the console shows the points well, and what
+  `--tidy` finds under a Windows `%TEMP%`, are NOT MEASURED. They are checked out with
   CRLF everywhere (`.gitattributes`), since cmd reads a batch file by CRLF
   and the skill pins their bytes. Written and checked as text on the Mac
   only: running them, the folder chooser, `python` finding the Microsoft
