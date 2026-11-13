@@ -286,7 +286,9 @@ Neither app contains toolchain logic of its own: they write the same
 
      **Widened 2026-11-10, for release work run by a Fable director (rule
      11).** Standing order from Russell: the director has authority to do
-     all necessary Git operations. That is committing, pushing, merging an
+     all necessary Git operations. (On either platform since 2026-11-13,
+     when he asked that the Windows session direct its release work the
+     same way; the method is the `direct-release` skill.) That is committing, pushing, merging an
      issue branch into `dev` with `--no-ff`, merging `dev` into `main`
      during a cut, tagging, merging `main` back into `dev`, and deleting
      merged branches, without asking per piece. Three limits:
@@ -1168,4 +1170,4 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`research/`](research/README.md) | Measurement records the code cites as evidence — the assistant's model choices, the preview-staleness findings. Not an automated gate; each file states its own conditions. |
 | [`mac-app/README.md`](mac-app/README.md) · [`windows-app/PROGRESS.md`](windows-app/PROGRESS.md) | Per-app build, test and layout notes. |
 | [`README.md`](README.md) | The repository's front page: sends teachers to plantoir.app and orients developers who want to fork. [`PRESENTATION.md`](PRESENTATION.md) is the 2025 workshop document it replaced, preserved as a historical artifact — leave it as it stands. |
-| `.claude/skills/` | Task-specific procedures: `example-content` (payloads and skeletons), `mac-app` (building so it can actually be run), `cut-release`. Invoke the skill rather than reconstructing its steps. |
+| `.claude/skills/` | Task-specific procedures: `example-content` (payloads and skeletons), `mac-app` (building so it can actually be run), `cut-release`, `ui-review` (the review page before a cut that changes the interface), `direct-release` (how a release run is directed, on either platform). Invoke the skill rather than reconstructing its steps. |
