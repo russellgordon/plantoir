@@ -1797,6 +1797,10 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     case noWorkingFolder
     case noSuchCourse(String)
     case noSuchSection(String, Int)
+    /// A call named no section, and the course has none or more than one, so
+    /// there is no one section it can mean (#865). Carries the course's
+    /// section numbers, sorted, so the sentence names the ones that exist.
+    case noSectionNamed(String, [Int])
     case noSuchPage(String, String, Int)
     case unreadablePage(String)
     case noClassOn(CalendarDay, String, Int)
@@ -1850,6 +1854,23 @@ enum AssistToolRefusal: LocalizedError, Equatable {
             return "There is no course called “\(code)” in this working folder."
         case .noSuchSection(let code, let number):
             return "\(code) has no Section \(number)."
+        case .noSectionNamed(let code, let numbers):
+            if numbers.isEmpty {
+                return AssistWording.noSectionNamedAndNoSections(course: code)
+            }
+            // "1", "1 and 2", "1, 2 and 3".
+            var listed: String = ""
+            for (position, number) in numbers.enumerated() {
+                if position == 0 {
+                    listed = String(number)
+                } else if position == numbers.count - 1 {
+                    listed += " and \(number)"
+                } else {
+                    listed += ", \(number)"
+                }
+            }
+            let word: String = numbers.count == 1 ? "Section" : "Sections"
+            return AssistWording.noSectionNamed(course: code, sections: "\(word) \(listed)")
         case .noSuchPage(let title, let code, let number):
             return "No page in \(code) Section \(number) is called “\(title)”. "
                  + "Use list_pages to find its exact title."
