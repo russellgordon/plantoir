@@ -145,6 +145,13 @@ class ScriptRunner {
     /// ordinary question.
     var pendingCredentialRequest: CredentialRequest?
 
+    /// The open share's two lists (#709), read from the launcher's marker
+    /// lines as they arrive, and whether the question waiting now is the one
+    /// they come before: that question is answered only in the lists' own
+    /// sheet, never the plain question alert (fix review H1).
+    var planShareLists: PlanShareLists?
+    var isAskingAboutPlanShareLists: Bool = false
+
     /// The answer the script would use if the teacher simply agreed —
     /// what it showed in square brackets. Offered in the answer field
     /// rather than left in the wording of the question.
@@ -469,6 +476,7 @@ class ScriptRunner {
     func send(line: String) {
         isAwaitingInput = false
         pendingCredentialRequest = nil
+        isAskingAboutPlanShareLists = false
         guard let terminal else {
             return
         }
@@ -645,7 +653,9 @@ class ScriptRunner {
                     self.pendingQuestion = asked.question
                     self.suggestedAnswer = asked.suggestedAnswer
                     self.pendingCancelToken = asked.cancelToken
-                    self.pendingCredentialRequest = CredentialRequest.matching(asked.question)
+                    self.isAskingAboutPlanShareLists = PlanShareLists.isTheListsQuestion(asked.question)
+                    self.pendingCredentialRequest = self.isAskingAboutPlanShareLists
+                        ? nil : CredentialRequest.matching(asked.question)
                     if let request = self.pendingCredentialRequest {
                         // A first publish that "never finished" is usually
                         // this: a task waiting behind a dialog nobody saw.
@@ -804,6 +814,8 @@ class ScriptRunner {
         linksChecklistMarkers = []
         problemsMarkers = []
         announcedPreviewAddress = nil
+        planShareLists = nil
+        isAskingAboutPlanShareLists = false
         pendingLine = ""
     }
 
@@ -841,6 +853,8 @@ class ScriptRunner {
         // A section's Cloudflare project made again because it was not in
         // the account any more (2026-09-30).
         CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
+        // A share of a course's unit plans: shared, refused or stopped (#709).
+        PlanShareReport.noteOnTheTrail(from: text)
         // A preview whose address was held by something else on this Mac,
         // or whose look could not be made (#310).
         PreviewAddressHeldReport.noteOnTheTrail(from: text)
@@ -901,6 +915,7 @@ class ScriptRunner {
         rememberHealthFindings(in: completeLines.joined(separator: "\n"))
         rememberPreviewAnnouncement(in: completeLines)
         rememberWhatIsWaitedFor(in: completeLines)
+        PlanShareLists.read(completeLines, into: &planShareLists)
     }
 
     /// Turns the launcher's `PLANTOIR_WAITING_FOR:` lines into the status

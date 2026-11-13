@@ -4320,7 +4320,10 @@ before the course's Planning tab (#708) and sharing (#709), so the skill and
 the greeting pointed at the folder and said nothing about either (Russell,
 2026-11-12). Since #708 the greeting's `one` and `some` sentences and the
 skill point at the Planning tab instead ("The course page's Planning tab
-(#708)" below); sharing adds its sentences with #709.
+(#708)" below); since #709 the skill also says the plans are shared from that
+tab, that a share without a password leaves answer keys out, and that the
+assistant never shares or deploys them ("Sharing unit plans from the Planning
+tab (#709)" below).
 
 **Where the plan lives: `courses/<CODE>/.internal/planning/`.** A folder whose
 name starts with a dot is never built (`build_site.py` → `_is_hidden`), never
@@ -4449,9 +4452,8 @@ the course's unit plans from `courses/<CODE>/.internal/planning/` on this Mac.
 The contract is `shared-rules.json` → `unitPlanning.tab` (`tabCases`,
 `choiceCases`, `navigationCases`, `words`, `assetsMirror`,
 `whatAPageMayRead`) and `app-rules.json` → `outsideAgents.planAUnit`; every
-case is walked by `PlanningTabTests`. Sharing a plan is #709 and is not on
-this tab yet: no Share control, no placeholder for one, and no sentence
-about it.
+case is walked by `PlanningTabTests`. Since #709 a share bar sits at the
+foot of the tab ("Sharing unit plans from the Planning tab (#709)" below).
 
 **The tabs are `DetailTabs`, and only the chosen tab is in the window.**
 `MainWindowView`'s `.course` branch draws `CourseDetailView`, which puts the
@@ -14630,3 +14632,76 @@ and the problem is a missing Release-26.6 build at the cut, not the daily
 compiler.
 
 Nothing here reaches Windows: it is the Swift toolchain only.
+
+## Sharing unit plans from the Planning tab (#709)
+
+The foot of the Planning tab is the share bar (`PlanShareBar`): the course's
+unit plans shared as a small website of their own on Cloudflare Pages, one
+for each school year. How a share works, what was measured and what was
+rejected is `documentation/07-deployment.md` → "Sharing a unit plan (#709)";
+this is the app's half.
+
+- **The bar reads the markers, never its own memory.** `PlanSharing.markers`
+  reads every `courses/<CODE>/.cloudflare_sites/plans-<year>.json` (exactly
+  that shape: a marker a reference copy moved aside is not a year still
+  shared), when the tab appears and when a share ends. So a share typed in
+  Terminal reads the same.
+- **Before the first share this school year:** `words.sharedThroughCloudflare`
+  and, when the course's class websites go to Netlify, `words.netlifyTeacher`;
+  Protect with a Username and Password; Include Answer Keys while Protect is
+  off; Share Unit Plans. **Once shared:** the address as a link and Copy Link;
+  with a password or open; the flood sentence for a protected share, from the
+  marker's `failClosed` (`PlanSharing.floodSentence`); when it was last
+  shared; how many answer keys an open share left out; while the marker's
+  `oldCopies` is above 0, that an earlier copy may still open at its own
+  address; Share Again, Change
+  Password or Remove Password (or Add a Password), and Stop Sharing. Earlier
+  years still shared are one row each with their own Stop Sharing.
+- **Never safer than the site** (implementation review H1): a marker left in
+  state `sending` by a share that stopped part way reads as
+  `words.lastShareUnfinished` (the plans may be open), and one in state
+  `stopping` as `words.stopUnconfirmed`, each with Stop Sharing
+  (`PlanSharing.barStatus`, `barCases`).
+- **Before an open share goes out** the launcher lists every file it will
+  share and every file it leaves out, by name, and asks. The app reads the
+  lists from their marker lines (`PlanShareLists`, kept out of the console)
+  and answers the question ONLY in `PlanShareListsSheet`: both lists in full,
+  scrolling, the by-name sentence, Share and Cancel with Cancel the default
+  (`TaskProgressView.questionSurface`; fix review H1, after the first fix
+  left it to the plain question alert, which showed the `[y/N]` line alone).
+- **A plan's password** is sent from the credential sheet exactly as typed
+  (`CredentialRequestSheet.answerToSend`); every other answer is trimmed.
+- **The warning** (`words.crawlerWarningTitle`, `PlanSharing.crawlerWarning`)
+  comes before a choice exactly when `PlanSharing.warns` says
+  (`warningCases`). Cancel there, and at the Stop Sharing alert, writes
+  nothing and runs nothing.
+- **The run** is `PlanShareRunner`: `deploy.sh` with
+  `PlanSharing.arguments` (`deployArguments.planShareCases`), through a
+  `ScriptRunner` in a sheet that shows the ordinary `TaskProgressView`, so
+  the Cloudflare token and the plans' username and password are asked the way
+  a section's deploy asks (`CredentialRequest.unitPlanUsername`,
+  `unitPlanPassword`). No argument ever carries a username or a password.
+- **The lease.** A share is held as a publish (`WorkLeaseRegistry.claimAPublish`)
+  under section 0 (`PlanSharing.leaseSection`), which no section has: a
+  section's own deploy is never refused by it, while the course reads as busy
+  to Quit, Rename, Back Up, Start of Year and Archive, and an outside
+  assistant's deploy waits, as review M7 asked. Quit names it "sharing the
+  unit plans of <CODE>"; the MCP server's stop-before-leaving skips it, since
+  a share builds no section. A new lease kind was rejected: `publish` already
+  means sending something somewhere to every reader of a lease.
+- **The trail** is written from the markers by `PlanShareReport`, which every
+  launcher run reads (`ScriptRunner`, beside `CloudflareProjectRemadeReport`):
+  "unit plans shared", "unit plan share refused", "unit plan sharing stopped".
+  Never the address, whose suffix is a line of defence, and never a username
+  or a password. The plan asked for the share line to say whether the
+  warning had been shown and the password changed; the markers do not carry
+  either, so the line does not, and that is a known gap for a later piece.
+- **A reference copy** of the course renames every year's marker aside
+  (`PlanSharing.releasePlanMarkers`, called by
+  `ReferenceCopier.makeIntoAReferenceCourse` beside `releaseSite`), so the
+  copy can never reach this year's plan site.
+- **Problem reports** carry two more redaction rules (`LogRedactor`):
+  `basicAuthHeader`, anchored on `Authorization:` so "Basic French" in a
+  course title is left alone, and `urlUserinfo`, before the email rule, which
+  would otherwise take a `user:password@host` for an address and leave the
+  username behind.

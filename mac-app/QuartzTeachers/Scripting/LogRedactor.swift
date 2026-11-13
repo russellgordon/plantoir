@@ -80,6 +80,14 @@ nonisolated enum LogRedactor {
             pattern: #"([A-Za-z]:\\Users\\)[^\\\s"':]+"#,
             replacement: "$1" + removedPersonPath
         ),
+        // A username and password written into an address (#709): before
+        // the email rule, which would otherwise take the password and the
+        // host for an address and leave the username behind.
+        RedactionRule(
+            name: "urlUserinfo",
+            pattern: #"(?i)(https?://)[^/\s:@]+:[^/\s@]+@"#,
+            replacement: "$1" + removedToken + "@"
+        ),
         RedactionRule(
             name: "emailAddress",
             pattern: #"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"#,
@@ -94,6 +102,14 @@ nonisolated enum LogRedactor {
             name: "bearerHeader",
             pattern: #"(?i)\bBearer\s+(?!\[removed: )\S+"#,
             replacement: "Bearer " + removedToken
+        ),
+        // A Basic Authorization header (#709): the base64 of a unit plan's
+        // username and password. Anchored on the header's own name, so
+        // "Basic French" in a course title is left alone (review L4).
+        RedactionRule(
+            name: "basicAuthHeader",
+            pattern: #"(?i)(\bAuthorization:\s*Basic\s+)\S+"#,
+            replacement: "$1" + removedToken
         ),
         RedactionRule(
             name: "netlifyToken",
